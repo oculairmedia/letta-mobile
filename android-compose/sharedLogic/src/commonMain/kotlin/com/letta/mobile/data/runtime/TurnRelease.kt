@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
@@ -62,7 +63,7 @@ internal class TurnReleaseRecord {
     fun reasonForRelease(key: TurnRuntimeKey): String = reason ?: run {
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.releaseReasonMissing",
-            "key" to key.toString(),
+            "key" attr key.toString(),
             level = Telemetry.Level.ERROR,
         )
         UNRECORDED

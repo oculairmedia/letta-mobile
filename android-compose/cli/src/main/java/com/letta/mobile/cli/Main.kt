@@ -41,42 +41,44 @@ class LettaMobileCli : CliktCommand(name = "meridian") {
 object Main {
     @JvmStatic
     fun main(args: Array<String>) {
-        if (args.isEmpty()) {
-            println(USAGE)
-            return
+        com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
+            if (args.isEmpty()) {
+                println(USAGE)
+                return
+            }
+            LettaMobileCli()
+                .subcommands(
+                    DumpTimelineCommand(),
+                    ReplayCommand(),
+                    RecordCursorStateCommand(),
+                    AppServerServeCommand(),
+                    AppServerServeIrohCommand(),
+                    AgentMessageCommand().subcommands(AgentMessageSendCommand()),
+                    PeerCommand().subcommands(
+                        PeerInviteCommand(),
+                        PeerListCommand(),
+                        PeerGetCommand(),
+                        PeerRenameCommand(),
+                        PeerSetCapabilitiesCommand(),
+                        PeerRevokeCommand(),
+                        PeerInviteListCommand(),
+                        PeerInviteRevokeCommand(),
+                        PeerSetAgentsCommand(),
+                    ),
+                    AppServerServeIrohStubCommand(),
+                    AppServerIrohProbeCommand(),
+                    AppServerIrohTwoClientProbeCommand(),
+                    AppServerIrohDeviceGateCommand(),
+                    AppServerSmokeCommand(),
+                    // letta-mobile-jvctq: talk to the agent swarm as a paired device.
+                    SwarmPairCommand(),
+                    SwarmUnpairCommand(),
+                    SwarmGroupCommand("agents", "Agents this paired device may message.").subcommands(AgentsListCommand()),
+                    SwarmGroupCommand("message", "Message an agent as this paired device, with staged delivery receipts.")
+                        .subcommands(MessageSendCommand(), MessageReadCommand(), MessageStatusCommand(), MessagePendingCommand()),
+                )
+                .main(args)
         }
-        LettaMobileCli()
-            .subcommands(
-                DumpTimelineCommand(),
-                ReplayCommand(),
-                RecordCursorStateCommand(),
-                AppServerServeCommand(),
-                AppServerServeIrohCommand(),
-                AgentMessageCommand().subcommands(AgentMessageSendCommand()),
-                PeerCommand().subcommands(
-                    PeerInviteCommand(),
-                    PeerListCommand(),
-                    PeerGetCommand(),
-                    PeerRenameCommand(),
-                    PeerSetCapabilitiesCommand(),
-                    PeerRevokeCommand(),
-                    PeerInviteListCommand(),
-                    PeerInviteRevokeCommand(),
-                    PeerSetAgentsCommand(),
-                ),
-                AppServerServeIrohStubCommand(),
-                AppServerIrohProbeCommand(),
-                AppServerIrohTwoClientProbeCommand(),
-                AppServerIrohDeviceGateCommand(),
-                AppServerSmokeCommand(),
-                // letta-mobile-jvctq: talk to the agent swarm as a paired device.
-                SwarmPairCommand(),
-                SwarmUnpairCommand(),
-                SwarmGroupCommand("agents", "Agents this paired device may message.").subcommands(AgentsListCommand()),
-                SwarmGroupCommand("message", "Message an agent as this paired device, with staged delivery receipts.")
-                    .subcommands(MessageSendCommand(), MessageReadCommand(), MessageStatusCommand(), MessagePendingCommand()),
-            )
-            .main(args)
     }
 
     private val USAGE = """

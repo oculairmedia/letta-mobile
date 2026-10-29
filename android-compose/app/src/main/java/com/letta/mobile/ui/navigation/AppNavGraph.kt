@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.navigation
 
+import com.letta.mobile.util.attr
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -282,7 +283,7 @@ private fun BackendConnectionStatus.homeHero(onRetry: () -> Unit): ShellHomeConn
 private fun dropUnroutableA2uiAction(action: A2uiAction) {
     Telemetry.event(
         "AndroidA2ui", "action.unroutable",
-        "surfaceId" to action.surfaceId, "name" to action.name,
+        "surfaceId" attr action.surfaceId, "name" attr action.name,
         level = Telemetry.Level.WARN,
     )
 }

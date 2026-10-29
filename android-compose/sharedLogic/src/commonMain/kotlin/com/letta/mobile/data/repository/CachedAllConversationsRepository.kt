@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.util.AgentConversationFleet
 import com.letta.mobile.data.model.Agent
@@ -59,8 +60,8 @@ open class CachedAllConversationsRepository(
     private val fleet = AgentConversationFleet(::readAgentPage) { agent, failure ->
         Telemetry.event(
             TAG, "agent_read_failed",
-            "agentId" to agent.value,
-            "error" to failure.toString(),
+            "agentId" attr agent.value,
+            "error" attr failure.toString(),
             level = Telemetry.Level.WARN,
         )
     }
@@ -81,7 +82,7 @@ open class CachedAllConversationsRepository(
                 Telemetry.event(
                     TAG,
                     "Failed to load cached conversations",
-                    "error" to (e.message ?: e.toString()),
+                    "error" attr (e.message ?: e.toString()),
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -102,7 +103,12 @@ open class CachedAllConversationsRepository(
         } catch (_: UnsupportedOperationException) {
             refreshAfterPush("unsupported")
         } catch (e: Exception) {
-            Telemetry.event(TAG, "conversation_updated.refetch_failed", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            Telemetry.event(
+                TAG,
+                "conversation_updated.refetch_failed",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
@@ -128,7 +134,13 @@ open class CachedAllConversationsRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
-            Telemetry.event(TAG, "conversation_updated.refresh_failed", "trigger" to trigger, "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            Telemetry.event(
+                TAG,
+                "conversation_updated.refresh_failed",
+                "trigger" attr trigger,
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 

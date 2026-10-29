@@ -13,6 +13,18 @@ import kotlin.test.assertTrue
  * lazy list now takes it: unique keys, no guard drop, and the settled rows under the live keys.
  */
 class LiveSettledKeyOverlapTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @Test fun settledTwinReplacesLiveRowUnderItsKeyAtEveryStep() = runBlocking {
         val harness = OverlapHarness.open(OverlapTurn.durable)
         try {

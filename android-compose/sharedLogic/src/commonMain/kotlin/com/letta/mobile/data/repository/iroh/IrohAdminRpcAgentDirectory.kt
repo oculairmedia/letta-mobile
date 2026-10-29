@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.commands.SlashCommandsResponse
@@ -409,8 +410,8 @@ class IrohAdminRpcAgentDirectory(
             Telemetry.event(
                 "IrohAdminRpcAgentDirectory",
                 "scheduleList.scopeMismatch",
-                "requestedAgentId" to agentId.value,
-                "excludedCount" to excludedCount,
+                "requestedAgentId" attr agentId.value,
+                "excludedCount" attr excludedCount,
                 level = Telemetry.Level.WARN,
             )
         }

@@ -1,5 +1,7 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.data.model.ConversationClass
@@ -49,6 +51,18 @@ import org.junit.jupiter.api.Test
  *    record (no stale per-agent rows can survive migration).
  */
 class A2aWiringTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @org.junit.jupiter.api.BeforeEach
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private fun config(tmp: File, addressBook: File) = A2aWiringConfig(
         identityDir = File(tmp, "identities"),
         addressBook = addressBook,
@@ -381,9 +395,9 @@ class A2aWiringTest {
 
         val events = com.letta.mobile.util.Telemetry.snapshot()
         val dropEvent = events.single { it.name == "a2a.drop" }
-        assertEquals("no_app_server_client", dropEvent.attrs["reason"])
-        assertEquals("agent-from-1", dropEvent.attrs["fromAgentId"])
-        assertEquals("agent-to-2", dropEvent.attrs["toAgentId"])
+        assertEquals("no_app_server_client", dropEvent.attrs["reason"]?.textOrNull)
+        assertEquals("agent-from-1", dropEvent.attrs["fromAgentId"]?.textOrNull)
+        assertEquals("agent-to-2", dropEvent.attrs["toAgentId"]?.textOrNull)
     }
 
     @Test
@@ -404,8 +418,8 @@ class A2aWiringTest {
 
         val events = com.letta.mobile.util.Telemetry.snapshot()
         val dropEvent = events.single { it.name == "a2a.drop" }
-        assertEquals("no_conversation_create_path", dropEvent.attrs["reason"])
-        assertEquals("Agent not found in registry", dropEvent.attrs["error"])
+        assertEquals("no_conversation_create_path", dropEvent.attrs["reason"]?.textOrNull)
+        assertEquals("Agent not found in registry", dropEvent.attrs["error"]?.textOrNull)
     }
 
     @Test
@@ -420,7 +434,7 @@ class A2aWiringTest {
             assertTrue(states.isEmpty(), "expected empty list of conversation states for missing agent")
             val events = com.letta.mobile.util.Telemetry.snapshot()
             val warnEvent = events.single { it.name == "a2a.agent_missing" }
-            assertEquals("agent-nonexistent", warnEvent.attrs["agentId"])
+            assertEquals("agent-nonexistent", warnEvent.attrs["agentId"]?.textOrNull)
             assertEquals(com.letta.mobile.util.Telemetry.Level.WARN, warnEvent.level)
         } finally {
             base.deleteRecursively()

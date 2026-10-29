@@ -1,5 +1,11 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
+import com.letta.mobile.util.booleanOrNull
+
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.testutil.TestMessageSource
 import com.letta.mobile.data.api.NoActiveRunException
@@ -55,6 +61,18 @@ import org.junit.jupiter.api.Tag
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("integration")
 class TimelineSyncLoopReconnectTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @org.junit.Before
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @org.junit.After
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @Test
     fun `EXPIRED run is classified as idle, not error`() = runTest {
         // Clear the Telemetry ring so we can look at an empty slate. This is
@@ -78,7 +96,7 @@ class TimelineSyncLoopReconnectTest {
         val idle404 = events.firstOrNull {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.idle404" &&
-                (it.attrs["conversationId"] as? String) == "conv-gqz3"
+                (it.attrs["conversationId"]?.textOrNull) == "conv-gqz3"
         }
         assertNotNull(
             "EXPIRED must be classified as idle (streamSubscriber.idle404). " +
@@ -90,7 +108,7 @@ class TimelineSyncLoopReconnectTest {
         val errorForGqz3 = events.firstOrNull {
             it.tag == "TimelineSync" &&
                 (it.name == "streamSubscriber.error" || it.name == "streamSubscriber.networkError") &&
-                (it.attrs["conversationId"] as? String) == "conv-gqz3"
+                (it.attrs["conversationId"]?.textOrNull) == "conv-gqz3"
         }
         assertEquals(
             "EXPIRED must NOT produce a streamSubscriber.error/networkError (it's an idle pattern, not a real failure)",
@@ -149,9 +167,9 @@ scope.coroutineContext.job.cancel()
             .filter {
                 it.tag == "TimelineSync" &&
                     it.name == "streamSubscriber.idle404" &&
-                    (it.attrs["conversationId"] as? String) == "conv-qv6d"
+                    (it.attrs["conversationId"]?.textOrNull) == "conv-qv6d"
             }
-            .mapNotNull { it.attrs["backoffMs"] as? Long }
+            .mapNotNull { it.attrs["backoffMs"]?.numberOrNull as? Long }
 
         assertTrue(
             "expected at least 5 idle404 events for conv-qv6d, saw ${backoffs.size}",
@@ -197,7 +215,7 @@ scope.coroutineContext.job.cancel()
             events.firstOrNull {
                 it.tag == "TimelineSync" &&
                     it.name == "streamSubscriber.silenceTimeout" &&
-                    (it.attrs["conversationId"] as? String) == "conv-watchdog"
+                    (it.attrs["conversationId"]?.textOrNull) == "conv-watchdog"
             },
         )
         assertNotNull(
@@ -205,8 +223,8 @@ scope.coroutineContext.job.cancel()
             events.firstOrNull {
                 it.tag == "TimelineSync" &&
                     it.name == "streamSubscriber.watchdogReconnect" &&
-                    (it.attrs["conversationId"] as? String) == "conv-watchdog" &&
-                    (it.attrs["reason"] as? String) == "silenceTimeout"
+                    (it.attrs["conversationId"]?.textOrNull) == "conv-watchdog" &&
+                    (it.attrs["reason"]?.textOrNull) == "silenceTimeout"
             },
         )
 
@@ -253,13 +271,13 @@ scope.coroutineContext.job.cancel()
         val dispatchEvent = com.letta.mobile.util.Telemetry.snapshot().firstOrNull {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.listenerDispatch" &&
-                (it.attrs["conversationId"] as? String) == "conv-dynamic-listener"
+                (it.attrs["conversationId"]?.textOrNull) == "conv-dynamic-listener"
         }
         assertNotNull("expected listener dispatch telemetry", dispatchEvent)
-        assertEquals("asst-dynamic", dispatchEvent!!.attrs["serverId"])
-        assertEquals("assistant_message", dispatchEvent.attrs["messageType"])
-        assertEquals(true, dispatchEvent.attrs["hasListener"])
-        assertEquals(19, dispatchEvent.attrs["previewLength"])
+        assertEquals("asst-dynamic", dispatchEvent!!.attrs["serverId"]?.textOrNull)
+        assertEquals("assistant_message", dispatchEvent.attrs["messageType"]?.textOrNull)
+        assertEquals(true, dispatchEvent.attrs["hasListener"]?.booleanOrNull)
+        assertEquals(19, dispatchEvent.attrs["previewLength"]?.numberOrNull)
         assertFalse("listener dispatch telemetry must not include raw preview", dispatchEvent.attrs.containsKey("contentPreview"))
         scope.coroutineContext.job.cancel()
     }

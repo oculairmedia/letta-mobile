@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -108,10 +109,10 @@ internal class ExternalToolDispatcher(
         ) {
             Telemetry.event(
                 TELEMETRY_SOURCE, "externalTool.claimSkipped",
-                "requestId" to request.requestId,
-                "toolCallId" to request.toolCallId,
-                "leaseToken" to leaseToken,
-                "generation" to validatedGeneration,
+                "requestId" attr request.requestId,
+                "toolCallId" attr request.toolCallId,
+                "leaseToken" attr leaseToken,
+                "generation" attr validatedGeneration,
             )
             return
         }
@@ -134,12 +135,12 @@ internal class ExternalToolDispatcher(
         if (abortStale(request, leaseToken, validatedGeneration, phase = "beforeSend")) return
         Telemetry.event(
             TELEMETRY_SOURCE, "externalTool.responded",
-            "requestId" to request.requestId,
-            "toolCallId" to request.toolCallId,
-            "toolName" to request.toolName,
-            "isError" to (result.isError == true).toString(),
-            "handled" to (externalToolRegistry != null).toString(),
-            "cached" to (cached != null).toString(),
+            "requestId" attr request.requestId,
+            "toolCallId" attr request.toolCallId,
+            "toolName" attr request.toolName,
+            "isError" attr (result.isError == true).toString(),
+            "handled" attr (externalToolRegistry != null).toString(),
+            "cached" attr (cached != null).toString(),
         )
         runCatching {
             client.sendExternalToolResponse(
@@ -203,10 +204,10 @@ internal class ExternalToolDispatcher(
                 } ?: run {
                     Telemetry.event(
                         TELEMETRY_SOURCE, "externalTool.invocationTimedOut",
-                        "requestId" to request.requestId,
-                        "toolCallId" to request.toolCallId,
-                        "toolName" to request.toolName,
-                        "timeoutMs" to invocationTimeoutMs,
+                        "requestId" attr request.requestId,
+                        "toolCallId" attr request.toolCallId,
+                        "toolName" attr request.toolName,
+                        "timeoutMs" attr invocationTimeoutMs,
                         level = Telemetry.Level.WARN,
                     )
                     ExternalToolResult.Error(
@@ -248,12 +249,12 @@ internal class ExternalToolDispatcher(
         if (connectionGenerationProvider() == generation) return false
         Telemetry.event(
             TELEMETRY_SOURCE, "externalTool.staleGenerationAborted",
-            "requestId" to request.requestId,
-            "toolCallId" to request.toolCallId,
-            "toolName" to request.toolName,
-            "claimGeneration" to generation,
-            "liveGeneration" to connectionGenerationProvider(),
-            "phase" to phase,
+            "requestId" attr request.requestId,
+            "toolCallId" attr request.toolCallId,
+            "toolName" attr request.toolName,
+            "claimGeneration" attr generation,
+            "liveGeneration" attr connectionGenerationProvider(),
+            "phase" attr phase,
             level = Telemetry.Level.WARN,
         )
         inboundControlRegistry.releaseClaim(

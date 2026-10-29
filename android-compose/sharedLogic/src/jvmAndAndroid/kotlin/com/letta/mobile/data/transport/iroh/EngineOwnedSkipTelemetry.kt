@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -92,10 +93,10 @@ private fun emitEngineOwnedSkipSnapshot(snapshot: EngineOwnedSkipSnapshot) {
     Telemetry.event(
         "IrohObserver",
         "ingest.skip_engine_owned_aggregated",
-        "conversationId" to snapshot.conversationId,
-        "turnId" to snapshot.turnId,
-        "skipped" to snapshot.skipped.toString(),
-        "deltaTypes" to snapshot.deltaTypes,
+        "conversationId" attr snapshot.conversationId,
+        "turnId" attr snapshot.turnId,
+        "skipped" attr snapshot.skipped.toString(),
+        "deltaTypes" attr snapshot.deltaTypes,
     )
 }
 

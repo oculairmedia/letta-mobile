@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -77,7 +78,7 @@ class CanvasRelayAttachment(
         while (currentCoroutineContext().isActive) {
             val link = runCatching { dial.open() }.getOrElse { failure ->
                 if (failure is CancellationException) throw failure
-                Telemetry.event(TAG, "host.dial.failed", "error" to failure.describe(), "retryMs" to backoffMs)
+                Telemetry.event(TAG, "host.dial.failed", "error" attr failure.describe(), "retryMs" attr backoffMs)
                 null
             }
             if (link != null && serve(link)) backoffMs = INITIAL_BACKOFF_MS
@@ -89,7 +90,7 @@ class CanvasRelayAttachment(
     /** Runs the relay over [link] until it ends; true when it ended cleanly. */
     private suspend fun serve(link: CanvasRelayLink): Boolean {
         val hostId = link.hostId.value
-        Telemetry.event(TAG, "host.connected", "hostId" to hostId)
+        Telemetry.event(TAG, "host.connected", "hostId" attr hostId)
         val ended = try {
             runCatching { relay.run(link.asRelayConnection()) }
         } finally {
@@ -97,10 +98,10 @@ class CanvasRelayAttachment(
         }
         ended.exceptionOrNull()?.let { failure ->
             if (failure is CancellationException) throw failure
-            Telemetry.event(TAG, "host.connection.failed", "hostId" to hostId, "error" to failure.describe())
+            Telemetry.event(TAG, "host.connection.failed", "hostId" attr hostId, "error" attr failure.describe())
             return false
         }
-        Telemetry.event(TAG, "host.disconnected", "hostId" to hostId)
+        Telemetry.event(TAG, "host.disconnected", "hostId" attr hostId)
         return true
     }
 

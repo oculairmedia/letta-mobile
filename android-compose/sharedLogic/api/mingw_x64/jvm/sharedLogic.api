@@ -63788,11 +63788,6 @@ public final class com/letta/mobile/qr/ZxingQrEncoder : com/letta/mobile/data/pa
 	public fun encode (Ljava/lang/String;)Lcom/letta/mobile/data/pairing/QrModules;
 }
 
-public final class com/letta/mobile/runtime/iroh/IrohAndroidInit {
-	public static final field INSTANCE Lcom/letta/mobile/runtime/iroh/IrohAndroidInit;
-	public final fun install (Ljava/lang/Object;)V
-}
-
 public final class com/letta/mobile/ui/ambient/AmbientBand {
 	public fun <init> (FF)V
 	public final fun component1 ()F
@@ -66611,6 +66606,7 @@ public final class com/letta/mobile/util/Telemetry {
 	public final fun getRosterCompletenessProbeEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
 	public final fun getTimelineDumpEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
 	public final fun getTimelineSyncGateDebugEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
+	public final fun installRecorder (Lcom/letta/mobile/util/TelemetryRecorder;)Ljava/lang/AutoCloseable;
 	public final fun isChatHotPathDebugEnabled ()Z
 	public final fun isChatHydrationTraceEnabled ()Z
 	public final fun isFrameFlowDiagEnabled ()Z
@@ -66692,5 +66688,80 @@ public final class com/letta/mobile/util/TelemetryFlag {
 	public fun <init> (Z)V
 	public final fun get ()Z
 	public final fun set (Z)V
+}
+
+public final class com/letta/mobile/util/TelemetryRecorder {
+	public fun <init> ()V
+	public final fun clear ()V
+	public final fun getEvents ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun record (Lcom/letta/mobile/util/Telemetry$Event;)V
+	public final fun snapshot ()Ljava/util/List;
+}
+
+public abstract interface class com/letta/mobile/util/TelemetryValue {
+}
+
+public final class com/letta/mobile/util/TelemetryValue$Flag : com/letta/mobile/util/TelemetryValue {
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lcom/letta/mobile/util/TelemetryValue$Flag;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/TelemetryValue$Flag;ZILjava/lang/Object;)Lcom/letta/mobile/util/TelemetryValue$Flag;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/TelemetryValue$Null : com/letta/mobile/util/TelemetryValue {
+	public static final field INSTANCE Lcom/letta/mobile/util/TelemetryValue$Null;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/TelemetryValue$Numeric : com/letta/mobile/util/TelemetryValue {
+	public fun <init> (Ljava/lang/Number;)V
+	public final fun component1 ()Ljava/lang/Number;
+	public final fun copy (Ljava/lang/Number;)Lcom/letta/mobile/util/TelemetryValue$Numeric;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/TelemetryValue$Numeric;Ljava/lang/Number;ILjava/lang/Object;)Lcom/letta/mobile/util/TelemetryValue$Numeric;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/Number;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/TelemetryValue$NumericList : com/letta/mobile/util/TelemetryValue {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/util/TelemetryValue$NumericList;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/TelemetryValue$NumericList;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/util/TelemetryValue$NumericList;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/TelemetryValue$Text : com/letta/mobile/util/TelemetryValue {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/util/TelemetryValue$Text;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/TelemetryValue$Text;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/util/TelemetryValue$Text;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/util/TelemetryValueKt {
+	public static final fun attr (Ljava/lang/String;Lcom/letta/mobile/util/TelemetryValue;)Lkotlin/Pair;
+	public static final fun attr (Ljava/lang/String;Ljava/lang/Boolean;)Lkotlin/Pair;
+	public static final fun attr (Ljava/lang/String;Ljava/lang/Number;)Lkotlin/Pair;
+	public static final fun attr (Ljava/lang/String;Ljava/lang/String;)Lkotlin/Pair;
+	public static final fun attr (Ljava/lang/String;Ljava/util/List;)Lkotlin/Pair;
+	public static final fun getBooleanOrNull (Lcom/letta/mobile/util/TelemetryValue;)Ljava/lang/Boolean;
+	public static final fun getNumberOrNull (Lcom/letta/mobile/util/TelemetryValue;)Ljava/lang/Number;
+	public static final fun getTextOrNull (Lcom/letta/mobile/util/TelemetryValue;)Ljava/lang/String;
+	public static final fun telemetryAttributes (Ljava/lang/Iterable;)[Lkotlin/Pair;
+	public static final fun telemetryAttributes ([Lkotlin/Pair;)[Lkotlin/Pair;
 }
 

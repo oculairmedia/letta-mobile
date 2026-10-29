@@ -1,5 +1,8 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.util.telemetryAttributes
+
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.AgentMessageClientId
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
@@ -154,9 +157,9 @@ internal fun authenticateSender(config: A2aWiringConfig, message: IrohAgentMessa
     Telemetry.event(
         "A2aHost",
         "a2a.sender_unverified_allowed",
-        "fromAgentId" to message.fromAgentId,
-        "msgId" to message.msgId,
-        "peer" to IrohFailureLog.remotePrefix(peer),
+        "fromAgentId" attr message.fromAgentId,
+        "msgId" attr message.msgId,
+        "peer" attr IrohFailureLog.remotePrefix(peer),
     )
     return true
 }
@@ -206,9 +209,9 @@ suspend fun publishHost(
     Telemetry.event(
         "A2aHost",
         "host.published",
-        "nodeId" to nodeHex,
-        "directAddrs" to direct.joinToString(","),
-        "addressBook" to config.addressBook.absolutePath,
+        "nodeId" attr nodeHex,
+        "directAddrs" attr direct.joinToString(","),
+        "addressBook" attr config.addressBook.absolutePath,
     )
     return HostEndpointRecord(
         hostKey = hostAddr.nodeIdHex.take(HostEndpointAddressStore.HOST_KEY_LENGTH),
@@ -262,7 +265,7 @@ internal suspend fun listConversationsForAgent(
     if (!store.agentExists(agentId)) {
         Telemetry.event(
             "A2aHost", "a2a.agent_missing",
-            "agentId" to agentId,
+            "agentId" attr agentId,
             level = Telemetry.Level.WARN,
         )
         return@withContext emptyList()
@@ -350,10 +353,10 @@ internal suspend fun handleDecision(
         is IrohAgentMessageRouter.RoutingDecision.Deliver -> {
             Telemetry.event(
                 "A2aHost", "a2a.deliver",
-                "fromAgentId" to normMessage.fromAgentId,
-                "toAgentId" to normMessage.toAgentId,
-                "msgId" to normMessage.msgId,
-                "conversationId" to decision.conversationId,
+                "fromAgentId" attr normMessage.fromAgentId,
+                "toAgentId" attr normMessage.toAgentId,
+                "msgId" attr normMessage.msgId,
+                "conversationId" attr decision.conversationId,
             )
             return inputOnConversation(client, normMessage, decision.conversationId)
         }
@@ -365,11 +368,11 @@ internal suspend fun handleDecision(
             // there — but we mark a different telemetry signal.
             Telemetry.event(
                 "A2aHost", "a2a.route",
-                "fromAgentId" to normMessage.fromAgentId,
-                "toAgentId" to normMessage.toAgentId,
-                "msgId" to normMessage.msgId,
-                "decision" to "queue",
-                "conversationId" to decision.conversationId,
+                "fromAgentId" attr normMessage.fromAgentId,
+                "toAgentId" attr normMessage.toAgentId,
+                "msgId" attr normMessage.msgId,
+                "decision" attr "queue",
+                "conversationId" attr decision.conversationId,
             )
             return inputOnConversation(client, normMessage, decision.conversationId)
         }
@@ -379,10 +382,10 @@ internal suspend fun handleDecision(
         is IrohAgentMessageRouter.RoutingDecision.Dropped -> {
             Telemetry.event(
                 "A2aHost", "a2a.drop",
-                "fromAgentId" to normMessage.fromAgentId,
-                "toAgentId" to normMessage.toAgentId,
-                "msgId" to normMessage.msgId,
-                "reason" to decision.reason,
+                "fromAgentId" attr normMessage.fromAgentId,
+                "toAgentId" attr normMessage.toAgentId,
+                "msgId" attr normMessage.msgId,
+                "reason" attr decision.reason,
             )
             return DeliveryOutcome(false, decision.reason)
         }
@@ -396,10 +399,10 @@ internal suspend fun handleCreateAndDeliver(
     if (client == null) {
         Telemetry.event(
             "A2aHost", "a2a.drop",
-            "fromAgentId" to message.fromAgentId,
-            "toAgentId" to message.toAgentId,
-            "msgId" to message.msgId,
-            "reason" to "no_app_server_client",
+            "fromAgentId" attr message.fromAgentId,
+            "toAgentId" attr message.toAgentId,
+            "msgId" attr message.msgId,
+            "reason" attr "no_app_server_client",
             level = Telemetry.Level.WARN,
         )
         return DeliveryOutcome(false, "application_enqueue_failure")
@@ -425,10 +428,10 @@ internal suspend fun handleCreateAndDeliver(
     if (!createdId.isNullOrEmpty()) {
         Telemetry.event(
             "A2aHost", "a2a.create_and_deliver",
-            "fromAgentId" to message.fromAgentId,
-            "toAgentId" to message.toAgentId,
-            "msgId" to message.msgId,
-            "conversationId" to createdId,
+            "fromAgentId" attr message.fromAgentId,
+            "toAgentId" attr message.toAgentId,
+            "msgId" attr message.msgId,
+            "conversationId" attr createdId,
         )
         return inputOnConversation(client, message, createdId)
     } else {
@@ -443,7 +446,7 @@ internal suspend fun handleCreateAndDeliver(
         }
         Telemetry.event(
             "A2aHost", "a2a.drop",
-            *dropAttrs.toTypedArray(),
+            attrs = dropAttrs.telemetryAttributes(),
             level = Telemetry.Level.WARN,
         )
     }
@@ -458,10 +461,10 @@ private suspend fun inputOnConversation(
     if (client == null) {
         Telemetry.event(
             "A2aHost", "a2a.drop",
-            "fromAgentId" to message.fromAgentId,
-            "toAgentId" to message.toAgentId,
-            "msgId" to message.msgId,
-            "reason" to "no_app_server_client",
+            "fromAgentId" attr message.fromAgentId,
+            "toAgentId" attr message.toAgentId,
+            "msgId" attr message.msgId,
+            "reason" attr "no_app_server_client",
             level = Telemetry.Level.WARN,
         )
         return DeliveryOutcome(false, "application_enqueue_failure")
@@ -504,19 +507,19 @@ private suspend fun inputOnConversation(
     }.map {
         Telemetry.event(
             "A2aHost", "a2a.application_delivered",
-            "msgId" to message.msgId,
-            "toAgentId" to message.toAgentId,
-            "conversationId" to conversationId,
+            "msgId" attr message.msgId,
+            "toAgentId" attr message.toAgentId,
+            "conversationId" attr conversationId,
         )
         DeliveryOutcome(true)
     }.getOrElse { t ->
         if (t is CancellationException) throw t
         Telemetry.event(
             "A2aHost", "a2a.application_failed",
-            "msgId" to message.msgId,
-            "toAgentId" to message.toAgentId,
-            "conversationId" to conversationId,
-            "reason" to "application_input_failure",
+            "msgId" attr message.msgId,
+            "toAgentId" attr message.toAgentId,
+            "conversationId" attr conversationId,
+            "reason" attr "application_input_failure",
             level = Telemetry.Level.WARN,
         )
         DeliveryOutcome(false, "application_input_failure")

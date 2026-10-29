@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
@@ -173,7 +174,7 @@ object ConversationAdminHandlers {
         val rows = result as? JsonArray ?: return result
         val visible = withoutHiddenAgentConversations(rows, hiddenAgents.hiddenAgentIds())
         if (visible.size != rows.size) {
-            Telemetry.event("IrohNode", "conversation_list.hidden_agent_rows_dropped", "dropped" to (rows.size - visible.size))
+            Telemetry.event("IrohNode", "conversation_list.hidden_agent_rows_dropped", "dropped" attr (rows.size - visible.size))
         }
         return JsonArray(visible)
     }
@@ -208,9 +209,9 @@ object ConversationAdminHandlers {
         if (result !is JsonArray) {
             Telemetry.event(
                 "IrohNode", "conversation_list.non_array_shape",
-                "kind" to if (result is JsonObject) "object" else "other",
-                "keyCount" to ((result as? JsonObject)?.size ?: 0),
-                "keys" to ((result as? JsonObject)?.keys.orEmpty().sorted().take(12).joinToString(",")),
+                "kind" attr if (result is JsonObject) "object" else "other",
+                "keyCount" attr ((result as? JsonObject)?.size ?: 0),
+                "keys" attr ((result as? JsonObject)?.keys.orEmpty().sorted().take(12).joinToString(",")),
                 level = Telemetry.Level.WARN,
             )
         }

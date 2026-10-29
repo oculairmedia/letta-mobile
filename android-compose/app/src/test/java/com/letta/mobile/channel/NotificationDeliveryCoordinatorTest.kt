@@ -1,5 +1,7 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -19,6 +21,18 @@ import org.junit.jupiter.api.Tag
 
 @Tag("integration")
 class NotificationDeliveryCoordinatorTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @org.junit.Before
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @org.junit.After
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun `publishes final candidate and records shared dedupe state`() {
@@ -120,7 +134,7 @@ class NotificationDeliveryCoordinatorTest {
             Telemetry.snapshot().any {
                 it.tag == "NotificationDelivery" &&
                     it.name == "deferred" &&
-                    it.attrs["previewFallbackReason"] == "TooShort"
+                    it.attrs["previewFallbackReason"]?.textOrNull == "TooShort"
             },
         )
     }
@@ -190,7 +204,7 @@ class NotificationDeliveryCoordinatorTest {
             Telemetry.snapshot().any {
                 it.tag == "NotificationDelivery" &&
                     it.name == "suppressed" &&
-                    it.attrs["reason"] == "PublishRejected"
+                    it.attrs["reason"]?.textOrNull == "PublishRejected"
             },
         )
     }

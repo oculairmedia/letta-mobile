@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.telemetryAttributes
+
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryFlag
 
@@ -376,9 +379,9 @@ object TimelineAcquisitionTelemetry {
     ) {
         if (!timelineAcquisitionProvenanceEnabled.get()) return
         Telemetry.event(
-            TAG, "acquisition.entry",
-            *baseAttrs(target, provenance),
-            "creator" to target.creator,
+            TAG,
+            "acquisition.entry",
+            attrs = baseAttrs(target, provenance).telemetryAttributes() + arrayOf("creator" attr target.creator),
         )
         provenance.attribution?.let { emitAttribution(it, provenance) }
     }
@@ -391,19 +394,19 @@ object TimelineAcquisitionTelemetry {
         if (!timelineAcquisitionProvenanceEnabled.get()) return
         Telemetry.event(
             TAG, "acquisition.conversationAttribution",
-            "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
-            "requestedAgentId" to TimelineProvenanceRedaction.boundedIdentifier(capture.requestedAgentId),
-            "selectedConversationId" to TimelineProvenanceRedaction.boundedIdentifier(capture.selectedConversationId),
-            "selectedRecordAgentId" to TimelineProvenanceRedaction.boundedIdentifier(capture.selectedRecordAgentId),
-            "candidateCount" to capture.candidateCount,
-            "parentAgentId" to TimelineProvenanceRedaction.boundedIdentifier(capture.parentAgentId),
-            "selectedAlsoAttributedToParent" to capture.selectedAlsoAttributedToParent,
-            "attribution" to capture.attribution.name,
-            "selectionMode" to capture.selectionMode.name,
-            "candidateListSource" to capture.candidateListSource.name,
-            "candidateListFreshness" to capture.candidateListFreshness.name,
-            "candidateIdSample" to capture.candidateIdSample.joinToString(","),
-            "candidateIdDigest" to capture.candidateIdDigest,
+            "acquisitionId" attr TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
+            "requestedAgentId" attr TimelineProvenanceRedaction.boundedIdentifier(capture.requestedAgentId),
+            "selectedConversationId" attr TimelineProvenanceRedaction.boundedIdentifier(capture.selectedConversationId),
+            "selectedRecordAgentId" attr TimelineProvenanceRedaction.boundedIdentifier(capture.selectedRecordAgentId),
+            "candidateCount" attr capture.candidateCount,
+            "parentAgentId" attr TimelineProvenanceRedaction.boundedIdentifier(capture.parentAgentId),
+            "selectedAlsoAttributedToParent" attr capture.selectedAlsoAttributedToParent,
+            "attribution" attr capture.attribution.name,
+            "selectionMode" attr capture.selectionMode.name,
+            "candidateListSource" attr capture.candidateListSource.name,
+            "candidateListFreshness" attr capture.candidateListFreshness.name,
+            "candidateIdSample" attr capture.candidateIdSample.joinToString(","),
+            "candidateIdDigest" attr capture.candidateIdDigest,
         )
     }
 

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.box1
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.box2
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.label1
@@ -18,6 +20,18 @@ import kotlin.test.assertEquals
 
 /** letta-mobile-qygvv.30: a stored scene that breaks the board's rules still draws, and says so. */
 class CanvasSceneStateGuardTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val json = Json
 
     private fun idsOf(sceneJson: String) =
@@ -42,8 +56,8 @@ class CanvasSceneStateGuardTest {
         assertEquals(listOf(box2.id, box1.id), idsOf(drawn))
         val warning = invalidStateWarnings().single()
         assertEquals(Telemetry.Level.WARN, warning.level)
-        assertEquals(CanvasStateInvariant.ELEMENT_DUPLICATE_ID.wire, warning.attrs["invariant"])
-        assertEquals(CANVAS, warning.attrs["canvasId"])
+        assertEquals(CanvasStateInvariant.ELEMENT_DUPLICATE_ID.wire, warning.attrs["invariant"]?.textOrNull)
+        assertEquals(CANVAS, warning.attrs["canvasId"]?.textOrNull)
     }
 
     @Test
@@ -67,7 +81,11 @@ class CanvasSceneStateGuardTest {
         guard.drawable(dangling)
 
         assertEquals(listOf(box2.id), idsOf(drawn))
-        assertEquals(listOf(CanvasStateInvariant.LABEL_OWNER.wire), invalidStateWarnings().map { it.attrs["invariant"] }, "reported once")
+        assertEquals(
+            listOf(CanvasStateInvariant.LABEL_OWNER.wire),
+            invalidStateWarnings().map { it.attrs["invariant"]?.textOrNull },
+            "reported once",
+        )
     }
 
     @Test

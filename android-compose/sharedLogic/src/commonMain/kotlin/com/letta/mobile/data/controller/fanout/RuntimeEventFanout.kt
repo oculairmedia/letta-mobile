@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.fanout
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -321,10 +322,10 @@ class RuntimeEventFanout(
             Telemetry.event(
                 "RuntimeEventFanout",
                 "pendingControl.evicted",
-                "requestId" to evicted.requestId,
-                "toolCallId" to (evicted.toolCallId ?: ""),
-                "generation" to evicted.generation,
-                "cap" to MAX_PENDING_CONTROL_FRAMES,
+                "requestId" attr evicted.requestId,
+                "toolCallId" attr (evicted.toolCallId ?: ""),
+                "generation" attr evicted.generation,
+                "cap" attr MAX_PENDING_CONTROL_FRAMES,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -352,9 +353,9 @@ class RuntimeEventFanout(
             Telemetry.event(
                 "RuntimeEventFanout",
                 "pendingControl.flushed",
-                "count" to dispatched.size,
-                "agentId" to key.agentId,
-                "conversationId" to key.conversationId,
+                "count" attr dispatched.size,
+                "agentId" attr key.agentId,
+                "conversationId" attr key.conversationId,
             )
         }
     }
@@ -428,12 +429,12 @@ class RuntimeEventFanout(
         Telemetry.event(
             "RuntimeEventFanout",
             "subscriber.overflowDetached",
-            "subscriberId" to slot.id,
-            "agentId" to slot.key.agentId,
-            "conversationId" to slot.key.conversationId,
-            "passive" to slot.passive,
-            "droppedFrameType" to (received.frame.type ?: ""),
-            "capacity" to SUBSCRIBER_BUFFER_CAPACITY,
+            "subscriberId" attr slot.id,
+            "agentId" attr slot.key.agentId,
+            "conversationId" attr slot.key.conversationId,
+            "passive" attr slot.passive,
+            "droppedFrameType" attr (received.frame.type ?: ""),
+            "capacity" attr SUBSCRIBER_BUFFER_CAPACITY,
             level = Telemetry.Level.WARN,
         )
     }

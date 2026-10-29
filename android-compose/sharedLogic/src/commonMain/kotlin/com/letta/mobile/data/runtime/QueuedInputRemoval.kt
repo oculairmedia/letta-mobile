@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Duration.Companion.milliseconds
@@ -37,10 +38,10 @@ internal class QueuedInputRemoval(
         }
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.queuedInputRemoved",
-            "key" to facts.key.toString(),
-            "leaseToken" to facts.leaseToken,
-            "clientMessageId" to clientMessageId,
-            "outcome" to outcome,
+            "key" attr facts.key.toString(),
+            "leaseToken" attr facts.leaseToken,
+            "clientMessageId" attr clientMessageId,
+            "outcome" attr outcome,
             level = if (outcome == "removed") Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
     }

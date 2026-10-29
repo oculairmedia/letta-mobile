@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
@@ -19,6 +21,18 @@ import kotlin.test.assertEquals
  * the rest, and says what it dropped.
  */
 class CanvasSceneRenderGuardTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val json = Json
 
     private val invented = buildJsonObject {
@@ -57,9 +71,9 @@ class CanvasSceneRenderGuardTest {
 
         val warning = Telemetry.snapshot().single { it.name == "scene.elementDropped" }
         assertEquals(Telemetry.Level.WARN, warning.level)
-        assertEquals(CANVAS, warning.attrs["canvasId"])
-        assertEquals("rect-1", warning.attrs["elementId"])
-        assertEquals("rectangle", warning.attrs["type"])
+        assertEquals(CANVAS, warning.attrs["canvasId"]?.textOrNull)
+        assertEquals("rect-1", warning.attrs["elementId"]?.textOrNull)
+        assertEquals("rectangle", warning.attrs["type"]?.textOrNull)
     }
 
     @Test

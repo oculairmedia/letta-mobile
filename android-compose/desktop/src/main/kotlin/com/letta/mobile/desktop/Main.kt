@@ -49,30 +49,32 @@ internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
 internal const val LETTA_DESKTOP_APP_NAME = "Letta Desktop"
 
 fun main(args: Array<String>) {
-    LinuxAwtScale().run()
-    DesktopCrashReporter.installGlobalHandler()
-    com.letta.mobile.desktop.startup.DesktopStartupPrewarm(
-        { desktopConfigStore }, { com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost.appServer },
-        { com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore.documents },
-        { if (Platform.Current == Platform.Windows) com.letta.mobile.desktop.touch.DesktopWindowsTouchKeyboard },
-    ).start()
-    com.letta.mobile.desktop.startup.DesktopAotTrainingExit().install() // packaging's AOT training run exits itself
-    initializeDesktopLifecycleMainThread()
-    // Kotzilla observability: before any UI composition, so the SDK captures startup too. Android boots it
-    // via ContentProvider; Desktop (and any future WasmJS) call this wrapper. See KotzillaKmpMonitoring.kt.
-    com.letta.mobile.data.observability.startKotzillaMonitoring()
-    // Phone preview (`:desktop:runPhone`, docs/development/phone-preview.md): the same app in a
-    // phone-sized window. Off unless the launch asks for it; the normal launch below is untouched.
-    if (com.letta.mobile.desktop.phone.desktopPhoneModeRequested()) {
-        com.letta.mobile.desktop.phone.runDesktopPhoneApplication(args)
-        return
+    com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
+        LinuxAwtScale().run()
+        DesktopCrashReporter.installGlobalHandler()
+        com.letta.mobile.desktop.startup.DesktopStartupPrewarm(
+            { desktopConfigStore }, { com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost.appServer },
+            { com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore.documents },
+            { if (Platform.Current == Platform.Windows) com.letta.mobile.desktop.touch.DesktopWindowsTouchKeyboard },
+        ).start()
+        com.letta.mobile.desktop.startup.DesktopAotTrainingExit().install() // packaging's AOT training run exits itself
+        initializeDesktopLifecycleMainThread()
+        // Kotzilla observability: before any UI composition, so the SDK captures startup too. Android boots it
+        // via ContentProvider; Desktop (and any future WasmJS) call this wrapper. See KotzillaKmpMonitoring.kt.
+        com.letta.mobile.data.observability.startKotzillaMonitoring()
+        // Phone preview (`:desktop:runPhone`, docs/development/phone-preview.md): the same app in a
+        // phone-sized window. Off unless the launch asks for it; the normal launch below is untouched.
+        if (com.letta.mobile.desktop.phone.desktopPhoneModeRequested()) {
+            com.letta.mobile.desktop.phone.runDesktopPhoneApplication(args)
+            return
+        }
+        if (Platform.Current == Platform.Windows) {
+            System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
+            WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)
+        }
+        val activationHandler = DesktopWindowActivationHandler()
+        runDesktopApplication(args, activationHandler)
     }
-    if (Platform.Current == Platform.Windows) {
-        System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
-        WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)
-    }
-    val activationHandler = DesktopWindowActivationHandler()
-    runDesktopApplication(args, activationHandler)
 }
 
 /**

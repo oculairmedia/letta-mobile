@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
 import java.nio.file.StandardOpenOption.CREATE
@@ -129,7 +130,7 @@ class NotebookLocalStore(
         if (health.isRetired(id.stableKey())) {
             Telemetry.event(
                 CanvasStorageFaults.TAG, "retired_document_refused",
-                "documentId" to id.stableKey(), "reason" to "moved to a new document; not registered again",
+                "documentId" attr id.stableKey(), "reason" attr "moved to a new document; not registered again",
                 level = Telemetry.Level.WARN,
             )
             return false

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.TurnFailureNotices
@@ -13,10 +14,10 @@ internal fun ConversationTurnState.advanceStartedIdentity(event: WsTimelineEvent
     if (transition !is TurnIdentityTransition.SameTurn || event.turnId != turnId) return false
     Telemetry.event(
         "AdminChatVM", "ws.turnStarted.runPromoted",
-        "conversationId" to ownerConversationId,
-        "turnId" to event.turnId,
-        "previousRunId" to (runId ?: ""),
-        "runId" to event.runId,
+        "conversationId" attr ownerConversationId,
+        "turnId" attr event.turnId,
+        "previousRunId" attr (runId ?: ""),
+        "runId" attr event.runId,
     )
     runId = event.runId
     return true

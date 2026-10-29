@@ -1,7 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
-
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -118,7 +118,7 @@ class CanonicalExternalTransportWriter(
         if (!coordinator.ingestExternal(owner(agentId, conversationId), message, retiredTail)) {
             Telemetry.event(
                 "CanonicalTimeline", "external.frameRejected",
-                "source" to source, "conversationId" to conversationId,
+                "source" attr source, "conversationId" attr conversationId,
             )
         }
     }

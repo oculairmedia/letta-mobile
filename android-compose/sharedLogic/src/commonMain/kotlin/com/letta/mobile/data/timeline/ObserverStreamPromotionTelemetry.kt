@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 internal object ObserverStreamPromotionTelemetry {
@@ -16,12 +17,12 @@ internal object ObserverStreamPromotionTelemetry {
         Telemetry.event(
             "TimelineSync",
             "streamSubscriber.forwardGrowthMerged",
-            "reason" to "observerPromotionOffTail",
-            "serverId" to event.stableServerId,
-            "incomingServerId" to event.incomingServerId,
-            "runId" to (event.runId ?: "<null>"),
-            "mergedLen" to event.mergedLen,
-            "conversationId" to event.conversationId,
+            "reason" attr "observerPromotionOffTail",
+            "serverId" attr event.stableServerId,
+            "incomingServerId" attr event.incomingServerId,
+            "runId" attr (event.runId ?: "<null>"),
+            "mergedLen" attr event.mergedLen,
+            "conversationId" attr event.conversationId,
             level = Telemetry.Level.DEBUG,
         )
     }

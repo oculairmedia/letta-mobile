@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
@@ -152,7 +153,7 @@ open class SubagentRepository(
         repositoryScope.launch {
             refreshScope(scope).onFailure { error ->
                 scopeFetches.release(scope)
-                Telemetry.event("SubagentRepo", "scopeFetch.failed", "error" to (error.message ?: "unknown"))
+                Telemetry.event("SubagentRepo", "scopeFetch.failed", "error" attr (error.message ?: "unknown"))
             }
         }
     }
@@ -293,8 +294,8 @@ open class SubagentRepository(
             Telemetry.event(
                 "SubagentRepo",
                 "merge.terminalKept",
-                "cacheKey" to entry.cacheKey(),
-                "terminalStatus" to ended.status,
+                "cacheKey" attr entry.cacheKey(),
+                "terminalStatus" attr ended.status,
             )
             ended
         }
@@ -326,9 +327,9 @@ open class SubagentRepository(
         Telemetry.event(
             "SubagentRepo",
             "merge.deltaRunningCount",
-            "localRunning" to localRunning,
-            "incomingRunning" to incomingRunning,
-            "delta" to (localRunning - incomingRunning),
+            "localRunning" attr localRunning,
+            "incomingRunning" attr incomingRunning,
+            "delta" attr (localRunning - incomingRunning),
         )
     }
 
@@ -349,11 +350,11 @@ open class SubagentRepository(
             Telemetry.event(
                 "SubagentRepo",
                 "merge.retainRunning",
-                "cacheKey" to key,
-                "status" to previous.status,
-                "ageMs" to 0L,
-                "kind" to kind.name,
-                "reason" to "absent-from-push-retained",
+                "cacheKey" attr key,
+                "status" attr previous.status,
+                "ageMs" attr 0L,
+                "kind" attr kind.name,
+                "reason" attr "absent-from-push-retained",
             )
             return@filter true
         }
@@ -365,11 +366,11 @@ open class SubagentRepository(
         Telemetry.event(
             "SubagentRepo",
             "merge.evictRunning",
-            "cacheKey" to key,
-            "status" to previous.status,
-            "ageMs" to ageMs,
-            "kind" to kind.name,
-            "reason" to "absent-from-push-exceeded-linger",
+            "cacheKey" attr key,
+            "status" attr previous.status,
+            "ageMs" attr ageMs,
+            "kind" attr kind.name,
+            "reason" attr "absent-from-push-exceeded-linger",
         )
         false
     }
@@ -430,17 +431,17 @@ open class SubagentRepository(
         Telemetry.event(
             "SubagentRepo",
             "liveness.verify",
-            "conversationId" to conversationLabel,
-            "entries" to entries.size,
-            "maxQuietMs" to entries.maxOf { clock() - it.lastSeenAtMs },
+            "conversationId" attr conversationLabel,
+            "entries" attr entries.size,
+            "maxQuietMs" attr entries.maxOf { clock() - it.lastSeenAtMs },
         )
         val verified = if (scope != null) refreshScope(scope) else refresh()
         if (verified.isSuccess) return
         Telemetry.event(
             "SubagentRepo",
             "liveness.unverifiable",
-            "conversationId" to conversationLabel,
-            "error" to (verified.exceptionOrNull()?.message ?: "unknown"),
+            "conversationId" attr conversationLabel,
+            "error" attr (verified.exceptionOrNull()?.message ?: "unknown"),
         )
         dropUnverifiable(entries.mapTo(mutableSetOf()) { it.cacheKey() })
     }
@@ -457,8 +458,8 @@ open class SubagentRepository(
             Telemetry.event(
                 "SubagentRepo",
                 "liveness.unverifiableDropped",
-                "cacheKey" to entry.cacheKey(),
-                "quietMs" to (now - entry.lastSeenAtMs),
+                "cacheKey" attr entry.cacheKey(),
+                "quietMs" attr (now - entry.lastSeenAtMs),
             )
         }
         state.value = kept

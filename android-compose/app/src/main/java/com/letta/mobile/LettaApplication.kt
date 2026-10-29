@@ -21,6 +21,14 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class LettaApplication : Application(), SingletonImageLoader.Factory {
+    private val telemetryRecorder = com.letta.mobile.util.TelemetryRecorder()
+    private val telemetryRecording = com.letta.mobile.util.Telemetry.installRecorder(telemetryRecorder)
+
+    override fun onTerminate() {
+        telemetryRecording.close()
+        super.onTerminate()
+    }
+
     /**
      * Single field inject required by `@HiltAndroidApp`. Collaborators live on
      * [LettaApplicationDependencies] via constructor injection.

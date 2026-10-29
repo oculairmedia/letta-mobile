@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
@@ -96,8 +97,8 @@ class DanglingToolCallResolver(
         val lifecycleEpoch = processor.state.value.lifecycleEpoch
         Telemetry.event(
             "TimelineSync", "danglingToolResolve.sweepScheduled",
-            "conversationId" to conversationId,
-            "clean" to clean,
+            "conversationId" attr conversationId,
+            "clean" attr clean,
         )
         sweepJob = scope.launch {
             for ((index, stepMs) in backoffMs.withIndex()) {
@@ -105,8 +106,8 @@ class DanglingToolCallResolver(
                 if (state.value.unresolvedToolCallIds().isEmpty()) {
                     Telemetry.event(
                         "TimelineSync", "danglingToolResolve.resolved",
-                        "conversationId" to conversationId,
-                        "attempt" to (index + 1),
+                        "conversationId" attr conversationId,
+                        "attempt" attr (index + 1),
                     )
                     return@launch
                 }
@@ -114,15 +115,15 @@ class DanglingToolCallResolver(
                     .onFailure { t ->
                         Telemetry.error(
                             "TimelineSync", "danglingToolResolve.reconcileFailed", t,
-                            "conversationId" to conversationId,
-                            "attempt" to (index + 1),
+                            "conversationId" attr conversationId,
+                            "attempt" attr (index + 1),
                         )
                     }
                 if (state.value.unresolvedToolCallIds().isEmpty()) {
                     Telemetry.event(
                         "TimelineSync", "danglingToolResolve.resolved",
-                        "conversationId" to conversationId,
-                        "attempt" to (index + 1),
+                        "conversationId" attr conversationId,
+                        "attempt" attr (index + 1),
                     )
                     return@launch
                 }
@@ -131,8 +132,8 @@ class DanglingToolCallResolver(
             if (exhausted.isNotEmpty()) {
                 Telemetry.event(
                     "TimelineSync", "danglingToolResolve.exhausted",
-                    "conversationId" to conversationId,
-                    "count" to exhausted.size,
+                    "conversationId" attr conversationId,
+                    "count" attr exhausted.size,
                 )
                 settleAsFailed(generation, lifecycleEpoch, exhausted)
             }
@@ -158,13 +159,13 @@ class DanglingToolCallResolver(
         if (state.value.unresolvedToolCallIds().isEmpty()) return
         Telemetry.event(
             "TimelineSync", "danglingToolResolve.hydrationGuard",
-            "conversationId" to conversationId,
+            "conversationId" attr conversationId,
         )
         runCatching { reconcile(HYDRATION_REASON, true) }
             .onFailure { t ->
                 Telemetry.error(
                     "TimelineSync", "danglingToolResolve.hydrationReconcileFailed", t,
-                    "conversationId" to conversationId,
+                    "conversationId" attr conversationId,
                 )
             }
         if (state.value.unresolvedToolCallIds().isNotEmpty()) {
@@ -185,8 +186,8 @@ class DanglingToolCallResolver(
         result.callIds.forEach { id ->
             Telemetry.event(
                 "TimelineSync", "danglingToolResolve.settledFailed",
-                "conversationId" to conversationId,
-                "toolCallId" to id,
+                "conversationId" attr conversationId,
+                "toolCallId" attr id,
             )
         }
     }

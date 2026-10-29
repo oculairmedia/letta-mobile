@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -108,11 +109,11 @@ internal class OrphanedTurnAborter(
         }
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.orphanAbort",
-            "key" to facts.key.toString(),
-            "leaseToken" to facts.leaseToken,
-            "releaseReason" to facts.releaseReason,
-            "runId" to (facts.runId ?: "<none>"),
-            "outcome" to outcome,
+            "key" attr facts.key.toString(),
+            "leaseToken" attr facts.leaseToken,
+            "releaseReason" attr facts.releaseReason,
+            "runId" attr (facts.runId ?: "<none>"),
+            "outcome" attr outcome,
             level = if (outcome.startsWith("aborted=")) Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
     }

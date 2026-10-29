@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.reconnect
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.AppServerInfoData
@@ -196,7 +197,7 @@ class ReconnectingAppServerClient(
         if (_state.value is ReconnectingClientState.Ready) return
         resumeRequested.value = true
         wakeups.trySend(Unit)
-        Telemetry.event(telemetryComponent, "resume_now", "state" to _state.value.toString())
+        Telemetry.event(telemetryComponent, "resume_now", "state" attr _state.value.toString())
     }
 
     /**
@@ -229,9 +230,9 @@ class ReconnectingAppServerClient(
                 Telemetry.event(
                     telemetryComponent,
                     "backoff",
-                    "attempt" to attempt,
-                    "delayMs" to delayMs,
-                    "reason" to (outcome.reason ?: ""),
+                    "attempt" attr attempt,
+                    "delayMs" attr delayMs,
+                    "reason" attr (outcome.reason ?: ""),
                 )
                 attempt += 1
                 if (backOffOrResume(delayMs)) attempt = 0
@@ -360,7 +361,7 @@ class ReconnectingAppServerClient(
 
         _state.value = ReconnectingClientState.Ready
         resumeRequested.value = false
-        Telemetry.event(telemetryComponent, "generation.ready", "attempt" to attempt)
+        Telemetry.event(telemetryComponent, "generation.ready", "attempt" attr attempt)
 
         val failed = generation.connectionState.first { it is AppServerConnectionState.Failed }
             as AppServerConnectionState.Failed
@@ -376,7 +377,7 @@ class ReconnectingAppServerClient(
 
     private suspend fun giveUp(reason: String?, kind: GiveUpKind = GiveUpKind.Exhausted) {
         _state.value = ReconnectingClientState.GaveUp(reason, kind)
-        Telemetry.event(telemetryComponent, "gave_up", "reason" to (reason ?: ""), "kind" to kind.name)
+        Telemetry.event(telemetryComponent, "gave_up", "reason" attr (reason ?: ""), "kind" attr kind.name)
         listener.onGaveUp(reason)
     }
 

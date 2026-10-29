@@ -1,5 +1,6 @@
 package com.letta.mobile.data.memory
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
@@ -183,8 +184,8 @@ class MemoryParitySectionReader(
         Telemetry.event(
             tag = "MemoryOverview",
             name = "section_degraded",
-            "section" to section,
-            "exceptionClass" to exceptionClass,
+            "section" attr section,
+            "exceptionClass" attr exceptionClass,
             level = Telemetry.Level.WARN,
         )
     },

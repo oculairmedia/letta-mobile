@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConversationRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerUpdateModelPayload
@@ -76,29 +77,29 @@ internal object ModelControlTelemetry {
     private const val TAG = "ModelControl"
 
     fun providerListed(providers: List<*>) {
-        Telemetry.event(TAG, "provider.list", "count" to providers.size.toString())
+        Telemetry.event(TAG, "provider.list", "count" attr providers.size.toString())
     }
 
     fun providerMutation(method: String, providerId: String, success: Boolean) {
-        Telemetry.event(TAG, method, "provider_id" to providerId, "success" to success.toString())
+        Telemetry.event(TAG, method, "provider_id" attr providerId, "success" attr success.toString())
     }
 
     fun modelUpdated(command: AppServerCommand.UpdateModel, success: Boolean, appliedTo: String?) {
         Telemetry.event(
             TAG,
             "model.update",
-            "conversation_id" to command.runtime.conversationId,
-            "model_handle" to (command.payload.modelHandle ?: command.payload.modelId),
-            "success" to success.toString(),
-            "applied_to" to appliedTo,
+            "conversation_id" attr command.runtime.conversationId,
+            "model_handle" attr (command.payload.modelHandle ?: command.payload.modelId),
+            "success" attr success.toString(),
+            "applied_to" attr appliedTo,
         )
     }
 
     fun exposureChanged(changed: Int, hiddenTotal: Int) {
-        Telemetry.event(TAG, "model.exposure.set", "changed" to changed.toString(), "hidden" to hiddenTotal.toString())
+        Telemetry.event(TAG, "model.exposure.set", "changed" attr changed.toString(), "hidden" attr hiddenTotal.toString())
     }
 
     fun modelListed(returned: Int, includeHidden: Boolean) {
-        Telemetry.event(TAG, "model.list", "returned" to returned.toString(), "include_hidden" to includeHidden.toString())
+        Telemetry.event(TAG, "model.list", "returned" attr returned.toString(), "include_hidden" attr includeHidden.toString())
     }
 }

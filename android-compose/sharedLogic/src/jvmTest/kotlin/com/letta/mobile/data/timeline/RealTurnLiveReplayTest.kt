@@ -27,6 +27,18 @@ import kotlin.test.assertTrue
  * rows hold exactly the stored `message.list` text and every tool return sits on its `tc-<call id>` row.
  */
 class RealTurnLiveReplayTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun everyRealTurnFoldsIntoOneRowPerLogicalIdWithTheStoredText() {

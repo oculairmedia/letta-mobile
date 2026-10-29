@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.numberOrNull
+
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -22,6 +24,18 @@ import org.junit.Test
 import java.net.SocketTimeoutException
 
 class TimelineRemotePageTransportParityTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @org.junit.Before
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @org.junit.After
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @Test
     fun `HTTP and Iroh newest pages have identical canonical result`() = runTest {
         val messages = listOf(message("old", "2026-01-01"), message("new", "2026-01-02"))
@@ -116,7 +130,7 @@ class TimelineRemotePageTransportParityTest {
         assertTrue(cancelled.await() is CancellationException)
         val pageEvents = Telemetry.snapshot().filter { it.name == "pageResult" }
         assertEquals(1, pageEvents.size)
-        assertEquals(successRequest.selectionGeneration.value, pageEvents.single().attrs["selectionGeneration"])
+        assertEquals(successRequest.selectionGeneration.value, pageEvents.single().attrs["selectionGeneration"]?.numberOrNull)
         assertFalse(pageEvents.single().attrs.values.any { it.toString().contains("owner") || it.toString().contains("success") })
     }
 
@@ -124,7 +138,10 @@ class TimelineRemotePageTransportParityTest {
         val http = http(messages).listConversationMessagePage(request)
         val iroh = iroh(irohResult).listConversationMessagePage(request)
         assertEquals(http, iroh)
-        assertEquals(listOf("old", if (messages.size == 2 && messages[1].id == "new") "new" else "middle"), (http as TimelineRemotePageResult.Page).records.map { it.identity.value })
+        assertEquals(
+            listOf("old", if (messages.size == 2 && messages[1].id == "new") "new" else "middle"),
+            (http as TimelineRemotePageResult.Page).records.map { it.identity.value },
+        )
     }
 
     private fun http(messages: List<AssistantMessage>) = MessageApiTimelineTransport(FakeMessageApi().apply { this.messages.addAll(messages) })

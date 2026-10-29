@@ -1,5 +1,6 @@
 package com.letta.mobile.data.document
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,7 +99,7 @@ class SharedDocument<Id, Op : DocumentOp, Snapshot : DocumentSnapshot<Id>> priva
     private fun reportDenied(denied: List<Op>) {
         Telemetry.event(
             options.tag, "op.denied",
-            "documentId" to id.toString(), "count" to denied.size, "actorId" to denied.first().actorId,
+            "documentId" attr id.toString(), "count" attr denied.size, "actorId" attr denied.first().actorId,
             level = Telemetry.Level.WARN,
         )
     }
@@ -173,7 +174,7 @@ class SharedDocument<Id, Op : DocumentOp, Snapshot : DocumentSnapshot<Id>> priva
 
     private fun overBudget(reason: String, error: Throwable?) {
         if (!live.escalate(HistoryPressure.OVER)) return
-        if (error != null) Telemetry.error(options.tag, "history.archive_failed", error, "documentId" to id.toString())
+        if (error != null) Telemetry.error(options.tag, "history.archive_failed", error, "documentId" attr id.toString())
         faults.report(
             SharedDocumentFault.Kind.OVER_BUDGET,
             "History of ${live.describe()} is over its budget and $reason; all of it is kept",

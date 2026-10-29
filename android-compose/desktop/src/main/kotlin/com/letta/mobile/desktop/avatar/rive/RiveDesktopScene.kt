@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.avatar.rive
 
+import com.letta.mobile.util.attr
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveInputSink
 import com.letta.mobile.avatar.rive.RiveWrite
@@ -101,7 +102,7 @@ class RiveDesktopScene internal constructor(
             rendererActiveReported = true
             Telemetry.event(
                 "Rive", "[mascot] Rive native renderer active:",
-                "adapter" to adapterName, "lib" to libraryPath?.value,
+                "adapter" attr adapterName, "lib" attr libraryPath?.value,
                 level = Telemetry.Level.INFO,
             )
         }

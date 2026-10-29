@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.textOrNull
+import com.letta.mobile.util.numberOrNull
+
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
@@ -19,6 +22,18 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 
 class TimelineRemotePageContractTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val request = TimelineRemotePageRequest(
         scope = TimelineScope("backend-secret", "conversation-secret", "agent-secret"),
         requestId = TimelineRequestId("request-secret"),
@@ -64,9 +79,9 @@ class TimelineRemotePageContractTest {
             TimelineRemotePageProgressClassifier.classify(request, repeated, TimelinePageProgress(request.continuation, 1, 0)),
         )
         val attrs = Telemetry.snapshot().first { it.name == "pageResult" }.attrs
-        assertNotEquals("request-secret", attrs["requestIdHash"])
-        assertNotEquals("backend-secret", attrs["scopeHash"])
-        assertEquals(7L, attrs["selectionGeneration"])
+        assertNotEquals("request-secret", attrs["requestIdHash"]?.textOrNull)
+        assertNotEquals("backend-secret", attrs["scopeHash"]?.textOrNull)
+        assertEquals(7L, attrs["selectionGeneration"]?.numberOrNull)
         assertEquals(false, attrs.values.any { it.toString().contains("secret") })
     }
 

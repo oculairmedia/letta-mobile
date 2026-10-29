@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -132,7 +133,7 @@ private fun CanvasSession.completedLoadState(failure: Throwable?): CanvasWorkspa
     null -> CanvasWorkspaceLoadState.Ready
     is CancellationException -> throw failure
     is Exception -> {
-        Telemetry.error("CanvasWorkspace", "session.load.failed", failure, "canvasId" to canvasId.value)
+        Telemetry.error("CanvasWorkspace", "session.load.failed", failure, "canvasId" attr canvasId.value)
         CanvasWorkspaceLoadState.Failed
     }
     else -> throw failure
@@ -240,9 +241,9 @@ private fun CanvasBoard.importOpenedScene(
     if (parsed != null) controller.importPath(parsed) else controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(scene.json))
     Telemetry.event(
         "CanvasPerformance", "open.loaded",
-        "canvasId" to s.canvasId.value,
-        "sceneChars" to scene.json.length,
-        "elements" to controller.state.value.elements.size,
+        "canvasId" attr s.canvasId.value,
+        "sceneChars" attr scene.json.length,
+        "elements" attr controller.state.value.elements.size,
         durationMs = openStarted.elapsedNow().inWholeMilliseconds,
     )
     ui.lastExportedJson = scene.json
@@ -308,10 +309,10 @@ private fun CanvasBoard.importExternalScene(scene: ExternalScene, importStarted:
     }
     Telemetry.event(
         "CanvasPerformance", "sync.imported",
-        "revision" to scene.doc?.revision,
-        "sceneChars" to scene.doc?.sceneJson?.length,
-        "changed" to scene.evaluated.changedElements,
-        "changedSample" to scene.evaluated.changedSample,
+        "revision" attr scene.doc?.revision,
+        "sceneChars" attr scene.doc?.sceneJson?.length,
+        "changed" attr scene.evaluated.changedElements,
+        "changedSample" attr scene.evaluated.changedSample,
         durationMs = importStarted.elapsedNow().inWholeMilliseconds,
         level = Telemetry.Level.DEBUG,
     )

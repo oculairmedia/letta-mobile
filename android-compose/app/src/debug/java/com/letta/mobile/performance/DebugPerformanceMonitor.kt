@@ -1,5 +1,6 @@
 package com.letta.mobile.performance
 
+import com.letta.mobile.util.attr
 import android.app.Activity
 import android.app.Application
 import android.os.Build
@@ -62,9 +63,9 @@ object DebugPerformanceMonitor {
         Telemetry.event(
             tag = "Perf",
             name = "debugInstrumentationEnabled",
-            "strictMode" to true,
-            "jankStats" to true,
-            "leakCanary" to true,
+            "strictMode" attr true,
+            "jankStats" attr true,
+            "leakCanary" attr true,
         )
     }
 
@@ -128,10 +129,10 @@ object DebugPerformanceMonitor {
             tag = TAG_STRICT_MODE,
             name = "violation",
             throwable = violation,
-            "policyType" to policyType,
-            "violationType" to violationType,
-            "sourceClass" to topFrame?.className,
-            "sourceMethod" to topFrame?.methodName,
+            "policyType" attr policyType,
+            "violationType" attr violationType,
+            "sourceClass" attr topFrame?.className,
+            "sourceMethod" attr topFrame?.methodName,
         )
     }
 
@@ -172,8 +173,8 @@ object DebugPerformanceMonitor {
             Telemetry.event(
                 tag = "Jank",
                 name = "frame",
-                "screen" to screenName,
-                "frameIndex" to currentFrameIndex,
+                "screen" attr screenName,
+                "frameIndex" attr currentFrameIndex,
                 durationMs = durationMs,
                 level = Telemetry.Level.WARN,
             )

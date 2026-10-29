@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.util.Telemetry
@@ -73,12 +74,12 @@ internal class IrohSessionLossCutOff(
     private fun report(turn: IrohActiveTurn, reason: String, outcome: CutOffOutcome) {
         Telemetry.event(
             "IrohTransport", "turn.cutoff_by_session_loss",
-            "conversationId" to turn.conversationId,
-            "turnId" to turn.turnId,
-            "runId" to turn.runId,
-            "reason" to reason,
-            "terminal" to outcome.name,
-            "terminalSource" to (turn.terminalSource?.name ?: ""),
+            "conversationId" attr turn.conversationId,
+            "turnId" attr turn.turnId,
+            "runId" attr turn.runId,
+            "reason" attr reason,
+            "terminal" attr outcome.name,
+            "terminalSource" attr (turn.terminalSource?.name ?: ""),
             level = Telemetry.Level.WARN,
         )
     }

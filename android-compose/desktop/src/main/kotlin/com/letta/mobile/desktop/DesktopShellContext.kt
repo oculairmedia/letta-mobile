@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -65,8 +66,8 @@ internal fun rememberDesktopShellContext(
     val onA2uiAction: (A2uiAction) -> Unit = { action ->
         com.letta.mobile.util.Telemetry.event(
             "DesktopA2ui", "action.unroutable",
-            "surfaceId" to action.surfaceId,
-            "name" to action.name,
+            "surfaceId" attr action.surfaceId,
+            "name" attr action.name,
             level = com.letta.mobile.util.Telemetry.Level.WARN,
         )
     }

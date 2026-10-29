@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -79,7 +80,7 @@ class HmacPairQrSigner(private val secretKeyStore: IrohSecretKeyStore) : PairQrS
             // a follow-up retry with a rekeyed store succeeds.
             Telemetry.event(
                 "PairQr", "sign.key_load_failed",
-                "reason" to (t.message ?: t::class.simpleName ?: "error"),
+                "reason" attr (t.message ?: t::class.simpleName ?: "error"),
                 level = Telemetry.Level.WARN,
             )
             return ""

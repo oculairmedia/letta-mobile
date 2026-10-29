@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -55,7 +56,7 @@ class TurnIdentityLedger(
         if (gate.awaitSettled(conversationId)) {
             backfillIfNeeded(conversation, listed)
         } else {
-            Telemetry.event(TAG, "turnIdentity.enrichTimedOut", "conversationId" to conversationId)
+            Telemetry.event(TAG, "turnIdentity.enrichTimedOut", "conversationId" attr conversationId)
         }
         val identities = conversation.snapshot()
         return listed.map { row -> row.ref()?.let { identities[it] }?.let { row.withIdentity(it) } ?: row }
@@ -73,7 +74,13 @@ class TurnIdentityLedger(
         val entries = HistoryTurnAssigner.assign(orderedRows, conversation.snapshot().keys)
         if (entries.isNotEmpty()) conversation.persist(entries)
         conversation.markBackfilled()
-        Telemetry.event(TAG, "turnIdentity.backfilled", "conversationId" to conversation.conversationId, "rows" to entries.size, durationMs = clock() - startedAt)
+        Telemetry.event(
+            TAG,
+            "turnIdentity.backfilled",
+            "conversationId" attr conversation.conversationId,
+            "rows" attr entries.size,
+            durationMs = clock() - startedAt,
+        )
     }
 
     private suspend fun backfillIfNeeded(conversation: ConversationIdentities, listed: List<JsonObject>) {
@@ -85,7 +92,12 @@ class TurnIdentityLedger(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Telemetry.event(TAG, "turnIdentity.backfillFailed", "conversationId" to conversation.conversationId, "error" to e.toString())
+            Telemetry.event(
+                TAG,
+                "turnIdentity.backfillFailed",
+                "conversationId" attr conversation.conversationId,
+                "error" attr e.toString(),
+            )
         }
     }
 
@@ -110,10 +122,10 @@ class TurnIdentityLedger(
         val name = if (report.unmatched.isEmpty()) "turnIdentity.settled" else "turnIdentity.unmatched"
         Telemetry.event(
             TAG, name,
-            "conversationId" to conversation.conversationId,
-            "turnId" to turn.turnId,
-            "matched" to report.matched,
-            "unmatched" to report.unmatched.joinToString(","),
+            "conversationId" attr conversation.conversationId,
+            "turnId" attr turn.turnId,
+            "matched" attr report.matched,
+            "unmatched" attr report.unmatched.joinToString(","),
             durationMs = tookMs,
         )
     }

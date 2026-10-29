@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.util.Telemetry
@@ -67,7 +68,7 @@ class SubagentRegistryPublisher(
                 val dropped = pending.first().also { pending.remove(it) }
                 Telemetry.event(
                     "SubagentPush", "pending_overflow",
-                    "max" to MAX_PENDING_KEYS, "droppedConversationId" to dropped.conversationId,
+                    "max" attr MAX_PENDING_KEYS, "droppedConversationId" attr dropped.conversationId,
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -90,7 +91,7 @@ class SubagentRegistryPublisher(
         val written = groups.count { (agentId, entries) ->
             viewer.writeFrame(frame(REASON_REPLAY, entries, SubagentConversationKey(agentId, conversationId)))
         }
-        Telemetry.event("SubagentPush", "replay", "conversationId" to conversationId, "frames" to written)
+        Telemetry.event("SubagentPush", "replay", "conversationId" attr conversationId, "frames" attr written)
         return written
     }
 
@@ -107,9 +108,9 @@ class SubagentRegistryPublisher(
         Telemetry.event(
             "SubagentPush",
             "published",
-            "conversationId" to key.conversationId,
-            "entries" to entries.size,
-            "delivered" to delivered,
+            "conversationId" attr key.conversationId,
+            "entries" attr entries.size,
+            "delivered" attr delivered,
         )
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ReasoningMessage
@@ -81,9 +82,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         if (match.approvalDecided) {
             hotPathTelemetry(
                 "streamSubscriber.eventDeduped",
-                "reason" to "approvalAlreadyDecided",
-                "approvalRequestId" to reqId,
-                "conversationId" to conversationId,
+                "reason" attr "approvalAlreadyDecided",
+                "approvalRequestId" attr reqId,
+                "conversationId" attr conversationId,
             )
             return output()
         }
@@ -102,9 +103,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val tcid = message.toolCallId
         hotPathTelemetry(
             "toolReturn.observed",
-            "toolCallId" to (tcid ?: "<null>"),
-            "hasBody" to (message.toolReturn.funcResponse?.isNotEmpty() == true),
-            "timelineSize" to timeline.events.size,
+            "toolCallId" attr (tcid ?: "<null>"),
+            "hasBody" attr (message.toolReturn.funcResponse?.isNotEmpty() == true),
+            "timelineSize" attr timeline.events.size,
         )
         if (!tcid.isNullOrBlank()) {
             val match = timeline.events.firstOrNull { ev ->
@@ -139,8 +140,8 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
                 hotPathTelemetry(
                     "toolReturn.attached",
-                    "serverId" to match.serverId,
-                    "bodyLen" to body.length,
+                    "serverId" attr match.serverId,
+                    "bodyLen" attr body.length,
                 )
                 val mt = message.messageType
                 if (mt == "tool_return_message" && body.isNotBlank()) {
@@ -156,8 +157,8 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 pendingToolReturnsByCallId[tcid] = message
                 hotPathTelemetry(
                     "toolReturn.noMatch",
-                    "toolCallId" to tcid,
-                    "timelineSize" to timeline.events.size,
+                    "toolCallId" attr tcid,
+                    "timelineSize" attr timeline.events.size,
                 )
             }
         }
@@ -168,9 +169,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     if (confirmed == null) {
         hotPathTelemetry(
             "streamSubscriber.toTimelineEventNull",
-            "messageType" to message.messageType,
-            "messageId" to message.id,
-            "conversationId" to conversationId,
+            "messageType" attr message.messageType,
+            "messageId" attr message.id,
+            "conversationId" attr conversationId,
         )
         return output()
     }
@@ -182,11 +183,11 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         if (!syntheticLiveToRealFinal && existing.hasAlreadyIngestedStreamFrame(confirmed)) {
             hotPathTelemetry(
                 "streamSubscriber.duplicateSeqSkipped",
-                "serverId" to confirmed.serverId,
-                "messageType" to message.messageType,
-                "existingSeqId" to existing.seqId,
-                "incomingSeqId" to confirmed.seqId,
-                "conversationId" to conversationId,
+                "serverId" attr confirmed.serverId,
+                "messageType" attr message.messageType,
+                "existingSeqId" attr existing.seqId,
+                "incomingSeqId" attr confirmed.seqId,
+                "conversationId" attr conversationId,
             )
             return output()
         }
@@ -271,28 +272,28 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
         hotPathTelemetry(
             "streamSubscriber.merged",
-            "serverId" to confirmed.serverId,
-            "messageType" to message.messageType,
-            "existingType" to existing.messageType.name,
-            "oldLen" to oldText.length,
-            "newLen" to newText.length,
-            "mergedLen" to mergedText.length,
-            "mergeBranch" to textMerge.branch.name,
-            "mergeGarbleRisk" to textMerge.garbleRisk,
-            "oldToolCalls" to oldCalls.size,
-            "newToolCalls" to newCalls.size,
-            "mergedToolCalls" to mergedCalls.size,
-            "conversationId" to conversationId,
+            "serverId" attr confirmed.serverId,
+            "messageType" attr message.messageType,
+            "existingType" attr existing.messageType.name,
+            "oldLen" attr oldText.length,
+            "newLen" attr newText.length,
+            "mergedLen" attr mergedText.length,
+            "mergeBranch" attr textMerge.branch.name,
+            "mergeGarbleRisk" attr textMerge.garbleRisk,
+            "oldToolCalls" attr oldCalls.size,
+            "newToolCalls" attr newCalls.size,
+            "mergedToolCalls" attr mergedCalls.size,
+            "conversationId" attr conversationId,
         )
         textMerge.defensiveTelemetryName()?.let { eventName ->
             hotPathTelemetry(
                 eventName,
-                "serverId" to confirmed.serverId,
-                "messageType" to message.messageType,
-                "oldLen" to oldText.length,
-                "newLen" to newText.length,
-                "mergedLen" to mergedText.length,
-                "conversationId" to conversationId,
+                "serverId" attr confirmed.serverId,
+                "messageType" attr message.messageType,
+                "oldLen" attr oldText.length,
+                "newLen" attr newText.length,
+                "mergedLen" attr mergedText.length,
+                "conversationId" attr conversationId,
             )
         }
         return output()
@@ -359,32 +360,32 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             pendingEvents += TimelineSyncEvent.StreamEventIngested(otidMatch.serverId, message.messageType)
             hotPathTelemetry(
                 "streamSubscriber.otidCumulativeMerged",
-                "otid" to confirmed.otid,
-                "serverId" to otidMatch.serverId,
-                "incomingServerId" to confirmed.serverId,
-                "oldLen" to otidMatch.content.length,
-                "newLen" to confirmed.content.length,
-                "mergedLen" to merge.text.length,
-                "mergeBranch" to merge.branch.name,
-                "conversationId" to conversationId,
+                "otid" attr confirmed.otid,
+                "serverId" attr otidMatch.serverId,
+                "incomingServerId" attr confirmed.serverId,
+                "oldLen" attr otidMatch.content.length,
+                "newLen" attr confirmed.content.length,
+                "mergedLen" attr merge.text.length,
+                "mergeBranch" attr merge.branch.name,
+                "conversationId" attr conversationId,
             )
             return output()
         }
         hotPathTelemetry(
             "streamSubscriber.eventDeduped",
-            "reason" to "otidSeen",
-            "otid" to confirmed.otid,
-            "conversationId" to conversationId,
+            "reason" attr "otidSeen",
+            "otid" attr confirmed.otid,
+            "conversationId" attr conversationId,
         )
         return output()
     }
     if (timeline.containsIdentityFor(confirmed)) {
         hotPathTelemetry(
             "streamSubscriber.eventDeduped",
-            "reason" to "semanticIdentitySeen",
-            "serverId" to confirmed.serverId,
-            "messageType" to message.messageType,
-            "conversationId" to conversationId,
+            "reason" attr "semanticIdentitySeen",
+            "serverId" attr confirmed.serverId,
+            "messageType" attr message.messageType,
+            "conversationId" attr conversationId,
         )
         return output()
     }
@@ -393,12 +394,12 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     if (prefixOrphanTarget != null) {
         hotPathTelemetry(
             "streamSubscriber.assistantPrefixOrphanSkipped",
-            "incomingServerId" to confirmed.serverId,
-            "existingServerId" to prefixOrphanTarget.serverId,
-            "runId" to (confirmed.runId ?: "<null>"),
-            "incomingLen" to confirmed.content.length,
-            "existingLen" to prefixOrphanTarget.content.length,
-            "conversationId" to conversationId,
+            "incomingServerId" attr confirmed.serverId,
+            "existingServerId" attr prefixOrphanTarget.serverId,
+            "runId" attr (confirmed.runId ?: "<null>"),
+            "incomingLen" attr confirmed.content.length,
+            "existingLen" attr prefixOrphanTarget.content.length,
+            "conversationId" attr conversationId,
         )
         return output()
     }
@@ -450,12 +451,12 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         pendingEvents += TimelineSyncEvent.StreamEventIngested(otidRow.serverId, message.messageType)
         hotPathTelemetry(
             "streamSubscriber.otidAppendMerged",
-            "otid" to confirmed.otid,
-            "serverId" to otidRow.serverId,
-            "incomingServerId" to confirmed.serverId,
-            "mergedLen" to merge.text.length,
-            "mergeBranch" to merge.branch.name,
-            "conversationId" to conversationId,
+            "otid" attr confirmed.otid,
+            "serverId" attr otidRow.serverId,
+            "incomingServerId" attr confirmed.serverId,
+            "mergedLen" attr merge.text.length,
+            "mergeBranch" attr merge.branch.name,
+            "conversationId" attr conversationId,
         )
         return output()
     }
@@ -495,9 +496,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
     hotPathTelemetry(
         "streamSubscriber.ingested",
-        "serverId" to confirmed.serverId,
-        "messageType" to message.messageType,
-        "conversationId" to conversationId,
+        "serverId" attr confirmed.serverId,
+        "messageType" attr message.messageType,
+        "conversationId" attr conversationId,
     )
     val mt = message.messageType
     return output(
@@ -696,8 +697,8 @@ internal fun applyPendingToolReturns(
     }
     Telemetry.event(
         "TimelineSync", "toolReturn.attachedPending",
-        "serverId" to ev.serverId,
-        "count" to matchingReturns.size,
+        "serverId" attr ev.serverId,
+        "count" attr matchingReturns.size,
     )
     val firstCallId = matchingReturns.first().first
     return ev.copy(

@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
 import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
 import com.letta.mobile.data.chat.runtime.ChatStopRequest
@@ -289,8 +290,8 @@ internal class AdminChatComposerCoordinator(
                     Telemetry.event(
                         TELEMETRY_TAG,
                         "interrupt.lateFrameSuppressed",
-                        "agentId" to agentId.value,
-                        "conversationId" to explicitConversationId,
+                        "agentId" attr agentId.value,
+                        "conversationId" attr explicitConversationId,
                         level = Telemetry.Level.WARN,
                     )
                     chatBannerController.forceClearStreamingAfterInterrupt()

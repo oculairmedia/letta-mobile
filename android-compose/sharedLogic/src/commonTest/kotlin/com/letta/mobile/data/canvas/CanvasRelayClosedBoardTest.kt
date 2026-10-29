@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.HostId
@@ -20,6 +22,18 @@ import kotlin.test.assertTrue
  * still joined to the canvas's topic; the op must reach the board, not be skipped.
  */
 class CanvasRelayClosedBoardTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val topic = CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION))
 
     private class Host {
@@ -100,8 +114,8 @@ class CanvasRelayClosedBoardTest {
         assertEquals(before, phone.cursor(), "the op was not applied, so it must not be skipped")
         val warning = Telemetry.snapshot().single { it.name == "op.unapplied" }
         assertEquals(Telemetry.Level.WARN, warning.level)
-        assertEquals(opId, warning.attrs["opId"])
-        assertEquals(topic, warning.attrs["topic"])
+        assertEquals(opId, warning.attrs["opId"]?.textOrNull)
+        assertEquals(topic, warning.attrs["topic"]?.textOrNull)
     }
 
     @Test

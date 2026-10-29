@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.runtime.BackendId
@@ -186,7 +187,11 @@ internal object IrohTransportSupport {
             } catch (error: kotlinx.coroutines.CancellationException) {
                 throw error
             } catch (error: Exception) {
-                com.letta.mobile.util.Telemetry.event("IrohTransport", "notebook.start.failed", "error" to (error.message ?: error.toString()))
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohTransport",
+                    "notebook.start.failed",
+                    "error" attr (error.message ?: error.toString()),
+                )
             }
         }
     }

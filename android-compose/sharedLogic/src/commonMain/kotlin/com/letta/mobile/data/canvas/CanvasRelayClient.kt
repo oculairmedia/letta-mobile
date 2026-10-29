@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.document.getOrCreate
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
@@ -424,7 +425,7 @@ class CanvasRelayClient(
             // other apps draw its preview.
             is CanvasRelayMessage.AssetRejected -> {
                 com.letta.mobile.util.Telemetry.event(
-                    "CanvasRelayClient", "asset.rejected", "ref" to message.ref, "reason" to message.reason,
+                    "CanvasRelayClient", "asset.rejected", "ref" attr message.ref, "reason" attr message.reason,
                     level = com.letta.mobile.util.Telemetry.Level.WARN,
                 )
                 uploads.rejected(message)
@@ -455,9 +456,9 @@ class CanvasRelayClient(
         val op = message.op
         com.letta.mobile.util.Telemetry.event(
             "CanvasRelayClient", "op.received",
-            "topic" to message.topic, "cursor" to message.cursor, "origin" to message.origin,
-            "actorId" to op.actorId, "opIdPrefix" to op.opIdPrefix, "kind" to op.kind,
-            "subject" to op.subjectId, "applied" to applied,
+            "topic" attr message.topic, "cursor" attr message.cursor, "origin" attr message.origin,
+            "actorId" attr op.actorId, "opIdPrefix" attr op.opIdPrefix, "kind" attr op.kind,
+            "subject" attr op.subjectId, "applied" attr applied,
             level = com.letta.mobile.util.Telemetry.Level.DEBUG,
         )
     }
@@ -466,7 +467,7 @@ class CanvasRelayClient(
         gate.markGap(CanvasRelayTopic(message.topic))
         com.letta.mobile.util.Telemetry.event(
             "CanvasRelayClient", "op.unapplied",
-            "topic" to message.topic, "cursor" to message.cursor, "opId" to message.op.opId,
+            "topic" attr message.topic, "cursor" attr message.cursor, "opId" attr message.op.opId,
             level = com.letta.mobile.util.Telemetry.Level.WARN,
         )
     }
@@ -571,7 +572,7 @@ class CanvasRelayClient(
     private fun held(topic: String, op: CanvasOp) {
         com.letta.mobile.util.Telemetry.event(
             "CanvasRelayClient", "op.held",
-            "topic" to topic, "opId" to op.opId, "needs" to CanvasRelayFeatures.required(op).joinToString(","),
+            "topic" attr topic, "opId" attr op.opId, "needs" attr CanvasRelayFeatures.required(op).joinToString(","),
             level = com.letta.mobile.util.Telemetry.Level.WARN,
         )
     }

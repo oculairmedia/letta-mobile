@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
@@ -72,9 +73,9 @@ fun Timeline.mergeServerMessages(
         if (timeline.shouldSuppressAbandonedAssistantFragment(confirmed)) {
             Telemetry.event(
                 "TimelineSync", "recentReconcile.abandonedAssistantSuppressed",
-                "conversationId" to timeline.conversationId,
-                "serverId" to confirmed.serverId,
-                "runId" to (confirmed.runId ?: ""),
+                "conversationId" attr timeline.conversationId,
+                "serverId" attr confirmed.serverId,
+                "runId" attr (confirmed.runId ?: ""),
             )
             return@forEach
         }
@@ -86,9 +87,9 @@ fun Timeline.mergeServerMessages(
         if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
             Telemetry.event(
                 "TimelineSync", "recentReconcile.contentDeduped",
-                "conversationId" to timeline.conversationId,
-                "serverId" to confirmed.serverId,
-                "messageType" to confirmed.messageType.name,
+                "conversationId" attr timeline.conversationId,
+                "serverId" attr confirmed.serverId,
+                "messageType" attr confirmed.messageType.name,
             )
             return@forEach
         }
@@ -174,9 +175,9 @@ private fun Timeline.mergeViaLegacyAssistantHeuristics(
             "TimelineSync",
             if (prefixIndex != null) "recentReconcile.assistantPrefixReplaced"
             else "recentReconcile.assistantSameRunReplaced",
-            "conversationId" to conversationId,
-            "serverId" to confirmed.serverId,
-            "incomingLen" to confirmed.content.length,
+            "conversationId" attr conversationId,
+            "serverId" attr confirmed.serverId,
+            "incomingLen" attr confirmed.content.length,
         )
         ConfirmedServerMergeResult(timeline, true)
     } else {
@@ -220,9 +221,9 @@ private fun Timeline.resolveCrossBoundaryAssistantIdentity(
 private fun Timeline.reportUnresolvedCrossBoundaryIdentity(incoming: TimelineEvent.Confirmed) {
     Telemetry.event(
         "TimelineSync", "recentReconcile.unresolvedCrossBoundaryIdentity",
-        "conversationId" to conversationId,
-        "serverId" to incoming.serverId,
-        "messageType" to incoming.messageType.name,
+        "conversationId" attr conversationId,
+        "serverId" attr incoming.serverId,
+        "messageType" attr incoming.messageType.name,
         level = Telemetry.Level.WARN,
     )
 }

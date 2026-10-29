@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -27,7 +28,7 @@ internal object ConversationAgentListHelper {
         if (!store.agentExists(request.agentId)) {
             Telemetry.event(
                 "IrohNode", "conversation.list_agent.agent_missing",
-                "agentId" to request.agentId,
+                "agentId" attr request.agentId,
                 level = Telemetry.Level.WARN,
             )
             return JsonArray(emptyList())

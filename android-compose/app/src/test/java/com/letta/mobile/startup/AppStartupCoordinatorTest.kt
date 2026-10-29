@@ -18,6 +18,18 @@ import org.junit.Before
 import org.junit.Test
 
 class AppStartupCoordinatorTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @org.junit.Before
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @org.junit.After
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val application = mockk<Application>(relaxed = true)
 
     @Before

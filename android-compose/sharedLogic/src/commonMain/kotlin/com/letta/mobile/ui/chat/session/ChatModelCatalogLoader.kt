@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LlmModel
@@ -89,7 +90,7 @@ class ChatModelCatalogLoader(
         Telemetry.event(
             TELEMETRY_TAG,
             "modelCatalog.loadFailed",
-            "exceptionClass" to (failure::class.simpleName ?: "Throwable"),
+            "exceptionClass" attr (failure::class.simpleName ?: "Throwable"),
             level = Telemetry.Level.WARN,
         )
     }

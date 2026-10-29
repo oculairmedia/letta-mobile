@@ -19,6 +19,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineHydrationReducerTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @org.junit.Before
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @org.junit.After
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @After
     fun tearDown() {

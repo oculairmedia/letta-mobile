@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.config
 
+import com.letta.mobile.util.attr
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -106,7 +107,6 @@ private fun rememberLocalModelImportLauncher(viewModel: ConfigViewModel, context
         }
     }
 }
-
 /** Battery optimization, re-read whenever the app resumes (the system dialog returns to it). */
 @Composable
 private fun rememberBatteryOptimizationState(context: Context): BatteryOptimizationState {
@@ -115,7 +115,7 @@ private fun rememberBatteryOptimizationState(context: Context): BatteryOptimizat
     var exempt by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) }
     fun refresh(source: String) {
         exempt = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
-        Telemetry.event("BatteryOptimization", "status", "source" to source, "exempt" to exempt)
+        Telemetry.event("BatteryOptimization", "status", "source" attr source, "exempt" attr exempt)
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh("requestReturned") }
     DisposableEffect(context, lifecycleOwner) {

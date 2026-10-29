@@ -21,6 +21,18 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class AppServerAgentSecretsSourceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val openAiKey = "sk-live-0penai-VALUE-123"
     private val githubToken = "ghp_GITHUB-VALUE-456"
 

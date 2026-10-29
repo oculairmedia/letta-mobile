@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
@@ -196,10 +197,10 @@ internal class UnleasedApprovalAnswerer(
     ) {
         Telemetry.event(
             "AppServerTurnEngine", event,
-            "requestId" to details.request.requestId,
-            "key" to details.key.toString(),
-            "tool" to (details.toolName ?: ""),
-            "permissionMode" to details.mode.name,
+            "requestId" attr details.request.requestId,
+            "key" attr details.key.toString(),
+            "tool" attr (details.toolName ?: ""),
+            "permissionMode" attr details.mode.name,
             level = Telemetry.Level.WARN,
         )
     }

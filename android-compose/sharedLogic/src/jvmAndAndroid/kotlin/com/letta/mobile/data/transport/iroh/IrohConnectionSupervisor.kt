@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.TerminalConnectionFailure
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -210,9 +211,9 @@ class IrohConnectionSupervisor(
                 }
                 Telemetry.event(
                     "IrohSupervisor", "loss.stale_ignored",
-                    "reason" to reason,
-                    "lostSession" to lostHandle.sessionId,
-                    "currentSession" to (currentHandle?.sessionId ?: ""),
+                    "reason" attr reason,
+                    "lostSession" attr lostHandle.sessionId,
+                    "currentSession" attr (currentHandle?.sessionId ?: ""),
                 )
                 return@withLock null
             }
@@ -433,7 +434,13 @@ class IrohConnectionSupervisor(
         val delayMs = backoffPolicy.delayMs(attempt, randomJitterMs)
         redialReadyAtMs = System.currentTimeMillis() + delayMs
         redialJob = scope.launch {
-            Telemetry.event("IrohSupervisor", "redial.scheduled", "reason" to reason, "delayMs" to delayMs.toString(), "attempt" to attempt.toString())
+            Telemetry.event(
+                "IrohSupervisor",
+                "redial.scheduled",
+                "reason" attr reason,
+                "delayMs" attr delayMs.toString(),
+                "attempt" attr attempt.toString(),
+            )
             delay(delayMs.milliseconds)
             val config = configProvider() ?: return@launch
             mutex.withLock {
@@ -466,9 +473,9 @@ class IrohConnectionSupervisor(
         onStateChanged(next)
         Telemetry.event(
             "IrohSupervisor", "state",
-            "from" to previous.name,
-            "to" to next.name,
-            "reason" to reason,
+            "from" attr previous.name,
+            "to" attr next.name,
+            "reason" attr reason,
         )
     }
 

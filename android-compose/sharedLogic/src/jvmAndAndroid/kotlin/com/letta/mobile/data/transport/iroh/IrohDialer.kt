@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
@@ -215,7 +216,7 @@ internal class IrohDialer(
     private suspend fun bindLocalEndpoint(secretKey: ByteArray): Endpoint = runCatching {
         bindEndpoint(secretKey, if (notebookHandlerFactory == null) emptyList() else listOf(AUTOMERGE_REPO_ALPN))
     }.onFailure { t ->
-        Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
+        Telemetry.event("IrohTransport", "bind.failed", "error" attr (t.message ?: t.toString()), "class" attr t::class.simpleName)
     }.getOrThrow()
 
     private fun createTransport(
@@ -252,8 +253,8 @@ internal class IrohDialer(
         }
         Telemetry.event(
             "IrohTransport", "auth.negotiated",
-            "success" to auth.success,
-            "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
+            "success" attr auth.success,
+            "serverCapabilities" attr (auth.capabilities ?: emptyList()).sorted().joinToString(","),
         )
         return auth.capabilities?.toSet()
     }
@@ -296,7 +297,7 @@ internal class IrohDialer(
                 throw e
             } catch (e: Exception) {
                 if (!isActive) return
-                Telemetry.event("IrohTransport", "notebook.accept.failed", "error" to (e.message ?: e.toString()))
+                Telemetry.event("IrohTransport", "notebook.accept.failed", "error" attr (e.message ?: e.toString()))
                 delay(100)
             }
         }
@@ -312,7 +313,7 @@ internal class IrohDialer(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Telemetry.event("IrohTransport", "notebook.incoming.failed", "error" to (e.message ?: e.toString()))
+                Telemetry.event("IrohTransport", "notebook.incoming.failed", "error" attr (e.message ?: e.toString()))
             } finally {
                 connection?.let {
                     connections.remove(it)
@@ -361,7 +362,7 @@ internal class IrohDialer(
         .bindAndStart(router, detectGaps = true, scope = scope)
 
     private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
-        Telemetry.event("IrohTrace", "transport.close.resources", "reason" to reason)
+        Telemetry.event("IrohTrace", "transport.close.resources", "reason" attr reason)
         runCatching { transport?.close() }
         runCatching { endpoint?.shutdown() }
         runCatching { endpoint?.close() }

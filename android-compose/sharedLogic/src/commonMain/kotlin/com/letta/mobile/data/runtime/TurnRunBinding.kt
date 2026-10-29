@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.util.Telemetry
@@ -114,17 +115,17 @@ internal fun TurnLeaseSlot.bindRun(received: AppServerReceivedFrame, leaseToken:
         runIdGate.promote(runId, leaseToken)
         Telemetry.event(
             "AppServerTurnEngine", "turn.run_bound",
-            "runId" to runId,
-            "conversationId" to key.conversationId,
+            "runId" attr runId,
+            "conversationId" attr key.conversationId,
         )
     }
     val ownership = runBinding.ownershipOf(received)
     if (ownership == RunOwnership.Foreign) {
         Telemetry.event(
             "AppServerTurnEngine", "frame.foreign_run_dropped",
-            "runId" to (received.boundRunIdOrNull() ?: "<none>"),
-            "frameType" to (received.frame.type ?: "<unknown>"),
-            "conversationId" to key.conversationId,
+            "runId" attr (received.boundRunIdOrNull() ?: "<none>"),
+            "frameType" attr (received.frame.type ?: "<unknown>"),
+            "conversationId" attr key.conversationId,
         )
     }
     return ownership

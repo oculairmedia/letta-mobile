@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.compaction.ConversationCompactRpc
 import com.letta.mobile.data.compaction.executeCommandAnswer
 import com.letta.mobile.data.context.limit.ContextLimitOutcome
@@ -69,7 +70,7 @@ internal object ConversationContextLimitHandlers {
             ContextLimitOutcome.Unsupported -> adminError("capability_unavailable: this App Server has no /context-limit")
             is ContextLimitOutcome.Failed -> adminError("context_limit_failed: ${outcome.message}")
         }
-        Telemetry.event("IrohNode", "conversation_context_limit.ok", "scope" to result.appliedTo)
+        Telemetry.event("IrohNode", "conversation_context_limit.ok", "scope" attr result.appliedTo)
         return AppServerProtocol.json.encodeToJsonElement(ContextLimitResult.serializer(), result)
     }
 
@@ -88,7 +89,7 @@ internal object ConversationContextLimitHandlers {
     private fun fail(outcome: String, error: Exception, message: String): Nothing {
         Telemetry.event(
             "IrohNode", "conversation_context_limit.$outcome",
-            "class" to error::class.simpleName,
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
         adminError(message)

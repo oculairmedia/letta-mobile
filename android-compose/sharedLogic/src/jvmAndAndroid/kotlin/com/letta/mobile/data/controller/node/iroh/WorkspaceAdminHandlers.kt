@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -46,7 +47,7 @@ internal object WorkspaceAdminHandlers {
         val command = WorkspaceRelay.decodeCommand(method, params, NativeAdmin.requestId())
         val frames = forward(client, method, command).map { WorkspaceRelay.normalizeFrame(method, it) }
         val result = WorkspaceRelay.encodeResult(frames)
-        Telemetry.event("IrohNode", "workspace_relay.ok", "method" to method.method, "frames" to frames.size)
+        Telemetry.event("IrohNode", "workspace_relay.ok", "method" attr method.method, "frames" attr frames.size)
         return result
     }
 
@@ -70,8 +71,8 @@ internal object WorkspaceAdminHandlers {
     private fun fail(method: WorkspaceRelayMethod, outcome: String, error: Exception, message: String): Nothing {
         Telemetry.event(
             "IrohNode", "workspace_relay.$outcome",
-            "method" to method.method,
-            "class" to error::class.simpleName,
+            "method" attr method.method,
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
         adminError(message)

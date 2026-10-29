@@ -1,5 +1,6 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.attr
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -68,7 +69,7 @@ class ChatPushService : LifecycleService() {
         scope.launch { deps.approvalAttention.watch() }
         Telemetry.event(
             "ChatPushService", "created",
-            "foregrounded" to foregrounded.toString(),
+            "foregrounded" attr foregrounded.toString(),
         )
     }
 
@@ -79,8 +80,8 @@ class ChatPushService : LifecycleService() {
         // being killed, onStartCommand fires without onCreate in that case).
         Telemetry.event(
             "ChatPushService", "startCommand",
-            "startId" to startId,
-            "intentAction" to (intent?.action ?: "<null>"),
+            "startId" attr startId,
+            "intentAction" attr (intent?.action ?: "<null>"),
         )
         channelNotificationPublisher.ensureChannel()
         ensureForegroundNotification()

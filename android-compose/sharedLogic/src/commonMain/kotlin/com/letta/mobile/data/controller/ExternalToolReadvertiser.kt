@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAdvertisementState
 import com.letta.mobile.data.controller.extras.ToolAudience
@@ -72,9 +73,9 @@ internal class ExternalToolReadvertiser(
         // change) carries the current set again.
         Telemetry.event(
             TELEMETRY_SOURCE, "externalTools.readvertiseFailed",
-            "agentId" to runtime.agentId,
-            "conversationId" to runtime.conversationId,
-            "error" to failure,
+            "agentId" attr runtime.agentId,
+            "conversationId" attr runtime.conversationId,
+            "error" attr failure,
             level = Telemetry.Level.WARN,
         )
     }

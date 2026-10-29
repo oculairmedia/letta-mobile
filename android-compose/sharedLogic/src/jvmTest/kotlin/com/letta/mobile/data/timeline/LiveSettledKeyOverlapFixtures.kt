@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.model.AssistantMessage
@@ -52,7 +54,7 @@ internal data class OverlapFrame(val live: List<ChatRenderItem>, val settledKeys
 
 /** Guard drops recorded for [keys]; Telemetry is process-wide, so other tests' keys are ignored. */
 internal fun guardDrops(keys: Set<String>): Int = Telemetry.snapshot().count { event ->
-    event.name == "timeline.duplicateKeyDropped" && event.attrs["key"] in keys
+    event.name == "timeline.duplicateKeyDropped" && event.attrs["key"]?.textOrNull in keys
 }
 
 /** One conversation's coordinator and presentation, with a presenter standing in for Paging. */

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -102,7 +103,12 @@ open class CachedAgentRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
-            Telemetry.event("CachedAgentRepository", "Failed to load cached agents", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            Telemetry.event(
+                "CachedAgentRepository",
+                "Failed to load cached agents",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
@@ -271,7 +277,12 @@ open class CachedAgentRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
-            Telemetry.event("CachedAgentRepository", "Failed to cache agents to Room", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            Telemetry.event(
+                "CachedAgentRepository",
+                "Failed to cache agents to Room",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
@@ -303,7 +314,11 @@ open class CachedAgentRepository(
             val existingIds = merged.asSequence().map { it.id }.toSet()
             val newAgents = page.filter { it.id !in existingIds }
             if (newAgents.isEmpty()) {
-                Telemetry.event("CachedAgentRepository", "Agent list offset pagination made no progress; falling back to count-sized fetch", level = Telemetry.Level.WARN)
+                Telemetry.event(
+                    "CachedAgentRepository",
+                    "Agent list offset pagination made no progress; falling back to count-sized fetch",
+                    level = Telemetry.Level.WARN,
+                )
                 return fetchAgentsWithoutOffsetFallback(onProgress)
             }
 
@@ -440,7 +455,12 @@ open class CachedAgentRepository(
 
     private suspend fun persistUpdatedAgent(agent: Agent) {
         runCatchingCancellable { localCache?.invoke()?.upsert(agent) }
-            .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${agent.id.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
+            .onFailure { e -> Telemetry.event(
+                "CachedAgentRepository",
+                "agent_updated cache persist failed for ${agent.id.value}",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            ) }
     }
 
     private fun invalidateAgentLocked(id: AgentId) {
@@ -481,11 +501,21 @@ open class CachedAgentRepository(
             transport = channelTransport,
             onDeleted = { agentId ->
                 runCatchingCancellable { removeAgentFromCache(agentId) }
-                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated delete cache update failed for ${agentId.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
+                    .onFailure { e -> Telemetry.event(
+                        "CachedAgentRepository",
+                        "agent_updated delete cache update failed for ${agentId.value}",
+                        "error" attr (e.message ?: e.toString()),
+                        level = Telemetry.Level.WARN,
+                    ) }
             },
             onChanged = { agentId ->
                 refreshAgent(agentId)
-                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated refresh failed for ${agentId.value}", "detail" to e.message, level = Telemetry.Level.WARN) }
+                    .onFailure { e -> Telemetry.event(
+                        "CachedAgentRepository",
+                        "agent_updated refresh failed for ${agentId.value}",
+                        "detail" attr e.message,
+                        level = Telemetry.Level.WARN,
+                    ) }
             },
         )
     }
@@ -497,7 +527,12 @@ open class CachedAgentRepository(
         // (letta-mobile-vcmin).
         observeReconnectRefresh(channelTransport) {
             runCatchingCancellable { refreshAgents() }
-                .onFailure { e -> Telemetry.event("CachedAgentRepository", "reconnect agent refresh failed", "detail" to e.message, level = Telemetry.Level.WARN) }
+                .onFailure { e -> Telemetry.event(
+                    "CachedAgentRepository",
+                    "reconnect agent refresh failed",
+                    "detail" attr e.message,
+                    level = Telemetry.Level.WARN,
+                ) }
         }
     }
 
@@ -570,7 +605,12 @@ open class CachedAgentRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
-            Telemetry.event("CachedAgentRepository", "Failed to update cached agents after delete", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            Telemetry.event(
+                "CachedAgentRepository",
+                "Failed to update cached agents after delete",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
@@ -617,21 +657,25 @@ open class CachedAgentRepository(
         } finally {
             val updatedAgent = fetchAgentRemote(agentId)
             if (!checkpoint.matches(updatedAgent)) {
-                Telemetry.event("CachedAgentRepository", "Agent config drift detected after operation, restoring checkpoint", level = Telemetry.Level.WARN)
+                Telemetry.event(
+                    "CachedAgentRepository",
+                    "Agent config drift detected after operation, restoring checkpoint",
+                    level = Telemetry.Level.WARN,
+                )
                 Telemetry.event(
                     "CachedAgentRepository",
                     "configDriftDetected",
-                    "agentId" to agentId,
-                    "originalModel" to checkpoint.model,
-                    "driftedModel" to updatedAgent.model,
+                    "agentId" attr agentId.toString(),
+                    "originalModel" attr checkpoint.model,
+                    "driftedModel" attr updatedAgent.model,
                     level = Telemetry.Level.WARN
                 )
                 updateAgent(agentId, checkpoint.toUpdateParams())
                 Telemetry.event(
                     "CachedAgentRepository",
                     "configRestored",
-                    "agentId" to agentId,
-                    "restoredModel" to checkpoint.model
+                    "agentId" attr agentId.toString(),
+                    "restoredModel" attr checkpoint.model
                 )
             }
         }

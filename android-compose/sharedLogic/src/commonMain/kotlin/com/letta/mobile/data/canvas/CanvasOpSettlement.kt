@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.util.Telemetry
@@ -84,7 +85,7 @@ internal class CanvasOpSettlement(private val canvasId: CanvasId, private val op
     } catch (error: Exception) {
         recoveryDue = true
         carried.clear()
-        Telemetry.error(TAG, "journal.$stage.failed", error, "canvasId" to canvasId.value)
+        Telemetry.error(TAG, "journal.$stage.failed", error, "canvasId" attr canvasId.value)
         null
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.fanout.RuntimeSessionLink
 import com.letta.mobile.data.controller.fanout.isRuntimeStreamDetached
 import com.letta.mobile.data.controller.fanout.isRuntimeSubscriberOverflow
@@ -91,11 +92,11 @@ internal class SessionLossCutOff(
         Telemetry.event(
             "AppServerTurnEngine",
             "turn.reconnecting",
-            "key" to lease.key.toString(),
-            "runId" to (lease.current?.runId ?: ""),
-            "epoch" to state.epoch,
-            "reason" to (state.reason ?: ""),
-            "graceMs" to graceMs,
+            "key" attr lease.key.toString(),
+            "runId" attr (lease.current?.runId ?: ""),
+            "epoch" attr state.epoch,
+            "reason" attr (state.reason ?: ""),
+            "graceMs" attr graceMs,
         )
     }
 
@@ -133,12 +134,12 @@ internal class SessionLossCutOff(
         Telemetry.event(
             "AppServerTurnEngine",
             if (overflow) "turn.cutoff_by_subscriber_overflow" else "turn.cutoff_by_session_loss",
-            "key" to lease.key.toString(),
-            "leaseToken" to lease.token,
-            "runId" to (lease.current?.runId ?: ""),
-            "agentId" to command.agentId.value,
-            "conversationId" to command.conversationId.value,
-            "outcome" to outcome.name,
+            "key" attr lease.key.toString(),
+            "leaseToken" attr lease.token,
+            "runId" attr (lease.current?.runId ?: ""),
+            "agentId" attr command.agentId.value,
+            "conversationId" attr command.conversationId.value,
+            "outcome" attr outcome.name,
             level = Telemetry.Level.WARN,
         )
     }

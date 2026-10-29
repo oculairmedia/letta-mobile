@@ -2,6 +2,7 @@
 
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.runtime.INPUT_QUEUED_REASON
@@ -153,7 +154,7 @@ object RuntimeEventServerFrameMapper {
         RuntimeRunStatus.Completed -> listOf(turnDone(context, "completed"))
         RuntimeRunStatus.Failed -> {
             com.letta.mobile.util.Telemetry.event(
-                "IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""),
+                "IrohTransport", "turn.lifecycle_failed", "reason" attr (payload.reason ?: ""),
             )
             // letta-mobile-br5g0: the terminal lifecycle is the ONLY carrier of
             // the provider failure reason on this path, and dropping it here is

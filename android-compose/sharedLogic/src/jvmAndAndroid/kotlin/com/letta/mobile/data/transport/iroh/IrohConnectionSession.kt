@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.util.Telemetry
@@ -87,7 +88,7 @@ internal class IrohConnectionSession(
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
             stopObserverIngest(SessionStopReason.ObserverStreamUnavailable)
-            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
+            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" attr handle.sessionId)
             return
         }
         observerJob?.let { priorObserver ->
@@ -96,8 +97,8 @@ internal class IrohConnectionSession(
         }
         Telemetry.event(
             "IrohObserver", "ingest.start",
-            "sessionId" to handle.sessionId,
-            "generation" to readyGeneration.toString(),
+            "sessionId" attr handle.sessionId,
+            "generation" attr readyGeneration.toString(),
         )
         observerJob = scope.launch {
             runCatching {
@@ -109,8 +110,8 @@ internal class IrohConnectionSession(
                 if (error is CancellationException) throw error
                 Telemetry.event(
                     "IrohObserver", "ingest.failed",
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
+                    "error" attr (error.message ?: error.toString()),
+                    "class" attr error::class.simpleName,
                 )
             }
         }
@@ -123,7 +124,7 @@ internal class IrohConnectionSession(
         observerJob = null
         stoppedObserverJobs.add(job)
         job.cancel()
-        Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason.telemetryValue)
+        Telemetry.event("IrohObserver", "ingest.stop", "reason" attr reason.telemetryValue)
         return job
     }
 
@@ -143,8 +144,8 @@ internal class IrohConnectionSession(
         if (!isCurrent(request.generation)) return
         Telemetry.event(
             "IrohObserver", "resubscribe.begin",
-            "conversationId" to request.conversation.id.value,
-            "generation" to request.generation.toString(),
+            "conversationId" attr request.conversation.id.value,
+            "generation" attr request.generation.toString(),
         )
         resubscribeIfCurrent(request)
     }
@@ -159,9 +160,9 @@ internal class IrohConnectionSession(
         if (error is CancellationException) throw error
         Telemetry.event(
             "IrohObserver", "resubscribe.failed",
-            "conversationId" to request.conversation.id.value,
-            "error" to (error.message ?: error.toString()),
-            "class" to error::class.simpleName,
+            "conversationId" attr request.conversation.id.value,
+            "error" attr (error.message ?: error.toString()),
+            "class" attr error::class.simpleName,
         )
     }
 

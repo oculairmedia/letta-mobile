@@ -1,5 +1,6 @@
 package com.letta.mobile.data.context
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.util.Telemetry
 import kotlinx.io.IOException
@@ -39,7 +40,7 @@ class ContextReadingSnapshots(
         try {
             store.putString(KEY, encoded)
         } catch (failure: IOException) {
-            Telemetry.event("ContextReadings", "snapshot.saveFailed", "error" to failure.message, level = Telemetry.Level.WARN)
+            Telemetry.event("ContextReadings", "snapshot.saveFailed", "error" attr failure.message, level = Telemetry.Level.WARN)
         }
     }
 

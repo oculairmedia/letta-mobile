@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.recompile.IrohConversationRecompileRpc
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerConversationRecompile
@@ -52,7 +53,7 @@ internal object ConversationRecompileHandlers {
             Telemetry.event("IrohNode", "conversation_recompile.refused", level = Telemetry.Level.WARN)
             adminError("recompile_failed: ${response.error ?: "the App Server gave no reason"}")
         }
-        Telemetry.event("IrohNode", "conversation_recompile.ok", "dry_run" to request.dryRun)
+        Telemetry.event("IrohNode", "conversation_recompile.ok", "dry_run" attr request.dryRun)
         return IrohConversationRecompileRpc.result(response.result, request.dryRun)
     }
 
@@ -78,7 +79,7 @@ internal object ConversationRecompileHandlers {
     private fun fail(outcome: String, error: Exception, message: String): Nothing {
         Telemetry.event(
             "IrohNode", "conversation_recompile.$outcome",
-            "class" to error::class.simpleName,
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
         adminError(message)

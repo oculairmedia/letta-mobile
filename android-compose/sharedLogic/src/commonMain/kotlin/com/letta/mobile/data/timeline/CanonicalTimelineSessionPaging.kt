@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import androidx.paging.ExperimentalPagingApi
 import androidx.paging.LoadType
 import androidx.paging.Pager
@@ -89,7 +90,7 @@ internal fun Flow<PagingData<TimelineSettledRecord>>.observePublications(
                 // alone. Every replaced generation redraws the list; a capture names what moved it.
                 Telemetry.event(
                     "TimelinePaging", "generation.replaced",
-                    "revision" to current.durableRevision, level = Telemetry.Level.DEBUG,
+                    "revision" attr current.durableRevision, level = Telemetry.Level.DEBUG,
                 )
             }
         }

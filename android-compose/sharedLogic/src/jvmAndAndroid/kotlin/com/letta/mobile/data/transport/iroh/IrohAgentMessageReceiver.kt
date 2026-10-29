@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.util.Telemetry
@@ -70,11 +71,11 @@ class IrohAgentMessageReceiver(
             Telemetry.event(
                 "A2aHost",
                 "a2a.recv",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
-                "msgId" to message.msgId,
+                "fromAgentId" attr message.fromAgentId,
+                "toAgentId" attr message.toAgentId,
+                "msgId" attr message.msgId,
             )
-            Telemetry.event("A2aHost", "a2a.transport_accepted", "msgId" to message.msgId)
+            Telemetry.event("A2aHost", "a2a.transport_accepted", "msgId" attr message.msgId)
             // Route + deliver and return the application outcome through the
             // correlated ack only after durable app-server acceptance.
             val outcome = respond(message, peer)
@@ -98,10 +99,10 @@ class IrohAgentMessageReceiver(
         Telemetry.event(
             "A2aHost",
             "a2a.sender_rejected",
-            "fromAgentId" to message.fromAgentId,
-            "toAgentId" to message.toAgentId,
-            "msgId" to message.msgId,
-            "peer" to IrohFailureLog.remotePrefix(peer),
+            "fromAgentId" attr message.fromAgentId,
+            "toAgentId" attr message.toAgentId,
+            "msgId" attr message.msgId,
+            "peer" attr IrohFailureLog.remotePrefix(peer),
         )
         return DeliveryOutcome(false, SENDER_NOT_AUTHENTICATED)
     }

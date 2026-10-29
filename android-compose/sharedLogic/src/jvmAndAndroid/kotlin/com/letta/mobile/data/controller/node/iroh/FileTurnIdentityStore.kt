@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.RowIdentity
 import com.letta.mobile.data.runtime.StoredRowRef
 import com.letta.mobile.data.runtime.TurnIdentityStore
@@ -93,7 +94,7 @@ class FileTurnIdentityStore(
         if (pruned == 0) return
         Telemetry.event(
             "TurnIdentity", "turnIdentity.filesPruned",
-            "pruned" to pruned, "maxFiles" to maxFiles,
+            "pruned" attr pruned, "maxFiles" attr maxFiles,
             level = Telemetry.Level.WARN,
         )
     }
@@ -126,8 +127,8 @@ class FileTurnIdentityStore(
     }.onFailure {
         Telemetry.event(
             "TurnIdentity", "turnIdentity.storeCorruptLine",
-            "conversationId" to ledger.nameWithoutExtension,
-            "preview" to line.take(CORRUPT_PREVIEW_CHARS),
+            "conversationId" attr ledger.nameWithoutExtension,
+            "preview" attr line.take(CORRUPT_PREVIEW_CHARS),
         )
     }.getOrNull()
 

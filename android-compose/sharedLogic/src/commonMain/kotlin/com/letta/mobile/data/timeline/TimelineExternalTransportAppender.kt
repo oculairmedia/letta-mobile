@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
@@ -71,10 +72,10 @@ class TimelineExternalTransportAppender(
         ).appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.externalTransportLocalAppended",
-            "otid" to event.otid,
-            "conversationId" to conversationId,
-            "contentLength" to event.content.length,
-            "changed" to result.changed,
+            "otid" attr event.otid,
+            "conversationId" attr conversationId,
+            "contentLength" attr event.content.length,
+            "changed" attr result.changed,
         )
         event.ack.complete(event.otid)
     }
@@ -101,15 +102,15 @@ class TimelineExternalTransportAppender(
             }
             if (result.shouldDeletePendingLocal) deleteConfirmedPendingLocal(request.otid)
             timer.stop(
-                "otid" to request.otid.value,
-                "serverCount" to serverMessages.size,
-                "confirmedLocal" to result.confirmedLocal,
-                "appendedMissing" to result.appendedMissing,
+                "otid" attr request.otid.value,
+                "serverCount" attr serverMessages.size,
+                "confirmedLocal" attr result.confirmedLocal,
+                "appendedMissing" attr result.appendedMissing,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            timer.stopError(t, "otid" to request.otid.value)
+            timer.stopError(t, "otid" attr request.otid.value)
             events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
         }
     }
@@ -127,9 +128,9 @@ class TimelineExternalTransportAppender(
         } catch (failure: Throwable) {
             Telemetry.error(
                 "TimelineSync", "reconcile.pendingLocalDeleteFailed", failure,
-                "otid" to otid.value,
-                "conversationId" to conversationId,
-                "retry" to "nextHydrate",
+                "otid" attr otid.value,
+                "conversationId" attr conversationId,
+                "retry" attr "nextHydrate",
             )
         }
     }
@@ -176,10 +177,10 @@ class TimelineExternalTransportAppender(
     ) {
         Telemetry.error(
             "TimelineSync", "reconcile.ws.retry", failure,
-            "otid" to request.otid.value,
-            "agentId" to request.agentId,
-            "conversationId" to request.externalConversationId,
-            "attempt" to attempt.value + 1,
+            "otid" attr request.otid.value,
+            "agentId" attr request.agentId,
+            "conversationId" attr request.externalConversationId,
+            "attempt" attr attempt.value + 1,
         )
     }
 

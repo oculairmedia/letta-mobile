@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.render
 
+import com.letta.mobile.util.attr
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.letta.mobile.data.model.UiGeneratedComponent
@@ -78,8 +79,8 @@ class ChatMessageGeometryState(
             if (recordMeasurementsTotal and 0xFL == 0L) {
                 com.letta.mobile.util.Telemetry.event(
                     "GeometryCache", "write.dedup",
-                    "renderKey" to signature.bucket.renderKey,
-                    "size" to exactHeights.size,
+                    "renderKey" attr signature.bucket.renderKey,
+                    "size" attr exactHeights.size,
                 )
             }
             recordMeasurementsTotal++
@@ -96,9 +97,9 @@ class ChatMessageGeometryState(
         if (recordMeasurementsTotal and 0xFL == 0L) {
             com.letta.mobile.util.Telemetry.event(
                 "GeometryCache", "write.insert",
-                "renderKey" to signature.bucket.renderKey,
-                "isNew" to isNew,
-                "size" to exactHeights.size,
+                "renderKey" attr signature.bucket.renderKey,
+                "isNew" attr isNew,
+                "size" attr exactHeights.size,
             )
         }
     }
@@ -137,10 +138,10 @@ class ChatMessageGeometryState(
         // cache is write-only and the re-measurement cost is fully paid.
         com.letta.mobile.util.Telemetry.event(
             "GeometryCache", "read",
-            "renderKey" to signature.bucket.renderKey,
-            "hit" to isHit,
-            "readsTotal" to readsTotal,
-            "readsHits" to readsHits,
+            "renderKey" attr signature.bucket.renderKey,
+            "hit" attr isHit,
+            "readsTotal" attr readsTotal,
+            "readsHits" attr readsHits,
         )
         return cached
     }

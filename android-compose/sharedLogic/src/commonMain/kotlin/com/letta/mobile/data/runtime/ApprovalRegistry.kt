@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.runtime.ToolApprovalRequest
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -163,9 +164,9 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
             // storage (gates lived on TurnLeaseSlot, which evicts at the same cap).
             Telemetry.event(
                 "ApprovalRegistry", "gate.evictedOverCap",
-                "key" to victim.toString(),
-                "gates" to dropped,
-                "cap" to cap,
+                "key" attr victim.toString(),
+                "gates" attr dropped,
+                "cap" attr cap,
                 level = Telemetry.Level.WARN,
             )
         }

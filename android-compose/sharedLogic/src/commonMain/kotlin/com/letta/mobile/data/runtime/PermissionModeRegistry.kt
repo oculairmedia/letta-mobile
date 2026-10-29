@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -40,7 +41,12 @@ class PermissionModeSettings(
      */
     fun setDefaultMode(mode: AppServerPermissionMode): Boolean {
         val saved = runCatching { store.putString(key, mode.wireValue()) }
-            .onFailure { Telemetry.event("PermissionModeSettings", "defaultMode.writeFailed", "error" to it.message, level = Telemetry.Level.WARN) }
+            .onFailure { Telemetry.event(
+                "PermissionModeSettings",
+                "defaultMode.writeFailed",
+                "error" attr it.message,
+                level = Telemetry.Level.WARN,
+            ) }
             .isSuccess
         if (saved) _defaultMode.value = mode
         return saved
@@ -282,7 +288,12 @@ class PermissionModeRegistry(
     /** True when the choice is in the store. */
     private fun persist(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
         runCatching { store?.putString(storeKey(runtime), mode.wireValue()) }
-            .onFailure { Telemetry.event("PermissionModeRegistry", "choice.writeFailed", "error" to it.message, level = Telemetry.Level.WARN) }
+            .onFailure { Telemetry.event(
+                "PermissionModeRegistry",
+                "choice.writeFailed",
+                "error" attr it.message,
+                level = Telemetry.Level.WARN,
+            ) }
             .isSuccess
 
     private companion object {

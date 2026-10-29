@@ -1,5 +1,9 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ScheduleCreateParams
@@ -22,6 +26,18 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohAgentAndScheduleRepositoryTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun refreshSchedulesFallsBackToEmptyListOn404() = runTest(UnconfinedTestDispatcher()) {
@@ -81,8 +97,8 @@ class IrohAgentAndScheduleRepositoryTest {
             assertEquals(listOf("sched-1"), repository.getSchedules("agent-1").first().map { it.id })
             val warning = Telemetry.snapshot().single { it.name == "scheduleList.scopeMismatch" }
             assertEquals(Telemetry.Level.WARN, warning.level)
-            assertEquals("agent-1", warning.attrs["requestedAgentId"])
-            assertEquals(1, warning.attrs["excludedCount"])
+            assertEquals("agent-1", warning.attrs["requestedAgentId"]?.textOrNull)
+            assertEquals(1, warning.attrs["excludedCount"]?.numberOrNull)
             assertTrue(warning.attrs.keys.none { it.contains("url", ignoreCase = true) || it.contains("payload", ignoreCase = true) })
             assertTrue(warning.attrs.values.none { it.toString().contains("secret-sched") })
         } finally {

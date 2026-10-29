@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
@@ -79,9 +80,9 @@ object LastChatSelectionStorage {
             Telemetry.event(
                 TELEMETRY_TAG,
                 "lastChatSelectionMalformedDiscarded",
-                "reason" to "undeserializable",
-                "errorClass" to (e::class.simpleName ?: "SerializationException"),
-                "rawLength" to raw.length,
+                "reason" attr "undeserializable",
+                "errorClass" attr (e::class.simpleName ?: "SerializationException"),
+                "rawLength" attr raw.length,
                 level = Telemetry.Level.WARN,
             )
             return null
@@ -115,10 +116,10 @@ object LastChatSelectionStorage {
             Telemetry.event(
                 TELEMETRY_TAG,
                 "lastChatSelectionIdentityFenceRejected",
-                "source" to source,
-                "reason" to "blankAgentId",
-                "hadAgentName" to (selection.agentName?.isNotBlank() == true),
-                "hadConversationId" to (selection.conversationId?.isNotBlank() == true),
+                "source" attr source,
+                "reason" attr "blankAgentId",
+                "hadAgentName" attr (selection.agentName?.isNotBlank() == true),
+                "hadConversationId" attr (selection.conversationId?.isNotBlank() == true),
                 level = Telemetry.Level.WARN,
             )
             return null

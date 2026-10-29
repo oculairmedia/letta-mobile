@@ -28,6 +28,18 @@ import kotlin.test.assertEquals
 // TODO(D2 letta-mobile-qhj9o): this test models the pre-stamp, run-id/otid-derived identity; it is deleted with the
 // reconcile heuristics it covers.
 class IrohObserverRunIdReconcileDedupTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @AfterTest
     fun tearDown() {
         Telemetry.clear()

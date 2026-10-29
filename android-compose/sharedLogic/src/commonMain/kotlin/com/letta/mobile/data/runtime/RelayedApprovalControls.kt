@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -99,7 +100,7 @@ class RelayedPermissionModes(
         val mode = push.permissionMode() ?: return
         if (push.agentId.isBlank() || push.conversationId.isBlank()) return
         modes.observed(AppServerRuntimeScope(push.agentId, push.conversationId), mode)
-        Telemetry.event("RelayedPermissionModes", "push.adopted", "mode" to PermissionModeRpc.wire(mode))
+        Telemetry.event("RelayedPermissionModes", "push.adopted", "mode" attr PermissionModeRpc.wire(mode))
     }
 
     private suspend fun request(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): ModeChangeResult = try {
@@ -112,7 +113,7 @@ class RelayedPermissionModes(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-        Telemetry.event("RelayedPermissionModes", "set.failed", "class" to error::class.simpleName, level = Telemetry.Level.WARN)
+        Telemetry.event("RelayedPermissionModes", "set.failed", "class" attr error::class.simpleName, level = Telemetry.Level.WARN)
         ModeChangeResult.Unconfirmed
     }
 

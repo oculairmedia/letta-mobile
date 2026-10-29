@@ -559,7 +559,7 @@ JVM/Android QR encoding and rendering contracts backed by ZXing. They produce bi
 
 # Package com.letta.mobile.runtime.iroh
 
-Platform initialization hooks for the native Iroh runtime. Actual implementations vary by target; an unsupported-target hook does not promise a working native transport. Keep target-specific native initialization behind the [IrohAndroidInit](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.runtime.iroh/-iroh-android-init/index.html) expect/actual seam; callers must respect the implementation available in their source set.
+Android-only physical initialization for the native Iroh runtime. `IrohAndroidInit.install(context: android.content.Context)` binds the Android context before native transport operations. Pairing and session transport hosts call this hook from Android source sets; common, desktop, browser, and native code have no initialization shim.
 
 # Package com.letta.mobile.ui.ambient
 

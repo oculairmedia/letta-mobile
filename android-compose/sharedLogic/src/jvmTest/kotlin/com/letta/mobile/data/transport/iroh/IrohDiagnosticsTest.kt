@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -48,7 +49,7 @@ class IrohDiagnosticsTest {
     @Test
     fun frameAttributesExcludeBodySnippets() {
         assertEquals(
-            listOf("type" to "stream_delta", "bytes" to 42),
+            listOf("type" attr "stream_delta", "bytes" attr 42),
             IrohDiagnostics.redactedFrameAttributes("stream_delta", 42),
         )
     }

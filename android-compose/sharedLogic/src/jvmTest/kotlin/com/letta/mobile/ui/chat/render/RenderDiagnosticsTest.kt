@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.render
 
+import com.letta.mobile.util.booleanOrNull
+
 import com.letta.mobile.util.Telemetry
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -9,6 +11,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RenderDiagnosticsTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @BeforeTest
     fun setUp() {
@@ -230,7 +244,7 @@ class RenderDiagnosticsTest {
         // Sample flag is recorded on every event so a watcher can verify the
         // sampling is happening (and not, e.g., every generation by accident).
         // Exactly the first generation of each sample window is marked true.
-        val sampledTrueCount = renderBuilt.count { it.attrs["contentDupesScanSampled"] == true }
+        val sampledTrueCount = renderBuilt.count { it.attrs["contentDupesScanSampled"]?.booleanOrNull == true }
         assertEquals(
             2,
             sampledTrueCount,

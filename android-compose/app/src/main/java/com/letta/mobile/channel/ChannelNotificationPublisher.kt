@@ -1,5 +1,6 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.attr
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -59,8 +60,8 @@ class ChannelNotificationPublisher @Inject constructor(
             Log.w(TAG, "POST_NOTIFICATIONS not granted; skipping notification for ${notification.conversationId}")
             Telemetry.event(
                 "ChannelNotificationPublisher", "publishBlocked",
-                "reason" to "POST_NOTIFICATIONS_DENIED",
-                "conversationId" to notification.conversationId,
+                "reason" attr "POST_NOTIFICATIONS_DENIED",
+                "conversationId" attr notification.conversationId,
             )
             return false
         }
@@ -70,8 +71,8 @@ class ChannelNotificationPublisher @Inject constructor(
             Log.w(TAG, "Notifications disabled for app; skipping notification for ${notification.conversationId}")
             Telemetry.event(
                 "ChannelNotificationPublisher", "publishBlocked",
-                "reason" to "NOTIFICATIONS_DISABLED",
-                "conversationId" to notification.conversationId,
+                "reason" attr "NOTIFICATIONS_DISABLED",
+                "conversationId" attr notification.conversationId,
             )
             return false
         }
@@ -107,28 +108,28 @@ class ChannelNotificationPublisher @Inject constructor(
         } catch (t: Throwable) {
             Telemetry.error(
                 "ChannelNotificationPublisher", "publishFailed", t,
-                "conversationId" to notification.conversationId,
-                "messageId" to notification.messageId,
-                "notificationTag" to notificationTag,
-                "notificationId" to notificationId,
-                "rawPreviewLength" to content.preview.rawLength,
-                "normalizedPreviewLength" to content.preview.normalizedLength,
-                "finalPreviewLength" to content.messageText.length,
-                "previewFallbackReason" to content.preview.fallbackReason.name,
+                "conversationId" attr notification.conversationId,
+                "messageId" attr notification.messageId,
+                "notificationTag" attr notificationTag,
+                "notificationId" attr notificationId,
+                "rawPreviewLength" attr content.preview.rawLength,
+                "normalizedPreviewLength" attr content.preview.normalizedLength,
+                "finalPreviewLength" attr content.messageText.length,
+                "previewFallbackReason" attr content.preview.fallbackReason.name,
             )
             return false
         }
         Telemetry.event(
             "ChannelNotificationPublisher", "published",
-            "conversationId" to notification.conversationId,
-            "messageId" to notification.messageId,
-            "notificationTag" to notificationTag,
-            "notificationId" to notificationId,
-            "rawPreviewLength" to content.preview.rawLength,
-            "normalizedPreviewLength" to content.preview.normalizedLength,
-            "finalPreviewLength" to content.messageText.length,
-            "previewFallbackReason" to content.preview.fallbackReason.name,
-            "titleFallbackReason" to content.titleText.fallbackReason.name,
+            "conversationId" attr notification.conversationId,
+            "messageId" attr notification.messageId,
+            "notificationTag" attr notificationTag,
+            "notificationId" attr notificationId,
+            "rawPreviewLength" attr content.preview.rawLength,
+            "normalizedPreviewLength" attr content.preview.normalizedLength,
+            "finalPreviewLength" attr content.messageText.length,
+            "previewFallbackReason" attr content.preview.fallbackReason.name,
+            "titleFallbackReason" attr content.titleText.fallbackReason.name,
         )
         return true
     }

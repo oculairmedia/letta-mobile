@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.runtime.PermissionModeRpc
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -51,10 +52,10 @@ internal object PermissionModeAdminHandlers {
         } catch (unsupported: UnsupportedOperationException) {
             adminError("capability_unavailable: this host cannot change permission modes")
         } catch (error: Exception) {
-            Telemetry.event("IrohNode", "permission_mode.set_failed", "class" to error::class.simpleName, level = Telemetry.Level.WARN)
+            Telemetry.event("IrohNode", "permission_mode.set_failed", "class" attr error::class.simpleName, level = Telemetry.Level.WARN)
             adminError("permission_mode_failed: the host could not reach the App Server")
         }
-        Telemetry.event("IrohNode", "permission_mode.set", "mode" to PermissionModeRpc.wire(mode), "confirmed" to confirmed)
+        Telemetry.event("IrohNode", "permission_mode.set", "mode" attr PermissionModeRpc.wire(mode), "confirmed" attr confirmed)
         val now = controller.permissionModeOf(runtime) ?: mode.takeIf { confirmed }
         // letta-mobile-a4tm7: the other clients' chips follow only what the App Server confirmed.
         if (confirmed && now != null) publisher?.publish(runtime, now)

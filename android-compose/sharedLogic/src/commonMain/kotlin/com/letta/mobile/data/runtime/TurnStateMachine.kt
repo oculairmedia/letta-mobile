@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -29,9 +30,9 @@ internal class TurnStateMachine<P : Any, E : Any>(
         if (to == null) {
             Telemetry.event(
                 "AppServerTurnEngine", "turn.illegal_transition",
-                "machine" to name,
-                "phase" to from.toString(),
-                "event" to event.toString(),
+                "machine" attr name,
+                "phase" attr from.toString(),
+                "event" attr event.toString(),
                 level = Telemetry.Level.WARN,
             )
             return null

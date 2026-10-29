@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.util.attr
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutCubic
@@ -144,7 +145,7 @@ internal fun DesktopAmbientChatBackground(
                 Telemetry.event(
                     AMBIENT_TELEMETRY_TAG,
                     "shader.compileFailed",
-                    "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                    "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
                     level = Telemetry.Level.WARN,
                 )
             }

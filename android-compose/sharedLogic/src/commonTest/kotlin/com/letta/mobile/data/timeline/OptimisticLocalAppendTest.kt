@@ -41,6 +41,18 @@ import kotlinx.coroutines.test.runTest
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class OptimisticLocalAppendTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @BeforeTest
     fun setUp() {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.compaction.ConversationCompactRpc
 import com.letta.mobile.data.compaction.executeCommandAnswer
 import com.letta.mobile.data.dreaming.AdminRpcDreamingRepository
@@ -114,7 +115,7 @@ internal object ReflectionAdminHandlers {
             is DreamOutcome.Unsupported -> adminError(AdminRpcDreamingRepository.NO_DREAM_COMMAND)
             is DreamOutcome.Failed -> adminError(AdminRpcDreamingRepository.FAILED_PREFIX + outcome.message)
         }
-        Telemetry.event("IrohNode", "reflection_run.ok", "status" to start.status.name)
+        Telemetry.event("IrohNode", "reflection_run.ok", "status" attr start.status.name)
         return AppServerProtocol.json.encodeToJsonElement(DreamRunStart.serializer(), start)
     }
 
@@ -140,7 +141,7 @@ internal object ReflectionAdminHandlers {
     private fun fail(outcome: String, error: Exception, message: String): Nothing {
         Telemetry.event(
             "IrohNode", "reflection_run.$outcome",
-            "class" to error::class.simpleName,
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
         adminError(message)

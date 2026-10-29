@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.util.telemetryAttributes
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
@@ -60,7 +61,7 @@ internal fun interface ChatComposerTelemetry {
 
 internal class ChatComposerController(
     private val telemetry: ChatComposerTelemetry = ChatComposerTelemetry { name, attrs ->
-        Telemetry.event("AdminChatVM", name, *attrs)
+        Telemetry.event("AdminChatVM", name, attrs = attrs.telemetryAttributes())
     },
     private val limits: AttachmentLimits = AttachmentLimits.Default,
 ) {

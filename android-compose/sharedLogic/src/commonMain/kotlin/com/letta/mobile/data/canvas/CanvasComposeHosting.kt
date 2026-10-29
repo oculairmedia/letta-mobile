@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeGuide
 import com.letta.mobile.data.canvas.compose.CanvasComposeService
@@ -45,7 +46,7 @@ internal class CanvasComposeHosting(private val host: String, private val toolCa
             // artifact; without either, a retry would put a second copy on the board.
             Telemetry.event(
                 CanvasComposeService.TAG, "compose.noToolCallId",
-                "host" to host, "canvasId" to target.canvasId.value,
+                "host" attr host, "canvasId" attr target.canvasId.value,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -70,22 +71,22 @@ internal class CanvasComposeHosting(private val host: String, private val toolCa
         when (outcome) {
             is ComposeOutcome.Done -> Telemetry.event(
                 CanvasComposeService.TAG, "compose.answered",
-                "host" to host,
-                "canvasId" to canvasId?.value,
-                "artifactId" to outcome.receipt.artifactId,
-                "status" to outcome.receipt.status.name,
-                "revision" to outcome.receipt.revision,
-                "items" to outcome.receipt.items.size,
-                "retry" to outcome.receipt.warnings.isNotEmpty(),
-                "toolCallId" to toolCallId,
+                "host" attr host,
+                "canvasId" attr canvasId?.value,
+                "artifactId" attr outcome.receipt.artifactId,
+                "status" attr outcome.receipt.status.name,
+                "revision" attr outcome.receipt.revision,
+                "items" attr outcome.receipt.items.size,
+                "retry" attr outcome.receipt.warnings.isNotEmpty(),
+                "toolCallId" attr toolCallId,
             )
             is ComposeOutcome.Refused -> Telemetry.event(
                 CanvasComposeService.TAG, "compose.refused",
-                "host" to host,
-                "canvasId" to canvasId?.value,
-                "code" to outcome.refusal.code.name,
-                "problems" to outcome.refusal.problems.size,
-                "toolCallId" to toolCallId,
+                "host" attr host,
+                "canvasId" attr canvasId?.value,
+                "code" attr outcome.refusal.code.name,
+                "problems" attr outcome.refusal.problems.size,
+                "toolCallId" attr toolCallId,
                 level = Telemetry.Level.WARN,
             )
         }

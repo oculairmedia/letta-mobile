@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.GoalStatusResponse
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.SlashCommandsResponse
@@ -138,8 +139,8 @@ open class IrohAdminRpcSlashCommandSource(
         }
         Telemetry.event(
             "IrohTransport", "adminRpc.ensureConnected",
-            "serverUrl" to backendUrlTelemetryDescriptor(serverUrl),
-            "state" to channelTransport.state.value::class.simpleName,
+            "serverUrl" attr backendUrlTelemetryDescriptor(serverUrl),
+            "state" attr channelTransport.state.value::class.simpleName,
         )
         channelTransport.connect(
             baseShimUrl = serverUrl,

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
@@ -171,8 +172,8 @@ internal object IrohStreamDeltaServerFrameMapper {
     private fun dropUnstampedText(messageType: String, frameId: String): List<ServerFrame> {
         Telemetry.event(
             "IrohStreamDelta", "live.unstampedFrame",
-            "messageType" to messageType,
-            "frameId" to frameId,
+            "messageType" attr messageType,
+            "frameId" attr frameId,
             level = Telemetry.Level.WARN,
         )
         return emptyList()

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas.library
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasArchiveStore
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasCreateOptions
@@ -86,7 +87,7 @@ class CanvasLibraryController(
                 currentCoroutineContext().ensureActive()
                 result.fold(onSuccess = onSuccess, onFailure = { error ->
                     if (error !is Exception) throw error
-                    Telemetry.error("CanvasLibrary", "operationFailed", error, "operation" to operation)
+                    Telemetry.error("CanvasLibrary", "operationFailed", error, "operation" attr operation)
                     mutableState.update { it.copy(error = "Canvas storage is unavailable. Retry loading the library.") }
                 })
             } finally {

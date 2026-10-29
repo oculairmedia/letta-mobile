@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.avatar.rive
 
+import com.letta.mobile.util.textOrNull
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.ui.mascot.frame.RiveFrameStep
@@ -17,6 +19,18 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class RiveDesktopAdvanceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private class NativeFixture {
         var activityResult = 1
         var createFails = false
@@ -89,8 +103,8 @@ class RiveDesktopAdvanceTest {
             val events = evidence()
             assertEquals(before + 1, events.size, "all scenes share one process-wide report")
             assertEquals(Telemetry.Level.INFO, events.first().level)
-            assertEquals("test adapter", events.first().attrs["adapter"])
-            assertEquals(path, events.first().attrs["lib"])
+            assertEquals("test adapter", events.first().attrs["adapter"]?.textOrNull)
+            assertEquals(path, events.first().attrs["lib"]?.textOrNull)
             assertEquals(setOf("rive-render"), native.threads.toSet())
         } finally {
             scenes.forEach { it.close() }

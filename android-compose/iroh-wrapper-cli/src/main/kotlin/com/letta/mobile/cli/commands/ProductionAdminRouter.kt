@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
@@ -78,14 +79,14 @@ fun buildProductionAdminRouter(
         Telemetry.event(
             "SkillsCatalog",
             "host.hydrated",
-            "skillsDir" to resolvedSkillsDir,
-            "skills" to skillsCatalog.snapshot().size.toString(),
+            "skillsDir" attr resolvedSkillsDir,
+            "skills" attr skillsCatalog.snapshot().size.toString(),
         )
     } else {
         Telemetry.event(
             "SkillsCatalog",
             "host.root_missing",
-            "skillsDir" to resolvedSkillsDir,
+            "skillsDir" attr resolvedSkillsDir,
         )
     }
     val subagentStore = subagentRegistryFile

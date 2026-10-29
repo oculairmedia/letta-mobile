@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport
@@ -96,7 +97,7 @@ class IrohCanvasPresenceTransport(
             }
         }.onFailure { t ->
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasPresence", "incoming.error", "error" to errorMsg)
+            Telemetry.event("CanvasPresence", "incoming.error", "error" attr errorMsg)
         }
     }
 
@@ -167,7 +168,7 @@ class IrohCanvasPresenceTransport(
             throw cancelled
         } catch (t: Throwable) {
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasPresence", "connection.error", "error" to errorMsg)
+            Telemetry.event("CanvasPresence", "connection.error", "error" attr errorMsg)
         }
     }
 
@@ -292,7 +293,7 @@ internal suspend fun CoroutineScope.runCanvasAcceptLoop(
             throw e
         } catch (t: Throwable) {
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event(telemetryTag, "accept.error", "error" to errorMsg)
+            Telemetry.event(telemetryTag, "accept.error", "error" attr errorMsg)
         }
     }
 }

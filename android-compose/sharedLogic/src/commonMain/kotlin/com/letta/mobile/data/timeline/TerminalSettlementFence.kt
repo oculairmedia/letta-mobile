@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -68,28 +69,28 @@ internal fun evaluateTerminalSettlementFence(
     if (supersetOfAccumulated) {
         Telemetry.event(
             "TimelineSync", "terminal.settlement.fence",
-            "conversationId" to conversationId,
-            "serverId" to terminal.serverId,
-            "decision" to "allowed_superset",
-            "fenceReason" to "stale_seq_but_superset",
-            "lastDeltaSeq" to lastSeq,
-            "terminalSeq" to terminalSeq,
-            "existingLen" to accumulated.content.length,
-            "incomingLen" to terminal.content.length,
+            "conversationId" attr conversationId,
+            "serverId" attr terminal.serverId,
+            "decision" attr "allowed_superset",
+            "fenceReason" attr "stale_seq_but_superset",
+            "lastDeltaSeq" attr lastSeq,
+            "terminalSeq" attr terminalSeq,
+            "existingLen" attr accumulated.content.length,
+            "incomingLen" attr terminal.content.length,
         )
         return TerminalSettlementFenceDecision(blocked = false, reason = "stale_seq_but_superset")
     }
 
     Telemetry.event(
         "TimelineSync", "terminal.settlement.fence",
-        "conversationId" to conversationId,
-        "serverId" to terminal.serverId,
-        "decision" to "blocked",
-        "fenceReason" to "stale_terminal_not_superset",
-        "lastDeltaSeq" to lastSeq,
-        "terminalSeq" to terminalSeq,
-        "existingLen" to accumulated.content.length,
-        "incomingLen" to terminal.content.length,
+        "conversationId" attr conversationId,
+        "serverId" attr terminal.serverId,
+        "decision" attr "blocked",
+        "fenceReason" attr "stale_terminal_not_superset",
+        "lastDeltaSeq" attr lastSeq,
+        "terminalSeq" attr terminalSeq,
+        "existingLen" attr accumulated.content.length,
+        "incomingLen" attr terminal.content.length,
         level = Telemetry.Level.WARN,
     )
     return TerminalSettlementFenceDecision(blocked = true, reason = "stale_terminal_not_superset")

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
@@ -11,7 +12,6 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
@@ -222,18 +222,18 @@ class IrohNodeConnection(
         subscription.subscribe(conversationId)
         Telemetry.event(
             "IrohNode", "viewer.registered",
-            "remoteEndpointId" to remoteEndpointId,
-            "conversationId" to conversationId,
-            "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
+            "remoteEndpointId" attr remoteEndpointId,
+            "conversationId" attr conversationId,
+            "deregistered" attr (previous?.takeIf { it != conversationId } ?: ""),
         )
     }
 
     suspend fun serve() = coroutineScope {
         try {
             val controlBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" to remoteEndpointId)
+            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" attr remoteEndpointId)
             val streamBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" to remoteEndpointId)
+            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" attr remoteEndpointId)
             val streamSend = streamBiStream.send()
             // eaczz.3: build this connection's viewer handle now that its turn
             // stream is open, so both subscription signals (runtime_start on the
@@ -267,9 +267,9 @@ class IrohNodeConnection(
         } catch (e: Exception) {
             Telemetry.event(
                 "IrohNode", "connection.error",
-                "remoteEndpointId" to remoteEndpointId,
-                "error" to (e.message ?: e.toString()),
-                "class" to e::class.simpleName,
+                "remoteEndpointId" attr remoteEndpointId,
+                "error" attr (e.message ?: e.toString()),
+                "class" attr e::class.simpleName,
             )
         } finally {
             // Release only this connection generation. An overlapped reconnect
@@ -277,12 +277,7 @@ class IrohNodeConnection(
             viewerRegistration?.let { registration ->
                 runCatching { connectionRegistry?.release(registration) }
             }
-            Telemetry.event(
-                "IrohNode", "connection.closed",
-                "remoteEndpointId" to remoteEndpointId,
-                "closeReason" to IrohDiagnostics.closeReason(connection),
-                *IrohDiagnostics.connectionStatsAttributes(runCatching { connection.stats() }.getOrNull()).toTypedArray(),
-            )
+            recordConnectionClosed("remoteEndpointId" attr remoteEndpointId, connection)
             runCatching { connection.close() }
         }
     }
@@ -344,7 +339,7 @@ class IrohNodeConnection(
         val type = frame["type"]?.jsonPrimitive?.contentOrNull
         if (type !in AGENT_ADDRESSED_FRAME_TYPES || !authenticated.get()) return null
         if (AgentScopeGuard.allowsParams(sessionAuth.agentScope(), frame)) return null
-        Telemetry.event("IrohNode", "authz.agent_scope_denied", "remoteEndpointId" to remoteEndpointId, "type" to type)
+        Telemetry.event("IrohNode", "authz.agent_scope_denied", "remoteEndpointId" attr remoteEndpointId, "type" attr type)
         val requestId = frame["request_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
         return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
     }
@@ -362,9 +357,9 @@ class IrohNodeConnection(
         if (!IrohPeerCapabilities.isAllowed(effectiveCapabilities(), requiredCapability)) {
             Telemetry.event(
                 "IrohNode", "authz.denied",
-                "remoteEndpointId" to remoteEndpointId,
-                "method" to method,
-                "capability" to requiredCapability,
+                "remoteEndpointId" attr remoteEndpointId,
+                "method" attr method,
+                "capability" attr requiredCapability,
             )
             return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"forbidden","capability":"$requiredCapability"}"""
         }
@@ -406,18 +401,18 @@ class IrohNodeConnection(
         val settle = subscription.observe(ConversationId(conversationId))
         Telemetry.event(
             "IrohNode", "viewer.registered",
-            "remoteEndpointId" to remoteEndpointId,
-            "conversationId" to conversationId,
-            "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
+            "remoteEndpointId" attr remoteEndpointId,
+            "conversationId" attr conversationId,
+            "deregistered" attr (previous?.takeIf { it != conversationId } ?: ""),
         )
         return { succeeded ->
             settle(succeeded)
             if (!succeeded) {
                 Telemetry.event(
                     "IrohNode", "viewer.registration_rolled_back",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "failedConversationId" to conversationId,
-                    "nowViewing" to (subscription.currentConversation ?: ""),
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "failedConversationId" attr conversationId,
+                    "nowViewing" attr (subscription.currentConversation ?: ""),
                 )
             }
         }
@@ -434,8 +429,8 @@ class IrohNodeConnection(
             } catch (error: Exception) {
                 Telemetry.event(
                     "IrohNode", "admin_rpc.method_observer.rollback_failed",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "error" to (error.message ?: error.toString()),
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "error" attr (error.message ?: error.toString()),
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -498,7 +493,7 @@ class IrohNodeConnection(
                     }
                 },
             ) { frameJson ->
-                Telemetry.event("IrohNode", "control.recv", "remoteEndpointId" to remoteEndpointId, "bytes" to frameJson.length)
+                Telemetry.event("IrohNode", "control.recv", "remoteEndpointId" attr remoteEndpointId, "bytes" attr frameJson.length)
                 try {
                     val response = handleControlFrame(
                         frameJson = frameJson,
@@ -512,9 +507,9 @@ class IrohNodeConnection(
                 } catch (error: Exception) {
                     Telemetry.event(
                         "IrohNode", "control.frame_failed",
-                        "remoteEndpointId" to remoteEndpointId,
-                        "error" to (error.message ?: error.toString()),
-                        "class" to error::class.simpleName,
+                        "remoteEndpointId" attr remoteEndpointId,
+                        "error" attr (error.message ?: error.toString()),
+                        "class" attr error::class.simpleName,
                     )
                 }
             }
@@ -536,7 +531,7 @@ class IrohNodeConnection(
             val type = obj["type"]?.jsonPrimitive?.content
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
-            Telemetry.event("IrohNode", "control.frame", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
+            recordControlFrame("remoteEndpointId" attr remoteEndpointId, obj)
             agentScopeViolation(obj)?.let { return it }
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
@@ -595,17 +590,17 @@ class IrohNodeConnection(
                 activeTurnJobsMutex.withLock { activeTurnJobs.remove(job) }
                 Telemetry.event(
                     "IrohNode", "stream.job.done",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "cancelled" to (cause is CancellationException),
-                    "error" to (cause?.message ?: ""),
-                    "class" to (cause?.let { it::class.simpleName } ?: ""),
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "cancelled" attr (cause is CancellationException),
+                    "error" attr (cause?.message ?: ""),
+                    "class" attr (cause?.let { it::class.simpleName } ?: ""),
                 )
             }
         }
         Telemetry.event(
             "IrohNode", "stream.job.started",
-            "remoteEndpointId" to remoteEndpointId,
-            "activeJobs" to activeTurnJobs.size,
+            "remoteEndpointId" attr remoteEndpointId,
+            "activeJobs" attr activeTurnJobs.size,
         )
         job.start()
     }
@@ -618,8 +613,8 @@ class IrohNodeConnection(
         if (jobs.isEmpty()) return
         Telemetry.event(
             "IrohNode", "stream.jobs.drain",
-            "remoteEndpointId" to remoteEndpointId,
-            "activeJobs" to jobs.size,
+            "remoteEndpointId" attr remoteEndpointId,
+            "activeJobs" attr jobs.size,
         )
         val completed = withTimeoutOrNull(STREAM_JOB_DRAIN_TIMEOUT_MS.milliseconds) {
             jobs.joinAll()
@@ -628,8 +623,8 @@ class IrohNodeConnection(
         if (completed) return
         Telemetry.event(
             "IrohNode", "stream.jobs.drain_timeout",
-            "remoteEndpointId" to remoteEndpointId,
-            "activeJobs" to jobs.count { it.isActive },
+            "remoteEndpointId" attr remoteEndpointId,
+            "activeJobs" attr jobs.count { it.isActive },
             level = Telemetry.Level.WARN,
         )
         jobs.forEach { job ->
@@ -662,9 +657,9 @@ class IrohNodeConnection(
         peerCapabilities.set(advertised)
         Telemetry.event(
             "IrohNode", "auth.ok",
-            "remoteEndpointId" to remoteEndpointId,
-            "method" to decision.method,
-            "peerCapabilities" to advertised.sorted().joinToString(","),
+            "remoteEndpointId" attr remoteEndpointId,
+            "method" attr decision.method,
+            "peerCapabilities" attr advertised.sorted().joinToString(","),
         )
         val capabilities = advertisedCapabilities(adminRpcRouter)
         return buildJsonObject {
@@ -684,7 +679,7 @@ class IrohNodeConnection(
      */
     private fun rejectAuth(requestId: String, outcome: IrohBearerAuthVerifier.Outcome): String {
         if (outcome is IrohBearerAuthVerifier.Outcome.RateLimited) {
-            Telemetry.event("IrohNode", "auth.rate_limited", "remoteEndpointId" to remoteEndpointId)
+            Telemetry.event("IrohNode", "auth.rate_limited", "remoteEndpointId" attr remoteEndpointId)
             runCatching { connection.close(4429L, "auth_rate_limited".encodeToByteArray()) }
             return """{"type":"auth_response","request_id":"$requestId","success":false,"error":"rate_limited"}"""
         }
@@ -692,12 +687,12 @@ class IrohNodeConnection(
         val failures = authFailuresOnThisConnection.incrementAndGet()
         Telemetry.event(
             "IrohNode", "auth.failed",
-            "remoteEndpointId" to remoteEndpointId,
-            "reason" to reason,
-            "connectionFailures" to failures,
+            "remoteEndpointId" attr remoteEndpointId,
+            "reason" attr reason,
+            "connectionFailures" attr failures,
         )
         if (failures >= IrohBearerAuthVerifier.MAX_FAILURES_BEFORE_CLOSE) {
-            Telemetry.event("IrohNode", "auth.connection_closed", "remoteEndpointId" to remoteEndpointId)
+            Telemetry.event("IrohNode", "auth.connection_closed", "remoteEndpointId" attr remoteEndpointId)
             runCatching { connection.close(4401L, "auth_failures".encodeToByteArray()) }
         }
         return """{"type":"auth_response","request_id":"$requestId","success":false,"error":"$reason"}"""
@@ -712,9 +707,9 @@ class IrohNodeConnection(
         val id = requestId ?: ""
         Telemetry.event(
             "IrohNode", "authz.denied",
-            "remoteEndpointId" to remoteEndpointId,
-            "requestId" to id,
-            "capability" to required,
+            "remoteEndpointId" attr remoteEndpointId,
+            "requestId" attr id,
+            "capability" attr required,
         )
         return """{"type":"error","request_id":"$id","message":"forbidden","capability":"$required"}"""
     }
@@ -731,7 +726,7 @@ class IrohNodeConnection(
             block()
         } else {
             val id = requestId ?: ""
-            Telemetry.event("IrohNode", "auth.required", "remoteEndpointId" to remoteEndpointId, "requestId" to id, "reason" to "missing_token")
+            recordAuthenticationRequired("remoteEndpointId" attr remoteEndpointId, "requestId" attr id)
             """{"type":"error","request_id":"$id","message":"unauthorized"}"""
         }
 
@@ -862,9 +857,9 @@ class IrohNodeConnection(
             if (parkedFrameSequence != null) {
                 Telemetry.event(
                     "IrohNode", "input.duplicate_replayed_parked_frames",
-                    "clientMessageId" to clientMsgId,
-                    "agentId" to input.runtime.agentId,
-                    "conversationId" to input.runtime.conversationId,
+                    "clientMessageId" attr clientMsgId,
+                    "agentId" attr input.runtime.agentId,
+                    "conversationId" attr input.runtime.conversationId,
                 )
                 runCatching {
                     replayParkedDeltas(ensureSelfViewer(streamSend), input.runtime, parkedFrameSequence)
@@ -877,9 +872,9 @@ class IrohNodeConnection(
             } else {
                 Telemetry.event(
                     "IrohNode", "input.duplicate_ignored",
-                    "clientMessageId" to clientMsgId,
-                    "agentId" to input.runtime.agentId,
-                    "conversationId" to input.runtime.conversationId,
+                    "clientMessageId" attr clientMsgId,
+                    "agentId" attr input.runtime.agentId,
+                    "conversationId" attr input.runtime.conversationId,
                 )
             }
             return
@@ -970,9 +965,9 @@ class IrohNodeConnection(
         }
         Telemetry.event(
             "IrohNode", "stream.busy_rejected_initiator_only",
-            "remoteEndpointId" to remoteEndpointId,
-            "error" to errorText,
-            "class" to error::class.simpleName,
+            "remoteEndpointId" attr remoteEndpointId,
+            "error" attr errorText,
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
     }
@@ -986,19 +981,19 @@ class IrohNodeConnection(
     ) {
         Telemetry.event(
             "IrohNode", "stream.closed_before_terminal",
-            "remoteEndpointId" to remoteEndpointId,
-            "error" to (error.message ?: error.toString()),
-            "class" to error::class.simpleName,
+            "remoteEndpointId" attr remoteEndpointId,
+            "error" attr (error.message ?: error.toString()),
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
         if (clientMsgId == null || fanout.anyTerminalWritten) return
         tracker?.parkFrames(parkedTerminals, clientMsgId, NodeTurnHost.INTERRUPTED_TERMINAL)
         Telemetry.event(
             "IrohNode", "stream.frames_parked",
-            "remoteEndpointId" to remoteEndpointId,
-            "clientMessageId" to clientMsgId,
-            "conversationId" to input.runtime.conversationId,
-            "frameCount" to (tracker?.frameCount() ?: 0),
+            "remoteEndpointId" attr remoteEndpointId,
+            "clientMessageId" attr clientMsgId,
+            "conversationId" attr input.runtime.conversationId,
+            "frameCount" attr (tracker?.frameCount() ?: 0),
         )
     }
 

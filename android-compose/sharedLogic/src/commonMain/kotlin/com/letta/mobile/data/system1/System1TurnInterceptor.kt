@@ -1,5 +1,6 @@
 package com.letta.mobile.data.system1
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
@@ -62,17 +63,17 @@ class System1TurnInterceptor(
 
     private fun emitTelemetry(assessment: System1Assessment) {
         if (!assessment.available) {
-            Telemetry.event(TAG, "system1_unavailable", "reason" to assessment.reason)
+            Telemetry.event(TAG, "system1_unavailable", "reason" attr assessment.reason)
             return
         }
         Telemetry.event(
             TAG,
             "system1_assessment",
-            "disposition" to assessment.disposition.name,
-            "domain" to assessment.route.domain,
-            "difficulty" to assessment.route.difficultyLabel,
-            "jailbreak_prob" to assessment.guard.jailbreakProb,
-            "interaction_mode" to assessment.interaction.interactionMode,
+            "disposition" attr assessment.disposition.name,
+            "domain" attr assessment.route.domain,
+            "difficulty" attr assessment.route.difficultyLabel,
+            "jailbreak_prob" attr assessment.guard.jailbreakProb,
+            "interaction_mode" attr assessment.interaction.interactionMode,
             durationMs = assessment.latencyMs.toLong(),
         )
     }

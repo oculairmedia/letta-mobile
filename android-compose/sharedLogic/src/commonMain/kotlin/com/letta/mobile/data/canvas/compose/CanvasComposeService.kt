@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas.compose
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasBatchCheck
 import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasBatchViolation
@@ -142,7 +143,11 @@ internal class ComposeRun(
         // Loud: the batch passed every rule and the board still did not take it.
         Telemetry.event(
             CanvasComposeService.TAG, "publish.failed",
-            "canvasId" to target.canvasId.value, "artifactId" to ready.artifactId, "ops" to ready.ops.size, "code" to code.name, "reason" to message,
+            "canvasId" attr target.canvasId.value,
+            "artifactId" attr ready.artifactId,
+            "ops" attr ready.ops.size,
+            "code" attr code.name,
+            "reason" attr message,
             level = Telemetry.Level.WARN,
         )
         val problemCode = if (code == ComposeErrorCode.BOARD_REFUSED) CanvasComposeService.PUBLISH_FAILED else code.name

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.util.Telemetry
 import io.ak1.drawbox.domain.model.DrawingSerializer
@@ -45,7 +46,7 @@ private suspend fun CanvasBoard.persistDrawingOrRetainDraft(drawing: State, base
     throw cancelled
 } catch (expectedFailure: Exception) {
     ui.statusMessage = "Error: Could not save drawing: ${expectedFailure.message ?: "Unknown"}"
-    Telemetry.error("CanvasWorkspace", "drawing.save.failed", expectedFailure, "canvasId" to requireNotNull(session).canvasId.value)
+    Telemetry.error("CanvasWorkspace", "drawing.save.failed", expectedFailure, "canvasId" attr requireNotNull(session).canvasId.value)
     false
 }
 

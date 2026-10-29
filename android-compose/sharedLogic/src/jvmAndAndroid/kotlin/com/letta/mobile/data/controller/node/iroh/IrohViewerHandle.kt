@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
@@ -118,7 +119,7 @@ internal class IrohViewerHandle(
     } catch (e: Exception) {
         Telemetry.event(
             "IrohNode", "viewer.write.failed",
-            "error" to (e.message ?: e.toString()),
+            "error" attr (e.message ?: e.toString()),
             level = Telemetry.Level.WARN,
         )
         false

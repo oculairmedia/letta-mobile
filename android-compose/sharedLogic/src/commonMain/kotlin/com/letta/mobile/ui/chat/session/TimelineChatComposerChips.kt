@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.model.AgentId
@@ -125,7 +126,7 @@ private suspend fun readRecordedConversation(source: TimelineModelSource, conver
     runCatching { source.conversation(conversation) }
         .onFailure { failure ->
             if (failure is CancellationException) throw failure
-            Telemetry.event(TELEMETRY_TAG, "conversationModel.readFailed", "error" to failure.message, level = Telemetry.Level.WARN)
+            Telemetry.event(TELEMETRY_TAG, "conversationModel.readFailed", "error" attr failure.message, level = Telemetry.Level.WARN)
         }
         .getOrNull()
 
@@ -144,7 +145,12 @@ private class TargetConversationModelHost(
     override fun showModel(update: ConversationModelUpdate) {
         if (update.conversationId != conversation) return
         update.label?.let { label -> state.update { it.copy(label = label) } }
-        update.error?.let { Telemetry.event(TELEMETRY_TAG, "conversationModel.switchFailed", "error" to it, level = Telemetry.Level.WARN) }
+        update.error?.let { Telemetry.event(
+            TELEMETRY_TAG,
+            "conversationModel.switchFailed",
+            "error" attr it,
+            level = Telemetry.Level.WARN,
+        ) }
     }
 
     override suspend fun recordModel(model: String) {

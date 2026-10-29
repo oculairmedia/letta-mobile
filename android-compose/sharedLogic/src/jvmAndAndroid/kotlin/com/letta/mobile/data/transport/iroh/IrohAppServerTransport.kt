@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -31,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryValue
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -128,7 +130,12 @@ class IrohAppServerTransport(
     // Without this, an uncaught IrohException in a scope.launch propagates to
     // the thread's default uncaught exception handler and crashes the app.
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Telemetry.event("IrohTransport", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
+        Telemetry.event(
+            "IrohTransport",
+            "crash.caught",
+            "error" attr (throwable.message ?: throwable.toString()),
+            "class" attr throwable::class.simpleName,
+        )
     }
 
     private val controlJob = scope.launch(irohExceptionHandler) {
@@ -154,8 +161,9 @@ class IrohAppServerTransport(
         val reason = runCatching { activeConnection.closed() }.getOrNull()
         val closeReason = IrohDiagnostics.closeReason(reason)
         Telemetry.event(
-            "IrohTransport", "connection.closed",
-            *(IrohDiagnostics.closeAttributes(activeConnection) + ("reason" to closeReason)).toTypedArray(),
+            "IrohTransport",
+            "connection.closed",
+            attrs = (IrohDiagnostics.closeAttributes(activeConnection) + ("reason" attr closeReason)).toTypedArray(),
         )
         onConnectionLost("connection_closed: $closeReason")
     }
@@ -183,7 +191,7 @@ class IrohAppServerTransport(
     override val isConnected: Flow<Boolean> get() = connected
 
     override suspend fun sendControl(command: AppServerCommand) {
-        Telemetry.event("IrohTransport", "control.enqueue", "command" to command::class.simpleName)
+        Telemetry.event("IrohTransport", "control.enqueue", "command" attr command::class.simpleName)
         controlCommandQueue.send(command)
     }
 
@@ -204,7 +212,7 @@ class IrohAppServerTransport(
         val biStream = connection.openBi()
         val sendStream = biStream.send()
         var sendFinished = false
-        Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" to method, "path" to path, "requestId" to requestId)
+        Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" attr method, "path" attr path, "requestId" attr requestId)
         try {
             val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
             IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES, allowFrameParts = true)
@@ -215,10 +223,25 @@ class IrohAppServerTransport(
             val response = decodeFrame(rawResponse, AppServerChannel.Control).frame
             val adminResponse = response as? AppServerInboundFrame.AdminRpcResponse
                 ?: error("admin_rpc expected admin_rpc_response but received ${response.type}")
-            Telemetry.event("IrohTransport", "admin_rpc.stream.complete", "method" to method, "path" to path, "requestId" to requestId, "success" to adminResponse.success.toString())
+            Telemetry.event(
+                "IrohTransport",
+                "admin_rpc.stream.complete",
+                "method" attr method,
+                "path" attr path,
+                "requestId" attr requestId,
+                "success" attr adminResponse.success.toString(),
+            )
             adminResponse
         } catch (error: Throwable) {
-            Telemetry.event("IrohTransport", "admin_rpc.stream.failed", "method" to method, "path" to path, "requestId" to requestId, "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+            Telemetry.event(
+                "IrohTransport",
+                "admin_rpc.stream.failed",
+                "method" attr method,
+                "path" attr path,
+                "requestId" attr requestId,
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
+            )
             throw error
         } finally {
             if (!sendFinished) {
@@ -258,7 +281,11 @@ class IrohAppServerTransport(
             connection = withTimeout(CONNECT_TIMEOUT_MS.milliseconds) {
                 endpoint.connect(remoteAddr, alpn)
             }
-            Telemetry.event("IrohTransport", "connect.ok", *IrohDiagnostics.connectionAttributes(connection).toTypedArray())
+            Telemetry.event(
+                "IrohTransport",
+                "connect.ok",
+                attrs = IrohDiagnostics.connectionAttributes(connection).toTypedArray(),
+            )
             selectedPathTelemetry.onConnect(runCatching { connection.paths() }.getOrDefault(emptyList()))
             controlBiStream = connection.openBi()
             Telemetry.event("IrohTransport", "control.opened")
@@ -269,10 +296,10 @@ class IrohAppServerTransport(
             onConnectionLost("connect_failed: ${t.message ?: t.toString()}")
             Telemetry.event(
                 "IrohTransport", "connect.failed",
-                "remoteEndpointId" to IrohDiagnostics.endpointIdHex(remoteAddr.id().toBytes()),
-                "closeReason" to "",
-                "error" to (t.message ?: t.toString()),
-                "class" to t::class.simpleName,
+                "remoteEndpointId" attr IrohDiagnostics.endpointIdHex(remoteAddr.id().toBytes()),
+                "closeReason" attr "",
+                "error" attr (t.message ?: t.toString()),
+                "class" attr t::class.simpleName,
             )
             connectionReady.completeExceptionally(t)
             if (!streamReady.isCompleted) streamReady.completeExceptionally(t)
@@ -288,7 +315,7 @@ class IrohAppServerTransport(
             for (command in sender) {
                 val json = protocol.encodeCommand(command)
                 val bytes = json.encodeToByteArray()
-                Telemetry.event("IrohTransport", "control.write", "command" to command::class.simpleName, "bytes" to bytes.size)
+                Telemetry.event("IrohTransport", "control.write", "command" attr command::class.simpleName, "bytes" attr bytes.size)
                 IrohFrameCodec.write(sendStream, json, allowFrameParts = true)
             }
         }
@@ -302,7 +329,7 @@ class IrohAppServerTransport(
     }
 
     private suspend fun runStreamChannel() {
-        Telemetry.event("IrohTransport", "stream.channel_start", "alive" to true)
+        Telemetry.event("IrohTransport", "stream.channel_start", "alive" attr true)
         // Open stream bi-stream (we only read from this, but QUIC requires bi-directional)
         streamBiStream = connection.openBi()
         Telemetry.event("IrohTransport", "stream.opened")
@@ -323,7 +350,7 @@ class IrohAppServerTransport(
         channel: AppServerChannel,
         sink: MutableSharedFlow<AppServerReceivedFrame>,
     ) {
-        Telemetry.event("IrohTransport", "frame.reader_start", "channel" to channel.name)
+        Telemetry.event("IrohTransport", "frame.reader_start", "channel" attr channel.name)
         try {
             IrohFrameCodec.readAll(
                 recvStream = recvStream,
@@ -331,24 +358,25 @@ class IrohAppServerTransport(
                 chunkBytes = READ_CHUNK_SIZE,
             ) { json ->
                 val frame = decodeFrame(json, channel)
-                Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
+                Telemetry.event("IrohTransport", "frame.recv", "channel" attr channel.name, "type" attr frame.frame.type)
                 recordServerCapabilities(frame)
                 sink.emit(frame)
             }
         } catch (error: IrohFrameCodec.ProtocolException) {
             Telemetry.event(
-                "IrohTransport", "frame.protocol_error",
-                "channel" to channel.name,
-                *(if (::connection.isInitialized) IrohDiagnostics.closeAttributes(connection) else emptyList()).toTypedArray(),
-                "error" to (error.message ?: error.toString()),
+                "IrohTransport",
+                "frame.protocol_error",
+                attrs = arrayOf("channel" attr channel.name) +
+                    (if (::connection.isInitialized) IrohDiagnostics.closeAttributes(connection) else emptyList()).toTypedArray() +
+                    arrayOf("error" attr (error.message ?: error.toString())),
             )
             throw error
         } catch (error: Throwable) {
             Telemetry.event(
                 "IrohTransport", "frame.reader_error",
-                "channel" to channel.name,
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
+                "channel" attr channel.name,
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
             )
             throw error
         } finally {
@@ -361,8 +389,8 @@ class IrohAppServerTransport(
         connected.value = false
         Telemetry.event(
             "IrohSupervisor", "reader.exit",
-            "channel" to channel.name,
-            "reason" to reason,
+            "channel" attr channel.name,
+            "reason" attr reason,
         )
         onConnectionLost(reason)
     }
@@ -378,15 +406,17 @@ class IrohAppServerTransport(
                     selectedPathTelemetry.onPathsChanged(paths)
                     Telemetry.event(
                         "IrohTransport", "paths.changed",
-                        "remoteEndpointId" to (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: ""),
-                        "selectedPathKind" to summary.selectedKind,
-                        "selectedPathId" to summary.selectedPathId,
-                        "pathCount" to summary.pathCount,
-                        "relayPathCount" to summary.relayPathCount,
-                        "directPathCount" to summary.directPathCount,
-                        "rttMs" to summary.selectedRttMs,
-                        "lostPackets" to summary.lostPackets,
-                        "lostBytes" to summary.lostBytes,
+                        "remoteEndpointId" attr (
+                            (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: TelemetryValue.Text(""))
+                        ),
+                        "selectedPathKind" attr summary.selectedKind,
+                        "selectedPathId" attr summary.selectedPathId,
+                        "pathCount" attr summary.pathCount,
+                        "relayPathCount" attr summary.relayPathCount,
+                        "directPathCount" attr summary.directPathCount,
+                        "rttMs" attr summary.selectedRttMs,
+                        "lostPackets" attr summary.lostPackets,
+                        "lostBytes" attr summary.lostBytes,
                     )
                 }
             })
@@ -394,17 +424,21 @@ class IrohAppServerTransport(
         }.onFailure { error ->
             Telemetry.event(
                 "IrohTransport", "paths.watch_failed",
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
             )
         }
         runCatching {
             connection.watchPathEvents(object : PathEventCallback {
                 override suspend fun onEvent(event: computer.iroh.PathEvent) {
                     Telemetry.event(
-                        "IrohTransport", "path.event",
-                        "remoteEndpointId" to (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: ""),
-                        *IrohDiagnostics.pathEventAttributes(event).toTypedArray(),
+                        "IrohTransport",
+                        "path.event",
+                        attrs = arrayOf(
+                            "remoteEndpointId" attr (
+                                attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: TelemetryValue.Text("")
+                            ),
+                        ) + IrohDiagnostics.pathEventAttributes(event).toTypedArray(),
                     )
                 }
             })
@@ -412,8 +446,8 @@ class IrohAppServerTransport(
         }.onFailure { error ->
             Telemetry.event(
                 "IrohTransport", "path_events.watch_failed",
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
             )
         }
     }

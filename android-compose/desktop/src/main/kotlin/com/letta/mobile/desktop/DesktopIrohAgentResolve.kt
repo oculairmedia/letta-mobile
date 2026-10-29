@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
@@ -25,8 +26,8 @@ private suspend fun lookupAgent(
 } catch (t: Throwable) {
     Telemetry.event(
         "DesktopAgents", "resolve.agentLookupFailed",
-        "agentId" to id,
-        "errorClass" to (t::class.simpleName ?: "Unknown"),
+        "agentId" attr id,
+        "errorClass" attr (t::class.simpleName ?: "Unknown"),
     )
     null
 }
@@ -41,8 +42,8 @@ private fun reportUnresolved(agentIds: Set<String>, resolvedIds: Set<String>) {
     if (missing == 0) return
     Telemetry.event(
         "DesktopAgents", "resolve.unresolvedIds",
-        "requestedIds" to agentIds.size,
-        "unresolved" to missing,
+        "requestedIds" attr agentIds.size,
+        "unresolved" attr missing,
     )
 }
 

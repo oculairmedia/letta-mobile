@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
@@ -352,11 +353,11 @@ open class CachedSettingsRepository(
                 Telemetry.event(
                     "SettingsRepository",
                     "backendSwitchCachePartialClear",
-                    "fromConfigId" to (currentId ?: "<none>"),
-                    "toConfigId" to (nextId ?: "<none>"),
-                    "successes" to result.successes,
-                    "failures" to result.failedCacheNames.size,
-                    "failedCaches" to result.failedCacheNames.joinToString(","),
+                    "fromConfigId" attr (currentId ?: "<none>"),
+                    "toConfigId" attr (nextId ?: "<none>"),
+                    "successes" attr result.successes,
+                    "failures" attr result.failedCacheNames.size,
+                    "failedCaches" attr result.failedCacheNames.joinToString(","),
                 )
             }
         }

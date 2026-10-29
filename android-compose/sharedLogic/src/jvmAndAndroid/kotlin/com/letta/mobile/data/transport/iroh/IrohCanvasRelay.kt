@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasRelayDecoded
 import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.CanvasRelayMessage
@@ -63,7 +64,7 @@ class IrohCanvasRelay(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Telemetry.event("CanvasRelay", "stream.failed", "origin" to origin, "error" to (e.message ?: e.toString()))
+            Telemetry.event("CanvasRelay", "stream.failed", "origin" attr origin, "error" attr (e.message ?: e.toString()))
             return
         }
         val send = stream.send()
@@ -72,7 +73,7 @@ class IrohCanvasRelay(
         val session = host.connect(origin) { message ->
             writes.withLock { CanvasRelayFraming.write(send, CanvasRelayProtocol.encode(message)) }
         }
-        Telemetry.event("CanvasRelay", "app.connected", "origin" to origin, "generation" to session.generation)
+        Telemetry.event("CanvasRelay", "app.connected", "origin" attr origin, "generation" attr session.generation)
         try {
             while (!session.closed) {
                 val text = CanvasRelayFraming.read(recv) ?: break
@@ -91,19 +92,19 @@ class IrohCanvasRelay(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Telemetry.event("CanvasRelay", "app.error", "origin" to origin, "error" to (e.message ?: e.toString()))
+            Telemetry.event("CanvasRelay", "app.error", "origin" attr origin, "error" attr (e.message ?: e.toString()))
         } finally {
             withContext(NonCancellable) {
                 session.close()
                 runCatching { send.finish() }
                 runCatching { connection.close() }
             }
-            Telemetry.event("CanvasRelay", "app.disconnected", "origin" to origin, "generation" to session.generation)
+            Telemetry.event("CanvasRelay", "app.disconnected", "origin" attr origin, "generation" attr session.generation)
         }
     }
 
     private suspend fun refuse(session: CanvasRelayHost.Session, reason: String) {
-        Telemetry.event("CanvasRelay", "app.refused", "origin" to session.origin, "reason" to reason)
+        Telemetry.event("CanvasRelay", "app.refused", "origin" attr session.origin, "reason" attr reason)
         session.deliver(CanvasRelayMessage.Refused(reason))
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -48,8 +49,8 @@ internal class TurnOwnerLivenessProbe(
         } catch (timeout: TimeoutCancellationException) {
             Telemetry.event(
                 "AppServerTurnEngine", "activeTurn.reconcileSyncTimedOut",
-                "key" to "${scope.agentId}/${scope.conversationId}",
-                "timeoutMs" to timeoutMs,
+                "key" attr "${scope.agentId}/${scope.conversationId}",
+                "timeoutMs" attr timeoutMs,
                 level = Telemetry.Level.WARN,
             )
             OwnerLiveness.Inconclusive
@@ -58,7 +59,7 @@ internal class TurnOwnerLivenessProbe(
         } catch (error: Throwable) {
             Telemetry.error(
                 "AppServerTurnEngine", "activeTurn.reconcileSyncFailed", error,
-                "key" to "${scope.agentId}/${scope.conversationId}",
+                "key" attr "${scope.agentId}/${scope.conversationId}",
             )
             OwnerLiveness.Inconclusive
         } finally {

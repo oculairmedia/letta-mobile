@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.InMemorySubagentRegistryStore
 import com.letta.mobile.data.subagents.SubagentChipState
@@ -28,6 +30,18 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubagentRegistryPublisherTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private var nowMs = 10_000_000L
     private val registry = DurableSubagentRegistry(store = InMemorySubagentRegistryStore(), clock = { nowMs })
     private val source = ControllerSubagentRegistrySource(registry)
@@ -92,7 +106,7 @@ class SubagentRegistryPublisherTest {
         (1..total).forEach { publisher.onConversationChanged(SubagentConversationKey(AGENT, "c$it")) }
         // Read before the sender runs: its thousand "published" lines would push these out of the telemetry ring.
         val overflows = Telemetry.snapshot().filter { it.tag == "SubagentPush" && it.name == "pending_overflow" }
-        assertEquals(setOf("c1", "c2", "c3", "c4", "c5"), overflows.map { it.attrs["droppedConversationId"] }.toSet())
+        assertEquals(setOf("c1", "c2", "c3", "c4", "c5"), overflows.map { it.attrs["droppedConversationId"]?.textOrNull }.toSet())
         publisher.attach { conversationId, _ -> published += conversationId; 1 }
         runCurrent()
 

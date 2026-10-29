@@ -18,15 +18,50 @@ them silently is a correctness bug.
 There are exactly three recommended call shapes. Nothing else.
 
 ```kotlin
+import com.letta.mobile.util.attr
+
 // 1. Point event — "something happened"
-Telemetry.event("Tag", "verb.noun", "key" to value, …)
+Telemetry.event("Tag", "verb.noun", "key" attr value, …)
 
 // 2. Measured span — "this block took N ms"
-val result = Telemetry.measure("Tag", "verb.noun", "key" to value) { … }
+val result = Telemetry.measure("Tag", "verb.noun", "key" attr value) { … }
 
 // 3. Error event — "this blew up, here's the throwable"
-Telemetry.error("Tag", "verb.failed", throwable, "key" to value, …)
+Telemetry.error("Tag", "verb.failed", throwable, "key" attr value, …)
 ```
+
+### Attribute and history ownership contracts
+
+`attr` accepts nullable strings, numbers, booleans, and flat numeric lists and
+stores a typed `TelemetryValue`; numbers and numeric-list elements retain their
+original primitive types. Numeric lists preserve their structure and bracketed
+diagnostic rendering, including the pointer observer's consumed-ID lists. Use
+`TelemetryValue.Null` for a literal null. Inspect scalar values with
+`textOrNull`, `numberOrNull`, or `booleanOrNull` rather than casting the attribute
+itself. Duplicate keys retain the last supplied value, and diagnostic text keeps
+the same scalar rendering. Convert domain-specific diagnostics explicitly at
+the call site; arbitrary object payloads are not accepted.
+
+History belongs to a host or test lifecycle, not the process-global facade:
+
+```kotlin
+val recorder = TelemetryRecorder()
+Telemetry.installRecorder(recorder).use {
+    // Start history-producing work only after installation.
+    Telemetry.event("Tag", "verb.noun", "count" attr 1)
+}
+```
+
+Application entrypoints install before ordinary startup events and retain the
+installation until their lifecycle ends. Before installation and after close,
+console/delegate routing still works but no history is recorded. With no
+delegate, DEBUG has no fallback console output; other levels retain fallback
+output. Disabling logcat output does not disable installed history recording.
+The recorder keeps the newest 1000 events, newest first. Existing `events`
+collectors follow replacement installations. Closing an obsolete installation
+cannot detach its replacement, and close serializes with routed appends so no
+routed writer can modify that owner after close returns. Tests that inspect
+history must own an installation and close it during teardown.
 
 ### Anti-patterns to avoid
 
@@ -34,8 +69,8 @@ Telemetry.error("Tag", "verb.failed", throwable, "key" to value, …)
 // ❌ Don't manually add errorClass/errorMessage. Use Telemetry.error().
 Telemetry.event(
     "Tag", "verb.failed",
-    "errorClass" to t::class.simpleName,
-    "errorMessage" to (t.message ?: ""),
+    "errorClass" attr t::class.simpleName,
+    "errorMessage" attr (t.message ?: ""),
     level = Telemetry.Level.ERROR,
 )
 
@@ -136,7 +171,7 @@ Telemetry.event("TimelineSync", "hydrate", …)
 // ✅ Unambiguous pair.
 Telemetry.event("TimelineSync", "hydrate.start", …)
 // … later …
-Telemetry.event("TimelineSync", "hydrate.ok", "rawCount" to n, durationMs = ms)
+Telemetry.event("TimelineSync", "hydrate.ok", "rawCount" attr n, durationMs = ms)
 
 // ✅ Or use a measured span which emits both automatically.
 Telemetry.measure("TimelineSync", "hydrate") { … }
@@ -151,14 +186,15 @@ alerts / the inspector pivot on events.
 
 **Rules**:
 
-- **Flat key-value only.** Never nest maps or lists — stringify first if
-  you need structure.
+- **Flat, typed key-values only.** Scalars and flat numeric lists retain their
+  original types. Never pass nested maps/lists or opaque object graphs; choose an
+  explicitly bounded, redacted diagnostic instead.
 - Keys are `lowerCamelCase` and as short as possible while still being
   unambiguous: `conversationId`, `durationMs`, `backoffMs`, `runId`.
 - **Always use the canonical key for cross-subsystem concerns.** See the
   table below. This is the #1 thing that makes dashboards easy to build.
-- Emit enumerable values as plain strings. E.g. `"via" to "apiException"`
-  rather than `"via" to 2`.
+- Emit enumerable values as plain strings. E.g. `"via" attr "apiException"`
+  rather than `"via" attr 2`.
 - Emit booleans as booleans (`true`/`false`) — the Telemetry serializer
   handles them fine.
 - Emit numbers as their natural Kotlin type; the serializer handles Long,
@@ -195,16 +231,16 @@ Use these EXACT spellings so dashboards can filter across subsystems:
 // ✅ Canonical keys, flat structure.
 Telemetry.event(
     "TimelineSync", "streamSubscriber.opened",
-    "conversationId" to conversationId,
-    "runId" to runId,
+    "conversationId" attr conversationId,
+    "runId" attr runId,
 )
 
 // ❌ Key drift breaks dashboards. Don't.
 Telemetry.event(
     "TimelineSync", "streamSubscriber.opened",
-    "conv_id" to conversationId,     // — should be conversationId
-    "run" to runId,                  // — should be runId
-    "elapsed" to ms,                 // — should be durationMs (via named param)
+    "conv_id" attr conversationId,     // — should be conversationId
+    "run" attr runId,                  // — should be runId
+    "elapsed" attr ms,                 // — should be durationMs (via named param)
 )
 ```
 

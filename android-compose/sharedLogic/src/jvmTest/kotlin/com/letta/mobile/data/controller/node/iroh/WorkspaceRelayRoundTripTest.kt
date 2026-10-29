@@ -50,6 +50,18 @@ import kotlinx.serialization.json.jsonObject
  * the capability matrix applies, and that secret values never reach telemetry.
  */
 class WorkspaceRelayRoundTripTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     /** Everything telemetry holds (its ring keeps the newest events). */
     private fun recordedTelemetry(): String = Telemetry.events.value.joinToString("\n")
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.messaging.AgentMessageClientId
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.IdFormats
@@ -264,17 +265,17 @@ data class Timeline(
             Telemetry.error(
                 "Timeline", "init.positionViolation",
                 IllegalStateException("Timeline events are not strictly ordered by position"),
-                "conversationId" to conversationId,
-                "eventCount" to events.size,
+                "conversationId" attr conversationId,
+                "eventCount" attr events.size,
             )
         }
         if (otidDupes) {
             Telemetry.error(
                 "Timeline", "init.otidDuplicates",
                 IllegalStateException("Timeline contains duplicate otids"),
-                "conversationId" to conversationId,
-                "eventCount" to events.size,
-                "uniqueOtids" to otidToIndex.size,
+                "conversationId" attr conversationId,
+                "eventCount" attr events.size,
+                "uniqueOtids" attr otidToIndex.size,
             )
         }
     }
@@ -336,8 +337,8 @@ data class Timeline(
         if (event is TimelineEvent.Confirmed && findByLogicalId(event.logicalId) != null) {
             Telemetry.event(
                 "Timeline", "live.duplicateAppend",
-                "conversationId" to conversationId,
-                "logicalId" to event.logicalId,
+                "conversationId" attr conversationId,
+                "logicalId" attr event.logicalId,
                 level = Telemetry.Level.WARN,
             )
             return this
@@ -346,8 +347,8 @@ data class Timeline(
         if (eventIdentity in residentOtids) {
             Telemetry.event(
                 "Timeline", "append.duplicateOtid",
-                "conversationId" to conversationId,
-                "otid" to event.otid,
+                "conversationId" attr conversationId,
+                "otid" attr event.otid,
                 level = Telemetry.Level.WARN,
             )
             return this
@@ -356,10 +357,10 @@ data class Timeline(
         val safeEvent: TimelineEvent = if (lastPos != null && lastPos >= event.position) {
             Telemetry.event(
                 "Timeline", "append.positionBumped",
-                "conversationId" to conversationId,
-                "otid" to event.otid,
-                "requested" to event.position,
-                "bumpedTo" to (lastPos + 1.0),
+                "conversationId" attr conversationId,
+                "otid" attr event.otid,
+                "requested" attr event.position,
+                "bumpedTo" attr (lastPos + 1.0),
                 level = Telemetry.Level.WARN,
             )
             when (event) {
@@ -465,10 +466,10 @@ data class Timeline(
         val newOldestServerId = remaining.firstNotNullOfOrNull { (it as? TimelineEvent.Confirmed)?.serverId }
         Telemetry.event(
             "Timeline", "slideResidentWindow.evicted",
-            "conversationId" to conversationId,
-            "evictedCount" to evictedCount,
-            "residentCount" to remaining.size,
-            "totalReleasedOlderCount" to (releasedOlderCount + evictedCount),
+            "conversationId" attr conversationId,
+            "evictedCount" attr evictedCount,
+            "residentCount" attr remaining.size,
+            "totalReleasedOlderCount" attr (releasedOlderCount + evictedCount),
         )
         return copy(
             events = remaining,
@@ -546,9 +547,9 @@ data class Timeline(
         }
         Telemetry.event(
             "Timeline", "replaceByServerId.duplicateOtidDropped",
-            "conversationId" to conversationId,
-            "serverId" to confirmed.serverId,
-            "otid" to stabilized.otid,
+            "conversationId" attr conversationId,
+            "serverId" attr confirmed.serverId,
+            "otid" attr stabilized.otid,
             level = Telemetry.Level.WARN,
         )
         return copy(events = deduped.toPersistentList(), stablePrefixVersion = stablePrefixVersion + 1)
@@ -618,13 +619,13 @@ data class Timeline(
         }.toPersistentList()
         Telemetry.event(
             "TimelineSync", "orphanAssistantFragments.cleaned",
-            "conversationId" to conversationId,
-            "runId" to targetRunIds.joinToString(","),
-            "turnId" to (turnId ?: ""),
-            "reason" to reason,
-            "count" to removeServerIds.size,
-            "removedServerIds" to removeServerIds.take(MAX_REMOVED_SERVER_IDS_TELEMETRY).joinToString(","),
-            "removedServerIdsTruncated" to (removeServerIds.size > MAX_REMOVED_SERVER_IDS_TELEMETRY),
+            "conversationId" attr conversationId,
+            "runId" attr targetRunIds.joinToString(","),
+            "turnId" attr (turnId ?: ""),
+            "reason" attr reason,
+            "count" attr removeServerIds.size,
+            "removedServerIds" attr removeServerIds.take(MAX_REMOVED_SERVER_IDS_TELEMETRY).joinToString(","),
+            "removedServerIdsTruncated" attr (removeServerIds.size > MAX_REMOVED_SERVER_IDS_TELEMETRY),
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(

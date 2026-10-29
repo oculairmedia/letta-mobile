@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.PersistentList
@@ -17,10 +18,10 @@ class TimelineStateTransitionHandler(
         ).appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.localAppended",
-            "otid" to event.pending.otid,
-            "conversationId" to conversationId,
-            "contentLength" to event.pending.content.length,
-            "changed" to result.changed,
+            "otid" attr event.pending.otid,
+            "conversationId" attr conversationId,
+            "contentLength" attr event.pending.content.length,
+            "changed" attr result.changed,
         )
         event.ack.complete(Unit)
     }
@@ -75,9 +76,9 @@ class TimelineStateTransitionHandler(
         if (appended) {
             Telemetry.event(
                 "TimelineSync", "send.optimisticLocalAppended",
-                "otid" to otid,
-                "conversationId" to conversationId,
-                "contentLength" to content.length,
+                "otid" attr otid,
+                "conversationId" attr conversationId,
+                "contentLength" attr content.length,
             )
         }
         return appended
@@ -95,8 +96,8 @@ class TimelineStateTransitionHandler(
         ack.appliedResultOrThrow()
         Telemetry.event(
             "TimelineSync", "send.optimisticLocalFailed",
-            "otid" to otid,
-            "conversationId" to conversationId,
+            "otid" attr otid,
+            "conversationId" attr conversationId,
         )
     }
 

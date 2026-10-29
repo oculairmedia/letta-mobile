@@ -1,5 +1,6 @@
 package com.letta.mobile.performance
 
+import com.letta.mobile.util.attr
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
@@ -38,8 +39,8 @@ object ProductionJankStatsMonitor {
             Telemetry.event(
                 tag = "Perf",
                 name = "prodJankStatsSkipped",
-                "sampleRate" to sampleRate,
-                "buildType" to BuildConfig.BUILD_TYPE,
+                "sampleRate" attr sampleRate,
+                "buildType" attr BuildConfig.BUILD_TYPE,
             )
             return
         }
@@ -48,9 +49,9 @@ object ProductionJankStatsMonitor {
         Telemetry.event(
             tag = "Perf",
             name = "prodJankStatsEnabled",
-            "sampleRate" to sampleRate,
-            "buildType" to BuildConfig.BUILD_TYPE,
-            "frameBudgetMs" to FRAME_BUDGET_MS,
+            "sampleRate" attr sampleRate,
+            "buildType" attr BuildConfig.BUILD_TYPE,
+            "frameBudgetMs" attr FRAME_BUDGET_MS,
         )
     }
 
@@ -95,9 +96,9 @@ object ProductionJankStatsMonitor {
             Telemetry.event(
                 tag = "Jank",
                 name = "frame.sampled",
-                "screen" to screenName,
-                "durationMs" to durationMs,
-                "attachedToSpan" to attached,
+                "screen" attr screenName,
+                "durationMs" attr durationMs,
+                "attachedToSpan" attr attached,
                 level = Telemetry.Level.INFO,
             )
         }

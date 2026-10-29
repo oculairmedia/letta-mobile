@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentId
@@ -205,7 +206,7 @@ class IrohAdminRpcTimelineTransport(
 
     private fun httpGated(path: String) {
         if (gatedTelemetryPaths.add(path)) {
-            Telemetry.event("TimelineSync", "irohMode.httpGated", "path" to path)
+            Telemetry.event("TimelineSync", "irohMode.httpGated", "path" attr path)
         }
     }
 
@@ -228,8 +229,8 @@ class IrohAdminRpcTimelineTransport(
             // this is conversation content) instead of failing with an opaque decode error.
             Telemetry.event(
                 "IrohTransport", "message_list.unexpected_object_shape",
-                "keyCount" to result.size,
-                "keys" to result.keys.sorted().take(12).joinToString(","),
+                "keyCount" attr result.size,
+                "keys" attr result.keys.sorted().take(12).joinToString(","),
                 level = Telemetry.Level.WARN,
             )
         }

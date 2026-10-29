@@ -1,5 +1,9 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryDelegate
 import kotlinx.coroutines.CompletableDeferred
@@ -24,6 +28,18 @@ import kotlin.test.assertNull
  * both are legal on JVM but illegal in Kotlin/Native.
  */
 class RosterNameTelemetryTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     private object SilentDelegate : TelemetryDelegate {
         override fun logToLogcat(level: Telemetry.Level, tag: String, body: String, throwable: Throwable?) = Unit
@@ -62,9 +78,9 @@ class RosterNameTelemetryTest {
 
         RosterNameTelemetry.rosterCompleteness(outcome, source = "test")
         val ev = lastEvent("roster.completeness")
-        assertEquals("match", ev.attrs["completeness"])
-        assertEquals(131, ev.attrs["sweptSize"])
-        assertEquals(131, ev.attrs["authoritativeCount"])
+        assertEquals("match", ev.attrs["completeness"]?.textOrNull)
+        assertEquals(131, ev.attrs["sweptSize"]?.numberOrNull)
+        assertEquals(131, ev.attrs["authoritativeCount"]?.numberOrNull)
         assertEquals(Telemetry.Level.INFO, ev.level)
     }
 
@@ -75,10 +91,10 @@ class RosterNameTelemetryTest {
 
         RosterNameTelemetry.rosterCompleteness(outcome, source = "test")
         val ev = lastEvent("roster.completeness")
-        assertEquals("mismatch", ev.attrs["completeness"])
-        assertEquals(50, ev.attrs["sweptSize"])
-        assertEquals(131, ev.attrs["authoritativeCount"])
-        assertEquals(-81, ev.attrs["delta"])
+        assertEquals("mismatch", ev.attrs["completeness"]?.textOrNull)
+        assertEquals(50, ev.attrs["sweptSize"]?.numberOrNull)
+        assertEquals(131, ev.attrs["authoritativeCount"]?.numberOrNull)
+        assertEquals(-81, ev.attrs["delta"]?.numberOrNull)
         assertEquals(Telemetry.Level.WARN, ev.level)
     }
 
@@ -91,9 +107,9 @@ class RosterNameTelemetryTest {
 
         RosterNameTelemetry.rosterCompleteness(outcome, source = "test")
         val ev = lastEvent("roster.completeness")
-        assertEquals("unknown", ev.attrs["completeness"])
-        assertEquals("unknown", ev.attrs["authoritativeCount"])
-        assertEquals(RosterNameTelemetry.UnknownReason.COUNT_UNAVAILABLE, ev.attrs["unknownReason"])
+        assertEquals("unknown", ev.attrs["completeness"]?.textOrNull)
+        assertEquals("unknown", ev.attrs["authoritativeCount"]?.textOrNull)
+        assertEquals(RosterNameTelemetry.UnknownReason.COUNT_UNAVAILABLE, ev.attrs["unknownReason"]?.textOrNull)
         assertEquals(Telemetry.Level.WARN, ev.level)
     }
 
@@ -107,9 +123,9 @@ class RosterNameTelemetryTest {
 
         RosterNameTelemetry.rosterCompleteness(outcome, source = "test")
         val ev = lastEvent("roster.completeness")
-        assertEquals("unknown", ev.attrs["completeness"])
-        assertEquals(RosterNameTelemetry.UnknownReason.COUNT_FAILED, ev.attrs["unknownReason"])
-        assertNull(ev.attrs["delta"])
+        assertEquals("unknown", ev.attrs["completeness"]?.textOrNull)
+        assertEquals(RosterNameTelemetry.UnknownReason.COUNT_FAILED, ev.attrs["unknownReason"]?.textOrNull)
+        assertNull(ev.attrs["delta"]?.numberOrNull)
     }
 
     @Test
@@ -118,7 +134,7 @@ class RosterNameTelemetryTest {
         // read as agreement just because the numbers could be made to line up.
         val outcome = RosterNameTelemetry.classifyCompleteness(sweptSize = 0, authoritativeCount = null)
         assertTrue(outcome is RosterNameTelemetry.Completeness.Unknown)
-        assertEquals("unknown", RosterNameTelemetry.completenessAttrs(outcome).toMap()["completeness"])
+        assertEquals("unknown", RosterNameTelemetry.completenessAttrs(outcome).toMap()["completeness"]?.textOrNull)
     }
 
     @Test
@@ -140,10 +156,10 @@ class RosterNameTelemetryTest {
             source = "test",
         )
         val ev = lastEvent("roster.sweepStopped")
-        assertEquals("noResult", ev.attrs["stop"])
-        assertEquals(100, ev.attrs["offset"])
-        assertEquals(0, ev.attrs["pageSize"])
-        assertEquals(100, ev.attrs["mergedSize"])
+        assertEquals("noResult", ev.attrs["stop"]?.textOrNull)
+        assertEquals(100, ev.attrs["offset"]?.numberOrNull)
+        assertEquals(0, ev.attrs["pageSize"]?.numberOrNull)
+        assertEquals(100, ev.attrs["mergedSize"]?.numberOrNull)
         assertEquals(Telemetry.Level.INFO, ev.level)
     }
 
@@ -157,9 +173,9 @@ class RosterNameTelemetryTest {
             source = "test",
         )
         val ev = lastEvent("roster.sweepStopped")
-        assertEquals("emptyPage", ev.attrs["stop"])
-        assertEquals(150, ev.attrs["offset"])
-        assertEquals(131, ev.attrs["mergedSize"])
+        assertEquals("emptyPage", ev.attrs["stop"]?.textOrNull)
+        assertEquals(150, ev.attrs["offset"]?.numberOrNull)
+        assertEquals(131, ev.attrs["mergedSize"]?.numberOrNull)
     }
 
     @Test
@@ -172,10 +188,10 @@ class RosterNameTelemetryTest {
             source = "test",
         )
         val ev = lastEvent("roster.sweepStopped")
-        assertEquals("noFreshIgnoredOffset", ev.attrs["stop"])
+        assertEquals("noFreshIgnoredOffset", ev.attrs["stop"]?.textOrNull)
         // A full page that yielded nothing new is NOT the same as an empty page.
-        assertEquals(50, ev.attrs["pageSize"])
-        assertTrue(ev.attrs["stop"] != "emptyPage")
+        assertEquals(50, ev.attrs["pageSize"]?.numberOrNull)
+        assertTrue(ev.attrs["stop"]?.textOrNull != "emptyPage")
     }
 
     @Test
@@ -188,8 +204,8 @@ class RosterNameTelemetryTest {
             source = "test",
         )
         val ev = lastEvent("roster.sweepStopped")
-        assertEquals("shortPage", ev.attrs["stop"])
-        assertEquals(31, ev.attrs["pageSize"])
+        assertEquals("shortPage", ev.attrs["stop"]?.textOrNull)
+        assertEquals(31, ev.attrs["pageSize"]?.numberOrNull)
         assertEquals(Telemetry.Level.INFO, ev.level)
     }
 
@@ -203,7 +219,7 @@ class RosterNameTelemetryTest {
             source = "test",
         )
         val ev = lastEvent("roster.sweepStopped")
-        assertEquals("pageCapExhausted", ev.attrs["stop"])
+        assertEquals("pageCapExhausted", ev.attrs["stop"]?.textOrNull)
         assertEquals(Telemetry.Level.WARN, ev.level)
     }
 
@@ -220,9 +236,9 @@ class RosterNameTelemetryTest {
     fun `cache miss records the agent id and the roster size it missed against`() {
         RosterNameTelemetry.cacheMiss(agentId = "agent-abcdef12", cacheSize = 50, source = "AgentRepository")
         val ev = lastEvent("agentCache.miss")
-        assertEquals("agent-abcdef12", ev.attrs["agentId"])
-        assertEquals(50, ev.attrs["cacheSize"])
-        assertEquals("AgentRepository", ev.attrs["source"])
+        assertEquals("agent-abcdef12", ev.attrs["agentId"]?.textOrNull)
+        assertEquals(50, ev.attrs["cacheSize"]?.numberOrNull)
+        assertEquals("AgentRepository", ev.attrs["source"]?.textOrNull)
         assertEquals(Telemetry.Level.WARN, ev.level)
     }
 
@@ -237,9 +253,9 @@ class RosterNameTelemetryTest {
             rosterSize = 50,
         )
         val ev = lastEvent("name.fallback")
-        assertEquals("conversationList", ev.attrs["site"])
-        assertEquals("idPrefix", ev.attrs["fallbackKind"])
-        assertEquals(50, ev.attrs["rosterSize"])
+        assertEquals("conversationList", ev.attrs["site"]?.textOrNull)
+        assertEquals("idPrefix", ev.attrs["fallbackKind"]?.textOrNull)
+        assertEquals(50, ev.attrs["rosterSize"]?.numberOrNull)
         assertEquals(Telemetry.Level.WARN, ev.level)
     }
 
@@ -252,8 +268,8 @@ class RosterNameTelemetryTest {
             rosterSize = 50,
         )
         val ev = lastEvent("name.fallback")
-        assertEquals("chatCoordinator", ev.attrs["site"])
-        assertEquals("previousUiName", ev.attrs["fallbackKind"])
+        assertEquals("chatCoordinator", ev.attrs["site"]?.textOrNull)
+        assertEquals("previousUiName", ev.attrs["fallbackKind"]?.textOrNull)
     }
 
     @Test
@@ -281,7 +297,7 @@ class RosterNameTelemetryTest {
         assertEquals("Ada", resolver.resolve("agent-1"))
         assertEquals(1, fetches)
         val event = lastEvent("name.resolveOutcome")
-        assertEquals("success", event.attrs["outcome"])
+        assertEquals("success", event.attrs["outcome"]?.textOrNull)
     }
 
     @Test
@@ -289,10 +305,10 @@ class RosterNameTelemetryTest {
         RosterNameResolver<String>({ null }, "test").resolve("missing")
         RosterNameResolver<String>({ error("down") }, "test").resolve("failed")
 
-        val outcomes = eventsNamed("name.resolveOutcome").associateBy { it.attrs["agentId"] }
-        assertEquals("notFound", outcomes["missing"]?.attrs?.get("outcome"))
+        val outcomes = eventsNamed("name.resolveOutcome").associateBy { it.attrs["agentId"]?.textOrNull }
+        assertEquals("notFound", outcomes["missing"]?.attrs?.get("outcome")?.textOrNull)
         assertEquals(Telemetry.Level.WARN, outcomes["missing"]?.level)
-        assertEquals("failure", outcomes["failed"]?.attrs?.get("outcome"))
+        assertEquals("failure", outcomes["failed"]?.attrs?.get("outcome")?.textOrNull)
         assertEquals(Telemetry.Level.WARN, outcomes["failed"]?.level)
     }
 
@@ -310,7 +326,7 @@ class RosterNameTelemetryTest {
             fallbackKind = RosterNameTelemetry.FallbackKind.PREVIOUS_UI_NAME,
             rosterSize = 1,
         )
-        val sites = eventsNamed("name.fallback").map { it.attrs["site"] }.toSet()
+        val sites = eventsNamed("name.fallback").map { it.attrs["site"]?.textOrNull }.toSet()
         assertEquals(setOf("conversationList", "chatCoordinator"), sites)
     }
 }

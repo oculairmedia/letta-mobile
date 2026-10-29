@@ -2,8 +2,6 @@ package com.letta.mobile.util
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
 
 interface TelemetryDelegate {
@@ -30,7 +28,7 @@ class TelemetryContext {
     inline fun event(
         tag: String,
         name: String,
-        vararg attrs: Pair<String, Any?>,
+        vararg attrs: Pair<String, TelemetryValue>,
         durationMs: Long? = null,
         level: Telemetry.Level = Telemetry.Level.INFO,
     ) = Telemetry.event(tag, name, *attrs, durationMs = durationMs, level = level)
@@ -39,7 +37,7 @@ class TelemetryContext {
         tag: String,
         name: String,
         throwable: Throwable,
-        vararg attrs: Pair<String, Any?>,
+        vararg attrs: Pair<String, TelemetryValue>,
     ) = Telemetry.error(tag, name, throwable, *attrs)
 
     inline fun startTimer(tag: String, name: String): Telemetry.Timer =
@@ -90,13 +88,19 @@ object Telemetry {
     private const val CHAT_HYDRATION_TRACE_TAG = "LettaChatHydrationTrace"
     private const val FRAME_FLOW_DIAG_TAG = "LettaFrameFlowDiag"
     private const val TAG_PREFIX = "Telemetry"
-    private const val MAX_RING_SIZE = 1000
     private const val TRACE_MAX_LEN = 127
 
-    private val _eventsFlow = MutableStateFlow<List<Event>>(emptyList())
+    private val history = TelemetryHistoryBinding()
     private var traceCookie = 1
 
-    val events: StateFlow<List<Event>> = _eventsFlow.asStateFlow()
+    val events: StateFlow<List<Event>> = history
+
+    /**
+     * Hosts install before startup events and own the returned binding for their lifecycle.
+     * Before installation (and after close), console/delegate logging continues without history.
+     * Existing collectors follow replacement recorders rather than retaining abandoned histories.
+     */
+    fun installRecorder(recorder: TelemetryRecorder): AutoCloseable = history.install(recorder)
 
     fun isTimelineDumpEnabled(): Boolean =
         timelineDumpEnabled.get() || (delegate?.isLoggable(TIMELINE_DUMP_TAG, 2) ?: false)
@@ -119,7 +123,7 @@ object Telemetry {
     fun event(
         tag: String,
         name: String,
-        vararg attrs: Pair<String, Any?>,
+        vararg attrs: Pair<String, TelemetryValue>,
         durationMs: Long? = null,
         level: Level = Level.INFO,
     ) {
@@ -141,13 +145,13 @@ object Telemetry {
         tag: String,
         name: String,
         throwable: Throwable,
-        vararg attrs: Pair<String, Any?>,
+        vararg attrs: Pair<String, TelemetryValue>,
     ) {
         if (!enabled.get()) return
 
         val allAttrs = attrs.toMutableList()
-        allAttrs.add("errorClass" to (throwable::class.simpleName ?: "Throwable"))
-        allAttrs.add("errorMessage" to (throwable.message ?: "<none>"))
+        allAttrs.add("errorClass" attr (throwable::class.simpleName ?: "Throwable"))
+        allAttrs.add("errorMessage" attr (throwable.message ?: "<none>"))
         emit(
             Event(
                 timestampMs = nowEpochMillis(),
@@ -164,7 +168,7 @@ object Telemetry {
     inline fun <T> measure(
         tag: String,
         name: String,
-        vararg attrs: Pair<String, Any?>,
+        vararg attrs: Pair<String, TelemetryValue>,
         block: () -> T,
     ): T {
         val sectionName = traceSectionName(tag, name)
@@ -175,7 +179,7 @@ object Telemetry {
             event(tag, name, *attrs, durationMs = nowEpochMillis() - start)
             result
         } catch (t: Throwable) {
-            error(tag, "$name:failed", t, "durationMs" to (nowEpochMillis() - start), *attrs)
+            error(tag, "$name:failed", t, "durationMs" attr (nowEpochMillis() - start), *attrs)
             throw t
         } finally {
             if (traced) endTraceSection()
@@ -244,20 +248,23 @@ object Telemetry {
     }
 
     fun clear() {
-        _eventsFlow.value = emptyList()
+        history.clear()
     }
 
-    fun snapshot(): List<Event> = _eventsFlow.value
+    fun snapshot(): List<Event> = history.value
 
     private fun emit(ev: Event) {
         if (logcatEnabled.get()) {
             logToLogcat(ev)
         }
 
-        _eventsFlow.update { current -> (listOf(ev) + current).take(MAX_RING_SIZE) }
+        history.record(ev)
     }
 
     private fun logToLogcat(ev: Event) {
+        val currentDelegate = delegate
+        // Browser/desktop fallback output is not a debug sink. Keep debug events in the ring only.
+        if (currentDelegate == null && ev.level == Level.DEBUG) return
         val tagStr = "$TAG_PREFIX/${ev.tag}"
         val body = buildString {
             append(ev.name)
@@ -267,7 +274,6 @@ object Telemetry {
                 ev.attrs.entries.joinTo(this, separator = " ") { (key, value) -> "$key=$value" }
             }
         }
-        val currentDelegate = delegate
         if (currentDelegate != null) {
             currentDelegate.logToLogcat(ev.level, tagStr, body, ev.throwable)
         } else {
@@ -306,7 +312,7 @@ object Telemetry {
         val tag: String,
         val name: String,
         val durationMs: Long?,
-        val attrs: Map<String, Any?>,
+        val attrs: Map<String, TelemetryValue>,
         val level: Level,
         val throwable: Throwable? = null,
     ) {
@@ -334,18 +340,18 @@ object Telemetry {
         private val traceSectionName: String?,
         private val traceCookie: Int,
     ) {
-        fun stop(vararg attrs: Pair<String, Any?>) {
+        fun stop(vararg attrs: Pair<String, TelemetryValue>) {
             closeTraceSection()
             event(tag, name, *attrs, durationMs = nowEpochMillis() - startMs)
         }
 
-        fun stopError(throwable: Throwable, vararg attrs: Pair<String, Any?>) {
+        fun stopError(throwable: Throwable, vararg attrs: Pair<String, TelemetryValue>) {
             closeTraceSection()
             error(
                 tag,
                 "$name:failed",
                 throwable,
-                "durationMs" to (nowEpochMillis() - startMs),
+                "durationMs" attr (nowEpochMillis() - startMs),
                 *attrs,
             )
         }

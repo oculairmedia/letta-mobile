@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.canvas.compose.Sha256
 import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
@@ -66,6 +68,18 @@ import kotlinx.serialization.json.jsonPrimitive
  * view bridge. `docs/reference/plugin-trust-model.md` maps every guarantee to its test here.
  */
 class PluginTrustTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val canvasOnly = setOf(PluginCapability.CANVAS_PLACE)
 
     private fun withDriver(
@@ -236,8 +250,8 @@ class PluginTrustTest {
             fixture.driver.invoke(call("leak"))
             withTimeout(10.seconds) { while (tap.named(PluginHostEvent.STDERR).size < 2 || tap.named(PluginHostEvent.LOG).isEmpty()) delay(20) }
 
-            assertEquals(SecretScrubber.REFUSED, tap.named(PluginHostEvent.LOG).single().attrs["message"])
-            assertTrue(tap.named(PluginHostEvent.STDERR).any { it.attrs["line"] == SecretScrubber.REFUSED })
+            assertEquals(SecretScrubber.REFUSED, tap.named(PluginHostEvent.LOG).single().attrs["message"]?.textOrNull)
+            assertTrue(tap.named(PluginHostEvent.STDERR).any { it.attrs["line"]?.textOrNull == SecretScrubber.REFUSED })
             assertTrue(tap.named(PluginHostEvent.STDERR).all { it.level == Telemetry.Level.WARN })
             assertTrue(rig.written().none { SECRET in it.toString() }, "a secret reached the canvas")
             assertTrue(fixture.stderr.none { SECRET in it })

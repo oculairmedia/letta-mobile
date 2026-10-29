@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
@@ -56,13 +57,13 @@ class CanvasSceneStateGuard(private val canvasId: CanvasId?) {
         val first = violations.firstOrNull() ?: return
         Telemetry.event(
             "Canvas", "scene.invalidState",
-            "canvasId" to canvasId?.value,
-            "invariant" to first.invariant.wire,
-            "subject" to first.subject,
-            "detail" to first.detail,
-            "violations" to violations.size,
-            "invariants" to violations.map { it.invariant.wire }.distinct().joinToString(","),
-            "fallback" to violations.any { it.invariant.breaksRender },
+            "canvasId" attr canvasId?.value,
+            "invariant" attr first.invariant.wire,
+            "subject" attr first.subject,
+            "detail" attr first.detail,
+            "violations" attr violations.size,
+            "invariants" attr violations.map { it.invariant.wire }.distinct().joinToString(","),
+            "fallback" attr violations.any { it.invariant.breaksRender },
             level = Telemetry.Level.WARN,
         )
     }

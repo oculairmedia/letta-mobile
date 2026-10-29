@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnRuntimeKey
@@ -72,9 +73,9 @@ internal class IrohTurnDispatcher(
     ) {
         Telemetry.event(
             "IrohTransport", "send.rejected_same_conversation_busy",
-            "conversationId" to conversationId,
-            "activeTurnId" to result.activeTurn.turnId,
-            "rejectedTurnId" to request.token.turnId.value,
+            "conversationId" attr conversationId,
+            "activeTurnId" attr result.activeTurn.turnId,
+            "rejectedTurnId" attr request.token.turnId.value,
         )
     }
 
@@ -82,10 +83,10 @@ internal class IrohTurnDispatcher(
         val concurrent = registry.concurrentTurns(turn.token.conversationId)
         if (concurrent.isEmpty()) return
         Telemetry.event(
-            "IrohTransport", "turn.concurrent_start", "conversationId" to turn.conversationId,
-            "turnId" to turn.turnId,
-            "concurrentConversations" to concurrent.joinToString(",") { it.conversationId },
-            "concurrentTurnIds" to concurrent.joinToString(",") { it.turnId },
+            "IrohTransport", "turn.concurrent_start", "conversationId" attr turn.conversationId,
+            "turnId" attr turn.turnId,
+            "concurrentConversations" attr concurrent.joinToString(",") { it.conversationId },
+            "concurrentTurnIds" attr concurrent.joinToString(",") { it.turnId },
         )
     }
 
@@ -95,16 +96,29 @@ internal class IrohTurnDispatcher(
         job.invokeOnCompletion {
             val removed = registry.finish(turn.token)
             if (removed && !turn.hasTerminal) {
-                Telemetry.event("IrohTransport", "turn.abandoned_nonterminal", "conversationId" to turn.conversationId, "turnId" to turn.turnId, "runId" to turn.runId)
+                Telemetry.event(
+                    "IrohTransport",
+                    "turn.abandoned_nonterminal",
+                    "conversationId" attr turn.conversationId,
+                    "turnId" attr turn.turnId,
+                    "runId" attr turn.runId,
+                )
             } else if (!removed) {
-                Telemetry.event("IrohTransport", "turn.completion_after_eviction", "conversationId" to turn.conversationId, "turnId" to turn.turnId, "hasTerminal" to turn.hasTerminal, "currentTurnId" to (registry.getActiveTurn(turn.token.conversationId)?.turnId ?: ""))
+                Telemetry.event(
+                    "IrohTransport",
+                    "turn.completion_after_eviction",
+                    "conversationId" attr turn.conversationId,
+                    "turnId" attr turn.turnId,
+                    "hasTerminal" attr turn.hasTerminal,
+                    "currentTurnId" attr (registry.getActiveTurn(turn.token.conversationId)?.turnId ?: ""),
+                )
             }
             registry.unregisterSendJob(IrohSendJobRegistration(turn.token.conversationId, job))
         }
     }
 
     private suspend fun dispatch(request: IrohTurnDispatch) {
-        Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to request.turn.turnId, "runId" to request.turn.runId)
+        Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" attr request.turn.turnId, "runId" attr request.turn.runId)
         val handle = readyHandle(request) ?: return
         val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
         // letta-mobile-1n5py: the registry retires a turn as its terminal is published, a moment
@@ -128,8 +142,8 @@ internal class IrohTurnDispatcher(
         runCatching { ready() }.getOrElse { error ->
             Telemetry.event(
                 "IrohTransport", "turn.ready_failed",
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
             )
             emitFailure(request, "iroh_connection_not_ready", error.message ?: error.toString())
             null
@@ -140,27 +154,27 @@ internal class IrohTurnDispatcher(
         val ownerAcquiredAtMs = owner?.acquiredAtMs
         Telemetry.event(
             "IrohTransport", "turn.busy",
-            "turnId" to request.turn.turnId,
-            "runId" to request.turn.runId,
-            "sendAgentId" to request.agentId,
-            "sendConversationId" to request.conversationId,
-            "sendOtid" to request.input.localMessageId,
-            "ownerRunId" to owner?.runId,
-            "ownerRuntimeId" to owner?.runtimeId,
-            "ownerAgentId" to owner?.agentId,
-            "ownerConversationId" to owner?.conversationId,
-            "ownerAcquiredAtMs" to ownerAcquiredAtMs,
-            "ownerHeldForMs" to ownerAcquiredAtMs?.let { System.currentTimeMillis() - it },
-            "ownerLastTerminal" to owner?.lastTerminal,
-            "ownerLastTerminalSource" to owner?.lastTerminalSource,
-            "ownerLastTerminalAtMs" to owner?.lastTerminalAtMs,
-            "ownerLastTerminalSeq" to owner?.lastTerminalSeq,
-            "ownerLastTerminalScopeMatched" to owner?.lastTerminalScopeMatched,
-            "ownerSettleDeadlineMs" to owner?.settleDeadlineMs,
-            "ownerWatchdogDeadlineMs" to owner?.watchdogDeadlineMs,
-            "ownerProcessRole" to owner?.processRole,
-            "ownerReleaseReason" to owner?.releaseReason,
-            "otherBusyKeys" to engine.busyRuntimeKeys()
+            "turnId" attr request.turn.turnId,
+            "runId" attr request.turn.runId,
+            "sendAgentId" attr request.agentId,
+            "sendConversationId" attr request.conversationId,
+            "sendOtid" attr request.input.localMessageId,
+            "ownerRunId" attr owner?.runId,
+            "ownerRuntimeId" attr owner?.runtimeId,
+            "ownerAgentId" attr owner?.agentId,
+            "ownerConversationId" attr owner?.conversationId,
+            "ownerAcquiredAtMs" attr ownerAcquiredAtMs,
+            "ownerHeldForMs" attr ownerAcquiredAtMs?.let { System.currentTimeMillis() - it },
+            "ownerLastTerminal" attr owner?.lastTerminal,
+            "ownerLastTerminalSource" attr owner?.lastTerminalSource,
+            "ownerLastTerminalAtMs" attr owner?.lastTerminalAtMs,
+            "ownerLastTerminalSeq" attr owner?.lastTerminalSeq,
+            "ownerLastTerminalScopeMatched" attr owner?.lastTerminalScopeMatched,
+            "ownerSettleDeadlineMs" attr owner?.settleDeadlineMs,
+            "ownerWatchdogDeadlineMs" attr owner?.watchdogDeadlineMs,
+            "ownerProcessRole" attr owner?.processRole,
+            "ownerReleaseReason" attr owner?.releaseReason,
+            "otherBusyKeys" attr engine.busyRuntimeKeys()
                 .filter { it.conversationId != request.conversationId || it.agentId != request.agentId }
                 .joinToString(",") { it.toString() },
         )
@@ -200,13 +214,13 @@ internal class IrohTurnDispatcher(
 
     private suspend fun reportCollectionFailure(request: IrohTurnDispatch, error: Throwable) {
         if (error is CancellationException) {
-            Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to request.turn.turnId, "runId" to request.turn.runId)
+            Telemetry.event("IrohTransport", "turn.cancelled", "turnId" attr request.turn.turnId, "runId" attr request.turn.runId)
             return
         }
         Telemetry.event(
             "IrohTransport", "turn.failed",
-            "error" to (error.message ?: error.toString()),
-            "class" to error::class.simpleName,
+            "error" attr (error.message ?: error.toString()),
+            "class" attr error::class.simpleName,
         )
         emitFailure(request, "iroh_app_server_error", error.message ?: error.toString())
     }

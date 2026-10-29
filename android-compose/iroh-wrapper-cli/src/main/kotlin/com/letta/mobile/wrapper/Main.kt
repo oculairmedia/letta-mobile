@@ -57,11 +57,13 @@ fun buildIrohWrapperCli(): CliktCommand =
 object Main {
     @JvmStatic
     fun main(args: Array<String>) {
-        if (args.isEmpty()) {
-            println(USAGE)
-            return
+        com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
+            if (args.isEmpty()) {
+                println(USAGE)
+                return
+            }
+            buildIrohWrapperCli().main(args)
         }
-        buildIrohWrapperCli().main(args)
     }
 
     private val USAGE = """

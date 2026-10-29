@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
@@ -42,9 +43,9 @@ internal class TimelineImageRecovery(
         if (targets.isNotEmpty()) {
             Telemetry.event(
                 "TimelineSync", "imageRecovery.completed",
-                "conversationId" to conversationId,
-                "requested" to targets.size,
-                "restored" to restored,
+                "conversationId" attr conversationId,
+                "requested" attr targets.size,
+                "restored" attr restored,
             )
         }
         restored
@@ -63,8 +64,8 @@ internal class TimelineImageRecovery(
         } catch (error: Exception) {
             Telemetry.error(
                 "TimelineSync", "imageRecovery.fetchFailed", error,
-                "conversationId" to conversationId,
-                "serverId" to target.serverId,
+                "conversationId" attr conversationId,
+                "serverId" attr target.serverId,
             )
             return null
         }

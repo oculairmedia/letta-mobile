@@ -1,5 +1,6 @@
 package com.letta.mobile.debug
 
+import com.letta.mobile.util.attr
 import android.content.Context
 import android.util.Base64
 import ca.oculair.meridian.BuildConfig
@@ -35,8 +36,8 @@ object AutomationAuthBootstrap {
                 tag = "AutomationAuth",
                 name = "releasePayloadImportFailed",
                 throwable = error,
-                "prefsName" to PREFS_NAME,
-                "key" to KEY_PAYLOAD_BASE64,
+                "prefsName" attr PREFS_NAME,
+                "key" attr KEY_PAYLOAD_BASE64,
             )
         }
     }

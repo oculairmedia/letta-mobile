@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -40,12 +41,12 @@ object IrohFrameFlowDiagnostics {
         val len = content.length
         Telemetry.event(
             TAG, "gate",
-            "gate" to gate,
-            "key" to key,
-            "type" to messageType,
-            "len" to len,
+            "gate" attr gate,
+            "key" attr key,
+            "type" attr messageType,
+            "len" attr len,
             // tail so we can see WHICH characters are present at this gate
-            "tail" to content.takeLast(24).replace("\n", "\\n"),
+            "tail" attr content.takeLast(24).replace("\n", "\\n"),
         )
     }
 }

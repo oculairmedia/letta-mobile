@@ -1,5 +1,9 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.util.Telemetry
@@ -8,6 +12,18 @@ import kotlin.test.assertEquals
 
 /** letta-mobile-qygvv.24: the live rows are hidden against the snapshot the list keys by. */
 class TimelineRowAssemblyTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private fun row(key: String) = ChatRenderItem.Single(
         UiMessage(key, "assistant", "", timestamp = ""), GroupPosition.None, keyOverride = key,
     )
@@ -37,10 +53,10 @@ class TimelineRowAssemblyTest {
     fun guardNamesTheSourceItDropped() {
         TimelineRowKeyGuard.duplicateRows(listOf("guard-probe-key", "guard-probe-key")) { if (it == 0) "live" else "settled" }
         val event = Telemetry.snapshot().last {
-            it.name == "timeline.duplicateKeyDropped" && it.attrs["key"] == "guard-probe-key"
+            it.name == "timeline.duplicateKeyDropped" && it.attrs["key"]?.textOrNull == "guard-probe-key"
         }
-        assertEquals("live", event.attrs["kept"])
-        assertEquals("settled", event.attrs["dropped"])
-        assertEquals(1, event.attrs["index"])
+        assertEquals("live", event.attrs["kept"]?.textOrNull)
+        assertEquals("settled", event.attrs["dropped"]?.textOrNull)
+        assertEquals(1, event.attrs["index"]?.numberOrNull)
     }
 }

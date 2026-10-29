@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
@@ -88,14 +89,14 @@ internal class IrohObserverIngestor(
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
             stop(ObserverStopRequest("no_observer_stream"))
-            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
+            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" attr handle.sessionId)
             return
         }
         observerJob?.cancel()
         Telemetry.event(
             "IrohObserver", "ingest.start",
-            "sessionId" to handle.sessionId,
-            "generation" to generation.toString(),
+            "sessionId" attr handle.sessionId,
+            "generation" attr generation.toString(),
         )
         observerJob = scope.launch {
             runCatching {
@@ -107,8 +108,8 @@ internal class IrohObserverIngestor(
                 if (error is CancellationException) throw error
                 Telemetry.event(
                     "IrohObserver", "ingest.failed",
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
+                    "error" attr (error.message ?: error.toString()),
+                    "class" attr error::class.simpleName,
                 )
             }
         }
@@ -122,7 +123,7 @@ internal class IrohObserverIngestor(
         pendingObserverTerminals.values.forEach { it.cancel() }
         pendingObserverTerminals.clear()
         observedTurns.reset()
-        Telemetry.event("IrohObserver", "ingest.stop", "reason" to request.reason)
+        Telemetry.event("IrohObserver", "ingest.stop", "reason" attr request.reason)
     }
 
     fun recordViewedConversationFrom(request: ViewedConversationRequest) {
@@ -298,8 +299,8 @@ internal class IrohObserverIngestor(
         if (connectionGeneration() != subscription.generation) return
         Telemetry.event(
             "IrohObserver", "resubscribe.begin",
-            "conversationId" to (subscription.conversationId ?: ""),
-            "generation" to subscription.generation.toString(),
+            "conversationId" attr (subscription.conversationId ?: ""),
+            "generation" attr subscription.generation.toString(),
         )
         runCatching {
             if (connectionGeneration() != subscription.generation) return
@@ -308,9 +309,9 @@ internal class IrohObserverIngestor(
             if (error is CancellationException) throw error
             Telemetry.event(
                 "IrohObserver", "resubscribe.failed",
-                "conversationId" to (subscription.conversationId ?: ""),
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
+                "conversationId" attr (subscription.conversationId ?: ""),
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
             )
         }
     }
@@ -322,7 +323,7 @@ internal class IrohObserverIngestor(
         val delta = streamDelta.delta as? JsonObject
         val runId = delta?.string("run_id") ?: delta?.string("runId") ?: return false
         if (!turnRegistry.isRetiredRun(IrohRunId(runId))) return false
-        Telemetry.event("IrohObserver", "ingest.skip_already_retired", "conversationId" to conversationId, "runId" to runId)
+        Telemetry.event("IrohObserver", "ingest.skip_already_retired", "conversationId" attr conversationId, "runId" attr runId)
         return true
     }
 
@@ -337,8 +338,8 @@ internal class IrohObserverIngestor(
         if (!retiredRun && !retiredTurn) return false
         Telemetry.event(
             "IrohObserver", "ingest.skip_already_retired",
-            "conversationId" to scope.conversationId,
-            "runId" to (run ?: ""),
+            "conversationId" attr scope.conversationId,
+            "runId" attr (run ?: ""),
         )
         return true
     }
@@ -461,9 +462,9 @@ internal class IrohObserverIngestor(
         if (pendingObserverTerminals[key]?.isActive == true) return
         Telemetry.event(
             "IrohObserver", "terminal.fallback_scheduled",
-            "conversationId" to localTurn.conversationId,
-            "turnId" to key,
-            "graceMs" to observerTerminalGraceMs,
+            "conversationId" attr localTurn.conversationId,
+            "turnId" attr key,
+            "graceMs" attr observerTerminalGraceMs,
         )
         val job = scope.launch {
             kotlinx.coroutines.delay(observerTerminalGraceMs)
@@ -486,16 +487,16 @@ internal class IrohObserverIngestor(
         if (!turnRegistry.claimTerminal(publication)) {
             Telemetry.event(
                 "IrohObserver", "terminal.fallback_superseded",
-                "conversationId" to localTurn.conversationId,
-                "turnId" to localTurn.turnId,
-                "terminalSource" to (localTurn.terminalSource?.toString() ?: ""),
+                "conversationId" attr localTurn.conversationId,
+                "turnId" attr localTurn.turnId,
+                "terminalSource" attr (localTurn.terminalSource?.toString() ?: ""),
             )
             return
         }
         Telemetry.event(
             "IrohObserver", "terminal.fallback_claimed",
-            "conversationId" to localTurn.conversationId,
-            "turnId" to localTurn.turnId,
+            "conversationId" attr localTurn.conversationId,
+            "turnId" attr localTurn.turnId,
             level = Telemetry.Level.WARN,
         )
         // The turn's ending (stop reason / usage) goes ahead of the TurnDone, or the coordinator
@@ -557,9 +558,9 @@ internal class IrohObserverIngestor(
         Telemetry.event(
             "IrohObserver",
             "subagent.activity_suppressed",
-            "subagentId" to streamDelta.subagentId.orEmpty(),
-            "conversationId" to streamDelta.runtime.conversationId,
-            "activityBytes" to line.encodeToByteArray().size,
+            "subagentId" attr streamDelta.subagentId.orEmpty(),
+            "conversationId" attr streamDelta.runtime.conversationId,
+            "activityBytes" attr line.encodeToByteArray().size,
         )
     }
 

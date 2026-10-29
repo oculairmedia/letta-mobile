@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.AgentEventAttachment
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -50,9 +51,9 @@ internal fun WsTimelineEvent.isForeignTo(boundAgentId: String): Boolean {
     if (eventAgentId == null || eventAgentId == boundAgentId) return false
     Telemetry.event(
         "AdminChatVM", "ws.event.foreignAgentDropped",
-        "eventType" to (this::class.simpleName ?: ""),
-        "eventAgentId" to eventAgentId,
-        "boundAgentId" to boundAgentId,
+        "eventType" attr (this::class.simpleName ?: ""),
+        "eventAgentId" attr eventAgentId,
+        "boundAgentId" attr boundAgentId,
         level = Telemetry.Level.WARN,
     )
     return true

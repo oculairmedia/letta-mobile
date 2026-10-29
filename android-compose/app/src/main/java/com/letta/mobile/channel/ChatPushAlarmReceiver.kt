@@ -1,5 +1,6 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.attr
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -32,7 +33,7 @@ class ChatPushAlarmReceiver : BroadcastReceiver() {
         }
 
         if (!started) {
-            Telemetry.event("ChatPushAlarm", "startFailed", "reason" to "startReturnedFalse")
+            Telemetry.event("ChatPushAlarm", "startFailed", "reason" attr "startReturnedFalse")
         }
     }
 

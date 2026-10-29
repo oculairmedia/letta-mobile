@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.session
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
@@ -70,7 +71,7 @@ internal class ChatSessionInitializer(
         } else if (explicitNewChat) {
             Telemetry.event(
                 "AdminChatVM", "resumeRecent.explicitNewChat",
-                "agentId" to agentId,
+                "agentId" attr agentId,
             )
         }
     }
@@ -81,7 +82,7 @@ internal class ChatSessionInitializer(
 
         Telemetry.event(
             "AdminChatVM", "resumeRecent.attempted",
-            "agentId" to agentId,
+            "agentId" attr agentId,
         )
         val resumed = runCatching {
             sessionResolver.resolveMostRecentConversation(
@@ -92,14 +93,14 @@ internal class ChatSessionInitializer(
         if (resumed != null) {
             Telemetry.event(
                 "AdminChatVM", "resumeRecent.succeeded",
-                "agentId" to agentId,
-                "conversationId" to resumed,
+                "agentId" attr agentId,
+                "conversationId" attr resumed,
             )
             conversationCoordinator.setActiveConversationId(resumed)
         } else {
             Telemetry.event(
                 "AdminChatVM", "resumeRecent.noRecent",
-                "agentId" to agentId,
+                "agentId" attr agentId,
             )
         }
     }

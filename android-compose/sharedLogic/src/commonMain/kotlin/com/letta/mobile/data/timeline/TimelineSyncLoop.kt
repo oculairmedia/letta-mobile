@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.telemetryAttributes
+
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.timeline.api.TimelineOutboundPendingPersistence
 import com.letta.mobile.data.timeline.api.TimelineOutboundStreamCallbacks
 import com.letta.mobile.data.model.ConversationId
@@ -217,19 +220,18 @@ class TimelineSyncLoop(
         if (detachedAsStaleWriter) return
         if (turnActive && !reason.isTurnBoundary) {
             Telemetry.event(
-                "TimelineSync", "snapshotPersist.streamingDeferred",
-                *identityAttrs(),
-                "reason" to reason.name,
+                "TimelineSync",
+                "snapshotPersist.streamingDeferred",
+                attrs = identityAttrs().telemetryAttributes() + arrayOf("reason" attr reason.name),
             )
             deferredDuringTurn = true
             armSafetyFlushDeadline()
             return
         }
         Telemetry.event(
-            "TimelineSync", "snapshotPersist.scheduled",
-            *identityAttrs(),
-            "reason" to reason.name,
-            "turnActive" to turnActive.toString(),
+            "TimelineSync",
+            "snapshotPersist.scheduled",
+            attrs = identityAttrs().telemetryAttributes() + arrayOf("reason" attr reason.name, "turnActive" attr turnActive.toString()),
         )
         persistRequests.trySend(
             if (reason.isDebounced) SnapshotPersistRequest.Debounced else SnapshotPersistRequest.Immediate,
@@ -271,7 +273,7 @@ class TimelineSyncLoop(
         val committedState = timelineProcessor.state.value
         val capturedDelta = pendingPersistenceDelta.snapshot()
         val planningDecision = decideIncrementalPlan(snapshotScope, committedState.timeline, capturedDelta)
-        emitPlanningDecision(planningDecision, capturedDelta)
+        emitSnapshotPlanningDecision(planningDecision, capturedDelta, identityAttrs())
         if (planningDecision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork) {
             // Sequence-safe known-no-persisted-change state: local-only updates (append, retry,
             // delivery state) produce no confirmed delta against an already-persisted baseline.
@@ -296,13 +298,7 @@ class TimelineSyncLoop(
         val fallbackReason = requireNotNull(planningDecision.reason) {
             "planningDecision.reason must not be null when full scan fallback is planned"
         }
-        Telemetry.event(
-            "TimelineSync", "snapshotPersist.fullScanPlanned",
-            *identityAttrs(),
-            "reason" to fallbackReason.name,
-            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
-            "metadataChanged" to capturedDelta.metadataChanged,
-        )
+        emitFullScanPlanned(identityAttrs(), fallbackReason.name, capturedDelta)
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = committedState.timeline,
@@ -316,10 +312,10 @@ class TimelineSyncLoop(
         if (fingerprint == lastPersistedFingerprint) {
             Telemetry.event(
                 "TimelineSync", "snapshotPersist.identicalSkipped",
-                "conversationId" to conversationId,
-                "revision" to snapshotRevision,
-                "fingerprint" to fingerprint,
-                "eventCount" to provisionalEnvelope.events.size,
+                "conversationId" attr conversationId,
+                "revision" attr snapshotRevision,
+                "fingerprint" attr fingerprint,
+                "eventCount" attr provisionalEnvelope.events.size,
             )
             return
         }
@@ -363,8 +359,8 @@ class TimelineSyncLoop(
         } catch (error: Throwable) {
             Telemetry.error(
                 "TimelineSync", "snapshotPersist.failed", error,
-                "conversationId" to conversationId,
-                "revision" to revision,
+                "conversationId" attr conversationId,
+                "revision" attr revision,
             )
         }
     }
@@ -440,40 +436,6 @@ class TimelineSyncLoop(
         )
     }
 
-    private fun emitPlanningDecision(
-        decision: IncrementalPlanningDecision,
-        delta: PendingTimelinePersistenceDelta.Snapshot,
-    ) {
-        val plan = (decision.result as? TimelineIncrementalSnapshotPlanner.Result.Planned)?.plan
-        val comparisonEvents = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.comparisonEvents ?: 0
-        val encodedRows = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.encodedRows ?: 0
-        val planningMode = when {
-            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
-            canPersistIncremental(decision) -> "delta"
-            else -> "full_scan"
-        }
-        val reasonStr = when {
-            decision.reason != null -> decision.reason.name
-            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
-            else -> "delta"
-        }
-        Telemetry.event(
-            "TimelineSync", "snapshotPersist.planningDecision",
-            *identityAttrs(),
-            "planningMode" to planningMode,
-            "reason" to reasonStr,
-            "throughSequence" to delta.throughSequence,
-            "dirtyChanged" to delta.changedConfirmedServerIds.size,
-            "dirtyDeleted" to delta.deletedConfirmedServerIds.size,
-            "metadataChanged" to delta.metadataChanged,
-            "baselineRevision" to (decision.baseRevision ?: 0L),
-            "targetRevision" to decision.targetRevision,
-            "comparisonEvents" to comparisonEvents,
-            "encodedRows" to encodedRows,
-            "storeSupportsIncremental" to decision.storeSupportsIncremental,
-        )
-    }
-
     private suspend fun persistIncrementalSnapshot(
         snapshotScope: TimelineScope,
         timeline: Timeline,
@@ -503,16 +465,18 @@ class TimelineSyncLoop(
                         recordSuccessfulSnapshotMutation(envelope, revision)
                         commitsSinceLegacyCheckpoint += 1
                         Telemetry.event(
-                            "TimelineSync", "snapshotPersist.written",
-                            *identityAttrs(),
-                            "revision" to revision,
-                            "eventCount" to envelope.events.size,
-                            "durationMs" to durationMs,
-                            "committed" to (result is NormalizedTimelineWriteResult.Committed),
-                            "planningMode" to "delta",
-                            "dirtyIdentities" to capturedDelta.dirtyIdentityCount,
-                            "rowPayloadsEncoded" to incremental.changedEvents.size,
-                            "fullEnvelopeEncodes" to 0,
+                            "TimelineSync",
+                            "snapshotPersist.written",
+                            attrs = identityAttrs().telemetryAttributes() + arrayOf(
+                                "revision" attr revision,
+                                "eventCount" attr envelope.events.size,
+                                "durationMs" attr durationMs,
+                                "committed" attr (result is NormalizedTimelineWriteResult.Committed),
+                                "planningMode" attr "delta",
+                                "dirtyIdentities" attr capturedDelta.dirtyIdentityCount,
+                                "rowPayloadsEncoded" attr incremental.changedEvents.size,
+                                "fullEnvelopeEncodes" attr 0,
+                            ),
                         )
                     }
                     is NormalizedTimelineWriteResult.Stale -> onStaleRejection(result, revision)
@@ -524,7 +488,7 @@ class TimelineSyncLoop(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
-            Telemetry.error("TimelineSync", "snapshotPersist.failed", error, "conversationId" to conversationId, "revision" to revision)
+            Telemetry.error("TimelineSync", "snapshotPersist.failed", error, "conversationId" attr conversationId, "revision" attr revision)
         }
     }
 
@@ -600,12 +564,14 @@ class TimelineSyncLoop(
             }
         }
         Telemetry.event(
-            "TimelineSync", "snapshotPersist.staleRejected",
-            *identityAttrs(),
-            "revision" to revision,
-            "actualHighWaterRevision" to result.highWaterRevision.value,
-            "consecutiveStale" to consecutiveStaleRejections,
-            "detachedAsWriter" to detaching,
+            "TimelineSync",
+            "snapshotPersist.staleRejected",
+            attrs = identityAttrs().telemetryAttributes() + arrayOf(
+                "revision" attr revision,
+                "actualHighWaterRevision" attr result.highWaterRevision.value,
+                "consecutiveStale" attr consecutiveStaleRejections,
+                "detachedAsWriter" attr detaching,
+            ),
             level = Telemetry.Level.WARN,
         )
     }
@@ -625,12 +591,14 @@ class TimelineSyncLoop(
         recordSuccessfulSnapshotMutation(envelope, revision)
         commitsSinceLegacyCheckpoint = if (checkpointDue) 0 else commitsSinceLegacyCheckpoint + 1
         Telemetry.event(
-            "TimelineSync", "snapshotPersist.written",
-            *identityAttrs(),
-            "revision" to revision,
-            "eventCount" to envelope.events.size,
-            "durationMs" to durationMs,
-            "committed" to (result is NormalizedTimelineWriteResult.Committed),
+            "TimelineSync",
+            "snapshotPersist.written",
+            attrs = identityAttrs().telemetryAttributes() + arrayOf(
+                "revision" attr revision,
+                "eventCount" attr envelope.events.size,
+                "durationMs" attr durationMs,
+                "committed" attr (result is NormalizedTimelineWriteResult.Committed),
+            ),
         )
     }
 
@@ -700,18 +668,20 @@ class TimelineSyncLoop(
                         if (failure is CancellationException) throw failure
                         Telemetry.error(
                             "TimelineSync", "snapshotPersist.fallbackReconcileFailed", failure,
-                            "conversationId" to conversationId,
-                            "revision" to revision,
+                            "conversationId" attr conversationId,
+                            "revision" attr revision,
                         )
                     }
             }
         }
         Telemetry.event(
-            "TimelineSync", "snapshotPersist.invalidRejected",
-            *identityAttrs(),
-            "revision" to revision,
-            "reason" to result.reason.name,
-            "legacyFallbackWritten" to recovered,
+            "TimelineSync",
+            "snapshotPersist.invalidRejected",
+            attrs = identityAttrs().telemetryAttributes() + arrayOf(
+                "revision" attr revision,
+                "reason" attr result.reason.name,
+                "legacyFallbackWritten" attr recovered,
+            ),
             level = Telemetry.Level.WARN,
         )
     }
@@ -726,26 +696,26 @@ class TimelineSyncLoop(
         lastPersistedSnapshot = structuralSummary
         Telemetry.event(
             "TimelineSync", "snapshotPersist.mutationShape",
-            "revision" to revision,
-            "previousCount" to mutationShape.previousCount,
-            "eventCount" to mutationShape.currentCount,
-            "inserted" to mutationShape.inserted,
-            "updated" to mutationShape.updated,
-            "deleted" to mutationShape.deleted,
-            "moved" to mutationShape.moved,
-            "cursorMetadataChanged" to mutationShape.cursorMetadataChanged,
-            "noOp" to mutationShape.noOp,
-            "unclassifiable" to mutationShape.unclassifiable,
-            "comparisonEvents" to mutationShape.eventComparisons,
-            "fullEnvelopeEncodes" to mutationShape.fullEnvelopeEncodes,
+            "revision" attr revision,
+            "previousCount" attr mutationShape.previousCount,
+            "eventCount" attr mutationShape.currentCount,
+            "inserted" attr mutationShape.inserted,
+            "updated" attr mutationShape.updated,
+            "deleted" attr mutationShape.deleted,
+            "moved" attr mutationShape.moved,
+            "cursorMetadataChanged" attr mutationShape.cursorMetadataChanged,
+            "noOp" attr mutationShape.noOp,
+            "unclassifiable" attr mutationShape.unclassifiable,
+            "comparisonEvents" attr mutationShape.eventComparisons,
+            "fullEnvelopeEncodes" attr mutationShape.fullEnvelopeEncodes,
             // This operation already owns the envelope and summary counts. Expose
             // residency/copy amplification without another history traversal.
-            "durableRows" to mutationShape.currentCount,
-            "residentRows" to envelope.events.size,
-            "settledEventsVisited" to mutationShape.eventComparisons,
-            "pagesCopied" to TimelineMetricAvailability.UNAVAILABLE,
-            "liveProjected" to TimelineMetricAvailability.UNAVAILABLE,
-            "boundaryRebuilt" to TimelineMetricAvailability.UNAVAILABLE,
+            "durableRows" attr mutationShape.currentCount,
+            "residentRows" attr envelope.events.size,
+            "settledEventsVisited" attr mutationShape.eventComparisons,
+            "pagesCopied" attr TimelineMetricAvailability.UNAVAILABLE,
+            "liveProjected" attr TimelineMetricAvailability.UNAVAILABLE,
+            "boundaryRebuilt" attr TimelineMetricAvailability.UNAVAILABLE,
         )
     }
 
@@ -795,8 +765,8 @@ class TimelineSyncLoop(
                 is TimelineReductionEffect.RepairHydrationCursor -> {
                     Telemetry.event(
                         "TimelineSync", "hydrate.cursorRepaired",
-                        "conversationId" to conversationId,
-                        "cursorSeq" to effect.sequence,
+                        "conversationId" attr conversationId,
+                        "cursorSeq" attr effect.sequence,
                     )
                 }
                 is TimelineReductionEffect.RecordStreamSequence, is TimelineReductionEffect.AdvanceCursor -> Unit
@@ -1025,7 +995,11 @@ class TimelineSyncLoop(
         val alreadyEnded = turnEndScheduled
         turnEndScheduled = true
         if (alreadyEnded) {
-            Telemetry.event("TimelineSync", "snapshotPersist.duplicateTurnEndSkipped", *identityAttrs())
+            Telemetry.event(
+                "TimelineSync",
+                "snapshotPersist.duplicateTurnEndSkipped",
+                attrs = identityAttrs().telemetryAttributes(),
+            )
         } else {
             scheduleSnapshotPersist(SnapshotPersistReason.TURN_END)
         }
@@ -1162,10 +1136,18 @@ class TimelineSyncLoop(
                 completeGatewayEventExceptionally(event, cancelled)
                 throw cancelled
             } catch (t: Throwable) {
-                completeGatewayEventExceptionally(event, t)
-                Telemetry.error("TimelineSync", "gateway.eventFailed", t, "conversationId" to conversationId, "event" to event::class.simpleName)
+                reportGatewayEventFailure(event, t)
             }
         }
+    }
+
+    private fun reportGatewayEventFailure(event: TimelineGatewayEvent, error: Throwable) {
+        completeGatewayEventExceptionally(event, error)
+        Telemetry.error(
+            "TimelineSync", "gateway.eventFailed", error,
+            "conversationId" attr conversationId,
+            "event" attr event::class.simpleName,
+        )
     }
 
     private fun completeGatewayEventExceptionally(event: TimelineGatewayEvent, t: Throwable) {
@@ -1258,8 +1240,8 @@ class TimelineSyncLoop(
             .onFailure { t ->
                 Telemetry.error(
                     "TimelineSync", "toolReturn.resolveFailed", t,
-                    "conversationId" to conversationId,
-                    "messageId" to messageId,
+                    "conversationId" attr conversationId,
+                    "messageId" attr messageId,
                 )
             }
             .getOrNull() as? ToolReturnMessage ?: return false
@@ -1271,9 +1253,9 @@ class TimelineSyncLoop(
         scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
         Telemetry.event(
             "TimelineSync", "toolReturn.resolved",
-            "conversationId" to conversationId,
-            "messageId" to messageId,
-            "bodyLen" to (message.toolReturn.funcResponse?.length ?: 0),
+            "conversationId" attr conversationId,
+            "messageId" attr messageId,
+            "bodyLen" attr (message.toolReturn.funcResponse?.length ?: 0),
         )
         return true
     }
@@ -1327,12 +1309,18 @@ class TimelineSyncLoop(
     private suspend fun setStreamSubscriberActive(active: Boolean) {
         if (_streamSubscriberActive.value == active) return
         _streamSubscriberActive.value = active
-        Telemetry.event("TimelineSync", "streamSubscriber.activeChanged", "conversationId" to conversationId, "active" to active)
+        Telemetry.event("TimelineSync", "streamSubscriber.activeChanged", "conversationId" attr conversationId, "active" attr active)
     }
 
     suspend fun submitStreamEvent(message: LettaMessage) {
         if (wsSubscription.isActive()) {
-            Telemetry.event("TimelineSync", "streamSubscriber.skippedDualIngest", "conversationId" to conversationId, "messageType" to message.messageType, "messageId" to message.id)
+            Telemetry.event(
+                "TimelineSync",
+                "streamSubscriber.skippedDualIngest",
+                "conversationId" attr conversationId,
+                "messageType" attr message.messageType,
+                "messageId" attr message.id,
+            )
             return
         }
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, source = "subscriber.loop${hashCode()}"))
@@ -1363,11 +1351,11 @@ class TimelineSyncLoop(
         if (duplicate) {
             Telemetry.event(
                 "TimelineSync", "streamMessage.exactDuplicateDropped",
-                "conversationId" to conversationId,
-                "messageId" to message.id,
-                "messageType" to message.messageType,
-                "seqId" to (message.seqId ?: -1),
-                "source" to source,
+                "conversationId" attr conversationId,
+                "messageId" attr message.id,
+                "messageType" attr message.messageType,
+                "seqId" attr (message.seqId ?: -1),
+                "source" attr source,
             )
         }
         return duplicate

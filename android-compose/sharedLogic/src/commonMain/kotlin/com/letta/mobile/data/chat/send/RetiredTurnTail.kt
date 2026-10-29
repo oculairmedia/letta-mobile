@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
 
@@ -22,9 +23,9 @@ internal fun forwardRetiredTurnTail(
     batcher.enqueue(event, conversationId)
     Telemetry.event(
         "AdminChatVM", "ws.event.retiredTurnTailForwarded",
-        "eventType" to (event::class.simpleName ?: ""),
-        "turnId" to (tail.turnId ?: ""),
-        "runId" to (tail.runId ?: ""),
-        "conversationId" to (conversationId ?: ""),
+        "eventType" attr (event::class.simpleName ?: ""),
+        "turnId" attr (tail.turnId ?: ""),
+        "runId" attr (tail.runId ?: ""),
+        "conversationId" attr (conversationId ?: ""),
     )
 }

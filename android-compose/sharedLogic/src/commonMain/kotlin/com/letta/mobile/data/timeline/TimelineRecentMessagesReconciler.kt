@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -106,11 +107,11 @@ class TimelineRecentMessagesReconciler(
         if (!request.canReuse(success, freshness.sequence, nowMillis())) return null
         Telemetry.event(
             "TimelineSync", "recentReconcile.coalesced",
-            "conversationId" to conversationId,
-            "reason" to request.reason,
-            "generation" to request.connectionGeneration,
-            "coalescedWith" to "recent_successful_reconcile",
-            "appended" to success.appended,
+            "conversationId" attr conversationId,
+            "reason" attr request.reason,
+            "generation" attr request.connectionGeneration,
+            "coalescedWith" attr "recent_successful_reconcile",
+            "appended" attr success.appended,
         )
         return RecentMessagesReconcileOutcome.Applied(success.appended)
     }
@@ -119,10 +120,10 @@ class TimelineRecentMessagesReconciler(
         if (request.isOlderThan(latestRequestedGeneration)) {
             Telemetry.event(
                 "TimelineSync", "recentReconcile.staleGenerationRejected",
-                "conversationId" to conversationId,
-                "reason" to request.reason,
-                "generation" to request.connectionGeneration,
-                "latestGeneration" to latestRequestedGeneration,
+                "conversationId" attr conversationId,
+                "reason" attr request.reason,
+                "generation" attr request.connectionGeneration,
+                "latestGeneration" attr latestRequestedGeneration,
                 level = Telemetry.Level.WARN,
             )
             val rejected = CompletableDeferred<RecentMessagesReconcileOutcome>()
@@ -142,11 +143,11 @@ class TimelineRecentMessagesReconciler(
         Telemetry.event(
             "TimelineSync",
             if (retryAfterward) "recentReconcile.superseded" else "recentReconcile.coalesced",
-            "conversationId" to conversationId,
-            "reason" to request.reason,
-            "generation" to request.connectionGeneration,
-            "inFlightGeneration" to current.request.connectionGeneration,
-            "inFlightForced" to current.request.allowWhileStreamActive,
+            "conversationId" attr conversationId,
+            "reason" attr request.reason,
+            "generation" attr request.connectionGeneration,
+            "inFlightGeneration" attr current.request.connectionGeneration,
+            "inFlightForced" attr current.request.allowWhileStreamActive,
         )
         FlightClaim(current, retryAfterward)
     }
@@ -232,13 +233,13 @@ class TimelineRecentMessagesReconciler(
                 ?: return skipReconcile(timer, telemetryName, telemetryReason, "supersededGeneration")
             val (serverCount, appended) = result
             onForcedReconcileCompleted(isForcedWhileActive, connectionGeneration)
-            timer.stop("reason" to telemetryReason, "serverCount" to serverCount, "appended" to appended)
+            timer.stop("reason" attr telemetryReason, "serverCount" attr serverCount, "appended" attr appended)
             dumpTimelineState("reconcile.$telemetryName", conversationId, state.value)
             RecentMessagesReconcileOutcome.Applied(appended)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            timer.stopError(t, "reason" to telemetryReason)
+            timer.stopError(t, "reason" attr telemetryReason)
             RecentMessagesReconcileOutcome.Failed(t)
         }
     }
@@ -320,16 +321,16 @@ class TimelineRecentMessagesReconciler(
     ): RecentMessagesReconcileOutcome {
         Telemetry.event(
             "TimelineSync", "$telemetryName.skipped",
-            "conversationId" to conversationId,
-            "reconcileReason" to telemetryReason,
-            "reason" to reason,
+            "conversationId" attr conversationId,
+            "reconcileReason" attr telemetryReason,
+            "reason" attr reason,
         )
         timer.stop(
-            "reason" to telemetryReason,
-            "serverCount" to 0,
-            "appended" to 0,
-            "skipped" to true,
-            "skipReason" to reason,
+            "reason" attr telemetryReason,
+            "serverCount" attr 0,
+            "appended" attr 0,
+            "skipped" attr true,
+            "skipReason" attr reason,
         )
         return RecentMessagesReconcileOutcome.Skipped(reason)
     }
@@ -367,9 +368,9 @@ class TimelineRecentMessagesReconciler(
     private fun reportStaleSnapshot(event: TimelineGatewayEvent.RecentMessagesSnapshot) {
         Telemetry.event(
             "TimelineSync", "recentReconcile.staleSnapshotDropped",
-            "conversationId" to conversationId,
-            "snapshotGeneration" to event.generation,
-            "highestAppliedGeneration" to processor.state.value.highestAppliedReconcileGeneration,
+            "conversationId" attr conversationId,
+            "snapshotGeneration" attr event.generation,
+            "highestAppliedGeneration" attr processor.state.value.highestAppliedReconcileGeneration,
             level = Telemetry.Level.WARN,
         )
     }

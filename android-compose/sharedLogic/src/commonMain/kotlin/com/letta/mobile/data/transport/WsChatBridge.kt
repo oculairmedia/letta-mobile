@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.util.attr
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -354,9 +355,9 @@ internal fun TransportFrameEvent.projectTimelineEvent(): WsTimelineEvent? {
     val event = frame.toTimelineEvent(isReplay)
     com.letta.mobile.util.Telemetry.event(
         "IrohGate", "gate2.bridgeEvent",
-        "frame" to (frame::class.simpleName ?: ""),
-        "event" to (event?.let { it::class.simpleName } ?: "null"),
-        "isReplay" to isReplay,
+        "frame" attr (frame::class.simpleName ?: ""),
+        "event" attr (event?.let { it::class.simpleName } ?: "null"),
+        "isReplay" attr isReplay,
     )
     return event
 }

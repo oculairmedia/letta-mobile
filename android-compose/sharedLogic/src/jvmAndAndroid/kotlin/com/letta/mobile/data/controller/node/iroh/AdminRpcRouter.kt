@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -80,7 +81,7 @@ class AdminRpcRouter(
         handler: suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement,
     ) {
         handlers[method] = handler
-        Telemetry.event("AdminRpc", "handler.registered", "method" to method)
+        Telemetry.event("AdminRpc", "handler.registered", "method" attr method)
     }
 
     fun requireNonEmpty(minMethods: Int = 1): AdminRpcRouter {
@@ -117,12 +118,12 @@ class AdminRpcRouter(
     internal fun preauthorize(invocation: AdminRpcInvocation): String? {
         val handler = handlers[invocation.method]
         if (handler == null) {
-            Telemetry.event("AdminRpc", "method.not_found", "method" to invocation.method)
+            Telemetry.event("AdminRpc", "method.not_found", "method" attr invocation.method)
             return encodeFailure(invocation.requestId, AdminRpcErrors.unknownMethod(invocation.method))
         }
         val agentScope = invocation.context.authorizedAgentIds
         if (!AgentScopeGuard.allowsParams(agentScope, invocation.params)) {
-            Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" to invocation.method)
+            Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" attr invocation.method)
             return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
         }
         return null
@@ -161,8 +162,8 @@ class AdminRpcRouter(
             Telemetry.event(
                 "AdminRpc",
                 "handler.error",
-                "method" to invocation.method,
-                "error" to (e.message ?: ""),
+                "method" attr invocation.method,
+                "error" attr (e.message ?: ""),
             )
             encodeFailure(invocation.requestId, e.message ?: "Internal error")
         }

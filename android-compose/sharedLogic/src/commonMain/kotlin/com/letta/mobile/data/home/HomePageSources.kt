@@ -17,6 +17,7 @@ import com.letta.mobile.data.session.isUnsupportedHomeStatistic
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.CancellationException
@@ -227,7 +228,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         result.onFailure {
             cache.remember(figure, it)
             Telemetry.event(
-                TAG, "stat.failed", "figure" to figure.name, "failureType" to it::class.simpleName,
+                TAG, "stat.failed", "figure" attr figure.name, "failureType" attr it::class.simpleName,
                 level = Telemetry.Level.ERROR,
             )
         }

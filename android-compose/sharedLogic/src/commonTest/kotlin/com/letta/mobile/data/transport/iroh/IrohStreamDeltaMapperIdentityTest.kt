@@ -18,6 +18,18 @@ import kotlin.test.assertTrue
  * (`logical_message_id`, `turn_id`, `text_seq`) and derives nothing of its own.
  */
 class IrohStreamDeltaMapperIdentityTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun mapperCopiesLogicalIdTurnIdAndTextSeq() {

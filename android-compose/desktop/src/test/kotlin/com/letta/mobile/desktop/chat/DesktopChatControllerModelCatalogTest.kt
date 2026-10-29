@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
@@ -17,6 +19,18 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DesktopChatControllerModelCatalogTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun modelCatalogLoadFailureEmitsADiagnosableTelemetryEventInsteadOfSilentlyDegrading() = runTest {
@@ -41,7 +55,7 @@ class DesktopChatControllerModelCatalogTest {
             val newEvents = after.take(after.size - before)
             val modelCatalogEvent = newEvents.singleOrNull { it.name == "modelCatalog.loadFailed" }
             assertNotNull(modelCatalogEvent, "expected a modelCatalog.loadFailed telemetry event")
-            assertEquals("IllegalStateException", modelCatalogEvent.attrs["exceptionClass"])
+            assertEquals("IllegalStateException", modelCatalogEvent.attrs["exceptionClass"]?.textOrNull)
         } finally {
             controller.close()
             com.letta.mobile.util.Telemetry.delegate = savedDelegate

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerDeviceStatePayload
@@ -108,11 +109,11 @@ internal class DeviceStateChanger(
     private fun report(scope: AppServerRuntimeScope, field: String, event: String, cause: Throwable) {
         Telemetry.event(
             "DeviceStateChanger", event,
-            "field" to field,
-            "agentId" to scope.agentId,
-            "conversationId" to scope.conversationId,
-            "timeoutMs" to timeoutMs,
-            "error" to (cause.message ?: cause::class.simpleName ?: "<unknown>"),
+            "field" attr field,
+            "agentId" attr scope.agentId,
+            "conversationId" attr scope.conversationId,
+            "timeoutMs" attr timeoutMs,
+            "error" attr (cause.message ?: cause::class.simpleName ?: "<unknown>"),
             level = Telemetry.Level.WARN,
         )
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
@@ -45,10 +46,10 @@ object CanvasSceneRenderGuard {
         val obj = element as? JsonObject
         Telemetry.event(
             "Canvas", "scene.elementDropped",
-            "canvasId" to canvasId?.value,
-            "elementId" to obj?.stringOf("id"),
-            "type" to obj?.stringOf("type"),
-            "reason" to reason,
+            "canvasId" attr canvasId?.value,
+            "elementId" attr obj?.stringOf("id"),
+            "type" attr obj?.stringOf("type"),
+            "reason" attr reason,
             level = Telemetry.Level.WARN,
         )
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.util.Telemetry
@@ -201,19 +202,19 @@ private object TimelineRemotePageTelemetry {
     ) {
         Telemetry.event(
             "TimelineRemotePage", "pageResult",
-            "scopeHash" to hash(request.scope.storageKey),
-            "requestIdHash" to hash(request.requestId.value),
-            "selectionGeneration" to request.selectionGeneration.value,
-            "order" to request.order.name,
-            "continuationKind" to request.continuation.kind(),
-            "nextContinuationKind" to page.nextContinuation?.kind(),
-            "recordCount" to page.records.size,
-            "newIdentityCount" to progress.newIdentityCount,
-            "decodedBodyBytes" to page.decodedBodyBytes,
-            "hasMore" to page.hasMore,
-            "continuationAdvanced" to advanced,
-            "duplicateOnly" to (page.records.isNotEmpty() && progress.newIdentityCount == 0),
-            "outcome" to if (outcome is TimelineRemotePageResult.NoProgress) "no_progress" else "page",
+            "scopeHash" attr hash(request.scope.storageKey),
+            "requestIdHash" attr hash(request.requestId.value),
+            "selectionGeneration" attr request.selectionGeneration.value,
+            "order" attr request.order.name,
+            "continuationKind" attr request.continuation.kind(),
+            "nextContinuationKind" attr page.nextContinuation?.kind(),
+            "recordCount" attr page.records.size,
+            "newIdentityCount" attr progress.newIdentityCount,
+            "decodedBodyBytes" attr page.decodedBodyBytes,
+            "hasMore" attr page.hasMore,
+            "continuationAdvanced" attr advanced,
+            "duplicateOnly" attr (page.records.isNotEmpty() && progress.newIdentityCount == 0),
+            "outcome" attr if (outcome is TimelineRemotePageResult.NoProgress) "no_progress" else "page",
         )
     }
 

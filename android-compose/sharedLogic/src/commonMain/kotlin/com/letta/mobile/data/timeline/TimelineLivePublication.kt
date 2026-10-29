@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.hasNoRenderableContent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -140,9 +141,9 @@ internal fun TimelineSettledRecord.presentationWithAdapter(
         if (event.isSyntheticSkillEnvelope()) {
             Telemetry.event(
                 "TimelineSettledPresentation", "skillEnvelope.dropped",
-                "identity" to key.identity.value,
-                "messageType" to event.messageType.name,
-                "chars" to event.content.length,
+                "identity" attr key.identity.value,
+                "messageType" attr event.messageType.name,
+                "chars" attr event.content.length,
                 level = Telemetry.Level.WARN,
             )
             TimelineSettledPresentation.Drop
@@ -231,8 +232,8 @@ data class TimelineLivePublication(
         if (maxRevision >= revision + STRAND_GUARD_REVISION_DELTA) {
             Telemetry.event(
                 "TimelineLivePublication", "strandGuard.drained",
-                "settlementRevision" to revision,
-                "headRevision" to maxRevision,
+                "settlementRevision" attr revision,
+                "headRevision" attr maxRevision,
                 level = Telemetry.Level.WARN,
             )
             return true

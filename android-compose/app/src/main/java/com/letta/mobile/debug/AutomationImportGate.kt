@@ -1,5 +1,6 @@
 package com.letta.mobile.debug
 
+import com.letta.mobile.util.attr
 import android.content.Context
 import com.letta.mobile.util.Telemetry
 
@@ -43,7 +44,7 @@ object AutomationImportGate {
             Telemetry.event(
                 tag = "AutomationAuth",
                 name = "releasePayloadRejected",
-                "prefsName" to AutomationAuthBootstrap.PREFS_NAME,
+                "prefsName" attr AutomationAuthBootstrap.PREFS_NAME,
                 level = Telemetry.Level.WARN,
             )
             return null

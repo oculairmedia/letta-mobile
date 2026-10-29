@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.turnStreamIdentityFor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -330,7 +331,7 @@ internal class ConversationTurnFanout(
         if (openIds.isEmpty()) return
         Telemetry.event(
             "IrohNode", "stream.dangling_tool_calls_synthesized",
-            "count" to openIds.size,
+            "count" attr openIds.size,
         )
         openIds.forEach { toolCallId ->
             broadcastDeltaBody(DanglingToolCallSynthesizer.cancelledToolReturnDelta(toolCallId))
@@ -506,9 +507,9 @@ internal class ConversationTurnFanout(
         lastBroadcastAudience = audience
         Telemetry.event(
             "IrohNode", "fanout.broadcast",
-            "conversationId" to conversationId,
-            "viewerCount" to viewerCount,
-            "hasInitiator" to hasInitiator,
+            "conversationId" attr conversationId,
+            "viewerCount" attr viewerCount,
+            "hasInitiator" attr hasInitiator,
         )
     }
 
@@ -623,8 +624,8 @@ internal class ConversationTurnFanout(
         if (ok != true) {
             Telemetry.event(
                 "IrohNode", "fanout.observer_dropped",
-                "conversationId" to conversationId,
-                "reason" to if (ok == null) "write_timeout" else "write_failed",
+                "conversationId" attr conversationId,
+                "reason" attr if (ok == null) "write_timeout" else "write_failed",
                 level = Telemetry.Level.WARN,
             )
             runCatching { unregisterViewer(conversationId, viewer) }

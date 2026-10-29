@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentMapOf
@@ -27,6 +29,18 @@ import kotlin.test.assertTrue
  * truncated-tail parameterization.
  */
 class TerminalSettlementFenceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @JvmInline
     private value class TestMessageId(val value: String)
@@ -193,7 +207,7 @@ class TerminalSettlementFenceTest {
         assertTrue(
             Telemetry.snapshot().any {
                 it.tag == "TimelineSync" && it.name == "terminal.settlement.fence" &&
-                    it.attrs["decision"] == "blocked"
+                    it.attrs["decision"]?.textOrNull == "blocked"
             },
             "stale block must emit the discriminator telemetry; got: " + Telemetry.snapshot(),
         )

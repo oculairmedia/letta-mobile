@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -113,10 +114,10 @@ object MessageListPageGuard {
         val keys = (this as? JsonObject)?.keys.orEmpty().sorted().take(MAX_LOGGED_KEYS)
         Telemetry.event(
             "IrohNode", "message_list.unboundable_shape",
-            "kind" to kind,
-            "keyCount" to ((this as? JsonObject)?.size ?: 0),
-            "keys" to keys.joinToString(","),
-            "byteLen" to byteLen(this),
+            "kind" attr kind,
+            "keyCount" attr ((this as? JsonObject)?.size ?: 0),
+            "keys" attr keys.joinToString(","),
+            "byteLen" attr byteLen(this),
             level = Telemetry.Level.WARN,
         )
         return this

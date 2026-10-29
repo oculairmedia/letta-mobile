@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.PermissionModeRpc
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -47,10 +48,10 @@ class PermissionModePublisher(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-                Telemetry.event("PermissionModePush", "failed", "class" to error::class.simpleName, level = Telemetry.Level.WARN)
+                Telemetry.event("PermissionModePush", "failed", "class" attr error::class.simpleName, level = Telemetry.Level.WARN)
                 return@launch
             }
-            Telemetry.event("PermissionModePush", "published", "mode" to PermissionModeRpc.wire(mode), "delivered" to delivered)
+            Telemetry.event("PermissionModePush", "published", "mode" attr PermissionModeRpc.wire(mode), "delivered" attr delivered)
         }
     }
 }

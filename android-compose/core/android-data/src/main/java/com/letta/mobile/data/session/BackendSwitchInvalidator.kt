@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -53,7 +54,7 @@ class BackendSwitchInvalidator @Inject constructor(
                     "BackendSwitch",
                     "cacheClearFailed",
                     error,
-                    "cache" to cacheName,
+                    "cache" attr cacheName,
                 )
             }
         }

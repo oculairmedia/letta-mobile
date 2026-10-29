@@ -13,6 +13,16 @@ import org.junit.jupiter.api.Tag
 
 @Tag("unit")
 class TelemetryTest : WordSpec({
+    var ownedTelemetryHistory: AutoCloseable? = null
+
+    beforeTest {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    afterTest {
+        ownedTelemetryHistory?.close()
+    }
+
     "Telemetry" should {
         "collect events when Logcat mirroring is disabled" {
             val wasEnabled = Telemetry.enabled.get()
@@ -23,13 +33,13 @@ class TelemetryTest : WordSpec({
                 Telemetry.enabled.set(true)
                 Telemetry.logcatEnabled.set(false)
 
-                Telemetry.event("Metrics", "sample", "count" to 1)
+                Telemetry.event("Metrics", "sample", "count" attr 1)
 
                 val snapshot = Telemetry.snapshot()
                 snapshot shouldHaveSize 1
                 snapshot.first().tag shouldBe "Metrics"
                 snapshot.first().name shouldBe "sample"
-                snapshot.first().attrs shouldContain ("count" to 1)
+                snapshot.first().attrs shouldContain ("count" attr 1)
             } finally {
                 Telemetry.clear()
                 Telemetry.enabled.set(wasEnabled)
@@ -90,7 +100,7 @@ class TelemetryTest : WordSpec({
                     val emitters = (1..8).map { worker ->
                         async(Dispatchers.Default) {
                             repeat(250) { index ->
-                                Telemetry.event("Concurrent", "sample", "worker" to worker, "index" to index)
+                                Telemetry.event("Concurrent", "sample", "worker" attr worker, "index" attr index)
                             }
                         }
                     }
