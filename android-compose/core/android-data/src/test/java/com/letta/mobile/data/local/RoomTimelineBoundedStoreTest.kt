@@ -6,6 +6,9 @@ import com.letta.mobile.data.timeline.*
 import com.letta.mobile.data.timeline.snapshot.*
 import java.util.Base64
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -145,6 +148,95 @@ class RoomTimelineBoundedStoreTest {
         assertEquals(3L, store.read(scope) { checkpoint().revision })
         val reopened = CanonicalPendingLocalStore(RoomTimelineBoundedStore(db, codec))
         assertEquals(listOf(record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed)), reopened.load(scope))
+    }
+
+    /** Delegates to Room but fails every transaction after its block ran, before commit. */
+    private fun failingCommit(failure: () -> Throwable) = object : TimelineBoundedStore {
+        override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
+            store.read(scope, block)
+        override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T =
+            store.transaction(scope) { block(); throw failure() }
+    }
+
+    @Test fun pendingSaveAndMarkRollBackWithTheirTransaction() = runBlocking {
+        val pending = CanonicalPendingLocalStore(store)
+        val record = CanonicalPendingLocalStore.Record("rollback-1", "hello", emptyList(), "2026-09-08T21:00:00Z")
+        val cancelled = CanonicalPendingLocalStore(failingCommit { CancellationException("cancel before commit") })
+        val broken = CanonicalPendingLocalStore(failingCommit { IllegalStateException("disk full") })
+        try { cancelled.save(scope, record); fail("Expected cancellation") } catch (_: CancellationException) { }
+        try { broken.save(scope, record); fail("Expected failure") } catch (_: IllegalStateException) { }
+        assertTrue(pending.load(scope).isEmpty())
+        assertEquals(0L, store.read(scope) { checkpoint().revision })
+
+        pending.save(scope, record)
+        try {
+            cancelled.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Sent); fail("Expected cancellation")
+        } catch (_: CancellationException) { }
+        try {
+            broken.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Failed); fail("Expected failure")
+        } catch (_: IllegalStateException) { }
+        assertEquals(listOf(record), pending.load(scope))
+        assertEquals(1L, store.read(scope) { checkpoint().revision })
+
+        pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+        try { broken.discardFailed(scope, record.otid); fail("Expected failure") } catch (_: IllegalStateException) { }
+        val failed = record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(listOf(failed), CanonicalPendingLocalStore(RoomTimelineBoundedStore(db, codec)).load(scope))
+        assertEquals(2L, store.read(scope) { checkpoint().revision })
+    }
+
+    @Test fun outcomesForAStaleAttemptChangeNothingEvenWhenRacing() = runBlocking {
+        val pending = CanonicalPendingLocalStore(store)
+        val record = CanonicalPendingLocalStore.Record("cas-1", "hello", emptyList(), "2026-09-08T21:00:00Z")
+        pending.save(scope, record)
+        coroutineScope {
+            repeat(8) { stale ->
+                launch(Dispatchers.IO) {
+                    pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Failed, expectedAttempt = stale + 1L)
+                }
+            }
+            launch(Dispatchers.IO) {
+                pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 0L)
+            }
+        }
+        assertEquals(listOf(record.copy(delivery = CanonicalPendingLocalStore.Delivery.Sent)), pending.load(scope))
+        assertEquals(2L, store.read(scope) { checkpoint().revision })
+    }
+
+    @Test fun concurrentSavesNeverLoseAnotherPrompt() = runBlocking {
+        val pending = CanonicalPendingLocalStore(store)
+        val records = (1..16).map {
+            CanonicalPendingLocalStore.Record("concurrent-$it", "hello $it", emptyList(), "2026-09-08T21:00:00Z")
+        }
+        coroutineScope { records.forEach { record -> launch(Dispatchers.IO) { pending.save(scope, record) } } }
+        assertEquals(records.toSet(), pending.load(scope).toSet())
+        assertEquals(records.size.toLong(), store.read(scope) { checkpoint().revision })
+    }
+
+    @Test fun echoConfirmationRollsBackWithTheCanonicalWrite() = runBlocking {
+        val pending = CanonicalPendingLocalStore(store)
+        val local = CanonicalPendingLocalStore.Record("joint-local", "hello", emptyList(), "2026-09-08T21:00:00Z")
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val echo = TimelineRemoteRecord(TimelineMessageId("joint-server"), com.letta.mobile.data.model.UserMessage(
+            id = "joint-server", contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"), date = local.sentAt, otid = local.otid,
+        ), 0)
+        pending.save(scope, local)
+        try {
+            store.transaction(scope) {
+                assertTrue(writer.merge(this, echo))
+                nextRevision()
+                throw CancellationException("cancel echo before commit")
+            }
+            fail("Expected cancellation")
+        } catch (_: CancellationException) { }
+        assertEquals(listOf(local), pending.load(scope))
+        assertEquals(1L, store.read(scope) { checkpoint().revision })
+        store.transaction(scope) {
+            assertTrue("The rolled-back echo must still be new", writer.merge(this, echo))
+            nextRevision()
+        }
+        assertTrue(pending.load(scope).isEmpty())
+        assertEquals(2L, store.read(scope) { checkpoint().revision })
     }
 
     @Test fun replayedEchoRemovalAndToolSweepCommitRevisions() = runBlocking {
