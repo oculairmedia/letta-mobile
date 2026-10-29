@@ -50,6 +50,13 @@ class MonitorEventsTest {
     }
 
     @Test
+    fun `a merge stays actionable when the event also reports passing checks`() {
+        assertTrue(isActionableMonitorEvent("PR merged; checks passed"))
+        assertTrue(isActionableMonitorEvent("merge conflict appeared while CI still running"))
+        assertFalse(isActionableMonitorEvent("connection closed, retrying"))
+    }
+
+    @Test
     fun `forty routine events fold into one chip at the newest`() {
         val messages = listOf(monitorCall("monitor_a", "Watch PR #2259")) +
             (1..40).map { message("e$it", event("monitor_a", "CI $it/40")) }

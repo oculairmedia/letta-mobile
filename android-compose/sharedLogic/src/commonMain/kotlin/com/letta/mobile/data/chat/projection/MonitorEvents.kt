@@ -30,12 +30,14 @@ fun UiSubagentNotification.monitorEventCount(): Int {
 
 /**
  * Whether a Monitor event earns a one-line row besides updating its chip. The watcher script decides
- * what an event says, so this goes by its words: recovery, rate-limit, edit, poll and passing-check
- * news is routine even when it names a failure ("recovered after 1 failed poll"); a failure, merge,
- * review, conflict or finished task is actionable; anything else (progress such as "CI 6/11") is routine.
+ * what an event says, so this goes by its words. A merge, reopen, conflict or change request is
+ * always actionable ("PR merged; checks passed"). Otherwise recovery, rate-limit, edit, poll and
+ * passing-check news is routine even when it names a failure ("recovered after 1 failed poll"); a
+ * failure, review or finished task is actionable; anything else (progress such as "CI 6/11") is routine.
  */
 internal fun isActionableMonitorEvent(event: String): Boolean =
-    !ROUTINE_WORDS.containsMatchIn(event) && ACTIONABLE_WORDS.containsMatchIn(event)
+    DECISIVE_WORDS.containsMatchIn(event) ||
+        (!ROUTINE_WORDS.containsMatchIn(event) && ACTIONABLE_WORDS.containsMatchIn(event))
 
 /**
  * [messages] (chronological) with each Monitor watch's events folded: its newest event becomes the
@@ -137,6 +139,10 @@ private val ROUTINE_WORDS = Regex(
     "\\b(recover(ed|ing|y)?|rate[- ]?limit(ed|s)?|throttl\\w*|edit(ed|s)?|poll(ed|ing|s)?|retr(y|ying|ied|ies)|" +
         "heartbeat|still|unchanged|no change|pending|queued|in[ _-]?progress|running|pass(ed|es|ing)?|" +
         "succeeded|success(ful)?|advisory|started|watching)\\b",
+    RegexOption.IGNORE_CASE,
+)
+private val DECISIVE_WORDS = Regex(
+    "\\b(merged|reopened|conflicts?|conflicted|changes requested)\\b",
     RegexOption.IGNORE_CASE,
 )
 private val ACTIONABLE_WORDS = Regex(

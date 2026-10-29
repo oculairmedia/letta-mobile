@@ -60,7 +60,8 @@ internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
         },
     )
     val count = notification.monitorEventCount()
-    val description = stringResource(Res.string.rows_monitor_chip_description, label, state, event)
+    val events = pluralStringResource(Res.plurals.rows_monitor_events, count, count)
+    val description = stringResource(Res.string.rows_monitor_chip_description, label, state, event, events)
     Column(
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.MONITOR_WATCHER).padding(vertical = LettaDimens.Space.xs),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -82,7 +83,13 @@ internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
                     modifier = Modifier.size(LettaDimens.Control.icon),
                     tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(text = label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
                 Text(
                     text = event,
                     style = MaterialTheme.typography.bodySmall,
@@ -91,8 +98,7 @@ internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 Text(
-                    text = listOfNotNull(pluralStringResource(Res.plurals.rows_monitor_events, count, count).takeIf { count > 0 }, state)
-                        .joinToString(" · "),
+                    text = listOfNotNull(events.takeIf { count > 0 }, state).joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
