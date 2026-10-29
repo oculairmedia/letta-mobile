@@ -1,11 +1,11 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
+import io.mockk.coEvery
+import io.mockk.spyk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -107,11 +107,11 @@ class SessionScopedAllConversationsRepositoryTest {
         // fires because a fresh rebuild lands mid-operation; after
         // MAX_SESSION_SWITCH_RETRIES the refresh must stop and throw explicitly.
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val fakeConversationApi = BarrierConversationApi().apply {
+        val fakeConversationApi = BarrierConversationApi {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", summary = "Backend A"))
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi.remote, dispatcher)
         fakeConversationApi.currentGraph = { sessionManager.current }
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
@@ -135,7 +135,7 @@ class SessionScopedAllConversationsRepositoryTest {
             "Session graph kept switching; refresh abandoned after 3 attempts",
             error?.message,
         )
-        assertEquals(3, fakeConversationApi.calls.count { it == "listConversations" })
+        assertEquals(3, fakeConversationApi.remote.calls.count { it == "listConversations" })
     }
 
     /** What a refresh still in flight when the backend switches (failing [staleTransportErrors] times) ends with. */
@@ -143,12 +143,12 @@ class SessionScopedAllConversationsRepositoryTest {
 
     private suspend fun TestScope.refreshAcrossARebuild(staleTransportErrors: Int): RebuildRefresh {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val fakeConversationApi = BarrierConversationApi().apply {
+        val fakeConversationApi = BarrierConversationApi {
             conversations = mutableListOf(TestData.conversation(id = "conv-b", summary = "Backend B"))
             staleTransportIaeCountdown = staleTransportErrors
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi.remote, dispatcher)
         fakeConversationApi.currentGraph = { sessionManager.current }
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
@@ -177,7 +177,7 @@ class SessionScopedAllConversationsRepositoryTest {
         return RebuildRefresh(
             error = error,
             listed = conversationsProxy.conversations.value.map { it.id.value },
-            listCalls = fakeConversationApi.calls.count { it == "listConversations" },
+            listCalls = fakeConversationApi.remote.calls.count { it == "listConversations" },
         )
     }
 }
@@ -201,7 +201,7 @@ private fun TestScope.sessionManager(
 )
 
 /** Holds each real remote invocation until the test has observed the graph publication. */
-private class BarrierConversationApi : FakeConversationApi() {
+private class BarrierConversationApi(configure: FakeConversationApi.() -> Unit) {
     class Attempt(val graph: SessionGraph) {
         val release = CompletableDeferred<Unit>()
         val completed = CompletableDeferred<Throwable?>()
@@ -209,29 +209,24 @@ private class BarrierConversationApi : FakeConversationApi() {
 
     lateinit var currentGraph: () -> SessionGraph
     val started = Channel<Attempt>(Channel.UNLIMITED)
+    val remote = spyk(FakeConversationApi().apply(configure))
 
-    override suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int?,
-        after: String?,
-        archiveStatus: String?,
-        summarySearch: String?,
-        order: String?,
-        orderBy: String?,
-    ): List<Conversation> {
-        val attempt = Attempt(currentGraph())
-        started.send(attempt)
-        try {
-            attempt.release.await()
-            val result = super.listConversations(agentId, limit, after, archiveStatus, summarySearch, order, orderBy)
-            attempt.completed.complete(null)
-            return result
-        } catch (error: CancellationException) {
-            attempt.completed.complete(error)
-            throw error
-        } catch (error: Throwable) {
-            attempt.completed.complete(error)
-            throw error
+    init {
+        coEvery { remote.listConversations(any(), any(), any(), any(), any(), any(), any()) } coAnswers {
+            val attempt = Attempt(currentGraph())
+            started.send(attempt)
+            try {
+                attempt.release.await()
+                val result = callOriginal()
+                attempt.completed.complete(null)
+                result
+            } catch (error: CancellationException) {
+                attempt.completed.complete(error)
+                throw error
+            } catch (error: Throwable) {
+                attempt.completed.complete(error)
+                throw error
+            }
         }
     }
 }
