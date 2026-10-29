@@ -250,4 +250,15 @@ class GazeCalmTest {
         const val STEP = 0.01f
         const val EPSILON = 0.0001f
     }
+
+    @Test
+    fun invalidCalmTunablesAreRejected() {
+        val config = GazeDirectorConfig()
+        kotlin.test.assertFailsWith<IllegalArgumentException> { config.stateDebounceSeconds = Float.NaN }
+        kotlin.test.assertFailsWith<IllegalArgumentException> { config.stateDebounceSeconds = -1f }
+        kotlin.test.assertFailsWith<IllegalArgumentException> { config.workDriftReach = Float.POSITIVE_INFINITY }
+        kotlin.test.assertFailsWith<IllegalArgumentException> { config.workDriftReach = -0.1f }
+        kotlin.test.assertFailsWith<IllegalArgumentException> { config.workDriftSeconds = Float.NaN..9f }
+        kotlin.test.assertFailsWith<IllegalArgumentException> { config.workDriftSeconds = 0f..9f }
+    }
 }

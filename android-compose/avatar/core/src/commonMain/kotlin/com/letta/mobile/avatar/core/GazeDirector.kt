@@ -97,6 +97,10 @@ class GazeDirector(
     /** A seat hand-off's eye lead ([lead]): where, and for how much longer. */
     private var leadPoint: GazePoint = GazePoint(0f, 0f)
     private var leadRemaining: Float = 0f
+    /** Seconds a cued dwell has waited for its look to be displayed (bounded by one fixation slot). */
+    private var cueWait: Float = 0f
+    /** The lead's countdown starts only once its look is on screen; until then it waits for a slot. */
+    private var leadShown: Boolean = false
 
     /** Current habituation 0..1 (Pan et al. / Disney Research eq. 2). [GazeTarget.OWN] never decays. */
     fun interestOf(target: GazeTarget): Float = interest[target] ?: 1f
@@ -128,7 +132,7 @@ class GazeDirector(
         commitFixation(next, world)
         tickHabituation()
         val pose = tickMotion()
-        leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
+        if (leadShown || !planDrives(world.mode)) leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
         lastPose = pose
         return pose
     }
@@ -152,6 +156,7 @@ class GazeDirector(
     fun lead(toward: GazePoint, seconds: Float) {
         leadPoint = toward.coerce()
         leadRemaining = seconds.coerceAtLeast(0f)
+        leadShown = false
     }
 
     /** True while a seat hand-off's eye lead owns the look. */
@@ -178,7 +183,7 @@ class GazeDirector(
         val activeState = noteStateFlip(state)
         beginCue(world)
         if (holdWorkLook(activeState, world)) return
-        if (cuedDwellWaitingForDisplay()) return
+        if (cuedDwellWaitingForDisplay(world)) return
         phaseRemaining -= stepSeconds
         var steps = 0
         while (phaseRemaining <= 0f && steps < 4) {
@@ -188,8 +193,16 @@ class GazeDirector(
         holdWorkLook(activeState, world)
     }
 
-    /** A cued dwell starts counting only once its fixation is actually displayed. */
-    private fun cuedDwellWaitingForDisplay(): Boolean = cuedDwell && (desiredTarget != target || cursorNear)
+    /**
+     * A cued dwell starts counting only once its fixation, at its current aim, is displayed. The
+     * wait is bounded by one fixation slot so a continuously moving aim cannot hold the cue.
+     */
+    private fun cuedDwellWaitingForDisplay(world: GazeWorld): Boolean {
+        if (!cuedDwell) return false
+        val waiting = desiredTarget != target || cursorNear || aimBase(desiredTarget, world) != fixationBase
+        if (!waiting) cueWait = 0f else cueWait += stepSeconds
+        return waiting && cueWait < 1f / config.maxSaccadesPerSecond
+    }
 
     /** Plan-driven work: no cue or hand-off owns the eyes right now. */
     private fun planOwnsWorkLook(state: AvatarState): Boolean =
@@ -277,6 +290,7 @@ class GazeDirector(
         fixationBase = base
         fixationLook = look
         fixationFree = free
+        if (leadRemaining > 0f) leadShown = true
         if (!free) lastPlanAim = base
         saccadeAge = 0f
         committedSnap = snap
