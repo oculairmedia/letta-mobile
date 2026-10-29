@@ -157,9 +157,9 @@ internal fun authenticateSender(config: A2aWiringConfig, message: IrohAgentMessa
     Telemetry.event(
         "A2aHost",
         "a2a.sender_unverified_allowed",
-        "fromAgentId" to message.fromAgentId,
-        "msgId" to message.msgId,
-        "peer" to IrohFailureLog.remotePrefix(peer),
+        "fromAgentId" attr message.fromAgentId,
+        "msgId" attr message.msgId,
+        "peer" attr IrohFailureLog.remotePrefix(peer),
     )
     return true
 }
