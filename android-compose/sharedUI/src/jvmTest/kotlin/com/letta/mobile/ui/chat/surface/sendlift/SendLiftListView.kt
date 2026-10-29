@@ -53,6 +53,9 @@ internal class SendLiftListView(private val test: ComposeUiTest, private val pro
         )
     }
 
+    /** Absent semantics means not mounted yet; an unresolvable state is a harness error, not readiness. */
+    fun isReadyToScroll(): Boolean = stateOrNull()?.layoutInfo?.visibleItemsInfo?.isNotEmpty() == true
+
     /** Scrolls the list towards older messages, as a person reading back would. */
     fun scrollAwayFromTheEdge() {
         checkNotNull(stateOrNull()) { "the page has no timeline list to scroll" }
