@@ -7,7 +7,7 @@ import com.letta.mobile.data.timeline.OutboxStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -171,6 +171,6 @@ internal class OutboxStoreTest {
     private companion object {
         const val SENT_AT = "2026-01-01T00:00:00Z"
         val IMAGE = MessageContentPart.Image("aGVsbG8=", "image/png")
-        val json = Json { encodeDefaults = true }
+        val json = LettaJson.persisted
     }
 }

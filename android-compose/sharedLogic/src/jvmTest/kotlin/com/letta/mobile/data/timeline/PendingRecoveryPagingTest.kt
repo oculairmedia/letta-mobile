@@ -137,7 +137,9 @@ class PendingRecoveryPagingTest {
         finish.complete(Unit)
         retry.join()
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
-        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, owner.session.pending.value.single().delivery)
+        // The retry is a new attempt: its echo horizon starts now, not at the prompt's first send.
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, owner.session.pending.value.single().delivery)
+        assertEquals(1L, owner.session.pending.value.single().attempt)
     }
 
     private class Fixture(

@@ -3,8 +3,10 @@ package com.letta.mobile.data.timeline.api
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.TimelineStoreReader
 import com.letta.mobile.data.timeline.TimelineStoreTransaction
+import com.letta.mobile.data.serialization.LettaJson
+import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
+import com.letta.mobile.data.timeline.timelineInstantDurationMillis
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /** Live entries are capped by [OutboxTransitions.BUDGET]; this caps their encoded size. */
 internal const val OUTBOX_MAX_BYTES: Int = 2 * 1024 * 1024
@@ -12,12 +14,6 @@ internal const val OUTBOX_MAX_BYTES: Int = 2 * 1024 * 1024
 private const val OUTBOX_KEY = "outbox/v2"
 private const val LEGACY_OUTBOX_KEY = "pending/local/v1"
 private const val OUTBOX_VERSION = 2
-
-// The timeline snapshot codec's settings, without importing the snapshot package into this one.
-private val outboxJson = Json {
-    ignoreUnknownKeys = true
-    encodeDefaults = true
-}
 
 @Serializable
 private data class OutboxEnvelope(val version: Int = OUTBOX_VERSION, val entries: List<OutboxEntry>)
@@ -33,7 +29,7 @@ internal fun List<OutboxEntry>.replacing(otid: String, next: OutboxEntry): List<
 internal suspend fun TimelineStoreReader.readOutbox(nowMillis: Long): List<OutboxEntry> {
     val bytes = evidence(OUTBOX_KEY, OUTBOX_MAX_BYTES) ?: return readLegacyOutbox(nowMillis)
     require(bytes.size <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
-    val envelope = outboxJson.decodeFromString(OutboxEnvelope.serializer(), bytes.decodeToString())
+    val envelope = LettaJson.persisted.decodeFromString(OutboxEnvelope.serializer(), bytes.decodeToString())
     require(envelope.version == OUTBOX_VERSION) { "Unsupported outbox version" }
     return envelope.entries.also(::validateOutbox)
 }
@@ -51,7 +47,7 @@ internal fun encodeOutbox(entries: List<OutboxEntry>): ByteArray? {
             entry.attachments.sumOf { it.base64.length.toLong() + it.mediaType.length }
     }
     require(textUnits <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
-    val bytes = outboxJson.encodeToString(OutboxEnvelope.serializer(), OutboxEnvelope(entries = entries))
+    val bytes = LettaJson.persisted.encodeToString(OutboxEnvelope.serializer(), OutboxEnvelope(entries = entries))
         .encodeToByteArray()
     require(bytes.size <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
     return bytes
@@ -67,7 +63,8 @@ internal suspend fun TimelineStoreTransaction.writeOutbox(entries: List<OutboxEn
 
 /**
  * A pending-store record as an outbox entry: Sending has been handed to the transport, Sent was
- * accepted and awaits its echo, and Failed is not known to have been received.
+ * accepted and awaits its echo, and Failed is not known to have been received. The send entered
+ * its state when it was sent, so that is when its clock starts.
  */
 internal fun CanonicalPendingLocalStore.Record.toOutboxEntry(nowMillis: Long): OutboxEntry {
     val failed = delivery == CanonicalPendingLocalStore.Delivery.Failed
@@ -82,17 +79,26 @@ internal fun CanonicalPendingLocalStore.Record.toOutboxEntry(nowMillis: Long): O
             CanonicalPendingLocalStore.Delivery.Failed -> OutboxState.Failed
         },
         attempt = attempt,
-        stateSinceMillis = nowMillis,
+        stateSinceMillis = sentAtMillis(sentAt, nowMillis),
         failure = if (failed) OutboxFailure.Unconfirmed else null,
     )
 }
+
+/** [sentAt] in epoch milliseconds, never later than [nowMillis]; now when it does not parse. */
+private fun sentAtMillis(sentAt: String, nowMillis: Long): Long {
+    val epoch = parseTimelineInstantOrNull(EPOCH) ?: return nowMillis
+    val sent = parseTimelineInstantOrNull(sentAt) ?: return nowMillis
+    return minOf(timelineInstantDurationMillis(epoch, sent), nowMillis)
+}
+
+private const val EPOCH = "1970-01-01T00:00:00Z"
 
 internal suspend fun TimelineStoreReader.hasLegacyOutbox(): Boolean =
     evidence(LEGACY_OUTBOX_KEY, CanonicalPendingLocalStore.MAX_BYTES) != null
 
 private suspend fun TimelineStoreReader.readLegacyOutbox(nowMillis: Long): List<OutboxEntry> {
     val bytes = evidence(LEGACY_OUTBOX_KEY, CanonicalPendingLocalStore.MAX_BYTES) ?: return emptyList()
-    val legacy = outboxJson.decodeFromString(LegacyOutboxEnvelope.serializer(), bytes.decodeToString())
+    val legacy = LettaJson.persisted.decodeFromString(LegacyOutboxEnvelope.serializer(), bytes.decodeToString())
     require(legacy.version == 1) { "Unsupported pending state version" }
     return legacy.records.map { it.toOutboxEntry(nowMillis) }.also(::validateOutbox)
 }

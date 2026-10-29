@@ -28,7 +28,7 @@ import kotlinx.serialization.encoding.Encoder
  *
  * The records are a view of the conversation's outbox: every change below is an outbox
  * transition, compared and set by attempt inside one store transaction, and the lost-echo horizon
- * counts from when a send entered its current state rather than from when it was first sent.
+ * counts from when the current attempt began, so a retried old prompt gets a fresh one.
  */
 class CanonicalPendingLocalStore(
     private val store: TimelineBoundedStore,
@@ -103,7 +103,7 @@ class CanonicalPendingLocalStore(
     ): Boolean {
         if (!accept()) return false
         val existing = previous.first { it.otid == candidate.otid }
-        val dispatched = existing.after(listOf(OutboxEvent.DispatchStart), now) ?: return true
+        val dispatched = existing.after(listOf(OutboxEvent.DispatchStart), now)?.sinceAttemptStart(existing) ?: return true
         commit(previous.replacing(existing.otid, dispatched))
         return true
     }
@@ -162,7 +162,8 @@ class CanonicalPendingLocalStore(
             val previous = readOutbox(now)
             val entry = previous.firstOrNull { it.otid == otid } ?: return@transaction
             if (expectedAttempt != null && entry.attempt != expectedAttempt) return@transaction
-            val next = entry.after(outcomeEvents(delivery)[entry.state].orEmpty(), now) ?: return@transaction
+            val next = entry.after(outcomeEvents(delivery)[entry.state].orEmpty(), now)?.sinceAttemptStart(entry)
+                ?: return@transaction
             commit(previous.replacing(otid, next))
         }
     }
@@ -234,6 +235,13 @@ private fun OutboxEntry.after(events: List<OutboxEvent>, now: Long): OutboxEntry
         entry?.let { (OutboxTransitions.next(it, event, now, it.attempt) as? OutboxTransition.Applied)?.entry }
     }
 }
+
+/**
+ * A transport outcome is about the current attempt, so the lost-echo horizon keeps counting from
+ * when that attempt began: the first send, or the retry that started it.
+ */
+private fun OutboxEntry.sinceAttemptStart(before: OutboxEntry): OutboxEntry =
+    if (state == OutboxState.Failed) this else copy(stateSinceMillis = before.stateSinceMillis)
 
 private fun OutboxEntry.toRecord(): CanonicalPendingLocalStore.Record = CanonicalPendingLocalStore.Record(
     otid = otid,
