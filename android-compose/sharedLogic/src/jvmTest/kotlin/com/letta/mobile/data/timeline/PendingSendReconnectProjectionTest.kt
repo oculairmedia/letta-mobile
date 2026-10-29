@@ -163,7 +163,10 @@ class PendingSendReconnectProjectionTest {
         runCurrent()
         val delta = launch {
             f.sender.handleEvent(WsTimelineEvent.MessageDelta(
-                message = f.reply(MessageId("live"), 5.seconds), agentId = "agent", conversationId = FIRST.value, turnId = "turn",
+                // Its own id: message-delta dedupe keys are process-wide, and resumedFramesCancelTheRedialDeadline
+                // sends "live" in the same fixture conversation.
+                message = f.reply(MessageId("live-during-read"), 5.seconds), agentId = "agent", conversationId = FIRST.value,
+                turnId = "turn",
             ))
         }
         runCurrent()
