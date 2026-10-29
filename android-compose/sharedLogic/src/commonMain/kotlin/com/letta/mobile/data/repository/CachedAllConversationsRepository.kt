@@ -103,7 +103,12 @@ open class CachedAllConversationsRepository(
         } catch (_: UnsupportedOperationException) {
             refreshAfterPush("unsupported")
         } catch (e: Exception) {
-            Telemetry.event(TAG, "conversation_updated.refetch_failed", "error" attr (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            Telemetry.event(
+                TAG,
+                "conversation_updated.refetch_failed",
+                "error" attr (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
