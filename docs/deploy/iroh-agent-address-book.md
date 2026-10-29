@@ -66,6 +66,31 @@ The wrapper serves the `/letta/a2a/0` ALPN on its one Iroh endpoint
 endpoint's node id and direct addresses. `LETTA_A2A_PORT` / `--a2a-port`
 binds nothing: `-1` disables the receiver, any other value enables it.
 
+## Sender authentication
+
+Every sender dials with its own persisted identity (`identities/<agentId>.json`,
+the key `meridian agent-message send` loads for `--from`). The receiver accepts a
+message only when the dialing node is the identity this host holds for the
+message's claimed `fromAgentId` (letta-mobile-8h07i). Anything else is acked as
+not delivered with reason `sender_not_authenticated` and logged as
+`a2a.sender_rejected`:
+
+- a node claiming an agent whose key it does not hold;
+- a sender this host holds no identity for.
+
+The receiver never creates an identity while checking one.
+
+- `LETTA_A2A_SENDER_AUTH` / `--a2a-sender-auth`: `enforce` (default) or
+  `observe`. `observe` delivers an unverified message anyway and logs
+  `a2a.sender_unverified_allowed`, so a deploy can confirm that no legitimate
+  traffic is refused before relying on `enforce`.
+- The receiver and the agent-message tool must read the same identity dir
+  (`--a2a-identity-dir` / `LETTA_A2A_IDENTITY_DIR`; the wrapper passes one value
+  to both). If they differ, every message is refused.
+- An agent on another host keeps its key in that host's identity dir, so this
+  host refuses it until cross-host trust (an allowlist of other hosts' agent
+  node ids) exists.
+
 ---
 
 ## The three artifacts

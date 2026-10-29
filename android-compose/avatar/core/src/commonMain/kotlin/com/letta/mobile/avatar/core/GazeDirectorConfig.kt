@@ -2,9 +2,35 @@ package com.letta.mobile.avatar.core
 
 /**
  * Bench tunables for [GazeDirector]. Properties rather than constructor args.
- * Defaults match `RiveDesktopSpike.kt` (omega 8.5 / zeta 0.72).
+ * Product defaults keep the live-edge gaze calm; the original policy came from `RiveDesktopSpike.kt`.
  */
 class GazeDirectorConfig {
+    /** A new sustained mode must remain stable this long before its plan replaces the current one. */
+    var stateDebounceSeconds: Float = 0.5f
+        set(value) {
+            require(value.isFinite() && value >= 0f) { "The state debounce must be finite and non-negative" }
+            field = value
+        }
+    /** Maximum combined rate of target/aim changes and scan fixations, including priority demands. */
+    var maxSaccadesPerSecond: Float = 1.5f
+        set(value) {
+            require(value.isFinite() && value > 0f) { "The fixation rate must be finite and positive" }
+            field = value
+        }
+    /** Time between small at-work drifts around the live edge. */
+    var workDriftSeconds: ClosedFloatingPointRange<Float> = 6f..9f
+        set(value) {
+            require(value.start.isFinite() && value.endInclusive.isFinite() && value.start > 0f) {
+                "The drift interval must be finite and positive"
+            }
+            field = value
+        }
+    /** Maximum at-work drift from the live edge, in gaze units. */
+    var workDriftReach: Float = 0.025f
+        set(value) {
+            require(value.isFinite() && value >= 0f) { "The drift reach must be finite and non-negative" }
+            field = value
+        }
     /** AWAY: how far off-axis the eyes park (gaze units, |x|). */
     var awayReach: ClosedFloatingPointRange<Float> = 0.45f..0.85f
     /** OWN: a subtler aside when own thoughts drift off-centre. */

@@ -111,6 +111,9 @@ internal object ChatRowTestTags {
     const val COMPLETED_ACTIVITY_SUMMARY = "completed-activity-summary"
     const val SUBAGENT_DISPATCH = "subagent-dispatch"
     const val SUBAGENT_NOTIFICATION = "subagent-notification"
+    /** A Monitor watch's chip, and one of its actionable events. */
+    const val MONITOR_WATCHER = "monitor-watcher"
+    const val MONITOR_EVENT = "monitor-event"
     const val COMMAND_REPORT = "command-report"
     const val NOTIFICATION_TRANSCRIPT = "notification-transcript"
     const val USER_PROMPT = "chat-user-prompt"

@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.chat.projection.isMonitorWatcher
+import com.letta.mobile.data.chat.projection.monitorEvent
+import com.letta.mobile.data.chat.projection.monitorEventCount
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.StoredToolCall
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -284,6 +287,37 @@ class TimelinePageProjectionTest {
 
     private fun fixture() = InMemoryTimelineStore().also { store -> (1..3).forEach { seed(store, it) } }
     private fun key(id: Int) = TimelinePageKey(id.toLong(), TimelineMessageId("id-$id"))
+    // letta-mobile-a7ir6: a page's Monitor events fold into one chip in the newest event's row.
+    @Test fun monitorEventsOnAPageFoldIntoOneChipAtTheNewest() = runTest {
+        val store = InMemoryTimelineStore()
+        (1..5).forEach { id -> seedMonitorEvent(store, id, "CI $id/5") }
+        val engine = engine(store, TimelinePageBudget(8, 64 * 1024))
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+
+        val page = engine.preparePage(
+            selection,
+            TimelineReadPosition.Tail,
+            8,
+            "own-agent",
+            DefaultTimelineSettledProjectionAdapter,
+        )
+
+        val rendered = page.records.mapNotNull { (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item }
+        val chip = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.Single>(rendered.single())
+            .message.subagentNotification!!
+        assertTrue(chip.isMonitorWatcher())
+        assertEquals("CI 5/5", chip.monitorEvent())
+        assertEquals(5, chip.monitorEventCount())
+        assertEquals(4, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Drop })
+    }
+
+    private fun seedMonitorEvent(store: InMemoryTimelineStore, id: Int, text: String) {
+        val content = "<task-notification>\n<task-id>monitor_a</task-id>\n" +
+            "<summary>Monitor event: &quot;$text&quot;</summary>\n<result>\n<event>$text</event>\n</result>\n</task-notification>"
+        val event = StoredTimelineEvent(id.toDouble(), "otid-$id", content, "id-$id", "user_message", "2026-01-01T00:00:0${id}Z")
+        store.rows[key(id)] = TimelineStoredRecord(key(id), TIMELINE_EVENT_CONTENT_TYPE,
+            TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event).encodeToByteArray())
+    }
     private fun seed(store: InMemoryTimelineStore, id: Int, run: String? = "run-a", content: String = "hello") {
         val event = StoredTimelineEvent(id.toDouble(), "", content, "id-$id", "assistant_message",
             "2026-01-01T00:00:00Z", runId = run)

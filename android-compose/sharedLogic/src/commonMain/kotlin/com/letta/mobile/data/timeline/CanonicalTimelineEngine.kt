@@ -616,7 +616,7 @@ class CanonicalTimelineEngine(
                 runEnvelope(page.metadata, records, remaining, adapter),
             )
             val prepared = input.project(adapter)
-            TimelinePreparedPage(page.metadata, input.aggregatePreparedRuns(prepared), input)
+            TimelinePreparedPage(page.metadata, input.aggregatePreparedRuns(foldMonitorEventsOnPage(prepared)), input)
         }
     }
 

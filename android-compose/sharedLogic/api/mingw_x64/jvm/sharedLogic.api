@@ -9497,6 +9497,12 @@ public final class com/letta/mobile/data/chat/projection/MessageGroupingKt {
 	public static final fun runKey (Ljava/lang/String;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/chat/projection/MonitorEventsKt {
+	public static final fun isMonitorWatcher (Lcom/letta/mobile/data/model/UiSubagentNotification;)Z
+	public static final fun monitorEvent (Lcom/letta/mobile/data/model/UiSubagentNotification;)Ljava/lang/String;
+	public static final fun monitorEventCount (Lcom/letta/mobile/data/model/UiSubagentNotification;)I
+}
+
 public final class com/letta/mobile/data/chat/projection/PendingUserInputKt {
 	public static final fun pendingUserInputApproval (Ljava/util/List;)Lcom/letta/mobile/data/model/UiApprovalRequest;
 	public static final fun requiresUserInput (Lcom/letta/mobile/data/model/UiApprovalRequest;)Z
@@ -62361,6 +62367,10 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentIdentity$Compan
 	public final fun loadOrCreate (Ljava/lang/String;Ljava/io/File;)Lcom/letta/mobile/data/transport/iroh/IrohAgentIdentity;
 }
 
+public final class com/letta/mobile/data/transport/iroh/IrohAgentIdentityKt {
+	public static final fun isFromIdentityIn (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/io/File;Ljava/lang/String;)Z
+}
+
 public final class com/letta/mobile/data/transport/iroh/IrohAgentMessage {
 	public static final field Companion Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;)V
@@ -62439,7 +62449,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentMessageAck$Comp
 }
 
 public final class com/letta/mobile/data/transport/iroh/IrohAgentMessageReceiver : com/letta/mobile/data/controller/node/iroh/IrohNodeProtocolHandler {
-	public fun <init> (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;)V
+	public fun <init> (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;)V
 	public fun accept (Lcomputer/iroh/Connection;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun authorize (Ljava/lang/String;)Z
 	public fun getAlpn ()[B
