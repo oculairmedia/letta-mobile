@@ -1563,7 +1563,6 @@
     <ID>ReturnCount:ChatMessageListChange.kt$ChatMessageListChange.Companion$fun compute(previous: List&lt;UiMessage&gt;, next: List&lt;UiMessage&gt;): ChatMessageListChange</ID>
     <ID>ReturnCount:ChatRenderModelBuilder.kt$IncrementalChatRenderItemsCache$private fun canReuseCommittedHistory( messages: List&lt;UiMessage&gt;, mode: ChatDisplayMode, change: ChatMessageListChange, tailStartIndex: Int, ): Boolean</ID>
     <ID>ReturnCount:ChatRenderModelBuilder.kt$private fun shouldCollapseOptimisticTwin(a: UiMessage, b: UiMessage): Boolean</ID>
-    <ID>ReturnCount:ChatSendCoordinator.kt$ChatSendCoordinator$private suspend fun handleRedialWhileTurnActiveLocked(event: RedialWhileTurnActive)</ID>
     <ID>ReturnCount:ChatTimelineProjector.kt$ChatTimelineProjector$private fun tailProjectionFastPath( timeline: Timeline, prefix: List&lt;UiMessage&gt;, isActiveRunStreaming: Boolean, scope: ProjectionScope, ): TimelineProjection?</ID>
     <ID>ReturnCount:ContextTokenReadings.kt$private fun ServerFrame.RunActivity.compactionReading(readings: Map&lt;ContextReadingKey, Int&gt;): Pair&lt;ContextReadingKey, Int&gt;?</ID>
     <ID>ReturnCount:CronBuilder.kt$CronBuilder$fun fromExpression(expression: String): CronBuilderState</ID>

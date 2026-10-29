@@ -1,5 +1,6 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

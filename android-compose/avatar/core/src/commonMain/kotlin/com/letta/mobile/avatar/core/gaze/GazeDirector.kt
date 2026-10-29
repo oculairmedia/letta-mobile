@@ -1,5 +1,6 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
 
+import com.letta.mobile.avatar.core.model.AvatarState
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.hypot

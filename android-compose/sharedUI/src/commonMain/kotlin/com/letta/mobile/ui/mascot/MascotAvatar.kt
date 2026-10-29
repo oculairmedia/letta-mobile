@@ -34,15 +34,15 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import com.letta.mobile.avatar.core.MascotGesture
-import com.letta.mobile.avatar.core.MotionPreference
+import com.letta.mobile.avatar.core.body.MascotGesture
+import com.letta.mobile.avatar.core.model.MotionPreference
 import com.letta.mobile.ui.haptics.LocalHaptics
-import com.letta.mobile.avatar.core.AvatarLookTarget
-import com.letta.mobile.avatar.core.GazeMath
-import com.letta.mobile.avatar.core.GazeReach
-import com.letta.mobile.avatar.core.GazeRect
-import com.letta.mobile.avatar.core.GazeWorld
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
+import com.letta.mobile.avatar.core.gaze.GazeMath
+import com.letta.mobile.avatar.core.gaze.GazeReach
+import com.letta.mobile.avatar.core.gaze.GazeRect
+import com.letta.mobile.avatar.core.gaze.GazeWorld
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
@@ -120,7 +120,7 @@ fun mascotAvailable(agentId: String?): Boolean {
 /**
  * The live mascot for one agent at [size], from the process-wide entry so it never restarts
  * when the view changes. Feeds the entry's director the agent's presence and the frame clock,
- * and feeds [com.letta.mobile.avatar.core.GazeDirector] the pointer, this tile, and any
+ * and feeds [com.letta.mobile.avatar.core.gaze.GazeDirector] the pointer, this tile, and any
  * composer / timeline rects the host published on [MascotIdentityRegistry] so justified
  * attention (not only cursor tracking) runs on every host. Callers that need a fallback
  * check [mascotAvailable] first (or use [MascotAvatar]).

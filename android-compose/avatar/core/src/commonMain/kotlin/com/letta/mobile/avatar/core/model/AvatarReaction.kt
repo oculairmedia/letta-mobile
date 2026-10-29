@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.model
 
 /**
  * A one-shot the mascot plays and returns from, as opposed to the sustained [AvatarState] it sits

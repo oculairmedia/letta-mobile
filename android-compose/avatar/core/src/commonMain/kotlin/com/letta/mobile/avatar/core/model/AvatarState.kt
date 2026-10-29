@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.model
 
 /**
  * The full presence vocabulary the director arbitrates and every surface/mod

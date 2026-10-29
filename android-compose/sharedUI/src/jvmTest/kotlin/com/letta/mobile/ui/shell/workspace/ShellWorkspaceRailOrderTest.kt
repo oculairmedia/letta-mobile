@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell.workspace
 
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotShape
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceState

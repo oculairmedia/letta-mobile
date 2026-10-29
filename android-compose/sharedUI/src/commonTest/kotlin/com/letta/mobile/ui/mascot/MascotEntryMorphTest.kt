@@ -1,9 +1,9 @@
 package com.letta.mobile.ui.mascot
 
 import com.letta.mobile.avatar.core.HeadlessAvatarRuntime
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotPalette
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotPalette
+import com.letta.mobile.avatar.core.model.MascotShape
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

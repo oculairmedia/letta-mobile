@@ -150,6 +150,33 @@ class PendingSendReconnectProjectionTest {
         assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
     }
 
+    // softs (#2258 deferred defect 1): the redial history read no longer holds the turn lock.
+    @Test fun streamFramesAreNotHeldBehindASlowRedialHistoryRead() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("slow recovery")
+        f.streaming = true
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted("turn", "agent", FIRST.value, "run"))
+        f.channel.busy = true
+        f.dropAndReconnect()
+        f.historyGate = CompletableDeferred()
+        f.channel.redials.emit(RedialWhileTurnActive("agent", FIRST.value, "turn", "run", 2))
+        runCurrent()
+        val delta = launch {
+            f.sender.handleEvent(WsTimelineEvent.MessageDelta(
+                // Its own id: message-delta dedupe keys are process-wide, and resumedFramesCancelTheRedialDeadline
+                // sends "live" in the same fixture conversation.
+                message = f.reply(MessageId("live-during-read"), 5.seconds), agentId = "agent", conversationId = FIRST.value,
+                turnId = "turn",
+            ))
+        }
+        runCurrent()
+        assertTrue(delta.isCompleted, "a resumed stream frame must not wait for the history read")
+        // The read then times out, but the stream that resumed the turn owns it now.
+        advanceTimeBy(30.seconds)
+        runCurrent()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, f.pending(FIRST).single().delivery)
+    }
+
     @Test fun resumedFramesCancelTheRedialDeadline() = runTest {
         val f = Fixture(this)
         f.sendQueued("resumed stream")

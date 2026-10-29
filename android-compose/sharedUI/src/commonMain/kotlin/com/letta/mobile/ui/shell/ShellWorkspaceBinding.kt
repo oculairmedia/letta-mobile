@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.model.CanvasId

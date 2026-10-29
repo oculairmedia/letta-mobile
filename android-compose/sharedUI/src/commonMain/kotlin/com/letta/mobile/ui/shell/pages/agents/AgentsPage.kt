@@ -16,7 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.shell.rail.ShellAgentLibrary
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions

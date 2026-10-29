@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
-import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.chat.outbox
 
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.PendingImageSerializer
+import kotlinx.serialization.Serializable
 
 /**
  * Where one outbound prompt is in its delivery. Every move between states goes through
@@ -10,6 +12,7 @@ import com.letta.mobile.data.model.MessageContentPart
  * host ([Dispatching] and later) it is never sent again blindly: contact loss leads to [Unknown],
  * which only a history probe resolves.
  */
+@Serializable
 internal enum class OutboxState {
     /** Persisted and admitted to the budget; no transport call has been made for this attempt. */
     Queued,
@@ -37,6 +40,7 @@ internal enum class OutboxState {
 }
 
 /** Why an entry is [OutboxState.Failed]. */
+@Serializable
 internal enum class OutboxFailure {
     /** The transport refused the input before accepting it: it never reached the server. */
     NotAccepted,
@@ -50,10 +54,11 @@ internal enum class OutboxFailure {
  * so a retried old prompt gets a fresh echo horizon. [attempt] fences events: an event carrying
  * another attempt is stale and does not apply.
  */
+@Serializable
 internal data class OutboxEntry(
     val otid: String,
     val content: String,
-    val attachments: List<MessageContentPart.Image>,
+    val attachments: List<@Serializable(with = PendingImageSerializer::class) MessageContentPart.Image>,
     val createdAtMillis: Long,
     val state: OutboxState,
     val attempt: Long,

@@ -1,4 +1,6 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
+
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
 
 /**
  * How the host drives the [GazeDirector]. JUSTIFIED is the product behaviour;

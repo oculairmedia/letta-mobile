@@ -33,8 +33,8 @@ import app.rive.RiveFile
 import app.rive.RiveFileSource
 import app.rive.core.RiveWorker
 import app.rive.rememberRiveWorkerOrNull
-import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.avatar.rive.AndroidMascotScene
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.R

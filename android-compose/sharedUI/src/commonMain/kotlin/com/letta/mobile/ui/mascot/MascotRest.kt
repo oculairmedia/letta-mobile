@@ -7,7 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.data.presence.RunEdges
 import kotlin.time.Duration
