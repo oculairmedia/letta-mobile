@@ -16,6 +16,87 @@ detekt_build="$(<"$SOURCE_ROOT/android-compose/build.gradle.kts")"
 assert_contains "$detekt_build" 'files(allSourceSetDirs(layout.projectDirectory.dir("src").asFile))'
 assert_not_contains "$detekt_build" 'files(pluginDefaultSource)'
 
+# Artifact-only Ivy repositories must never probe Maven libraries. Coordinates
+# match the setup tasks in KGP 2.4.10, including Binaryen's lowercase group.
+python3 - "$SOURCE_ROOT/android-compose/settings.gradle.kts" <<'PY'
+import json
+from pathlib import Path
+import re
+import sys
+
+
+def tokens(text):
+    # Ignore comments, but preserve strings (URLs contain //) and block nesting.
+    return [m.group() for m in re.finditer(
+        r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/|[A-Za-z_][A-Za-z_0-9]*|[^\s]',
+        text, re.S,
+    ) if not m.group().startswith(('//', '/*'))]
+
+
+def blocks(ts, prefix):
+    found = []
+    depth = 0
+    for i, token in enumerate(ts):
+        if depth == 0 and ts[i:i + len(prefix)] == prefix:
+            start = i + len(prefix)
+            level = 1
+            end = start
+            while end < len(ts) and level:
+                level += (ts[end] == '{') - (ts[end] == '}')
+                end += 1
+            assert level == 0, 'unbalanced repository block'
+            found.append(ts[start:end - 1])
+        depth += (token == '{') - (token == '}')
+    return found
+
+
+def only_block(ts, prefix):
+    matches = blocks(ts, prefix)
+    assert len(matches) == 1, f'expected one block: {prefix}'
+    return matches[0]
+
+
+tools = (
+    ('https://nodejs.org/dist/', 'org.nodejs', 'node'),
+    ('https://github.com/yarnpkg/yarn/releases/download', 'com.yarnpkg', 'yarn'),
+    ('https://github.com/WebAssembly/binaryen/releases/download', 'com.github.webassembly', 'binaryen'),
+)
+
+
+def check(text):
+    management = only_block(tokens(text), ['dependencyResolutionManagement', '{'])
+    repos = only_block(management, ['repositories', '{'])
+    for url, group, module in tools:
+        repo = only_block(repos, ['ivy', '(', json.dumps(url), ')', '{'])
+        content = only_block(repo, ['content', '{'])
+        assert content == tokens(f'includeModule("{group}", "{module}")'), (
+            f'{module}: allow only the exact tool module, not broad includes'
+        )
+
+
+settings = Path(sys.argv[1]).read_text()
+check(settings)  # Positive: all three normal tool coordinates remain permitted.
+for _, group, module in tools:
+    include = f'includeModule("{group}", "{module}")'
+    filter_block = re.search(r'content\s*\{\s*' + re.escape(include) + r'\s*\}', settings)
+    assert filter_block, f'{module}: missing filter fixture'
+    for replacement in (
+        '',  # Missing filter, even with a valid filter elsewhere in settings.
+        'content { // ' + include + '\n}',
+        'content { includeModule("wrong.group", "wrong-module") }',
+        'content { ' + include + ' includeGroupByRegex(".*") }',
+        'content { ' + include + f' includeGroup("{group}")' + ' }',
+    ):
+        invalid = settings[:filter_block.start()] + replacement + settings[filter_block.end():]
+        invalid += '\ncontent { ' + include + ' }\n'
+        try:
+            check(invalid)
+        except AssertionError:
+            continue
+        raise AssertionError(f'{module}: accepted missing, misplaced, commented or broad filter')
+print('Distribution repository scope checks passed (3 positive modules, 15 negative mutations)')
+PY
+
 # Probe assertions moved with the probe helpers into the JVM CLI. Keep the
 # workflow pointed at that owner: the old sharedLogic filter selects no tests
 # and prevents the hermetic/red-path jobs from running.
@@ -82,6 +163,32 @@ assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
 assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
 assert_contains "$required_test_job" 'WEB_RESULT: ${{ needs.web-wasm.result }}'
+api_docs_job="$(awk '/^  api-docs:$/ { active=1; next }
+  active && /^  [[:alnum:]_-]+:$/ { exit }
+  active { print }' "$android_workflow")"
+docs_precompile_step='      - name: Precompile shared Android API dependency
+        working-directory: android-compose
+        run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process --console=plain :sharedLogic:compileAndroidMain'
+
+docs_compiles_in_separate_process() {
+  local job="$1"
+  local before_generation="${job%%      - name: Generate shared API reference*}"
+  [[ "$before_generation" != "$job" && "$before_generation" == *"$docs_precompile_step"$'\n' ]] || return 1
+  local generation="${job#*      - name: Generate shared API reference}"
+  [[ "$generation" == *'set -o pipefail'* ]] || return 1
+  [[ "$generation" == *'./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} --console=plain :dokkaGeneratePublicationHtml 2>&1 | tee dokka-diagnostics.log'* ]]
+}
+
+docs_compiles_in_separate_process "$api_docs_job" || fail 'API documentation must precompile Android in a separate single-use JVM'
+for invalid_docs_job in \
+  "${api_docs_job/"$docs_precompile_step"/}" \
+  "${api_docs_job/"$docs_precompile_step"/}"$'\n'"$docs_precompile_step" \
+  "${api_docs_job/:sharedLogic:compileAndroidMain/:sharedLogic:compileAndroidMain :dokkaGeneratePublicationHtml}" \
+  "${api_docs_job/"$docs_precompile_step"/"$docs_precompile_step"$'\n        if: false'}"; do
+  if docs_compiles_in_separate_process "$invalid_docs_job"; then
+    fail 'API documentation isolation check accepted a missing, reordered, combined or disabled compiler invocation'
+  fi
+done
 required_test_script="$(sed -n '/run: |/,$p' <<<"$required_test_job" | tail -n +2)"
 for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do

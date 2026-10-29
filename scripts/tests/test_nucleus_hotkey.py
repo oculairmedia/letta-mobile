@@ -80,5 +80,19 @@ class HotkeyPackagingTests(unittest.TestCase):
             self.derive()
 
 
+
+class RegressionExitTests(unittest.TestCase):
+    def test_the_program_status_wins_over_an_xvfb_teardown_error(self):
+        output = 'LOST_HANDLER: successful grab\nLETTA_EXIT=42\nxvfb-run: error: problem while cleaning up\n'
+        self.assertEqual(builder.program_exit(output), 42)
+
+    def test_a_program_line_cannot_impersonate_the_final_status(self):
+        self.assertEqual(builder.program_exit('LETTA_EXIT=42\nLETTA_EXIT=0\n'), 0)
+
+    def test_no_reported_status_fails_the_build(self):
+        with self.assertRaisesRegex(ValueError, 'did not report an exit status'):
+            builder.program_exit('xvfb-run: error: Xvfb failed to start\n')
+
+
 if __name__ == '__main__':
     unittest.main()

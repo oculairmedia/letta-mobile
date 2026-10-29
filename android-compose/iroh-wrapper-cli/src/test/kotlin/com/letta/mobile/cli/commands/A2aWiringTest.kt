@@ -80,6 +80,22 @@ class A2aWiringTest {
      * the kv file, regardless of how many agents share the host. This is the
      * regression-pin for the O(1) bind-time write count.
      */
+    // letta-mobile-8h07i: the rollout switch decides what an unproven sender gets.
+    @Test
+    fun `an unknown sender is refused when enforcing and allowed when observing`() {
+        val tmp = Files.createTempDirectory("8h07i-sender-auth").toFile()
+        try {
+            val addressBook = File(tmp, "agents.kv")
+            val message = IrohAgentMessage("agent-unknown", "agent-recv", "hi", "m-1", 1L)
+            val peer = "a".repeat(64)
+            assertFalse(authenticateSender(config(tmp, addressBook), message, peer))
+            assertTrue(authenticateSender(config(tmp, addressBook).copy(enforceSenderAuth = false), message, peer))
+            assertFalse(File(tmp, "identities").exists(), "authentication never mints an identity")
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
     @Test
     fun `publishHost writes exactly one host record per bind`() {
         val tmp = Files.createTempDirectory("xmpqm-publish-host").toFile()

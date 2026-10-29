@@ -4,9 +4,13 @@ import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.chat.projection.buildFoldedChatRenderModel
+import com.letta.mobile.data.chat.projection.foldMonitorEvents
 import com.letta.mobile.data.chat.projection.hasNoRenderableContent
+import com.letta.mobile.data.chat.projection.isMonitorWatcher
+import com.letta.mobile.data.chat.projection.scopeMessagesToAgent
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
 /** Canonical ownership, shared by settled and live projection; never inferred from message content. */
@@ -61,6 +65,39 @@ internal fun TimelinePageProjectionInput.project(adapter: TimelineSettledProject
         record.copy(preparedPresentation = presentation)
     }
 
+// letta-mobile-a7ir6: one row per Monitor watch per page instead of one per event.
+/**
+ * [prepared] with each Monitor watch's events on this page folded
+ * (foldMonitorEvents): the newest becomes the watch's chip in its own record's row, an older
+ * actionable event keeps its row, an older routine one drops. A page reads no further than its
+ * records, so a watch spanning a page boundary shows a chip on each page.
+ */
+internal fun foldMonitorEventsOnPage(prepared: List<TimelineSettledRecord>): List<TimelineSettledRecord> {
+    val messages = prepared.map { (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item?.soleMessage() }
+    val folded = foldMonitorEvents(messages)
+    if (folded === messages) return prepared
+    return prepared.mapIndexed { index, record ->
+        val render = record.preparedPresentation as? TimelineSettledPresentation.Render
+        val message = folded[index]
+        when {
+            render == null || message === messages[index] -> record
+            message == null -> record.copy(preparedPresentation = TimelineSettledPresentation.Drop)
+            else -> record.copy(preparedPresentation = render.copy(item = render.item.withSoleMessage(message)))
+        }
+    }
+}
+
+/** The one message of a per-record item; null for a page-built run of several. */
+private fun ChatRenderItem.soleMessage(): UiMessage? = when (this) {
+    is ChatRenderItem.Single -> message
+    is ChatRenderItem.RunBlock -> messages.singleOrNull()?.first
+}
+
+private fun ChatRenderItem.withSoleMessage(message: UiMessage): ChatRenderItem = when (this) {
+    is ChatRenderItem.Single -> copy(message = message)
+    is ChatRenderItem.RunBlock -> copy(messages = messages.map { (_, position) -> message to position })
+}
+
 /** A per-record item (one message) carrying its page-attached receipts. */
 private fun ChatRenderItem.withReceipts(receipts: List<CanvasArtifactReceipt>?): ChatRenderItem {
     if (receipts.isNullOrEmpty()) return this
@@ -83,10 +120,10 @@ internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
 ): List<TimelineSettledRecord> {
     val renderable = renderableRecords(prepared)
     if (renderable.size < 2) return prepared
-    val grouped = buildChatRenderModel(
-        messages = renderable.map { it.message }.withPromptOwnedRunIds(),
+    // The page's Monitor events are already folded (foldMonitorEventsOnPage).
+    val grouped = buildFoldedChatRenderModel(
+        messages = scopeMessagesToAgent(renderable.map { it.message }.withPromptOwnedRunIds(), context.scope.agentId),
         mode = ChatDisplayMode.Interactive,
-        activeAgentId = context.scope.agentId,
     ).renderItems
     val output = prepared.toMutableList()
     grouped.mapNotNull { it.runClaim() }
@@ -105,7 +142,9 @@ private fun TimelinePageProjectionInput.renderableRecords(
         context.ownAgentId,
         canvasReceipts[CanvasArtifactReceipts.eventKey(presentation.event)].orEmpty(),
     ) ?: return@mapIndexedNotNull null
-    IndexedRenderedRecord(index, record, presentation, message)
+    // A Monitor watch's chip (foldMonitorEventsOnPage) lives on the record's item, not on its event.
+    val chip = presentation.item.soleMessage()?.subagentNotification?.takeIf { it.isMonitorWatcher() }
+    IndexedRenderedRecord(index, record, presentation, chip?.let { message.copy(subagentNotification = it) } ?: message)
 }
 
 /** A page-built run and the message ids it owns, in chat order. */
