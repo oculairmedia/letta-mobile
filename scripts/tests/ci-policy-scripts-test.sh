@@ -36,6 +36,7 @@ android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
 # pull_request.branches filters the PR base. Missing these patterns is why
 # stacked reviews never got test / build-apk-pass / shared-multiplatform.
 android_workflow_text="$(<"$android_workflow")"
+assert_contains "$android_workflow_text" $'      - name: Upload sharedUI JVM test reports\n        if: always()\n'
 assert_contains "$android_workflow_text" '- "feat/**"'
 assert_contains "$android_workflow_text" '- "cursor/**"'
 assert_contains "$android_workflow_text" '- "codex/**"'
