@@ -19,10 +19,17 @@ import kotlinx.serialization.json.JsonPrimitive
 internal class PagedSendLiftRig private constructor(
     private val rig: TimelineDomainRig,
     private val main: ManualMainDispatcher,
+    private var deferredHistory: List<LettaMessage>? = null,
+    private var pumpsUntilHistory: Int = 0,
 ) : AutoCloseable {
     val presentation: CanonicalTimelinePresentation get() = rig.presentation
 
     fun pump() {
+        // Release history by pump count, not elapsed time, so readiness regressions cannot race it.
+        if (deferredHistory != null && --pumpsUntilHistory == 0) {
+            runBlocking { rig.openOn(checkNotNull(deferredHistory)) }
+            deferredHistory = null
+        }
         Thread.sleep(REAL_MILLIS_PER_FRAME)
         main.drain()
     }
@@ -54,10 +61,17 @@ internal class PagedSendLiftRig private constructor(
         private const val REPLIED_AT = "2026-09-25T04:00:01.000Z"
         private val scope = TimelineScope("backend", "conv-send-lift", "agent")
 
-        fun open(main: ManualMainDispatcher, pairs: Int): PagedSendLiftRig = runBlocking {
+        /** Nonzero [initialHistoryAfterPumps] deterministically withholds history during initial setup. */
+        fun open(main: ManualMainDispatcher, pairs: Int, initialHistoryAfterPumps: Int = 0): PagedSendLiftRig = runBlocking {
+            require(initialHistoryAfterPumps >= 0)
             val rig = TimelineDomainRig.open(scope)
-            rig.openOn(history(pairs))
-            PagedSendLiftRig(rig, main)
+            val history = history(pairs)
+            rig.openOn(if (initialHistoryAfterPumps == 0) history else emptyList())
+            PagedSendLiftRig(
+                rig, main,
+                deferredHistory = history.takeIf { initialHistoryAfterPumps > 0 },
+                pumpsUntilHistory = initialHistoryAfterPumps,
+            )
         }
 
         private fun history(pairs: Int): List<LettaMessage> = (0 until pairs).flatMap { i ->
