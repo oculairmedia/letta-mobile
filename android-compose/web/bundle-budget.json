@@ -7,9 +7,9 @@
   "groups": {
     "kotlin-app-and-skiko-wasm": {
       "include": ["*.wasm"],
-      "ceiling_gzip_bytes": 8000000,
-      "measured_gzip_bytes": 7982879,
-      "notes": "Owner-approved increase by Emmanuel on 2026-10-25 from 7,980,000 to 8,000,000 for native document viewers and durable canvas handoff (PR #2226). Optimized CI gzip measurements using the same budget checker: a5c76949e 7,982,571 bytes; registry simplification at 4d77e2c24 7,982,512 bytes (one run each, 59-byte reduction); session-replacement fix at fb3056b86 and test-only a91c48327 both 7,982,879 bytes (runs 40179503678 and 40182177974). New headroom is 17,121 bytes, not 3%. No correctness gate relaxed. Previous increase 7,900,000 to 7,980,000 was owner-approved on 2026-10-23 for browser pairing PR #2188."
+      "ceiling_gzip_bytes": 8008000,
+      "measured_gzip_bytes": 8000713,
+      "notes": "Owner-approved increase by Emmanuel on 2026-10-29 from 8,000,000 to 8,008,000 for Monitor watch chips (PR #2260). CI gzip measurements: main 7,806.4 KiB (run 40814102493); PR heads 44914fc 8,000,953; d5fd9a2 8,000,743 after folding the chip and event row into one composable; 2cd049ee9 8,000,713 (run 40835582365). New headroom is 7,287 bytes. No correctness gate relaxed. Previous: Owner-approved increase by Emmanuel on 2026-10-25 from 7,980,000 to 8,000,000 for native document viewers and durable canvas handoff (PR #2226). Optimized CI gzip measurements using the same budget checker: a5c76949e 7,982,571 bytes; registry simplification at 4d77e2c24 7,982,512 bytes (one run each, 59-byte reduction); session-replacement fix at fb3056b86 and test-only a91c48327 both 7,982,879 bytes (runs 40179503678 and 40182177974). New headroom is 17,121 bytes, not 3%. No correctness gate relaxed. Previous increase 7,900,000 to 7,980,000 was owner-approved on 2026-10-23 for browser pairing PR #2188."
     },
     "app-js": {
       "include": ["letta-web.js"],

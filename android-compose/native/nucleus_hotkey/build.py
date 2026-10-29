@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shlex
 import subprocess
 import sys
@@ -15,6 +16,7 @@ import zipfile
 HERE = Path(__file__).resolve().parent
 MEMBER = 'nucleus/native/linux-x64/libnucleus_global_hotkey.so'
 PROVENANCE = 'META-INF/letta/nucleus-hotkey.json'
+EXIT_MARKER = re.compile(r'^LETTA_EXIT=(\d+)$', re.M)
 
 
 def sha256(data):
@@ -53,14 +55,24 @@ def compiler_args(jdk, source):
 def regression(work, compiler, links, patched):
     executable = work / ('patched-test' if patched else 'upstream-test')
     subprocess.run(compiler + ['-o', str(executable), str(HERE / 'handler_test.c')] + links, check=True)
-    result = subprocess.run(['xvfb-run', '-a', str(executable)], text=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+    # xvfb-run can fail tearing down its temporary directory after the program has exited, and then
+    # returns its own status; the program reports its own so that error cannot mask the result.
+    result = subprocess.run(['xvfb-run', '-a', 'sh', '-c', '"$0"; printf \'\\nLETTA_EXIT=%s\\n\' "$?"',
+                             str(executable)], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
     print(result.stdout, end='', flush=True)
+    code = program_exit(result.stdout)
     if patched:
-        require(result.returncode == 0, 'Patched handler regression failed')
+        require(code == 0, 'Patched handler regression failed')
     else:
-        require(result.returncode == 42 and 'LOST_HANDLER: successful grab' in result.stdout,
+        require(code == 42 and 'LOST_HANDLER: successful grab' in result.stdout,
                 'Unpatched control did not reproduce handler loss')
+
+
+def program_exit(output):
+    """The exit status the regression program reported; absent when the display never started."""
+    codes = EXIT_MARKER.findall(output)
+    require(codes, 'Regression program did not report an exit status')
+    return int(codes[-1])
 
 
 def write_jar(upstream, output, native, metadata):

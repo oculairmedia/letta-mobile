@@ -220,4 +220,14 @@
         <item quantity="one">and %1$d more problem</item>
         <item quantity="other">and %1$d more problems</item>
     </plurals>
+    <!-- letta-mobile-a7ir6: a Monitor watch's chip and its actionable event rows. -->
+    <string name="rows_monitor_label">Monitor</string>
+    <string name="rows_monitor_watching">watching</string>
+    <string name="rows_monitor_ended">ended</string>
+    <string name="rows_monitor_failed">failed</string>
+    <string name="rows_monitor_chip_description">%1$s: %2$s, %3$s, %4$s</string>
+    <plurals name="rows_monitor_events">
+        <item quantity="one">%1$d event</item>
+        <item quantity="other">%1$d events</item>
+    </plurals>
 </resources>
