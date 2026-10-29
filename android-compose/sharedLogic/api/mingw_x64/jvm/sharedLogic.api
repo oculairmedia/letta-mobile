@@ -9497,6 +9497,12 @@ public final class com/letta/mobile/data/chat/projection/MessageGroupingKt {
 	public static final fun runKey (Ljava/lang/String;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/chat/projection/MonitorEventsKt {
+	public static final fun isMonitorWatcher (Lcom/letta/mobile/data/model/UiSubagentNotification;)Z
+	public static final fun monitorEvent (Lcom/letta/mobile/data/model/UiSubagentNotification;)Ljava/lang/String;
+	public static final fun monitorEventCount (Lcom/letta/mobile/data/model/UiSubagentNotification;)I
+}
+
 public final class com/letta/mobile/data/chat/projection/PendingUserInputKt {
 	public static final fun pendingUserInputApproval (Ljava/util/List;)Lcom/letta/mobile/data/model/UiApprovalRequest;
 	public static final fun requiresUserInput (Lcom/letta/mobile/data/model/UiApprovalRequest;)Z
