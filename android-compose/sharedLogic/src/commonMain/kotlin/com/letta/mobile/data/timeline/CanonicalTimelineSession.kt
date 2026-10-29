@@ -41,8 +41,9 @@ class CanonicalTimelineCoordinator(
             val record = owner.session.pending.value.singleOrNull {
                 it.otid == identity.value && it.delivery == CanonicalPendingLocalStore.Delivery.Failed
             } ?: return false
-            val agent = owner.selection.scope.agentId?.let(::AgentId) ?: return false
-            val sender = kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] } ?: return false
+            val sender = owner.selection.scope.agentId?.let(::AgentId)?.let { agent ->
+                kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] }
+            } ?: return false
             val retry = owner.session.retryPending(record.otid) ?: return false
             retry to sender
         }
@@ -128,7 +129,10 @@ class CanonicalTimelineCoordinator(
         owner.session.appendPending(record)
     }
 
-    suspend fun markPending(owner: Owner, otid: String, delivery: CanonicalPendingLocalStore.Delivery, expectedAttempt: Long? = null) = mutex.withLock {
+    /** Apply an outcome only to the expected retry generation when one is supplied. */
+    suspend fun markPending(
+        owner: Owner, otid: String, delivery: CanonicalPendingLocalStore.Delivery, expectedAttempt: Long? = null,
+    ) = mutex.withLock {
         check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
         owner.session.markPending(otid, delivery, expectedAttempt)
     }
@@ -326,7 +330,9 @@ class CanonicalTimelineSession(
         mutablePending.value = pendingStore.load(scope)
     }
 
-    suspend fun markPending(otid: String, delivery: CanonicalPendingLocalStore.Delivery, expectedAttempt: Long? = null) = pendingMutex.withLock {
+    internal suspend fun markPending(
+        otid: String, delivery: CanonicalPendingLocalStore.Delivery, expectedAttempt: Long? = null,
+    ) = pendingMutex.withLock {
         pendingStore.mark(scope, otid, delivery, expectedAttempt)
         if (delivery == CanonicalPendingLocalStore.Delivery.Sending) recoveryCandidates -= MessageId(otid)
         mutablePending.value = pendingStore.load(scope)

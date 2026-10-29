@@ -5,7 +5,8 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 
 /** No-runtime hosts delegate metadata handling here; actual writes still fail loudly. */
-fun unboundTimelineWriterResult(member: String): com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome? = when (member.substringBefore('-')) {
+fun unboundTimelineWriterResult(member: String): com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome? =
+    when (member.substringBefore('-')) {
     "bindPendingRetry" -> null
     "reconcileRecentMessages" -> com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Skipped("no_runtime")
     else -> error("No chat runtime is captured for this backend ($member)")

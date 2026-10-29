@@ -16,6 +16,8 @@ class AdmittedTimelineExternalWriter(
     override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
         delegate.bindPendingRetry(agent, sender)
 
+    override suspend fun acceptPendingSend(attempt: TimelinePendingSendAttempt, content: String, attachments: List<MessageContentPart.Image>, accept: () -> Boolean) =
+        admission.admitted(attempt.conversation.value) { delegate.acceptPendingSend(attempt, content, attachments, accept) }
     override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) =
         admission.admitted(attempt.conversation.value) { delegate.isPendingSendCurrent(attempt) }
     override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) =

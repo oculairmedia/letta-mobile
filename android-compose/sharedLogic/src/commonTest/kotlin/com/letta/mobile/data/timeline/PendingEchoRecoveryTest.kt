@@ -36,8 +36,13 @@ class PendingEchoRecoveryTest {
 private object ExhaustedHistoryTransport : TimelineTransport {
     override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
         TimelineRemotePageAdapter.fromMessages(request, emptyList(), hasMore = false)
-    override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> = error("unexpected send")
+    override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> =
+        error("unexpected send")
     override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = error("unexpected stream")
-    override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<LettaMessage> = error("legacy hydration")
-    override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?): List<LettaMessage> = error("legacy hydration")
+    override suspend fun listConversationMessages(
+        conversationId: ConversationId, limit: Int?, after: String?, order: String?,
+    ): List<LettaMessage> = error("legacy hydration")
+    override suspend fun listAgentMessages(
+        agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?,
+    ): List<LettaMessage> = error("legacy hydration")
 }

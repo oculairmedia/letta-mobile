@@ -16,6 +16,7 @@ import kotlinx.coroutines.plus
 class GenerationTimelineTransport(
     private val delegate: TimelineTransport,
     parent: CoroutineScope,
+    /** Dispatch leases shared across replacement timeline generations. */
     val dispatchOwners: PendingDispatchOwners = PendingDispatchOwners(),
 ) : TimelineTransport {
     private val job = SupervisorJob(parent.coroutineContext[Job])

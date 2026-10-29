@@ -56,6 +56,17 @@ class CanonicalExternalTransportWriter(
     override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
         coordinator.bindPendingRetry(agent, sender)
 
+    override suspend fun acceptPendingSend(
+        attempt: TimelinePendingSendAttempt,
+        content: String,
+        attachments: List<MessageContentPart.Image>,
+        accept: () -> Boolean,
+    ): Boolean = CanonicalPendingLocalStore(coordinator.pendingStorage).accept(
+        resolveScope(attempt.agent.value, attempt.conversation.value),
+        CanonicalPendingLocalStore.Record(attempt.identity.value, content, attachments, now(), attempt = attempt.generation),
+        accept,
+    )
+
     override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt): Boolean {
         val scope = resolveScope(attempt.agent.value, attempt.conversation.value)
         return CanonicalPendingLocalStore(coordinator.pendingStorage).load(scope).any {
@@ -70,7 +81,9 @@ class CanonicalExternalTransportWriter(
     }
 
     override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
-        coordinator.markPending(owner(attempt.agent.value, attempt.conversation.value), attempt.identity.value, delivery, attempt.generation)
+        coordinator.markPending(
+            owner(attempt.agent.value, attempt.conversation.value), attempt.identity.value, delivery, attempt.generation,
+        )
 
     private suspend fun owner(agentId: String?, conversationId: String) =
         coordinator.acquire(resolveScope(agentId, conversationId))

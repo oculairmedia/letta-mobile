@@ -50,6 +50,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -324,6 +325,10 @@ internal fun PendingPromptActions(item: ChatRenderItem, presentation: CanonicalT
         actions.launch {
             try {
                 if (!action()) rejected = message
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                rejected = message
             } finally {
                 busy = false
             }

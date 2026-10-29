@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageId
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.TimelinePendingRetryBinding
@@ -23,7 +24,10 @@ import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -31,6 +35,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
@@ -55,7 +60,9 @@ class PendingSendReconnectProjectionTest {
     private fun resolveQueuedRetry(dismiss: Boolean) = runTest {
         val f = Fixture(this)
         f.sendQueued("active turn")
-        f.sender.handleEvent(WsTimelineEvent.TurnStarted(agentId = "agent", conversationId = FIRST.value, turnId = "turn-active", runId = "run-active"))
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted(
+            agentId = "agent", conversationId = FIRST.value, turnId = "turn-active", runId = "run-active",
+        ))
         val screen = f.screen(FIRST)
         val retry = Prompt(MessageId("retry-otid"), "already persisted")
         f.failed(FIRST, retry)
@@ -73,7 +80,9 @@ class PendingSendReconnectProjectionTest {
         }
         assertTrue(f.pending(FIRST).none { it.otid == retry.otid.value })
         f.channel.busy = false
-        f.sender.handleEvent(WsTimelineEvent.TurnDone("turn-active", "run-active", com.letta.mobile.data.transport.BridgeTurnStatus.Completed))
+        f.sender.handleEvent(WsTimelineEvent.TurnDone(
+            "turn-active", "run-active", com.letta.mobile.data.transport.BridgeTurnStatus.Completed,
+        ))
         runCurrent()
         assertEquals(listOf("cm-test-1"), f.channel.accepted.map { it.otid?.value })
         assertTrue(f.sender.sendQueue.state.value.isEmpty())
@@ -92,6 +101,79 @@ class PendingSendReconnectProjectionTest {
         }
         f.dropAndReconnect()
         assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+    }
+
+    @Test fun redialWithoutResumedFramesFailsPendingWithinThirtySeconds() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("lost stream")
+        f.streaming = true
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted("turn", "agent", FIRST.value, "run"))
+        f.channel.busy = true
+        f.dropAndReconnect()
+        advanceTimeBy(29.seconds)
+        runCurrent()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, f.pending(FIRST).single().delivery)
+        advanceTimeBy(1.seconds)
+        runCurrent()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+        assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
+    }
+
+    @Test fun failedRedialRecoveryReleasesLocalAndTransportOwnership() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("failed recovery")
+        f.streaming = true
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted("turn", "agent", FIRST.value, "run"))
+        f.channel.busy = true
+        f.dropAndReconnect()
+        f.historyFailure = IllegalStateException("history unavailable")
+        f.channel.redials.emit(RedialWhileTurnActive("agent", FIRST.value, "turn", "run", 2))
+        runCurrent()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+        assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
+    }
+
+    @Test fun hungRedialHistoryReadTimesOutAndReleasesOwnership() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("hung recovery")
+        f.streaming = true
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted("turn", "agent", FIRST.value, "run"))
+        f.channel.busy = true
+        f.dropAndReconnect()
+        f.historyGate = CompletableDeferred()
+        f.channel.redials.emit(RedialWhileTurnActive("agent", FIRST.value, "turn", "run", 2))
+        runCurrent()
+        advanceTimeBy(30.seconds)
+        runCurrent()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+        assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
+    }
+
+    @Test fun resumedFramesCancelTheRedialDeadline() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("resumed stream")
+        f.streaming = true
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted("turn", "agent", FIRST.value, "run"))
+        f.dropAndReconnect()
+        advanceTimeBy(20.seconds)
+        f.sender.handleEvent(WsTimelineEvent.MessageDelta(
+            message = f.reply(MessageId("live"), 20.seconds), agentId = "agent", conversationId = FIRST.value, turnId = "turn",
+        ))
+        advanceTimeBy(20.seconds)
+        runCurrent()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, f.pending(FIRST).single().delivery)
+    }
+
+    @Test fun fullPendingBudgetRefusesSendBeforeTransportAndShowsErrorWithoutEviction() = runTest {
+        val f = Fixture(this, captureSendFailures = true)
+        repeat(CanonicalPendingLocalStore.MAX_RECORDS) { index -> f.failed(FIRST, Prompt(MessageId("old-$index"), "keep $index")) }
+        val previous = f.pending(FIRST)
+        f.sender.send("overflow")
+        runCurrent()
+        assertTrue(f.channel.accepted.isEmpty(), "the transport must not accept an unrecordable send")
+        assertEquals(previous, f.pending(FIRST), "every existing pending record must survive")
+        assertTrue(f.sendFailures.single().contains("Dismiss an unsent message"))
+        assertTrue(f.sender.sendQueue.state.value.isEmpty(), "a refused send is not silently queued")
     }
 
     @Test fun staleFailureAndSentCallbacksCannotChangeActiveRetry() = runTest {
@@ -309,31 +391,48 @@ class PendingSendReconnectProjectionTest {
         screen.close()
     }
 
-    private class Fixture(private val test: TestScope) {
+    private class Fixture(private val test: TestScope, private val captureSendFailures: Boolean = false) {
         val store = ScopedStore()
         val history = mutableMapOf<ConversationId, List<LettaMessage>>()
         val channel = Channel()
+        var streaming = false
+        val sendFailures = mutableListOf<String>()
+        var historyFailure: Throwable? = null
+        var historyGate: CompletableDeferred<Unit>? = null
         var selected = FIRST
         var minted = 0
         private val baseMillis = timelineCurrentTimeMillis()
         fun at(delay: Duration) = Instant.fromEpochMilliseconds(baseMillis + delay.inWholeMilliseconds).toString()
         fun scope(conversation: ConversationId) = TimelineScope("backend", conversation.value, "agent")
         val transport = object : TimelineTransport by unexpectedTimelineTransport() {
-            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-                TimelineRemotePageAdapter.fromMessages(request, history[ConversationId(request.scope.conversationId)].orEmpty(), hasMore = false)
+            override suspend fun listConversationMessagePage(
+                request: TimelineRemotePageRequest, progress: TimelinePageProgress?,
+            ): TimelineRemotePageResult {
+                historyGate?.await()
+                historyFailure?.let { throw it }
+                return TimelineRemotePageAdapter.fromMessages(
+                    request, history[ConversationId(request.scope.conversationId)].orEmpty(), hasMore = false,
+                )
+            }
         }
         val dispatchOwners = com.letta.mobile.data.timeline.api.PendingDispatchOwners()
         private val coordinator = CanonicalTimelineCoordinator(store, transport, dispatchOwners)
-        private val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, test.backgroundScope, { _, _, _ -> }, { throw it })
+        private val maintenance = IndexedCanonicalTimelineMaintenance(
+            coordinator, test.backgroundScope, { _, _, _ -> }, { throw it },
+        )
         private val admitted = AdmittedTimelineExternalWriter(
-            CanonicalExternalTransportWriter(coordinator, { _, conversation -> scope(ConversationId(conversation)) }, maintenance, { at(10.seconds) }),
+            CanonicalExternalTransportWriter(
+                coordinator, { _, conversation -> scope(ConversationId(conversation)) }, maintenance, { at(10.seconds) },
+            ),
             TimelineLegacyAdmission(),
         )
         val writer = object : TimelineExternalTransportWriter by admitted {
             private val pendingRetry = TimelinePendingRetryBinding()
             override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
                 pendingRetry.bind(agent, sender)
-            override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>) =
+            override suspend fun appendExternalTransportLocal(
+                agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>,
+            ) =
                 admitted.also(pendingRetry::resolved).appendExternalTransportLocal(agentId, conversationId, content, otid, attachments)
         }
         private val senderJob = kotlinx.coroutines.SupervisorJob(test.backgroundScope.coroutineContext[kotlinx.coroutines.Job])
@@ -350,7 +449,13 @@ class PendingSendReconnectProjectionTest {
                 override fun getConversations(agentId: AgentId) = emptyFlow<List<Conversation>>()
                 override fun getCachedConversations(agentId: AgentId) = emptyList<Conversation>()
             },
-            ui = sink(), clearComposerAfterSend = {}, activeConversationId = { selected.value },
+            ui = object : ChatSendUiSink by sink() {
+                override fun isStreaming() = streaming
+                override fun onSendFailed(message: String) {
+                    if (!captureSendFailures) fail(message)
+                    sendFailures += message
+                }
+            }, clearComposerAfterSend = {}, activeConversationId = { selected.value },
             setActiveConversationId = { selected = ConversationId(it) }, startTimelineObserver = {},
             clientVersion = { "test" }, otidGenerator = { "cm-test-${++minted}" },
         )
@@ -433,10 +538,13 @@ class PendingSendReconnectProjectionTest {
         var busy = false
         val accepted = mutableListOf<AcceptedSend>()
         // Adapt the legacy wire call once; acceptance and assertions share typed send identities.
-        val transport = proxy<IChannelTransport>(::invoke)
+        val redials = MutableSharedFlow<RedialWhileTurnActive>()
+        val transport: IChannelTransport = object : IChannelTransport by proxy<IChannelTransport>(::invoke), RedialAwareChannelTransport {
+            override val redialWhileTurnActive = redials
+        }
 
         private fun invoke(method: Method, args: Array<out Any?>): Any? = when (method.name) {
-            "send" -> accept(AcceptedSend(ConversationId(args[1] as String), (args[3] as String?)?.let(::MessageId)))
+            "send" -> accept(AcceptedSend(ConversationId(args[1] as String), args[3]?.let { MessageId(it as String) }))
             "hasActiveChatTurn", "getHasAnyActiveChatTurn" -> busy
             else -> property(method)
         }

@@ -25,6 +25,9 @@ import com.letta.mobile.data.timeline.TimelineRemotePageAdapter
 import com.letta.mobile.data.timeline.TimelineRemotePageRequest
 import com.letta.mobile.data.timeline.TimelinePageProgress
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.data.timeline.TimelineBoundedStore
+import com.letta.mobile.data.timeline.TimelineStoreTransaction
+import kotlinx.coroutines.CancellationException
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -67,6 +70,62 @@ class PendingTimelineActionsUiTest {
 
     @Test fun rejectedRetryShowsFeedbackAndRemainsEnabled() = rejectedAction(retry = true)
     @Test fun rejectedDismissShowsFeedbackAndRemainsEnabled() = rejectedAction(retry = false)
+
+    @Test fun throwingRetryShowsFeedbackAndRemainsEnabled() = throwingAction(retry = true)
+    @Test fun throwingDismissShowsFeedbackAndRemainsEnabled() = throwingAction(retry = false)
+    @Test fun cancelledRetryRemainsEnabledWithoutRejection() = throwingAction(retry = true, cancelled = true)
+    @Test fun cancelledDismissRemainsEnabledWithoutRejection() = throwingAction(retry = false, cancelled = true)
+
+    private fun throwingAction(retry: Boolean, cancelled: Boolean = false) = runComposeUiTest {
+        val scope = TimelineScope("throwing-action", "conversation", "agent")
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val reject = java.util.concurrent.atomic.AtomicBoolean(false)
+        val attempted = java.util.concurrent.atomic.AtomicBoolean(false)
+        val delegate = UiFrameTimelineStore()
+        val store = object : TimelineBoundedStore by delegate {
+            override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
+                if (reject.get()) {
+                    attempted.set(true)
+                    if (cancelled) throw CancellationException("action cancelled")
+                    throw AssertionError("pending storage unavailable")
+                }
+                return delegate.transaction(scope, block)
+            }
+        }
+        val coordinator = CanonicalTimelineCoordinator(store, historyTransport(false))
+        val owner = runBlocking { coordinator.acquire(scope) }
+        // Retry must get as far as the transaction, rather than returning false for no sender.
+        CanonicalExternalTransportWriter(coordinator, { _, _ -> scope },
+            IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it }))
+            .bindPendingRetry(AgentId("agent")) { _, _ -> }
+        val record = CanonicalPendingLocalStore.Record("throwing", "prompt", emptyList(), "2026-10-28T12:00:00Z")
+        val presentation = runBlocking {
+            coordinator.appendPending(owner, record)
+            coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+            CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        }
+        try {
+            val row = record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed).toRenderItem()
+            setContent { MaterialTheme { PendingPromptActions(row, presentation) } }
+            reject.set(true)
+            val button = if (retry) "Retry" else "Dismiss"
+            val feedback = if (retry) "Couldn’t retry this message. Try again." else "Couldn’t dismiss this message. Try again."
+            onNodeWithText(button).performClick()
+            waitUntil(timeoutMillis = 10_000) { main.drain(); attempted.get() }
+            if (cancelled) {
+                waitForIdle()
+                onNodeWithText(feedback).assertDoesNotExist()
+            } else {
+                waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText(feedback).fetchSemanticsNodes().isNotEmpty() }
+            }
+            onNodeWithText(button).assertIsEnabled()
+            assertEquals(listOf(record.otid), owner.session.pending.value.map { it.otid })
+        } finally {
+            reject.set(false)
+            runBlocking { presentation.close() }
+            ui.cancel()
+        }
+    }
 
     @Test fun rejectedRetryAfterSuspensionKeepsVisibleFeedback() = runComposeUiTest {
         val scope = TimelineScope("suspended-rejection", "conversation", "agent")

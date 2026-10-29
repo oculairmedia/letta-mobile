@@ -19,17 +19,6 @@ import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
-import javax.inject.Singleton
-
-@Singleton
-/** One captured config, pinned for the lifetime of a single selected-runtime capture. */
-private class CapturedSettings(
-    delegate: ISettingsRepository,
-    config: com.letta.mobile.data.model.LettaConfig,
-) : ISettingsRepository by delegate {
-    override val activeConfig = MutableStateFlow<com.letta.mobile.data.model.LettaConfig?>(config)
-    override val activeConfigChanges = flowOf(config)
-}
 
 class ProductionSelectedChatRuntimeProvider @Inject constructor(
     private val sessions: SessionManager,
@@ -138,22 +127,30 @@ internal class CapturedSelectedChatRuntime(
         job.cancelAndJoin()
     }
 }
-
 /** Every operation resolves only within this captured subscriber, including late terminal calls. */
 internal class SelectedRuntimeWriter(
     private val agent: String,
     private val pendingRetry: TimelinePendingRetryBinding = TimelinePendingRetryBinding(),
     private val resolve: suspend (String) -> TimelineExternalTransportWriter,
 ) : TimelineExternalTransportWriter {
-    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) = pendingRetry.bind(agent, sender)
+    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+        pendingRetry.bind(agent, sender)
     private suspend fun writer(id: ConversationId, suppliedAgent: AgentId?): TimelineExternalTransportWriter {
         require(suppliedAgent == null || suppliedAgent.value == agent) { "Foreign agent on captured writer" }
         return resolve(id.value).also(pendingRetry::resolved)
     }
-    override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) = writer(attempt.conversation, attempt.agent).isPendingSendCurrent(attempt)
-    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) = writer(attempt.conversation, attempt.agent).ownPendingSend(attempt, active)
-    override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) = writer(attempt.conversation, attempt.agent).markPendingSend(attempt, delivery)
-    override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) = appendExternalTransportLocal(agent, conversationId, content, otid, attachments)
+    override suspend fun acceptPendingSend(
+        attempt: TimelinePendingSendAttempt, content: String, attachments: List<MessageContentPart.Image>, accept: () -> Boolean,
+    ) = writer(attempt.conversation, attempt.agent).acceptPendingSend(attempt, content, attachments, accept)
+    override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) =
+        writer(attempt.conversation, attempt.agent).isPendingSendCurrent(attempt)
+    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) =
+        writer(attempt.conversation, attempt.agent).ownPendingSend(attempt, active)
+    override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
+        writer(attempt.conversation, attempt.agent).markPendingSend(attempt, delivery)
+    override suspend fun appendExternalTransportLocal(
+        conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>,
+    ) = appendExternalTransportLocal(agent, conversationId, content, otid, attachments)
     override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =
         writer(ConversationId(conversationId), agentId?.let(::AgentId))
             .appendExternalTransportLocal(agent, conversationId, content, otid, attachments)

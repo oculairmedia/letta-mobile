@@ -23,6 +23,7 @@ class CanonicalPendingLocalStore(
         val attachments: List<@Serializable(with = PendingImageSerializer::class) MessageContentPart.Image>,
         val sentAt: String,
         val delivery: Delivery = Delivery.Sending,
+        /** Retry generation persisted with this message to fence delayed callbacks. */
         val attempt: Long = 0,
     )
 
@@ -68,6 +69,24 @@ class CanonicalPendingLocalStore(
         }
     }
 
+    internal suspend fun accept(scope: TimelineScope, record: Record, accept: () -> Boolean): Boolean = store.transaction(scope) {
+        require(record.otid.isNotBlank())
+        val previous = readPending()
+        val existing = previous.firstOrNull { it.otid == record.otid }
+        if (existing != null) {
+            require(existing.content == record.content && existing.attachments == record.attachments) {
+                "Pending identity already belongs to another message"
+            }
+            return@transaction accept()
+        }
+        // The transaction reserves capacity while encoding checks every budget before acceptance.
+        val bytes = encodePending(previous + record)
+        if (!accept()) return@transaction false
+        putEvidence(KEY, bytes)
+        nextRevision()
+        true
+    }
+
     /**
      * Mark overdue unconfirmed sends as failed, retaining every prompt for explicit Retry or
      * dismissal. A transport drop can leave either Sending or Sent without an echo.
@@ -107,6 +126,7 @@ class CanonicalPendingLocalStore(
         return timelineInstantDurationMillis(sent, now) >= horizonMillis
     }
 
+    /** Update delivery for the expected retry generation while retaining unconfirmed messages. */
     suspend fun mark(scope: TimelineScope, otid: String, delivery: Delivery, expectedAttempt: Long? = null) {
         store.transaction(scope) {
             val previous = readPending()
@@ -185,6 +205,11 @@ class CanonicalPendingLocalStore(
     }
 
     private suspend fun TimelineStoreTransaction.writePending(records: List<Record>) {
+        val bytes = encodePending(records)
+        if (records.isEmpty()) deleteEvidence(KEY) else putEvidence(KEY, bytes)
+    }
+
+    private fun encodePending(records: List<Record>): ByteArray {
         require(records.size <= MAX_RECORDS) { "Pending row budget exceeded" }
         // Reject oversized inputs before serialization allocates another copy of their text.
         var textUnits = 0L
@@ -199,7 +224,7 @@ class CanonicalPendingLocalStore(
         }
         val bytes = TimelineSnapshotCodec.json.encodeToString(Envelope.serializer(), Envelope(records = records)).encodeToByteArray()
         require(bytes.size <= MAX_BYTES) { "Pending byte budget exceeded" }
-        if (records.isEmpty()) deleteEvidence(KEY) else putEvidence(KEY, bytes)
+        return bytes
     }
 
         /** Fallback timeout for unowned, unconfirmed sends. */

@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline.api
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
@@ -9,7 +12,7 @@ import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
  * This keeps WebSocket tests on deterministic fakes instead of mocking the
  * process-wide TimelineRepository and its cached TimelineSyncLoop state.
  */
-interface TimelineExternalTransportWriter : TimelinePendingRetryTarget, TimelinePendingSendTarget {
+interface TimelineExternalTransportWriter : TimelinePendingRetryTarget, TimelineExternalDeliveryWriter {
     suspend fun appendExternalTransportLocal(
         conversationId: String,
         content: String,
@@ -28,14 +31,6 @@ interface TimelineExternalTransportWriter : TimelinePendingRetryTarget, Timeline
     suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String = "external")
 
     suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String = "external")
-
-    suspend fun markExternalTransportLocalSent(conversationId: String, otid: String)
-
-    override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String)
-
-    suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String)
-
-    override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)
 
     suspend fun reconcileExternalTransportSend(
         conversationId: String,
@@ -80,6 +75,31 @@ interface TimelineExternalTransportWriter : TimelinePendingRetryTarget, Timeline
         forceRefresh: Boolean = false,
         connectionGeneration: Long = 0L,
     ): RecentMessagesReconcileOutcome
+
+
+}
+
+/** Delivery updates, turn lifecycle and typed attempt adaptation shared by external transports. */
+interface TimelineExternalDeliveryWriter : TimelinePendingSendTarget {
+    /** Record transport acceptance while awaiting a persisted echo. */
+    suspend fun markExternalTransportLocalSent(conversationId: String, otid: String)
+
+    /** Record transport acceptance in the captured agent and conversation. */
+    suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String)
+
+    /** Adapt typed pending identities to the legacy external transport writer. */
+    override suspend fun markExternalTransportLocalSent(agentId: AgentId?, conversationId: ConversationId, otid: MessageId) =
+        markExternalTransportLocalSent(agentId?.value, conversationId.value, otid.value)
+
+    /** Retain the unconfirmed message as a retryable failure. */
+    suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String)
+
+    /** Retain a retryable failure in the captured agent and conversation. */
+    suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)
+
+    /** Adapt typed pending identities to the legacy external transport writer. */
+    override suspend fun markExternalTransportLocalFailed(agentId: AgentId?, conversationId: ConversationId, otid: MessageId) =
+        markExternalTransportLocalFailed(agentId?.value, conversationId.value, otid.value)
 
     /**
      * Signals that a turn started on

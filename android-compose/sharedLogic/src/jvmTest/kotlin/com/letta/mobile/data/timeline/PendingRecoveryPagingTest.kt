@@ -127,7 +127,9 @@ class PendingRecoveryPagingTest {
         var active = false
         var offline = false
         private val transport = object : TimelineTransport by unexpectedTimelineTransport() {
-            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?): TimelineRemotePageResult {
+            override suspend fun listConversationMessagePage(
+                request: TimelineRemotePageRequest, progress: TimelinePageProgress?,
+            ): TimelineRemotePageResult {
                 check(!offline) { "offline" }
                 val first = request.continuation == TimelineContinuation.Initial
                 val message = if (first) user("newer", "another-otid", firstPageAt.toString()) else
