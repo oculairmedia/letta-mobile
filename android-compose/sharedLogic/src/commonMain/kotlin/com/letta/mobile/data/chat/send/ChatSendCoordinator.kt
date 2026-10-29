@@ -539,9 +539,9 @@ class ChatSendCoordinator(
             delay(30.seconds)
             contained("RedialTimeout") {
                 turnStateMutex.withLock {
-                    if (state.inFlightSend == pending && !state.reachedTerminal && !state.pendingRecoveryExpired) {
-                        expirePendingRecovery(state)
-                    }
+                    if (state.inFlightSend != pending) return@withLock
+                    if (state.reachedTerminal || state.pendingRecoveryExpired) return@withLock
+                    expirePendingRecovery(state)
                 }
             }
         }

@@ -73,10 +73,15 @@ class PendingTimelineActionsUiTest {
 
     @Test fun throwingRetryShowsFeedbackAndRemainsEnabled() = throwingAction(retry = true)
     @Test fun throwingDismissShowsFeedbackAndRemainsEnabled() = throwingAction(retry = false)
-    @Test fun cancelledRetryRemainsEnabledWithoutRejection() = throwingAction(retry = true, cancelled = true)
-    @Test fun cancelledDismissRemainsEnabledWithoutRejection() = throwingAction(retry = false, cancelled = true)
+    @Test fun cancelledRetryRemainsEnabledWithoutRejection() =
+        throwingAction(retry = true, failure = CancellationException("action cancelled"))
+    @Test fun cancelledDismissRemainsEnabledWithoutRejection() =
+        throwingAction(retry = false, failure = CancellationException("action cancelled"))
 
-    private fun throwingAction(retry: Boolean, cancelled: Boolean = false) = runComposeUiTest {
+    private fun throwingAction(
+        retry: Boolean,
+        failure: Throwable = AssertionError("pending storage unavailable"),
+    ) = runComposeUiTest {
         val scope = TimelineScope("throwing-action", "conversation", "agent")
         val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val reject = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -86,8 +91,7 @@ class PendingTimelineActionsUiTest {
             override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
                 if (reject.get()) {
                     attempted.set(true)
-                    if (cancelled) throw CancellationException("action cancelled")
-                    throw AssertionError("pending storage unavailable")
+                    throw failure
                 }
                 return delegate.transaction(scope, block)
             }
@@ -108,15 +112,21 @@ class PendingTimelineActionsUiTest {
             val row = record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed).toRenderItem()
             setContent { MaterialTheme { PendingPromptActions(row, presentation) } }
             reject.set(true)
-            val button = if (retry) "Retry" else "Dismiss"
-            val feedback = if (retry) "Couldn’t retry this message. Try again." else "Couldn’t dismiss this message. Try again."
+            val (button, feedback) = if (retry) {
+                "Retry" to "Couldn’t retry this message. Try again."
+            } else {
+                "Dismiss" to "Couldn’t dismiss this message. Try again."
+            }
             onNodeWithText(button).performClick()
             waitUntil(timeoutMillis = 10_000) { main.drain(); attempted.get() }
-            if (cancelled) {
+            if (failure is CancellationException) {
                 waitForIdle()
                 onNodeWithText(feedback).assertDoesNotExist()
             } else {
-                waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText(feedback).fetchSemanticsNodes().isNotEmpty() }
+                waitUntil(timeoutMillis = 10_000) {
+                    main.drain()
+                    onAllNodesWithText(feedback).fetchSemanticsNodes().isNotEmpty()
+                }
             }
             onNodeWithText(button).assertIsEnabled()
             assertEquals(listOf(record.otid), owner.session.pending.value.map { it.otid })

@@ -46373,10 +46373,8 @@ public final class com/letta/mobile/data/timeline/AdmittedTimelineExternalWriter
 	public fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalFailed-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalSent-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -46412,10 +46410,8 @@ public final class com/letta/mobile/data/timeline/CanonicalExternalTransportWrit
 	public fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalFailed-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalSent-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -49221,10 +49217,8 @@ public class com/letta/mobile/data/timeline/TimelineRepository : com/letta/mobil
 	public fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalFailed-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalSent-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun markOptimisticLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun markOptimisticLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -49981,10 +49975,8 @@ public final class com/letta/mobile/data/timeline/api/PendingDispatchOwners {
 public abstract interface class com/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter : com/letta/mobile/data/timeline/api/TimelinePendingSendTarget {
 	public abstract fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalFailed-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalSent-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun turnEnded (Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun turnStarted (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun turnStarted$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -49993,9 +49985,6 @@ public abstract interface class com/letta/mobile/data/timeline/api/TimelineExter
 public final class com/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter$DefaultImpls {
 	public static fun acceptPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun markExternalTransportLocalFailed-Gl4Xflg (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun markExternalTransportLocalSent-Gl4Xflg (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun turnEnded (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun turnStarted (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -50015,6 +50004,7 @@ public abstract interface class com/letta/mobile/data/timeline/api/TimelineExter
 	public abstract fun ingestExternalTransportMessage (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/LettaMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun ingestExternalTransportMessage$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Lcom/letta/mobile/data/model/LettaMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun ingestExternalTransportMessage$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/LettaMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun reconcileExternalTransportSendScoped (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun reconcileRecentMessages (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -50033,8 +50023,6 @@ public final class com/letta/mobile/data/timeline/api/TimelineExternalTransportW
 	public static synthetic fun ingestExternalTransportMessage$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Lcom/letta/mobile/data/model/LettaMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun ingestExternalTransportMessage$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/LettaMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun markExternalTransportLocalFailed-Gl4Xflg (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun markExternalTransportLocalSent-Gl4Xflg (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun reconcileRecentMessages$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZJLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -50087,16 +50075,13 @@ public final class com/letta/mobile/data/timeline/api/TimelinePendingSendAttempt
 public abstract interface class com/letta/mobile/data/timeline/api/TimelinePendingSendTarget {
 	public fun acceptPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun markExternalTransportLocalFailed-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun markExternalTransportLocalSent-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/timeline/api/TimelinePendingSendTarget$DefaultImpls {
 	public static fun acceptPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -50408,10 +50393,8 @@ public final class com/letta/mobile/data/timeline/headless/HeadlessTimelineStore
 	public fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalFailed-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun markExternalTransportLocalSent-Gl4Xflg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

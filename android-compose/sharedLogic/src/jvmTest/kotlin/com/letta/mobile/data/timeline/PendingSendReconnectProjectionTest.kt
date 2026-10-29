@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.TimelinePendingRetryBinding
+import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -430,10 +431,9 @@ class PendingSendReconnectProjectionTest {
             private val pendingRetry = TimelinePendingRetryBinding()
             override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
                 pendingRetry.bind(agent, sender)
-            override suspend fun appendExternalTransportLocal(
-                agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>,
-            ) =
-                admitted.also(pendingRetry::resolved).appendExternalTransportLocal(agentId, conversationId, content, otid, attachments)
+            override suspend fun acceptPendingSend(
+                attempt: TimelinePendingSendAttempt, content: String, attachments: List<MessageContentPart.Image>, accept: () -> Boolean,
+            ) = admitted.also(pendingRetry::resolved).acceptPendingSend(attempt, content, attachments, accept)
         }
         private val senderJob = kotlinx.coroutines.SupervisorJob(test.backgroundScope.coroutineContext[kotlinx.coroutines.Job])
         private val senderScope = kotlinx.coroutines.CoroutineScope(test.backgroundScope.coroutineContext + senderJob)

@@ -1,10 +1,8 @@
 package com.letta.mobile.data.timeline.api
 
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 
 /**
@@ -76,10 +74,19 @@ interface TimelineExternalTransportWriter : TimelinePendingRetryTarget, Timeline
         connectionGeneration: Long = 0L,
     ): RecentMessagesReconcileOutcome
 
+    /** Adapt attempt-aware delivery outcomes to legacy external transport writers. */
+    override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: Delivery) {
+        if (delivery == Delivery.Failed) {
+            markExternalTransportLocalFailed(attempt.agent.value, attempt.conversation.value, attempt.identity.value)
+        } else {
+            markExternalTransportLocalSent(attempt.agent.value, attempt.conversation.value, attempt.identity.value)
+        }
+    }
+
 
 }
 
-/** Delivery updates, turn lifecycle and typed attempt adaptation shared by external transports. */
+/** Legacy delivery and turn lifecycle notifications shared by external transports. */
 interface TimelineExternalDeliveryWriter : TimelinePendingSendTarget {
     /** Record transport acceptance while awaiting a persisted echo. */
     suspend fun markExternalTransportLocalSent(conversationId: String, otid: String)
@@ -87,19 +94,11 @@ interface TimelineExternalDeliveryWriter : TimelinePendingSendTarget {
     /** Record transport acceptance in the captured agent and conversation. */
     suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String)
 
-    /** Adapt typed pending identities to the legacy external transport writer. */
-    override suspend fun markExternalTransportLocalSent(agentId: AgentId?, conversationId: ConversationId, otid: MessageId) =
-        markExternalTransportLocalSent(agentId?.value, conversationId.value, otid.value)
-
     /** Retain the unconfirmed message as a retryable failure. */
     suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String)
 
     /** Retain a retryable failure in the captured agent and conversation. */
     suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)
-
-    /** Adapt typed pending identities to the legacy external transport writer. */
-    override suspend fun markExternalTransportLocalFailed(agentId: AgentId?, conversationId: ConversationId, otid: MessageId) =
-        markExternalTransportLocalFailed(agentId?.value, conversationId.value, otid.value)
 
     /**
      * Signals that a turn started on
@@ -123,16 +122,4 @@ interface TimelineExternalDeliveryWriter : TimelinePendingSendTarget {
      * no-op so existing fakes compile unchanged.
      */
     suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {}
-}
-
-/** Provenance values an ingest's `source` may carry that a writer acts on, not just logs. */
-object TimelineIngestSources {
-    /**
-     * A frame of a turn the send coordinator has already finished: its tail arrived behind the
-     * terminal. A canonical writer folds it into that turn and never opens a new turn for it.
-     */
-    const val RETIRED_TURN_TAIL = "coordinator.retiredTurnTail"
-
-    /** The send coordinator's source for a delta, naming a finished turn's tail as such. */
-    fun coordinator(retiredTail: Boolean): String = if (retiredTail) RETIRED_TURN_TAIL else "coordinator"
 }

@@ -1,8 +1,5 @@
 package com.letta.mobile.data.timeline.api
 
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 
@@ -22,17 +19,6 @@ interface TimelinePendingSendTarget {
     /** Retain dispatch ownership independently of viewport and runtime replacement. */
     suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) {}
 
-    /** Attempt-aware outcomes; legacy writers retain their existing behavior. */
-    suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: Delivery) {
-        if (delivery == Delivery.Failed) {
-            markExternalTransportLocalFailed(attempt.agent, attempt.conversation, attempt.identity)
-        } else {
-            markExternalTransportLocalSent(attempt.agent, attempt.conversation, attempt.identity)
-        }
-    }
-
-    /** Record transport acceptance for the named optimistic message. */
-    suspend fun markExternalTransportLocalSent(agentId: AgentId?, conversationId: ConversationId, otid: MessageId)
-    /** Retain the named optimistic message as a retryable failure. */
-    suspend fun markExternalTransportLocalFailed(agentId: AgentId?, conversationId: ConversationId, otid: MessageId)
+    /** Apply an outcome to the identified retry generation. */
+    suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: Delivery)
 }
