@@ -17,8 +17,7 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     val result = block.xmlTag("result")
     return UiSubagentNotification(
         toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
-        status = block.xmlTag("status") ?: block.xmlTag("state")
-            ?: if (block.xmlTag("event") != null) MONITOR_EVENT_STATUS else "completed",
+        status = block.notificationStatus(),
         summary = block.xmlTag("summary"),
         result = result,
         usage = usage,
@@ -34,6 +33,10 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
         subagentAgentId = block.notificationAgentId(result),
     )
 }
+
+/** The block's status; a Monitor event carries none, and is not a completion. */
+private fun String.notificationStatus(): String =
+    xmlTag("status") ?: xmlTag("state") ?: if (xmlTag("event") != null) MONITOR_EVENT_STATUS else "completed"
 
 private fun String.notificationAgentId(result: String?): String? =
     xmlTag("agent_id") ?: xmlTag("agentId")

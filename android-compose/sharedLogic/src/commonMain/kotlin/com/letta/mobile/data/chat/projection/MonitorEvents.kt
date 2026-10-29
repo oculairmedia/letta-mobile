@@ -53,43 +53,55 @@ internal fun collapseMonitorEvents(messages: List<UiMessage>): List<UiMessage> {
  * keeps its message, becomes its watch's chip, or is null when the event is left out.
  */
 internal fun foldMonitorEvents(messages: List<UiMessage?>): List<UiMessage?> {
-    val newest = HashMap<String, Int>()
-    val counts = HashMap<String, Int>()
-    val ends = HashMap<String, String>()
-    messages.forEachIndexed { index, message ->
-        val notification = message?.subagentNotification ?: return@forEachIndexed
-        val taskId = notification.taskId?.takeIf(::isMonitorTaskId) ?: return@forEachIndexed
-        when {
-            notification.rawMonitorEvent() != null -> {
-                newest[taskId] = index
-                counts[taskId] = (counts[taskId] ?: 0) + 1
-            }
+    val watches = MonitorWatches()
+    messages.forEachIndexed(watches::record)
+    if (watches.isEmpty()) return messages
+    val labels = monitorLabels(messages)
+    return messages.mapIndexed { index, message -> watches.fold(index, message, labels) }
+}
+
+/** Each watch's newest event, event count and end status, as [foldMonitorEvents] reads them. */
+private class MonitorWatches {
+    private val newest = HashMap<String, Int>()
+    private val counts = HashMap<String, Int>()
+    private val ends = HashMap<String, String>()
+
+    fun isEmpty(): Boolean = newest.isEmpty()
+
+    fun record(index: Int, message: UiMessage?) {
+        val notification = message?.subagentNotification ?: return
+        val taskId = notification.taskId?.takeIf(::isMonitorTaskId) ?: return
+        if (notification.rawMonitorEvent() != null) {
+            newest[taskId] = index
+            counts[taskId] = (counts[taskId] ?: 0) + 1
+        } else if (!notification.isMonitorWatcher()) {
             // The watch's own completed or failed notification, which keeps its row.
-            !notification.isMonitorWatcher() -> ends[taskId] = notification.status
+            ends[taskId] = notification.status
         }
     }
-    if (newest.isEmpty()) return messages
-    val labels = monitorLabels(messages)
-    return messages.mapIndexed { index, message ->
+
+    /** [message] as it stays, as its watch's chip, or null when it is left out. */
+    fun fold(index: Int, message: UiMessage?, labels: Map<String, String>): UiMessage? {
         val notification = message?.subagentNotification
         val event = notification?.rawMonitorEvent()
         val taskId = notification?.taskId
-        when {
+        return when {
             message == null || notification == null || event == null || taskId == null -> message
-            newest[taskId] == index -> message.copy(
-                subagentNotification = notification.copy(
-                    status = ends[taskId]?.trim()?.lowercase()?.ifEmpty { null } ?: WATCHING_STATUS,
-                    summary = labels[taskId],
-                    result = "<event>$event</event>",
-                    usage = "events: ${counts[taskId] ?: 1}",
-                    transcriptUri = null,
-                    durationMs = null,
-                ),
-            )
+            newest[taskId] == index -> message.copy(subagentNotification = chip(notification, taskId, event, labels[taskId]))
             isActionableMonitorEvent(event) -> message
             else -> null
         }
     }
+
+    private fun chip(notification: UiSubagentNotification, taskId: String, event: String, label: String?) =
+        notification.copy(
+            status = ends[taskId]?.trim()?.lowercase()?.ifEmpty { null } ?: WATCHING_STATUS,
+            summary = label,
+            result = "<event>$event</event>",
+            usage = "events: ${counts[taskId] ?: 1}",
+            transcriptUri = null,
+            durationMs = null,
+        )
 }
 
 /** Each watch's description, from the Monitor call that started it ("Monitor started (task monitor_…"). */
