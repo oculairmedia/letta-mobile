@@ -68,78 +68,79 @@ internal object OutboxTransitions {
      */
     fun next(entry: OutboxEntry, event: OutboxEvent, nowMillis: Long, attempt: Long? = null): OutboxTransition {
         require(!event.fenced || attempt != null) { "$event must name its attempt" }
+        val move = Move(entry, nowMillis)
         val target = when {
             entry.state.isTerminal -> return OutboxTransition.Rejected(OutboxRejection.Terminal)
             event.fenced && attempt != entry.attempt -> return OutboxTransition.Rejected(OutboxRejection.StaleAttempt)
-            event == OutboxEvent.EchoIngested -> entry.moved(OutboxState.Confirmed, nowMillis)
-            else -> move(entry, event, nowMillis)
+            event == OutboxEvent.EchoIngested -> move.enter(OutboxState.Confirmed)
+            else -> move.on(event)
         }
         return target?.let { OutboxTransition.Applied(it) } ?: OutboxTransition.Rejected(OutboxRejection.NotAllowed)
     }
 
-    private fun move(entry: OutboxEntry, event: OutboxEvent, now: Long): OutboxEntry? = when (entry.state) {
-        OutboxState.Queued -> fromQueued(entry, event, now)
-        OutboxState.Dispatching -> fromDispatching(entry, event, now)
-        OutboxState.Accepted -> fromAccepted(entry, event, now)
-        OutboxState.Unknown -> fromUnknown(entry, event, now)
-        OutboxState.Failed -> fromFailed(entry, event, now)
-        OutboxState.Confirmed, OutboxState.Dismissed -> null
-    }
-
-    private fun fromQueued(entry: OutboxEntry, event: OutboxEvent, now: Long) = when (event) {
-        OutboxEvent.DispatchStart -> entry.moved(OutboxState.Dispatching, now)
-        OutboxEvent.UserAbort -> entry.moved(OutboxState.Dismissed, now)
-        else -> null
-    }
-
-    private fun fromDispatching(entry: OutboxEntry, event: OutboxEvent, now: Long) = when (event) {
-        OutboxEvent.TransportAccepted -> entry.moved(OutboxState.Accepted, now)
-        OutboxEvent.TransportRejected -> entry.failed(OutboxFailure.NotAccepted, now)
-        OutboxEvent.Disconnected -> entry.moved(OutboxState.Unknown, now)
-        else -> null
-    }
-
-    private fun fromAccepted(entry: OutboxEntry, event: OutboxEvent, now: Long) = when (event) {
-        // The turn ended before its echo arrived: the echo horizon starts again from here.
-        OutboxEvent.TurnSettled -> entry.moved(OutboxState.Accepted, now)
-        // A missing echo is a reason to read history, never a reason to fail.
-        OutboxEvent.EchoTimeout, OutboxEvent.Disconnected -> entry.moved(OutboxState.Unknown, now)
-        else -> null
-    }
-
-    private fun fromUnknown(entry: OutboxEntry, event: OutboxEvent, now: Long) = when (event) {
-        OutboxEvent.ProbeFoundEcho -> entry.moved(OutboxState.Confirmed, now)
-        OutboxEvent.ProbeNoEcho -> entry.noEcho(now)
-        else -> null
-    }
-
-    /** History ran past the prompt without its echo: resend only when the user asked to retry. */
-    private fun OutboxEntry.noEcho(now: Long): OutboxEntry =
-        if (resendOnNoEcho) {
-            moved(OutboxState.Queued, now).copy(attempt = attempt + 1)
-        } else {
-            failed(OutboxFailure.Unconfirmed, now)
+    /** One entry moving at one instant; the table, split by the state it leaves. */
+    private class Move(private val entry: OutboxEntry, private val atMillis: Long) {
+        fun on(event: OutboxEvent): OutboxEntry? = when (entry.state) {
+            OutboxState.Queued -> fromQueued(event)
+            OutboxState.Dispatching -> fromDispatching(event)
+            OutboxState.Accepted -> fromAccepted(event)
+            OutboxState.Unknown -> fromUnknown(event)
+            OutboxState.Failed -> fromFailed(event)
+            OutboxState.Confirmed, OutboxState.Dismissed -> null
         }
 
-    private fun fromFailed(entry: OutboxEntry, event: OutboxEvent, now: Long) = when (event) {
-        OutboxEvent.UserDismiss -> entry.moved(OutboxState.Dismissed, now)
-        OutboxEvent.UserRetry -> entry.retried(now)
-        else -> null
+        private fun fromQueued(event: OutboxEvent) = when (event) {
+            OutboxEvent.DispatchStart -> enter(OutboxState.Dispatching)
+            OutboxEvent.UserAbort -> enter(OutboxState.Dismissed)
+            else -> null
+        }
+
+        private fun fromDispatching(event: OutboxEvent) = when (event) {
+            OutboxEvent.TransportAccepted -> enter(OutboxState.Accepted)
+            OutboxEvent.TransportRejected -> failed(OutboxFailure.NotAccepted)
+            OutboxEvent.Disconnected -> enter(OutboxState.Unknown)
+            else -> null
+        }
+
+        private fun fromAccepted(event: OutboxEvent) = when (event) {
+            // The turn ended before its echo arrived: the echo horizon starts again from here.
+            OutboxEvent.TurnSettled -> enter(OutboxState.Accepted)
+            // A missing echo is a reason to read history, never a reason to fail.
+            OutboxEvent.EchoTimeout, OutboxEvent.Disconnected -> enter(OutboxState.Unknown)
+            else -> null
+        }
+
+        private fun fromUnknown(event: OutboxEvent) = when (event) {
+            OutboxEvent.ProbeFoundEcho -> enter(OutboxState.Confirmed)
+            OutboxEvent.ProbeNoEcho -> noEcho()
+            else -> null
+        }
+
+        private fun fromFailed(event: OutboxEvent) = when (event) {
+            OutboxEvent.UserDismiss -> enter(OutboxState.Dismissed)
+            OutboxEvent.UserRetry -> retried()
+            else -> null
+        }
+
+        /** History ran past the prompt without its echo: resend only when the user asked to retry. */
+        private fun noEcho(): OutboxEntry =
+            if (entry.resendOnNoEcho) enter(OutboxState.Queued).nextAttempt() else failed(OutboxFailure.Unconfirmed)
+
+        /**
+         * A prompt that never reached the server is queued again. One that may have reached it is
+         * probed first and resent only when history shows no echo, so a retry cannot duplicate it.
+         */
+        private fun retried(): OutboxEntry = when (entry.failure) {
+            OutboxFailure.Unconfirmed -> enter(OutboxState.Unknown).nextAttempt().copy(resendOnNoEcho = true)
+            else -> enter(OutboxState.Queued).nextAttempt()
+        }
+
+        fun enter(state: OutboxState): OutboxEntry =
+            entry.copy(state = state, stateSinceMillis = atMillis, failure = null, resendOnNoEcho = false)
+
+        private fun failed(failure: OutboxFailure): OutboxEntry =
+            entry.copy(state = OutboxState.Failed, stateSinceMillis = atMillis, failure = failure, resendOnNoEcho = false)
+
+        private fun OutboxEntry.nextAttempt(): OutboxEntry = copy(attempt = attempt + 1)
     }
-
-    /**
-     * A prompt that never reached the server is queued again. One that may have reached it is
-     * probed first and resent only when history shows no echo, so a retry cannot duplicate it.
-     */
-    private fun OutboxEntry.retried(now: Long): OutboxEntry = when (failure) {
-        OutboxFailure.Unconfirmed ->
-            moved(OutboxState.Unknown, now).copy(attempt = attempt + 1, resendOnNoEcho = true)
-        else -> moved(OutboxState.Queued, now).copy(attempt = attempt + 1)
-    }
-
-    private fun OutboxEntry.moved(state: OutboxState, now: Long) =
-        copy(state = state, stateSinceMillis = now, failure = null, resendOnNoEcho = false)
-
-    private fun OutboxEntry.failed(failure: OutboxFailure, now: Long) =
-        copy(state = OutboxState.Failed, stateSinceMillis = now, failure = failure, resendOnNoEcho = false)
 }
