@@ -206,6 +206,10 @@ internal class OutboxTransitionsTest {
         val settled = live.map { it.copy(state = Confirmed) }
         assertEquals(OutboxAdmission.Admitted, OutboxTransitions.admit(settled, candidate, budget = 3))
         assertEquals(OutboxAdmission.AlreadyQueued, OutboxTransitions.admit(live, live[0], budget = 3))
+        val accepted = live[0].copy(state = Accepted)
+        assertEquals(OutboxAdmission.AlreadyQueued, OutboxTransitions.admit(listOf(accepted), accepted, budget = 3))
+        val failed = live[0].copy(state = Failed, failure = OutboxFailure.NotAccepted)
+        assertEquals(OutboxAdmission.AlreadyQueued, OutboxTransitions.admit(listOf(failed), failed, budget = 3))
         assertEquals(
             OutboxAdmission.IdentityConflict,
             OutboxTransitions.admit(live, live[0].copy(content = "other"), budget = 3),

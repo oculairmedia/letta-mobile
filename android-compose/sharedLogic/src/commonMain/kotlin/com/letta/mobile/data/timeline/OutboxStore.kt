@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.OUTBOX_ADMISSION_MAX_BYTES
+import com.letta.mobile.data.timeline.api.OUTBOX_MAX_BYTES
 import com.letta.mobile.data.timeline.api.OutboxAdmission
 import com.letta.mobile.data.timeline.api.OutboxEntry
 import com.letta.mobile.data.timeline.api.OutboxEvent
@@ -33,7 +35,7 @@ internal class OutboxStore(
         return store.transaction(scope) {
             val previous = readOutbox(clock())
             val admission = OutboxTransitions.admit(previous, candidate)
-            if (admission == OutboxAdmission.Admitted) commit(previous + candidate)
+            if (admission == OutboxAdmission.Admitted) commit(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
             admission
         }
     }
@@ -65,8 +67,8 @@ internal class OutboxStore(
         recovered
     }
 
-    private suspend fun TimelineStoreTransaction.commit(entries: List<OutboxEntry>) {
-        writeOutbox(entries)
+    private suspend fun TimelineStoreTransaction.commit(entries: List<OutboxEntry>, limit: Int = OUTBOX_MAX_BYTES) {
+        writeOutbox(entries, limit)
         nextRevision()
     }
 }

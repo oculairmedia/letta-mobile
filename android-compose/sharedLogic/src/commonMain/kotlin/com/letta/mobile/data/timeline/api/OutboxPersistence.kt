@@ -11,6 +11,12 @@ import kotlinx.serialization.Serializable
 /** Live entries are capped by [OutboxTransitions.BUDGET]; this caps their encoded size. */
 internal const val OUTBOX_MAX_BYTES: Int = 2 * 1024 * 1024
 
+/**
+ * Admitting a prompt stops short of [OUTBOX_MAX_BYTES]: a later transition grows its entry (a
+ * failure reason, a longer attempt), and that write must never be refused, or the entry is stuck.
+ */
+internal const val OUTBOX_ADMISSION_MAX_BYTES: Int = OUTBOX_MAX_BYTES - OutboxTransitions.BUDGET * 64
+
 private const val OUTBOX_KEY = "outbox/v2"
 private const val LEGACY_OUTBOX_KEY = "pending/local/v1"
 private const val OUTBOX_VERSION = 2
@@ -36,9 +42,9 @@ internal suspend fun TimelineStoreReader.readOutbox(nowMillis: Long): List<Outbo
 
 /**
  * Encodes [entries] (null when there are none), checking every budget, so a caller can refuse an
- * oversized prompt before anything leaves this device.
+ * oversized prompt before anything leaves this device. Admission passes [OUTBOX_ADMISSION_MAX_BYTES].
  */
-internal fun encodeOutbox(entries: List<OutboxEntry>): ByteArray? {
+internal fun encodeOutbox(entries: List<OutboxEntry>, limit: Int = OUTBOX_MAX_BYTES): ByteArray? {
     if (entries.isEmpty()) return null
     validateOutbox(entries)
     // Reject oversized prompts before serialization allocates another copy of their text.
@@ -46,10 +52,10 @@ internal fun encodeOutbox(entries: List<OutboxEntry>): ByteArray? {
         entry.content.length.toLong() + entry.otid.length + entry.createdAt.length +
             entry.attachments.sumOf { it.base64.length.toLong() + it.mediaType.length }
     }
-    require(textUnits <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
+    require(textUnits <= limit) { "Outbox byte budget exceeded" }
     val bytes = LettaJson.persisted.encodeToString(OutboxEnvelope.serializer(), OutboxEnvelope(entries = entries))
         .encodeToByteArray()
-    require(bytes.size <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
+    require(bytes.size <= limit) { "Outbox byte budget exceeded" }
     return bytes
 }
 
@@ -59,7 +65,8 @@ internal suspend fun TimelineStoreTransaction.putOutbox(encoded: ByteArray?) {
     if (hasLegacyOutbox()) deleteEvidence(LEGACY_OUTBOX_KEY)
 }
 
-internal suspend fun TimelineStoreTransaction.writeOutbox(entries: List<OutboxEntry>) = putOutbox(encodeOutbox(entries))
+internal suspend fun TimelineStoreTransaction.writeOutbox(entries: List<OutboxEntry>, limit: Int = OUTBOX_MAX_BYTES) =
+    putOutbox(encodeOutbox(entries, limit))
 
 /**
  * A pending-store record as an outbox entry: Sending has been handed to the transport, Sent was

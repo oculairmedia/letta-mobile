@@ -7,6 +7,7 @@ import com.letta.mobile.data.timeline.api.OutboxAdmission
 import com.letta.mobile.data.timeline.api.OutboxEntry
 import com.letta.mobile.data.timeline.api.OutboxEvent
 import com.letta.mobile.data.timeline.api.OutboxState
+import com.letta.mobile.data.timeline.api.OUTBOX_ADMISSION_MAX_BYTES
 import com.letta.mobile.data.timeline.api.OUTBOX_MAX_BYTES
 import com.letta.mobile.data.timeline.api.confirmOutboxEcho
 import com.letta.mobile.data.timeline.api.OutboxTransition
@@ -76,7 +77,7 @@ class CanonicalPendingLocalStore(
             val previous = readOutbox(now)
             val candidate = record.toOutboxEntry(now)
             // A later send is not permission to discard an earlier, unconfirmed prompt.
-            if (admitted(previous, candidate)) commit(previous + candidate)
+            if (admitted(previous, candidate)) commit(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
         }
     }
 
@@ -87,7 +88,7 @@ class CanonicalPendingLocalStore(
         val candidate = record.toOutboxEntry(now)
         if (!admitted(previous, candidate)) return@transaction acceptExisting(previous, candidate, now, accept)
         // The transaction reserves capacity while encoding checks every budget before acceptance.
-        val encoded = encodeOutbox(previous + candidate)
+        val encoded = encodeOutbox(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
         if (!accept()) return@transaction false
         putOutbox(encoded)
         nextRevision()
@@ -202,8 +203,8 @@ class CanonicalPendingLocalStore(
         confirmEcho(transaction, otid)
     }
 
-    private suspend fun TimelineStoreTransaction.commit(entries: List<OutboxEntry>) {
-        writeOutbox(entries)
+    private suspend fun TimelineStoreTransaction.commit(entries: List<OutboxEntry>, limit: Int = OUTBOX_MAX_BYTES) {
+        writeOutbox(entries, limit)
         nextRevision()
     }
 

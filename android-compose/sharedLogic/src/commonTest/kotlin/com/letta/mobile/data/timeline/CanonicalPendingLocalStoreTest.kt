@@ -1,6 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.OUTBOX_ADMISSION_MAX_BYTES
 import com.letta.mobile.data.timeline.api.PendingDispatchOwners
+import com.letta.mobile.data.timeline.api.encodeOutbox
+import com.letta.mobile.data.timeline.api.toOutboxEntry
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -52,6 +55,24 @@ class CanonicalPendingLocalStoreTest {
             pending.save(scope, record.copy(otid = "large", content = "x".repeat(CanonicalPendingLocalStore.MAX_BYTES + 1)))
         }
         assertEquals(listOf(record), pending.load(scope))
+    }
+
+    @Test fun aPromptAdmittedAtTheByteLimitCanStillFailAndOneByteMoreIsRefused() = runTest {
+        val ledger = Store()
+        val pending = CanonicalPendingLocalStore(ledger)
+        val scope = TimelineScope("backend", "conversation")
+        val empty = CanonicalPendingLocalStore.Record("edge", "", emptyList(), "2026-09-08T00:00:00Z")
+        val overhead = encodeOutbox(listOf(empty.toOutboxEntry(timelineCurrentTimeMillis())))!!.size
+        val edge = empty.copy(content = "x".repeat(OUTBOX_ADMISSION_MAX_BYTES - overhead))
+        assertFailsWith<IllegalArgumentException> {
+            pending.save(TimelineScope("backend", "other"), edge.copy(content = edge.content + "x"))
+        }
+        pending.save(scope, edge)
+        pending.mark(scope, edge.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        pending.mark(scope, edge.otid, CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, pending.load(scope).single().delivery)
+        assertEquals(true, pending.discardFailed(scope, edge.otid))
+        assertEquals(emptyList(), pending.load(scope))
     }
 
     @Test fun attachmentsRoundTripAndOversizedImageDoesNotReplacePending() = runTest {
