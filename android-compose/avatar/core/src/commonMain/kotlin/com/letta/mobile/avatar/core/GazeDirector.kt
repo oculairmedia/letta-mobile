@@ -132,7 +132,7 @@ class GazeDirector(
         commitFixation(next, world)
         tickHabituation()
         val pose = tickMotion()
-        if (leadShown || !planDrives(world.mode)) leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
+        tickLead(world.mode)
         lastPose = pose
         return pose
     }
@@ -157,6 +157,11 @@ class GazeDirector(
         leadPoint = toward.coerce()
         leadRemaining = seconds.coerceAtLeast(0f)
         leadShown = false
+    }
+
+    /** A lead counts down only once shown, or when the plan cannot show it at all (bench, still). */
+    private fun tickLead(mode: GazeDriveMode) {
+        if (leadShown || !planDrives(mode)) leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
     }
 
     /** True while a seat hand-off's eye lead owns the look. */
