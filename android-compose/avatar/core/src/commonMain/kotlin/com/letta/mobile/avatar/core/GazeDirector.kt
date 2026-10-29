@@ -8,8 +8,8 @@ import kotlin.random.Random
 /**
  * Attention policy lifted from the desktop bench (`RiveDesktopSpike.kt`) —
  * the justified-plan `LaunchedEffect`, the scan `LaunchedEffect(target)`, and
- * the per-frame eye-ease / head-spring loop. Numbers are that source. The
- * host writes look + `turnX`/`turnY`; the file keeps AutoLook / plate saccades.
+ * the per-frame eye-ease / head-spring loop. Product fixations share one calm rate budget.
+ * The host writes look + `turnX`/`turnY`; the file keeps AutoLook / plate saccades.
  *
  * Drive it with [tick] (`deltaSeconds` from the same clock as [AvatarDirector]).
  * Apply [GazePose.lookTarget] via [AvatarDirector.setLookTarget] and
@@ -23,6 +23,7 @@ class GazeDirector(
 
     var target: GazeTarget = GazeTarget.OWN
         private set
+    private var desiredTarget: GazeTarget = GazeTarget.OWN
 
     var lastPose: GazePose = GazePose.CENTER
         private set
@@ -32,6 +33,16 @@ class GazeDirector(
     }
 
     private var lastState: AvatarState? = null
+    private var pendingState: AvatarState? = null
+    private var pendingStateAge: Float = 0f
+    private var saccadeAge: Float = Float.POSITIVE_INFINITY
+    private var workDriftWait: Float = 0f
+    private var workDrift: GazePoint = GazePoint(0f, 0f)
+    // The committed fixation includes geometry and overlays, not just the semantic target.
+    private var fixationBase: GazePoint = GazePoint(0f, 0f)
+    private var fixationLook: GazePoint = GazePoint(0f, 0f)
+    private var fixationFree: Boolean = false
+    private var committedSnap: Boolean = false
     /** Where an OWN / AWAY dwell parks the eyes (picked per dwell); a PEER dwell's chosen peer. */
     private var asidePoint: GazePoint = GazePoint(0f, 0f)
     private var peerIndex: Int = 0
@@ -47,7 +58,6 @@ class GazeDirector(
     private var scanY: Float = 0f
     private var headScan: Float = 0f
     private var scanWait: Float = 0f
-    private var scanLine: Int = 0
     private var scanCursor: Float = 0f
     private var scanSpeed: Float = 0.04f
     private var scanUserIndex: Int = 0
@@ -87,6 +97,10 @@ class GazeDirector(
     /** A seat hand-off's eye lead ([lead]): where, and for how much longer. */
     private var leadPoint: GazePoint = GazePoint(0f, 0f)
     private var leadRemaining: Float = 0f
+    /** Seconds a cued dwell has waited for its look to be displayed (bounded by one fixation slot). */
+    private var cueWait: Float = 0f
+    /** The lead's countdown starts only once its look is on screen; until then it waits for a slot. */
+    private var leadShown: Boolean = false
 
     /** Current habituation 0..1 (Pan et al. / Disney Research eq. 2). [GazeTarget.OWN] never decays. */
     fun interestOf(target: GazeTarget): Float = interest[target] ?: 1f
@@ -109,13 +123,16 @@ class GazeDirector(
         notePointer(world.pointer)
         attentionClock.advance(world.attention, stepSeconds)
         still = world.mode == GazeDriveMode.JUSTIFIED && world.reducedMotion
+        saccadeAge += stepSeconds
         chooseTarget(state, world)
-        if (target != scanKind) resetScan(target)
         cursorNear = cursorDemandsLook(state, world)
-        tickHabituation()
+        val next = if (cursorNear) GazeTarget.CURSOR else desiredTarget
+        if (next != scanKind) resetScan(next)
         advanceScan(world.mode)
-        val pose = tickMotion(world)
-        leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
+        commitFixation(next, world)
+        tickHabituation()
+        val pose = tickMotion()
+        tickLead(world.mode)
         lastPose = pose
         return pose
     }
@@ -123,7 +140,8 @@ class GazeDirector(
     /**
      * Bias the next look by a reaction (te3n1.2): [GazeCue.APPROVAL_ASK] snaps to the approval card
      * with a head turn and a blink; [GazeCue.SENT] glances at the newest message, then back at you.
-     * Honoured at the next justified tick; reduced motion keeps its one held look instead.
+     * Skips state debounce at the next justified tick and takes the next available fixation slot;
+     * reduced motion keeps its one held look instead.
      */
     fun cue(cue: GazeCue) {
         pendingCue = cue
@@ -138,6 +156,12 @@ class GazeDirector(
     fun lead(toward: GazePoint, seconds: Float) {
         leadPoint = toward.coerce()
         leadRemaining = seconds.coerceAtLeast(0f)
+        leadShown = false
+    }
+
+    /** A lead counts down only once shown, or when the plan cannot show it at all (bench, still). */
+    private fun tickLead(mode: GazeDriveMode) {
+        if (leadShown || !planDrives(mode)) leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
     }
 
     /** True while a seat hand-off's eye lead owns the look. */
@@ -152,7 +176,7 @@ class GazeDirector(
             still -> holdStill(state, world)
             world.mode == GazeDriveMode.JUSTIFIED -> tickPlan(state, world)
             else -> {
-                target = GazeTarget.CURSOR
+                desiredTarget = GazeTarget.CURSOR
                 lastState = state
             }
         }
@@ -161,25 +185,125 @@ class GazeDirector(
     // --- plan (spike `LaunchedEffect(gazeMode, current)`) ----------------------
 
     private fun tickPlan(state: AvatarState, world: GazeWorld) {
-        noteStateFlip(state)
+        val activeState = noteStateFlip(state)
         beginCue(world)
+        if (holdWorkLook(activeState, world)) return
+        if (cuedDwellWaitingForDisplay(world)) return
         phaseRemaining -= stepSeconds
         var steps = 0
         while (phaseRemaining <= 0f && steps < 4) {
             steps++
-            stepPhase(state, world)
+            stepPhase(activeState, world)
         }
+        holdWorkLook(activeState, world)
     }
 
     /**
-     * A new state restarts the plan, unless a cued look holds through the flip its own event
-     * caused (an approval turns the state to WAITING_INPUT).
+     * A cued dwell starts counting only once its fixation, at its current aim, is displayed. The
+     * wait is bounded by one fixation slot so a continuously moving aim cannot hold the cue.
      */
-    private fun noteStateFlip(state: AvatarState) {
-        if (state == lastState) return
-        lastState = state
-        if (!cuedDwell) restartPlan()
+    private fun cuedDwellWaitingForDisplay(world: GazeWorld): Boolean {
+        if (!cuedDwell) return false
+        val waiting = desiredTarget != target || cursorNear || aimBase(desiredTarget, world) != fixationBase
+        if (!waiting) cueWait = 0f else cueWait += stepSeconds
+        return waiting && cueWait < 1f / config.maxSaccadesPerSecond
     }
+
+    /** Plan-driven work: no cue or hand-off owns the eyes right now. */
+    private fun planOwnsWorkLook(state: AvatarState): Boolean =
+        ContentGaze.isAtWork(state) && !cuedDwell && followUp == null
+
+    private fun holdWorkLook(state: AvatarState, world: GazeWorld): Boolean {
+        if (!planOwnsWorkLook(state)) return false
+        val look = workTarget(world) ?: return false
+        desiredTarget = look
+        return true
+    }
+
+    /**
+     * At-work states share one mode. Other changes restart the plan only after a stable hold;
+     * cued looks continue through the state change caused by their own event.
+     */
+    private fun noteStateFlip(state: AvatarState): AvatarState {
+        val current = lastState
+        if (current == null) {
+            lastState = state
+            restartPlan()
+            return state
+        }
+        if (state == current) {
+            pendingState = null
+            pendingStateAge = 0f
+            return current
+        }
+        if (sameMode(state, current)) return acceptState(state)
+        if (!stableLongEnough(state)) return current
+        acceptState(state)
+        if (!cuedDwell) restartPlan()
+        return state
+    }
+
+    /** Ages a pending state change; true once the same mode has held for the debounce window. */
+    private fun stableLongEnough(state: AvatarState): Boolean {
+        val continuing = pendingState?.let { sameMode(it, state) } == true
+        pendingStateAge = if (continuing) pendingStateAge + stepSeconds else stepSeconds
+        pendingState = state
+        return pendingStateAge >= config.stateDebounceSeconds
+    }
+
+    private fun acceptState(state: AvatarState): AvatarState {
+        lastState = state
+        pendingState = null
+        pendingStateAge = 0f
+        return state
+    }
+
+    private fun sameMode(first: AvatarState, second: AvatarState): Boolean =
+        first == second || (ContentGaze.isAtWork(first) && ContentGaze.isAtWork(second))
+
+    /** The shared live edge wins while the agent works, regardless of reasoning/tool/text state. */
+    private fun workTarget(world: GazeWorld): GazeTarget? = when {
+        world.timeline != null -> GazeTarget.TIMELINE
+        available(GazeTarget.MESSAGE, world) -> GazeTarget.MESSAGE
+        available(GazeTarget.TOOL, world) -> GazeTarget.TOOL
+        else -> null
+    }
+
+    private fun fixationReady(): Boolean = saccadeAge >= 1f / config.maxSaccadesPerSecond
+
+    /**
+     * The only commit point for targets AND their aims: plans, cues, scans, moving geometry,
+     * pointer demands and hand-off leads share the same minimum fixation. Priority demands skip
+     * state debounce and take the next free slot. Reduced motion retains its original held look.
+     */
+    private fun commitFixation(next: GazeTarget, world: GazeWorld) {
+        if (!still && !fixationReady()) return
+        val base = aimBase(next, world)
+        val free = pointerDemands(world.mode)
+        val look = wantLook(base, free)
+        if (!headSnapDue(next, free) && isCurrent(next, base, look, free)) return
+        applyFixation(next, base, look, free)
+    }
+
+    /** A pending cue's head snap fires with its own plan fixation, never with a pointer demand. */
+    private fun headSnapDue(next: GazeTarget, free: Boolean): Boolean = snapHead && !free && next == desiredTarget
+
+    private fun applyFixation(next: GazeTarget, base: GazePoint, look: GazePoint, free: Boolean) {
+        // Read before the target changes: the snap belongs to the cue's own plan fixation.
+        val snap = headSnapDue(next, free)
+        target = next
+        fixationBase = base
+        fixationLook = look
+        fixationFree = free
+        if (leadRemaining > 0f) leadShown = true
+        if (!free) lastPlanAim = base
+        saccadeAge = 0f
+        committedSnap = snap
+        if (snap) snapHead = false
+    }
+
+    private fun isCurrent(next: GazeTarget, base: GazePoint, look: GazePoint, free: Boolean): Boolean =
+        next == target && base == fixationBase && look == fixationLook && free == fixationFree
 
     /** One PICK -> DWELL -> GAP step of the plan. */
     private fun stepPhase(state: AvatarState, world: GazeWorld) {
@@ -191,10 +315,12 @@ class GazeDirector(
     }
 
     private fun restartPlan() {
-        target = GazeTarget.OWN
+        desiredTarget = GazeTarget.OWN
         phase = PlanPhase.PICK
         phaseRemaining = 0f
         dwellLook = null
+        workDrift = CENTER
+        workDriftWait = pickRange(config.workDriftSeconds)
     }
 
     /** Turns a pending [GazeCue] into a cued dwell, now. */
@@ -235,7 +361,8 @@ class GazeDirector(
 
     /** A dwell on [look] for [seconds] that the plan did not pick and a state flip does not cut short. */
     private fun holdCued(look: GazeTarget, seconds: ClosedFloatingPointRange<Float>) {
-        target = look
+        desiredTarget = look
+        snapHead = false
         dwellLook = GazeLook(look, 1, seconds, CUED_GAP_SECONDS)
         phase = PlanPhase.DWELL
         phaseRemaining = pickRange(seconds)
@@ -245,7 +372,7 @@ class GazeDirector(
     private fun beginDwell(state: AvatarState, world: GazeWorld) {
         if (beginFollowUp()) return
         val look = pickLook(GazePlan.forState(state), world)
-        target = look.target
+        desiredTarget = look.target
         dwellLook = look
         phase = PlanPhase.DWELL
         phaseRemaining = pickRange(look.dwellSeconds)
@@ -296,11 +423,14 @@ class GazeDirector(
     private fun holdStill(state: AvatarState, world: GazeWorld) {
         // Forget the plan (and any cue) so it restarts cleanly if motion comes back.
         lastState = null
+        pendingState = null
+        pendingStateAge = 0f
         asidePoint = CENTER
         pendingCue = null
         followUp = null
         cuedDwell = false
-        target = stillTarget(state, world)
+        snapHead = false
+        desiredTarget = stillTarget(state, world)
     }
 
     /**
@@ -330,7 +460,7 @@ class GazeDirector(
         // were, they do not snap to centre between every look. After a look at a place (the reply,
         // the input, a peer, you) the eyes rest on that place rather than on a stale aside.
         if (dwellLook?.target?.isPlace() == true) asidePoint = lastPlanAim
-        target = GazeTarget.OWN
+        desiredTarget = GazeTarget.OWN
         phase = PlanPhase.GAP
         phaseRemaining = dwellLook?.let { pickRange(it.gapSeconds) } ?: 0.5f
     }
@@ -385,7 +515,10 @@ class GazeDirector(
         val previous = lastPointer
         lastPointer = pointer
         val moved = previous == null || previous.x != pointer.x || previous.y != pointer.y
-        pointerFresh = if (moved) config.cursorDemandSeconds else (pointerFresh - stepSeconds).coerceAtLeast(0f)
+        // A demand must survive until the next legal fixation, even when its normal freshness
+        // window is shorter than the rate cap's remaining hold.
+        val demandHold = maxOf(config.cursorDemandSeconds, 1f / config.maxSaccadesPerSecond - saccadeAge + 2f * stepSeconds)
+        pointerFresh = if (moved) demandHold else (pointerFresh - stepSeconds).coerceAtLeast(0f)
     }
 
     private fun cursorDemandsLook(state: AvatarState, world: GazeWorld): Boolean {
@@ -401,7 +534,7 @@ class GazeDirector(
     // --- habituation (spike: -dt/4 attended non-OWN, +dt/12 otherwise) --------
 
     private fun tickHabituation() {
-        val attended = if (cursorNear) GazeTarget.CURSOR else target
+        val attended = target
         for (t in GazeTarget.entries) {
             val current = interest[t] ?: 1f
             val next = if (t == attended && t != GazeTarget.OWN) {
@@ -421,16 +554,9 @@ class GazeDirector(
         scanY = 0f
         headScan = 0f
         scanWait = 0f
-        scanLine = 0
         scanUserIndex = 0
         scanPhase = ScanPhase.STEP
         when (kind) {
-            // The newest message reads like the timeline's live edge; the caret scans like the field.
-            GazeTarget.TIMELINE, GazeTarget.MESSAGE -> {
-                scanCursor = TIMELINE_SCAN_START
-                applyTimeline()
-                scanWait = pickRange(0.180f..0.340f)
-            }
             GazeTarget.INPUT, GazeTarget.CARET -> {
                 scanCursor = -0.15f
                 scanSpeed = pickRange(0.03f..0.06f)
@@ -446,24 +572,45 @@ class GazeDirector(
     }
 
     private fun advanceScan(mode: GazeDriveMode) {
-        if (still) clearScan() else if (mode == GazeDriveMode.JUSTIFIED) tickScan()
+        when {
+            still -> clearScan()
+            mode != GazeDriveMode.JUSTIFIED -> Unit
+            ContentGaze.isAtWork(lastState ?: AvatarState.IDLE) && !cuedDwell -> tickWorkDrift()
+            else -> tickScan()
+        }
+    }
+
+    /** A small, infrequent offset keeps the held live-edge look alive without reading sweeps. */
+    private fun tickWorkDrift() {
+        if (scanKind != GazeTarget.TIMELINE && scanKind != GazeTarget.MESSAGE) {
+            clearScan()
+            return
+        }
+        workDriftWait -= stepSeconds
+        if (workDriftWait <= 0f && fixationReady()) {
+            val reach = config.workDriftReach
+            workDrift = GazePoint(pickSigned(-reach..reach), pickSigned(-reach..reach))
+            workDriftWait = pickRange(config.workDriftSeconds)
+        }
+        scanX = workDrift.x
+        scanY = workDrift.y
+        headScan = 0f
     }
 
     private fun tickScan() {
         if (!hasScanOverlay(scanKind)) return
         scanWait -= stepSeconds
-        var steps = 0
-        while (scanWait <= 0f && steps < 8) {
-            steps++
-            stepScan()
-        }
+        if (scanWait > 0f || !fixationReady()) return
+        stepScan()
     }
 
     private fun hasScanOverlay(kind: GazeTarget): Boolean = kind == GazeTarget.USER || kind.readsAsScan()
 
-    /** Targets the eyes read across in quick fixations (text being written or typed), rather than hold. */
+    // GazeWorld publishes geometry/source identities, not text revisions. Never infer a reading
+    // scan from those or a state flip; keep the live edge steady. Typing scans share the rate cap.
+    /** Targets with a typing scan overlay. */
     private fun GazeTarget.readsAsScan(): Boolean = when (this) {
-        GazeTarget.TIMELINE, GazeTarget.MESSAGE, GazeTarget.INPUT, GazeTarget.CARET -> true
+        GazeTarget.INPUT, GazeTarget.CARET -> true
         else -> false
     }
 
@@ -474,29 +621,9 @@ class GazeDirector(
                 applyUser()
                 scanWait = pickRange(0.100f..0.500f)
             }
-            GazeTarget.TIMELINE, GazeTarget.MESSAGE -> stepTimeline()
             GazeTarget.INPUT, GazeTarget.CARET -> stepInput()
             else -> scanWait = 1f
         }
-    }
-
-    private fun stepTimeline() {
-        if (scanPhase == ScanPhase.HOLD) {
-            scanLine = (scanLine + 1) % 3
-            scanCursor = TIMELINE_SCAN_START
-            scanPhase = ScanPhase.STEP
-            applyTimeline()
-            scanWait = pickRange(0.180f..0.340f)
-            return
-        }
-        scanCursor += 0.05f + random.nextFloat() * 0.05f
-        if (scanCursor >= TIMELINE_SCAN_END) {
-            scanPhase = ScanPhase.HOLD
-            scanWait = pickRange(0.120f..0.260f)
-            return
-        }
-        applyTimeline()
-        scanWait = pickRange(0.180f..0.340f)
     }
 
     private fun stepInput() {
@@ -532,16 +659,6 @@ class GazeDirector(
         }
     }
 
-    /**
-     * Reading the reply as it is written: each sweep runs left to right from just before the live
-     * edge, and successive lines climb (a reversed list grows upward), so the read stays up / right.
-     */
-    private fun applyTimeline() {
-        scanX = scanCursor
-        scanY = -scanLine * TIMELINE_LINE_STEP
-        headScan = scanCursor * 0.5f
-    }
-
     /** Reduced motion: the target holds still, no saccades on top of it. */
     private fun clearScan() {
         scanX = 0f
@@ -564,12 +681,10 @@ class GazeDirector(
 
     // --- eyes ease, head spring (spike per-frame loop) ------------------------
 
-    private fun tickMotion(world: GazeWorld): GazePose {
-        val base = aimBase(world)
-        val want = wantLook(base, world)
-        noteWantJump(base)
-        pulseBlink = commitHeadIfLed(base)
-        easeEyes(want, world.mode)
+    private fun tickMotion(): GazePose {
+        noteWantJump(fixationBase)
+        pulseBlink = commitHeadIfLed(fixationBase)
+        easeEyes(fixationLook)
         stepHeadSpring()
         return finishedPose()
     }
@@ -578,14 +693,13 @@ class GazeDirector(
      * The base aim plus this tick's scan saccade, held inside the plate (SPEC §10.4, [GazeContainment]):
      * the intent first, the saccade attenuated before the intent is.
      */
-    private fun wantLook(base: GazePoint, world: GazeWorld): GazePoint {
-        val mode = world.mode
+    private fun wantLook(base: GazePoint, free: Boolean): GazePoint {
         // A look the pointer or a hand-off lead owns is followed as is, with no scan on top.
-        val useScan = !pointerDemands(mode)
+        val useScan = !free
         val host = contained(base)
         val lambda = if (useScan) GazeContainment.noiseScale(host, scanX, scanY) else 0f
         val want = GazePoint((host.x + lambda * scanX).coerceIn(-1f, 1f), (host.y + lambda * scanY).coerceIn(-1f, 1f))
-        return if (pointerDemands(mode)) want else constrained(want)
+        return if (free) want else constrained(want)
     }
 
     /** [point] as is when it fits the plate, else scaled in by the greatest κ that does (rare: extremes only). */
@@ -623,8 +737,8 @@ class GazeDirector(
 
     private fun commitHeadIfLed(base: GazePoint): Boolean {
         // A cued snap (APPROVAL_ASK) turns the head at once, with a blink; otherwise it waits out the lead.
-        val snap = snapHead
-        snapHead = false
+        val snap = committedSnap
+        committedSnap = false
         if (wantAge <= config.headLeadSeconds && !snap) return false
         // Spike always adds headScan (0 unless TIMELINE); eyes drop scan when near/cursor.
         val nextX = base.x * config.headXScale + headScan
@@ -635,7 +749,7 @@ class GazeDirector(
         return blink || snap
     }
 
-    private fun easeEyes(want: GazePoint, mode: GazeDriveMode) {
+    private fun easeEyes(want: GazePoint) {
         // Scans snap between fixations; a held (reduced-motion) look always eases gently.
         val scanning = !still && target.readsAsScan()
         val tau = if (scanning) config.scanTauSeconds else config.eyeTauSeconds
@@ -646,7 +760,7 @@ class GazeDirector(
         eyeY += (ey - eyeY) * k
         // Head compensation can swing the eyes past the target while the head settles; a planned
         // look still never reads as glancing left (the pointer, when it demands, is followed as is).
-        if (!pointerDemands(mode)) eyeX = eyeX.coerceAtLeast(ContentGaze.MAX_LEFT_X)
+        if (!fixationFree) eyeX = eyeX.coerceAtLeast(ContentGaze.MAX_LEFT_X)
     }
 
     private fun stepHeadSpring() {
@@ -665,25 +779,23 @@ class GazeDirector(
             look = contained(GazePoint(eyeX, eyeY).coerce()),
             head = GazePoint(headX, headY).coerce(),
             blink = pulseBlink,
-            target = if (cursorNear) GazeTarget.CURSOR else target,
+            target = target,
         )
     }
 
-    private fun aimBase(world: GazeWorld): GazePoint {
+    private fun aimBase(next: GazeTarget, world: GazeWorld): GazePoint {
         if (leading(world.mode)) return leadPoint
         if (pointerDemands(world.mode)) return (world.pointer ?: CENTER).coerce()
-        val aim = constrained(planAim(world) ?: CENTER)
-        lastPlanAim = aim
-        return aim
+        return constrained(planAim(next, world) ?: CENTER)
     }
 
     /** Where the current plan target is this frame; null falls back to centre. */
-    private fun planAim(world: GazeWorld): GazePoint? = when (target) {
+    private fun planAim(next: GazeTarget, world: GazeWorld): GazePoint? = when (next) {
         GazeTarget.CURSOR -> world.pointer
         // While a caret is published the field's look rides it, so its scan follows the caret's x.
         GazeTarget.INPUT -> world.attentionOf(AttentionKind.CARET)?.point ?: world.input
         GazeTarget.TIMELINE -> world.timeline
-        GazeTarget.CARET, GazeTarget.MESSAGE, GazeTarget.APPROVAL, GazeTarget.TOOL -> attentionPoint(target, world)?.point
+        GazeTarget.CARET, GazeTarget.MESSAGE, GazeTarget.APPROVAL, GazeTarget.TOOL -> attentionPoint(next, world)?.point
         GazeTarget.PEER -> world.peers.getOrNull(peerIndex) ?: asidePoint
         GazeTarget.OWN, GazeTarget.AWAY -> asidePoint
         GazeTarget.USER -> CENTER
@@ -710,13 +822,6 @@ class GazeDirector(
 
         /** The pause after a cued look: short, so the hand-over (SENT's look back at you) reads as one beat. */
         val CUED_GAP_SECONDS = 0.1f..0.25f
-
-        /** A timeline sweep starts just before the live edge and reads rightward past it. */
-        const val TIMELINE_SCAN_START = -0.05f
-        const val TIMELINE_SCAN_END = 0.3f
-
-        /** How far each successive line of the reply climbs (gaze units; negative y is up). */
-        const val TIMELINE_LINE_STEP = 0.05f
 
         /** Spike `triangle`: other person's eyes and nose (Disney Research). */
         val USER_TRIANGLE: List<GazePoint> = listOf(
