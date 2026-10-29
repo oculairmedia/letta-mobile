@@ -4366,7 +4366,7 @@ public final class com/letta/mobile/ui/mascot/AgentMascotIdentityWriter {
 }
 
 public final class com/letta/mobile/ui/mascot/MascotAttentionKt {
-	public static final fun mascotAttention-kqqH6KY (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/letta/mobile/avatar/core/gaze/AttentionKind;ZLcom/letta/mobile/avatar/core/gaze/AttentionInterest;Landroidx/compose/runtime/Composer;II)Landroidx/compose/ui/Modifier;
+	public static final fun mascotAttention-0PRjZhs (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/letta/mobile/avatar/core/gaze/AttentionKind;ZLcom/letta/mobile/avatar/core/gaze/AttentionInterest;Landroidx/compose/runtime/Composer;II)Landroidx/compose/ui/Modifier;
 	public static final fun mascotTouchPresence (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/Modifier;
 }
 
