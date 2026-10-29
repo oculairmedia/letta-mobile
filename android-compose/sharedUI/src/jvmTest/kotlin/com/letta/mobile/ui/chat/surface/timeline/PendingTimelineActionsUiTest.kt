@@ -178,7 +178,8 @@ class PendingTimelineActionsUiTest {
     private fun rejectedAction(retry: Boolean) = runComposeUiTest {
         val scope = TimelineScope("rejection-backend", "conversation", "agent")
         val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(), historyTransport(false))
+        val store = UiFrameTimelineStore()
+        val coordinator = CanonicalTimelineCoordinator(store, historyTransport(false))
         val owner = runBlocking { coordinator.acquire(scope) }
         val record = CanonicalPendingLocalStore.Record("rejected", "prompt", emptyList(), "2026-10-28T12:00:00Z")
         val presentation = runBlocking {
@@ -189,7 +190,9 @@ class PendingTimelineActionsUiTest {
         val row = record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed).toRenderItem()
         try {
             setContent { MaterialTheme { PendingPromptActions(row, presentation) } }
-            if (!retry) runBlocking { coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Sending) }
+            // Another path settles the prompt first, so the dismiss on screen is refused. (Only a retry
+            // can move a failed prompt back to Sending; a Sending report no longer does.)
+            if (!retry) runBlocking { CanonicalPendingLocalStore(store).discardFailed(scope, record.otid) }
             val button = if (retry) "Retry" else "Dismiss"
             onNodeWithText(button).performClick()
             val message = if (retry) "Couldn’t retry this message. Try again." else "Couldn’t dismiss this message. Try again."
