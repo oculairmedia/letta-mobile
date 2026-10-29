@@ -178,8 +178,7 @@ class GazeDirector(
         val activeState = noteStateFlip(state)
         beginCue(world)
         if (holdWorkLook(activeState, world)) return
-        // A cued dwell starts counting only when its fixation is actually displayed.
-        if (cuedDwell && (desiredTarget != target || cursorNear)) return
+        if (cuedDwellWaitingForDisplay()) return
         phaseRemaining -= stepSeconds
         var steps = 0
         while (phaseRemaining <= 0f && steps < 4) {
@@ -189,8 +188,15 @@ class GazeDirector(
         holdWorkLook(activeState, world)
     }
 
+    /** A cued dwell starts counting only once its fixation is actually displayed. */
+    private fun cuedDwellWaitingForDisplay(): Boolean = cuedDwell && (desiredTarget != target || cursorNear)
+
+    /** Plan-driven work: no cue or hand-off owns the eyes right now. */
+    private fun planOwnsWorkLook(state: AvatarState): Boolean =
+        ContentGaze.isAtWork(state) && !cuedDwell && followUp == null
+
     private fun holdWorkLook(state: AvatarState, world: GazeWorld): Boolean {
-        if (!ContentGaze.isAtWork(state) || cuedDwell || followUp != null) return false
+        if (!planOwnsWorkLook(state)) return false
         val look = workTarget(world) ?: return false
         desiredTarget = look
         return true
@@ -212,19 +218,25 @@ class GazeDirector(
             pendingStateAge = 0f
             return current
         }
-        if (ContentGaze.isAtWork(state) && ContentGaze.isAtWork(current)) {
-            lastState = state
-            pendingState = null
-            pendingStateAge = 0f
-            return state
-        }
-        pendingStateAge = if (pendingState?.let { sameMode(it, state) } == true) pendingStateAge + stepSeconds else stepSeconds
+        if (sameMode(state, current)) return acceptState(state)
+        if (!stableLongEnough(state)) return current
+        acceptState(state)
+        if (!cuedDwell) restartPlan()
+        return state
+    }
+
+    /** Ages a pending state change; true once the same mode has held for the debounce window. */
+    private fun stableLongEnough(state: AvatarState): Boolean {
+        val continuing = pendingState?.let { sameMode(it, state) } == true
+        pendingStateAge = if (continuing) pendingStateAge + stepSeconds else stepSeconds
         pendingState = state
-        if (pendingStateAge < config.stateDebounceSeconds) return current
+        return pendingStateAge >= config.stateDebounceSeconds
+    }
+
+    private fun acceptState(state: AvatarState): AvatarState {
         lastState = state
         pendingState = null
         pendingStateAge = 0f
-        if (!cuedDwell) restartPlan()
         return state
     }
 
@@ -252,7 +264,7 @@ class GazeDirector(
         val free = pointerDemands(world.mode)
         val look = wantLook(base, free)
         val snap = snapHead && !free && next == desiredTarget
-        if (next == target && base == fixationBase && look == fixationLook && free == fixationFree && !snap) return
+        if (!snap && sameFixation(next, base, look, free)) return
         target = next
         fixationBase = base
         fixationLook = look
@@ -262,6 +274,9 @@ class GazeDirector(
         committedSnap = snap
         if (snap) snapHead = false
     }
+
+    private fun sameFixation(next: GazeTarget, base: GazePoint, look: GazePoint, free: Boolean): Boolean =
+        next == target && base == fixationBase && look == fixationLook && free == fixationFree
 
     /** One PICK -> DWELL -> GAP step of the plan. */
     private fun stepPhase(state: AvatarState, world: GazeWorld) {
