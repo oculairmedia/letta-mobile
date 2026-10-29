@@ -313,12 +313,13 @@ class TimelineDockedPromptImageUiTest {
         var fastScrolls = 0
         var fineScrolls = 0
         var lastQ2 = "q2 not read"
-        val event: (String) -> Unit = {
-            val labelled = "$phase budgetCounter=$steps/$MAX_FAST_STEPS $it"
-            if (it.startsWith("q2 ")) lastQ2 = labelled
-            trace(labelled)
+        val label: (String) -> String = { "$phase budgetCounter=$steps/$MAX_FAST_STEPS $it" }
+        val event: (String) -> Unit = { trace(label(it)) }
+        val q2Event: (String) -> Unit = {
+            lastQ2 = label(it)
+            trace(lastQ2)
         }
-        while ((nextPromptTop(event) ?: Float.MAX_VALUE) > (pinnedBubble(event)?.bottom ?: 0f) + NEAR_PX && steps++ < MAX_FAST_STEPS) {
+        while ((nextPromptTop(q2Event) ?: Float.MAX_VALUE) > (pinnedBubble(event)?.bottom ?: 0f) + NEAR_PX && steps++ < MAX_FAST_STEPS) {
             step(-FAST_STEP_PX, event)
             fastScrolls++
         }
