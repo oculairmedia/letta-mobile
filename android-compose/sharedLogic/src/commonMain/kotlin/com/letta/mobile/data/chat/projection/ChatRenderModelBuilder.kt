@@ -1,6 +1,5 @@
 package com.letta.mobile.data.chat.projection
 
-import com.letta.mobile.data.chat.display.isMonitorWatcher
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
@@ -51,6 +50,13 @@ fun buildChatRenderModel(
     // or unscoped history.
     activeAgentId: String? = null,
 ): ChatRenderModel = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = true)
+
+/** [buildChatRenderModel] over messages whose Monitor events are already folded (a paged page's). */
+internal fun buildFoldedChatRenderModel(
+    messages: List<UiMessage>,
+    mode: ChatDisplayMode,
+    activeAgentId: String? = null,
+): ChatRenderModel = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = false)
 
 /**
  * [buildChatRenderModel]; [foldMonitorEvents] is false only for lists already folded by

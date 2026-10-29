@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.data.chat.projection.isMonitorWatcher
+import com.letta.mobile.data.chat.projection.monitorEvent
 import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
@@ -140,6 +142,8 @@ private fun AssistantPrimaryContent(
 ) {
     val notification = message.subagentNotification
     when {
+        notification?.isMonitorWatcher() == true -> MonitorWatcherChip(notification)
+        notification?.monitorEvent() != null -> MonitorEventRow(notification)
         notification != null -> SubagentNotificationCard(notification, callbacks.openSubagent)
         message.content.isBlank() -> Unit
         message.isError -> ErrorBubble(
@@ -187,7 +191,8 @@ internal fun showsSpeakerHeader(message: UiMessage, position: GroupPosition): Bo
  * one draws no card, so it must not label the row either.
  */
 private fun UiMessage.hasStructuredContent(): Boolean {
-    val cards = listOf(generatedUi, approvalResponse, subagentNotification)
+    // A Monitor watch's chip and event lines recede: no speaker label (letta-mobile-a7ir6).
+    val cards = listOf(generatedUi, approvalResponse, subagentNotification?.takeIf { it.monitorEvent() == null })
     return cards.any { it != null } || approvalRequest?.requiresUserInput() == true || attachments.isNotEmpty()
 }
 
