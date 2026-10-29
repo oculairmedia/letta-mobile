@@ -49,28 +49,18 @@ fun buildChatRenderModel(
     // unknown) is kept — we only exclude a PROVEN foreign agent, never same-agent
     // or unscoped history.
     activeAgentId: String? = null,
-): ChatRenderModel = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = true)
+): ChatRenderModel = buildFoldedChatRenderModel(collapseMonitorEvents(scopeMessagesToAgent(messages, activeAgentId)), mode)
 
-/** [buildChatRenderModel] over messages whose Monitor events are already folded (a paged page's). */
+/**
+ * [buildChatRenderModel] over messages already scoped to their agent and with their Monitor events
+ * folded once (collapseMonitorEvents, or a paged page's fold): folding twice would fold the kept
+ * actionable events again.
+ */
 internal fun buildFoldedChatRenderModel(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
-    activeAgentId: String? = null,
-): ChatRenderModel = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = false)
-
-/**
- * [buildChatRenderModel]; [foldMonitorEvents] is false only for lists already folded by
- * collapseMonitorEvents (the incremental cache folds the whole list once, then builds its parts).
- */
-private fun buildRenderModel(
-    messages: List<UiMessage>,
-    mode: ChatDisplayMode,
-    activeAgentId: String?,
-    foldMonitorEvents: Boolean,
 ): ChatRenderModel {
-    val agentScoped = scopeMessagesToAgent(messages, activeAgentId)
-        .let { if (foldMonitorEvents) collapseMonitorEvents(it) else it }
-    val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
+    val afterReasoningDedup = dedupeReasoningAssistantEchoes(messages)
 
     val visibleMessages = chainToolRoundRunIds(
         backfillMissingAssistantRunIds(
@@ -105,7 +95,7 @@ private fun buildRenderModel(
     )
 }
 
-private fun scopeMessagesToAgent(messages: List<UiMessage>, activeAgentId: String?): List<UiMessage> =
+internal fun scopeMessagesToAgent(messages: List<UiMessage>, activeAgentId: String?): List<UiMessage> =
     if (activeAgentId == null) messages else messages.filter { it.agentId == null || it.agentId == activeAgentId }
 
 /**
@@ -272,11 +262,9 @@ class IncrementalChatRenderItemsCache {
         // committed history this tick would otherwise reuse as it was.
         val watchersChanged = monitorWatchers(normalizedMessages) != monitorWatchers(previousMessages)
         if (!watchersChanged && canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
-            val tailRenderItems = buildRenderModel(
+            val tailRenderItems = buildFoldedChatRenderModel(
                 messages = normalizedMessages.subList(tailStartIndex, normalizedMessages.size),
                 mode = mode,
-                activeAgentId = activeAgentId,
-                foldMonitorEvents = false,
             ).renderItems
             // letta-mobile-vxase: the tail and the committed history are each
             // deduplicated WITHIN themselves by groupMessagesForRender, but
@@ -315,7 +303,7 @@ class IncrementalChatRenderItemsCache {
             return next
         }
 
-        return rebuildFull(normalizedMessages, mode, tailStartIndex, activeAgentId = activeAgentId)
+        return rebuildFull(normalizedMessages, mode, tailStartIndex)
     }
 
     private fun canReuseCommittedHistory(
@@ -349,17 +337,15 @@ class IncrementalChatRenderItemsCache {
         messages: List<UiMessage>,
         mode: ChatDisplayMode,
         tailStartIndex: Int,
-        activeAgentId: String?,
     ): List<ChatRenderItem> {
         // buildChatRenderModel already applies deduplicateRenderItemsByMessageId
         // internally (single chokepoint), so no extra wrap needed here.
-        val full = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = false).renderItems
+        // [messages] are already scoped and folded (renderItems).
+        val full = buildFoldedChatRenderModel(messages, mode).renderItems
         committedRenderItems = if (tailStartIndex > 0) {
-            buildRenderModel(
+            buildFoldedChatRenderModel(
                 messages = messages.subList(0, tailStartIndex),
                 mode = mode,
-                activeAgentId = activeAgentId,
-                foldMonitorEvents = false,
             ).renderItems
         } else {
             emptyList()

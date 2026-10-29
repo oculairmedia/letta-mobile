@@ -8,6 +8,7 @@ import com.letta.mobile.data.chat.projection.buildFoldedChatRenderModel
 import com.letta.mobile.data.chat.projection.foldMonitorEvents
 import com.letta.mobile.data.chat.projection.hasNoRenderableContent
 import com.letta.mobile.data.chat.projection.isMonitorWatcher
+import com.letta.mobile.data.chat.projection.scopeMessagesToAgent
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -121,9 +122,8 @@ internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     if (renderable.size < 2) return prepared
     // The page's Monitor events are already folded (foldMonitorEventsOnPage).
     val grouped = buildFoldedChatRenderModel(
-        messages = renderable.map { it.message }.withPromptOwnedRunIds(),
+        messages = scopeMessagesToAgent(renderable.map { it.message }.withPromptOwnedRunIds(), context.scope.agentId),
         mode = ChatDisplayMode.Interactive,
-        activeAgentId = context.scope.agentId,
     ).renderItems
     val output = prepared.toMutableList()
     grouped.mapNotNull { it.runClaim() }

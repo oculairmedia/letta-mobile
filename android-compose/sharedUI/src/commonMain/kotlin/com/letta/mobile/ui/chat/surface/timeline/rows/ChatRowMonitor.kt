@@ -100,7 +100,7 @@ internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
                 DisclosureChevron(expanded = expanded, compact = true, contentDescription = null)
             }
         }
-        if (expanded) MonitorDetails(event, notification.taskId)
+        if (expanded) MonitorDetails(event, notification)
     }
 }
 
@@ -134,16 +134,16 @@ internal fun MonitorEventRow(notification: UiSubagentNotification) {
             )
             DisclosureChevron(expanded = expanded, compact = true, contentDescription = null)
         }
-        if (expanded) MonitorDetails(event, notification.taskId)
+        if (expanded) MonitorDetails(event, notification)
     }
 }
 
 @Composable
-private fun MonitorDetails(event: String, taskId: String?) {
+private fun MonitorDetails(event: String, notification: UiSubagentNotification) {
     SelectionContainer {
         Text(text = event, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    taskId?.let {
+    notification.taskId?.let {
         Text(
             text = stringResource(Res.string.rows_task_id, it),
             style = MaterialTheme.typography.labelSmall,

@@ -15,7 +15,7 @@ import com.letta.mobile.data.model.UiSubagentNotification
 
 /** The event text of a Monitor event, or a watcher chip's newest event; null for any other notification. */
 fun UiSubagentNotification.monitorEvent(): String? {
-    if (!isMonitorTaskId(taskId)) return null
+    if (!isMonitorTask()) return null
     return result?.let(EVENT_TAG::find)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
 }
 
@@ -70,7 +70,7 @@ private class MonitorWatches {
 
     fun record(index: Int, message: UiMessage?) {
         val notification = message?.subagentNotification ?: return
-        val taskId = notification.taskId?.takeIf(::isMonitorTaskId) ?: return
+        val taskId = notification.taskId?.takeIf { notification.isMonitorTask() } ?: return
         if (notification.rawMonitorEvent() != null) {
             newest[taskId] = index
             counts[taskId] = (counts[taskId] ?: 0) + 1
@@ -87,14 +87,16 @@ private class MonitorWatches {
         val taskId = notification?.taskId
         return when {
             message == null || notification == null || event == null || taskId == null -> message
-            newest[taskId] == index -> message.copy(subagentNotification = chip(notification, taskId, event, labels[taskId]))
+            newest[taskId] == index -> message.copy(subagentNotification = chip(notification, event, labels[taskId]))
             isActionableMonitorEvent(event) -> message
             else -> null
         }
     }
 
-    private fun chip(notification: UiSubagentNotification, taskId: String, event: String, label: String?) =
-        notification.copy(
+    /** [notification] (one of the watch's events) as the watch's chip. */
+    private fun chip(notification: UiSubagentNotification, event: String, label: String?): UiSubagentNotification {
+        val taskId = notification.taskId.orEmpty()
+        return notification.copy(
             status = ends[taskId]?.trim()?.lowercase()?.ifEmpty { null } ?: WATCHING_STATUS,
             summary = label,
             result = "<event>$event</event>",
@@ -102,6 +104,7 @@ private class MonitorWatches {
             transcriptUri = null,
             durationMs = null,
         )
+    }
 }
 
 /** Each watch's description, from the Monitor call that started it ("Monitor started (task monitor_…"). */
@@ -119,7 +122,7 @@ private fun monitorLabels(messages: List<UiMessage?>): Map<String, String> {
 private fun UiSubagentNotification.rawMonitorEvent(): String? =
     if (status == MONITOR_EVENT_STATUS) monitorEvent() else null
 
-private fun isMonitorTaskId(taskId: String?): Boolean = taskId?.startsWith(MONITOR_TASK_PREFIX) == true
+private fun UiSubagentNotification.isMonitorTask(): Boolean = taskId?.startsWith(MONITOR_TASK_PREFIX) == true
 
 private const val MONITOR_TASK_PREFIX = "monitor_"
 private const val MONITOR_TOOL = "Monitor"
