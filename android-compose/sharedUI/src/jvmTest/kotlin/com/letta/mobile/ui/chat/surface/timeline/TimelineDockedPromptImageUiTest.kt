@@ -10,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
@@ -129,8 +131,12 @@ class TimelineDockedPromptImageUiTest {
 
     private fun ComposeUiTest.px(dp: Dp): Float = with(density) { dp.toPx() }
 
-    private fun ComposeUiTest.step(deltaPx: Float) {
-        runOnIdle { listState.dispatchRawDelta(deltaPx) }
+    private fun ComposeUiTest.step(deltaPx: Float, trace: ((String) -> Unit)? = null) {
+        runOnIdle {
+            val consumed = listState.dispatchRawDelta(deltaPx)
+            trace?.invoke("scroll requested=$deltaPx consumed=$consumed " +
+                "first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
+        }
         waitForIdle()
     }
 
@@ -234,16 +240,26 @@ class TimelineDockedPromptImageUiTest {
     }
 
     /** The pinned copy's bubble, in root px. */
-    private fun ComposeUiTest.pinnedBubble(): Rect? = onAllNodes(
-        hasTestTag(ChatRowTestTags.USER_PROMPT) and inPinnedCopy,
-        useUnmergedTree = true,
-    ).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+    private fun ComposeUiTest.pinnedBubble(trace: ((String) -> Unit)? = null): Rect? {
+        val node = onAllNodes(
+            hasTestTag(ChatRowTestTags.USER_PROMPT) and inPinnedCopy,
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes().firstOrNull()
+        val bounds = node?.boundsInRoot
+        trace?.invoke("pinned left=${bounds?.left} top=${bounds?.top} right=${bounds?.right} bottom=${bounds?.bottom} " +
+            "position=${node?.positionInRoot} size=${node?.size} semanticsId=${node?.id} " +
+            "text=${node?.config?.getOrNull(SemanticsProperties.Text)?.joinToString()?.take(100) ?: "unavailable (owner unknown)"}")
+        return bounds
+    }
 
     /** The second prompt's row top, px from the list's top edge; null off screen. */
-    private fun ComposeUiTest.nextPromptTop(): Float? = runOnIdle {
+    private fun ComposeUiTest.nextPromptTop(trace: ((String) -> Unit)? = null): Float? = runOnIdle {
         val info = listState.layoutInfo
-        info.visibleItemsInfo.firstOrNull { it.key.toString().contains("q2") }
-            ?.let { (info.viewportEndOffset - it.offset - it.size).toFloat() }
+        val item = info.visibleItemsInfo.firstOrNull { it.key.toString().contains("q2") }
+        val top = item?.let { (info.viewportEndOffset - it.offset - it.size).toFloat() }
+        trace?.invoke("q2 key=${item?.key} offset=${item?.offset} size=${item?.size} top=$top " +
+            "viewportStart=${info.viewportStartOffset} viewportEnd=${info.viewportEndOffset}")
+        top
     }
 
     /**
@@ -263,9 +279,18 @@ class TimelineDockedPromptImageUiTest {
         val held = pinnedBubble() ?: error("nothing docked")
         val bubbleColor = onRoot().captureToImage().toAwtImage()
             .getRGB((held.left + BUBBLE_EDGE_PX).toInt(), (held.top + held.height / 2).toInt())
-        pushIntoHeaderBand(gone - PUSHED_PAST_PX)
-        val pushed = pinnedBubble() ?: error("the docked prompt left before it was pushed into the header band")
-        assertTrue(pushed.top < gone - PUSHED_PAST_PX && pushed.bottom > line, "pushed across the line: $pushed (line $line)")
+        // Observe only existing reads/scrolls; keep output bounded and attach it only to failures.
+        val recent = ArrayDeque<String>()
+        val trace: (String) -> Unit = { event ->
+            if (recent.size == 24) recent.removeFirst()
+            recent.addLast(event)
+        }
+        val summary = pushIntoHeaderBand(gone - PUSHED_PAST_PX, trace)
+        val pushed = pinnedBubble(trace)
+        val diagnostic = "$summary; held=$held line=$line gone=$gone target=${gone - PUSHED_PAST_PX}; " +
+            "semanticsId is not prompt identity; recent events:\n${recent.joinToString("\n")}"
+        if (pushed == null) error("the docked prompt left before it was pushed into the header band; $diagnostic")
+        assertTrue(pushed.top < gone - PUSHED_PAST_PX && pushed.bottom > line, "pushed across the line: $pushed (line $line); $diagnostic")
         val image = onRoot().captureToImage().toAwtImage()
         val bubblePixels = { ys: IntRange ->
             val xs = (pushed.left.toInt() + 1) until (pushed.right.toInt() - 1)
@@ -282,14 +307,28 @@ class TimelineDockedPromptImageUiTest {
      * Scrolls fast until the next prompt nears the docked copy, then finely until it has pushed the
      * copy's top above [targetTop] (root px).
      */
-    private fun ComposeUiTest.pushIntoHeaderBand(targetTop: Float) {
+    private fun ComposeUiTest.pushIntoHeaderBand(targetTop: Float, trace: (String) -> Unit): String {
         var steps = 0
-        while ((nextPromptTop() ?: Float.MAX_VALUE) > (pinnedBubble()?.bottom ?: 0f) + NEAR_PX && steps++ < MAX_FAST_STEPS) {
-            step(-FAST_STEP_PX)
+        var phase = "fast"
+        var fastScrolls = 0
+        var fineScrolls = 0
+        var lastQ2 = "q2 not read"
+        val event: (String) -> Unit = {
+            val labelled = "$phase budgetCounter=$steps/$MAX_FAST_STEPS $it"
+            if (it.startsWith("q2 ")) lastQ2 = labelled
+            trace(labelled)
         }
-        while ((pinnedBubble()?.top ?: Float.MAX_VALUE) > targetTop && steps++ < MAX_FAST_STEPS) {
-            step(-STEP_PX)
+        while ((nextPromptTop(event) ?: Float.MAX_VALUE) > (pinnedBubble(event)?.bottom ?: 0f) + NEAR_PX && steps++ < MAX_FAST_STEPS) {
+            step(-FAST_STEP_PX, event)
+            fastScrolls++
         }
+        phase = "fine"
+        while ((pinnedBubble(event)?.top ?: Float.MAX_VALUE) > targetTop && steps++ < MAX_FAST_STEPS) {
+            step(-STEP_PX, event)
+            fineScrolls++
+        }
+        return "fastScrolls=$fastScrolls fineScrolls=$fineScrolls sharedBudgetCounter=$steps/$MAX_FAST_STEPS " +
+            "(post-increment guards); last fast-phase q2 observation: $lastQ2"
     }
 
     private fun near(argb: Int, other: Int): Boolean {
