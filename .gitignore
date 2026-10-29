@@ -32,6 +32,7 @@ kotzilla.json
 .dolt/
 *.db
 .beads-credential-key
+.beads.gate.lock*
 
 # Orphan KMP shared-ui build output (module is not in settings.gradle.kts)
 android-compose/shared-ui/

@@ -96,7 +96,7 @@ class GazeAttentionTest {
     }
 
     @Test
-    fun theRunningToolDominatesWhileWorking() {
+    fun theLiveEdgeHoldsWhileWorkingWithATool() {
         val world = GazeWorld(
             timeline = GazePoint(0.3f, -0.5f),
             attention = listOf(point(AttentionKind.TOOL, 0.6f, -0.1f)),
@@ -105,8 +105,9 @@ class GazeAttentionTest {
         GazeDirector(Random(9)).run(60f, AvatarState.WORKING, world) { counts[it.target.ordinal]++ }
         val tool = counts[GazeTarget.TOOL.ordinal]
         val timeline = counts[GazeTarget.TIMELINE.ordinal]
-        assertTrue(tool > timeline, "tool $tool should outweigh timeline $timeline")
-        assertTrue(tool > counts.sum() * 0.35f, "tool $tool of ${counts.sum()} ticks")
+        // At work, tool/text/thinking state changes share the timeline fixation.
+        assertEquals(0, tool, "a tool appearing must not pull the eyes off the live edge")
+        assertEquals(counts.sum(), timeline, "hold the live edge for the entire turn")
     }
 
     @Test

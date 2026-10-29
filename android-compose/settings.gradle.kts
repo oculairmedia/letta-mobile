@@ -28,6 +28,9 @@ dependencyResolutionManagement {
         gradlePluginPortal()
         ivy("https://nodejs.org/dist/") {
             name = "Node.js distributions"
+            content {
+                includeModule("org.nodejs", "node")
+            }
             patternLayout {
                 artifact("v[revision]/[artifact](-v[revision]-[classifier]).[ext]")
             }
@@ -37,6 +40,9 @@ dependencyResolutionManagement {
         }
         ivy("https://github.com/yarnpkg/yarn/releases/download") {
             name = "Yarn distributions"
+            content {
+                includeModule("com.yarnpkg", "yarn")
+            }
             patternLayout {
                 artifact("v[revision]/[artifact](-v[revision]).[ext]")
             }
@@ -46,6 +52,9 @@ dependencyResolutionManagement {
         }
         ivy("https://github.com/WebAssembly/binaryen/releases/download") {
             name = "Binaryen distributions"
+            content {
+                includeModule("com.github.webassembly", "binaryen")
+            }
             patternLayout {
                 artifact("version_[revision]/binaryen-version_[revision]-[classifier].[ext]")
             }

@@ -49,9 +49,18 @@ fun buildChatRenderModel(
     // unknown) is kept — we only exclude a PROVEN foreign agent, never same-agent
     // or unscoped history.
     activeAgentId: String? = null,
+): ChatRenderModel = buildFoldedChatRenderModel(collapseMonitorEvents(scopeMessagesToAgent(messages, activeAgentId)), mode)
+
+/**
+ * [buildChatRenderModel] over messages already scoped to their agent and with their Monitor events
+ * folded once (collapseMonitorEvents, or a paged page's fold): folding twice would fold the kept
+ * actionable events again.
+ */
+internal fun buildFoldedChatRenderModel(
+    messages: List<UiMessage>,
+    mode: ChatDisplayMode,
 ): ChatRenderModel {
-    val agentScoped = scopeMessagesToAgent(messages, activeAgentId)
-    val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
+    val afterReasoningDedup = dedupeReasoningAssistantEchoes(messages)
 
     val visibleMessages = chainToolRoundRunIds(
         backfillMissingAssistantRunIds(
@@ -86,7 +95,7 @@ fun buildChatRenderModel(
     )
 }
 
-private fun scopeMessagesToAgent(messages: List<UiMessage>, activeAgentId: String?): List<UiMessage> =
+internal fun scopeMessagesToAgent(messages: List<UiMessage>, activeAgentId: String?): List<UiMessage> =
     if (activeAgentId == null) messages else messages.filter { it.agentId == null || it.agentId == activeAgentId }
 
 /**
@@ -236,7 +245,9 @@ class IncrementalChatRenderItemsCache {
         // buildChatRenderModel so foreign-agent messages are scoped out.
         activeAgentId: String? = null,
     ): List<ChatRenderItem> {
-        val normalizedMessages = chainToolRoundRunIds(backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId)))
+        val normalizedMessages = collapseMonitorEvents(
+            chainToolRoundRunIds(backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId))),
+        )
         if (normalizedMessages.isEmpty()) {
             cachedMode = mode
             previousMessages = normalizedMessages
@@ -247,11 +258,15 @@ class IncrementalChatRenderItemsCache {
         }
 
         val tailStartIndex = activeTailStartIndex(normalizedMessages)
-        if (canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
-            val tailRenderItems = buildChatRenderModel(
+        // letta-mobile-a7ir6: a Monitor event updates its watcher chip in place. Only a chip in the
+        // committed history this tick would reuse as it was forces a full rebuild; one in the tail
+        // is rebuilt with it.
+        val watchersChanged =
+            committedWatchers(normalizedMessages, tailStartIndex) != committedWatchers(previousMessages, tailStartIndex)
+        if (!watchersChanged && canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
+            val tailRenderItems = buildFoldedChatRenderModel(
                 messages = normalizedMessages.subList(tailStartIndex, normalizedMessages.size),
                 mode = mode,
-                activeAgentId = activeAgentId,
             ).renderItems
             // letta-mobile-vxase: the tail and the committed history are each
             // deduplicated WITHIN themselves by groupMessagesForRender, but
@@ -290,7 +305,7 @@ class IncrementalChatRenderItemsCache {
             return next
         }
 
-        return rebuildFull(normalizedMessages, mode, tailStartIndex, activeAgentId = activeAgentId)
+        return rebuildFull(normalizedMessages, mode, tailStartIndex)
     }
 
     private fun canReuseCommittedHistory(
@@ -324,16 +339,15 @@ class IncrementalChatRenderItemsCache {
         messages: List<UiMessage>,
         mode: ChatDisplayMode,
         tailStartIndex: Int,
-        activeAgentId: String?,
     ): List<ChatRenderItem> {
         // buildChatRenderModel already applies deduplicateRenderItemsByMessageId
         // internally (single chokepoint), so no extra wrap needed here.
-        val full = buildChatRenderModel(messages, mode, activeAgentId).renderItems
+        // [messages] are already scoped and folded (renderItems).
+        val full = buildFoldedChatRenderModel(messages, mode).renderItems
         committedRenderItems = if (tailStartIndex > 0) {
-            buildChatRenderModel(
+            buildFoldedChatRenderModel(
                 messages = messages.subList(0, tailStartIndex),
                 mode = mode,
-                activeAgentId = activeAgentId,
             ).renderItems
         } else {
             emptyList()
@@ -371,6 +385,9 @@ class IncrementalChatRenderItemsCache {
         }
         return if (reusedAny) reconciled else rebuilt
     }
+
+    private fun committedWatchers(messages: List<UiMessage>, tailStartIndex: Int): List<UiMessage> =
+        messages.take(tailStartIndex).filter { it.subagentNotification?.isMonitorWatcher() == true }
 
     private fun activeTailStartIndex(messages: List<UiMessage>): Int {
         val lastUserIndex = messages.indexOfLast { it.role == "user" }
