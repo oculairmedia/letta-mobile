@@ -2,9 +2,18 @@
 
 package com.letta.mobile.ui.chat.surface.sendlift
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ScrollAxisRange
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.verticalScrollAxisRange
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
 import com.letta.mobile.ui.chat.surface.timeline.ManualMainDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -78,6 +87,25 @@ internal class SendLiftReadinessTest {
                 }
             } finally {
                 rig.close()
+            }
+        }
+    }
+
+    @Test
+    fun unresolvableListStateFailsImmediatelyInsteadOfTimingOut() {
+        runDesktopComposeUiTest(width = SendLiftFrameRecorder.WIDTH, height = SendLiftFrameRecorder.HEIGHT) {
+            setContent {
+                Box(Modifier.size(100.dp).testTag(ChatTimelineTags.LIST).semantics {
+                    verticalScrollAxisRange = ScrollAxisRange(value = { 0f }, maxValue = { 1f })
+                })
+            }
+            SendLiftFrameRecorder(this, SendLiftPort(0, PROMPT)).use { recorder ->
+                val failure = assertFailsWith<IllegalStateException> {
+                    recorder.awaitScrollableList(timeoutMillis = 1L)
+                }
+                assertEquals("no LazyListState reachable from the list's scroll semantics", failure.message)
+                assertEquals(null, failure.cause, "a broken state finder must not become a readiness timeout")
+                assertTrue(recorder.frames.isEmpty())
             }
         }
     }
