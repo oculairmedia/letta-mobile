@@ -28,7 +28,15 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 internal class OutboxTransitionsTest {
-    private val created = OutboxEntry.queued("otid-1", "hello", emptyList(), "2026-01-01T00:00:00Z", nowMillis = 1_000)
+    private val created = OutboxEntry(
+        otid = "otid-1",
+        content = "hello",
+        attachments = emptyList(),
+        createdAt = "2026-01-01T00:00:00Z",
+        state = Queued,
+        attempt = 0,
+        stateSinceMillis = 1_000,
+    )
 
     private fun entry(
         state: OutboxState,

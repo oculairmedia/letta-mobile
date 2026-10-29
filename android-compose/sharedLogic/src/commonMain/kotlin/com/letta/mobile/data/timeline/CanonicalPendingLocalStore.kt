@@ -85,7 +85,7 @@ class CanonicalPendingLocalStore(
         val now = timelineCurrentTimeMillis()
         val previous = readOutbox(now)
         val candidate = record.toOutboxEntry(now)
-        if (!admitted(previous, candidate)) return@transaction acceptExisting(previous, record.otid, now, accept)
+        if (!admitted(previous, candidate)) return@transaction acceptExisting(previous, candidate, now, accept)
         // The transaction reserves capacity while encoding checks every budget before acceptance.
         val encoded = encodeOutbox(previous + candidate)
         if (!accept()) return@transaction false
@@ -97,13 +97,14 @@ class CanonicalPendingLocalStore(
     /** A retry dispatching its queued prompt; any other repeat acceptance changes nothing. */
     private suspend fun TimelineStoreTransaction.acceptExisting(
         previous: List<OutboxEntry>,
-        otid: String,
+        candidate: OutboxEntry,
         now: Long,
         accept: () -> Boolean,
     ): Boolean {
         if (!accept()) return false
-        val dispatched = previous.first { it.otid == otid }.after(listOf(OutboxEvent.DispatchStart), now) ?: return true
-        commit(previous.replacing(otid, dispatched))
+        val existing = previous.first { it.otid == candidate.otid }
+        val dispatched = existing.after(listOf(OutboxEvent.DispatchStart), now) ?: return true
+        commit(previous.replacing(existing.otid, dispatched))
         return true
     }
 
@@ -121,9 +122,7 @@ class CanonicalPendingLocalStore(
         // Callers already hold a freshly loaded list, and a send enters its state no earlier than it
         // was sent, so a younger send cannot be stale: refresh runs on ordinary traffic and must not
         // bill a commit and a revision when nothing is.
-        if (loaded.none { it.delivery != Delivery.Failed && unowned(scope, it.otid) && overdue(it.sentAt, now, horizonMillis) }) {
-            return 0
-        }
+        if (loaded.none { mayBeStale(scope, it, now, horizonMillis) }) return 0
         val nowMillis = now.epochMillis()
         return store.transaction(scope) {
             val previous = readOutbox(nowMillis)
@@ -142,9 +141,13 @@ class CanonicalPendingLocalStore(
     private fun unowned(scope: TimelineScope, otid: String): Boolean =
         !recoveryProtected(otid) && !dispatchOwners.isActive(scope.backendId, scope.conversationId, otid)
 
-    /** An unparsable timestamp is not evidence of staleness, so such a record is left alone. */
-    private fun overdue(sentAt: String, now: TimelineInstant, horizonMillis: Long): Boolean {
-        val sent = runCatching { parseTimelineInstant(sentAt) }.getOrNull() ?: return false
+    /**
+     * Whether [record] could be past the horizon: unconfirmed, unowned and sent long enough ago. An
+     * unparsable timestamp is not evidence of staleness, so such a record is left alone.
+     */
+    private fun mayBeStale(scope: TimelineScope, record: Record, now: TimelineInstant, horizonMillis: Long): Boolean {
+        if (record.delivery == Delivery.Failed || !unowned(scope, record.otid)) return false
+        val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
         return timelineInstantDurationMillis(sent, now) >= horizonMillis
     }
 

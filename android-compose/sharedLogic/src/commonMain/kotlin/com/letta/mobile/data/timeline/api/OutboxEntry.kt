@@ -105,22 +105,5 @@ internal data class OutboxEntry(
             OutboxState.Accepted,
             OutboxState.Unknown,
         )
-
-        /** A new prompt, admitted before any transport call. */
-        fun queued(
-            otid: String,
-            content: String,
-            attachments: List<MessageContentPart.Image>,
-            createdAt: String,
-            nowMillis: Long,
-        ): OutboxEntry = OutboxEntry(
-            otid = otid,
-            content = content,
-            attachments = attachments,
-            createdAt = createdAt,
-            state = OutboxState.Queued,
-            attempt = 0,
-            stateSinceMillis = nowMillis,
-        )
     }
 }
