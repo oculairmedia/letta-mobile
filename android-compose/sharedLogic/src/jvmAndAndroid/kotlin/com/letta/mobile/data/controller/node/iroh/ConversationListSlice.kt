@@ -27,7 +27,10 @@ internal fun agentConversationPage(full: JsonArray, agent: AgentId, after: Conve
     // queryOf sends a limit that parses as a Long as a number, anything else as a string (then 20).
     val count = limit?.toLongOrNull()?.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())?.toInt()
         ?: DEFAULT_APP_SERVER_PAGE
-    return JsonArray(if (count >= 0) rows.take(count) else rows.dropLast(-count))
+    return JsonArray(
+        if (count >= 0) rows.take(count)
+        else rows.take((rows.size.toLong() + count).coerceAtLeast(0L).toInt()),
+    )
 }
 
 private fun kotlinx.serialization.json.JsonElement.field(name: String): String? =

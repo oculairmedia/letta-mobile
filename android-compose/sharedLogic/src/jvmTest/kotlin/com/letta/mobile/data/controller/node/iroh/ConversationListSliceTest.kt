@@ -48,6 +48,17 @@ class ConversationListSliceTest {
     }
 
     @Test
+    fun extremeNegativeLimitsMatchSlicePrefixSemanticsWithoutOverflow() {
+        assertEquals(emptyList(), page("a", limit = "-2147483648"))
+        assertEquals(emptyList(), page("a", limit = "-2147483649"))
+        assertEquals(emptyList(), page("a", limit = "-9223372036854775808"))
+        assertEquals(emptyList(), page("a", limit = "-4"))
+        assertEquals(emptyList(), page("a", limit = "-5"))
+        assertEquals(emptyList(), page("a", after = "a2", limit = "-2147483648"))
+        assertEquals(emptyList(), page("missing", limit = "-2147483648"))
+    }
+
+    @Test
     fun agentFreeRowsAreInNoAgentsPage() {
         assertEquals(emptyList(), page("missing"))
         assertEquals(false, page("a").contains("free"))
