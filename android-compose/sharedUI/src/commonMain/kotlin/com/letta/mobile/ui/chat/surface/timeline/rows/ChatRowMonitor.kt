@@ -20,9 +20,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.projection.monitorEvent
 import com.letta.mobile.data.chat.projection.monitorEventCount
@@ -44,33 +46,32 @@ import org.jetbrains.compose.resources.stringResource
 
 // letta-mobile-a7ir6: a Monitor watch recedes to one chip (its newest event, the event count and
 // whether it still watches); an actionable event is one line. The raw task id shows only expanded.
+// Both are one composable: the web bundle budget has no room for two near-identical rows.
 
-/** A Monitor watch's chip: one line that opens to the newest event in full and the task id. */
+/**
+ * One Monitor line that opens to the event in full and the task id. A [watcher] is the watch's
+ * chip, labelled and counted; otherwise it is a single actionable event.
+ */
 @Composable
-internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
-    var expanded by remember(notification.taskId) { mutableStateOf(false) }
+internal fun MonitorRow(notification: UiSubagentNotification, watcher: Boolean) {
+    // A watch's chip keeps its state as new events replace its text; an event row is its event.
+    var expanded by remember(notification.taskId, notification.result.takeUnless { watcher }) { mutableStateOf(false) }
     val event = notification.monitorEvent().orEmpty()
-    val label = notification.summary ?: stringResource(Res.string.rows_monitor_label)
+    val chip = if (watcher) monitorChipText(notification, event) else null
     val failed = notification.status.equals("failed", ignoreCase = true)
-    val state = stringResource(
-        when {
-            failed -> Res.string.rows_monitor_failed
-            notification.status.equals("running", ignoreCase = true) -> Res.string.rows_monitor_watching
-            else -> Res.string.rows_monitor_ended
-        },
-    )
-    val count = notification.monitorEventCount()
-    val events = pluralStringResource(Res.plurals.rows_monitor_events, count, count)
-    val description = stringResource(Res.string.rows_monitor_chip_description, label, state, event, events)
+    val tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     Column(
-        modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.MONITOR_WATCHER).padding(vertical = LettaDimens.Space.xs),
+        modifier = Modifier.fillMaxWidth()
+            .testTag(monitorTag(watcher))
+            .padding(vertical = LettaDimens.Space.xs),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Surface(
             shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = monitorBackground(watcher),
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.clickable { expanded = !expanded }.semantics { contentDescription = description },
+            modifier = Modifier.clickable { expanded = !expanded }
+                .semantics { chip?.let { contentDescription = it.third } },
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
@@ -78,31 +79,14 @@ internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Icon(
-                    imageVector = LettaIcons.Visibility,
+                    imageVector = monitorIcon(watcher),
                     contentDescription = null,
                     modifier = Modifier.size(LettaDimens.Control.icon),
-                    tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = tint,
                 )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = event,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = listOfNotNull(events.takeIf { count > 0 }, state).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                chip?.let { OneLine(it.first, MaterialTheme.typography.labelMedium, Modifier.weight(1f, fill = false)) }
+                OneLine(event, MaterialTheme.typography.bodySmall, Modifier.weight(1f, fill = watcher.not()))
+                chip?.let { Text(text = it.second, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1) }
                 DisclosureChevron(expanded = expanded, compact = true, contentDescription = null)
             }
         }
@@ -110,38 +94,37 @@ internal fun MonitorWatcherChip(notification: UiSubagentNotification) {
     }
 }
 
-/** An actionable Monitor event: one line that opens to its full text and the task id. */
+private fun monitorTag(watcher: Boolean) = if (watcher) ChatRowTestTags.MONITOR_WATCHER else ChatRowTestTags.MONITOR_EVENT
+
+private fun monitorIcon(watcher: Boolean) = if (watcher) LettaIcons.Visibility else LettaIcons.Info
+
 @Composable
-internal fun MonitorEventRow(notification: UiSubagentNotification) {
-    var expanded by remember(notification.taskId, notification.result) { mutableStateOf(false) }
-    val event = notification.monitorEvent().orEmpty()
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.MONITOR_EVENT).padding(vertical = LettaDimens.Space.xs),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        ) {
-            Icon(
-                imageVector = LettaIcons.Info,
-                contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Control.icon),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = event,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            DisclosureChevron(expanded = expanded, compact = true, contentDescription = null)
-        }
-        if (expanded) MonitorDetails(event, notification)
-    }
+private fun monitorBackground(watcher: Boolean): Color =
+    if (watcher) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
+
+/** The chip's label, its trailing count and state, and its content description. */
+@Composable
+private fun monitorChipText(notification: UiSubagentNotification, event: String): Triple<String, String, String> {
+    val label = notification.summary ?: stringResource(Res.string.rows_monitor_label)
+    val state = stringResource(
+        when {
+            notification.status.equals("failed", ignoreCase = true) -> Res.string.rows_monitor_failed
+            notification.status.equals("running", ignoreCase = true) -> Res.string.rows_monitor_watching
+            else -> Res.string.rows_monitor_ended
+        },
+    )
+    val count = notification.monitorEventCount()
+    val events = pluralStringResource(Res.plurals.rows_monitor_events, count, count)
+    return Triple(
+        label,
+        listOfNotNull(events.takeIf { count > 0 }, state).joinToString(" · "),
+        stringResource(Res.string.rows_monitor_chip_description, label, state, event, events),
+    )
+}
+
+@Composable
+private fun OneLine(text: String, style: TextStyle, modifier: Modifier) {
+    Text(text = text, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
 }
 
 @Composable

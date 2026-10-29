@@ -142,8 +142,7 @@ private fun AssistantPrimaryContent(
 ) {
     val notification = message.subagentNotification
     when {
-        notification?.isMonitorWatcher() == true -> MonitorWatcherChip(notification)
-        notification?.monitorEvent() != null -> MonitorEventRow(notification)
+        notification?.monitorEvent() != null -> MonitorRow(notification, watcher = notification.isMonitorWatcher())
         notification != null -> SubagentNotificationCard(notification, callbacks.openSubagent)
         message.content.isBlank() -> Unit
         message.isError -> ErrorBubble(
