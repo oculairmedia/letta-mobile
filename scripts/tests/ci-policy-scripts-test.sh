@@ -82,6 +82,31 @@ assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
 assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
 assert_contains "$required_test_job" 'WEB_RESULT: ${{ needs.web-wasm.result }}'
+api_docs_job="$(awk '/^  api-docs:$/ { active=1; next }
+  active && /^  [[:alnum:]_-]+:$/ { exit }
+  active { print }' "$android_workflow")"
+docs_precompile_step='      - name: Precompile shared Android API dependency
+        working-directory: android-compose
+        run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process --console=plain :sharedLogic:compileAndroidMain'
+
+docs_compiles_in_separate_process() {
+  local job="$1"
+  local before_generation="${job%%      - name: Generate shared API reference*}"
+  [[ "$before_generation" != "$job" && "$before_generation" == *"$docs_precompile_step"$'\n'* ]] || return 1
+  local generation="${job#*      - name: Generate shared API reference}"
+  [[ "$generation" == *'set -o pipefail'* ]] || return 1
+  [[ "$generation" == *'./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} --console=plain :dokkaGeneratePublicationHtml 2>&1 | tee dokka-diagnostics.log'* ]]
+}
+
+docs_compiles_in_separate_process "$api_docs_job" || fail 'API documentation must precompile Android in a separate single-use JVM'
+for invalid_docs_job in \
+  "${api_docs_job/"$docs_precompile_step"/}" \
+  "${api_docs_job/"$docs_precompile_step"/}"$'\n'"$docs_precompile_step" \
+  "${api_docs_job/:sharedLogic:compileAndroidMain/:sharedLogic:compileAndroidMain :dokkaGeneratePublicationHtml}"; do
+  if docs_compiles_in_separate_process "$invalid_docs_job"; then
+    fail 'API documentation isolation check accepted a missing, reordered or combined compiler invocation'
+  fi
+done
 required_test_script="$(sed -n '/run: |/,$p' <<<"$required_test_job" | tail -n +2)"
 for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do
