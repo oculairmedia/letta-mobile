@@ -31,8 +31,22 @@ class CanonicalTimelineCoordinator(
     internal suspend fun retryPending(owner: Owner, identity: MessageId): Boolean {
         val scope = owner.selection.scope
         return dispatchOwners.protecting(Triple(scope.backendId, scope.conversationId, identity.value)) {
-            dispatchRetry(owner, identity)
+            echoArrivedBeforeRetry(owner, identity) || dispatchRetry(owner, identity)
         }
+    }
+
+    /**
+     * A failed prompt may have reached the host before contact was lost, and the App Server does
+     * not deduplicate `client_message_id`, so a blind resend can post it twice. Recent history is
+     * read first: when it holds the echo, the prompt is confirmed and there is nothing to resend.
+     */
+    private suspend fun echoArrivedBeforeRetry(owner: Owner, identity: MessageId): Boolean {
+        val failed = owner.session.pending.value.any {
+            it.otid == identity.value && it.delivery == CanonicalPendingLocalStore.Delivery.Failed
+        }
+        if (!failed) return false
+        reconcileRecent(owner)
+        return owner.session.pending.value.none { it.otid == identity.value }
     }
 
     private suspend fun dispatchRetry(owner: Owner, identity: MessageId): Boolean {

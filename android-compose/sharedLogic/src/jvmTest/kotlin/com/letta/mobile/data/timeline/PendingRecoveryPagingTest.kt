@@ -15,6 +15,7 @@ import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
@@ -89,6 +90,30 @@ class PendingRecoveryPagingTest {
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    // softs (Q2): a prompt that reached the host before contact was lost is not posted twice.
+    @Test fun retryConfirmsAnEchoAlreadyInHistoryInsteadOfResending() = runTest {
+        val scope = TimelineScope("retry-probe", "conversation", "agent")
+        val store = InMemoryTimelineStore()
+        val record = CanonicalPendingLocalStore.Record("received", "prompt", emptyList(), "2026-01-01T00:00:00Z",
+            CanonicalPendingLocalStore.Delivery.Failed)
+        CanonicalPendingLocalStore(store).save(scope, record)
+        val echo = UserMessage("server-echo", contentRaw = JsonPrimitive("prompt"), otid = record.otid, date = record.sentAt)
+        val transport = object : TimelineTransport by unexpectedTimelineTransport() {
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
+                TimelineRemotePageAdapter.fromMessages(request, listOf(echo), hasMore = false)
+        }
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        var resent = false
+        coordinator.bindPendingRetry(AgentId("agent")) { _, _ -> resent = true }
+
+        assertTrue(coordinator.retryPending(owner, MessageId(record.otid)))
+
+        assertFalse(resent, "a prompt whose echo is already in history must not be sent again")
+        assertTrue(owner.session.pending.value.isEmpty())
+        assertTrue(CanonicalPendingLocalStore(store).load(scope).isEmpty())
+    }
+
     @Test fun suspendedRetryAdmissionCannotBeRetiredAsAnOldLostEcho() = runTest {
         val scope = TimelineScope("admission-recovery", "conversation", "agent")
         val store = InMemoryTimelineStore()

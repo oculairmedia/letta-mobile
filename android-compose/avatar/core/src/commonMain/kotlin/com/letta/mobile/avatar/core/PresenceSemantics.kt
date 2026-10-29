@@ -1,5 +1,7 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarState
+
 /**
  * Presence semantics service (PRD §4 P3) — the single source of truth mapping a
  * director [AvatarState] to the ThinkingRing presence language `{color, mode}`.

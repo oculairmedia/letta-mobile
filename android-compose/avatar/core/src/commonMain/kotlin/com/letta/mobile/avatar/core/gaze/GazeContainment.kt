@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
 
 import kotlin.math.abs
 import kotlin.math.max

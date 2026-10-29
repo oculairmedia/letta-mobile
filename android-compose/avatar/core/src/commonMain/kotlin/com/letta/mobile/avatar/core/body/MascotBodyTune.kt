@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.body
 
 /**
  * The tune of a [MascotBody] (letta-mobile-te3n1.3). Stiffness is in 1/s^2 at unit mass, the same

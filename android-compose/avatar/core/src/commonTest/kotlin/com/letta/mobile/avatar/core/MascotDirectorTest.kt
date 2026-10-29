@@ -1,5 +1,12 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarGesture
+import com.letta.mobile.avatar.core.model.AvatarModel
+import com.letta.mobile.avatar.core.model.AvatarReaction
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.ListenLevel
+import com.letta.mobile.avatar.core.model.MotionPreference
+import com.letta.mobile.avatar.core.model.ReactionArg
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test

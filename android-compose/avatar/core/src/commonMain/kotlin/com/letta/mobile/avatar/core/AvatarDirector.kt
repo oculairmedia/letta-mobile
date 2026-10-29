@@ -1,5 +1,9 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarExpression
+import com.letta.mobile.avatar.core.model.AvatarLifecycle
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
+import com.letta.mobile.avatar.core.model.AvatarState
 import kotlin.random.Random
 
 /**

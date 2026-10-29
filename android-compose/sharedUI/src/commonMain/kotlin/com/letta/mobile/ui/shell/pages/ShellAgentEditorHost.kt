@@ -3,7 +3,7 @@ package com.letta.mobile.ui.shell.pages
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.agenteditor.AgentCreator
 import com.letta.mobile.data.agenteditor.AgentEditorController
 import com.letta.mobile.data.agenteditor.AgentEditorLinks

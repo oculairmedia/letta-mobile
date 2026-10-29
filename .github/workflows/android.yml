@@ -400,9 +400,10 @@ jobs:
 
       # :sharedUI:jvmTest runs here as an additive task. Its Skiko UI tests can
       # fail on Linux alone (font metrics), and the console log carries neither
-      # assertion messages nor stdout, so keep the reports when this job fails.
+      # assertion messages nor stdout. Keep passing reports too, so selected
+      # test methods and their verdicts remain independently verifiable.
       - name: Upload sharedUI JVM test reports
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sharedui-jvmtest-reports-${{ github.run_id }}

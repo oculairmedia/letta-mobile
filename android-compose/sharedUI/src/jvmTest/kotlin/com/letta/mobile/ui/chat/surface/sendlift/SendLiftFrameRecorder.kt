@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
@@ -92,8 +93,25 @@ internal class SendLiftFrameRecorder(
         test.mainClock.advanceTimeByFrame()
     }
 
+    /** Waits only during setup: no readiness frames are added to the captured send timeline. */
+    fun awaitScrollableList(timeoutMillis: Long = 5_000L) {
+        try {
+            test.waitUntil(timeoutMillis = timeoutMillis) {
+                if (!list.isReadyToScroll()) step(1)
+                list.isReadyToScroll()
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            throw IllegalStateException(
+                "timeline list '${ChatTimelineTags.LIST}' never became ready to scroll: " +
+                    "missing semantics node or no visible items after ${timeoutMillis}ms",
+                timeout,
+            )
+        }
+    }
+
     /** Scrolls the list one viewport towards older messages and lets it settle. */
     fun scrollListAwayFromTheEdge() {
+        awaitScrollableList()
         list.scrollAwayFromTheEdge()
         step(SETTLE_FRAMES)
     }

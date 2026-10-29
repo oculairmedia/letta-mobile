@@ -4362,24 +4362,24 @@ public final class com/letta/mobile/ui/mascot/AgentMascotIdentityWriter {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun write (Lcom/letta/mobile/avatar/core/MascotIdentity;)V
+	public final fun write (Lcom/letta/mobile/avatar/core/model/MascotIdentity;)V
 }
 
 public final class com/letta/mobile/ui/mascot/MascotAttentionKt {
-	public static final fun mascotAttention-kqqH6KY (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/letta/mobile/avatar/core/AttentionKind;ZLcom/letta/mobile/avatar/core/AttentionInterest;Landroidx/compose/runtime/Composer;II)Landroidx/compose/ui/Modifier;
+	public static final fun mascotAttention-0PRjZhs (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/letta/mobile/avatar/core/gaze/AttentionKind;ZLcom/letta/mobile/avatar/core/gaze/AttentionInterest;Landroidx/compose/runtime/Composer;II)Landroidx/compose/ui/Modifier;
 	public static final fun mascotTouchPresence (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/Modifier;
 }
 
 public final class com/letta/mobile/ui/mascot/MascotAvatarKt {
 	public static final field MASCOT_TILE_OVERSCALE F
 	public static final fun MascotAvatar-VUP9l70 (Ljava/lang/String;FLandroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function0;FZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
-	public static final fun MascotCandidate-uFdPcIQ (Lcom/letta/mobile/avatar/core/MascotIdentity;FLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun MascotLive-AFY4PWA (Ljava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;FLandroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotTouch;Landroidx/compose/runtime/Composer;II)V
+	public static final fun MascotCandidate-uFdPcIQ (Lcom/letta/mobile/avatar/core/model/MascotIdentity;FLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun MascotLive-AFY4PWA (Ljava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;FLandroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotTouch;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getLocalMascotHost ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun mascotAtWork (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Z
 	public static final fun mascotAvailable (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Z
-	public static final fun mascotCandidateAvailable (Lcom/letta/mobile/avatar/core/MascotIdentity;Landroidx/compose/runtime/Composer;I)Z
-	public static final fun pointerLook (FFLandroidx/compose/ui/geometry/Rect;F)Lcom/letta/mobile/avatar/core/AvatarLookTarget$Screen;
+	public static final fun mascotCandidateAvailable (Lcom/letta/mobile/avatar/core/model/MascotIdentity;Landroidx/compose/runtime/Composer;I)Z
+	public static final fun pointerLook (FFLandroidx/compose/ui/geometry/Rect;F)Lcom/letta/mobile/avatar/core/model/AvatarLookTarget$Screen;
 }
 
 public final class com/letta/mobile/ui/mascot/MascotCursorCaptureKt {
@@ -4390,31 +4390,31 @@ public final class com/letta/mobile/ui/mascot/MascotEntries {
 	public static final field $stable I
 	public fun <init> (Lkotlin/jvm/functions/Function1;)V
 	public final fun closeAll ()V
-	public final fun get (Ljava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
+	public final fun get (Ljava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
 }
 
 public abstract class com/letta/mobile/ui/mascot/MascotEntry {
 	public static final field $stable I
 	public static final field Companion Lcom/letta/mobile/ui/mascot/MascotEntry$Companion;
 	public static final field MORPH_SECONDS F
-	public fun <init> (Lcom/letta/mobile/avatar/core/AvatarRuntime;Lcom/letta/mobile/avatar/core/MascotIdentity;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Lcom/letta/mobile/avatar/core/AvatarRuntime;Lcom/letta/mobile/avatar/core/model/MascotIdentity;Lkotlin/jvm/functions/Function1;)V
 	public final fun apply (Lcom/letta/mobile/data/presence/AgentPresence;)V
 	public abstract fun dispose ()V
 	public final fun ensureLoaded (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getDirector ()Lcom/letta/mobile/avatar/core/MascotDirector;
-	public final fun getGazeWorld ()Lcom/letta/mobile/avatar/core/GazeWorld;
-	public final fun getIdentity ()Lcom/letta/mobile/avatar/core/MascotIdentity;
-	public final fun getLastGaze ()Lcom/letta/mobile/avatar/core/GazePose;
+	public final fun getGazeWorld ()Lcom/letta/mobile/avatar/core/gaze/GazeWorld;
+	public final fun getIdentity ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
+	public final fun getLastGaze ()Lcom/letta/mobile/avatar/core/gaze/GazePose;
 	public final fun getRuntime ()Lcom/letta/mobile/avatar/core/AvatarRuntime;
 	protected abstract fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun retarget (Lcom/letta/mobile/avatar/core/MascotIdentity;F)V
-	public static synthetic fun retarget$default (Lcom/letta/mobile/ui/mascot/MascotEntry;Lcom/letta/mobile/avatar/core/MascotIdentity;FILjava/lang/Object;)V
-	public final fun setGazeWorld (Lcom/letta/mobile/avatar/core/GazeWorld;)V
+	public final fun retarget (Lcom/letta/mobile/avatar/core/model/MascotIdentity;F)V
+	public static synthetic fun retarget$default (Lcom/letta/mobile/ui/mascot/MascotEntry;Lcom/letta/mobile/avatar/core/model/MascotIdentity;FILjava/lang/Object;)V
+	public final fun setGazeWorld (Lcom/letta/mobile/avatar/core/gaze/GazeWorld;)V
 	public final fun setKeystrokes (I)V
 	public final fun setPlatformFacts (Lcom/letta/mobile/ui/mascot/MascotPlatformFacts;)V
-	public final fun shownIdentity ()Lcom/letta/mobile/avatar/core/MascotIdentity;
+	public final fun shownIdentity ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
 	public final fun tickTo (J)V
-	protected abstract fun writeIdentity (Lcom/letta/mobile/avatar/core/MascotIdentity;)V
+	protected abstract fun writeIdentity (Lcom/letta/mobile/avatar/core/model/MascotIdentity;)V
 }
 
 public final class com/letta/mobile/ui/mascot/MascotEntry$Companion {
@@ -4430,7 +4430,7 @@ public final class com/letta/mobile/ui/mascot/MascotGazeSurface : java/lang/Enum
 
 public abstract interface class com/letta/mobile/ui/mascot/MascotHost {
 	public abstract fun Surface (Lcom/letta/mobile/ui/mascot/MascotEntry;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;I)V
-	public abstract fun entry (Ljava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
+	public abstract fun entry (Ljava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
 	public abstract fun getAvailable ()Z
 	public fun getStills ()Lcom/letta/mobile/ui/mascot/MascotStills;
 }
@@ -4465,11 +4465,11 @@ public final class com/letta/mobile/ui/mascot/MascotIdentityRegistryKt {
 
 public final class com/letta/mobile/ui/mascot/MascotIdentityStoreKt {
 	public static final field MASCOT_IDENTITY_METADATA_KEY Ljava/lang/String;
-	public static final fun chosenMascotIdentity (Lcom/letta/mobile/data/model/Agent;Ljava/lang/String;)Lcom/letta/mobile/avatar/core/MascotIdentity;
-	public static final fun mascotIdentity (Lcom/letta/mobile/data/model/Agent;)Lcom/letta/mobile/avatar/core/MascotIdentity;
+	public static final fun chosenMascotIdentity (Lcom/letta/mobile/data/model/Agent;Ljava/lang/String;)Lcom/letta/mobile/avatar/core/model/MascotIdentity;
+	public static final fun mascotIdentity (Lcom/letta/mobile/data/model/Agent;)Lcom/letta/mobile/avatar/core/model/MascotIdentity;
 	public static final fun mascotIdentitySettingsKey (Ljava/lang/String;)Ljava/lang/String;
-	public static final fun resolveMascotIdentity (Ljava/lang/String;Lcom/letta/mobile/data/model/Agent;Ljava/lang/String;)Lcom/letta/mobile/avatar/core/MascotIdentity;
-	public static final fun withinAgentMetadata (Lcom/letta/mobile/avatar/core/MascotIdentity;Ljava/util/Map;)Ljava/util/Map;
+	public static final fun resolveMascotIdentity (Ljava/lang/String;Lcom/letta/mobile/data/model/Agent;Ljava/lang/String;)Lcom/letta/mobile/avatar/core/model/MascotIdentity;
+	public static final fun withinAgentMetadata (Lcom/letta/mobile/avatar/core/model/MascotIdentity;Ljava/util/Map;)Ljava/util/Map;
 }
 
 public final class com/letta/mobile/ui/mascot/MascotLoadingKt {
@@ -4483,9 +4483,9 @@ public abstract interface class com/letta/mobile/ui/mascot/MascotMotionListener 
 
 public final class com/letta/mobile/ui/mascot/MascotPickerKt {
 	public static final field MASCOT_ROTATION_STEP I
-	public static final fun MascotPicker-ww6aTOc (Lcom/letta/mobile/avatar/core/MascotIdentity;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;JLandroidx/compose/runtime/Composer;II)V
-	public static final fun MascotShapeGlyph-942rkJo (Lcom/letta/mobile/avatar/core/MascotShape;IFLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun drawMascotShape-mxwnekA (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lcom/letta/mobile/avatar/core/MascotShape;J)V
+	public static final fun MascotPicker-ww6aTOc (Lcom/letta/mobile/avatar/core/model/MascotIdentity;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;JLandroidx/compose/runtime/Composer;II)V
+	public static final fun MascotShapeGlyph-942rkJo (Lcom/letta/mobile/avatar/core/model/MascotShape;IFLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun drawMascotShape-mxwnekA (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lcom/letta/mobile/avatar/core/model/MascotShape;J)V
 	public static final fun snapRotation (I)I
 }
 
@@ -4507,7 +4507,7 @@ public final class com/letta/mobile/ui/mascot/MascotPlatformFacts {
 
 public final class com/letta/mobile/ui/mascot/MascotSeatKt {
 	public static final fun MascotMirror-EUb7tLY (Ljava/lang/String;FLandroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
-	public static final fun MascotSeat-5Azxhi0 (Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotStage;FLandroidx/compose/ui/Modifier;FLcom/letta/mobile/avatar/core/MascotIdentity;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;III)V
+	public static final fun MascotSeat-5Azxhi0 (Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotStage;FLandroidx/compose/ui/Modifier;FLcom/letta/mobile/avatar/core/model/MascotIdentity;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;III)V
 	public static final fun mascotDrawnAt (Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotStage;Landroidx/compose/runtime/Composer;I)Z
 }
 
@@ -4528,14 +4528,14 @@ public final class com/letta/mobile/ui/mascot/MascotSemantics {
 
 public final class com/letta/mobile/ui/mascot/MascotSlot {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/avatar/core/GazeRect;)V
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/avatar/core/gaze/GazeRect;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lcom/letta/mobile/avatar/core/GazeRect;
-	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/avatar/core/GazeRect;)Lcom/letta/mobile/ui/mascot/MascotSlot;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/mascot/MascotSlot;Ljava/lang/String;Lcom/letta/mobile/avatar/core/GazeRect;ILjava/lang/Object;)Lcom/letta/mobile/ui/mascot/MascotSlot;
+	public final fun component2 ()Lcom/letta/mobile/avatar/core/gaze/GazeRect;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/avatar/core/gaze/GazeRect;)Lcom/letta/mobile/ui/mascot/MascotSlot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/mascot/MascotSlot;Ljava/lang/String;Lcom/letta/mobile/avatar/core/gaze/GazeRect;ILjava/lang/Object;)Lcom/letta/mobile/ui/mascot/MascotSlot;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
-	public final fun getBounds ()Lcom/letta/mobile/avatar/core/GazeRect;
+	public final fun getBounds ()Lcom/letta/mobile/avatar/core/gaze/GazeRect;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -4567,9 +4567,9 @@ public final class com/letta/mobile/ui/mascot/MascotStills {
 	public static final field SIZE_PX I
 	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotStillStore;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/mascot/MascotStillStore;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun ensure (Lcom/letta/mobile/avatar/core/MascotIdentity;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun get (Lcom/letta/mobile/avatar/core/MascotIdentity;)Landroidx/compose/ui/graphics/ImageBitmap;
-	public final fun keyOf (Lcom/letta/mobile/avatar/core/MascotIdentity;)Ljava/lang/String;
+	public final fun ensure (Lcom/letta/mobile/avatar/core/model/MascotIdentity;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun get (Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Landroidx/compose/ui/graphics/ImageBitmap;
+	public final fun keyOf (Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/mascot/MascotStills$Companion {
@@ -4596,11 +4596,11 @@ public final class com/letta/mobile/ui/mascot/MascotTransport {
 	public fun <init> (Z)V
 	public synthetic fun <init> (ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun activeStage (Ljava/lang/String;)Lcom/letta/mobile/ui/mascot/MascotStage;
-	public final fun bodyOf-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/avatar/core/MascotBody;
+	public final fun bodyOf-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/avatar/core/body/MascotBody;
 	public final fun getFollowsSeatRule ()Z
 	public final fun getMotionListener ()Lcom/letta/mobile/ui/mascot/MascotMotionListener;
 	public final fun getRigCarriesBody ()Z
-	public final fun preview (Ljava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;)V
+	public final fun preview (Ljava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)V
 	public final fun rest (Ljava/lang/String;)V
 	public final fun setMotionListener (Lcom/letta/mobile/ui/mascot/MascotMotionListener;)V
 	public final fun setRigCarriesBody (Z)V
@@ -4623,7 +4623,7 @@ public final class com/letta/mobile/ui/mascot/NoMascotHost : com/letta/mobile/ui
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/mascot/NoMascotHost;
 	public fun Surface (Lcom/letta/mobile/ui/mascot/MascotEntry;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;I)V
-	public fun entry (Ljava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
+	public fun entry (Ljava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Lcom/letta/mobile/ui/mascot/MascotEntry;
 	public fun getAvailable ()Z
 	public fun getStills ()Lcom/letta/mobile/ui/mascot/MascotStills;
 }
@@ -9196,8 +9196,8 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailActivity {
 
 public final class com/letta/mobile/ui/shell/rail/ShellRailEntry {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;Z)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Z
 	public final fun component2 ()Ljava/lang/String;
@@ -9206,14 +9206,14 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailEntry {
 	public final fun component5 ()I
 	public final fun component6 ()Z
 	public final fun component7 ()Z
-	public final fun component8 ()Lcom/letta/mobile/avatar/core/MascotIdentity;
+	public final fun component8 ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
 	public final fun component9 ()Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;Z)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;Z)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActivity ()Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;
 	public final fun getAgentId ()Ljava/lang/String;
-	public final fun getIdentity ()Lcom/letta/mobile/avatar/core/MascotIdentity;
+	public final fun getIdentity ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
 	public final fun getInitial ()Ljava/lang/String;
 	public final fun getKey ()Ljava/lang/String;
 	public final fun getMemberCount ()I
@@ -9898,17 +9898,17 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellNavRowModel {
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellPanelAgent {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;)V
-	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)V
+	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()I
 	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Lcom/letta/mobile/avatar/core/MascotIdentity;
-	public final fun copy (Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;)Lcom/letta/mobile/ui/shell/sidebar/ShellPanelAgent;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellPanelAgent;Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/MascotIdentity;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellPanelAgent;
+	public final fun component4 ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
+	public final fun copy (Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;)Lcom/letta/mobile/ui/shell/sidebar/ShellPanelAgent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellPanelAgent;Ljava/lang/String;ILjava/lang/String;Lcom/letta/mobile/avatar/core/model/MascotIdentity;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellPanelAgent;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
-	public final fun getIdentity ()Lcom/letta/mobile/avatar/core/MascotIdentity;
+	public final fun getIdentity ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getOrbIndex ()I
 	public fun hashCode ()I

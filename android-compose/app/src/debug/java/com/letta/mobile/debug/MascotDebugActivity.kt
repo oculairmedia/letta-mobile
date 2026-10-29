@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.AvatarActivity
 import com.letta.mobile.avatar.core.AvatarDirector
-import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.model.AvatarState
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import com.letta.mobile.avatar.rive.RiveAvatarSurface
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold

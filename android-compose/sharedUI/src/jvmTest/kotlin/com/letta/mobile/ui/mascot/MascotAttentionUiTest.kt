@@ -12,10 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.avatar.core.AttentionInterest
-import com.letta.mobile.avatar.core.AttentionKey
-import com.letta.mobile.avatar.core.AttentionKind
-import com.letta.mobile.avatar.core.GazeRect
+import com.letta.mobile.avatar.core.gaze.AttentionInterest
+import com.letta.mobile.avatar.core.gaze.AttentionKey
+import com.letta.mobile.avatar.core.gaze.AttentionKind
+import com.letta.mobile.avatar.core.gaze.GazeRect
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

@@ -17,11 +17,11 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextLayoutResult
-import com.letta.mobile.avatar.core.AttentionInterest
-import com.letta.mobile.avatar.core.AttentionKey
-import com.letta.mobile.avatar.core.AttentionKind
-import com.letta.mobile.avatar.core.AttentionRect
-import com.letta.mobile.avatar.core.GazeRect
+import com.letta.mobile.avatar.core.gaze.AttentionInterest
+import com.letta.mobile.avatar.core.gaze.AttentionKey
+import com.letta.mobile.avatar.core.gaze.AttentionKind
+import com.letta.mobile.avatar.core.gaze.AttentionRect
+import com.letta.mobile.avatar.core.gaze.GazeRect
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

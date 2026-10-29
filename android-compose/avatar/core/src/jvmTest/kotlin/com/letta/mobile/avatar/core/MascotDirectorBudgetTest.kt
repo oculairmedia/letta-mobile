@@ -1,5 +1,20 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.gaze.AttentionKey
+import com.letta.mobile.avatar.core.gaze.AttentionKind
+import com.letta.mobile.avatar.core.gaze.AttentionRect
+import com.letta.mobile.avatar.core.gaze.GazeDirector
+import com.letta.mobile.avatar.core.gaze.GazePoint
+import com.letta.mobile.avatar.core.gaze.GazeReach
+import com.letta.mobile.avatar.core.gaze.GazeRect
+import com.letta.mobile.avatar.core.gaze.GazeTargetRects
+import com.letta.mobile.avatar.core.gaze.GazeWindow
+import com.letta.mobile.avatar.core.gaze.GazeWorld
+import com.letta.mobile.avatar.core.model.AvatarExpression
+import com.letta.mobile.avatar.core.model.AvatarGesture
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
+import com.letta.mobile.avatar.core.model.AvatarModel
+import com.letta.mobile.avatar.core.model.AvatarState
 import java.lang.management.ManagementFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

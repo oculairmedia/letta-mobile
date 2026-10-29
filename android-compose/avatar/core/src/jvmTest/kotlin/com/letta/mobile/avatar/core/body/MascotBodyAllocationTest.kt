@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.body
 
 import java.lang.management.ManagementFactory
 import kotlin.test.Test

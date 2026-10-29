@@ -37,9 +37,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotPalette
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotPalette
+import com.letta.mobile.avatar.core.model.MascotShape
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin

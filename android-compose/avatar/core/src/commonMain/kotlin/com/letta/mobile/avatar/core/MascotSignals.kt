@@ -1,5 +1,11 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.gaze.GazePose
+import com.letta.mobile.avatar.core.model.AvatarReaction
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.Hover
+import com.letta.mobile.avatar.core.model.Petting
+
 /**
  * What the app knows about one agent right now, as levels (letta-mobile-te3n1.1). The
  * [MascotDirector] takes a whole snapshot at a time and applies only what changed, so a host

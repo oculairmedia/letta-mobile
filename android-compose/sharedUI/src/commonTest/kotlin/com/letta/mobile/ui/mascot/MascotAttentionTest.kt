@@ -2,12 +2,12 @@ package com.letta.mobile.ui.mascot
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import com.letta.mobile.avatar.core.AttentionInterest
-import com.letta.mobile.avatar.core.AttentionKey
-import com.letta.mobile.avatar.core.AttentionKind
-import com.letta.mobile.avatar.core.GazeReach
-import com.letta.mobile.avatar.core.GazeRect
-import com.letta.mobile.avatar.core.GazeWorld
+import com.letta.mobile.avatar.core.gaze.AttentionInterest
+import com.letta.mobile.avatar.core.gaze.AttentionKey
+import com.letta.mobile.avatar.core.gaze.AttentionKind
+import com.letta.mobile.avatar.core.gaze.GazeReach
+import com.letta.mobile.avatar.core.gaze.GazeRect
+import com.letta.mobile.avatar.core.gaze.GazeWorld
 import com.letta.mobile.data.model.AgentId
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -9,8 +9,8 @@ import app.rive.Result
 import app.rive.RiveFileSource
 import app.rive.rememberRiveFile
 import app.rive.rememberRiveWorker
-import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.MascotIdentity
 
 /**
  * The 2D mascot, rendered by Rive and driven by the director's arbitrated [state] - the bench

@@ -1,5 +1,8 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarLifecycle
+import com.letta.mobile.avatar.core.model.AvatarModel
+import com.letta.mobile.avatar.core.model.AvatarState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
