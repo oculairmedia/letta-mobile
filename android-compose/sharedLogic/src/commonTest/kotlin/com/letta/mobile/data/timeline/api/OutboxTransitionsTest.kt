@@ -1,24 +1,25 @@
-package com.letta.mobile.data.chat.outbox
+package com.letta.mobile.data.timeline.api
 
-import com.letta.mobile.data.chat.outbox.OutboxEvent.DispatchStart
-import com.letta.mobile.data.chat.outbox.OutboxEvent.Disconnected
-import com.letta.mobile.data.chat.outbox.OutboxEvent.EchoIngested
-import com.letta.mobile.data.chat.outbox.OutboxEvent.EchoTimeout
-import com.letta.mobile.data.chat.outbox.OutboxEvent.ProbeFoundEcho
-import com.letta.mobile.data.chat.outbox.OutboxEvent.ProbeNoEcho
-import com.letta.mobile.data.chat.outbox.OutboxEvent.TransportAccepted
-import com.letta.mobile.data.chat.outbox.OutboxEvent.TransportRejected
-import com.letta.mobile.data.chat.outbox.OutboxEvent.TurnSettled
-import com.letta.mobile.data.chat.outbox.OutboxEvent.UserAbort
-import com.letta.mobile.data.chat.outbox.OutboxEvent.UserDismiss
-import com.letta.mobile.data.chat.outbox.OutboxEvent.UserRetry
-import com.letta.mobile.data.chat.outbox.OutboxState.Accepted
-import com.letta.mobile.data.chat.outbox.OutboxState.Confirmed
-import com.letta.mobile.data.chat.outbox.OutboxState.Dismissed
-import com.letta.mobile.data.chat.outbox.OutboxState.Dispatching
-import com.letta.mobile.data.chat.outbox.OutboxState.Failed
-import com.letta.mobile.data.chat.outbox.OutboxState.Queued
-import com.letta.mobile.data.chat.outbox.OutboxState.Unknown
+import com.letta.mobile.data.timeline.api.OutboxEvent.DispatchStart
+import com.letta.mobile.data.timeline.api.OutboxEvent.Disconnected
+import com.letta.mobile.data.timeline.api.OutboxEvent.EchoIngested
+import com.letta.mobile.data.timeline.api.OutboxEvent.EchoTimeout
+import com.letta.mobile.data.timeline.api.OutboxEvent.ProbeFoundEcho
+import com.letta.mobile.data.timeline.api.OutboxEvent.ProbeNoEcho
+import com.letta.mobile.data.timeline.api.OutboxEvent.TransportAccepted
+import com.letta.mobile.data.timeline.api.OutboxEvent.TransportRejected
+import com.letta.mobile.data.timeline.api.OutboxEvent.TurnSettled
+import com.letta.mobile.data.timeline.api.OutboxEvent.UserAbort
+import com.letta.mobile.data.timeline.api.OutboxEvent.UserDismiss
+import com.letta.mobile.data.timeline.api.OutboxEvent.UserResendAnyway
+import com.letta.mobile.data.timeline.api.OutboxEvent.UserRetry
+import com.letta.mobile.data.timeline.api.OutboxState.Accepted
+import com.letta.mobile.data.timeline.api.OutboxState.Confirmed
+import com.letta.mobile.data.timeline.api.OutboxState.Dismissed
+import com.letta.mobile.data.timeline.api.OutboxState.Dispatching
+import com.letta.mobile.data.timeline.api.OutboxState.Failed
+import com.letta.mobile.data.timeline.api.OutboxState.Queued
+import com.letta.mobile.data.timeline.api.OutboxState.Unknown
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -27,7 +28,15 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 internal class OutboxTransitionsTest {
-    private val created = OutboxEntry.queued("otid-1", "hello", emptyList(), nowMillis = 1_000)
+    private val created = OutboxEntry(
+        otid = "otid-1",
+        content = "hello",
+        attachments = emptyList(),
+        createdAt = "2026-01-01T00:00:00Z",
+        state = Queued,
+        attempt = 0,
+        stateSinceMillis = 1_000,
+    )
 
     private fun entry(
         state: OutboxState,
@@ -74,6 +83,7 @@ internal class OutboxTransitionsTest {
         for (failed in listOf("Failed(NotAccepted)", "Failed(Unconfirmed)")) put(failed to UserDismiss, Dismissed)
         put("Failed(NotAccepted)" to UserRetry, Queued)
         put("Failed(Unconfirmed)" to UserRetry, Unknown)
+        for (failed in listOf("Failed(NotAccepted)", "Failed(Unconfirmed)")) put(failed to UserResendAnyway, Queued)
     }
 
     @Test
@@ -145,14 +155,14 @@ internal class OutboxTransitionsTest {
     @Test
     fun aRetriedOldPromptGetsAFreshEchoHorizon() {
         val horizon = 300_000L
-        val old = entry(Failed, OutboxFailure.NotAccepted).copy(createdAtMillis = 0, stateSinceMillis = 0)
+        val old = entry(Failed, OutboxFailure.NotAccepted).copy(stateSinceMillis = 0)
         val now = 10 * horizon
         val queued = old.on(UserRetry, now).applied()
         val accepted = queued.on(DispatchStart, now).applied().on(TransportAccepted, now).applied()
         val settled = accepted.on(TurnSettled, now + 1).applied()
         assertFalse(settled.echoOverdue(now + 1, horizon))
         assertTrue(settled.echoOverdue(now + 1 + horizon, horizon))
-        assertEquals(0, settled.createdAtMillis)
+        assertEquals("2026-01-01T00:00:00Z", settled.createdAt)
     }
 
     @Test
@@ -196,6 +206,10 @@ internal class OutboxTransitionsTest {
         val settled = live.map { it.copy(state = Confirmed) }
         assertEquals(OutboxAdmission.Admitted, OutboxTransitions.admit(settled, candidate, budget = 3))
         assertEquals(OutboxAdmission.AlreadyQueued, OutboxTransitions.admit(live, live[0], budget = 3))
+        val accepted = live[0].copy(state = Accepted)
+        assertEquals(OutboxAdmission.AlreadyQueued, OutboxTransitions.admit(listOf(accepted), accepted, budget = 3))
+        val failed = live[0].copy(state = Failed, failure = OutboxFailure.NotAccepted)
+        assertEquals(OutboxAdmission.AlreadyQueued, OutboxTransitions.admit(listOf(failed), failed, budget = 3))
         assertEquals(
             OutboxAdmission.IdentityConflict,
             OutboxTransitions.admit(live, live[0].copy(content = "other"), budget = 3),
@@ -217,5 +231,15 @@ internal class OutboxTransitionsTest {
         assertFailsWith<IllegalArgumentException> { entry(Queued, OutboxFailure.NotAccepted) }
         assertFailsWith<IllegalArgumentException> { entry(Queued, resendOnNoEcho = true) }
         assertFailsWith<IllegalArgumentException> { created.copy(otid = " ") }
+    }
+
+    @Test
+    fun resendAnywayQueuesEitherFailureAtTheNextAttempt() {
+        for (failure in OutboxFailure.entries) {
+            val queued = entry(Failed, failure).on(UserResendAnyway).applied()
+            assertEquals(Queued, queued.state)
+            assertEquals(1, queued.attempt)
+            assertEquals(null, queued.failure)
+        }
     }
 }

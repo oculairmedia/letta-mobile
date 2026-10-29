@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
@@ -238,7 +239,7 @@ class CanonicalTimelineEngineTest {
             override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage = error("unused")
             override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray = error("unused")
             override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
-                assertEquals("pending/local/v1", key)
+                assertTrue(key == "outbox/v2" || key == "pending/local/v1", key)
                 assertEquals(CanonicalPendingLocalStore.MAX_BYTES, maxBytes)
                 return null
             }

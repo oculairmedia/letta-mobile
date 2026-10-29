@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.outbox
+package com.letta.mobile.data.timeline.api
 
 /** Something that happened to an outbox entry. Only [OutboxTransitions.next] turns it into a state. */
 internal enum class OutboxEvent(
@@ -17,6 +17,9 @@ internal enum class OutboxEvent(
     /** The user echo with this otid was ingested. An echo always wins, whatever the attempt. */
     EchoIngested(fenced = false),
     UserRetry(fenced = false),
+
+    /** Retry that resends at once, accepting a possible duplicate when the prompt was received. */
+    UserResendAnyway(fenced = false),
     UserDismiss(fenced = false),
     UserAbort(fenced = false),
 }
@@ -119,6 +122,7 @@ internal object OutboxTransitions {
         private fun fromFailed(event: OutboxEvent) = when (event) {
             OutboxEvent.UserDismiss -> enter(OutboxState.Dismissed)
             OutboxEvent.UserRetry -> retried()
+            OutboxEvent.UserResendAnyway -> enter(OutboxState.Queued).nextAttempt()
             else -> null
         }
 

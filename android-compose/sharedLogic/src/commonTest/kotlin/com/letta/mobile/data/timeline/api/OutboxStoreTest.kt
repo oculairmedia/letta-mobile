@@ -1,10 +1,13 @@
-package com.letta.mobile.data.chat.outbox
+package com.letta.mobile.data.timeline.api
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.InMemoryTimelineStore
+import com.letta.mobile.data.timeline.OutboxStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
+import com.letta.mobile.data.serialization.LettaJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -18,40 +21,47 @@ internal class OutboxStoreTest {
     private val ledger = InMemoryTimelineStore()
     private var now = 1_000L
     private val outbox = OutboxStore(ledger) { now }
-
-    private fun prompt(otid: String, content: String = "hello") =
-        OutboxEntry.queued(otid, content, listOf(MessageContentPart.Image("aGVsbG8=", "image/png")), now)
+    private val prompt = OutboxEntry(
+        otid = "otid-1",
+        content = "hello",
+        attachments = listOf(IMAGE),
+        createdAt = SENT_AT,
+        state = OutboxState.Queued,
+        attempt = 0,
+        stateSinceMillis = now,
+    )
 
     @Test
     fun admittedPromptsSurviveARestartWithTheirAttachments() = runTest {
-        val first = prompt("otid-1")
-        assertEquals(OutboxAdmission.Admitted, outbox.enqueue(scope, first))
-        assertEquals(OutboxAdmission.AlreadyQueued, outbox.enqueue(scope, first))
-        assertEquals(OutboxAdmission.IdentityConflict, outbox.enqueue(scope, first.copy(content = "other")))
-        assertEquals(listOf(first), OutboxStore(ledger) { now }.load(scope))
+        assertEquals(OutboxAdmission.Admitted, outbox.enqueue(scope, prompt))
+        assertEquals(OutboxAdmission.AlreadyQueued, outbox.enqueue(scope, prompt))
+        assertEquals(OutboxAdmission.IdentityConflict, outbox.enqueue(scope, prompt.copy(content = "other")))
+        assertEquals(listOf(prompt), OutboxStore(ledger) { now }.load(scope))
     }
 
     @Test
     fun aFullOutboxRefusesBeforeAnythingIsWritten() = runTest {
-        repeat(OutboxTransitions.BUDGET) { assertEquals(OutboxAdmission.Admitted, outbox.enqueue(scope, prompt("otid-$it"))) }
+        repeat(OutboxTransitions.BUDGET) {
+            assertEquals(OutboxAdmission.Admitted, outbox.enqueue(scope, prompt.copy(otid = "otid-$it")))
+        }
         val revision = ledger.current.revision
-        assertEquals(OutboxAdmission.OverBudget, outbox.enqueue(scope, prompt("otid-over")))
+        assertEquals(OutboxAdmission.OverBudget, outbox.enqueue(scope, prompt.copy(otid = "otid-over")))
         assertEquals(revision, ledger.current.revision)
         assertEquals(OutboxTransitions.BUDGET, outbox.load(scope).size)
     }
 
     @Test
     fun anOversizedPromptLeavesTheOutboxUntouched() = runTest {
-        outbox.enqueue(scope, prompt("otid-1"))
+        outbox.enqueue(scope, prompt)
         assertFailsWith<IllegalArgumentException> {
-            outbox.enqueue(scope, prompt("otid-big", content = "x".repeat(OutboxStore.MAX_BYTES + 1)))
+            outbox.enqueue(scope, prompt.copy(otid = "otid-big", content = "x".repeat(OUTBOX_MAX_BYTES + 1)))
         }
         assertEquals(listOf("otid-1"), outbox.load(scope).map { it.otid })
     }
 
     @Test
     fun transitionsAreComparedAndSetByAttempt() = runTest {
-        outbox.enqueue(scope, prompt("otid-1"))
+        outbox.enqueue(scope, prompt)
         now = 2_000
         assertIs<OutboxTransition.Applied>(outbox.transition(scope, "otid-1", OutboxEvent.DispatchStart, attempt = 0))
         val stale = outbox.transition(scope, "otid-1", OutboxEvent.TransportRejected, attempt = 7)
@@ -63,8 +73,8 @@ internal class OutboxStoreTest {
 
     @Test
     fun settledEntriesAreRemovedAndLaterEventsFindNothing() = runTest {
-        outbox.enqueue(scope, prompt("otid-1"))
-        outbox.enqueue(scope, prompt("otid-2"))
+        outbox.enqueue(scope, prompt)
+        outbox.enqueue(scope, prompt.copy(otid = "otid-2"))
         outbox.transition(scope, "otid-1", OutboxEvent.EchoIngested)
         outbox.transition(scope, "otid-2", OutboxEvent.UserAbort)
         assertEquals(emptyList(), outbox.load(scope))
@@ -74,8 +84,8 @@ internal class OutboxStoreTest {
 
     @Test
     fun restartTurnsAnythingThatMayHaveLeftIntoAProbe() = runTest {
-        outbox.enqueue(scope, prompt("queued"))
-        outbox.enqueue(scope, prompt("accepted"))
+        outbox.enqueue(scope, prompt.copy(otid = "queued"))
+        outbox.enqueue(scope, prompt.copy(otid = "accepted"))
         outbox.transition(scope, "accepted", OutboxEvent.DispatchStart, attempt = 0)
         outbox.transition(scope, "accepted", OutboxEvent.TransportAccepted, attempt = 0)
         now = 9_000
@@ -87,67 +97,80 @@ internal class OutboxStoreTest {
 
     @Test
     fun theLegacyPendingStoreIsConvertedOnTheFirstWrite() = runTest {
-        val legacy = CanonicalPendingLocalStore(ledger)
-        val sending = CanonicalPendingLocalStore.Record("sending", "first", emptyList(), "1970-01-01T00:00:01Z")
-        legacy.save(scope, sending)
-        legacy.save(scope, sending.copy(otid = "failed", content = "second", sentAt = "not a time"))
-        legacy.mark(scope, "failed", CanonicalPendingLocalStore.Delivery.Failed)
+        legacy(
+            CanonicalPendingLocalStore.Record("sending", "first", emptyList(), "1970-01-01T00:00:01Z"),
+            CanonicalPendingLocalStore.Record("failed", "second", emptyList(), "not a time", CanonicalPendingLocalStore.Delivery.Failed),
+        )
         now = 5_000
 
         val read = outbox.load(scope)
-        assertEquals(listOf(OutboxState.Unknown, OutboxState.Failed), read.map { it.state })
+        assertEquals(listOf(OutboxState.Dispatching, OutboxState.Failed), read.map { it.state })
         assertEquals(listOf(null, OutboxFailure.Unconfirmed), read.map { it.failure })
-        assertEquals(listOf(1_000L, 5_000L), read.map { it.createdAtMillis })
+        assertEquals(listOf("1970-01-01T00:00:01Z", "not a time"), read.map { it.createdAt })
         assertTrue("pending/local/v1" in ledger.evidence)
 
-        outbox.recoverAfterRestart(scope)
+        val recovered = outbox.recoverAfterRestart(scope)
         assertTrue("pending/local/v1" !in ledger.evidence)
-        assertEquals(read, outbox.load(scope))
+        assertEquals(listOf(OutboxState.Unknown, OutboxState.Failed), recovered.map { it.state })
+        assertEquals(recovered, outbox.load(scope))
     }
 
     @Test
     fun anEchoIsConfirmedInsideTheTransactionThatWritesIt() = runTest {
-        outbox.enqueue(scope, prompt("otid-1"))
+        outbox.enqueue(scope, prompt)
         val revision = ledger.current.revision
-        val confirmed = ledger.transaction(scope) { OutboxStore.confirmEcho(this, "otid-1", now) }
+        val confirmed = ledger.transaction(scope) { confirmOutboxEcho(this, "otid-1", now) }
         assertTrue(confirmed)
         assertEquals(revision, ledger.current.revision)
         assertEquals(emptyList(), outbox.load(scope))
-        assertEquals(false, ledger.transaction(scope) { OutboxStore.confirmEcho(this, "otid-1", now) })
+        assertEquals(false, ledger.transaction(scope) { confirmOutboxEcho(this, "otid-1", now) })
     }
-
-    private fun stored(entries: String, version: Int = 2) =
-        ledger.putEvidence("outbox/v2", """{"version":$version,"entries":[$entries]}""".encodeToByteArray())
-
-    private fun row(otid: String, state: String = "Queued") =
-        """{"otid":"$otid","content":"hi","attachments":[],"createdAtMillis":1,"state":"$state",""" +
-            """"attempt":0,"stateSinceMillis":1}"""
 
     @Test
     fun aCorruptStoredOutboxFailsInsteadOfReadingAsEmpty() = runTest {
-        ledger.putEvidence("outbox/v2", "{not json".encodeToByteArray())
+        "{not json".storedAsOutbox()
         assertFails { outbox.load(scope) }
-        stored(row("otid-1"), version = 3)
+        encoded(prompt).replace("\"version\":2", "\"version\":3").storedAsOutbox()
         assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
-        stored(row("otid-1") + "," + row("otid-1"))
+        encoded(prompt, prompt).storedAsOutbox()
         assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
-        stored(row("otid-1", state = "Confirmed"))
+        encoded(prompt.copy(state = OutboxState.Confirmed)).storedAsOutbox()
         assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
-        stored(row("otid-1", state = "Failed"))
+        val failed = prompt.copy(state = OutboxState.Failed, failure = OutboxFailure.NotAccepted)
+        encoded(failed).replace(",\"failure\":\"NotAccepted\"", "").storedAsOutbox()
         assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
-        stored(row("otid-1"))
-        assertEquals(listOf("otid-1"), outbox.load(scope).map { it.otid })
+        encoded(prompt).storedAsOutbox()
+        assertEquals(listOf(prompt), outbox.load(scope))
     }
 
     @Test
     fun aLegacyRecordKeepsItsAttachmentsAndAttemptThroughConversion() = runTest {
-        val image = MessageContentPart.Image("aGVsbG8=", "image/png")
-        val legacy = CanonicalPendingLocalStore(ledger)
-        legacy.save(scope, CanonicalPendingLocalStore.Record("with-image", "caption", listOf(image), "2026-01-01T00:00:00Z", attempt = 3))
+        legacy(
+            CanonicalPendingLocalStore.Record(
+                "with-image", "caption", listOf(IMAGE), SENT_AT, CanonicalPendingLocalStore.Delivery.Sent, attempt = 3,
+            ),
+        )
         outbox.recoverAfterRestart(scope)
         val converted = OutboxStore(ledger) { now }.load(scope).single()
-        assertEquals(listOf(image), converted.attachments)
+        assertEquals(listOf(IMAGE), converted.attachments)
         assertEquals(3, converted.attempt)
         assertEquals(OutboxState.Unknown, converted.state)
+    }
+
+    // Stored values are written with the real serializers so a fixture cannot drift from the format.
+    private fun encoded(vararg entries: OutboxEntry): String =
+        """{"version":2,"entries":${json.encodeToString(ListSerializer(OutboxEntry.serializer()), entries.toList())}}"""
+
+    private fun String.storedAsOutbox() = ledger.putEvidence("outbox/v2", encodeToByteArray())
+
+    private fun legacy(vararg records: CanonicalPendingLocalStore.Record) {
+        val list = json.encodeToString(ListSerializer(CanonicalPendingLocalStore.Record.serializer()), records.toList())
+        ledger.putEvidence("pending/local/v1", """{"version":1,"records":$list}""".encodeToByteArray())
+    }
+
+    private companion object {
+        const val SENT_AT = "2026-01-01T00:00:00Z"
+        val IMAGE = MessageContentPart.Image("aGVsbG8=", "image/png")
+        val json = LettaJson.persisted
     }
 }

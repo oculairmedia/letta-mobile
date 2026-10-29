@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.outbox
+package com.letta.mobile.data.timeline.api
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.PendingImageSerializer
@@ -50,16 +50,16 @@ internal enum class OutboxFailure {
 }
 
 /**
- * One outbound prompt. [createdAtMillis] only orders rows; every timer reads [stateSinceMillis],
- * so a retried old prompt gets a fresh echo horizon. [attempt] fences events: an event carrying
- * another attempt is stale and does not apply.
+ * One outbound prompt. [createdAt] (the send time as sent, ISO-8601) only places the row; every
+ * timer reads [stateSinceMillis], so a retried old prompt gets a fresh echo horizon. [attempt]
+ * fences events: an event carrying another attempt is stale and does not apply.
  */
 @Serializable
 internal data class OutboxEntry(
     val otid: String,
     val content: String,
     val attachments: List<@Serializable(with = PendingImageSerializer::class) MessageContentPart.Image>,
-    val createdAtMillis: Long,
+    val createdAt: String,
     val state: OutboxState,
     val attempt: Long,
     val stateSinceMillis: Long,
@@ -104,22 +104,6 @@ internal data class OutboxEntry(
             OutboxState.Dispatching,
             OutboxState.Accepted,
             OutboxState.Unknown,
-        )
-
-        /** A new prompt, admitted before any transport call. */
-        fun queued(
-            otid: String,
-            content: String,
-            attachments: List<MessageContentPart.Image>,
-            nowMillis: Long,
-        ): OutboxEntry = OutboxEntry(
-            otid = otid,
-            content = content,
-            attachments = attachments,
-            createdAtMillis = nowMillis,
-            state = OutboxState.Queued,
-            attempt = 0,
-            stateSinceMillis = nowMillis,
         )
     }
 }
