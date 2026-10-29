@@ -1,48 +1,30 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.local.AgentDao
-import com.letta.mobile.data.local.AgentEntity
-import com.letta.mobile.data.local.ConversationDao
-import com.letta.mobile.data.local.ConversationEntity
-import com.letta.mobile.data.local.ConversationRefreshEntity
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeMcpServerApi
-import com.letta.mobile.testutil.FakeModelApi
-import com.letta.mobile.testutil.FakePassageApi
-import com.letta.mobile.testutil.FakeProjectApi
-import com.letta.mobile.testutil.FakeProjectWorkApi
-import com.letta.mobile.testutil.FakeProviderApi
-import com.letta.mobile.testutil.FakeRunApi
-import com.letta.mobile.testutil.FakeScheduleApi
 import com.letta.mobile.testutil.FakeSettingsRepository
-import com.letta.mobile.testutil.FakeStepApi
-import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
-import io.mockk.mockk
+import io.mockk.coEvery
+import io.mockk.spyk
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-
-// letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because
-// production constructor now takes Lazy<AgentDao> / Lazy<ConversationDao>.
-private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 class SessionScopedAllConversationsRepositoryTest {
 
     @Test
@@ -125,29 +107,27 @@ class SessionScopedAllConversationsRepositoryTest {
         // fires because a fresh rebuild lands mid-operation; after
         // MAX_SESSION_SWITCH_RETRIES the refresh must stop and throw explicitly.
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val fakeConversationApi = FakeConversationApi().apply {
+        val fakeConversationApi = BarrierConversationApi {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", summary = "Backend A"))
-            listDelayMillis = 200L
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi.remote, dispatcher)
+        fakeConversationApi.currentGraph = { sessionManager.current }
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
         var error: Throwable? = null
         val refreshJob = launch { error = runCatching { conversationsProxy.refresh() }.exceptionOrNull() }
-        // three attempts, each interrupted mid-flight by a fresh rebuild
-        advanceTimeBy(1)
-        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
-        advanceTimeBy(1)
-        advanceTimeBy(201)
-        settingsRepository.activeConfigState.value = sessionTestConfig("backend-c")
-        advanceTimeBy(1)
-        advanceTimeBy(201)
-        settingsRepository.activeConfigState.value = sessionTestConfig("backend-d")
-        advanceTimeBy(1)
-        advanceTimeBy(201)
-        advanceUntilIdle()
+        var expectedGraph = sessionManager.current
+        for (backend in listOf("backend-b", "backend-c", "backend-d")) {
+            val attempt = fakeConversationApi.started.receive()
+            assertSame(expectedGraph, attempt.graph)
+            settingsRepository.activeConfigState.value = sessionTestConfig(backend)
+            expectedGraph = sessionManager.currentGraph.first { it !== attempt.graph }
+            assertNotSame(attempt.graph, expectedGraph)
+            attempt.release.complete(Unit)
+            assertNull(attempt.completed.await())
+        }
         refreshJob.join()
 
         assertTrue(error is IllegalStateException)
@@ -155,7 +135,7 @@ class SessionScopedAllConversationsRepositoryTest {
             "Session graph kept switching; refresh abandoned after 3 attempts",
             error?.message,
         )
-        assertEquals(3, fakeConversationApi.calls.count { it == "listConversations" })
+        assertEquals(3, fakeConversationApi.remote.calls.count { it == "listConversations" })
     }
 
     /** What a refresh still in flight when the backend switches (failing [staleTransportErrors] times) ends with. */
@@ -163,36 +143,50 @@ class SessionScopedAllConversationsRepositoryTest {
 
     private suspend fun TestScope.refreshAcrossARebuild(staleTransportErrors: Int): RebuildRefresh {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val fakeConversationApi = FakeConversationApi().apply {
+        val fakeConversationApi = BarrierConversationApi {
             conversations = mutableListOf(TestData.conversation(id = "conv-b", summary = "Backend B"))
-            listDelayMillis = 50L
             staleTransportIaeCountdown = staleTransportErrors
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi.remote, dispatcher)
+        fakeConversationApi.currentGraph = { sessionManager.current }
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
+        val oldGraph = sessionManager.current
         var error: Throwable? = null
         val refreshJob = launch { error = runCatching { conversationsProxy.refresh() }.exceptionOrNull() }
-        advanceTimeBy(1)
+        val firstAttempt = fakeConversationApi.started.receive()
+        assertSame(oldGraph, firstAttempt.graph)
         settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
-        advanceTimeBy(1)
-        advanceUntilIdle()
+        val rebuiltGraph = sessionManager.currentGraph.first { it !== oldGraph }
+        assertNotSame(oldGraph, rebuiltGraph)
+        firstAttempt.release.complete(Unit)
+        val oldError = firstAttempt.completed.await()
+        if (staleTransportErrors == 0) {
+            assertNull(oldError)
+        } else {
+            assertTrue(oldError is IllegalStateException)
+            assertEquals("admin_rpc is not supported by this transport", oldError?.message)
+        }
+        val retry = fakeConversationApi.started.receive()
+        assertSame(rebuiltGraph, retry.graph)
+        retry.release.complete(Unit)
+        assertNull(retry.completed.await())
         refreshJob.join()
         return RebuildRefresh(
             error = error,
             listed = conversationsProxy.conversations.value.map { it.id.value },
-            listCalls = fakeConversationApi.calls.count { it == "listConversations" },
+            listCalls = fakeConversationApi.remote.calls.count { it == "listConversations" },
         )
     }
 }
 
 /**
- * A session manager over [conversationApi]. fyo4s: the list reads its roster's agents' conversations, and
+ * A session manager over [conversationApi]: the list reads its roster's agents' conversations, and
  * every test conversation is TestData's agent's, so the roster has that agent.
  */
-private fun sessionManager(
+private fun TestScope.sessionManager(
     settingsRepository: FakeSettingsRepository,
     conversationApi: FakeConversationApi,
     dispatcher: kotlinx.coroutines.CoroutineDispatcher,
@@ -201,6 +195,38 @@ private fun sessionManager(
     sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
         agentApi = FakeAgentApi().apply { agents = mutableListOf(TestData.agent()) }
         this.conversationApi = conversationApi
+        graphParentScope = { backgroundScope }
     },
-    managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+    managerScope = CoroutineScope(backgroundScope.coroutineContext + dispatcher),
 )
+
+/** Holds each real remote invocation until the test has observed the graph publication. */
+private class BarrierConversationApi(configure: FakeConversationApi.() -> Unit) {
+    class Attempt(val graph: SessionGraph) {
+        val release = CompletableDeferred<Unit>()
+        val completed = CompletableDeferred<Throwable?>()
+    }
+
+    lateinit var currentGraph: () -> SessionGraph
+    val started = Channel<Attempt>(Channel.UNLIMITED)
+    val remote = spyk(FakeConversationApi().apply(configure))
+
+    init {
+        coEvery { remote.listConversations(any(), any(), any(), any(), any(), any(), any()) } coAnswers {
+            val attempt = Attempt(currentGraph())
+            started.send(attempt)
+            try {
+                attempt.release.await()
+                val result = callOriginal()
+                attempt.completed.complete(null)
+                result
+            } catch (error: CancellationException) {
+                attempt.completed.complete(error)
+                throw error
+            } catch (error: Throwable) {
+                attempt.completed.complete(error)
+                throw error
+            }
+        }
+    }
+}
