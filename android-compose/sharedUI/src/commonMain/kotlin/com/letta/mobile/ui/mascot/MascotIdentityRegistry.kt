@@ -12,10 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import com.letta.mobile.avatar.core.AttentionKey
-import com.letta.mobile.avatar.core.AttentionRect
-import com.letta.mobile.avatar.core.GazeRect
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.gaze.AttentionKey
+import com.letta.mobile.avatar.core.gaze.AttentionRect
+import com.letta.mobile.avatar.core.gaze.GazeRect
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
 
 /**

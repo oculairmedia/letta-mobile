@@ -38,7 +38,7 @@ import com.letta.mobile.ui.mascot.MascotHost
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.MascotTransport
 import com.letta.mobile.ui.mascot.MascotTransportLayer
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import androidx.compose.runtime.CompositionLocalProvider
 import java.awt.image.BufferedImage
 import java.io.File

@@ -1,5 +1,7 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.gaze.GazeDirector
+
 /**
  * Head facing in -1..1 on each axis. This is a mascot-specific channel the
  * [GazeDirector] writes after the eyes have led; it is not an [AvatarRuntime]

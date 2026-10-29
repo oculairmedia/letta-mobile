@@ -36,8 +36,8 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.avatar.core.AttentionKey
-import com.letta.mobile.avatar.core.AttentionKind
+import com.letta.mobile.avatar.core.gaze.AttentionKey
+import com.letta.mobile.avatar.core.gaze.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.tools.ToolInset

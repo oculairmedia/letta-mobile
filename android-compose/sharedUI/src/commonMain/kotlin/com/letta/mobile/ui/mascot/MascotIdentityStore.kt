@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.mascot
 
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.model.Agent
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive

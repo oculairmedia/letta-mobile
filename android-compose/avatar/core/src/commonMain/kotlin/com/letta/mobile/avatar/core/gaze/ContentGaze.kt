@@ -1,4 +1,6 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
+
+import com.letta.mobile.avatar.core.model.AvatarState
 
 /**
  * Where the mascot looks relative to the content it is writing (letta-mobile-bglj6.1, device

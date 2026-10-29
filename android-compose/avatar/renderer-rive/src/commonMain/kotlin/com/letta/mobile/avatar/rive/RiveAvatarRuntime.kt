@@ -1,22 +1,22 @@
 package com.letta.mobile.avatar.rive
 
-import com.letta.mobile.avatar.core.AvatarCameraFraming
-import com.letta.mobile.avatar.core.AvatarCapabilities
-import com.letta.mobile.avatar.core.AvatarExpression
-import com.letta.mobile.avatar.core.AvatarGesture
+import com.letta.mobile.avatar.core.model.AvatarCameraFraming
+import com.letta.mobile.avatar.core.model.AvatarCapabilities
+import com.letta.mobile.avatar.core.model.AvatarExpression
+import com.letta.mobile.avatar.core.model.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarHeadTurn
-import com.letta.mobile.avatar.core.AvatarLookTarget
-import com.letta.mobile.avatar.core.AvatarModel
-import com.letta.mobile.avatar.core.AvatarReaction
-import com.letta.mobile.avatar.core.Hover
-import com.letta.mobile.avatar.core.ListenLevel
-import com.letta.mobile.avatar.core.MascotMotion
-import com.letta.mobile.avatar.core.MotionPreference
-import com.letta.mobile.avatar.core.Petting
-import com.letta.mobile.avatar.core.ReactionArg
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
+import com.letta.mobile.avatar.core.model.AvatarModel
+import com.letta.mobile.avatar.core.model.AvatarReaction
+import com.letta.mobile.avatar.core.model.Hover
+import com.letta.mobile.avatar.core.model.ListenLevel
+import com.letta.mobile.avatar.core.model.MascotMotion
+import com.letta.mobile.avatar.core.model.MotionPreference
+import com.letta.mobile.avatar.core.model.Petting
+import com.letta.mobile.avatar.core.model.ReactionArg
 import com.letta.mobile.avatar.core.AvatarRuntime
 import com.letta.mobile.avatar.core.AvatarRuntimeState
-import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.model.AvatarState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -100,7 +100,7 @@ class RiveAvatarRuntime(
 
     /**
      * The head turning toward the gaze, -1..1 on each axis. [AvatarHeadTurn]
-     * is a mascot-specific channel the [com.letta.mobile.avatar.core.GazeDirector]
+     * is a mascot-specific channel the [com.letta.mobile.avatar.core.gaze.GazeDirector]
      * writes after the eyes have led; it is not an [AvatarRuntime] command.
      */
     override fun setHeadTurn(turnX: Float, turnY: Float) {

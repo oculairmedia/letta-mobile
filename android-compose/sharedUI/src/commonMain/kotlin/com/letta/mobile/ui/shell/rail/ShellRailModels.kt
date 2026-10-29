@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell.rail
 
 import androidx.compose.runtime.Immutable
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.model.DisplayNames
 import kotlin.time.Instant

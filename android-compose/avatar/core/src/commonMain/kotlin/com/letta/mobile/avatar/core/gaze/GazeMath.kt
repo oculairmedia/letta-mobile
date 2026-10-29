@@ -1,5 +1,6 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
 
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
 import kotlin.math.sqrt
 
 /** Axis-aligned surface in the same space as a pointer (window or stage pixels). */

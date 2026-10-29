@@ -927,7 +927,6 @@
   ],
   "defaultTypeLimit": 50,
   "packageTypeLimits": {
-    "com.letta.mobile.avatar.core": 121,
     "com.letta.mobile.cli.commands": 80,
     "com.letta.mobile.data.a2ui": 60,
     "com.letta.mobile.data.canvas": 422,

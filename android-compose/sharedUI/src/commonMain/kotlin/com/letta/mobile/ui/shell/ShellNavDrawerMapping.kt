@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.shell
 
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput

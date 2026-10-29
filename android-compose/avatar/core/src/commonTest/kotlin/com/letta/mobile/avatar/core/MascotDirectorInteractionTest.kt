@@ -1,5 +1,7 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarModel
+import com.letta.mobile.avatar.core.model.AvatarReaction
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test

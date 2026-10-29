@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.avatar.core.HeadlessAvatarRuntime
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotShape
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.ui.mascot.LocalMascotHost

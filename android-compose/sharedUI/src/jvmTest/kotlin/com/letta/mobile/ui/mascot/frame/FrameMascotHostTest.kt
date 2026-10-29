@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.mascot.frame
 
 import androidx.compose.ui.unit.IntSize
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveWrite
 import com.letta.mobile.avatar.rive.RiveWriteSink

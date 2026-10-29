@@ -28,8 +28,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import com.letta.mobile.avatar.core.MascotEntrance
-import com.letta.mobile.avatar.core.MascotBodyTune
+import com.letta.mobile.avatar.core.body.MascotEntrance
+import com.letta.mobile.avatar.core.body.MascotBodyTune
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable

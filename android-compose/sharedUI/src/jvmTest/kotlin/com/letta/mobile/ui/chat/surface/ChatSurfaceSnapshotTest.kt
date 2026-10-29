@@ -31,7 +31,7 @@ import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.ui.mascot.FakeMascotHost
 import com.letta.mobile.ui.mascot.FakeMascotShell
 import com.letta.mobile.ui.mascot.LocalMascotHost

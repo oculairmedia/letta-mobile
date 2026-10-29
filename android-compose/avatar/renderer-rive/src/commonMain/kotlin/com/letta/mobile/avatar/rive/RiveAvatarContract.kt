@@ -1,9 +1,9 @@
 package com.letta.mobile.avatar.rive
 
-import com.letta.mobile.avatar.core.AvatarReaction
-import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.AvatarReaction
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotShape
 
 /**
  * The names a `.riv` mascot must expose for this renderer to drive it.
@@ -310,7 +310,7 @@ class RiveWriteSink(private val onWrite: (RiveWrite) -> Unit) : RiveInputSink {
 }
 
 /** The mascot this module ships: a raw resource on Android, a classpath resource on desktop. */
-val MASCOT_MODEL: com.letta.mobile.avatar.core.AvatarModel = com.letta.mobile.avatar.core.AvatarModel(
+val MASCOT_MODEL: com.letta.mobile.avatar.core.model.AvatarModel = com.letta.mobile.avatar.core.model.AvatarModel(
     id = "letta-mascot",
     displayName = "Letta Mascot",
     uri = "res://raw/mascot.riv",

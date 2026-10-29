@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.model
 
 import kotlin.jvm.JvmInline
 
