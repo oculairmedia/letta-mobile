@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentIdNamespace
 import computer.iroh.EndpointId
 import computer.iroh.SecretKey
@@ -73,6 +74,24 @@ class IrohAgentIdentity private constructor(
             return IrohAgentIdentity(agentId, bytes, nodeIdHex)
         }
 
+        /**
+         * The node id this host holds for [agent] in [dir], or null when it holds none. Read-only:
+         * unlike [loadOrCreate] it never creates a key, so a sender named on the wire cannot mint
+         * itself an identity. The id is canonicalized like [loadOrCreate], and one that is not a
+         * plain identifier (a path, say) matches nothing.
+         */
+        internal fun knownNodeIdHex(agent: AgentId, dir: File): String? {
+            val canonical = AgentIdNamespace.normalizeToBareId(agent.value)
+            if (!SAFE_IDENTITY_NAME.matches(canonical)) return null
+            val file = File(dir, "$canonical.json")
+            if (!file.isFile) return null
+            return runCatching {
+                parse(file.readText())?.let { nodeIdHexFromSecret(Base64.getDecoder().decode(it)) }
+            }.getOrNull()
+        }
+
+        private val SAFE_IDENTITY_NAME = Regex("[A-Za-z0-9][A-Za-z0-9_-]*")
+
         private fun nodeIdHexFromSecret(secretBytes: ByteArray): String {
             SecretKey.fromBytes(secretBytes).use { key ->
                 val endpointId: EndpointId = key.public()
@@ -106,3 +125,12 @@ class IrohAgentIdentity private constructor(
         }
     }
 }
+
+/**
+ * Whether [peer], the node that dialed in (as `IrohDiagnostics.endpointIdHex` renders it), is the
+ * identity this host holds in [identityDir] for this message's claimed sender. The a2a receiver's
+ * sender authentication: every sender dials with its own persisted identity, so a node claiming an
+ * agent it does not hold the key for, or an agent this host holds no identity for, does not match.
+ */
+fun IrohAgentMessage.isFromIdentityIn(identityDir: File, peer: String): Boolean =
+    IrohAgentIdentity.knownNodeIdHex(AgentId(fromAgentId), identityDir)?.equals(peer, ignoreCase = true) == true
