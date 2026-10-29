@@ -263,8 +263,15 @@ class GazeDirector(
         val base = aimBase(next, world)
         val free = pointerDemands(world.mode)
         val look = wantLook(base, free)
-        val snap = snapHead && !free && next == desiredTarget
+        val snap = headSnapDue(next, free)
         if (!snap && sameFixation(next, base, look, free)) return
+        applyFixation(next, base, look, free, snap)
+    }
+
+    /** A pending cue's head snap fires with its own plan fixation, never with a pointer demand. */
+    private fun headSnapDue(next: GazeTarget, free: Boolean): Boolean = snapHead && !free && next == desiredTarget
+
+    private fun applyFixation(next: GazeTarget, base: GazePoint, look: GazePoint, free: Boolean, snap: Boolean) {
         target = next
         fixationBase = base
         fixationLook = look
