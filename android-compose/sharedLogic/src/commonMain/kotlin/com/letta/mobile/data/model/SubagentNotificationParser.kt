@@ -16,27 +16,28 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     val usage = block.xmlTag("usage")
     val result = block.xmlTag("result")
     return UiSubagentNotification(
-        toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
+        toolCallId = block.firstTag("tool_call_id", "toolCallId"),
         status = block.notificationStatus(),
         summary = block.xmlTag("summary"),
         result = result,
         usage = usage,
         durationMs = usage?.durationMillisFromUsage(),
         transcriptUri = block.xmlTag("transcript")
-            ?: tail.lineAfter("Full transcript available at")
-            ?: tail.lineAfter("Full transcript at")
-            ?: tail.lineAfter("Full transcript:")
-            ?: block.lineAfter("Full transcript available at")
-            ?: block.lineAfter("Full transcript at")
-            ?: block.lineAfter("Full transcript:"),
-        taskId = block.xmlTag("task-id") ?: block.xmlTag("task_id") ?: block.xmlTag("taskId"),
+            ?: listOf(tail, block).firstNotNullOfOrNull { text -> TRANSCRIPT_MARKERS.firstNotNullOfOrNull(text::lineAfter) },
+        taskId = block.firstTag("task-id", "task_id", "taskId"),
         subagentAgentId = block.notificationAgentId(result),
     )
 }
 
+/** Where a transcript path follows the block, most specific first. */
+private val TRANSCRIPT_MARKERS = listOf("Full transcript available at", "Full transcript at", "Full transcript:")
+
 /** The block's status; a Monitor event carries none, and is not a completion. */
 private fun String.notificationStatus(): String =
-    xmlTag("status") ?: xmlTag("state") ?: if (xmlTag("event") != null) MONITOR_EVENT_STATUS else "completed"
+    firstTag("status", "state") ?: if (xmlTag("event") != null) MONITOR_EVENT_STATUS else "completed"
+
+/** The first of [names] the block carries. */
+private fun String.firstTag(vararg names: String): String? = names.firstNotNullOfOrNull { xmlTag(it) }
 
 private fun String.notificationAgentId(result: String?): String? =
     xmlTag("agent_id") ?: xmlTag("agentId")
