@@ -1,8 +1,8 @@
-package com.letta.mobile.data.chat.outbox
+package com.letta.mobile.data.timeline.api
 
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.InMemoryTimelineStore
+import com.letta.mobile.data.timeline.OutboxStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -20,7 +20,7 @@ internal class OutboxStoreTest {
     private val outbox = OutboxStore(ledger) { now }
 
     private fun prompt(otid: String, content: String = "hello") =
-        OutboxEntry.queued(otid, content, listOf(MessageContentPart.Image("aGVsbG8=", "image/png")), now)
+        OutboxEntry.queued(otid, content, listOf(MessageContentPart.Image("aGVsbG8=", "image/png")), SENT_AT, now)
 
     @Test
     fun admittedPromptsSurviveARestartWithTheirAttachments() = runTest {
@@ -44,7 +44,7 @@ internal class OutboxStoreTest {
     fun anOversizedPromptLeavesTheOutboxUntouched() = runTest {
         outbox.enqueue(scope, prompt("otid-1"))
         assertFailsWith<IllegalArgumentException> {
-            outbox.enqueue(scope, prompt("otid-big", content = "x".repeat(OutboxStore.MAX_BYTES + 1)))
+            outbox.enqueue(scope, prompt("otid-big", content = "x".repeat(OUTBOX_MAX_BYTES + 1)))
         }
         assertEquals(listOf("otid-1"), outbox.load(scope).map { it.otid })
     }
@@ -87,40 +87,44 @@ internal class OutboxStoreTest {
 
     @Test
     fun theLegacyPendingStoreIsConvertedOnTheFirstWrite() = runTest {
-        val legacy = CanonicalPendingLocalStore(ledger)
-        val sending = CanonicalPendingLocalStore.Record("sending", "first", emptyList(), "1970-01-01T00:00:01Z")
-        legacy.save(scope, sending)
-        legacy.save(scope, sending.copy(otid = "failed", content = "second", sentAt = "not a time"))
-        legacy.mark(scope, "failed", CanonicalPendingLocalStore.Delivery.Failed)
+        legacy(legacyRecord("sending", "Sending", "1970-01-01T00:00:01Z") + "," + legacyRecord("failed", "Failed", "not a time"))
         now = 5_000
 
         val read = outbox.load(scope)
-        assertEquals(listOf(OutboxState.Unknown, OutboxState.Failed), read.map { it.state })
+        assertEquals(listOf(OutboxState.Dispatching, OutboxState.Failed), read.map { it.state })
         assertEquals(listOf(null, OutboxFailure.Unconfirmed), read.map { it.failure })
-        assertEquals(listOf(1_000L, 5_000L), read.map { it.createdAtMillis })
+        assertEquals(listOf("1970-01-01T00:00:01Z", "not a time"), read.map { it.createdAt })
         assertTrue("pending/local/v1" in ledger.evidence)
 
-        outbox.recoverAfterRestart(scope)
+        val recovered = outbox.recoverAfterRestart(scope)
         assertTrue("pending/local/v1" !in ledger.evidence)
-        assertEquals(read, outbox.load(scope))
+        assertEquals(listOf(OutboxState.Unknown, OutboxState.Failed), recovered.map { it.state })
+        assertEquals(recovered, outbox.load(scope))
     }
+
+    private fun legacy(records: String) =
+        ledger.putEvidence("pending/local/v1", """{"version":1,"records":[$records]}""".encodeToByteArray())
+
+    private fun legacyRecord(otid: String, delivery: String, sentAt: String, attachments: String = "", attempt: Int = 0) =
+        """{"otid":"$otid","content":"c-$otid","attachments":[$attachments],"sentAt":"$sentAt",""" +
+            """"delivery":"$delivery","attempt":$attempt}"""
 
     @Test
     fun anEchoIsConfirmedInsideTheTransactionThatWritesIt() = runTest {
         outbox.enqueue(scope, prompt("otid-1"))
         val revision = ledger.current.revision
-        val confirmed = ledger.transaction(scope) { OutboxStore.confirmEcho(this, "otid-1", now) }
+        val confirmed = ledger.transaction(scope) { confirmOutboxEcho(this, "otid-1", now) }
         assertTrue(confirmed)
         assertEquals(revision, ledger.current.revision)
         assertEquals(emptyList(), outbox.load(scope))
-        assertEquals(false, ledger.transaction(scope) { OutboxStore.confirmEcho(this, "otid-1", now) })
+        assertEquals(false, ledger.transaction(scope) { confirmOutboxEcho(this, "otid-1", now) })
     }
 
     private fun stored(entries: String, version: Int = 2) =
         ledger.putEvidence("outbox/v2", """{"version":$version,"entries":[$entries]}""".encodeToByteArray())
 
     private fun row(otid: String, state: String = "Queued") =
-        """{"otid":"$otid","content":"hi","attachments":[],"createdAtMillis":1,"state":"$state",""" +
+        """{"otid":"$otid","content":"hi","attachments":[],"createdAt":"$SENT_AT","state":"$state",""" +
             """"attempt":0,"stateSinceMillis":1}"""
 
     @Test
@@ -142,12 +146,15 @@ internal class OutboxStoreTest {
     @Test
     fun aLegacyRecordKeepsItsAttachmentsAndAttemptThroughConversion() = runTest {
         val image = MessageContentPart.Image("aGVsbG8=", "image/png")
-        val legacy = CanonicalPendingLocalStore(ledger)
-        legacy.save(scope, CanonicalPendingLocalStore.Record("with-image", "caption", listOf(image), "2026-01-01T00:00:00Z", attempt = 3))
+        legacy(legacyRecord("with-image", "Sent", SENT_AT, """{"base64":"aGVsbG8=","mediaType":"image/png"}""", attempt = 3))
         outbox.recoverAfterRestart(scope)
         val converted = OutboxStore(ledger) { now }.load(scope).single()
         assertEquals(listOf(image), converted.attachments)
         assertEquals(3, converted.attempt)
         assertEquals(OutboxState.Unknown, converted.state)
+    }
+
+    private companion object {
+        const val SENT_AT = "2026-01-01T00:00:00Z"
     }
 }

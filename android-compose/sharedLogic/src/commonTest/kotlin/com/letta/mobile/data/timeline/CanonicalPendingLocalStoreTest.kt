@@ -8,6 +8,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlinx.datetime.Instant
 
 class CanonicalPendingLocalStoreTest {
     @Test fun optimisticProjectionPreservesDeliveryAndAttachments() {
@@ -70,7 +72,7 @@ class CanonicalPendingLocalStoreTest {
         assertEquals(listOf(record), pending.load(scope))
     }
 
-    @Test fun lostSendingAndSentRecordsBothRemainRetryableAndLateSentCannotUndoFailure() = runTest {
+    @Test fun lostSendingAndSentRecordsBothRemainRetryableAndOnlyRetryRevivesAFailure() = runTest {
         val pending = CanonicalPendingLocalStore(Store())
         val scope = TimelineScope("backend", "conversation")
         val sending = CanonicalPendingLocalStore.Record("sending", "first", emptyList(), "2026-01-01T00:00:00Z")
@@ -78,14 +80,35 @@ class CanonicalPendingLocalStoreTest {
         pending.save(scope, sending)
         pending.save(scope, sent)
         pending.mark(scope, sent.otid, CanonicalPendingLocalStore.Delivery.Sent)
-        assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), parseTimelineInstant("2026-01-01T00:10:00Z")))
+        assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), minutesFromNow(10)))
+        // Neither a late Sent nor a Sending report undoes a failure.
         pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sending)
         assertEquals(listOf(sending.otid, sent.otid), pending.load(scope).map { it.otid })
         assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Failed, CanonicalPendingLocalStore.Delivery.Failed),
             pending.load(scope).map { it.delivery })
-        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sending)
-        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        // An explicit retry revives it at the next attempt, whose transport outcome then applies.
+        val retry = assertNotNull(pending.retry(scope, sending.otid))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, retry.delivery)
+        assertEquals(1L, retry.attempt)
+        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 0)
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, pending.load(scope).first().delivery)
+        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 1)
         assertEquals(CanonicalPendingLocalStore.Delivery.Sent, pending.load(scope).first().delivery)
+    }
+
+    @Test fun aRetriedOldPromptAwaitsItsEchoFromTheRetryNotFromItsFirstSend() = runTest {
+        val pending = CanonicalPendingLocalStore(Store())
+        val scope = TimelineScope("backend", "conversation")
+        val old = CanonicalPendingLocalStore.Record("old", "prompt", emptyList(), "2026-01-01T00:00:00Z")
+        pending.save(scope, old)
+        pending.mark(scope, old.otid, CanonicalPendingLocalStore.Delivery.Failed)
+        assertNotNull(pending.retry(scope, old.otid))
+        pending.mark(scope, old.otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 1)
+        assertEquals(0, pending.retireLostEchoes(scope, pending.load(scope), minutesFromNow(1)))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, pending.load(scope).single().delivery)
+        assertEquals(1, pending.retireLostEchoes(scope, pending.load(scope), minutesFromNow(10)))
+        assertEquals("2026-01-01T00:00:00Z", pending.load(scope).single().sentAt)
     }
 
     @Test fun horizonRetiresAbandonedSendsButPreservesActiveDispatchesAndRetries() = runTest {
@@ -99,7 +122,7 @@ class CanonicalPendingLocalStoreTest {
         var active = true
         dispatchOwners.retain(scope.backendId, scope.conversationId, "active") { active }
         dispatchOwners.retain(scope.backendId, scope.conversationId, "retry") { active }
-        val now = parseTimelineInstant("2026-01-01T00:10:00Z")
+        val now = minutesFromNow(10)
         assertEquals(1, pending.retireLostEchoes(scope, pending.load(scope), now))
         assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Sending, CanonicalPendingLocalStore.Delivery.Sending,
             CanonicalPendingLocalStore.Delivery.Failed), pending.load(scope).map { it.delivery })
@@ -107,8 +130,34 @@ class CanonicalPendingLocalStoreTest {
         assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), now))
     }
 
+    @Test fun anOlderPendingStoreIsReadAndReplacedOnTheFirstWrite() = runTest {
+        val ledger = Store()
+        val scope = TimelineScope("backend", "conversation")
+        val legacy = """{"version":1,"records":[{"otid":"legacy","content":"hi","attachments":[],""" +
+            """"sentAt":"2026-01-01T00:00:00Z","delivery":"Sent","attempt":2}]}"""
+        ledger.seed(scope, "pending/local/v1", legacy.encodeToByteArray())
+        val pending = CanonicalPendingLocalStore(ledger)
+        val expected = CanonicalPendingLocalStore.Record(
+            "legacy", "hi", emptyList(), "2026-01-01T00:00:00Z", CanonicalPendingLocalStore.Delivery.Sent, attempt = 2,
+        )
+        assertEquals(listOf(expected), pending.load(scope))
+        pending.save(scope, expected.copy(otid = "new", delivery = CanonicalPendingLocalStore.Delivery.Sending, attempt = 0))
+        assertEquals(null, ledger.value(scope, "pending/local/v1"))
+        assertEquals(listOf("legacy", "new"), pending.load(scope).map { it.otid })
+        assertEquals(expected, pending.load(scope).first())
+    }
+
+    private fun minutesFromNow(minutes: Long): TimelineInstant =
+        parseTimelineInstant(Instant.fromEpochMilliseconds(timelineCurrentTimeMillis() + minutes * 60_000L).toString())
+
     private class Store : TimelineBoundedStore {
         private val values = mutableMapOf<TimelineScope, MutableMap<String, ByteArray>>()
+
+        fun seed(scope: TimelineScope, key: String, value: ByteArray) {
+            values.getOrPut(scope) { mutableMapOf() }[key] = value
+        }
+
+        fun value(scope: TimelineScope, key: String): ByteArray? = values[scope]?.get(key)
         private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()
         override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
             block(Transaction(values[scope].orEmpty().toMutableMap(), tools[scope]?.snapshot() ?: TestToolIndexState()))

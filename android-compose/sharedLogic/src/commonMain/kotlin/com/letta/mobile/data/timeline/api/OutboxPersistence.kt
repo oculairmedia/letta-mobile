@@ -1,0 +1,120 @@
+package com.letta.mobile.data.timeline.api
+
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
+import com.letta.mobile.data.timeline.TimelineStoreReader
+import com.letta.mobile.data.timeline.TimelineStoreTransaction
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/** Live entries are capped by [OutboxTransitions.BUDGET]; this caps their encoded size. */
+internal const val OUTBOX_MAX_BYTES: Int = 2 * 1024 * 1024
+
+private const val OUTBOX_KEY = "outbox/v2"
+private const val LEGACY_OUTBOX_KEY = "pending/local/v1"
+private const val OUTBOX_VERSION = 2
+
+// The timeline snapshot codec's settings, without importing the snapshot package into this one.
+private val outboxJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
+
+@Serializable
+private data class OutboxEnvelope(val version: Int = OUTBOX_VERSION, val entries: List<OutboxEntry>)
+
+@Serializable
+private data class LegacyOutboxEnvelope(val version: Int = 1, val records: List<CanonicalPendingLocalStore.Record>)
+
+/** The entries with [otid] replaced by [next], or removed when [next] is settled. */
+internal fun List<OutboxEntry>.replacing(otid: String, next: OutboxEntry): List<OutboxEntry> =
+    if (next.state.isTerminal) filterNot { it.otid == otid } else map { if (it.otid == otid) next else it }
+
+/** The conversation's outbox; an older pending store's value reads as converted. */
+internal suspend fun TimelineStoreReader.readOutbox(nowMillis: Long): List<OutboxEntry> {
+    val bytes = evidence(OUTBOX_KEY, OUTBOX_MAX_BYTES) ?: return readLegacyOutbox(nowMillis)
+    require(bytes.size <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
+    val envelope = outboxJson.decodeFromString(OutboxEnvelope.serializer(), bytes.decodeToString())
+    require(envelope.version == OUTBOX_VERSION) { "Unsupported outbox version" }
+    return envelope.entries.also(::validateOutbox)
+}
+
+/**
+ * Encodes [entries] (null when there are none), checking every budget, so a caller can refuse an
+ * oversized prompt before anything leaves this device.
+ */
+internal fun encodeOutbox(entries: List<OutboxEntry>): ByteArray? {
+    if (entries.isEmpty()) return null
+    validateOutbox(entries)
+    // Reject oversized prompts before serialization allocates another copy of their text.
+    val textUnits = entries.sumOf { entry ->
+        entry.content.length.toLong() + entry.otid.length + entry.createdAt.length +
+            entry.attachments.sumOf { it.base64.length.toLong() + it.mediaType.length }
+    }
+    require(textUnits <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
+    val bytes = outboxJson.encodeToString(OutboxEnvelope.serializer(), OutboxEnvelope(entries = entries))
+        .encodeToByteArray()
+    require(bytes.size <= OUTBOX_MAX_BYTES) { "Outbox byte budget exceeded" }
+    return bytes
+}
+
+/** Stores an [encodeOutbox] result. The legacy value goes in the same write, so it converts once. */
+internal suspend fun TimelineStoreTransaction.putOutbox(encoded: ByteArray?) {
+    if (encoded == null) deleteEvidence(OUTBOX_KEY) else putEvidence(OUTBOX_KEY, encoded)
+    if (hasLegacyOutbox()) deleteEvidence(LEGACY_OUTBOX_KEY)
+}
+
+internal suspend fun TimelineStoreTransaction.writeOutbox(entries: List<OutboxEntry>) = putOutbox(encodeOutbox(entries))
+
+/**
+ * A pending-store record as an outbox entry: Sending has been handed to the transport, Sent was
+ * accepted and awaits its echo, and Failed is not known to have been received.
+ */
+internal fun CanonicalPendingLocalStore.Record.toOutboxEntry(nowMillis: Long): OutboxEntry {
+    val failed = delivery == CanonicalPendingLocalStore.Delivery.Failed
+    return OutboxEntry(
+        otid = otid,
+        content = content,
+        attachments = attachments,
+        createdAt = sentAt,
+        state = when (delivery) {
+            CanonicalPendingLocalStore.Delivery.Sending -> OutboxState.Dispatching
+            CanonicalPendingLocalStore.Delivery.Sent -> OutboxState.Accepted
+            CanonicalPendingLocalStore.Delivery.Failed -> OutboxState.Failed
+        },
+        attempt = attempt,
+        stateSinceMillis = nowMillis,
+        failure = if (failed) OutboxFailure.Unconfirmed else null,
+    )
+}
+
+internal suspend fun TimelineStoreReader.hasLegacyOutbox(): Boolean =
+    evidence(LEGACY_OUTBOX_KEY, CanonicalPendingLocalStore.MAX_BYTES) != null
+
+private suspend fun TimelineStoreReader.readLegacyOutbox(nowMillis: Long): List<OutboxEntry> {
+    val bytes = evidence(LEGACY_OUTBOX_KEY, CanonicalPendingLocalStore.MAX_BYTES) ?: return emptyList()
+    val legacy = outboxJson.decodeFromString(LegacyOutboxEnvelope.serializer(), bytes.decodeToString())
+    require(legacy.version == 1) { "Unsupported pending state version" }
+    return legacy.records.map { it.toOutboxEntry(nowMillis) }.also(::validateOutbox)
+}
+
+private fun validateOutbox(entries: List<OutboxEntry>) {
+    require(entries.size <= OutboxTransitions.BUDGET) { "Outbox row budget exceeded" }
+    require(entries.none { it.state.isTerminal }) { "A settled entry was stored" }
+    require(entries.map { it.otid }.toSet().size == entries.size) { "Duplicate outbox otid" }
+}
+
+/**
+ * Confirms the echo of [otid] inside the transaction that durably writes that echo, so the prompt
+ * and its echo never both show. The enclosing transaction allocates the revision.
+ */
+internal suspend fun confirmOutboxEcho(transaction: TimelineStoreTransaction, otid: String, nowMillis: Long): Boolean {
+    if (otid.isBlank()) return false
+    return with(transaction) {
+        val previous = readOutbox(nowMillis)
+        val current = previous.firstOrNull { it.otid == otid } ?: return@with false
+        val outcome = OutboxTransitions.next(current, OutboxEvent.EchoIngested, nowMillis)
+        if (outcome !is OutboxTransition.Applied) return@with false
+        writeOutbox(previous.replacing(otid, outcome.entry))
+        true
+    }
+}
