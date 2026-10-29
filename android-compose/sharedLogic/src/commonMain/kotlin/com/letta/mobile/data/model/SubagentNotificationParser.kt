@@ -1,5 +1,11 @@
 package com.letta.mobile.data.model
 
+/**
+ * The status a Monitor event gets: letta-code sends each event as a `<task-notification>` with no
+ * `<status>` and a `<result><event>…</event></result>`, so it is not a completion.
+ */
+internal const val MONITOR_EVENT_STATUS = "event"
+
 fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
     val blockStart = raw.indexOf("<task-notification", ignoreCase = true)
@@ -11,7 +17,8 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     val result = block.xmlTag("result")
     return UiSubagentNotification(
         toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
-        status = block.xmlTag("status") ?: block.xmlTag("state") ?: "completed",
+        status = block.xmlTag("status") ?: block.xmlTag("state")
+            ?: if (block.xmlTag("event") != null) MONITOR_EVENT_STATUS else "completed",
         summary = block.xmlTag("summary"),
         result = result,
         usage = usage,

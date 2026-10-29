@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.chat.display.isMonitorWatcher
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
@@ -49,8 +50,20 @@ fun buildChatRenderModel(
     // unknown) is kept — we only exclude a PROVEN foreign agent, never same-agent
     // or unscoped history.
     activeAgentId: String? = null,
+): ChatRenderModel = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = true)
+
+/**
+ * [buildChatRenderModel]; [foldMonitorEvents] is false only for lists already folded by
+ * collapseMonitorEvents (the incremental cache folds the whole list once, then builds its parts).
+ */
+private fun buildRenderModel(
+    messages: List<UiMessage>,
+    mode: ChatDisplayMode,
+    activeAgentId: String?,
+    foldMonitorEvents: Boolean,
 ): ChatRenderModel {
     val agentScoped = scopeMessagesToAgent(messages, activeAgentId)
+        .let { if (foldMonitorEvents) collapseMonitorEvents(it) else it }
     val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
 
     val visibleMessages = chainToolRoundRunIds(
@@ -236,7 +249,9 @@ class IncrementalChatRenderItemsCache {
         // buildChatRenderModel so foreign-agent messages are scoped out.
         activeAgentId: String? = null,
     ): List<ChatRenderItem> {
-        val normalizedMessages = chainToolRoundRunIds(backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId)))
+        val normalizedMessages = collapseMonitorEvents(
+            chainToolRoundRunIds(backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId))),
+        )
         if (normalizedMessages.isEmpty()) {
             cachedMode = mode
             previousMessages = normalizedMessages
@@ -247,11 +262,15 @@ class IncrementalChatRenderItemsCache {
         }
 
         val tailStartIndex = activeTailStartIndex(normalizedMessages)
-        if (canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
-            val tailRenderItems = buildChatRenderModel(
+        // letta-mobile-a7ir6: a Monitor event updates its watcher chip in place, possibly in the
+        // committed history this tick would otherwise reuse as it was.
+        val watchersChanged = monitorWatchers(normalizedMessages) != monitorWatchers(previousMessages)
+        if (!watchersChanged && canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
+            val tailRenderItems = buildRenderModel(
                 messages = normalizedMessages.subList(tailStartIndex, normalizedMessages.size),
                 mode = mode,
                 activeAgentId = activeAgentId,
+                foldMonitorEvents = false,
             ).renderItems
             // letta-mobile-vxase: the tail and the committed history are each
             // deduplicated WITHIN themselves by groupMessagesForRender, but
@@ -328,12 +347,13 @@ class IncrementalChatRenderItemsCache {
     ): List<ChatRenderItem> {
         // buildChatRenderModel already applies deduplicateRenderItemsByMessageId
         // internally (single chokepoint), so no extra wrap needed here.
-        val full = buildChatRenderModel(messages, mode, activeAgentId).renderItems
+        val full = buildRenderModel(messages, mode, activeAgentId, foldMonitorEvents = false).renderItems
         committedRenderItems = if (tailStartIndex > 0) {
-            buildChatRenderModel(
+            buildRenderModel(
                 messages = messages.subList(0, tailStartIndex),
                 mode = mode,
                 activeAgentId = activeAgentId,
+                foldMonitorEvents = false,
             ).renderItems
         } else {
             emptyList()
@@ -371,6 +391,9 @@ class IncrementalChatRenderItemsCache {
         }
         return if (reusedAny) reconciled else rebuilt
     }
+
+    private fun monitorWatchers(messages: List<UiMessage>): List<UiMessage> =
+        messages.filter { it.subagentNotification?.isMonitorWatcher() == true }
 
     private fun activeTailStartIndex(messages: List<UiMessage>): Int {
         val lastUserIndex = messages.indexOfLast { it.role == "user" }
