@@ -2135,7 +2135,9 @@ public final class com/letta/mobile/ui/chat/surface/timeline/ChatTimelineSnapsho
 public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingletons$PagedTimelineListKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/ComposableSingletons$PagedTimelineListKt;
 	public fun <init> ()V
+	public final fun getLambda$-1503858161$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-848568627$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-914290202$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingletons$TimelineDeferredBodyKt {

@@ -7,6 +7,9 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionManager
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
+import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
+import com.letta.mobile.data.timeline.api.TimelinePendingRetryBinding
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
@@ -16,17 +19,6 @@ import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
-import javax.inject.Singleton
-
-@Singleton
-/** One captured config, pinned for the lifetime of a single selected-runtime capture. */
-private class CapturedSettings(
-    delegate: ISettingsRepository,
-    config: com.letta.mobile.data.model.LettaConfig,
-) : ISettingsRepository by delegate {
-    override val activeConfig = MutableStateFlow<com.letta.mobile.data.model.LettaConfig?>(config)
-    override val activeConfigChanges = flowOf(config)
-}
 
 class ProductionSelectedChatRuntimeProvider @Inject constructor(
     private val sessions: SessionManager,
@@ -108,17 +100,16 @@ internal class CapturedSelectedChatRuntime(
     private val job = SupervisorJob(parent.coroutineContext[Job])
     override val scope = parent + job
     private val bindings = RuntimeBindingCache<String, AndroidCanonicalTimelineRuntime.Binding>()
+    private val pendingRetry = TimelinePendingRetryBinding()
 
     private suspend fun binding(conversation: ConversationId) = com.letta.mobile.data.local.retryTimelineOwnership {
         bindings.get(conversation.value) {
             check(job.isActive) { "Selected runtime retired" }
-            hooks.bind(conversation.value)
+            hooks.bind(conversation.value).also { pendingRetry.resolved(it.writer) }
         }
     }
 
-    override suspend fun ready(conversationId: String) {
-        binding(ConversationId(conversationId))
-    }
+    override suspend fun ready(conversationId: String) { binding(ConversationId(conversationId)) }
 
     override suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatPagingPresentation {
         // Private host: never mutate the singleton presentation router.
@@ -127,7 +118,7 @@ internal class CapturedSelectedChatRuntime(
         return checkNotNull(host.openCanonical).invoke(agent, conversationId, target, scope)
     }
 
-    override val writer: TimelineExternalTransportWriter = SelectedRuntimeWriter(agent) { conversation ->
+    override val writer: TimelineExternalTransportWriter = SelectedRuntimeWriter(agent, pendingRetry) { conversation ->
         binding(ConversationId(conversation)).writer
     }
 
@@ -136,18 +127,30 @@ internal class CapturedSelectedChatRuntime(
         job.cancelAndJoin()
     }
 }
-
 /** Every operation resolves only within this captured subscriber, including late terminal calls. */
 internal class SelectedRuntimeWriter(
     private val agent: String,
+    private val pendingRetry: TimelinePendingRetryBinding = TimelinePendingRetryBinding(),
     private val resolve: suspend (String) -> TimelineExternalTransportWriter,
 ) : TimelineExternalTransportWriter {
+    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+        pendingRetry.bind(agent, sender)
     private suspend fun writer(id: ConversationId, suppliedAgent: AgentId?): TimelineExternalTransportWriter {
         require(suppliedAgent == null || suppliedAgent.value == agent) { "Foreign agent on captured writer" }
-        return resolve(id.value)
+        return resolve(id.value).also(pendingRetry::resolved)
     }
-    override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =
-        appendExternalTransportLocal(agent, conversationId, content, otid, attachments)
+    override suspend fun acceptPendingSend(
+        attempt: TimelinePendingSendAttempt, content: String, attachments: List<MessageContentPart.Image>, accept: () -> Boolean,
+    ) = writer(attempt.conversation, attempt.agent).acceptPendingSend(attempt, content, attachments, accept)
+    override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) =
+        writer(attempt.conversation, attempt.agent).isPendingSendCurrent(attempt)
+    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) =
+        writer(attempt.conversation, attempt.agent).ownPendingSend(attempt, active)
+    override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
+        writer(attempt.conversation, attempt.agent).markPendingSend(attempt, delivery)
+    override suspend fun appendExternalTransportLocal(
+        conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>,
+    ) = appendExternalTransportLocal(agent, conversationId, content, otid, attachments)
     override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =
         writer(ConversationId(conversationId), agentId?.let(::AgentId))
             .appendExternalTransportLocal(agent, conversationId, content, otid, attachments)
@@ -162,8 +165,7 @@ internal class SelectedRuntimeWriter(
         writer(ConversationId(conversationId), agentId?.let(::AgentId))
             .reconcileExternalTransportSendScoped(agent, conversationId, externalConversationId, otid)
     // The canonical repair is a committed reconcile; no retained watermark rides along.
-    override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) =
-        repairExpiredConversationCursorScoped(agent, conversationId, fallbackSeq)
+    override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) = repairExpiredConversationCursorScoped(agent, conversationId, fallbackSeq)
     override suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?) =
         writer(ConversationId(conversationId), agentId?.let(::AgentId))
             .repairExpiredConversationCursorScoped(agent, conversationId, fallbackSeq)

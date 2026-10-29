@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
@@ -18,6 +20,9 @@ import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -111,6 +116,20 @@ class ChatSendCoordinator(
     )
 
     init {
+        timelineRepository.bindPendingRetry(AgentId(agentId)) { conversation, record ->
+            scope.coroutineContext.ensureActive()
+            turnStateMutex.withLock {
+                val config = validatedActiveConfig(conversation) ?: error("No active backend")
+                check(queueTurns.ensureConnected(config, clientVersion)) { "Chat channel is not connected" }
+                prepareConversation(conversation.value)
+                healStaleVisualPresence(conversation)
+                val pending = QueuedChatSend(
+                    QueuedSendId(record.otid), QueueConversationId(conversation.value), record.content, record.attachments, record.attempt,
+                )
+                retainPendingOwner(pending)
+                queueDriver.submitLocked(pending)?.let { reportQueuedSend(pending, it) }
+            }
+        }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
                 contained("RedialWhileTurnActive") { turnStateMutex.withLock { handleRedialWhileTurnActiveLocked(event) } }
@@ -343,23 +362,9 @@ class ChatSendCoordinator(
             "otid" to pending.id.value,
             "clearComposer" to clearComposer,
         )
+        if (pending.attempt > 0 && !timelineRepository.isPendingSendCurrent(pending.pendingAttempt(agentId))) return true
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
-        val accepted = state.acceptSend(
-            pending = pending,
-            send = {
-                wsChatBridge.send(
-                    agentId = agentId,
-                    conversationId = pending.conversationId.value,
-                    text = pending.text,
-                    otid = pending.id.value,
-                    attachments = pending.attachments,
-                    startNewConversation = false,
-                )
-            },
-            onAccepted = {
-                pending.conversationId.value.takeIf { it.isNotBlank() }?.let { turnRegistry.lastActiveConversationId = it }
-            },
-        )
+        val accepted = reserveAndAcceptSend(pending, state) ?: return true
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
             "conversationId" to pending.conversationId.value,
@@ -377,10 +382,52 @@ class ChatSendCoordinator(
             otid = pending.id.value,
             attachments = pending.attachments,
         )
+        retainPendingOwner(pending)
         if (clearComposer) foreground.clearComposer(ConversationId(pending.conversationId.value))
         postSendReconciler.schedule(pending.conversationId.value, pending.id.value)
         foreground.dispatched(ConversationId(pending.conversationId.value))
         return true
+    }
+
+    private suspend fun reserveAndAcceptSend(pending: QueuedChatSend, state: ConversationTurnState): Boolean? {
+        return try {
+            timelineRepository.acceptPendingSend(pending.pendingAttempt(agentId), pending.text, pending.attachments) {
+                state.acceptSend(
+                    pending = pending,
+                    send = {
+                        wsChatBridge.send(
+                            agentId = agentId,
+                            conversationId = pending.conversationId.value,
+                            text = pending.text,
+                            otid = pending.id.value,
+                            attachments = pending.attachments,
+                            startNewConversation = false,
+                        )
+                    },
+                    onAccepted = {
+                        pending.conversationId.value.takeIf { it.isNotBlank() }?.let { turnRegistry.lastActiveConversationId = it }
+                    },
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            if (pending.attempt > 0) throw failure
+            Telemetry.error("AdminChatVM", "ws.send.pendingRejected", failure)
+            foreground.sendFailed(ConversationId(pending.conversationId.value),
+                "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
+            null
+        }
+    }
+
+    private suspend fun retainPendingOwner(pending: QueuedChatSend) {
+        timelineRepository.ownPendingSend(pending.pendingAttempt(agentId)) {
+            val conversation = ConversationId(pending.conversationId.value)
+            val state = turnRegistry.peekState(conversation)
+            val queued = scope.isActive && queuedSends.queueFor(pending.conversationId).positionOf(pending.id) != null
+            val running = state?.inFlightSend == pending && !state.reachedTerminal && !state.pendingRecoveryExpired
+            queued || (running && (scope.isActive || wsChatBridge.hasActiveChatTurn(conversation.value)))
+        }
     }
 
     private fun reportQueuedSend(pending: QueuedChatSend, position: Int) {
@@ -474,9 +521,46 @@ class ChatSendCoordinator(
                 "attempt" to event.reconnectAttempt,
             )
             foreground.transientDisconnect(turnRegistry.statesSnapshot)
+            // A redial preserves an owned or visibly streaming turn. Only an unacknowledged
+            // send without that presence fails here; an exact history echo may still confirm it.
+            turnRegistry.statesSnapshot.forEach { state ->
+                if (keepsActiveSendAcrossRedial(state)) awaitRedialProgress(state)
+                else expirePendingRecovery(state)
+            }
             return
         }
         failActiveTurnForDisconnect(event)
+    }
+
+    private fun awaitRedialProgress(state: ConversationTurnState) {
+        val pending = state.inFlightSend ?: return
+        if (state.pendingRedialTimeout?.isActive == true) return
+        state.pendingRedialTimeout = scope.launch {
+            delay(30.seconds)
+            contained("RedialTimeout") {
+                turnStateMutex.withLock {
+                    if (state.inFlightSend != pending) return@withLock
+                    if (state.reachedTerminal || state.pendingRecoveryExpired) return@withLock
+                    expirePendingRecovery(state)
+                }
+            }
+        }
+    }
+
+    private suspend fun expirePendingRecovery(state: ConversationTurnState) {
+        state.pendingRecoveryExpired = true
+        state.markPendingOutcome(timelineRepository, agentId, Delivery.Failed)
+    }
+
+    private fun resumed(state: ConversationTurnState) {
+        state.pendingRedialTimeout?.cancel()
+        state.pendingRedialTimeout = null
+    }
+
+    private fun keepsActiveSendAcrossRedial(state: ConversationTurnState): Boolean {
+        val conversation = ConversationId(state.ownerConversationId)
+        if (wsChatBridge.hasActiveChatTurn(conversation.value)) return true
+        return foreground.owns(conversation) && ui.isStreaming()
     }
 
     private fun messageDeduplicationScope(event: WsTimelineEvent): String? {
@@ -495,6 +579,7 @@ class ChatSendCoordinator(
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
         serverQueueMarks.onOwnTurnFrame(event)
         val conversation = incoming.messageDelta(event) ?: return
+        turnRegistry.peekState(conversation)?.let(::resumed)
         postSendReconciler.recordLiveIngest(conversation.value)
         foreground.messageDelta(conversation)
     }
@@ -533,15 +618,17 @@ class ChatSendCoordinator(
         // conversation's own turn state may be finalized by it.
         val state = turnRegistry.peekState(ConversationId(event.conversationId)) ?: return
         if (state.otid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
+        awaitRedialProgress(state)
         when (
-            val outcome = timelineRepository.reconcileRecentMessages(
+            val outcome = withTimeoutOrNull(30.seconds) { timelineRepository.reconcileRecentMessages(
                 agentId = agentId,
                 conversationId = event.conversationId,
                 reason = "redial-recovery",
                 forceRefresh = true,
                 connectionGeneration = event.connectionGeneration,
-            )
+            ) }
         ) {
+            null -> { expirePendingRecovery(state); return }
             is RecentMessagesReconcileOutcome.Applied -> Unit
             is RecentMessagesReconcileOutcome.Skipped -> {
                 Telemetry.event(
@@ -560,9 +647,11 @@ class ChatSendCoordinator(
                     "turnId" to event.turnId,
                     "runId" to event.runId,
                 )
+                expirePendingRecovery(state)
                 return
             }
         }
+        resumed(state)
         finishActiveTurn(state, TurnSettlementRequest(
             WsTimelineEvent.TurnDone(event.turnId, event.runId, BridgeTurnStatus.Completed),
             reason = "redial-recovery",
@@ -571,6 +660,7 @@ class ChatSendCoordinator(
 
     private suspend fun handleTurnStarted(event: WsTimelineEvent.TurnStarted) {
         val state = incoming.started(event, scope) ?: return
+        resumed(state)
         val conversation = ConversationId(state.ownerConversationId)
         showConversation(conversation)
         foreground.started(conversation)

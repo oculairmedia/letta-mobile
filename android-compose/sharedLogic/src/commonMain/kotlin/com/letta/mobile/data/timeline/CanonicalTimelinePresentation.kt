@@ -4,10 +4,12 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.map
 import androidx.paging.filter
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
+import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.platform.MemoryPressure
 import com.letta.mobile.ui.common.GroupPosition
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -107,12 +110,36 @@ class CanonicalTimelinePresentation private constructor(
 
     /** CRITICAL memory pressure drops every resident page but the one at the reading position. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val settled: Flow<PagingData<Row>> = anchor.flatMapLatest { key ->
+    private val settledRows: Flow<PagingData<Row>> = anchor.flatMapLatest { key ->
         owner.session.paging(owner.selection, key, settledProjectionAdapter, MemoryPressure.criticalTrims()).map { page ->
             page.filter { it.preparedPresentation !is TimelineSettledPresentation.Drop }
                 .map { record -> project(record, requireNotNull(record.preparedPresentation)) }
         }
     }.cachedIn(scope)
+
+    // A current send stays in the live overlay through its normal echo handover. Only a prompt
+    // older than resident history needs insertion; admitting every send here regenerates Paging
+    // on append/confirmation and lets a stale pending snapshot hide the streamed echo.
+    private val pendingInHistory = combine(owner.session.pending, resident) { pending, residents ->
+        pending.filter { (parseTimestampEpochMillis(it.sentAt) ?: 0L) < residents.newestTimestamp }
+    }.distinctUntilChanged()
+
+    /** Pending prompts occupy their send-time position in the same paged list as history. */
+    val settled: Flow<PagingData<Row>> = combine(settledRows, pendingInHistory) { rows, pending ->
+        rows.insertPending(pending, owner.selection.scope)
+    }
+
+    /** Retry only this conversation's failed prompt, retaining its original transport identity. */
+    suspend fun retry(identity: MessageId): Boolean {
+        check(job.isActive) { "Presentation closed" }
+        return coordinator.retryPending(owner, identity)
+    }
+
+    /** Explicitly discard only this conversation's failed prompt. */
+    suspend fun dismiss(identity: MessageId): Boolean {
+        check(job.isActive) { "Presentation closed" }
+        return coordinator.dismissPending(owner, identity)
+    }
 
     // Bounded by pending storage: pruned to the records still awaiting their durable echo. Each
     // otid remembers the turn whose overlay echoed it.
@@ -134,6 +161,7 @@ class CanonicalTimelinePresentation private constructor(
         val presented: Map<TimelineMessageId, Long> = emptyMap(),
         val otids: Set<String> = emptySet(),
         val serverIds: Set<String> = emptySet(),
+        val newestTimestamp: Long = 0L,
     )
 
     private fun createLiveProjection(): Flow<List<ChatRenderItem>> {
@@ -176,7 +204,7 @@ class CanonicalTimelinePresentation private constructor(
             mode = ChatDisplayMode.Interactive,
             activeAgentId = owner.selection.scope.agentId,
         ).renderItems
-        return active + optimistic.asReversed()
+        return positionPendingInLive(active, optimistic.asReversed())
     }
 
     private fun filterUnsettledEvents(
@@ -226,6 +254,7 @@ class CanonicalTimelinePresentation private constructor(
             presented = presented,
             otids = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) },
             serverIds = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) },
+            newestTimestamp = rows.maxOfOrNull { parseTimestampEpochMillis(it.item.boundaryTimestamp) ?: 0L } ?: 0L,
         )
         val fences = owner.session.settling.value.map { it.fence } + listOfNotNull(owner.session.live.value?.fence)
         fences.forEach { fence ->
@@ -292,10 +321,17 @@ class CanonicalTimelinePresentation private constructor(
         identity: TimelineMessageId,
         residents: List<TimelineResidentEvent>,
     ): ChatRenderItem {
+        // The persisted user echo keeps the optimistic slot even without a streamed alias.
+        if (this is ChatRenderItem.Single && hasOptimisticUserIdentity()) {
+            return copy(keyOverride = "msg-${message.clientMessageId}")
+        }
         val adopted = adoptions.adopted(this, residents, ::liveSnapshot)
         if (adopted != null) return adopted
         return if (isRunItem) this else withKeyOverride(replacementKey(identity))
     }
+
+    private fun ChatRenderItem.Single.hasOptimisticUserIdentity(): Boolean =
+        message.role == "user" && !message.clientMessageId.isNullOrBlank()
 
     private fun liveSnapshot(): Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>> =
         mutableLive.value to owner.session.live.value?.aliases.orEmpty()

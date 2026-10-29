@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,16 +35,22 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
+import com.letta.mobile.sharedui.resources.run_error_action_retry
+import com.letta.mobile.sharedui.resources.rows_dismiss
+import com.letta.mobile.sharedui.resources.pending_retry_rejected
+import com.letta.mobile.sharedui.resources.pending_dismiss_rejected
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -295,6 +302,48 @@ private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedR
             DayDividerRow(date, scope.today)
         }
         TimelineItemRow(item, scope.bindings)
+        PendingPromptActions(item, scope.params.presentation)
+    }
+}
+
+/** The same failed-prompt controls for the full timeline and docked overlay. */
+@Composable
+internal fun PendingPromptActions(item: ChatRenderItem, presentation: CanonicalTimelinePresentation) {
+    // Retry changes the row to Sending before its sender finishes. Keep the action's scope
+    // mounted through that state change so hiding the buttons cannot cancel the send.
+    val actions = rememberCoroutineScope()
+    val message = (item as? ChatRenderItem.Single)?.message ?: return
+    val identity = message.clientMessageId ?: return
+    var rejected by remember(identity) { mutableStateOf<String?>(null) }
+    var busy by remember(identity) { mutableStateOf(false) }
+    val retryRejected = stringResource(Res.string.pending_retry_rejected)
+    val dismissRejected = stringResource(Res.string.pending_dismiss_rejected)
+    if (!message.isSendFailed) return
+    fun perform(message: String, action: suspend () -> Boolean) {
+        busy = true
+        rejected = null
+        actions.launch {
+            try {
+                if (!action()) rejected = message
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                rejected = message
+            } finally {
+                busy = false
+            }
+        }
+    }
+    Column {
+        Row {
+            TextButton(enabled = !busy, onClick = { perform(retryRejected) { presentation.retry(MessageId(identity)) } }) {
+                Text(stringResource(Res.string.run_error_action_retry))
+            }
+            TextButton(enabled = !busy, onClick = { perform(dismissRejected) { presentation.dismiss(MessageId(identity)) } }) {
+                Text(stringResource(Res.string.rows_dismiss))
+            }
+        }
+        rejected?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
     }
 }
 
