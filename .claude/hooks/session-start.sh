@@ -6,17 +6,24 @@
 set -euo pipefail
 
 BD_VERSION=1.3.2
+# From the release's checksums.txt (beads_1.3.2_linux_amd64.tar.gz).
+BD_SHA256=c6ea3281f6ff82628351b2d0967c9eb85862c8a0ec0ebc24e63e645c8b02462e
 DOLT_CREDS_ID=5c1trdut2vlj0his4je1fljdoaqv4i1o44mjntf1n1m10
 
 cloud_setup() {
   if ! bd version 2>/dev/null | grep -q "bd version $BD_VERSION "; then
     echo "session-start: installing bd $BD_VERSION" >&2
-    curl -fsSL "https://github.com/gastownhall/beads/releases/download/v$BD_VERSION/beads_${BD_VERSION}_linux_amd64.tar.gz" \
-      | tar -xz -C /usr/local/bin bd
+    local archive
+    archive="$(mktemp)"
+    curl --proto '=https' --tlsv1.2 -fsSL -o "$archive" \
+      "https://github.com/gastownhall/beads/releases/download/v$BD_VERSION/beads_${BD_VERSION}_linux_amd64.tar.gz"
+    echo "$BD_SHA256  $archive" | sha256sum --check --status
+    tar -xzf "$archive" -C /usr/local/bin bd
+    rm -f "$archive"
   fi
 
   # Setup scripts can't see environment secrets; session hooks can.
-  if [ -z "${DOLT_CREDS_JWK_B64:-}" ]; then
+  if [[ -z "${DOLT_CREDS_JWK_B64:-}" ]]; then
     echo "session-start: DOLT_CREDS_JWK_B64 is not set; skipping beads sync" >&2
     return 0
   fi
@@ -30,19 +37,19 @@ cloud_setup() {
   git config beads.role maintainer
 
   # Bootstrap once per container; resume/clear/compact reuse the synced database.
-  if [ ! -d .beads/embeddeddolt ]; then
+  if [[ ! -d .beads/embeddeddolt ]]; then
     # bd rewrites tracked .beads files on bootstrap; put them back if they were clean before.
     local beads_clean=false
     git diff --quiet -- .beads && beads_clean=true
     bd bootstrap --yes >&2
-    [ "$beads_clean" = true ] && git checkout -- .beads
+    if [[ "$beads_clean" == true ]]; then git checkout -- .beads; fi
   fi
   bd ping >&2
 }
 
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
-if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+if [[ "${CLAUDE_CODE_REMOTE:-}" == "true" ]]; then
   cloud_setup
 fi
 
