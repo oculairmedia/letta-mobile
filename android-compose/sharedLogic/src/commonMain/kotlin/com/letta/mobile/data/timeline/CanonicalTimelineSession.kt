@@ -301,8 +301,10 @@ class CanonicalTimelineSession(
     val live = engine.live
     val settling = engine.settling
     private var recoveryCandidates = emptySet<MessageId>()
+    private var recoveryHistoryStart: TimelineInstant? = null
     private val dispatchOwners = (store as? PendingDispatchTimelineStore)?.dispatchOwners ?: PendingDispatchOwners()
-    private val pendingStore = CanonicalPendingLocalStore(store, dispatchOwners) { MessageId(it) in recoveryCandidates }
+    // Paging protection ends at the lost-echo horizon, even if the user never loads older pages.
+    private val pendingStore = CanonicalPendingLocalStore(store, dispatchOwners)
     private val pendingMutex = kotlinx.coroutines.sync.Mutex()
     private val mutablePending = kotlinx.coroutines.flow.MutableStateFlow<List<CanonicalPendingLocalStore.Record>>(emptyList())
     val pending: kotlinx.coroutines.flow.StateFlow<List<CanonicalPendingLocalStore.Record>> = mutablePending
@@ -311,9 +313,10 @@ class CanonicalTimelineSession(
         val opened = engine.open(scope, target)
         if (opened is TimelineEngineOpen.Opened) {
             mutablePending.value = pendingStore.load(scope)
-            // These sends predate this session. Only a successful history read can decide whether
-            // they persisted; a failed/offline read must leave them available for recovery.
+            // These sends predate this session. Successful history reads decide covered sends;
+            // older candidates can await more pages only until the lost-echo horizon.
             recoveryCandidates = pending.value.mapTo(mutableSetOf()) { MessageId(it.otid) }
+            recoveryHistoryStart = null
         }
         return opened
     }
@@ -345,21 +348,31 @@ class CanonicalTimelineSession(
         discarded
     }
 
-    private suspend fun refreshPending(historyExhausted: Boolean = false) = pendingMutex.withLock {
+    private suspend fun refreshPending(historyPage: TimelineRemotePageResult.Page? = null) = pendingMutex.withLock {
         val loaded = pendingStore.load(scope)
-        val abandoned = if (historyExhausted) loaded.filter {
+        recoveryHistoryStart = (listOfNotNull(recoveryHistoryStart) + historyPage?.records.orEmpty().mapNotNull {
+            it.message.date?.let(::parseTimelineInstantOrNull)
+        }).minWithOrNull(Comparator(::compareTimelineInstants))
+        // The canonical writer already removed matching echoes from pending storage. Absence is
+        // decisive once the loaded window spans a candidate's send time, even with more pages.
+        val abandoned = loaded.filter {
             MessageId(it.otid) in recoveryCandidates && it.delivery != CanonicalPendingLocalStore.Delivery.Failed &&
-                !dispatchOwners.isActive(scope.backendId, scope.conversationId, it.otid)
-        } else emptyList()
-        if (historyExhausted) {
-            abandoned.forEach {
-                pendingStore.mark(scope, it.otid, CanonicalPendingLocalStore.Delivery.Failed, it.attempt)
-            }
-            recoveryCandidates -= abandoned.map { MessageId(it.otid) }.toSet()
+                !dispatchOwners.isActive(scope.backendId, scope.conversationId, it.otid) &&
+                (historyPage?.hasMore == false || historyCovers(it.sentAt))
         }
+        abandoned.forEach {
+            pendingStore.mark(scope, it.otid, CanonicalPendingLocalStore.Delivery.Failed, it.attempt)
+        }
+        recoveryCandidates -= abandoned.map { MessageId(it.otid) }.toSet()
         recoveryCandidates = recoveryCandidates.intersect(loaded.map { MessageId(it.otid) }.toSet())
         val retired = pendingStore.retireLostEchoes(scope, loaded)
         mutablePending.value = if (abandoned.isNotEmpty() || retired > 0) pendingStore.load(scope) else loaded
+    }
+
+    private fun historyCovers(sentAt: String): Boolean {
+        val oldest = recoveryHistoryStart ?: return false
+        val sent = parseTimelineInstantOrNull(sentAt) ?: return false
+        return compareTimelineInstants(sent, oldest) >= 0
     }
 
     suspend fun loadOlder(selection: TimelineEngineSelection): TimelineEnginePageOutcome {
@@ -367,7 +380,7 @@ class CanonicalTimelineSession(
         try {
             return when (val response = transport.listConversationMessagePage(request.remote)) {
                 is TimelineRemotePageResult.Page -> engine.applyPage(request, response).also {
-                    if (it == TimelineEnginePageOutcome.Applied) refreshPending(historyExhausted = !response.hasMore)
+                    if (it == TimelineEnginePageOutcome.Applied) refreshPending(historyPage = response)
                 }
                 is TimelineRemotePageResult.NoProgress -> engine.rejectNoProgress(request, response)
             }
@@ -386,7 +399,7 @@ class CanonicalTimelineSession(
         try {
             return when (val response = transport.listConversationMessagePage(request.remote)) {
                 is TimelineRemotePageResult.Page -> engine.reconcilePageDetailed(request, response).also {
-                    if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending(historyExhausted = !response.hasMore)
+                    if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending(historyPage = response)
                 }
                 is TimelineRemotePageResult.NoProgress -> TimelineEngineReconcileResult(engine.rejectReconcileNoProgress(request, response))
             }
