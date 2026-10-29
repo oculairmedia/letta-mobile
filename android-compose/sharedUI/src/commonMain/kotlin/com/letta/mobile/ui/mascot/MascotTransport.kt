@@ -47,11 +47,11 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import com.letta.mobile.avatar.core.MascotBody
+import com.letta.mobile.avatar.core.body.MascotBody
 import com.letta.mobile.avatar.core.MascotDirector
 import com.letta.mobile.avatar.core.MascotEvent
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotVector
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.body.MascotVector
 import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch

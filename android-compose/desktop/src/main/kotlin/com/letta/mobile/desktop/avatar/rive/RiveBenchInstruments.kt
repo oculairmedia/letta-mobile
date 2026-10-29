@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import com.letta.mobile.avatar.core.AvatarState
+import com.letta.mobile.avatar.core.model.AvatarState
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import com.letta.mobile.ui.mascot.frame.RiveOnionSkin
 import kotlinx.coroutines.delay

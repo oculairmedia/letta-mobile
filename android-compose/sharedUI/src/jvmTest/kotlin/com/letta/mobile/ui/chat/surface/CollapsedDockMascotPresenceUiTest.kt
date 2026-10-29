@@ -31,14 +31,14 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.ui.mascot.FakeMascotHost
 import com.letta.mobile.ui.mascot.FakeMascotShell
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSemantics
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotShape
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.MascotTransport
 import com.letta.mobile.ui.mascot.MascotTransportLayer

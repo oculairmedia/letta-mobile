@@ -1,8 +1,8 @@
 package com.letta.mobile.ui.mascot
 
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotPalette
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotPalette
+import com.letta.mobile.avatar.core.model.MascotShape
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import kotlin.test.Test

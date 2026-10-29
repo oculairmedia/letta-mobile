@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
 
 /**
  * Bench tunables for [GazeDirector]. Properties rather than constructor args.

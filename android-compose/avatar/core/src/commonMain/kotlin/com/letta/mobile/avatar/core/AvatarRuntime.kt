@@ -1,5 +1,18 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.model.AvatarCameraFraming
+import com.letta.mobile.avatar.core.model.AvatarCapabilities
+import com.letta.mobile.avatar.core.model.AvatarExpression
+import com.letta.mobile.avatar.core.model.AvatarGesture
+import com.letta.mobile.avatar.core.model.AvatarLookTarget
+import com.letta.mobile.avatar.core.model.AvatarModel
+import com.letta.mobile.avatar.core.model.AvatarReaction
+import com.letta.mobile.avatar.core.model.Hover
+import com.letta.mobile.avatar.core.model.ListenLevel
+import com.letta.mobile.avatar.core.model.MascotMotion
+import com.letta.mobile.avatar.core.model.MotionPreference
+import com.letta.mobile.avatar.core.model.Petting
+import com.letta.mobile.avatar.core.model.ReactionArg
 import kotlinx.coroutines.flow.StateFlow
 
 /** Lifecycle of an [AvatarRuntime] as observed by the app. */

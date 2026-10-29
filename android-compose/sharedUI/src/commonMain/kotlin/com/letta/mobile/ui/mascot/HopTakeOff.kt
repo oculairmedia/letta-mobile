@@ -1,9 +1,9 @@
 package com.letta.mobile.ui.mascot
 
 import androidx.compose.ui.geometry.Rect
-import com.letta.mobile.avatar.core.GazeMath
-import com.letta.mobile.avatar.core.GazePoint
 import com.letta.mobile.avatar.core.MascotDirector
+import com.letta.mobile.avatar.core.gaze.GazeMath
+import com.letta.mobile.avatar.core.gaze.GazePoint
 
 /*
  * letta-mobile-te3n1.2 / te3n1.11: a seat hand-off goes at once. When the transport starts a hop

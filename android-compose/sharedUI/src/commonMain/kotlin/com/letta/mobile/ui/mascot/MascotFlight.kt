@@ -9,7 +9,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.IntOffset
-import com.letta.mobile.avatar.core.MascotEntrance
+import com.letta.mobile.avatar.core.body.MascotEntrance
 import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.roundToInt

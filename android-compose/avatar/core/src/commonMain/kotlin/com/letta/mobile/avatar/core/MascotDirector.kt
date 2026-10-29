@@ -1,5 +1,19 @@
 package com.letta.mobile.avatar.core
 
+import com.letta.mobile.avatar.core.gaze.GazeCue
+import com.letta.mobile.avatar.core.gaze.GazeDirector
+import com.letta.mobile.avatar.core.gaze.GazePoint
+import com.letta.mobile.avatar.core.gaze.GazePose
+import com.letta.mobile.avatar.core.gaze.GazeWorld
+import com.letta.mobile.avatar.core.model.AvatarGesture
+import com.letta.mobile.avatar.core.model.AvatarReaction
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.Hover
+import com.letta.mobile.avatar.core.model.ListenLevel
+import com.letta.mobile.avatar.core.model.MascotMotion
+import com.letta.mobile.avatar.core.model.MotionPreference
+import com.letta.mobile.avatar.core.model.Petting
+import com.letta.mobile.avatar.core.model.ReactionArg
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.random.Random

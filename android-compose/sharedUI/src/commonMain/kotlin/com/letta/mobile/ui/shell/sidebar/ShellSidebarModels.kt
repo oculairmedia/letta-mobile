@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell.sidebar
 
 import androidx.compose.runtime.Immutable
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
