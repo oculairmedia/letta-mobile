@@ -94,9 +94,13 @@ def rpc(token: str, command: str, payload: str) -> tuple[int, str]:
     )
     ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no",
                "-o", "ConnectTimeout=10", f"root@{HOST}", remote_cmd]
+    env = None
     if HOST_PW:
-        ssh_cmd = ["sshpass", "-p", HOST_PW] + ssh_cmd
-    res = subprocess.run(ssh_cmd, capture_output=True, text=True)
+        ssh_cmd = ["sshpass", "-e"] + ssh_cmd
+        import os
+        env = os.environ.copy()
+        env["SSHPASS"] = HOST_PW
+    res = subprocess.run(ssh_cmd, capture_output=True, text=True, env=env)
     body = res.stdout
     m = re.search(r"__HTTP__(\d+)\s*$", body)
     code = int(m.group(1)) if m else 0
