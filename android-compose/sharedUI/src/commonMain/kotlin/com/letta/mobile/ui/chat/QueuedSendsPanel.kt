@@ -43,8 +43,8 @@ internal object QueuedSendsPanelTestTags {
 /** The label on a queued message: where it stands in line. */
 fun queuedSendLabel(position: Int): String = "Queued · $position"
 
-/** The label on a sent message the App Server parked behind another client. */
-const val QUEUED_ON_SERVER_LABEL = "Queued on server · another client's turn"
+/** The server queue notice does not identify which client owns the preceding response. */
+const val QUEUED_ON_SERVER_LABEL = "Queued on server · waiting for the previous response"
 
 /** The label when it waits for this device's own stopped turn to wind down. */
 const val QUEUED_BEHIND_OWN_STOP_LABEL = "Queued on server · waiting for the previous response to stop"
@@ -53,6 +53,7 @@ const val QUEUED_BEHIND_OWN_STOP_LABEL = "Queued on server · waiting for the pr
 fun queuedOnServerLabel(behind: ServerQueueBlocker): String = when (behind) {
     ServerQueueBlocker.OtherClient -> QUEUED_ON_SERVER_LABEL
     ServerQueueBlocker.OwnStoppingTurn -> QUEUED_BEHIND_OWN_STOP_LABEL
+    ServerQueueBlocker.OwnRunningTurn -> QUEUED_ON_SERVER_LABEL
 }
 
 /** The panel's header: how many wait, and what holds them (a Stop, or another device's turn). */

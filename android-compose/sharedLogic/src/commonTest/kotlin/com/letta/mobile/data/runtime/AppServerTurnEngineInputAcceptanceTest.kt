@@ -120,6 +120,25 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
+    fun dequeueEmitsOneStartedLifecycleBeforeAnyAssistantContent() = runTest {
+        val turn = startTurn(InputAckFixture.Queued)
+        val queuedIndex = turn.drafts.indexOfLast {
+            (it.payload as? RuntimeEventPayload.RunLifecycleChanged)?.reason == INPUT_QUEUED_REASON
+        }
+        assertTrue(queuedIndex >= 0)
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        runCurrent()
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        runCurrent()
+
+        val resumed = turn.drafts.drop(queuedIndex + 1).mapNotNull {
+            it.payload as? RuntimeEventPayload.RunLifecycleChanged
+        }
+        assertEquals(listOf(RuntimeRunStatus.Started), resumed.map { it.status })
+        idleOut(turn)
+    }
+
+    @Test
     fun earlierTurnFinishedArrivingWhileQueuedDoesNotCompleteTurn() = runTest {
         val turn = startTurn(InputAckFixture.Queued)
         assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "queued input must be visible")

@@ -100,13 +100,20 @@ class RuntimeEventServerFrameMapperTest {
     }
 
     @Test
-    fun startedAndRunningLifecycle_mapToNothing() {
-        assertTrue(
-            RuntimeEventServerFrameMapper.map(
-                RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Started),
-                context,
-            ).isEmpty(),
-        )
+    fun startedLifecycle_mapsToTurnStarted() {
+        val frame = RuntimeEventServerFrameMapper.map(
+            RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Started),
+            context,
+        ).single()
+        val started = assertIs<ServerFrame.TurnStarted>(frame)
+        assertEquals("agent-1", started.agentId)
+        assertEquals("conv-1", started.conversationId)
+        assertEquals("turn-1", started.turnId)
+        assertEquals("run-1", started.runId)
+    }
+
+    @Test
+    fun runningLifecycle_mapsToNothing() {
         assertTrue(
             RuntimeEventServerFrameMapper.map(
                 RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Running),

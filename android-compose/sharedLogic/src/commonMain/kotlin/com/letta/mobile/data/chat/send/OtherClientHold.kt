@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
@@ -93,8 +94,8 @@ private const val MAX_RETRY_MS = 30_000L
 
 /**
  * Keeps the "queued on server" mark of a sent message. The App Server parks
- * this device's input behind another client's turn ([WsTimelineEvent.TurnQueued]); the first live
- * frame of this device's own turn means it started. Its terminal clears the mark with the turn state.
+ * this device's input behind a previous turn ([WsTimelineEvent.TurnQueued]); a dequeue start or live
+ * frame of this device's own turn releases the mark, with its identified terminal as a backstop.
  */
 internal class ServerQueueMarks(
     private val queue: ChatSendQueue,
@@ -105,15 +106,29 @@ internal class ServerQueueMarks(
 
     /** Conversations where this device's own turn was cancelled and may still be finishing. */
     private val stoppingOwnTurn = HashSet<QueueConversationId>()
+    private val startedOwnTurns = HashMap<QueueConversationId, QueuedSendId>()
+
+    /** Retains the locally submitted predecessor before acceptance replaces its conversation state. */
+    fun rememberOwnTurn(send: QueuedChatSend?) {
+        send?.let { synchronized(lock) { startedOwnTurns[it.conversationId] = it.id } }
+    }
 
     /**
      * This device's send waits in the App Server queue: behind its own just-stopped turn when one
-     * is still winding down there ([onOwnTurnCancelled]), otherwise behind another client's turn.
+     * is still winding down there, or behind a locally submitted previous response. Without local
+     * predecessor evidence the queue keeps its other-client classification.
      */
     fun markQueuedOnServer(event: WsTimelineEvent.TurnQueued) {
         val send = sendOfTurn(event.turnId) ?: sendOfConversation(event.conversationId) ?: return
         val behind = synchronized(lock) {
-            if (send.conversationId in stoppingOwnTurn) ServerQueueBlocker.OwnStoppingTurn else ServerQueueBlocker.OtherClient
+            val previous = startedOwnTurns[send.conversationId]
+            // A delayed/repeated queue notice cannot re-park an input already observed starting.
+            if (previous == send.id) return
+            when {
+                send.conversationId in stoppingOwnTurn -> ServerQueueBlocker.OwnStoppingTurn
+                previous != null -> ServerQueueBlocker.OwnRunningTurn
+                else -> ServerQueueBlocker.OtherClient
+            }
         }
         queue.markQueuedOnServer(send, behind)
     }
@@ -130,10 +145,32 @@ internal class ServerQueueMarks(
 
     /** A live frame of this device's own turn: a send the server had queued has started. */
     fun onOwnTurnFrame(event: WsTimelineEvent.MessageDelta) {
-        if (event.isReplay) return
+        if (event.isReplay || event.message is UserMessage) return
         val send = event.turnId?.let(sendOfTurn) ?: return
-        // A turn of ours runs: whatever we stopped before it has finished.
         synchronized(lock) { stoppingOwnTurn -= send.conversationId }
+        rememberOwnTurn(send)
+        release(TurnTail(event.turnId, event.message.runId))
+    }
+
+    /** A start after queueing releases the mark; the transport's pre-acceptance start does not. */
+    fun onTurnStarted(event: WsTimelineEvent.TurnStarted) {
+        if (event.isReplay) return
+        if (sendOfConversation(event.conversationId) == null) {
+            val conversation = QueueConversationId(event.conversationId)
+            synchronized(lock) {
+                startedOwnTurns -= conversation
+                stoppingOwnTurn -= conversation
+            }
+        }
+        release(TurnTail(event.turnId, event.runId))
+    }
+
+    /** Exact local-turn or client-message identity proves this queued input has started or ended. */
+    fun release(tail: TurnTail) {
+        val send = tail.turnId?.let(sendOfTurn) ?: return
+        if (queue.queueFor(send.conversationId).queuedOnServer?.id != send.id) return
+        synchronized(lock) { stoppingOwnTurn -= send.conversationId }
+        rememberOwnTurn(send)
         queue.clearQueuedOnServer(send.conversationId)
     }
 }

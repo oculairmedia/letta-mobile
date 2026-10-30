@@ -5,6 +5,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
+import com.letta.mobile.data.runtime.INPUT_DEQUEUED_REASON
 import com.letta.mobile.data.runtime.INPUT_QUEUED_REASON
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
@@ -39,7 +40,7 @@ object RuntimeEventServerFrameMapper {
     data class Context(
         val agentId: String,
         val conversationId: String,
-        // Lifecycle frames only (turn_done / turn_queued / errors). Never names a message row.
+        // Lifecycle frames only (start / done / queued / errors). Never names a message row.
         val turnId: String?,
         val runId: String?,
     )
@@ -191,7 +192,17 @@ object RuntimeEventServerFrameMapper {
             turnDone(context, "cancelled"),
         )
         RuntimeRunStatus.Running -> listOfNotNull(queuedFrame(payload, context))
-        RuntimeRunStatus.Started -> emptyList()
+        RuntimeRunStatus.Started -> listOf(
+            ServerFrame.TurnStarted(
+                id = "turn_started-${Uuid.random()}",
+                ts = nowIso(),
+                agentId = context.agentId,
+                conversationId = context.conversationId,
+                turnId = context.turnId.orEmpty(),
+                runId = context.runId.orEmpty(),
+                dequeued = payload.reason == INPUT_DEQUEUED_REASON,
+            ),
+        )
     }
 
     /**

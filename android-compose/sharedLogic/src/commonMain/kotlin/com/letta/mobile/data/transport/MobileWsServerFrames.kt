@@ -62,6 +62,8 @@ sealed interface ServerFrame {
         @SerialName("turn_id") val turnId: String,
         @SerialName("run_id") val runId: String,
         val seq: Long? = null,
+        /** This start follows removal of this input from the server queue. */
+        @SerialName("dequeued") val dequeued: Boolean = false,
     ) : ServerFrame
 
     /**
