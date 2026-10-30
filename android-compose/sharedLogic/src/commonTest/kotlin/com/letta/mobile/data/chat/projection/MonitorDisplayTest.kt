@@ -30,8 +30,13 @@ class MonitorDisplayTest {
     @Test
     fun otherWatcherEventsKeepMeaningAndClassification() {
         val fixtures = listOf(
-            "PR head changed from 9fea204411af to 454ecd7ac7b5. 1/6 checks complete, 0 failing, 5 pending; merge state BLOCKED, 4 unresolved review threads.",
-            "New PR comment from @sonarqubecloud: ## [![Quality Gate Passed](https://sonarsource.github.io/sonarcloud-github-static-resources/v2/checks/QualityGateBadge/qg-passed-20px.png 'Quality Gate Passed')](https://sonarcloud.io/dashboard?id=oculairmedia_letta-mobile&pullRequest=2282)… https://github.com/oculairmedia/letta-mobile/pull/2282#issuecomment-6515420405",
+            "PR head changed from 9fea204411af to 454ecd7ac7b5. 1/6 checks complete, 0 failing, 5 pending" +
+                "; merge state BLOCKED, 4 unresolved review threads.",
+            "New PR comment from @sonarqubecloud: ## [![Quality Gate Passed]" +
+                "(https://sonarsource.github.io/sonarcloud-github-static-resources" +
+                "/v2/checks/QualityGateBadge/qg-passed-20px.png 'Quality Gate Passed'" +
+                ")](https://sonarcloud.io/dashboard?id=oculairmedia_letta-mobile&pullRequest=2282)" +
+                "… https://github.com/oculairmedia/letta-mobile/pull/2282#issuecomment-6515420405",
             "ALL REQUIRED TERMINAL: build-apk-pass=completed/success detekt=completed/success ...",
             "[Monitor timed out — re-arm if needed.]",
         )
