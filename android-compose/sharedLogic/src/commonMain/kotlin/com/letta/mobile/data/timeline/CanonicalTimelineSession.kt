@@ -370,7 +370,9 @@ class CanonicalTimelineSession(
         }).minWithOrNull(Comparator(::compareTimelineInstants))
         // The canonical writer already removed matching echoes from pending storage. Absence is
         // decisive once the loaded window spans a candidate's send time, even with more pages.
-        val streaming = streaming()
+        val lastFrame = lastFrameMillis.value
+        val streaming = lastFrame > 0 &&
+            timelineCurrentTimeMillis() - lastFrame < CanonicalPendingLocalStore.LOST_ECHO_HORIZON_MILLIS
         val covered = loaded.filter {
             MessageId(it.otid) in recoveryCandidates && it.delivery != CanonicalPendingLocalStore.Delivery.Failed &&
                 (historyPage?.hasMore == false || historyCovers(it.sentAt))
@@ -385,11 +387,6 @@ class CanonicalTimelineSession(
         recoveryCandidates = recoveryCandidates.intersect(loaded.map { MessageId(it.otid) }.toSet())
         val retired = pendingStore.retireLostEchoes(scope, loaded, streaming = streaming)
         mutablePending.value = if (abandoned.isNotEmpty() || retired > 0) pendingStore.load(scope) else loaded
-    }
-
-    private fun streaming(): Boolean {
-        val last = lastFrameMillis.value
-        return last > 0 && timelineCurrentTimeMillis() - last < CanonicalPendingLocalStore.LOST_ECHO_HORIZON_MILLIS
     }
 
     private fun historyCovers(sentAt: String): Boolean {
