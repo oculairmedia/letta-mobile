@@ -102,7 +102,8 @@ class TimelineHydrationReducerTest {
 
         val toolEvent = result.timeline.events.single() as TimelineEvent.Confirmed
         assertEquals(
-            listOf(MessageContentPart.Image(base64 = "HYDRATED_TOOL_IMAGE+/==", mediaType = "image/png")),
+            // Tool-return images are owned by the tool call that returned them (letta-mobile-vqiua.1).
+            listOf(MessageContentPart.Image(base64 = "HYDRATED_TOOL_IMAGE+/==", mediaType = "image/png", toolCallId = "call-image")),
             toolEvent.attachments,
         )
     }
