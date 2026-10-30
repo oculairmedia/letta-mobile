@@ -192,22 +192,27 @@ object MessageListWireProjection {
      * clients cannot refetch an omitted image from a tool-return pointer.
      */
     private fun projectReturnBody(raw: JsonElement): JsonElement {
-        if (raw is JsonArray && raw.any { part ->
-            part is JsonObject && (part["type"] as? JsonPrimitive)?.contentOrNull in setOf("text", "image")
-        }) return JsonArray(raw.map { part ->
-            if (part !is JsonObject || (part["type"] as? JsonPrimitive)?.contentOrNull != "text") {
-                part
-            } else {
-                val text = part["text"] ?: return@map part
-                val projected = projectReturnBody(text)
-                if (projected == text) part else JsonObject(part.toMutableMap().apply { this["text"] = projected })
-            }
-        })
-        if (raw is JsonObject && (raw["type"] as? JsonPrimitive)?.contentOrNull == "image") return raw
+        if (raw is JsonArray && raw.isMultimodal()) return JsonArray(raw.map(::projectReturnPart))
+        if (raw is JsonObject && raw.partType() == "image") return raw
         val body = bodyString(raw)
         val size = utf8ByteLength(body)
         return if (size > TOOL_RETURN_PROJECTION_THRESHOLD_BYTES) JsonPrimitive(preview(body, size)) else raw
     }
+
+    /** A content-part array (text and image parts) rather than an arbitrary JSON array. */
+    private fun JsonArray.isMultimodal(): Boolean = any { part -> (part as? JsonObject)?.partType() in MULTIMODAL_PART_TYPES }
+
+    /** One part of a multimodal return: a text part's text is previewed, every other part kept. */
+    private fun projectReturnPart(part: JsonElement): JsonElement {
+        if (part !is JsonObject || part.partType() != "text") return part
+        val text = part["text"] ?: return part
+        val projected = projectReturnBody(text)
+        return if (projected == text) part else JsonObject(part.toMutableMap().apply { this["text"] = projected })
+    }
+
+    private fun JsonObject.partType(): String? = (this["type"] as? JsonPrimitive)?.contentOrNull
+
+    private val MULTIMODAL_PART_TYPES = setOf("text", "image")
 
     private fun bodyString(element: JsonElement): String =
         if (element is JsonPrimitive && element.isString) element.content else element.toString()
