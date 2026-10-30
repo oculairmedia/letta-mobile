@@ -291,29 +291,8 @@ private suspend fun MutableStateFlow<TimelineConversationsState>.readSelectedCon
     update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
 }
 
-/** A conversation the owner made (a new chat or a branch) joins the top of the list and opens. */
-private fun MutableStateFlow<TimelineConversationsState>.opened(conversation: Conversation, draft: PendingDraft?) {
-    update { current ->
-        val listed = listOf(conversation) + current.conversations.filterNot { it.id == conversation.id }
-        val next = current.copy(conversations = listed, selected = conversation.id)
-        if (draft == null) next else next.withDraft(conversation.id, draft)
-    }
-}
-
-private fun TimelineConversationsState.withDraft(conversation: ConversationId, draft: PendingDraft) =
+internal fun TimelineConversationsState.withDraft(conversation: ConversationId, draft: PendingDraft) =
     copy(drafts = drafts + (conversation to draft))
-
-/** A prompt into the composer; sent at once for a rerun or a send, text alone straight from the draft-free send. */
-private fun ChatActions.applyDraft(pending: PendingDraft) {
-    val draft = pending.draft
-    if (pending.sendNow && draft.images.isEmpty()) {
-        sendText(draft.text)
-        return
-    }
-    updateComposerText(draft.text)
-    draft.images.forEach(::attachImage)
-    if (pending.sendNow) send()
-}
 
 /** The shell's view of a conversation: whose it is and its newest activity. */
 private fun Conversation.shellRef() = ShellConversationRef(id, agentId, updatedAtLabel = lastMessageAt ?: updatedAt ?: createdAt.orEmpty())

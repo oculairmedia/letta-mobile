@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.chat.branch.PendingDraft
 import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.model.AgentId
@@ -7,6 +8,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.visibleConversationsInLists
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.chat.session.ChatActions
 import kotlinx.coroutines.flow.update
 
 /** A routed conversation outside the recents page, fetched once; null when listed, in legacy mode or already failed. */
@@ -15,8 +17,9 @@ internal fun TimelineConversationsState.unlistedRoute(
     failed: ConversationId?,
     legacyMode: Boolean,
 ): ConversationId? {
-    if (routed == null || routed == failed || legacyMode) return null
-    return routed.takeIf { record(it) == null }
+    if (legacyMode) return null
+    val route = routed?.takeIf { it != failed } ?: return null
+    return route.takeIf { record(it) == null }
 }
 
 /** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
@@ -83,3 +86,24 @@ internal fun List<Conversation>.activeChatOf(agent: AgentId): ConversationId? =
 
 /** A first chat may be made when the host asks for one and the last attempt did not fail. */
 internal fun TimelineConversationsState.mayCreate(wanted: Boolean): Boolean = wanted && error == null
+
+/** A conversation the owner made (a new chat or a branch) joins the top of the list and opens. */
+internal fun MutableStateFlow<TimelineConversationsState>.opened(conversation: Conversation, draft: PendingDraft?) {
+    update { current ->
+        val listed = listOf(conversation) + current.conversations.filterNot { it.id == conversation.id }
+        val next = current.copy(conversations = listed, selected = conversation.id)
+        if (draft == null) next else next.withDraft(conversation.id, draft)
+    }
+}
+
+/** A prompt into the composer; sent at once for a rerun or a send, text alone straight from the draft-free send. */
+internal fun ChatActions.applyDraft(pending: PendingDraft) {
+    val draft = pending.draft
+    if (pending.sendNow && draft.images.isEmpty()) {
+        sendText(draft.text)
+        return
+    }
+    updateComposerText(draft.text)
+    draft.images.forEach(::attachImage)
+    if (pending.sendNow) send()
+}
