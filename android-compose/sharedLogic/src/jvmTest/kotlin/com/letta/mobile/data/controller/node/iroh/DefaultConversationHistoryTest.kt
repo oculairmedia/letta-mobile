@@ -46,6 +46,7 @@ class DefaultConversationHistoryTest {
         client: StrictClient,
         context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
         method: String = "message.list",
+        conversationId: String = "conv-default-agent-child",
     ): JsonObject {
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router, tiers = NativeReadTiers(nativeClient = client))
@@ -53,7 +54,7 @@ class DefaultConversationHistoryTest {
             requestId = "history",
             method = method,
             params = buildJsonObject {
-                put("conversation_id", "conv-default-agent-child")
+                put("conversation_id", conversationId)
                 put("message_id", "child-message")
                 put("before", "newer-message")
             },
@@ -82,6 +83,17 @@ class DefaultConversationHistoryTest {
     }
 
     @Test
+    fun bareDefaultIsForwardedAsIsWithoutAnOwner() = runTest {
+        for (method in listOf("message.list", "message.get", "tool_return.get")) {
+            val client = StrictClient()
+            read(client, method = method, conversationId = "default")
+            val sent = client.requests.first()
+            assertEquals("default", sent.conversationId, method)
+            assertEquals(null, sent.query?.get("agent_id"), method)
+        }
+    }
+
+    @Test
     fun authorizedAgentCanReadAlias() = runTest {
         assertTrue(read(StrictClient(), AdminRpcRequestContext(true, authorizedAgentIds = setOf("agent-child")))
             .getValue("success").jsonPrimitive.boolean)
@@ -89,30 +101,31 @@ class DefaultConversationHistoryTest {
 
     @Test
     fun otherAgentCannotReadAlias() = runTest {
-        val client = StrictClient()
-        val response = read(client, AdminRpcRequestContext(true, authorizedAgentIds = setOf("agent-other")))
-        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
-        assertTrue(response.toString().contains("forbidden"))
-        assertTrue(client.requests.isEmpty())
+        assertForbiddenWithoutNativeRead(AdminRpcRequestContext(true, authorizedAgentIds = setOf("agent-other")))
     }
 
     @Test
     fun aliasConversationGrantDoesNotOverrideAgentScope() = runTest {
-        val client = StrictClient()
-        val response = read(client, AdminRpcRequestContext(
-            true,
-            authorizedConversationIds = setOf("conv-default-agent-child"),
-            authorizedAgentIds = setOf("agent-other"),
-        ))
-        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
-        assertTrue(response.toString().contains("forbidden"))
-        assertTrue(client.requests.isEmpty())
+        assertForbiddenWithoutNativeRead(
+            AdminRpcRequestContext(
+                true,
+                authorizedConversationIds = setOf("conv-default-agent-child"),
+                authorizedAgentIds = setOf("agent-other"),
+            ),
+        )
     }
 
     @Test
     fun conversationScopeCannotUseAnotherDefaultsAlias() = runTest {
+        assertForbiddenWithoutNativeRead(
+            AdminRpcRequestContext(true, authorizedConversationIds = setOf("conv-default-agent-other", "default")),
+        )
+    }
+
+    /** The read is refused as out of scope and never reaches the App Server. */
+    private suspend fun assertForbiddenWithoutNativeRead(context: AdminRpcRequestContext) {
         val client = StrictClient()
-        val response = read(client, AdminRpcRequestContext(true, authorizedConversationIds = setOf("conv-default-agent-other", "default")))
+        val response = read(client, context)
         assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
         assertTrue(response.toString().contains("forbidden"))
         assertTrue(client.requests.isEmpty())

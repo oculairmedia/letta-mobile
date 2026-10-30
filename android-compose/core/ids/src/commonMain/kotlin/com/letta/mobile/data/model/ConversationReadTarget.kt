@@ -4,10 +4,13 @@ package com.letta.mobile.data.model
 fun resolveConversationReadTarget(conversationId: ConversationId): Pair<ConversationId, AgentId?>? {
     val id = conversationId.value
     if (id.isEmpty() || id == IdFormats.DEFAULT_CONVERSATION_ID) return null
+    val owner = defaultAliasOwner(id) ?: return conversationId to null
+    return ConversationId(IdFormats.DEFAULT_CONVERSATION_ID) to owner
+}
+
+/** The agent a `conv-default-<agentId>` alias names, or null when [id] is not such an alias. */
+private fun defaultAliasOwner(id: String): AgentId? {
+    if (!IdFormats.hasDefaultConversationPrefix(id)) return null
     val agent = id.removePrefix(IdFormats.DEFAULT_CONVERSATION_PREFIX)
-    return if (id != agent && agent.startsWith(IdFormats.AGENT_PREFIX) && agent.length > IdFormats.AGENT_PREFIX.length) {
-        ConversationId(IdFormats.DEFAULT_CONVERSATION_ID) to AgentId(agent)
-    } else {
-        conversationId to null
-    }
+    return AgentId(agent).takeIf { agent.length > IdFormats.AGENT_PREFIX.length && agent.startsWith(IdFormats.AGENT_PREFIX) }
 }

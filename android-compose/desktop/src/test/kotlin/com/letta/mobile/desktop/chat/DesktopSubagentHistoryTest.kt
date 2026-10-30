@@ -45,6 +45,7 @@ class DesktopSubagentHistoryTest {
     private suspend fun kotlinx.coroutines.test.TestScope.assertHistory(
         route: (FakeDesktopChatGateway, SubagentView) -> SubagentTimelineRoute,
     ) {
+        val beforeRequests = mutableListOf<Pair<String, String>>()
         val gateway = object : FakeDesktopChatGateway() {
             override suspend fun listConversationMessages(
                 conversationId: ConversationId,
@@ -62,7 +63,20 @@ class DesktopSubagentHistoryTest {
                 limit: Int?,
                 order: String?,
                 conversationId: ConversationId?,
-            ): List<LettaMessage> = emptyList()
+            ): List<LettaMessage> {
+                agentMessageRequests += agentId.value to conversationId?.value
+                return emptyList()
+            }
+
+            override suspend fun listConversationMessagesBefore(
+                conversationId: ConversationId,
+                limit: Int,
+                before: String,
+                order: String,
+            ): List<LettaMessage> {
+                beforeRequests += conversationId.value to before
+                return emptyList()
+            }
         }
         val conversation = ConversationId("conv-default-agent-local-child")
         val view = SubagentView(AgentId("agent-local-child"), conversation)
@@ -71,6 +85,11 @@ class DesktopSubagentHistoryTest {
         runCurrent()
         assertTrue(session.port.uiState.value.messages.isNotEmpty(), "Existing child history must appear in the pane")
         assertEquals(listOf(conversation.value), gateway.conversationMessageRequests)
+        assertTrue(gateway.agentMessageRequests.isEmpty(), "Child history must not request gated agent history")
+        // Older history goes through the same route and still names the child's conversation.
+        val resolved = route(gateway, view)
+        resolved.transport.listConversationMessagesBefore(resolved.loopConversationId, 20, "older-cursor", "desc")
+        assertEquals(listOf(conversation.value to "older-cursor"), beforeRequests)
         session.close()
     }
 }
