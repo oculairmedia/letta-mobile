@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -41,6 +42,7 @@ import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.LocalListRowEndInset
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowSpacing
@@ -152,19 +154,21 @@ internal class RunStepDisclosure(
 @Composable
 internal fun RunStepListRow(spec: RunStepRowSpec, disclosure: RunStepDisclosure?, modifier: Modifier = Modifier) {
     val stateText = disclosure?.let { stringResource(if (it.expanded) it.labels.expandedState else it.labels.collapsedState) }
-    LettaListRow(
-        spec = LettaListRowSpec(title = spec.title, subtitle = spec.subtitle, enabled = disclosure != null),
-        onClick = { disclosure?.onToggle?.invoke() },
-        modifier = modifier
-            .testTag(spec.tags.row)
-            .semantics { stateText?.let { stateDescription = it } },
-        leading = { RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel) },
-        end = if (disclosure != null) {
-            { RunStepChevron(disclosure) }
-        } else {
-            null
-        },
-    )
+    CompositionLocalProvider(LocalListRowEndInset provides ChatRowSpacing.runDisclosureEndInset) {
+        LettaListRow(
+            spec = LettaListRowSpec(title = spec.title, subtitle = spec.subtitle, enabled = disclosure != null),
+            onClick = { disclosure?.onToggle?.invoke() },
+            modifier = modifier
+                .testTag(spec.tags.row)
+                .semantics { stateText?.let { stateDescription = it } },
+            leading = { RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel) },
+            end = if (disclosure != null) {
+                { RunStepChevron(disclosure) }
+            } else {
+                null
+            },
+        )
+    }
 }
 
 @Composable

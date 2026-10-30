@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.LettaSizingTokens
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.math.abs
 import kotlin.test.Test
@@ -96,12 +98,12 @@ class ChatRowRunAlignmentUiTest {
                 val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes()
                 assertEquals(2, steps.size, "@ $width")
                 val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
-                val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val indent = if (width < LettaSizingTokens.COMPACT_WIDTH_BREAKPOINT) 0f else ChatRowSpacing.runStepIndent.value
                 steps.forEach { step ->
                     val tools = step.boundsInRoot
-                    // The row ends at the run's right edge; the step sits indented under the summary's label.
+                    // Wide steps keep their indent; compact steps use the full run width.
                     assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the step row is inset: ${tools.right} vs ${block.right}")
-                    assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label (@ $width)")
+                    assertTrue(abs(tools.left - block.left - indent) < TOLERANCE_PX, "incorrect tool step indent (@ $width)")
                 }
             }
         }

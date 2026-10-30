@@ -79,7 +79,12 @@ internal fun RunSummaryLine(state: RunHeaderState) {
                     Modifier
                 },
             )
-            .padding(horizontal = ChatRowSpacing.runHeaderHorizontal, vertical = ChatRowSpacing.runHeaderVertical),
+            .padding(
+                start = ChatRowSpacing.runHeaderHorizontal,
+                end = ChatRowSpacing.runDisclosureEndInset,
+                top = ChatRowSpacing.runHeaderVertical,
+                bottom = ChatRowSpacing.runHeaderVertical,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {

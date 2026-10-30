@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +71,9 @@ object LettaListRowDefaults {
     const val TitleTestTag: String = "letta_list_row_title"
 }
 
+/** Allows nested disclosure rows to share their parent's trailing inset without changing their leading geometry. */
+internal val LocalListRowEndInset = staticCompositionLocalOf { LettaDimens.Space.sm }
+
 /** A compact selectable row rendering a [LettaListRowSpec]; every roster row is one (see RosterList). */
 @Composable
 fun LettaListRow(
@@ -89,7 +93,12 @@ fun LettaListRow(
             .clip(MaterialTheme.shapes.small)
             .background(background)
             .clickable(enabled = spec.enabled, onClick = onClick)
-            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
+            .padding(
+                start = LettaDimens.Space.sm,
+                end = LocalListRowEndInset.current,
+                top = LettaDimens.Space.sm,
+                bottom = LettaDimens.Space.sm,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {

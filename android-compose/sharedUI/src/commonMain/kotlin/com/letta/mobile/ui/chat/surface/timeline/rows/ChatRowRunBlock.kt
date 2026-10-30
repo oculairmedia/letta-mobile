@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
@@ -26,6 +28,7 @@ import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.LettaSizingTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -61,14 +64,18 @@ internal fun RunBlockRow(
     val messages = remember(runMessages) { runMessages.toImmutableList() }
     val plan = rememberRunBlockPlan(messages, context) ?: return
     val row = RunRowScope(context, callbacks)
-    Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
-        val header = plan.header(callbacks.actions)
-        RunHeader(header)
-        val lone = plan.loneMessage
-        if (lone != null) {
-            RunLoneStep(PositionedRunStep(RunStep.Message(lone), position), header, row)
-        } else {
-            RunBody(plan.body, header, row)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
+        CompositionLocalProvider(LocalCompactRunWidth provides (maxWidth < LettaSizingTokens.COMPACT_WIDTH_BREAKPOINT.dp)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                val header = plan.header(callbacks.actions)
+                RunHeader(header)
+                val lone = plan.loneMessage
+                if (lone != null) {
+                    RunLoneStep(PositionedRunStep(RunStep.Message(lone), position), header, row)
+                } else {
+                    RunBody(plan.body, header, row)
+                }
+            }
         }
     }
 }
@@ -371,8 +378,9 @@ internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
 /** A run step and its place among the run's visible steps (the legacy row's group position). */
 @Immutable
 private class PositionedRunStep(val step: RunStep, val position: GroupPosition) {
+    @Composable
     fun workPadding(body: RunBodyState): Modifier {
-        val indent = if (body.lifted) ChatRowSpacing.runStepIndent else 0.dp
+        val indent = if (body.lifted && !LocalCompactRunWidth.current) ChatRowSpacing.runStepIndent else 0.dp
         return Modifier.padding(start = indent, top = top())
     }
 
@@ -493,3 +501,6 @@ private fun UiMessage.hasProseAndToolCalls(): Boolean = isPlainAssistantStep() &
 
 /** Prose, or a canvas card: what keeps a tool-calling message a step of its own. */
 private fun UiMessage.hasStepOfItsOwn(): Boolean = content.isNotBlank() || artifacts.isNotEmpty()
+
+/** The run's own constraints decide whether its work and tool details need the full column width. */
+internal val LocalCompactRunWidth = staticCompositionLocalOf { false }

@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.gaze.AttentionKey
 import com.letta.mobile.avatar.core.gaze.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
@@ -204,7 +205,7 @@ private fun ToolStepLineRow(spec: StepLineSpec, disclosure: RunStepDisclosure?) 
             .heightIn(min = ChatRowSpacing.toolStepMinHeight)
             .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
             .then(if (disclosure != null) Modifier.stepToggle(disclosure) else Modifier.semantics { disabled() })
-            .padding(horizontal = LettaDimens.Space.sm),
+            .padding(start = LettaDimens.Space.sm, end = ChatRowSpacing.runDisclosureEndInset),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
@@ -286,11 +287,12 @@ private fun warningInk(): Color {
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
 private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
+    val indent = if (LocalCompactRunWidth.current) 0.dp else ChatRowSpacing.runStepDetailIndent
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ChatRowTestTags.TOOL_CARD_BODY)
-            .padding(start = ChatRowSpacing.runStepDetailIndent, end = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
+            .padding(start = indent, end = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         toolCall.agentMessageProvenance?.let { provenance ->

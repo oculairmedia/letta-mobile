@@ -85,6 +85,9 @@ object ChatRowSpacing {
      */
     val runHeaderMinHeight: Dp = LettaDimens.Space.xxl
     val runHeaderToggleMinHeight: Dp = LettaDimens.Orb.railSlotHeight
+    /** Shared trailing inset for run headers, tool steps and reasoning disclosures. */
+    internal val runDisclosureEndInset: Dp = LettaDimens.Space.sm
+
     val runHeaderHorizontal: Dp = LettaDimens.Space.xs
     val runHeaderVertical: Dp = LettaDimens.Space.hair
 
