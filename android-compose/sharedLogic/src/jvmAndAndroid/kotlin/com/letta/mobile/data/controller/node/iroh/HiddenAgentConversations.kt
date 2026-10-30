@@ -46,17 +46,25 @@ internal class HiddenAgentIndex(
     private val clock: () -> Long = System::currentTimeMillis,
     private val ttlMs: Long = DEFAULT_TTL_MS,
 ) {
-    @Volatile private var cached: Set<String> = emptySet()
+    /** The last successfully read set, or null while every read so far failed. One field, read once. */
+    @Volatile private var verified: Set<String>? = null
 
     @Volatile private var loadedAtMs: Long? = null
 
-    fun hiddenAgentIds(): Set<String> {
+    fun hiddenAgentIds(): Set<String> = verifiedHiddenAgentIds().orEmpty()
+
+    /**
+     * The hidden set only when it has been read successfully at least once; null when every load so
+     * far failed, so a caller that must not show hidden agents can refuse instead of using an empty set.
+     */
+    fun verifiedHiddenAgentIds(): Set<String>? {
         val now = clock()
         val loadedAt = loadedAtMs
-        if (loadedAt != null && now - loadedAt < ttlMs) return cached
-        load()?.let { cached = it }
-        loadedAtMs = now
-        return cached
+        if (loadedAt == null || now - loadedAt >= ttlMs) {
+            load()?.let { verified = it }
+            loadedAtMs = now
+        }
+        return verified
     }
 
     companion object {
