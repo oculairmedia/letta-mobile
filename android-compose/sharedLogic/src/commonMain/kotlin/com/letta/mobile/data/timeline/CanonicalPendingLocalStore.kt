@@ -89,13 +89,13 @@ class CanonicalPendingLocalStore(
     internal suspend fun accept(scope: TimelineScope, record: Record, accept: () -> Boolean): Boolean {
         require(record.otid.isNotBlank())
         val reservation = reserve(scope, record)
-        val accepted = try {
-            accept()
-        } catch (failure: Throwable) {
-            releaseQuietly(scope, reservation)
-            throw failure
+        var accepted = false
+        try {
+            accepted = accept()
+        } finally {
+            // Runs for a refusal and for a throw alike; a throw still propagates unchanged.
+            if (!accepted) releaseQuietly(scope, reservation)
         }
-        if (!accepted) releaseQuietly(scope, reservation)
         return accepted
     }
 
