@@ -31,6 +31,27 @@ class MessageListWireProjectionTest {
     }
 
     @Test
+    fun imagePartsSurviveWhileLargeTextIsPreviewed() {
+        val image = buildJsonObject {
+            put("type", "image")
+            put("source", buildJsonObject {
+                put("type", "base64")
+                put("media_type", "image/png")
+                put("data", "QUJD".repeat(2000))
+            })
+        }
+        val message = JsonObject(toolReturnMessage("") + ("tool_return" to buildJsonArray {
+            add(buildJsonObject { put("type", "text"); put("text", "x".repeat(threshold + 1)) })
+            add(image)
+        }))
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")!!
+        val parts = projected.getValue("tool_return").jsonArray
+        assertEquals(image, parts[1])
+        assertTrue(parts[0].jsonObject.getValue("text").jsonPrimitive.content.contains("[truncated"))
+        assertTrue(projected.getValue("tool_return_truncated").jsonPrimitive.boolean)
+    }
+
+    @Test
     fun bodyAtThresholdIsNotProjected() {
         val body = "a".repeat(threshold)
         val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")!!

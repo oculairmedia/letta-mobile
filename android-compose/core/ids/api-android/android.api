@@ -389,6 +389,10 @@ public final class com/letta/mobile/data/model/ConversationId$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/model/ConversationReadTargetKt {
+	public static final fun resolveConversationReadTarget-LfPRSJk (Ljava/lang/String;)Lkotlin/Pair;
+}
+
 public final class com/letta/mobile/data/model/DomainIdsKt {
 	public static final fun isLettaCodeEphemeralWorker-qkT7gGE (Ljava/lang/String;)Z
 }

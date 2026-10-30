@@ -98,14 +98,11 @@ private fun com.letta.mobile.data.model.ToolCall.toNativeUiToolCall(data: ToolCa
     )
 }
 
-/** Attach generated images to the generating call so they are not duplicated as message attachments. */
+/** Attach tool-returned images to the call so they are not duplicated as message attachments. */
 internal fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
-): List<UiImageAttachment> = if (name == "generate_image") {
+): List<UiImageAttachment> =
     attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
-} else {
-    emptyList()
-}
 
 /**
  * Approval chip for a TOOL_CALL event. An explicit

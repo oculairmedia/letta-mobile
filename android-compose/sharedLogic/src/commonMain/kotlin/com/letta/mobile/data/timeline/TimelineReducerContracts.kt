@@ -250,6 +250,9 @@ fun enrichTimelineFromSnapshot(timeline: Timeline, snapshot: List<LettaMessage>)
             toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = errors.toTimelinePersistentMap(),
             toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
+            attachments = ev.attachments.mergeIncomingImages(
+                matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments },
+            ).toTimelinePersistentList(),
         )
     }
     if (newEvents == timeline.events) return timeline

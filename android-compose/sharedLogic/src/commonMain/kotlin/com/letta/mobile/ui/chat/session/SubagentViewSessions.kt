@@ -1,15 +1,22 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageId
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -101,7 +108,58 @@ fun interface SubagentViewSessions {
 }
 
 /** Where a subagent's timeline is read: the transport, and the conversation id its loop runs under. */
-class SubagentTimelineRoute(val transport: TimelineTransport, val loopConversationId: ConversationId)
+class SubagentTimelineRoute(transport: TimelineTransport, loopConversationId: ConversationId) {
+    // A default child has a real addressable history. Keep the legacy default-shim hydration
+    // shortcut out of this read-only loop, while preserving the wire conversation on every read.
+    private val isDefault = IdFormats.hasDefaultConversationPrefix(loopConversationId.value)
+    val transport: TimelineTransport = if (isDefault) {
+        subagentConversationTransport(transport, loopConversationId)
+    } else {
+        transport
+    }
+    val loopConversationId: ConversationId = if (isDefault) {
+        ConversationId("subagent-view-${loopConversationId.value}")
+    } else {
+        loopConversationId
+    }
+}
+
+private fun subagentConversationTransport(
+    delegate: TimelineTransport,
+    target: ConversationId,
+): TimelineTransport = object : TimelineTransport {
+    override suspend fun listAgentMessages(
+        agentId: AgentId,
+        limit: Int?,
+        order: String?,
+        conversationId: ConversationId?,
+    ): List<LettaMessage> = delegate.listConversationMessages(target, limit, order = order)
+
+    override suspend fun listConversationMessages(
+        conversationId: ConversationId,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = delegate.listConversationMessages(target, limit, after, order)
+
+    override suspend fun listConversationMessagesBefore(
+        conversationId: ConversationId,
+        limit: Int,
+        before: String,
+        order: String,
+    ): List<LettaMessage>? = delegate.listConversationMessagesBefore(target, limit, before, order)
+
+    override suspend fun getToolReturn(conversationId: ConversationId, messageId: MessageId): LettaMessage? =
+        delegate.getToolReturn(target, messageId)
+
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> =
+        delegate.streamConversation(target)
+
+    override suspend fun sendConversationMessage(
+        conversationId: ConversationId,
+        request: MessageCreateRequest,
+    ): Flow<LettaMessage> = delegate.sendConversationMessage(target, request)
+}
 
 /**
  * The shared binding: the child conversation's own [TimelineSyncLoop] over the host's [route],

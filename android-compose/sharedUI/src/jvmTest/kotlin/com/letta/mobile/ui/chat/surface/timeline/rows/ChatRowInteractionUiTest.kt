@@ -33,6 +33,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -169,6 +170,28 @@ class ChatRowInteractionUiTest {
         setContent { MaterialTheme { ToolStep(tool, "img-1", rowCallbacks()) } }
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
         onNodeWithTag(ChatRowTestTags.IMAGE_GRID).assertExists()
+    }
+
+    @Test
+    fun completedReadImageStartsExpandedWithAnImageNode() = runComposeUiTest {
+        val tool = UiToolCall(
+            name = "Read",
+            arguments = "{}",
+            result = "[Image: pixel.png]",
+            status = "success",
+            toolCallId = "read-image",
+            generatedImageAttachments = listOf(UiImageAttachment(
+                base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+                mediaType = "image/png",
+            )),
+        )
+        setContent { MaterialTheme { ToolStep(tool, "read-image", rowCallbacks()) } }
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
+        onNodeWithTag(ChatRowTestTags.IMAGE_GRID).assertExists()
+        waitUntil(timeoutMillis = 5_000L) {
+            onAllNodesWithContentDescription("Attached image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithContentDescription("Attached image", useUnmergedTree = true).assertExists()
     }
 
     @Test

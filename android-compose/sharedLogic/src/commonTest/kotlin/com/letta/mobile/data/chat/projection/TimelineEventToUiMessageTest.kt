@@ -184,9 +184,10 @@ class TimelineEventToUiMessageTest {
 
         val ui = timelineEventToUiMessage(ev)!!
 
-        assertEquals(1, ui.attachments.size)
-        assertEquals("IMG+/==", ui.attachments.first().base64)
-        assertEquals("image/png", ui.attachments.first().mediaType)
+        assertTrue(ui.attachments.isEmpty())
+        val image = ui.toolCalls.orEmpty().single().generatedImageAttachments.single()
+        assertEquals("IMG+/==", image.base64)
+        assertEquals("image/png", image.mediaType)
     }
 
     @Test

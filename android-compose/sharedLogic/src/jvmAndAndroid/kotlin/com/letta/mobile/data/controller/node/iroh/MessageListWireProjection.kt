@@ -16,8 +16,9 @@ import kotlinx.serialization.json.contentOrNull
  * message) — mostly tool-return bodies — which blows the 1MiB iroh frame
  * budget. Instead of shipping full payloads on every hydrate:
  *
- * - Tool-return bodies larger than [TOOL_RETURN_PROJECTION_THRESHOLD_BYTES]
- *   are replaced with a ~[TOOL_RETURN_PREVIEW_BYTES] preview and the message
+ * - Text tool-return bodies (or individual text parts in multimodal arrays) larger than
+ *   [TOOL_RETURN_PROJECTION_THRESHOLD_BYTES] are replaced with a
+ *   ~[TOOL_RETURN_PREVIEW_BYTES] preview and the message
  *   is stamped with `tool_return_truncated`, `tool_return_byte_len`, and a
  *   `tool_return_pointer` that names the `tool_return.get` admin_rpc method
  *   clients use to fetch the full body on demand (e.g. when the user expands
@@ -27,7 +28,7 @@ import kotlinx.serialization.json.contentOrNull
  *   stripping it would silently lose images on every hydrate; oversized
  *   pages ride the capability-gated `frame_part` chunking instead.
  *
- * `tool_return.get` and `message.get` responses are NOT projected.
+ * `tool_return.get` returns the full body; `message.get` uses this same bounded projection.
  */
 object MessageListWireProjection {
     /** Bodies at or below this many UTF-8 bytes ship inline unmodified. */
@@ -138,12 +139,11 @@ object MessageListWireProjection {
         var originalBytes = 0L
 
         (message["tool_return"])?.let { raw ->
-            val body = bodyString(raw)
-            val size = utf8ByteLength(body)
-            if (size > TOOL_RETURN_PROJECTION_THRESHOLD_BYTES) {
+            val projected = projectReturnBody(raw)
+            if (projected != raw) {
                 truncated = true
-                originalBytes += size
-                out["tool_return"] = JsonPrimitive(preview(body, size))
+                originalBytes += utf8ByteLength(bodyString(raw))
+                out["tool_return"] = projected
             }
         }
 
@@ -152,13 +152,12 @@ object MessageListWireProjection {
             val projected = returns.map { entry ->
                 if (entry !is JsonObject) return@map entry
                 val funcResponse = entry["func_response"] ?: return@map entry
-                val body = bodyString(funcResponse)
-                val size = utf8ByteLength(body)
-                if (size <= TOOL_RETURN_PROJECTION_THRESHOLD_BYTES) return@map entry
+                val projectedBody = projectReturnBody(funcResponse)
+                if (projectedBody == funcResponse) return@map entry
                 truncated = true
                 changed = true
-                originalBytes += size
-                JsonObject(entry.toMutableMap().apply { this["func_response"] = JsonPrimitive(preview(body, size)) })
+                originalBytes += utf8ByteLength(bodyString(funcResponse))
+                JsonObject(entry.toMutableMap().apply { this["func_response"] = projectedBody })
             }
             if (changed) out["tool_returns"] = JsonArray(projected)
         }
@@ -186,6 +185,34 @@ object MessageListWireProjection {
         )
         return JsonObject(out)
     }
+
+    /**
+     * Attachment bodies follow the existing inline-attachment policy: no additional size cap here;
+     * capability-gated frame chunking carries oversized pages. Only text is previewed, because
+     * clients cannot refetch an omitted image from a tool-return pointer.
+     */
+    private fun projectReturnBody(raw: JsonElement): JsonElement {
+        if (raw is JsonArray && raw.isMultimodal()) return JsonArray(raw.map(::projectReturnPart))
+        if (raw is JsonObject && raw.partType() == "image") return raw
+        val body = bodyString(raw)
+        val size = utf8ByteLength(body)
+        return if (size > TOOL_RETURN_PROJECTION_THRESHOLD_BYTES) JsonPrimitive(preview(body, size)) else raw
+    }
+
+    /** A content-part array (text and image parts) rather than an arbitrary JSON array. */
+    private fun JsonArray.isMultimodal(): Boolean = any { part -> (part as? JsonObject)?.partType() in MULTIMODAL_PART_TYPES }
+
+    /** One part of a multimodal return: a text part's text is previewed, every other part kept. */
+    private fun projectReturnPart(part: JsonElement): JsonElement {
+        if (part !is JsonObject || part.partType() != "text") return part
+        val text = part["text"] ?: return part
+        val projected = projectReturnBody(text)
+        return if (projected == text) part else JsonObject(part.toMutableMap().apply { this["text"] = projected })
+    }
+
+    private fun JsonObject.partType(): String? = (this["type"] as? JsonPrimitive)?.contentOrNull
+
+    private val MULTIMODAL_PART_TYPES = setOf("text", "image")
 
     private fun bodyString(element: JsonElement): String =
         if (element is JsonPrimitive && element.isString) element.content else element.toString()

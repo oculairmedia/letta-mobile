@@ -123,14 +123,9 @@ private fun resolveDesktopTimelineRouting(
     conversation: DesktopConversationSummary,
 ): DesktopTimelineRouting = resolveDesktopTimelineRouting(gateway, ConversationId(conversation.id), conversation.agentId?.let(::AgentId))
 
-/**
- * letta-mobile-ulcg6.1: where a subagent's conversation is read for the dual view, routed the way a
- * selected conversation is (a `conv-default-<agentId>` child goes through the default-shim transport).
- */
-internal fun desktopSubagentTimelineRoute(gateway: DesktopChatGateway, view: SubagentView): SubagentTimelineRoute {
-    val routing = resolveDesktopTimelineRouting(gateway, view.conversationId, view.agentId)
-    return SubagentTimelineRoute(routing.transport, routing.loopConversationId)
-}
+/** Child history is conversation-scoped, including addressable local-agent default conversations. */
+internal fun desktopSubagentTimelineRoute(gateway: DesktopChatGateway, view: SubagentView): SubagentTimelineRoute =
+    SubagentTimelineRoute(gateway, view.conversationId)
 
 private fun resolveDesktopTimelineRouting(
     gateway: DesktopChatGateway,
