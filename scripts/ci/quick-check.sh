@@ -9,6 +9,7 @@
 #   platform-ui   scripts/ci/platform-ui-gate.sh --enforce
 #   kdoc          scripts/ci/check-kdoc-hygiene.py
 #   api-packages  scripts/ci/check-api-package-coverage.py
+#   wire-contracts scripts/ci/check-wire-contracts.py (pairs, index, shrinking baseline)
 #   ratchet       scripts/ci/baseline-ratchet-guard.py against the merge base with --base
 #   structure     scripts/ci/package_headroom.py --changed: package type caps, new import
 #                 cycles (CI's structure contract) and headroom of every touched package
@@ -46,12 +47,13 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 cd "$ROOT" || exit 2
 
-GATES=(parity platform-ui kdoc api-packages ratchet structure)
+GATES=(parity platform-ui kdoc api-packages wire-contracts ratchet structure)
 declare -A HINT=(
   [parity]="bind the shared contract on every platform, implement the shared type, or move the logic into sharedLogic/sharedUI; never add a scripts/ci/parity/ line (AGENTS.md 'No unshared frontend or logic')"
   [platform-ui]="build the @Composable in sharedUI and keep the platform file a container (PUI001), or shrink it below its cap (PUI002); delete stale allowlist lines (PUI003)"
   [kdoc]="move bead ids / CodeScene numbers out of /** KDoc */ into // comments or the commit message"
   [api-packages]="add an overview for each new production package to its module's Module.md (see the message above)"
+  [wire-contracts]="add matching versioned specs/fixtures, regenerate the index, and only shrink the uncovered baseline; run :sharedLogic:jvmTest for real registry/conformance"
   [ratchet]="baselines only shrink: fix the code instead of adding or raising a baseline line"
   [structure]="split a full package or put new types in a package with headroom; drop the import that closes a cycle; lower stale lines in android-compose/architecture-tests/structure-baseline.json"
 )
@@ -62,6 +64,7 @@ run_gate() {
     platform-ui) bash scripts/ci/platform-ui-gate.sh --enforce ;;
     kdoc) "$PY" scripts/ci/check-kdoc-hygiene.py ;;
     api-packages) "$PY" scripts/ci/check-api-package-coverage.py ;;
+    wire-contracts) "$PY" scripts/ci/check-wire-contracts.py --check --diff-base "$MERGE_BASE" ;;
     ratchet) "$PY" scripts/ci/baseline-ratchet-guard.py --diff-base "$MERGE_BASE" ;;
     structure) "$PY" scripts/ci/package_headroom.py --changed --base "$MERGE_BASE" ;;
   esac

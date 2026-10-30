@@ -1,0 +1,21 @@
+{
+  "method": "health.check",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/HealthAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "connected",
+      "context": {"authenticated": true},
+      "host_state": {"controller_state": "connected"},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"status": "ok", "controller_state": "connected", "native": true}}
+    },
+    {
+      "name": "disconnected",
+      "context": {"authenticated": true},
+      "host_state": {"controller_state": "disconnected"},
+      "params": {},
+      "expected_response": {"type": "admin_rpc_response", "request_id": "contract", "success": true, "result": {"status": "degraded", "controller_state": "disconnected", "native": true}}
+    }
+  ]
+}

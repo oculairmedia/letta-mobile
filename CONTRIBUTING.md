@@ -219,6 +219,24 @@ The normal sharedLogic JVM tests also enforce their parity. These tasks reuse
 the runtime registries/renderers and preserve prose outside the generated markers;
 their standalone Markdown outputs remain in `sharedLogic/build/`.
 
+## Admin RPC wire contracts
+
+Every new or changed `admin_rpc` method ships a versioned spec in
+`docs/reference/contracts/<method>/<name>-v<N>.md` and matching JSON fixture in
+`android-compose/sharedLogic/src/commonTest/resources/contracts/<method>/`.
+Describe params/types, responses, errors, scope and old-peer behaviour. Exercise
+real handlers in `WireContractsTest`; client fakes use the same data via
+`WireContractFixture`, not independently invented response shapes. New host-state
+families need an explicit adapter; unsupported fixtures fail rather than skip.
+
+The uncovered baseline in `scripts/ci/wire-contract-uncovered-baseline.txt` only
+shrinks. Remove a method when covered or removed; never add a new exception.
+Required CI compares the full runtime router registry in `:sharedLogic:jvmTest`
+and checks baseline growth, spec/fixture pairing and the generated index in the
+`api-docs` tooling step. Run `python3 scripts/ci/check-wire-contracts.py --write-index`
+to refresh navigation, `--check` to verify it, and `bash scripts/ci/quick-check.sh`
+for the local no-Gradle gates (which do not replace the JVM conformance run).
+
 ## Pre-push PR readiness
 
 CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that detekt flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
