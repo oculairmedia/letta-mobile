@@ -381,7 +381,9 @@ object TimelineHydrationReducer {
             toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
             toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
-            attachments = (attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
+            attachments = attachments.mergeIncomingImages(
+                matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments },
+            ).toTimelinePersistentList(),
         )
     }
 }

@@ -58,6 +58,8 @@ sealed class MessageContentPart {
          * placeholder labelled with [storedByteSize].
          */
         val storedByteSize: Long? = null,
+        /** Local projection ownership, not part of the outbound image wire format. */
+        val toolCallId: String? = null,
     ) : MessageContentPart() {
         /**
          * Build an `data:<mediaType>;base64,<base64>` URL. NOT used on the

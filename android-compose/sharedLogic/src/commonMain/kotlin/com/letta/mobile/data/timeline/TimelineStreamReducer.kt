@@ -134,7 +134,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                     toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
                     toolReturnIsErrorByCallId = (match.toolReturnIsErrorByCallId + (tcid to isError)).toTimelinePersistentMap(),
                     toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
-                    attachments = (match.attachments + message.attachments).distinct().toTimelinePersistentList(),
+                    attachments = match.attachments.mergeIncomingImages(message.attachments).toTimelinePersistentList(),
                 )
                 timeline = timeline.replaceByServerId(updated)
                 pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
@@ -709,6 +709,8 @@ internal fun applyPendingToolReturns(
         toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
         toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
         toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
-        attachments = (ev.attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
+        attachments = ev.attachments.mergeIncomingImages(
+            matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments },
+        ).toTimelinePersistentList(),
     )
 }

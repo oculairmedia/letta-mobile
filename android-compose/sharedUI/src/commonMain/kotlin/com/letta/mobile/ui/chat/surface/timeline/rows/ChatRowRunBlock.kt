@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -308,6 +309,10 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
                 val positioned = PositionedRunStep(step, stepPosition(index, steps.size))
                 if (step.isWork()) {
                     RunWorkStep(positioned, body, row)
+                    // Image output is conversation content, not work hidden by the run's disclosure.
+                    if (step is RunStep.ToolCalls) {
+                        step.calls.toolCalls.forEach { call -> ToolGeneratedImages(call, row.callbacks) }
+                    }
                 } else {
                     RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
                 }
@@ -367,12 +372,10 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
         is RunStep.Message -> Box(modifier = modifier.fillMaxWidth()) {
             ChatMessageRow(step.message, row.context, row.callbacks, positioned.position)
         }
-        is RunStep.ToolCalls -> RunToolSteps(
-            calls = step.calls,
-            context = row.context,
-            callbacks = row.callbacks,
-            modifier = modifier,
-        )
+        // The run draws its tool images outside the foldable work (RunSteps), not again in here.
+        is RunStep.ToolCalls -> CompositionLocalProvider(LocalToolImagesInline provides false) {
+            RunToolSteps(calls = step.calls, context = row.context, callbacks = row.callbacks, modifier = modifier)
+        }
     }
 }
 

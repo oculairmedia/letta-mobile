@@ -55879,7 +55879,7 @@ final class com.letta.mobile.data.timeline.snapshot/SnapshotStructuralSummary { 
 }
 
 final class com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer { // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer|null[0]
-    constructor <init>(kotlin/String, kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ...) // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.<init>|<init>(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?){}[0]
+    constructor <init>(kotlin/String, kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ..., kotlin/String? = ...) // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.<init>|<init>(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?;kotlin.String?){}[0]
 
     final val bodyReference // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.bodyReference|{}bodyReference[0]
         final fun <get-bodyReference>(): com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.bodyReference.<get-bodyReference>|<get-bodyReference>(){}[0]
@@ -55889,6 +55889,8 @@ final class com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer
         final fun <get-mediaType>(): kotlin/String // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
     final val thumbnailBase64 // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.thumbnailBase64|{}thumbnailBase64[0]
         final fun <get-thumbnailBase64>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.thumbnailBase64.<get-thumbnailBase64>|<get-thumbnailBase64>(){}[0]
+    final val toolCallId // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.toolCallId|{}toolCallId[0]
+        final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
     final val uriOrUrl // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.uriOrUrl|{}uriOrUrl[0]
         final fun <get-uriOrUrl>(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.uriOrUrl.<get-uriOrUrl>|<get-uriOrUrl>(){}[0]
 
@@ -55897,7 +55899,8 @@ final class com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer
     final fun component3(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component4|component4(){}[0]
     final fun component5(): com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ...): com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.copy|copy(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?){}[0]
+    final fun component6(): kotlin/String? // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.timeline.snapshot/StoredImageBodyReference? = ..., kotlin/String? = ...): com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.copy|copy(kotlin.String;kotlin.Long;kotlin.String?;kotlin.String?;com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.timeline.snapshot/StoredImageAttachmentPointer.toString|toString(){}[0]
@@ -64390,7 +64393,7 @@ sealed class com.letta.mobile.data.controller.node/IrohRelayConfig { // com.lett
 
 sealed class com.letta.mobile.data.model/MessageContentPart { // com.letta.mobile.data.model/MessageContentPart|null[0]
     final class Image : com.letta.mobile.data.model/MessageContentPart { // com.letta.mobile.data.model/MessageContentPart.Image|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ...) // com.letta.mobile.data.model/MessageContentPart.Image.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/Long? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/MessageContentPart.Image.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long?;kotlin.String?){}[0]
 
         final val base64 // com.letta.mobile.data.model/MessageContentPart.Image.base64|{}base64[0]
             final fun <get-base64>(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.base64.<get-base64>|<get-base64>(){}[0]
@@ -64398,11 +64401,14 @@ sealed class com.letta.mobile.data.model/MessageContentPart { // com.letta.mobil
             final fun <get-mediaType>(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
         final val storedByteSize // com.letta.mobile.data.model/MessageContentPart.Image.storedByteSize|{}storedByteSize[0]
             final fun <get-storedByteSize>(): kotlin/Long? // com.letta.mobile.data.model/MessageContentPart.Image.storedByteSize.<get-storedByteSize>|<get-storedByteSize>(){}[0]
+        final val toolCallId // com.letta.mobile.data.model/MessageContentPart.Image.toolCallId|{}toolCallId[0]
+            final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.model/MessageContentPart.Image.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
 
         final fun component1(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.component1|component1(){}[0]
         final fun component2(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.component2|component2(){}[0]
         final fun component3(): kotlin/Long? // com.letta.mobile.data.model/MessageContentPart.Image.component3|component3(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ...): com.letta.mobile.data.model/MessageContentPart.Image // com.letta.mobile.data.model/MessageContentPart.Image.copy|copy(kotlin.String;kotlin.String;kotlin.Long?){}[0]
+        final fun component4(): kotlin/String? // com.letta.mobile.data.model/MessageContentPart.Image.component4|component4(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin/String? = ...): com.letta.mobile.data.model/MessageContentPart.Image // com.letta.mobile.data.model/MessageContentPart.Image.copy|copy(kotlin.String;kotlin.String;kotlin.Long?;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/MessageContentPart.Image.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/MessageContentPart.Image.hashCode|hashCode(){}[0]
         final fun toDataUrl(): kotlin/String // com.letta.mobile.data.model/MessageContentPart.Image.toDataUrl|toDataUrl(){}[0]

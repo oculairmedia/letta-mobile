@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -298,7 +299,7 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, l
         }
         ToolStepInset(toolCall, callbacks, live, failed)
         ToolPreviewChips(toolCall, rememberToolStepLine(toolCall), callbacks)
-        ToolGeneratedImages(toolCall, callbacks)
+        if (LocalToolImagesInline.current) ToolGeneratedImages(toolCall, callbacks)
     }
 }
 
@@ -336,8 +337,14 @@ private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, c
     }
 }
 
+/**
+ * Whether a tool step draws its call's images inside its own details. A run block draws them
+ * outside its foldable work instead (so a folded run still shows them) and turns this off.
+ */
+internal val LocalToolImagesInline = staticCompositionLocalOf { true }
+
 @Composable
-private fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
+internal fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
     if (toolCall.generatedImageAttachments.isEmpty()) return
     val images = remember(toolCall.generatedImageAttachments) { toolCall.generatedImageAttachments.toImmutableList() }
     ChatImageAttachmentsGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())

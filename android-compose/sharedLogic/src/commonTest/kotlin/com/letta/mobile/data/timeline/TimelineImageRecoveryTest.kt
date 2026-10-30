@@ -105,6 +105,27 @@ class TimelineImageRecoveryTest {
     }
 
     @Test
+    fun liveAndHydratedImageCopiesRenderOnceDespiteMetadataDifferences() {
+        val live = MessageContentPart.Image(image, "IMAGE/PNG")
+        val hydrated = MessageContentPart.Image(image, "image/png", storedByteSize = 18_000)
+        val merged = listOf(live).mergeIncomingImages(listOf(hydrated))
+        assertEquals(1, merged.size, "The same image bytes must occupy one inline image slot")
+        assertEquals(image, merged.single().base64)
+    }
+
+    @Test
+    fun legacyUnownedPlaceholderIsReplacedByItsOwnedToolReturnImage() {
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-image", toolCallId = "read-image",
+            toolReturnRaw = buildContentParts("", listOf(MessageContentPart.Image(image, "image/png"))).toJsonArray(),
+        )
+        val merged = listOf(MessageContentPart.Image("", "image/png", storedByteSize = 18_000))
+            .mergeIncomingImages(returned.attachments)
+        assertEquals(1, merged.size, "An upgraded cache must not retain the old placeholder beside its returned image")
+        assertEquals(image, merged.single().base64)
+    }
+
+    @Test
     fun streamMergeReplacesThePlaceholderInsteadOfShowingBoth() {
         val merged = listOf(MessageContentPart.Image("", "image/jpeg", storedByteSize = 18_000))
             .mergeIncomingImages(listOf(MessageContentPart.Image(image, "image/jpeg")))

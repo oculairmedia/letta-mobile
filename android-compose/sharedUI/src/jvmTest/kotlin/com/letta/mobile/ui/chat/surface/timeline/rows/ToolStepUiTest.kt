@@ -15,6 +15,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -64,6 +66,30 @@ class ToolStepUiTest {
 
     private fun androidx.compose.ui.test.ComposeUiTest.show(call: () -> UiToolCall) {
         setContent { MaterialTheme { Box(Modifier.width(WIDTH.dp)) { ToolStep(call(), "call-1", rowCallbacks()) } } }
+    }
+
+    @Test
+    fun aReadWithOneImageRendersExactlyOneDecodedImageNode() = runComposeUiTest {
+        val image = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M9QDwADjgGAv7SktwAAAABJRU5ErkJggg=="
+        val call = UiToolCall(
+            name = "Read", arguments = """{"file_path":"/tmp/pixel.png"}""", result = "[Image: pixel.png]",
+            status = "success", toolCallId = "call-1",
+            generatedImageAttachments = listOf(com.letta.mobile.data.model.UiImageAttachment(image, "image/png")),
+        )
+        val files = WorkspaceFiles(WorkspaceFileOpener { }, MutableStateFlow(WorkspaceFileViewerState()), NoViewer)
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalWorkspaceFiles provides files) {
+                    Box(Modifier.width(WIDTH.dp)) { ToolStep(call, "call-1", rowCallbacks()) }
+                }
+            }
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithContentDescription("Attached image", useUnmergedTree = true).fetchSemanticsNodes().size == 1
+        }
+        onAllNodesWithContentDescription("Attached image", useUnmergedTree = true).assertCountEquals(1)
+        onNodeWithTag("workspace_file_link").assertExists()
+        onNodeWithText("pixel.png").assertExists()
     }
 
     @Test
