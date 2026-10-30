@@ -43,6 +43,7 @@ import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.chat.send.QueueConversationId
+import com.letta.mobile.data.chat.projection.chronologicalMessages
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatSendQueueSource
 import com.letta.mobile.ui.chat.session.ChatSendQueueTarget
@@ -1195,6 +1196,13 @@ class DesktopChatController(
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
 
+    @Volatile private var liveReply: Pair<String, List<com.letta.mobile.data.chat.projection.ChatRenderItem>>? = null
+
+    /** [conversationId]'s newest messages, oldest first: the hydrated map's, else (canonical, no map) its live overlay's. */
+    fun replyMessages(conversationId: String): List<com.letta.mobile.data.model.UiMessage>? =
+        _state.value.messagesByConversationId[conversationId]
+            ?: liveReply?.takeIf { it.first == conversationId }?.let { chronologicalMessages(it.second) }
+
     /**
      * letta-mobile-1n5py, by4vm.98.2: the selected conversation's send queue, the shared extension
      * point the session port reads; re-resolved when the selection or the canonical route changes.
@@ -1225,6 +1233,7 @@ class DesktopChatController(
         }
 
         _canonicalPresentation.value = null
+        liveReply = null
         val canonical = canonicalOpen
         if (canonical != null && canonicalEligible(conversationId)) {
             timelineJob = scope.launch {
@@ -1240,6 +1249,7 @@ class DesktopChatController(
                     try {
                         if (!isActiveSelection(generation)) return@launch
                         _canonicalPresentation.value = presentation
+                        launch { presentation.live.collect { if (it.isNotEmpty()) liveReply = conversationId to it } }
                         _state.update { it.withRuntimeState(ChatSessionReducer.hydrateCompleted(it.runtimeState, generation)) }
                         kotlinx.coroutines.awaitCancellation()
                     } finally {

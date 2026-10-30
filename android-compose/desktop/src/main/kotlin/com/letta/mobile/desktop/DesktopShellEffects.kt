@@ -69,11 +69,7 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             controller = context.core.nucleusController,
             // Read through the controller's live state: the toast fires from a
             // coroutine after composition-captured chatState may be stale.
-            replyPreviewFor = { conversationId ->
-                notificationReplyPreview(
-                    chatController.state.value.messagesByConversationId[conversationId],
-                )
-            },
+            replyPreviewFor = { conversationId -> notificationReplyPreview(chatController.replyMessages(conversationId)) },
             onOpenConversation = { context.router.openConversation(ConversationId(it)) },
             onReplyToConversation = chatController::replyFromNotification,
             attention = rememberShellAttentionBindings(context),
