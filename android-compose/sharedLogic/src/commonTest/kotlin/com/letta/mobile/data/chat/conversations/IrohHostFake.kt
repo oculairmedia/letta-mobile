@@ -69,6 +69,9 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
         methods += command.method
         calls += command.method to params
         if (command.method in failing) return failed(command, "${command.method} denied")
+        if (command.method == "conversation.list" && params["visible_only"] == JsonPrimitive(true)) {
+            return failed(command, "capability_unavailable: visible_only requires local agent visibility")
+        }
         val result = answer(command.method, params) ?: return failed(command, "unknown ${command.method}")
         return AppServerInboundFrame.AdminRpcResponse(command.requestId, success = true, result = result)
     }

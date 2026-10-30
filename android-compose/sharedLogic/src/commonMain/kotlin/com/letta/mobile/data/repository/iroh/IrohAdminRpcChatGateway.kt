@@ -235,6 +235,27 @@ class IrohAdminRpcChatGateway(
             .onEach { agentIdByConversation[it.id] = it.agentId }
     }
 
+    override suspend fun listRecentConversations(limit: Int, after: ConversationId?): List<Conversation> {
+        val params = buildJsonObject {
+            put("visible_only", true)
+            put("limit", limit)
+            after?.let { put("after", it.value) }
+        }
+        val result = rpc(AdminRpcCall.of(
+            method = AdminRpcMethod("conversation.list"),
+            path = AdminRpcPath("/v1/conversations"),
+            body = AdminRpcBody(params.toString()),
+        )) ?: throw TimelineTransportHttpException(502, "Visible recents returned no result")
+        // Legacy hosts ignore the flag. Inspect raw rows before the decoder discards agent-free workers.
+        if (result is JsonArray && result.any { row ->
+                row is JsonObject && com.letta.mobile.data.model.HiddenListFilter.isAgentFreeRow(row)
+            }) {
+            throw UnsupportedOperationException("Host ignored visible_only")
+        }
+        return json.decodeConversationList(result, ::reportSkippedConversationRows)
+            .onEach { agentIdByConversation[it.id] = it.agentId }
+    }
+
     override suspend fun getConversation(conversationId: String): Conversation {
         val result = rpc(
             AdminRpcCall.of(

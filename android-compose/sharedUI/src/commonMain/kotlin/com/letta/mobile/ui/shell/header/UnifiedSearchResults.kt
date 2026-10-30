@@ -27,6 +27,14 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun rememberUnifiedSearchSections(query: UnifiedSearchQuery, sources: UnifiedSearchSources): List<LettaSearchSection> {
+    val prepare = sources.prepareConversations
+    val agent = sources.agentId.takeIf { query.filterToAgent }?.let { com.letta.mobile.data.model.AgentId(it) }
+    LaunchedEffect(prepare, query.text, agent) {
+        if (query.text.isNotBlank()) {
+            delay(MESSAGE_SEARCH_DEBOUNCE_MILLIS)
+            prepare?.invoke(agent)
+        }
+    }
     val messageSearch = sources.messageSearch
     val messageQuery = messageQueryFor(query, sources).takeIf { messageSearch != null }
     var hits by remember { mutableStateOf(MessageHits.None) }

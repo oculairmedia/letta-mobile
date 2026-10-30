@@ -53,13 +53,15 @@ class WireContractsTest {
                 val name = case.getValue("name").jsonPrimitive.content
                 val host = case.getValue("host_state").jsonObject
                 // New fixture families must supply a real host-state adapter, never be skipped.
-                require(host.keys == setOf("controller_state")) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
+                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index")
+                require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
+                require("controller_state" in host)
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
                     "connected" -> AppServerControllerState.Connected
                     "disconnected" -> AppServerControllerState.Disconnected()
                     else -> error("Unsupported controller state for ${fixture.method}/$name")
                 }
-                withRouter(state) { router ->
+                withRouter(state, host) { router ->
                     assertTrue(fixture.method in router.registeredMethods, "Fixture names unregistered method ${fixture.method}")
                     val context = case.getValue("context").jsonObject
                     require(context.keys.all { it in setOf("authenticated", "authorized_conversation_ids", "authorized_agent_ids") })
@@ -138,14 +140,48 @@ class WireContractsTest {
         } as AppServerController
     }
 
-    private suspend fun withRouter(state: AppServerControllerState, block: suspend (AdminRpcRouter) -> Unit) {
+    private fun conversationNative(host: kotlinx.serialization.json.JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        check(method.name == "conversationList") { "Unexpected native call: ${method.name}" }
+        val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.ConversationList
+        val query = command.query.orEmpty()
+        val hide = query["include_hidden"] != kotlinx.serialization.json.JsonPrimitive(true)
+        val rows = host.getValue("conversations").jsonArray.filterNot {
+            hide && it.jsonObject["hidden"]?.jsonPrimitive?.content == "true"
+        }
+        val agent = query["agent_id"]?.jsonPrimitive?.content
+        val own = rows.filter { agent == null || it.jsonObject["agent_id"]?.jsonPrimitive?.content == agent }
+        val after = query["after"]?.jsonPrimitive?.content
+        val cursor = own.indexOfFirst { it.jsonObject["id"]?.jsonPrimitive?.content == after }
+        val limit = query["limit"]?.jsonPrimitive?.content?.toIntOrNull() ?: 20
+        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationListResponse(
+            command.requestId, true,
+            conversations = kotlinx.serialization.json.JsonArray(own.drop(cursor + 1).take(limit)),
+        )
+    } as AppServerClient
+
+    private suspend fun withRouter(
+        state: AppServerControllerState,
+        host: kotlinx.serialization.json.JsonObject? = null,
+        block: suspend (AdminRpcRouter) -> Unit,
+    ) {
         requireKnownWiring()
         val dir = kotlin.io.path.createTempDirectory("wire-contract-host").toFile()
         val plugins = PluginHostFixture(File(dir, "plugins").toPath())
         val runtime = plugins.runtime()
         // Health must not query native data. Any accidental native call fails rather than
         // returning a permissive fake response for an id the App Server cannot resolve.
-        val native = rejectCalls<AppServerClient>("native")
+        val native = if (host?.containsKey("conversations") == true) conversationNative(host) else rejectCalls("native")
+        val backend = File(dir, "backend")
+        if (host?.get("visibility_index")?.jsonPrimitive?.boolean == true) {
+            LocalBackendFixtureStore.create(backend)
+            host.getValue("hidden_agent_ids").jsonArray.forEach { id ->
+                val agent = id.jsonPrimitive.content
+                require(agent.matches(Regex("[A-Za-z0-9_-]+")))
+                File(backend, "agents/$agent.json").writeText("""{"id":"$agent","hidden":true}""")
+            }
+        }
         val identityStore = rejectCalls<TurnIdentityStore>("identity-store")
         val subagents = object : SubagentRegistrySource {
             override suspend fun list(conversationId: String, includeTerminal: Boolean) = error("Unexpected subagent read")
@@ -166,7 +202,7 @@ class WireContractsTest {
                 ),
                 native = AdminRpcNativeSources(
                     nativeClient = native,
-                    localBackendDir = File(dir, "backend").apply { mkdirs() }.path,
+                    localBackendDir = backend.path.takeUnless { host?.get("visibility_index")?.jsonPrimitive?.boolean == false },
                     skillsListing = NativeSkillsCatalog(
                         hostEnumeration = { kotlinx.serialization.json.JsonArray(emptyList()) },
                     ).asListingSource(),

@@ -52,6 +52,9 @@ class ShellTimelineConversationList internal constructor(
     private val owner: TimelineConversations?,
     private val onArchiveFilterChange: (ShellArchiveFilter) -> Unit,
 ) {
+    /** Pinned agents stay in the rail even when they are outside the recents window. */
+    val pinnedAgentIds: Set<String> get() = owner?.pinnedAgents?.mapTo(mutableSetOf()) { it.value }.orEmpty()
+
     /** [agent]'s conversations as the drawer lists them (the archive filter is the drawer mapping's). */
     fun drawer(agent: AgentId?): ShellDrawerConversations = ShellDrawerConversations(
         conversations = agent?.let { focused -> state.conversations.filter { it.agentId == focused } }.orEmpty(),
@@ -117,14 +120,31 @@ fun SyncTimelineConversations(workspace: ShellWorkspaceState, owner: TimelineCon
     val routed = remember(owner) { workspace.selectedConversationId }
     val state = owner?.state.collectOr(NoConversations)
     val selected = state.conversations.firstOrNull { it.id == state.selected }
-    val reported = state.conversations.takeIf { state.loaded }?.mapTo(mutableSetOf()) { it.id }
+    val reported = state.authoritativeConversationIds()
     SyncShellWorkspace(workspace, ShellChatSelection(session, state.selected, selected?.agentId, reported))
+    LaunchedEffect(workspace, state.conversations, state.authoritativeAgents, state.authoritative) {
+        if (!state.authoritative) {
+            workspace.conversationsReported(state.conversations.associate { it.id to it.agentId }, state.authoritativeAgents)
+        }
+    }
     LaunchedEffect(workspace, selected?.agentId) { selected?.agentId?.let { workspace.focusedAgentId = it } }
+    LaunchedEffect(owner, state.loaded, state.authoritativeAgents, workspace.focusedAgentId) {
+        val agent = workspace.focusedAgentId ?: return@LaunchedEffect
+        val live = owner?.takeIf { state.loaded } ?: return@LaunchedEffect
+        live.lists.prefetchPinnedAgents(live.pinnedAgents)
+        live.lists.focusAgent(agent)
+        // The current drawer has no paging affordance; read through only the focused agent.
+        while (live.lists.hasMore(agent) && live.state.value.error == null) live.lists.loadMore(agent)
+    }
     val chatShown = workspace.page is ShellDestination.Chat
     LaunchedEffect(owner, state.loaded, state.selected, workspace.focusedAgentId, chatShown) {
         owner?.openInitial(routed, workspace.focusedAgentId, createIfNone = chatShown)
     }
 }
+
+/** A bounded recents window is never evidence that an absent conversation was deleted. */
+internal fun TimelineConversationsState.authoritativeConversationIds(): Set<ConversationId>? =
+    conversations.takeIf { loaded && authoritative }?.mapTo(mutableSetOf()) { it.id }
 
 private const val UNTITLED = "Chat"
 
@@ -145,16 +165,20 @@ fun rememberTimelineConversations(
     backend: () -> ChatGateway?,
     agents: List<Agent>,
     prefs: ConversationManagementPrefs,
+    pinnedAgents: Set<AgentId> = emptySet(),
+    pinsLoaded: Boolean = true,
 ): TimelineConversations? {
     val roster by rememberUpdatedState(agents)
-    val owner by produceState<TimelineConversations?>(null, connection) {
-        val live = backend().takeIf { connection is BackendConnectionStatus.Connected }
-        value = live?.let { TimelineConversations(this, it, roster, prefs) }
+    val pins by rememberUpdatedState(pinnedAgents)
+    val owner by produceState<TimelineConversations?>(null, connection, pinsLoaded) {
+        val live = backend().takeIf { connection is BackendConnectionStatus.Connected && pinsLoaded }
+        value = live?.let { TimelineConversations(this, it, roster, prefs, pins) }
         // The owner launches later roster refreshes in this producer's scope.
         // Keep it alive even when its initial empty-roster refresh finishes.
         awaitDispose { }
     }
     LaunchedEffect(owner, agents) { owner?.roster = agents }
+    LaunchedEffect(owner, pinnedAgents) { owner?.lists?.prefetchPinnedAgents(pinnedAgents) }
     return owner
 }
 
@@ -171,6 +195,8 @@ class ShellTimelineChatBinding<P : ChatSessionPort>(
     /** A port for the owner's selected conversation in the given scope; null while there is no session. */
     val open: (TimelineConversations, TimelineChatTarget, CoroutineScope) -> P?,
     val close: (P) -> Unit,
+    val pinnedAgents: Set<AgentId> = emptySet(),
+    val pinsLoaded: Boolean = true,
 )
 
 /** The chat a host shows: the session's conversation owner, the drawer's list of it, and the selected conversation's port. */
@@ -189,7 +215,9 @@ class ShellTimelineChat<P : ChatSessionPort>(
  */
 @Composable
 fun <P : ChatSessionPort> rememberShellTimelineChat(binding: ShellTimelineChatBinding<P>): ShellTimelineChat<P> {
-    val owner = rememberTimelineConversations(binding.connection, binding.backend, binding.agents, binding.prefs)
+    val owner = rememberTimelineConversations(
+        binding.connection, binding.backend, binding.agents, binding.prefs, binding.pinnedAgents, binding.pinsLoaded,
+    )
     SyncTimelineConversations(binding.workspace, owner, binding.session)
     val list = rememberShellTimelineConversationList(owner)
     val target = remember(owner, list.state) { owner?.selectedTarget() }

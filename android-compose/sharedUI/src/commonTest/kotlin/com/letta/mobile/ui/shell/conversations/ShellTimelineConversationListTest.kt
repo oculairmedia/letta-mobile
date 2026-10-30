@@ -62,6 +62,19 @@ class ShellTimelineConversationListTest {
         assertNull(list.tab("gone"))
     }
 
+    @Test
+    fun partialRecentsNeverCloseTabsOutsideTheWindow() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat())
+        workspace.tabs = com.letta.mobile.data.desktopshell.ConversationTabsState(listOf("outside-window", "recent"))
+        val partial = TimelineConversationsState(
+            conversations = listOf(conversation("recent", "agent-1", "Recent")), loaded = true,
+        )
+        partial.authoritativeConversationIds()?.let(workspace::conversationsReported)
+        assertEquals(listOf("outside-window", "recent"), workspace.tabs.openConversationIds)
+        partial.copy(authoritative = true).authoritativeConversationIds()?.let(workspace::conversationsReported)
+        assertEquals(listOf("recent"), workspace.tabs.openConversationIds, "legacy full-list pruning remains intact")
+    }
+
     private fun list(
         conversations: List<Conversation>,
         pinned: Set<String> = emptySet(),

@@ -7,4 +7,5 @@ Uncovered methods live in `scripts/ci/wire-contract-uncovered-baseline.txt`, whi
 
 | Method | Version | Spec | Fixture | Implementing Handler |
 | --- | --- | --- | --- | --- |
+| `conversation.list` | v1 | [visible-recents-v1.md](../../../docs/reference/contracts/conversation.list/visible-recents-v1.md) | [visible-recents-v1.json](../../../android-compose/sharedLogic/src/commonTest/resources/contracts/conversation.list/visible-recents-v1.json) | [ConversationAdminHandlers.kt](../../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt) |
 | `health.check` | v1 | [status-v1.md](../../../docs/reference/contracts/health.check/status-v1.md) | [status-v1.json](../../../android-compose/sharedLogic/src/commonTest/resources/contracts/health.check/status-v1.json) | [HealthAdminHandlers.kt](../../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/HealthAdminHandlers.kt) |

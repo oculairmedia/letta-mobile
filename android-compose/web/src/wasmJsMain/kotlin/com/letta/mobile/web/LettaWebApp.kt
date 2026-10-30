@@ -59,12 +59,12 @@ fun LettaWebApp() {
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }
     LaunchedEffect(browserRoute, workspace.route) { browserRoute.publish(workspace.route) }
-    val chat = rememberShellTimelineChat(webTimelineChat(app, shell, connection))
+    val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
+    val home by controllers.home.state.collectAsState()
+    val chat = rememberShellTimelineChat(webTimelineChat(app, shell, connection, home))
     SideEffect { shell.chat.owner = chat.owner }
     LaunchedEffect(Unit) { startWebMemoryPressure() }
-    // letta-mobile-ckmub.17.5: the shared pages over the live session graph, as desktop binds them.
     val graph by app.gateway.sessionGraphProvider.currentGraph.collectAsState()
-    val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
     ShellHomeBackendFleetEffect(controllers.home, chat.list.state.conversations, backend.agents.value)
     val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
     val pairing = remember(backend, workspace) {
