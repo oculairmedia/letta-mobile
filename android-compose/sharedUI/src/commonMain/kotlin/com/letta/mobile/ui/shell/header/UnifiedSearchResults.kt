@@ -16,6 +16,8 @@ import com.letta.mobile.data.search.MessageSearchHit
 import com.letta.mobile.data.search.MessageSearchQuery
 import com.letta.mobile.data.search.MessageSearchSource
 import com.letta.mobile.ui.search.LettaSearchSection
+import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
@@ -27,6 +29,7 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun rememberUnifiedSearchSections(query: UnifiedSearchQuery, sources: UnifiedSearchSources): List<LettaSearchSection> {
+    val preparationError = rememberConversationPreparation(query, sources)
     val messageSearch = sources.messageSearch
     val messageQuery = messageQueryFor(query, sources).takeIf { messageSearch != null }
     var hits by remember { mutableStateOf(MessageHits.None) }
@@ -36,7 +39,50 @@ fun rememberUnifiedSearchSections(query: UnifiedSearchQuery, sources: UnifiedSea
         hits = MessageHits(asked, searchOrEmpty(messageSearch, asked))
     }
     val current = hits.takeIf { it.query == messageQuery }?.hits.orEmpty()
-    return remember(query, sources, current) { UnifiedShellSearch.sections(query, sources, current) }
+    val sections = remember(query, sources, current) { UnifiedShellSearch.sections(query, sources, current) }
+    return withPreparationWarning(sections, preparationError)
+}
+
+@Composable
+private fun rememberConversationPreparation(query: UnifiedSearchQuery, sources: UnifiedSearchSources): String? {
+    val prepare = sources.prepareConversations
+    val agent = sources.agentId.takeIf { query.filterToAgent }?.let(::AgentId)
+    val requested = shouldPrepareConversations(query)
+    val backendError by rememberUpdatedState(sources.conversationPreparationError)
+    var failure by remember(prepare, query.text, agent, requested) { mutableStateOf<String?>(null) }
+    LaunchedEffect(prepare, query.text, agent, requested) {
+        val read = prepare ?: return@LaunchedEffect
+        if (!requested) return@LaunchedEffect
+        delay(MESSAGE_SEARCH_DEBOUNCE_MILLIS)
+        prepareWithRetry(read, agent, { failure = it }) { failure != null || backendError != null }
+    }
+    if (!requested) return null
+    return failure ?: backendError
+}
+
+private fun shouldPrepareConversations(query: UnifiedSearchQuery): Boolean =
+    query.text.isNotBlank() && query.includes(UnifiedSearchKind.Conversations)
+
+private suspend fun prepareWithRetry(
+    prepare: suspend (AgentId?) -> Unit,
+    agent: AgentId?,
+    report: (String?) -> Unit,
+    incomplete: () -> Boolean,
+) {
+    var retryDelay = PREPARATION_RETRY_MILLIS
+    do {
+        val failure = runCatching { prepare(agent) }.exceptionOrNull()
+        if (failure is CancellationException) throw failure
+        report(failure?.let { it.message ?: "Could not prepare conversations" })
+        delay(retryDelay)
+        retryDelay = (retryDelay * 2).coerceAtMost(MAX_PREPARATION_RETRY_MILLIS)
+    } while (incomplete())
+}
+
+private fun withPreparationWarning(sections: List<LettaSearchSection>, failure: String?): List<LettaSearchSection> {
+    if (failure == null) return sections
+    val warning = LettaSearchRow("conversation-preparation-status", "Some conversations could not be searched", "$failure. Retrying...")
+    return sections + LettaSearchSection("Conversation search incomplete", listOf(warning))
 }
 
 /**
@@ -83,3 +129,5 @@ private class MessageHits(val query: MessageSearchQuery?, val hits: List<Message
 }
 
 private const val MESSAGE_SEARCH_DEBOUNCE_MILLIS = 200L
+private const val PREPARATION_RETRY_MILLIS = 1_000L
+private const val MAX_PREPARATION_RETRY_MILLIS = 30_000L

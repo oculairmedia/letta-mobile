@@ -198,7 +198,9 @@ class TimelineConversationsTest {
         runCurrent()
 
         assertEquals(false, owner.state.value.loaded)
-        assertTrue(host.methods.isEmpty(), "an empty initial roster does not query the backend")
+        assertEquals(listOf("conversation.list"), host.methods, "probe recents independently of roster arrival")
+        assertEquals("true", host.calls.single().second.text("visible_only"))
+        assertEquals("", host.calls.single().second.text("agent_id"))
 
         owner.roster = listOf(Agent(id = nora, name = "Nora"), Agent(id = ivo, name = "Ivo"))
         runCurrent()

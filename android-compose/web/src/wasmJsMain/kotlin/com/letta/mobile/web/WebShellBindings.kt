@@ -94,12 +94,18 @@ internal class WebBackend(initialConfig: LettaConfig) {
  * The web's binding of the shared chat ([ShellTimelineChatBinding]): the live session's
  * conversations, and a [WebChatSessionPort] per selected conversation with the shell's `/` palette.
  */
-internal fun webTimelineChat(app: WebApp, shell: WebShell, connection: BackendConnectionStatus) = ShellTimelineChatBinding(
+internal fun webTimelineChat(
+    app: WebApp, shell: WebShell, connection: BackendConnectionStatus, home: com.letta.mobile.data.home.HomePageState,
+) = ShellTimelineChatBinding(
     workspace = shell.workspace,
     session = webSessionKey(shell.backend.config.value),
     connection = connection,
     agents = shell.backend.agents.value,
-    prefs = app.conversationPrefs,
+    preferences = com.letta.mobile.ui.shell.conversations.TimelineConversationPreferences(management = app.conversationPrefs,
+        pinnedAgents = home.pinKeys.mapNotNull(com.letta.mobile.data.home.HomePinnedItem::parseAgentKey)
+            .mapTo(mutableSetOf()) { com.letta.mobile.data.model.AgentId(it) },
+        pinsLoaded = home.pinsLoaded,
+    ),
     backend = app.gateway::chatGateway,
     open = { owner, target, scope ->
         val model = shell.backend.agents.value.firstOrNull { it.id.value == target.agentId }?.model

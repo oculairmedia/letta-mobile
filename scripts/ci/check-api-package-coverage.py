@@ -89,7 +89,14 @@ def verify_standard_source_roots(module):
     """Do not silently skip manually configured source directories."""
     build_file = module / "build.gradle.kts"
     if build_file.exists():
-        build = code_without_comments(build_file.read_text(encoding="utf-8"), mask_strings=True)
+        build = code_without_comments(build_file.read_text(encoding="utf-8"))
+        # Only this literal test receiver is known not to add a published source root.
+        build = re.sub(
+            r'\bkotlin\s*\.\s*sourceSets\s*\.\s*getByName\(\s*"commonTest"\s*\)'
+            r'\s*\.\s*kotlin\s*\.\s*srcDir\b',
+            "COMMON_TEST_SOURCE_ROOT", build,
+        )
+        build = code_without_comments(build, mask_strings=True)
         if re.search(r"\b(?:srcDirs?|setSrcDirs)\b", build):
             raise ValueError(f"{build_file}: custom source roots require updating package discovery")
 

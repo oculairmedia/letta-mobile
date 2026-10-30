@@ -3,6 +3,8 @@ package com.letta.mobile.data.chat.conversations
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.transport.api.AppServerClientChannel
+import com.letta.mobile.data.transport.iroh.WireContractFixture
+import com.letta.mobile.data.transport.iroh.visibleRecentsContractText
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -14,6 +16,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
@@ -69,8 +73,19 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
         methods += command.method
         calls += command.method to params
         if (command.method in failing) return failed(command, "${command.method} denied")
+        if (command.method == "conversation.list" && params["visible_only"] == JsonPrimitive(true)) {
+            return unavailableRecents(command)
+        }
         val result = answer(command.method, params) ?: return failed(command, "unknown ${command.method}")
         return AppServerInboundFrame.AdminRpcResponse(command.requestId, success = true, result = result)
+    }
+
+    private fun unavailableRecents(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
+        val envelope = WireContractFixture(visibleRecentsContractText).response("no-index")
+        return AppServerInboundFrame.AdminRpcResponse(
+            command.requestId, success = envelope.getValue("success").jsonPrimitive.booleanOrNull == true,
+            result = envelope["result"], error = envelope["error"]?.jsonPrimitive?.contentOrNull,
+        )
     }
 
     private fun answer(method: String, params: JsonObject): JsonElement? = when (method) {

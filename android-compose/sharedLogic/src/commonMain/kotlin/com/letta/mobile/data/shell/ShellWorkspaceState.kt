@@ -68,6 +68,9 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
 
     /** Each agent's last shown conversation: where selecting the agent goes back to. */
     private var lastActiveByAgent: Map<AgentId, ConversationId> by mutableStateOf(emptyMap())
+    private var conversationAgents: Map<ConversationId, AgentId> = emptyMap()
+    /** Null for a legacy/global catalog; otherwise only these owners have complete conversation pages. */
+    private var partialConversationAuthority by mutableStateOf<Set<AgentId>?>(null)
 
     /** The session the state belongs to ([sessionChanged]). */
     private var session: String? = null
@@ -126,7 +129,10 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     fun conversationShown(conversation: ConversationId?, agent: AgentId?) {
         selectedConversationId = conversation
         if (conversation == null) return
-        if (agent != null) lastActiveByAgent = lastActiveByAgent + (agent to conversation)
+        if (agent != null) {
+            lastActiveByAgent = lastActiveByAgent + (agent to conversation)
+            conversationAgents = conversationAgents + (conversation to agent)
+        }
         if (page.isChatPage && conversation.value !in tabs.openConversationIds) {
             tabs = ConversationTabsReducer.select(tabs, conversation.value)
         }
@@ -134,9 +140,22 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
 
     /** The backend's conversation list is authoritative again: drop tabs and memories of gone conversations. */
     fun conversationsReported(available: Set<ConversationId>) {
+        partialConversationAuthority = null
         val availableValues = available.mapTo(mutableSetOf()) { it.value }
         tabs = ConversationTabsReducer.retainAvailable(tabs, availableValues, selectedConversationId?.value)
         lastActiveByAgent = lastActiveByAgent.filterValues { it in available }
+        conversationAgents = conversationAgents.filterKeys { it in available }
+    }
+
+    /** A partial catalog may prune only owners whose complete conversation page sequence has landed. */
+    fun conversationsReported(available: Map<ConversationId, AgentId>, authoritativeAgents: Set<AgentId>) {
+        partialConversationAuthority = authoritativeAgents.toSet()
+        conversationAgents = conversationAgents + available
+        val gone = conversationAgents.filter { (id, agent) -> agent in authoritativeAgents && id !in available }.keys
+        val keptTabs = tabs.openConversationIds.filterNot { ConversationId(it) in gone }.toSet()
+        tabs = ConversationTabsReducer.retainAvailable(tabs, keptTabs, selectedConversationId?.value)
+        lastActiveByAgent = lastActiveByAgent.filter { (agent, id) -> agent !in authoritativeAgents || id in available }
+        conversationAgents = conversationAgents - gone
     }
 
     /** A fresh roster keeps the focused agent while it is still there, else focuses the first agent. */
@@ -156,10 +175,12 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     /**
      * Where selecting [agent] goes: its last active conversation while it still exists, else its
      * most recent one in [conversations]; null means the agent has none, so a new one is made.
+     * An incomplete owner's absent remembered id remains a target for the chat port to resolve.
      */
     fun resolveAgentChat(agent: AgentId, conversations: List<ShellConversationRef>): ConversationId? {
         val own = conversations.filter { it.agent == agent }
-        val lastActive = lastActiveByAgent[agent]?.takeIf { id -> own.any { it.id == id } }
+        val unverified = partialConversationAuthority?.let { agent !in it } == true
+        val lastActive = lastActiveByAgent[agent]?.takeIf { id -> unverified || own.any { it.id == id } }
         return lastActive ?: own.maxByOrNull { conversationRecency(it.updatedAtLabel) }?.id
     }
 
@@ -176,6 +197,8 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         selectedConversationId = null
         tabs = ConversationTabsState()
         lastActiveByAgent = emptyMap()
+        conversationAgents = emptyMap()
+        partialConversationAuthority = null
         agentEditor = null
         page = page.refinedBy(agent = null, conversation = null)
     }

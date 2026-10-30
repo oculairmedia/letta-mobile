@@ -1,0 +1,154 @@
+{
+  "method": "conversation.list",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "visible",
+      "context": {"authenticated": true},
+      "host_state": {
+        "controller_state": "connected", "visibility_index": true, "hidden_agent_ids": ["worker"],
+        "conversations": [
+          {"id":"raw","agent_id":null,"updated_at":"2026-10-30T12:00:00Z"},
+          {"id":"worker-row","agent_id":"worker","updated_at":"2026-10-30T11:00:00Z"},
+          {"id":"hidden-row","agent_id":"agent-0","hidden":true,"updated_at":"2026-10-30T10:00:00Z"},
+          {"id":"archived-row","agent_id":"agent-0","archived":true,"updated_at":"2026-10-30T09:00:00Z"},
+          {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+          {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+        ]
+      },
+      "params": {"visible_only":true,"limit":30},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":true,"result":[
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]}
+    },
+    {
+      "name": "scoped-before-limit",
+      "context": {"authenticated":true,"authorized_agent_ids":["agent-1"],"authorized_conversation_ids":["older"]},
+      "host_state": {"controller_state":"connected","visibility_index":true,"hidden_agent_ids":[],"conversations":[
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]},
+      "params": {"visible_only":true,"limit":1},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":true,"result":[
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]}
+    },
+    {
+      "name": "after-visible",
+      "context": {"authenticated":true},
+      "host_state": {"controller_state":"connected","visibility_index":true,"hidden_agent_ids":[],"conversations":[
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]},
+      "params": {"visible_only":true,"after":"recent","limit":1},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":true,"result":[
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]}
+    },
+    {
+      "name": "unknown-cursor",
+      "context": {"authenticated":true},
+      "host_state": {"controller_state":"connected","visibility_index":true,"hidden_agent_ids":[],"conversations":[
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"}
+      ]},
+      "params": {"visible_only":true,"after":"unknown"},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":true,"result":[
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"}
+      ]}
+    },
+    {
+      "name": "full-window",
+      "context": {"authenticated":true},
+      "host_state": {"controller_state":"connected","visibility_index":true,"hidden_agent_ids":[],"conversations":[
+        {"id":"r00","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r01","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r02","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r03","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r04","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r05","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r06","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r07","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r08","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r09","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r10","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r11","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r12","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r13","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r14","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r15","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r16","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r17","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r18","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r19","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r20","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r21","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r22","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r23","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r24","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r25","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r26","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r27","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r28","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r29","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"existing-outside-recents","agent_id":"agent-2","updated_at":"2026-10-01T08:00:00Z"}
+      ]},
+      "params": {"visible_only":true,"limit":30},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":true,"result":[
+        {"id":"r00","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r01","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r02","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r03","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r04","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r05","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r06","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r07","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r08","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r09","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r10","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r11","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r12","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r13","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r14","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r15","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r16","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r17","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r18","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r19","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r20","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r21","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r22","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r23","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r24","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r25","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r26","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r27","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r28","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"r29","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"}
+      ]}
+    },
+    {
+      "name": "string-is-legacy",
+      "context": {"authenticated":true},
+      "host_state": {"controller_state":"connected","visibility_index":true,"hidden_agent_ids":[],"conversations":[
+        {"id":"raw","agent_id":null,"updated_at":"2026-10-30T12:00:00Z"},
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]},
+      "params": {"visible_only":"true","limit":30},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":true,"result":[
+        {"id":"raw","agent_id":null,"updated_at":"2026-10-30T12:00:00Z"},
+        {"id":"recent","agent_id":"agent-0","updated_at":"2026-10-30T08:00:00Z"},
+        {"id":"older","agent_id":"agent-1","updated_at":"2026-10-30T07:00:00Z"}
+      ]}
+    },
+    {
+      "name": "no-index",
+      "context": {"authenticated":true},
+      "host_state": {"controller_state":"connected","visibility_index":false,"hidden_agent_ids":[],"conversations":[]},
+      "params": {"visible_only":true,"limit":30},
+      "expected_response": {"type":"admin_rpc_response","request_id":"contract","success":false,"error":"capability_unavailable: visible_only requires local agent visibility"}
+    }
+  ]
+}

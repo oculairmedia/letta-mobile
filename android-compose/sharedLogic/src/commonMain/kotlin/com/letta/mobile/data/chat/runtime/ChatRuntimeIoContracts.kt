@@ -23,6 +23,11 @@ interface ChatConversationStore {
      * conversations are mostly agent-free worker transcripts that would crowd a user's chats out.
      */
     suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation>
+
+    /** Visible, active conversations across agents, newest first; unsupported hosts retain legacy agent reads. */
+    suspend fun listRecentConversations(limit: Int = 30, after: ConversationId? = null): List<Conversation> {
+        throw UnsupportedOperationException("Visible recents are not supported by this gateway")
+    }
     suspend fun getConversation(conversationId: String): Conversation
     suspend fun deleteConversation(conversationId: String) {
         throw UnsupportedOperationException("deleteConversation is not supported by this gateway")

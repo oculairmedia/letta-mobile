@@ -20,6 +20,6 @@ The fixture exercises connected and disconnected StateFlow snapshots. Host confo
 uses `AdminRpcRegistry.buildRouter` and the real health handler; its native client rejects
 all calls. Client doubles can load this same data through `WireContractFixture.response`.
 
-The `conversation.list visible_only` and `message.list` default-alias contracts are
-intentionally not seeded here: their implementations are pending in #2281 and #2280.
-Their methods stay uncovered until those changes add real-handler fixtures.
+The `conversation.list visible_only` contract is versioned separately under
+`conversation.list/visible-recents-v1.md`. The `message.list` default-alias contract
+remains uncovered until its real-handler fixture lands.

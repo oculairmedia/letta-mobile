@@ -9015,13 +9015,25 @@ public final class com/letta/mobile/data/chat/conversations/TimelineConversation
 	public final fun getOwner ()Lcom/letta/mobile/data/chat/conversations/TimelineConversations;
 }
 
+public final class com/letta/mobile/data/chat/conversations/TimelineConversationLists {
+	public final fun focusAgent-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun hasMore-qkT7gGE (Ljava/lang/String;)Z
+	public final fun loadMore-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun prefetchPinnedAgents (Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun prepareSearch-C7LexNE (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun prepareSearch-C7LexNE$default (Lcom/letta/mobile/data/chat/conversations/TimelineConversationLists;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun refresh (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/chat/conversations/TimelineConversations : com/letta/mobile/data/shell/ShellChatPort {
-	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;)V
-	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun conversations ()Ljava/util/List;
 	public fun createConversationForAgent-gfLNG5k (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun deliverTo-FCMYEXo (Ljava/lang/String;Lcom/letta/mobile/ui/chat/session/ChatActions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getLists ()Lcom/letta/mobile/data/chat/conversations/TimelineConversationLists;
 	public final fun getManagement ()Lcom/letta/mobile/data/chat/conversations/ConversationManagement;
+	public final fun getPinnedAgents ()Ljava/util/Set;
 	public final fun getRoster ()Ljava/util/List;
 	public fun getSelectedConversation-hsG4S5c ()Ljava/lang/String;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
@@ -9030,6 +9042,7 @@ public final class com/letta/mobile/data/chat/conversations/TimelineConversation
 	public fun selectConversation-LfPRSJk (Ljava/lang/String;)V
 	public final fun selectedTarget ()Lcom/letta/mobile/ui/chat/session/TimelineChatTarget;
 	public fun send-1iDlvEA (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun setPinnedAgents (Ljava/util/Set;)V
 	public final fun setRoster (Ljava/util/List;)V
 	public fun stageComposerText (Ljava/lang/String;)V
 	public fun startNewChat-XmxTwY8 (Ljava/lang/String;)V
@@ -9040,19 +9053,25 @@ public final class com/letta/mobile/data/chat/conversations/TimelineConversation
 }
 
 public final class com/letta/mobile/data/chat/conversations/TimelineConversationsState {
-	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;ZZLjava/util/Set;Ljava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;ZZLjava/util/Set;Ljava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/util/Set;
+	public final fun component12 ()Ljava/lang/String;
 	public final fun component2 ()Z
-	public final fun component3-hsG4S5c ()Ljava/lang/String;
-	public final fun component4 ()Z
-	public final fun component5 ()Ljava/util/Set;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/util/Map;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/Set;
+	public final fun component5-hsG4S5c ()Ljava/lang/String;
+	public final fun component6 ()Z
+	public final fun component7 ()Ljava/util/Set;
 	public final fun component8 ()Ljava/lang/String;
-	public final fun copy-HQhRzY4 (Ljava/util/List;ZLjava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;
-	public static synthetic fun copy-HQhRzY4$default (Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;Ljava/util/List;ZLjava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;
+	public final fun component9 ()Ljava/util/Map;
+	public final fun copy-oGKNt0c (Ljava/util/List;ZZLjava/util/Set;Ljava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;)Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;
+	public static synthetic fun copy-oGKNt0c$default (Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;Ljava/util/List;ZZLjava/util/Set;Ljava/lang/String;ZLjava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthoritative ()Z
+	public final fun getAuthoritativeAgents ()Ljava/util/Set;
 	public final fun getConversations ()Ljava/util/List;
 	public final fun getCreating ()Z
 	public final fun getDeleting ()Ljava/util/Set;
@@ -9061,6 +9080,8 @@ public final class com/letta/mobile/data/chat/conversations/TimelineConversation
 	public final fun getLoaded ()Z
 	public final fun getNotice ()Ljava/lang/String;
 	public final fun getOpening ()Z
+	public final fun getSearchError ()Ljava/lang/String;
+	public final fun getSearchFailedAgents ()Ljava/util/Set;
 	public final fun getSelected-hsG4S5c ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -10063,12 +10084,16 @@ public abstract interface class com/letta/mobile/data/chat/runtime/ChatConversat
 	public abstract fun getConversation (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getDeleteBehavior ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
 	public abstract fun listAgentConversations (Lcom/letta/mobile/data/chat/runtime/AgentConversationPage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listRecentConversations-DogRbrI (ILjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listRecentConversations-DogRbrI$default (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;ILjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun restoreDeletedConversation (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/chat/runtime/ChatConversationStore$DefaultImpls {
 	public static fun deleteConversation (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getDeleteBehavior (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;)Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
+	public static fun listRecentConversations-DogRbrI (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;ILjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listRecentConversations-DogRbrI$default (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;ILjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun restoreDeletedConversation (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -10109,6 +10134,7 @@ public final class com/letta/mobile/data/chat/runtime/ChatGateway$DefaultImpls {
 	public static fun getToolReturn-cWSMi4k (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun listConversationMessagePage (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Lcom/letta/mobile/data/timeline/TimelineRemotePageRequest;Lcom/letta/mobile/data/timeline/TimelinePageProgress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun listConversationMessagesBefore--chhp7Y (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun listRecentConversations-DogRbrI (Lcom/letta/mobile/data/chat/runtime/ChatGateway;ILjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun restoreDeletedConversation (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -40383,6 +40409,7 @@ public final class com/letta/mobile/data/repository/appserver/AppServerConversat
 	public fun getDeleteBehavior ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
 	public fun listAgentConversations (Lcom/letta/mobile/data/chat/runtime/AgentConversationPage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listLlmModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listRecentConversations-DogRbrI (ILjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun recompileConversation (Lcom/letta/mobile/data/chat/recompile/ConversationRecompileRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun restoreDeletedConversation (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setConversationArchived (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -40614,6 +40641,7 @@ public final class com/letta/mobile/data/repository/iroh/IrohAdminRpcChatGateway
 	public fun listConversationMessages--chhp7Y (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listConversationMessagesBefore--chhp7Y (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listLlmModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listRecentConversations-DogRbrI (ILjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun recompileConversation (Lcom/letta/mobile/data/chat/recompile/ConversationRecompileRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun restoreDeletedConversation (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun sendConversationMessage-FCMYEXo (Ljava/lang/String;Lcom/letta/mobile/data/model/MessageCreateRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -45569,6 +45597,7 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceState {
 	public fun <init> (Lcom/letta/mobile/data/shell/ShellDestination;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/shell/ShellDestination;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun conversationShown-R2uKnlI (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun conversationsReported (Ljava/util/Map;Ljava/util/Set;)V
 	public final fun conversationsReported (Ljava/util/Set;)V
 	public final fun focusFor-F2iaJyI (Ljava/lang/String;Ljava/util/List;)Ljava/lang/String;
 	public final fun getAgentEditor ()Lcom/letta/mobile/data/shell/ShellDestination$AgentEditor;

@@ -39,6 +39,7 @@ fun ShellWorkspaceState.workspaceNavigation(
         conversations = conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations(),
         library = ShellDrawerLibrary(
             identities = identities,
+            pinnedAgentIds = conversations?.pinnedAgentIds.orEmpty(),
             agentLastActiveAt = conversations?.state?.conversations?.let(RecentAgents::lastActiveAtFromConversations).orEmpty(),
         ),
     )

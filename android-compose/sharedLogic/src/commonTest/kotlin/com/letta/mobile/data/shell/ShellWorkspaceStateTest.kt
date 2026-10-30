@@ -72,6 +72,22 @@ class ShellWorkspaceStateTest {
     }
 
     @Test
+    fun partialCatalogPrunesOnlyCompletedAgentsAndKeepsOtherMemories() {
+        val state = ShellWorkspaceState(ShellDestination.Chat())
+        state.conversationShown(cOld, a1)
+        state.conversationShown(cOther, a2)
+        state.conversationShown(null, null)
+        state.conversationsReported(mapOf(cNew to a1), emptySet())
+        assertEquals(listOf("c-old", "c-other"), state.tabs.openConversationIds)
+        assertEquals(cOld, state.resolveAgentChat(a1, listOf(newer)), "partial rows must not invalidate remembered selection")
+        state.conversationsReported(mapOf(cNew to a1), setOf(a1))
+        assertEquals(listOf("c-other"), state.tabs.openConversationIds)
+        assertEquals(cNew, state.resolveAgentChat(a1, listOf(older, newer)))
+        val laterOther = ShellConversationRef(ConversationId("other-new"), a2, "2026-10-04T10:00:00Z")
+        assertEquals(cOther, state.resolveAgentChat(a2, listOf(laterOther)), "unloaded agent memory survives")
+    }
+
+    @Test
     fun aConversationGetsATabOnlyWhileTheChatIsThePage() {
         val state = ShellWorkspaceState(ShellDestination.Memory())
         state.conversationShown(cOld, a1)

@@ -113,6 +113,8 @@ private fun webSearchSources(shell: WebShell, page: WebPageInputs) = UnifiedSear
     conversations = page.chat.list.state.conversations.toChatConversationSummaries(shell.backend.roster.toMap()),
     agents = shell.backend.agents.value,
     agentId = shell.workspace.focusedAgentId?.value,
+    prepareConversations = page.chat.owner?.lists?.let { it::prepareSearch },
+    conversationPreparationError = page.chat.list.state.searchError,
 )
 
 private fun webOverlayData(shell: WebShell, page: WebPageInputs) = ShellWorkspaceOverlayData(

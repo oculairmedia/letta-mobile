@@ -7206,13 +7206,13 @@ public final class com/letta/mobile/ui/shell/conversations/ShellTimelineChat {
 
 public final class com/letta/mobile/ui/shell/conversations/ShellTimelineChatBinding {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/lang/String;Lcom/letta/mobile/data/model/BackendConnectionStatus;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/lang/String;Lcom/letta/mobile/data/model/BackendConnectionStatus;Ljava/util/List;Lcom/letta/mobile/ui/shell/conversations/TimelineConversationPreferences;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;)V
 	public final fun getAgents ()Ljava/util/List;
 	public final fun getBackend ()Lkotlin/jvm/functions/Function0;
 	public final fun getClose ()Lkotlin/jvm/functions/Function1;
 	public final fun getConnection ()Lcom/letta/mobile/data/model/BackendConnectionStatus;
 	public final fun getOpen ()Lkotlin/jvm/functions/Function3;
-	public final fun getPrefs ()Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
+	public final fun getPreferences ()Lcom/letta/mobile/ui/shell/conversations/TimelineConversationPreferences;
 	public final fun getSession ()Ljava/lang/String;
 	public final fun getWorkspace ()Lcom/letta/mobile/data/shell/ShellWorkspaceState;
 }
@@ -7222,6 +7222,7 @@ public final class com/letta/mobile/ui/shell/conversations/ShellTimelineConversa
 	public final fun drawer-XmxTwY8 (Ljava/lang/String;)Lcom/letta/mobile/ui/shell/ShellDrawerConversations;
 	public final fun getArchiveFilter ()Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;
 	public final fun getParentIds ()Ljava/util/Map;
+	public final fun getPinnedAgentIds ()Ljava/util/Set;
 	public final fun getPinnedIds ()Ljava/util/Set;
 	public final fun getState ()Lcom/letta/mobile/data/chat/conversations/TimelineConversationsState;
 	public final fun panelActions (Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;
@@ -7229,11 +7230,20 @@ public final class com/letta/mobile/ui/shell/conversations/ShellTimelineConversa
 }
 
 public final class com/letta/mobile/ui/shell/conversations/ShellTimelineConversationListKt {
-	public static final fun SyncTimelineConversations (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Lcom/letta/mobile/data/chat/conversations/TimelineConversations;Ljava/lang/String;Landroidx/compose/runtime/Composer;I)V
+	public static final fun SyncTimelineConversations (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Lcom/letta/mobile/data/chat/conversations/TimelineConversations;Ljava/lang/String;Ljava/util/List;Landroidx/compose/runtime/Composer;II)V
 	public static final fun rememberShellTimelineChat (Lcom/letta/mobile/ui/shell/conversations/ShellTimelineChatBinding;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/conversations/ShellTimelineChat;
-	public static final fun rememberShellTimelineConversationList (Lcom/letta/mobile/data/chat/conversations/TimelineConversations;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;
-	public static final fun rememberTimelineConversations (Lcom/letta/mobile/data/model/BackendConnectionStatus;Lkotlin/jvm/functions/Function0;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/chat/conversations/TimelineConversations;
+	public static final fun rememberShellTimelineConversationList (Lcom/letta/mobile/data/chat/conversations/TimelineConversations;Ljava/util/Set;Landroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;
+	public static final fun rememberTimelineConversations (Lcom/letta/mobile/data/model/BackendConnectionStatus;Lkotlin/jvm/functions/Function0;Ljava/util/List;Lcom/letta/mobile/ui/shell/conversations/TimelineConversationPreferences;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/chat/conversations/TimelineConversations;
 	public static final fun shellComposerCommands (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lcom/letta/mobile/data/chat/conversations/TimelineConversations;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/shell/conversations/TimelineConversationPreferences {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getManagement ()Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
+	public final fun getPinnedAgents ()Ljava/util/Set;
+	public final fun getPinsLoaded ()Z
 }
 
 public final class com/letta/mobile/ui/shell/header/ComposableSingletons$ShellHeaderSearchBarKt {
@@ -7521,8 +7531,8 @@ public final class com/letta/mobile/ui/shell/header/UnifiedSearchResultsKt {
 public final class com/letta/mobile/ui/shell/header/UnifiedSearchSources {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;Lkotlin/jvm/functions/Function2;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;Lkotlin/jvm/functions/Function2;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Ljava/util/List;
 	public final fun component3 ()Ljava/util/List;
@@ -7530,17 +7540,21 @@ public final class com/letta/mobile/ui/shell/header/UnifiedSearchSources {
 	public final fun component5 ()Ljava/lang/String;
 	public final fun component6 ()Ljava/util/List;
 	public final fun component7 ()Lcom/letta/mobile/data/search/MessageSearchSource;
-	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
+	public final fun component8 ()Lkotlin/jvm/functions/Function2;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;Lkotlin/jvm/functions/Function2;Ljava/lang/String;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/Map;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/search/MessageSearchSource;Lkotlin/jvm/functions/Function2;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getAgents ()Ljava/util/List;
 	public final fun getAvatarStyleByAgentId ()Ljava/util/Map;
 	public final fun getCanvases ()Ljava/util/List;
+	public final fun getConversationPreparationError ()Ljava/lang/String;
 	public final fun getConversations ()Ljava/util/List;
 	public final fun getDestinations ()Ljava/util/List;
 	public final fun getMessageCapabilities ()Lcom/letta/mobile/data/search/MessageSearchCapabilities;
 	public final fun getMessageSearch ()Lcom/letta/mobile/data/search/MessageSearchSource;
+	public final fun getPrepareConversations ()Lkotlin/jvm/functions/Function2;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

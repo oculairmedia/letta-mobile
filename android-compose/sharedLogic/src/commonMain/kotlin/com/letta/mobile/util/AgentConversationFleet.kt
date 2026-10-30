@@ -62,6 +62,36 @@ class AgentConversationFleet(
     /** Some agent has conversations not read yet. */
     val hasMore: Boolean get() = listed.values.any { it.cursor != null }
 
+    internal val loadedAgents: Set<AgentId> get() = listed.keys
+    internal val authoritativeAgents: Set<AgentId> get() = listed.filterValues { it.authoritative }.keys
+
+    internal suspend fun retainAgents(agents: Set<AgentId>) = mutex.withLock {
+        listed = listed.filterKeys { it in agents }
+    }
+
+    internal fun hasMore(agent: AgentId): Boolean = listed[agent]?.cursor != null
+
+    /** Refreshes only explicit agents, retaining other agents and already loaded tails. */
+    internal suspend fun refreshAgents(agents: Set<AgentId>): List<Conversation> = mutex.withLock {
+        val fresh = readAll(agents.associateWith { AgentListing() }, pages = 1)
+        fresh.values.firstOrNull { it.failure != null }?.failure?.let { throw it }
+        listed = listed + fresh.mapValues { (agent, rows) ->
+            // Keep cached tails visible, but restart traversal behind the new head to avoid reconnect gaps.
+            (listed[agent] ?: AgentListing()).refreshed(rows).copy(cursor = rows.cursor, confirmedIds = rows.confirmedIds)
+        }
+        listed.merged()
+    }
+
+    /** Pages just the focused agent, using that agent's own cursor. */
+    internal suspend fun loadMore(agent: AgentId): List<Conversation> = mutex.withLock {
+        val previous = listed[agent] ?: AgentListing()
+        if (previous.read && previous.cursor == null) return@withLock listed.merged()
+        val fresh = readPages(agent, previous, pages = 1)
+        fresh.failure?.let { throw it }
+        listed = listed + (agent to fresh)
+        listed.merged()
+    }
+
     /** Reads [agents]' (the visible ones') newest conversations again, dropping every earlier page. */
     suspend fun refresh(agents: List<Agent>): List<Conversation> = mutex.withLock {
         val roster = agents.visibleInLists().map { it.id }.distinct()
@@ -195,6 +225,8 @@ private data class AgentListing(
     val cursor: ConversationId? = null,
     val read: Boolean = false,
     val failure: Throwable? = null,
+    val authoritative: Boolean = false,
+    val confirmedIds: Set<ConversationId> = emptySet(),
 ) {
     /** Replace an authoritative short read; otherwise keep already loaded older pages and their cursor. */
     fun refreshed(fresh: AgentListing): AgentListing {
@@ -206,15 +238,23 @@ private data class AgentListing(
             cursor = if (read) cursor else fresh.cursor,
             read = true,
             failure = null,
+            authoritative = false,
+            confirmedIds = confirmedIds + fresh.confirmedIds,
         )
     }
 
     /** These rows and a page more: only [agent]'s own, visible ones; a [full] page may have more after it. */
     fun plus(agent: AgentId, page: List<Conversation>, full: Boolean): AgentListing {
-        val ids = rows.mapTo(mutableSetOf()) { it.id }
-        val own = page.filter { it.agentId == agent && it.id !in ids }.visibleConversationsInLists()
+        val ids = page.mapTo(mutableSetOf()) { it.id }
+        val own = page.filter { it.agentId == agent }.visibleConversationsInLists()
+        val confirmed = confirmedIds + own.map { it.id }
+        // Cached tails survive a head refresh, but only rows seen in this traversal survive its end.
+        val retained = rows.filterNot { it.id in ids }.filter { full || it.id in confirmed }
         // The cursor is the page's last row as the server sent it, so a filtered row never stalls paging.
-        return AgentListing(rows = rows + own, cursor = page.lastOrNull()?.id?.takeIf { full }, read = true)
+        return AgentListing(
+            rows = retained + own, confirmedIds = confirmed,
+            cursor = page.lastOrNull()?.id?.takeIf { full }, read = true, authoritative = !full,
+        )
     }
 }
 

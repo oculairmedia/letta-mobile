@@ -26,7 +26,6 @@ conversation.create
 conversation.delete
 conversation.fork
 conversation.get
-conversation.list
 conversation.list_agent
 conversation.recompile
 conversation.restore

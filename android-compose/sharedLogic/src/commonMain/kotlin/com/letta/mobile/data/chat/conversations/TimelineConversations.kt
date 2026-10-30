@@ -2,12 +2,7 @@ package com.letta.mobile.data.chat.conversations
 
 import com.letta.mobile.data.chat.branch.BranchDraft
 import com.letta.mobile.data.chat.branch.PendingDraft
-import com.letta.mobile.util.AgentConversationFleet
-import com.letta.mobile.util.AgentConversationFleetPaging
-import com.letta.mobile.data.chat.runtime.AgentConversationPage
-import com.letta.mobile.util.READ_THROUGH_PAGES
 import com.letta.mobile.data.chat.runtime.ChatGateway
-import com.letta.mobile.data.chat.runtime.agentConversationReader
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -15,7 +10,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.repository.observeConversationInvalidations
 import com.letta.mobile.data.shell.ShellChatPort
@@ -42,10 +36,14 @@ import kotlinx.coroutines.launch
 
 /** What a [TimelineConversations] owner holds: the list, the selection and what is on its way to the chat. */
 data class TimelineConversationsState(
-    /** Every agent's listed conversations, newest first. */
+    /** Visible recents and explicitly loaded agents' conversations, newest first. */
     val conversations: List<Conversation> = emptyList(),
-    /** True once the backend has listed them; until then the list is not authoritative. */
+    /** True once recents and pinned first pages have landed; this is not global completeness. */
     val loaded: Boolean = false,
+    /** Only a legacy full-fleet read may prune globally absent tabs or remembered conversations. */
+    val authoritative: Boolean = false,
+    /** Agents whose complete page sequence landed; only their missing ids may be pruned. */
+    val authoritativeAgents: Set<AgentId> = emptySet(),
     val selected: ConversationId? = null,
     /** A new conversation is being made (or an agent's found) for the chat to open. */
     val creating: Boolean = false,
@@ -56,6 +54,10 @@ data class TimelineConversationsState(
     val drafts: Map<ConversationId, PendingDraft> = emptyMap(),
     /** Failures the open chat shows in its composer (a branch, a rename, a delete). */
     val notice: String? = null,
+    /** Owners whose explicit search failed; successful owners' results remain searchable. */
+    val searchFailedAgents: Set<AgentId> = emptySet(),
+    /** A search-specific warning, independent of later chat or paging errors. */
+    val searchError: String? = null,
 ) {
     /** The chat is on its way: the list is loading, a chat is being made, or the selected one is opening; not after a failure. */
     val opening: Boolean get() = error == null && (!loaded || creating || selected != null)
@@ -64,7 +66,7 @@ data class TimelineConversationsState(
 /**
  * The web's conversation list owner: a host whose chat is a
  * [com.letta.mobile.ui.chat.session.TimelineChatSessionPort] per conversation. It lists the
- * roster's agents' conversations agent by agent ([AgentConversationFleet]) through the session's
+ * visible recents first, then each focused agent's pages through the session's
  * [ChatGateway] (the App Server's own commands on ws://, the host's `admin_rpc` over Iroh), keeps
  * the selection, opens new chats and is the shell's [ShellChatPort]. Its row actions, branching and `/recompile` are the shared [management], the
  * same one desktop's chat controller binds. Build one per session in a scope that ends with it,
@@ -75,66 +77,43 @@ class TimelineConversations(
     private val gateway: ChatGateway,
     roster: List<Agent>,
     prefs: ConversationManagementPrefs = ConversationManagementPrefs(),
+    /** Agents whose first page may be prefetched, independent of roster size. */
+    var pinnedAgents: Set<AgentId> = emptySet(),
 ) : ShellChatPort {
-    /** The agents whose conversations the list shows (and whose names title the chats); new agents list again. */
+    /** The visible directory supplies names and membership; new agents do not trigger a fleet read. */
     var roster: List<Agent> = roster
         set(agents) {
             val changed = rosterNeedsConversationRefresh(field, agents)
             field = agents
-            if (changed) scope.launch { refresh() }
+            if (changed) scope.launch { lists.rosterChanged() }
         }
-
-    /** Each agent's conversations, read through: the web's list has no "load more". */
-    private val fleet = AgentConversationFleet(
-        gateway.agentConversationReader(),
-        AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
-    )
 
     private val mutableState = MutableStateFlow(TimelineConversationsState())
     val state: StateFlow<TimelineConversationsState> = mutableState.asStateFlow()
+
+    /** Bounded bootstrap, per-agent paging and explicit search demand for any shell host. */
+    val lists = TimelineConversationLists(gateway, mutableState, { this.roster }, { pinnedAgents }, { pinnedAgents = it })
 
     /** Rename, pin, archive, delete, fork / edit / rerun and `/recompile`, shared with desktop. */
     val management = ConversationManagement(scope, ListHost(), prefs)
 
     /** Who waits for the chat being made (or found): every caller gets it, not only the first. */
     private val waitingForChat = mutableListOf<(ConversationId) -> Unit>()
+    private var failedInitialRoute: ConversationId? = null
 
     init {
         scope.launch { refresh() }
         scope.launch {
-            observeConversationInvalidations(gateway.conversationChanges) { dirty ->
-                runCatchingCancellable {
-                    fleet.refreshForInvalidations(dirty, { roster }) { gateway.getConversation(it.value) }.first
-                }.onSuccess { listed ->
-                    mutableState.update { current ->
-                        current.copy(
-                            conversations = listed.keeping(current.conversations.filter { it.id == current.selected }),
-                            loaded = true,
-                            error = null,
-                        )
-                    }
-                }.onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: LIST_FAILED) } }
-            }
+            observeConversationInvalidations(gateway.conversationChanges, lists::changed)
         }
     }
 
     /**
-     * Lists the roster's conversations again; a failure keeps the last list and says why. A
-     * conversation the list does not carry yet (the open one, made while it loaded) stays. With no
-     * roster yet there is nothing to list, and the list stays unloaded.
+     * Refreshes recents, pins and cached agents only; a failure keeps the last rows and says why.
+     * The open conversation stays even outside the recents window. Legacy hosts retain their
+     * roster-based policy and remain unloaded until their roster arrives.
      */
-    suspend fun refresh() {
-        // With no roster yet the list stays unloaded; a roster emptied after loading lists nothing.
-        if (roster.isEmpty() && !mutableState.value.loaded) return
-        runCatchingCancellable { fleet.refresh(roster) }
-            .onSuccess { listed ->
-                mutableState.update { current ->
-                    val selected = current.conversations.filter { it.id == current.selected }
-                    current.copy(conversations = listed.keeping(selected), loaded = true, error = null)
-                }
-            }
-            .onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: LIST_FAILED) } }
-    }
+    suspend fun refresh() = lists.refresh()
 
     /** The chat the page opens now: the selected conversation, titled by its agent. */
     fun selectedTarget(): TimelineChatTarget? = mutableState.value.selectedRecord()?.let { conversation ->
@@ -150,8 +129,14 @@ class TimelineConversations(
 
     override val selectedConversation: ConversationId? get() = mutableState.value.selected
 
-    override fun selectConversation(conversation: ConversationId) {
+    override fun selectConversation(conversation: ConversationId) = selectConversation(conversation) {}
+
+    private fun selectConversation(conversation: ConversationId, onMissing: () -> Unit) {
         mutableState.update { it.copy(selected = conversation) }
+        scope.launch {
+            val row = mutableState.readSelectedConversation(gateway, conversation)
+            if (row == null) onMissing() else lists.focusAgent(row.agentId)
+        }
     }
 
     /**
@@ -175,12 +160,24 @@ class TimelineConversations(
     fun openInitial(routed: ConversationId?, focused: AgentId?, createIfNone: Boolean) {
         val current = mutableState.value
         if (!current.awaitsFirstChat) return
+        val unlistedRoute = current.unlistedRoute(routed, failedInitialRoute, lists.legacyMode)
+        if (unlistedRoute != null) {
+            selectConversation(unlistedRoute) { initialRouteFailed(unlistedRoute, focused, createIfNone) }
+            return
+        }
         val first = current.listed(routed) ?: focused?.let(current::activeChatOf)
         if (first != null) {
             selectConversation(first)
             return
         }
         if (focused != null && current.mayCreate(createIfNone)) createConversationForAgent(focused)
+    }
+
+    private fun initialRouteFailed(route: ConversationId, focused: AgentId?, createIfNone: Boolean) {
+        if (mutableState.value.selected != route) return
+        failedInitialRoute = route
+        mutableState.update { it.copy(selected = null, error = if (focused == null) it.error else null) }
+        openInitial(null, focused, createIfNone)
     }
 
     override fun send(conversation: ConversationId, text: String) {
@@ -216,8 +213,9 @@ class TimelineConversations(
         if (mutableState.value.creating) return
         mutableState.update { it.copy(creating = true, error = null) }
         scope.launch {
-            val opened = runCatchingCancellable { (if (findExisting) existingChat(agent) else null) ?: create(agent) }
-                .onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: CREATE_FAILED) } }
+            val opened = runCatchingCancellable {
+                (if (findExisting) gateway.existingChat(agent, mutableState, ::selectConversation) else null) ?: create(agent)
+            }.onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: CREATE_FAILED) } }
                 .getOrNull()
             val waiting = waitingForChat.toList()
             waitingForChat.clear()
@@ -226,31 +224,11 @@ class TimelineConversations(
         }
     }
 
-    /** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
-    private suspend fun existingChat(agent: AgentId): ConversationId? {
-        val own = gateway.listAgentConversations(AgentConversationPage(agent))
-            .filter { it.agentId == agent }
-            .visibleConversationsInLists()
-        mutableState.update { it.copy(conversations = it.conversations.keeping(own)) }
-        val newest = own.firstOrNull { it.archived != true } ?: return null
-        selectConversation(newest.id)
-        return newest.id
-    }
-
     private suspend fun create(agent: AgentId): ConversationId {
         val extras = gateway as? ChatGatewayExtras ?: error(NO_CREATE)
         val created = extras.createConversation(agent.value)
-        opened(created, draft = null)
+        mutableState.opened(created, draft = null)
         return created.id
-    }
-
-    /** A conversation the owner made (a new chat or a branch) joins the top of the list and opens. */
-    private fun opened(conversation: Conversation, draft: PendingDraft?) {
-        mutableState.update { current ->
-            val listed = listOf(conversation) + current.conversations.filterNot { it.id == conversation.id }
-            val next = current.copy(conversations = listed, selected = conversation.id)
-            if (draft == null) next else next.withDraft(conversation.id, draft)
-        }
     }
 
     /** The list as the shared [management] reads and writes it. */
@@ -287,7 +265,7 @@ class TimelineConversations(
             }
         }
 
-        override suspend fun openBranch(branch: OpenedBranch) = opened(branch.conversation, branch.draft)
+        override suspend fun openBranch(branch: OpenedBranch) = mutableState.opened(branch.conversation, branch.draft)
 
         override fun showError(message: String) {
             mutableState.update { it.copy(notice = message) }
@@ -295,47 +273,19 @@ class TimelineConversations(
     }
 
     private companion object {
-        const val LIST_FAILED = "Could not list the conversations"
         const val CREATE_FAILED = "Could not start a new conversation"
         const val NO_CREATE = "This backend can't start a new conversation"
     }
 }
 
-private fun TimelineConversationsState.withDraft(conversation: ConversationId, draft: PendingDraft) =
+internal fun TimelineConversationsState.withDraft(conversation: ConversationId, draft: PendingDraft) =
     copy(drafts = drafts + (conversation to draft))
-
-/** A prompt into the composer; sent at once for a rerun or a send, text alone straight from the draft-free send. */
-private fun ChatActions.applyDraft(pending: PendingDraft) {
-    val draft = pending.draft
-    if (pending.sendNow && draft.images.isEmpty()) {
-        sendText(draft.text)
-        return
-    }
-    updateComposerText(draft.text)
-    draft.images.forEach(::attachImage)
-    if (pending.sendNow) send()
-}
 
 /** The shell's view of a conversation: whose it is and its newest activity. */
 private fun Conversation.shellRef() = ShellConversationRef(id, agentId, updatedAtLabel = lastMessageAt ?: updatedAt ?: createdAt.orEmpty())
 
 /** With no [expected] title, any; else only while the row still shows it. */
 private fun Conversation.showsTitle(expected: ConversationSummary?): Boolean = expected == null || summary.orEmpty() == expected.value
-
-private fun TimelineConversationsState.selectedRecord(): Conversation? = record(selected)
-
-private fun TimelineConversationsState.record(conversation: ConversationId?): Conversation? =
-    conversation?.let { id -> conversations.firstOrNull { it.id == id } }
-
-private fun TimelineConversationsState.edit(conversation: ConversationId, change: (Conversation) -> Conversation) =
-    copy(conversations = conversations.map { if (it.id == conversation) change(it) else it })
-
-/** The list without [conversation]; when it was the selected one, its agent's next active conversation is. */
-private fun TimelineConversationsState.without(conversation: ConversationId): TimelineConversationsState {
-    val remaining = conversations.filterNot { it.id == conversation }
-    val next = if (selected == conversation) record(conversation)?.agentId?.let { agent -> remaining.activeChatOf(agent) } else selected
-    return copy(conversations = remaining, selected = next, deleting = deleting - conversation)
-}
 
 /** The roster's name for [agent], for the chat's title. */
 private fun List<Agent>.nameOf(agent: AgentId): String = firstOrNull { it.id == agent }?.name.orEmpty()
@@ -348,29 +298,11 @@ private fun rosterNeedsConversationRefresh(previous: List<Agent>, next: List<Age
     return firstArrival || membershipChanged
 }
 
-/** This list, then the [others] it does not carry (newest first within each). */
-private fun List<Conversation>.keeping(others: List<Conversation>): List<Conversation> {
-    val ids = mapTo(mutableSetOf()) { it.id }
-    return this + others.filterNot { it.id in ids }
-}
-
 /** Loaded, with nothing selected and nothing being made: the first chat is still to open. */
 private val TimelineConversationsState.awaitsFirstChat: Boolean
     get() = loaded && isIdle
 
 private val TimelineConversationsState.isIdle: Boolean get() = selected == null && !creating
-
-/** [conversation] while the list carries it. */
-private fun TimelineConversationsState.listed(conversation: ConversationId?): ConversationId? = record(conversation)?.id
-
-/** [agent]'s newest active conversation in the list. */
-private fun TimelineConversationsState.activeChatOf(agent: AgentId): ConversationId? = conversations.activeChatOf(agent)
-
-private fun List<Conversation>.activeChatOf(agent: AgentId): ConversationId? =
-    firstOrNull { it.agentId == agent && it.archived != true }?.id
-
-/** A first chat may be made when the host asks for one and the last attempt did not fail. */
-private fun TimelineConversationsState.mayCreate(wanted: Boolean): Boolean = wanted && error == null
 
 /** What a timeline chat port takes from the shared [owner]: branching and `/recompile`, and the host's `/` [commands]. */
 class TimelineConversationChat(val owner: TimelineConversations, val commands: List<ChatHostCommand>)

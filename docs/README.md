@@ -204,6 +204,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 
+### reference/contracts/conversation.list
+
+- [conversation.list: Visible Recents v1](reference/contracts/conversation.list/visible-recents-v1.md)
+
 ### reference/contracts/health.check
 
 - [health.check: Controller Status v1](reference/contracts/health.check/status-v1.md)

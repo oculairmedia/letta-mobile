@@ -59,8 +59,8 @@ class TimelineConversationsIrohTest {
 
         assertTrue(owner.state.value.loaded, "the list loaded: ${owner.state.value.error}")
         assertEquals(listOf("c1", "c2"), owner.state.value.conversations.map { it.id.value })
-        assertEquals(listOf("agent-1", "agent-2"), host.calls.map { (_, params) -> params.text("agent_id") }.sorted())
-        assertEquals(listOf("conversation.list", "conversation.list"), host.methods)
+        assertEquals(listOf("", "agent-1", "agent-2"), host.calls.map { (_, params) -> params.text("agent_id") }.sorted())
+        assertEquals(listOf("conversation.list", "conversation.list", "conversation.list"), host.methods)
         assertTrue(host.native.isEmpty(), "native commands sent: ${host.native}")
     }
 
@@ -81,7 +81,7 @@ class TimelineConversationsIrohTest {
 
         assertEquals(
             listOf(
-                "conversation.list", "conversation.list",
+                "conversation.list", "conversation.list", "conversation.list",
                 "conversation.update", "conversation.archive", "conversation.fork", "conversation.archive",
             ),
             host.methods,
@@ -105,7 +105,10 @@ class TimelineConversationsIrohTest {
 
         owner.createConversationForAgent(AgentId("agent-3")) {}
         runCurrent()
-        assertEquals(listOf("conversation.list", "conversation.list", "conversation.list", "conversation.create"), host.methods)
+        assertEquals(
+            listOf("conversation.list", "conversation.list", "conversation.list", "conversation.list", "conversation.create"),
+            host.methods,
+        )
         assertEquals(ConversationId("new-1"), owner.selectedConversation)
         assertTrue(host.native.isEmpty(), "native commands sent: ${host.native}")
     }
@@ -121,7 +124,9 @@ class TimelineConversationsIrohTest {
         val listed = owner.state.value.conversations.map { it.id.value }
         assertEquals(61, listed.size, "every agent's own conversation, read past the first page")
         assertTrue(listed.none { it.startsWith("worker-") })
-        assertTrue(host.calls.all { (_, params) -> params.text("agent_id").isNotEmpty() }, "no cross-agent read")
+        assertTrue(host.calls.all { (_, params) ->
+            params.text("agent_id").isNotEmpty() || params["visible_only"] == kotlinx.serialization.json.JsonPrimitive(true)
+        }, "only the visible opt-in probe may cross agents")
     }
 
     private fun TestScope.owner(host: IrohHost, roster: List<String> = listOf("agent-1", "agent-2")) = TimelineConversations(
