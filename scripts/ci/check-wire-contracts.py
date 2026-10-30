@@ -114,12 +114,20 @@ def require_cases(path, cases):
     if not isinstance(cases, list) or not cases:
         raise ValueError(f"{path}: expected non-empty cases")
     names = [_case_name(case) for case in cases]
+    _require_unique_names(path, names)
+    for name, case in zip(names, cases):
+        _require_case_fields(path, name, case)
+
+
+def _require_unique_names(path, names):
     if None in names or len(set(names)) != len(names):
         raise ValueError(f"{path}: cases need unique non-empty names")
-    for name, case in zip(names, cases):
-        missing = next((field for field in CASE_FIELDS if not isinstance(case.get(field), dict)), None)
-        if missing:
-            raise ValueError(f"{path}: case {name} requires object {missing}")
+
+
+def _require_case_fields(path, name, case):
+    missing = [field for field in CASE_FIELDS if not isinstance(case.get(field), dict)]
+    if missing:
+        raise ValueError(f"{path}: case {name} requires object {missing[0]}")
 
 
 def is_repository_file(root, handler):
