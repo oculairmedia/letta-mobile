@@ -23,85 +23,12 @@ internal class ChatHistoryPager(
     private val activeConversationId: () -> String?,
 ) {
     fun loadOlderMessages(clientModeEnabled: Boolean) {
-        // letta-mobile-doq50: every short-circuit path is now telemetered so
-        // 'no loading indicator at all' diagnostics are answerable without
-        // device repro. Pair with the catch-block 'failed' event so the full
-        // skip/attempt/succeed/fail surface is visible.
-        if (clientModeEnabled) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "clientModeEnabled",
-                "agentId" to agentId,
-            )
-            return
-        }
         val conversationId = activeConversationId()
-        if (conversationId == null) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "noActiveConversation",
-                "agentId" to agentId,
-            )
-            return
-        }
-        val currentState = uiState.value
-        if (currentState.isLoadingMessages) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "isLoadingMessages",
-                "conversationId" to conversationId,
-            )
-            return
-        }
-        if (currentState.isLoadingOlderMessages) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "alreadyLoadingOlder",
-                "conversationId" to conversationId,
-            )
-            return
-        }
-        if (!currentState.hasMoreOlderMessages) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "noMoreOlder",
-                "conversationId" to conversationId,
-                "messageCount" to currentState.messages.size,
-            )
-            return
-        }
-        if (currentState.isStreaming) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "isStreaming",
-                "conversationId" to conversationId,
-            )
-            return
-        }
+        if (shouldSkipLoad(clientModeEnabled, conversationId)) return
 
-        // letta-mobile-doq50: prefer a real server message ID (user / assistant)
-        // over synthetic IDs like `toolreturn-...` that the WS frame mapper
-        // generates locally to dedup tool returns. The server doesn't
-        // recognize synthetic IDs as cursors, so older-message fetches with
-        // such an ID either silently no-op or return the same page that's
-        // already loaded â€” which the merge then filters out, leaving the
-        // visible message count unchanged.
-        //
-        // Fallback to the original "first non-pending" if no real ID is found
-        // so the bug surface is bounded by content shape rather than crashing.
-        val oldestLoadedMessageId = currentState.messages
-            .firstOrNull { !it.isPending && it.isPaginationCursorEligible() }
-            ?.id
-            ?: currentState.messages.firstOrNull { !it.isPending }?.id
-        if (oldestLoadedMessageId == null) {
-            Telemetry.event(
-                "ChatHistoryPager", "loadSkipped",
-                "reason" to "noNonPendingMessage",
-                "conversationId" to conversationId,
-                "messageCount" to currentState.messages.size,
-            )
-            return
-        }
+        val currentState = uiState.value
+        val oldestLoadedMessageId = getPaginationCursor(currentState, conversationId!!)
+            ?: return
 
         val cursorIsSynthetic = oldestLoadedMessageId.startsWith("toolreturn-")
         Telemetry.event(
@@ -114,71 +41,137 @@ internal class ChatHistoryPager(
 
         scope.launch {
             uiState.value = uiState.value.copy(isLoadingOlderMessages = true)
-            try {
-                val olderPage = messageRepository.fetchOlderMessagesPage(
-                    agentId = AgentId(agentId),
-                    conversationId = ConversationId(conversationId),
-                    beforeMessageId = oldestLoadedMessageId,
-                )
-                val olderMessages = olderPage.messages
-                if (conversationId != activeConversationId()) {
-                    Telemetry.event(
-                        "ChatHistoryPager", "loadAbandoned",
-                        "reason" to "conversationChanged",
-                        "conversationId" to conversationId,
-                    )
-                    return@launch
-                }
+            performLoad(conversationId, oldestLoadedMessageId)
+        }
+    }
 
-                val previousCount = uiState.value.messages.size
-                val olderUi = olderMessages.toUiMessages()
-                val mergedMessages = chatTimelineObserver.mergeOlderPage(
-                    conversationId = conversationId,
-                    olderMessages = olderUi,
-                    existingMessages = uiState.value.messages,
-                )
-                // letta-mobile-doq50: if a fetch returns messages but the
-                // merge filters all of them as duplicates of what's already
-                // loaded, the cursor is broken (server returned the same
-                // page). Mark pagination terminal to prevent an infinite
-                // spinner-then-clear loop. The user can still pull-to-
-                // refresh to retry.
-                val mergeAddedMessages = mergedMessages.size > previousCount
-                // letta-mobile-f0ixs: prefer the transport's explicit answer. Page SIZE is not a
-                // reliable end-of-history signal — MessageListPageGuard trims an oversized window
-                // to fit its byte budget, so a page with older history still behind it can arrive
-                // SHORT. Reading that as "reached the beginning" truncated scroll-back silently.
-                // hasMore is null when the transport said nothing (HTTP path, untrimmed pages),
-                // and only then do we fall back to the size heuristic.
-                val newHasMore = mergeAddedMessages &&
-                    (olderPage.hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
-                uiState.value = uiState.value.copy(
-                    messages = mergedMessages.toImmutableList(),
-                    messageListChange = ChatMessageListChange.Full,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = newHasMore,
-                )
+    private suspend fun performLoad(conversationId: String, oldestLoadedMessageId: String) {
+        try {
+            val olderPage = messageRepository.fetchOlderMessagesPage(
+                agentId = AgentId(agentId),
+                conversationId = ConversationId(conversationId),
+                beforeMessageId = oldestLoadedMessageId,
+            )
+            val olderMessages = olderPage.messages
+            if (conversationId != activeConversationId()) {
                 Telemetry.event(
-                    "ChatHistoryPager", "loadSucceeded",
+                    "ChatHistoryPager", "loadAbandoned",
+                    "reason" to "conversationChanged",
                     "conversationId" to conversationId,
-                    "fetchedCount" to olderMessages.size,
-                    "mergedAddedCount" to (mergedMessages.size - previousCount),
-                    "mergedTotalCount" to mergedMessages.size,
-                    "hasMoreAfter" to newHasMore,
-                    "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
                 )
-            } catch (e: Exception) {
-                Telemetry.error(
-                    "ChatHistoryPager", "loadFailed", e,
-                    "conversationId" to conversationId,
-                    "beforeMessageId" to oldestLoadedMessageId,
-                )
-                android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
-                if (conversationId == activeConversationId()) {
-                    uiState.value = uiState.value.copy(isLoadingOlderMessages = false)
-                }
+                return
+            }
+
+            val previousCount = uiState.value.messages.size
+            val olderUi = olderMessages.toUiMessages()
+            val mergedMessages = chatTimelineObserver.mergeOlderPage(
+                conversationId = conversationId,
+                olderMessages = olderUi,
+                existingMessages = uiState.value.messages,
+            )
+
+            val mergeAddedMessages = mergedMessages.size > previousCount
+            val newHasMore = mergeAddedMessages &&
+                (olderPage.hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
+
+            uiState.value = uiState.value.copy(
+                messages = mergedMessages.toImmutableList(),
+                messageListChange = ChatMessageListChange.Full,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = newHasMore,
+            )
+
+            Telemetry.event(
+                "ChatHistoryPager", "loadSucceeded",
+                "conversationId" to conversationId,
+                "fetchedCount" to olderMessages.size,
+                "mergedAddedCount" to (mergedMessages.size - previousCount),
+                "mergedTotalCount" to mergedMessages.size,
+                "hasMoreAfter" to newHasMore,
+                "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
+            )
+        } catch (e: Exception) {
+            Telemetry.error(
+                "ChatHistoryPager", "loadFailed", e,
+                "conversationId" to conversationId,
+                "beforeMessageId" to oldestLoadedMessageId,
+            )
+            android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
+            if (conversationId == activeConversationId()) {
+                uiState.value = uiState.value.copy(isLoadingOlderMessages = false)
             }
         }
+    }
+
+    private fun shouldSkipLoad(clientModeEnabled: Boolean, conversationId: String?): Boolean {
+        if (clientModeEnabled) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "clientModeEnabled",
+                "agentId" to agentId,
+            )
+            return true
+        }
+        if (conversationId == null) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "noActiveConversation",
+                "agentId" to agentId,
+            )
+            return true
+        }
+        val currentState = uiState.value
+        if (currentState.isLoadingMessages) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "isLoadingMessages",
+                "conversationId" to conversationId,
+            )
+            return true
+        }
+        if (currentState.isLoadingOlderMessages) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "alreadyLoadingOlder",
+                "conversationId" to conversationId,
+            )
+            return true
+        }
+        if (!currentState.hasMoreOlderMessages) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "noMoreOlder",
+                "conversationId" to conversationId,
+                "messageCount" to currentState.messages.size,
+            )
+            return true
+        }
+        if (currentState.isStreaming) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "isStreaming",
+                "conversationId" to conversationId,
+            )
+            return true
+        }
+        return false
+    }
+
+    private fun getPaginationCursor(currentState: ChatUiState, conversationId: String): String? {
+        val oldestLoadedMessageId = currentState.messages
+            .firstOrNull { !it.isPending && it.isPaginationCursorEligible() }
+            ?.id
+            ?: currentState.messages.firstOrNull { !it.isPending }?.id
+        if (oldestLoadedMessageId == null) {
+            Telemetry.event(
+                "ChatHistoryPager", "loadSkipped",
+                "reason" to "noNonPendingMessage",
+                "conversationId" to conversationId,
+                "messageCount" to currentState.messages.size,
+            )
+            return null
+        }
+        return oldestLoadedMessageId
     }
 
     /**
