@@ -1,7 +1,9 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.timeline.api.OUTBOX_ADMISSION_MAX_BYTES
+import com.letta.mobile.data.timeline.api.OutboxState
 import com.letta.mobile.data.timeline.api.PendingDispatchOwners
+import com.letta.mobile.data.timeline.api.readOutbox
 import com.letta.mobile.data.timeline.api.encodeOutbox
 import com.letta.mobile.data.timeline.api.toOutboxEntry
 
@@ -126,13 +128,20 @@ class CanonicalPendingLocalStoreTest {
         val scope = TimelineScope("backend", "conversation")
         val record = CanonicalPendingLocalStore.Record("send", "hello", emptyList(), "2026-09-08T00:00:00Z")
         var openDuringSend = -1
-        assertTrue(pending.accept(scope, record) { openDuringSend = store.open; true })
+        var reservedBeforeSend = false
+        assertTrue(pending.accept(scope, record) {
+            openDuringSend = store.open
+            reservedBeforeSend = store.value(scope, "outbox/v2") != null
+            true
+        })
         assertEquals(0, openDuringSend, "the store must not be held while the transport runs")
+        assertTrue(reservedBeforeSend, "the reservation must be stored before the transport runs")
         assertEquals(listOf(record), pending.load(scope))
     }
 
     @Test fun aRefusedOrFailedSendReleasesItsReservation() = runTest {
-        val pending = CanonicalPendingLocalStore(Store())
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
         val scope = TimelineScope("backend", "conversation")
         val record = CanonicalPendingLocalStore.Record("send", "hello", emptyList(), "2026-09-08T00:00:00Z")
         assertFalse(pending.accept(scope, record) { false })
@@ -145,6 +154,7 @@ class CanonicalPendingLocalStoreTest {
         val retry = assertNotNull(pending.retry(scope, record.otid))
         assertFalse(pending.accept(scope, retry) { false })
         assertEquals(listOf(retry), pending.load(scope))
+        assertEquals(OutboxState.Queued, store.read(scope) { readOutbox(timelineCurrentTimeMillis()) }.single().state)
         assertTrue(pending.accept(scope, retry) { true })
         assertEquals(1L, pending.load(scope).single().attempt)
     }

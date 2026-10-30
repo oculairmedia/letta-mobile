@@ -92,11 +92,19 @@ class CanonicalPendingLocalStore(
         val accepted = try {
             accept()
         } catch (failure: Throwable) {
-            withContext(NonCancellable) { release(scope, reservation) }
+            releaseQuietly(scope, reservation)
             throw failure
         }
-        if (!accepted) release(scope, reservation)
+        if (!accepted) releaseQuietly(scope, reservation)
         return accepted
+    }
+
+    /**
+     * Cleanup runs even if the caller is cancelled, and its own failure never replaces the
+     * transport's outcome; a reservation it cannot undo is resolved like any lost send.
+     */
+    private suspend fun releaseQuietly(scope: TimelineScope, reservation: Pair<OutboxEntry?, OutboxEntry>?) {
+        withContext(NonCancellable) { runCatching { release(scope, reservation) } }
     }
 
     /**
