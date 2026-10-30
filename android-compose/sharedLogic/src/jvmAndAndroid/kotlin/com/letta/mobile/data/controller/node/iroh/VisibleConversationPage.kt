@@ -58,7 +58,7 @@ private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive
 
 private const val VISIBLE_PAGE_DEFAULT = 30
 
-/** Opt-in only; agent slices, summary searches and archive selections retain their original contract. */
+/** Opt-in only; agent slices, summary searches, archive selections and explicit orderings keep their original contract. */
 internal fun wantsVisibleConversationPage(params: JsonObject?): Boolean =
     (params?.get("visible_only") as? JsonPrimitive)?.let { !it.isString && it.booleanOrNull == true } == true &&
-        listOf("agent_id", "summary_search", "archive_status").all { param(params, AdminParamKey(it)) == null }
+        listOf("agent_id", "summary_search", "archive_status", "order", "order_by").all { param(params, AdminParamKey(it)) == null }

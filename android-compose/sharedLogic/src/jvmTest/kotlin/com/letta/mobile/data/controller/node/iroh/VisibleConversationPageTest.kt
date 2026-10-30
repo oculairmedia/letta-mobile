@@ -172,12 +172,22 @@ class VisibleConversationPageTest {
         assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("agent_id", "a") }))
         assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("summary_search", "query") }))
         assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("archive_status", "archived") }))
+        assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("order", "asc") }))
+        assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("order_by", "created_at") }))
     }
 
     @Test fun unreadableVisibilityFailsClosedInsteadOfShowingHiddenAgents() = runTest {
         val index = HiddenAgentIndex(load = { null })
         assertEquals(null, index.verifiedHiddenAgentIds())
         assertEquals(setOf("x"), HiddenAgentIndex(load = { setOf("x") }).verifiedHiddenAgentIds())
+        // A failed reload keeps the last good set; it never turns into an empty "verified" set.
+        var fail = false
+        var now = 0L
+        val flaky = HiddenAgentIndex(load = { if (fail) null else setOf("x") }, clock = { now }, ttlMs = 10)
+        assertEquals(setOf("x"), flaky.verifiedHiddenAgentIds())
+        fail = true
+        now = 20
+        assertEquals(setOf("x"), flaky.verifiedHiddenAgentIds())
         val native = object : AppServerClient by FakeNativeClient() {
             override suspend fun conversationList(command: AppServerCommand.ConversationList) =
                 AppServerInboundFrame.ConversationListResponse(command.requestId, true, conversations = full)
