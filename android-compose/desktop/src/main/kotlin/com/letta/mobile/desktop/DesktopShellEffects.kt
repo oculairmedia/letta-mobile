@@ -5,7 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.dreaming.DreamNotifyPrefs
+import com.letta.mobile.data.chat.projection.chronologicalMessages
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.ui.shell.SyncShellWorkspace
 import com.letta.mobile.ui.shell.workspace.openSearchHit
@@ -182,3 +184,7 @@ private fun workingAgentName(params: WorkingAgentNameParams): String {
     }
     return byConversation ?: params.fallback
 }
+
+/** [conversationId]'s messages, oldest first: the hydrated map's, else the canonical route's live overlay. */
+private fun DesktopChatController.replyMessages(conversationId: String) = state.value.messagesByConversationId[conversationId]
+    ?: liveReply?.takeIf { it.first == conversationId }?.let { chronologicalMessages(it.second) }
