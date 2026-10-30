@@ -15,10 +15,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.ConversationId
@@ -64,8 +67,20 @@ class SubagentDualViewHolder(initial: SubagentDualViewState = SubagentDualViewSt
     var state: SubagentDualViewState by mutableStateOf(initial)
         private set
 
+    private var compact = false
+
+    /** The window turned compact or wide; only the change to compact trims the open views to one. */
+    internal fun setCompact(value: Boolean) {
+        if (compact == value) return
+        compact = value
+        if (value) {
+            state = state.active?.takeIf { state.showsSubagent }?.let { SubagentDualViewState.Closed.open(it) }
+                ?: SubagentDualViewState.Closed
+        }
+    }
+
     fun open(view: SubagentView) {
-        state = state.open(view)
+        state = (if (compact) SubagentDualViewState.Closed else state).open(view)
     }
 
     fun select(key: SubagentViewKey) {
@@ -128,7 +143,7 @@ object SubagentDualViewTags {
 /**
  * Draws [parent] (the parent conversation's page) and, while a subagent view is open, the subagent's
  * conversation: beside it from [LettaDimens.Pane.dualViewBreakpoint] up, in its place below that,
- * with the strip switching between the two. Without a [binding], or with nothing open, it is just
+ * with a compact back action closing the view. Without a [binding], or with nothing open, it is just
  * the parent page. The parent stays in the same place in the tree, so opening and closing a
  * subagent never resets it.
  */
@@ -142,8 +157,10 @@ fun SubagentDualViewFrame(
     val state = binding?.holder?.state ?: SubagentDualViewState.Closed
     BoxWithConstraints(modifier.testTag(SubagentDualViewTags.FRAME)) {
         val layout = DualViewLayout.of(state, wide = maxWidth >= LettaDimens.Pane.dualViewBreakpoint)
-        // Compact: the system Back returns from the subagent to its parent (Android; a no-op elsewhere).
-        CanvasBubbleBackHandler(enabled = layout.stripOnTop && state.showsSubagent) { binding?.holder?.showParent() }
+        // All host openers use the same holder; window width determines whether they replace or add.
+        SideEffect { binding?.holder?.setCompact(!layout.wide) }
+        // Compact: leaving the subagent closes it, including its strip and live session.
+        CanvasBubbleBackHandler(enabled = layout.stripOnTop && state.showsSubagent) { binding?.holder?.closeAll() }
         Column(Modifier.fillMaxSize()) {
             if (binding != null && layout.stripOnTop) {
                 SubagentViewStrip(binding, layout, Modifier.padding(top = options.topInset))
@@ -158,7 +175,7 @@ fun SubagentDualViewFrame(
 
 /** Where the dual view's parts go for one state and window width. */
 private data class DualViewLayout(val wide: Boolean, val open: Boolean, val showsSubagent: Boolean) {
-    /** Compact: the strip leads the page so the reader can switch sides. */
+    /** Compact: the active title and exit actions lead the page. */
     val stripOnTop: Boolean get() = open && !wide
     val showsParent: Boolean get() = wide || !showsSubagent
     val showsSubagentPane: Boolean get() = open && (wide || showsSubagent)
@@ -187,8 +204,8 @@ private fun RowScope.SubagentSide(binding: SubagentDualViewBinding, layout: Dual
 }
 
 /**
- * The open subagent views as tabs (the shared [LettaTabStrip]), led on a compact window by the way
- * back to the parent, and ended by the jump to the child's full chat and closing the whole view.
+ * Wide windows show open views as tabs (the shared [LettaTabStrip]); compact windows show only the
+ * active title and a way back to the parent. Both end with open-full and close actions.
  */
 @Composable
 private fun SubagentViewStrip(binding: SubagentDualViewBinding, layout: DualViewLayout, modifier: Modifier = Modifier) {
@@ -208,17 +225,27 @@ private fun SubagentViewStrip(binding: SubagentDualViewBinding, layout: DualView
             ) {
                 if (!layout.wide && state.showsSubagent) {
                     val backLabel = stringResource(Res.string.subagent_view_parent_tab)
-                    StripAction(LettaIcons.ArrowBack, backLabel, SubagentDualViewTags.BACK_TO_PARENT) { holder.showParent() }
+                    StripAction(LettaIcons.ArrowBack, backLabel, SubagentDualViewTags.BACK_TO_PARENT) { holder.closeAll() }
                 }
-                LettaTabStrip(
-                    tabs = state.views.map { it.toTab() },
-                    activeKey = state.active?.key?.value?.takeIf { layout.wide || state.showsSubagent },
-                    actions = LettaTabStripActions(
-                        onSelect = { key -> holder.select(SubagentViewKey(key)) },
-                        onClose = { key -> holder.close(SubagentViewKey(key)) },
-                    ),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
+                if (layout.wide) {
+                    LettaTabStrip(
+                        tabs = state.views.map { it.toTab() },
+                        activeKey = state.active?.key?.value,
+                        actions = LettaTabStripActions(
+                            onSelect = { key -> holder.select(SubagentViewKey(key)) },
+                            onClose = { key -> holder.close(SubagentViewKey(key)) },
+                        ),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                } else {
+                    Text(
+                        text = state.active?.let { it.title ?: it.fallbackTitle() }.orEmpty(),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 StripTrailingActions(binding)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
