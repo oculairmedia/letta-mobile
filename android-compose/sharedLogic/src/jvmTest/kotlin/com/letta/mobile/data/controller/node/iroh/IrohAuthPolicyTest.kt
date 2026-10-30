@@ -14,10 +14,26 @@ class IrohAuthPolicyTest {
 
     @Test
     fun bearerTokenRejectsBlankAndShortCredentials() {
-        assertFailsWith<IllegalArgumentException> { IrohAuthPolicy.BearerToken("") }
-        assertFailsWith<IllegalArgumentException> { IrohAuthPolicy.BearerToken("   ") }
-        assertFailsWith<IllegalArgumentException> { IrohAuthPolicy.BearerToken("short") }
+        val blankEx1 = assertFailsWith<IllegalArgumentException> { IrohAuthPolicy.BearerToken("") }
+        assertEquals("IrohAuthPolicy.BearerToken requires a non-blank token", blankEx1.message)
+
+        val blankEx2 = assertFailsWith<IllegalArgumentException> { IrohAuthPolicy.BearerToken("   ") }
+        assertEquals("IrohAuthPolicy.BearerToken requires a non-blank token", blankEx2.message)
+
+        val shortEx = assertFailsWith<IllegalArgumentException> { IrohAuthPolicy.BearerToken("short") }
+        assertEquals(
+            "IrohAuthPolicy.BearerToken requires a token of at least ${IrohAuthPolicy.MIN_TOKEN_LENGTH} characters; " +
+                "generate a fresh >=256-bit random credential",
+            shortEx.message
+        )
+
         assertEquals(strongToken, IrohAuthPolicy.BearerToken(strongToken).requiredBearerToken)
+    }
+
+    @Test
+    fun bearerTokenAcceptsExactlyMinimumLengthToken() {
+        val exactLengthToken = "a".repeat(IrohAuthPolicy.MIN_TOKEN_LENGTH)
+        assertEquals(exactLengthToken, IrohAuthPolicy.BearerToken(exactLengthToken).requiredBearerToken)
     }
 
     @Test
