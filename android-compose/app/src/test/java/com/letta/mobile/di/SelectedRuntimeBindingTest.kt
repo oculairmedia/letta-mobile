@@ -115,7 +115,7 @@ class SelectedRuntimeBindingTest {
         try {
             // The sender subscribes before any conversation resolves; later ones still reach it.
             val retries = captured.writer.queuedRetries(agent)
-            assertEquals(emptyList(), retries.first())
+            assertTrue(retries.first().isEmpty())
             if (open) captured.open("persisted-conversation", null, this) else captured.ready("persisted-conversation")
             assertEquals(listOf(retry), retries.first())
         } finally {
