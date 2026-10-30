@@ -304,7 +304,10 @@ private fun CommandReport(model: NotificationModel) {
 @Composable
 private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, actions: NotificationActions) {
     val onOpen = actions.onOpen
-    if (onOpen == null && !model.hasDetails()) return
+    // A completed card's summary row is already the disclosure (row and chevron); a second link here
+    // toggled the same state, so an expanded card showed two collapse controls.
+    val detailsLink = model.hasDetails() && !model.isSuccessfulCompletion
+    if (onOpen == null && !detailsLink) return
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -321,7 +324,7 @@ private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, a
                     .padding(vertical = LettaDimens.Space.sm),
             )
         }
-        if (model.hasDetails()) {
+        if (detailsLink) {
             val haptics = LocalHaptics.current
             DisclosureLink(label = detailsLabel(model, expanded), expanded = expanded, onToggle = {
                 haptics.play(LettaHapticCue.SegmentTick)
