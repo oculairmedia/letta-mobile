@@ -58,7 +58,8 @@ class VisibleConversationPageTest {
             }
             assertEquals((0 until 30).map { "c$it" }, request(false))
             assertEquals(expected.take(30), request(true))
-            assertEquals(listOf(30, Int.MAX_VALUE), queries)
+            // The uncached path asks for at most the holding cap plus one row, never an unbounded list.
+            assertEquals(listOf(30, 20_001), queries)
         } finally {
             root.deleteRecursively()
         }
@@ -149,5 +150,56 @@ class VisibleConversationPageTest {
         assertTrue(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true) }))
         assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("agent_id", "a") }))
         assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("summary_search", "query") }))
+        assertFalse(wantsVisibleConversationPage(buildJsonObject { put("visible_only", true); put("archive_status", "archived") }))
+    }
+
+    @Test fun unreadableVisibilityFailsClosedInsteadOfShowingHiddenAgents() = runTest {
+        val index = HiddenAgentIndex(load = { null })
+        assertEquals(null, index.verifiedHiddenAgentIds())
+        assertEquals(setOf("x"), HiddenAgentIndex(load = { setOf("x") }).verifiedHiddenAgentIds())
+        val native = object : AppServerClient by FakeNativeClient() {
+            override suspend fun conversationList(command: AppServerCommand.ConversationList) =
+                AppServerInboundFrame.ConversationListResponse(command.requestId, true, conversations = full)
+        }
+        val root = kotlin.io.path.createTempDirectory("visible-conversation-unreadable").toFile()
+        try {
+            // The store exists but its agent visibility cannot be read.
+            val unreadable = object : LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1") {
+                override fun hiddenAgentIds(): Set<String>? = null
+            }
+            val router = AdminRpcRouter()
+            ConversationAdminHandlers.register(router, NativeReadTiers(nativeClient = native, localBackendStore = unreadable))
+            val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation(
+                "recents", "conversation.list", buildJsonObject { put("visible_only", true) },
+            ))).jsonObject
+            assertEquals(false, response.getValue("success").jsonPrimitive.content.toBoolean(), response.toString())
+            assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun uncachedListLongerThanTheCapFailsExplicitly() = runTest {
+        val tooLong = JsonArray((0..20_000).map { i -> buildJsonObject { put("id", "x$i"); put("agent_id", "a") } })
+        val native = object : AppServerClient by FakeNativeClient() {
+            override suspend fun conversationList(command: AppServerCommand.ConversationList) =
+                AppServerInboundFrame.ConversationListResponse(command.requestId, true, conversations = tooLong)
+        }
+        val root = kotlin.io.path.createTempDirectory("visible-conversation-cap").toFile()
+        try {
+            java.io.File(root, "agents").mkdirs()
+            val router = AdminRpcRouter()
+            ConversationAdminHandlers.register(router, NativeReadTiers(
+                nativeClient = native,
+                localBackendStore = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1"),
+            ))
+            val response = Json.parseToJsonElement(router.dispatch(AdminRpcInvocation(
+                "recents", "conversation.list", buildJsonObject { put("visible_only", true) },
+            ))).jsonObject
+            assertEquals(false, response.getValue("success").jsonPrimitive.content.toBoolean(), response.toString())
+            assertTrue(response.getValue("error").jsonPrimitive.content.contains("at most 20000"))
+        } finally {
+            root.deleteRecursively()
+        }
     }
 }

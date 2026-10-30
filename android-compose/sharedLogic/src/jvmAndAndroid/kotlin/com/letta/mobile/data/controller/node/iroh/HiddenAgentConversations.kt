@@ -50,13 +50,27 @@ internal class HiddenAgentIndex(
 
     @Volatile private var loadedAtMs: Long? = null
 
+    @Volatile private var loadedOnce: Boolean = false
+
     fun hiddenAgentIds(): Set<String> {
         val now = clock()
         val loadedAt = loadedAtMs
         if (loadedAt != null && now - loadedAt < ttlMs) return cached
-        load()?.let { cached = it }
+        load()?.let {
+            cached = it
+            loadedOnce = true
+        }
         loadedAtMs = now
         return cached
+    }
+
+    /**
+     * The hidden set only when it has been read successfully at least once; null when every load so
+     * far failed, so a caller that must not show hidden agents can refuse instead of using an empty set.
+     */
+    fun verifiedHiddenAgentIds(): Set<String>? {
+        val ids = hiddenAgentIds()
+        return ids.takeIf { loadedOnce }
     }
 
     companion object {

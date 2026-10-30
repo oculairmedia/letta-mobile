@@ -159,8 +159,20 @@ object ConversationAdminHandlers {
     ): JsonArray? {
         val visibility = this ?: adminError("capability_unavailable: visible_only requires local agent visibility")
         val request = param(params, AdminParamKey("after"))?.let(::ConversationId) to param(params, AdminParamKey("limit"))
-        val page: (JsonArray) -> JsonArray = { full -> visibleConversationPage(full, visibility.hiddenAgentIds(), context, request) }
-        val ownVisible = suspend { listConversations(client, JsonObject(mapOf("limit" to JsonPrimitive(Long.MAX_VALUE))))?.let(page) }
+        val page: (JsonArray) -> JsonArray = { full ->
+            val hidden = visibility.verifiedHiddenAgentIds()
+                ?: adminError("capability_unavailable: visible_only could not read agent visibility")
+            visibleConversationPage(full, hidden, context, request)
+        }
+        // Never ask for more than the holding cap in one response: an unbounded list can exceed the
+        // App Server frame limit and close the shared session. A longer list fails explicitly.
+        val ownVisible = suspend {
+            listAgentConversations(client)?.also { full ->
+                if (full.size > MAX_HELD_CONVERSATIONS) {
+                    adminError("capability_unavailable: visible_only supports at most $MAX_HELD_CONVERSATIONS conversations")
+                }
+            }?.let(page)
+        }
         return if (heldList == null) ownVisible() else heldList.serve(fetchAll = { listAgentConversations(client) }, fromFull = page, fetchOwn = ownVisible)
     }
 
