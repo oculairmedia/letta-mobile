@@ -139,6 +139,8 @@ class SubagentDualViewUiTest {
         val holder = openTwo(width = 400.dp)
         onNodeWithText("Audit the build").assertDoesNotExist()
         runOnIdle { assertEquals(listOf(second), holder.state.views) }
+        // The replaced child's session is closed, not left reading in the background.
+        runOnIdle { assertEquals(listOf(child), closed) }
     }
 
     @Test
