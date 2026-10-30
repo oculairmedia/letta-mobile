@@ -669,6 +669,8 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Verify documentation tooling
+        env:
+          DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: |
           node --test android-compose/web/service-worker.test.cjs
           python3 -m unittest discover -s scripts/tests -p test_api_doc_links.py -v
@@ -677,6 +679,8 @@ jobs:
           python3 scripts/ci/check-kdoc-hygiene.py
           python3 -m unittest discover -s scripts/tests -p test_api_doc_undocumented.py -v
           python3 -m unittest discover -s scripts/tests -p test_api_doc_progress.py -v
+          python3 -m unittest discover -s scripts/tests -p test_wire_contracts.py -v
+          python3 scripts/ci/check-wire-contracts.py --check --diff-base "$DOCS_DIFF_BASE"
       # Finish the Android compiler's single-use JVM before starting the documentation graph.
       - name: Precompile shared Android API dependency
         working-directory: android-compose

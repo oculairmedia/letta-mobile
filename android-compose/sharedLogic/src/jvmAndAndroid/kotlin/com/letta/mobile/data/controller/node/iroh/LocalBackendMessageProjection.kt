@@ -258,12 +258,23 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     private fun parseBooleanFlag(value: JsonElement?): Boolean =
         (value as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
 
+    /** The text alone, or the text followed by the result's images when it returned any. */
+    private fun toolResultBody(parts: JsonArray, returnText: String): JsonElement {
+        val images = parts.mapNotNull { (it as? JsonObject)?.let(::normalizeImagePart) }
+        if (images.isEmpty()) return JsonPrimitive(returnText)
+        return buildJsonArray {
+            add(buildJsonObject { put("type", "text"); put("text", returnText) })
+            images.forEach { add(it) }
+        }
+    }
+
     /** toolResult top-level row (letta-code 0.25.x). */
     private fun projectToolResultRow(ctx: ProjCtx, localMsg: JsonObject, parts: JsonArray): List<JsonObject> {
         val callId = localMsg["toolCallId"]?.stringOrNull() ?: ""
         val toolName = localMsg["toolName"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
         val isError = parseBooleanFlag(localMsg["isError"])
         val returnText = partsToText(parts)
+        val returnBody = toolResultBody(parts, returnText)
         val status = if (isError) "error" else "success"
         val tr = toolReturnInner(callId, status, JsonNull, JsonNull, returnText)
         val trMsg = buildJsonObject {
@@ -279,7 +290,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("run_id", ctx.projectedRunId)
             put("tool_call_id", callId)
             put("status", status)
-            put("tool_return", returnText)
+            put("tool_return", returnBody)
             put("stdout", JsonNull)
             put("stderr", JsonNull)
             put("tool_returns", JsonArray(listOf(tr)))

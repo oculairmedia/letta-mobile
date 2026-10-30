@@ -505,17 +505,28 @@ internal data class CanonicalToolReturn(
 
 internal fun canonicalToolReturn(delta: JsonObject, defaultId: String? = null): CanonicalToolReturn {
     val returnObject = delta["tool_return"] as? JsonObject
+    val listedReturn = (delta["tool_returns"] as? JsonArray)?.firstOrNull() as? JsonObject
     return CanonicalToolReturn(
-        toolCallId = delta.stringValue("tool_call_id")
-            ?: returnObject?.stringValue("tool_call_id")
-            ?: defaultId.orEmpty(),
-        status = delta.stringValue("status") ?: returnObject?.stringValue("status") ?: "success",
-        body = delta["tool_return"]
-            ?: delta["output"]
-            ?: delta["message"]
-            ?: delta["content"],
+        toolCallId = firstString("tool_call_id", delta, returnObject, listedReturn) ?: defaultId.orEmpty(),
+        status = firstString("status", delta, returnObject, listedReturn) ?: "success",
+        body = canonicalReturnBody(delta, listedReturn),
     )
 }
+
+/** [key]'s first string value across [sources], in order. */
+private fun firstString(key: String, vararg sources: JsonObject?): String? =
+    sources.firstNotNullOfOrNull { it?.stringValue(key) }
+
+/** The return's body: the frame's own, then the listed return's, then the frame's fallbacks. */
+private fun canonicalReturnBody(delta: JsonObject, listedReturn: JsonObject?): JsonElement? =
+    sequenceOf(
+        delta["tool_return"],
+        listedReturn?.get("tool_return"),
+        listedReturn?.get("func_response"),
+        delta["output"],
+        delta["message"],
+        delta["content"],
+    ).firstOrNull { it != null }
 
 private fun JsonObject.stringValue(key: String): String? {
     return (this[key] as? JsonPrimitive)?.contentOrNull

@@ -761,3 +761,4 @@ final object com.letta.mobile.data.model/IdFormats { // com.letta.mobile.data.mo
 }
 
 final fun (com.letta.mobile.data.model/AgentId).com.letta.mobile.data.model/isLettaCodeEphemeralWorker(): kotlin/Boolean // com.letta.mobile.data.model/isLettaCodeEphemeralWorker|isLettaCodeEphemeralWorker@com.letta.mobile.data.model.AgentId(){}[0]
+final fun com.letta.mobile.data.model/resolveConversationReadTarget(com.letta.mobile.data.model/ConversationId): kotlin/Pair<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId?>? // com.letta.mobile.data.model/resolveConversationReadTarget|resolveConversationReadTarget(com.letta.mobile.data.model.ConversationId){}[0]

@@ -222,6 +222,8 @@
     </plurals>
     <!-- letta-mobile-a7ir6: a Monitor watch's chip and its actionable event rows. -->
     <string name="rows_monitor_label">Monitor</string>
+    <string name="rows_monitor_show_raw">Show raw</string>
+    <string name="rows_monitor_hide_raw">Hide raw</string>
     <string name="rows_monitor_watching">watching</string>
     <string name="rows_monitor_ended">ended</string>
     <string name="rows_monitor_failed">failed</string>

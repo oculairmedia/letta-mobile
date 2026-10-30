@@ -200,6 +200,14 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Plugin view bridge \`lcp-view/1\` — for plugin page authors](reference/plugin-view-bridge-v1.md)
 - [QR Pairing Protocol](reference/qr-pairing-protocol.md)
 
+### reference/contracts
+
+- [Admin RPC Wire Contracts](reference/contracts/README.md)
+
+### reference/contracts/health.check
+
+- [health.check: Controller Status v1](reference/contracts/health.check/status-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)
