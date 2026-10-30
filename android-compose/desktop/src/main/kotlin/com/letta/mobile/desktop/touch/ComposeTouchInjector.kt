@@ -33,7 +33,7 @@ import kotlin.math.roundToInt
  * focus raises it through [DesktopTouchKeyboardTaps].
  */
 @OptIn(InternalComposeUiApi::class)
-internal class ComposeTouchInjector private constructor(
+internal class ComposeTouchInjector internal constructor(
     private val scene: ComposeScene,
     private val container: JComponent,
     private val content: JComponent,
@@ -53,7 +53,7 @@ internal class ComposeTouchInjector private constructor(
         when (sample.kind) {
             TabletBridge.KIND_DOWN -> placing += sample.contact
             TabletBridge.KIND_MOVE -> toScene(target, sample.x, sample.y)?.let { moveTo(sample.contact, it) }
-            TabletBridge.KIND_UP, TabletBridge.KIND_OUT -> lift(sample.contact)
+            TabletBridge.KIND_UP, TabletBridge.KIND_OUT -> lift(sample.contact, at = toScene(target, sample.x, sample.y))
             // An Ink cancel is the Ink copy of a finger leaving, not this finger.
             TabletBridge.KIND_CANCEL -> Unit
         }
@@ -80,9 +80,9 @@ internal class ComposeTouchInjector private constructor(
         }
     }
 
-    /** Releases a placed finger; a tap also tells the touch keyboard a field was tapped. */
-    private fun lift(contact: Int) {
-        placing -= contact
+    /** Releases a finger; a still tap, which no move placed, is placed [at] its lift first so it still presses. Taps tell the keyboard. */
+    internal fun lift(contact: Int, at: Offset?) {
+        if (contact in placing && at != null) moveTo(contact, at) else placing -= contact
         if (contact !in active) return
         send(PointerEventType.Release, released = contact)
         val lifted = active.remove(contact) ?: return
