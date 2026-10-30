@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.resolveConversationReadTarget
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -353,15 +354,12 @@ object ConversationAdminHandlers {
             val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
             val response = NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
                 val native = c.conversationMessagesList(
-                    AppServerCommand.ConversationMessagesList(
-                        requestId = NativeAdmin.requestId(),
-                        conversationId = convId,
-                        query = NativeAdmin.queryOf(
-                            "limit" to effectiveLimit,
-                            "after" to param(params, AdminParamKey("after")),
-                            "before" to param(params, AdminParamKey("before")),
-                            "order" to param(params, AdminParamKey("order")),
-                        ),
+                    nativeMessageList(
+                        ConversationId(convId),
+                        "limit" to effectiveLimit,
+                        "after" to param(params, AdminParamKey("after")),
+                        "before" to param(params, AdminParamKey("before")),
+                        "order" to param(params, AdminParamKey("order")),
                     ),
                 )
                 if (native.success) native.messages else null
@@ -459,14 +457,11 @@ object ConversationAdminHandlers {
         repeat(maxPages) {
             val messages = NativeAdmin.require(nativeClient, op) { c ->
                 val native = c.conversationMessagesList(
-                    AppServerCommand.ConversationMessagesList(
-                        requestId = NativeAdmin.requestId(),
-                        conversationId = conversationId,
-                        query = NativeAdmin.queryOf(
-                            "limit" to pageLimit.toString(),
-                            "order" to "desc",
-                            "before" to before,
-                        ),
+                    nativeMessageList(
+                        ConversationId(conversationId),
+                        "limit" to pageLimit.toString(),
+                        "order" to "desc",
+                        "before" to before,
                     ),
                 )
                 if (!native.success) null else native.messages as? JsonArray
@@ -497,9 +492,32 @@ object ConversationAdminHandlers {
     ): Boolean = oldestId == null || oldestId == previousBefore || pageSize < pageLimit
 
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
-        if (!context.canAccessConversation(conversationId)) {
+        if (!context.canAccessConversation(conversationId) || !aliasOwnerInScope(context, conversationId)) {
             adminError("forbidden: conversation out of authorized scope")
         }
+    }
+
+    /** A default-conversation alias is readable only when its owning agent is in the caller's scope. */
+    private fun aliasOwnerInScope(context: AdminRpcRequestContext, conversationId: String): Boolean {
+        val owner = resolveConversationReadTarget(ConversationId(conversationId))?.second ?: return true
+        val scope = context.authorizedAgentIds ?: return true
+        return IrohPeerCapabilities.isAgentInScope(scope, owner.value)
+    }
+
+    /**
+     * The App Server's message-list command for [conversation]: a default-conversation alias is
+     * sent as the native default conversation with its owning agent, any other id as is.
+     */
+    private fun nativeMessageList(
+        conversation: ConversationId,
+        vararg query: Pair<String, String?>,
+    ): AppServerCommand.ConversationMessagesList {
+        val target = resolveConversationReadTarget(conversation)
+        return AppServerCommand.ConversationMessagesList(
+            requestId = NativeAdmin.requestId(),
+            conversationId = (target?.first ?: conversation).value,
+            query = NativeAdmin.queryOf("agent_id" to target?.second?.value, *query),
+        )
     }
 
     /** Conversation lists past this are not held: about 1 KB per row, so roughly 20 MB at the cap. */
