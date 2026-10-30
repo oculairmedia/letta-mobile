@@ -30,7 +30,7 @@ class VisibleConversationPageTest {
     })
     private val expected = (27 until 100).filter { it != 31 && it != 32 }.map { "c$it" }
     private fun page(context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated, after: String? = null, limit: String? = null, hidden: Set<String> = emptySet()) =
-        visibleConversationPage(full, hidden, context, after?.let(::ConversationId), limit).map { it.jsonObject["id"]!!.jsonPrimitive.content }
+        visibleConversationPage(full, hidden, context, VisiblePageRequest(after?.let(::ConversationId), limit)).map { it.jsonObject["id"]!!.jsonPrimitive.content }
 
     @Test fun handlerOptInFillsPageButLegacyUnfilteredStillPassesThrough() = runTest {
         val queries = mutableListOf<Int>()
@@ -134,7 +134,7 @@ class VisibleConversationPageTest {
             buildJsonObject { put("id", "message"); put("agent_id", "a"); put("last_message_at", "2026-10-30T01:00:00+02:00"); put("updated_at", "2026-10-31T00:00:00Z") },
             buildJsonObject { put("id", "updated"); put("agent_id", "a"); put("updated_at", "2026-10-30T00:00:00Z") },
         ))
-        assertEquals(listOf("updated", "message", "created"), visibleConversationPage(rows, emptySet(), AdminRpcRequestContext.Authenticated, null, null).map { it.jsonObject["id"]!!.jsonPrimitive.content })
+        assertEquals(listOf("updated", "message", "created"), visibleConversationPage(rows, emptySet(), AdminRpcRequestContext.Authenticated, VisiblePageRequest(null, null)).map { it.jsonObject["id"]!!.jsonPrimitive.content })
     }
 
     @Test fun extremeLimits() {

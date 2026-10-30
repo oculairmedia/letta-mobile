@@ -116,23 +116,7 @@ object ConversationAdminHandlers {
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
                 if (wantsVisibleConversationPage(params)) {
-                    val visibility = hiddenAgents
-                        ?: adminError("capability_unavailable: visible_only requires local agent visibility")
-                    val page: (JsonArray) -> JsonArray = { full ->
-                        visibleConversationPage(
-                            full, visibility.hiddenAgentIds(), context,
-                            param(params, AdminParamKey("after"))?.let(::ConversationId),
-                            param(params, AdminParamKey("limit")),
-                        )
-                    }
-                    // Above the holding cap (or without a usable signature), fetch the full list rather
-                    // than filtering a truncated raw window. Never return an underfilled page.
-                    val ownVisible = suspend {
-                        listConversations(c, JsonObject(mapOf("limit" to JsonPrimitive(Long.MAX_VALUE))))?.let(page)
-                    }
-                    return@require if (heldList == null) ownVisible() else heldList.serve(
-                        fetchAll = { listAgentConversations(c) }, fromFull = page, fetchOwn = ownVisible,
-                    )
+                    return@require visibleRecents(c, params, context, hiddenAgents, heldList)
                 }
                 val own = suspend { listConversations(c, params) }
                 // One agent's page (no summary search) is cut from the held full list: the App Server
@@ -160,6 +144,28 @@ object ConversationAdminHandlers {
             // (subagent) agents. A list asked for one agent explicitly is served as is.
             if (agentId == null && hiddenAgents != null) dropHiddenAgentConversations(scoped, hiddenAgents) else scoped
         }
+    }
+
+    /**
+     * The visible recents page (see [registerConversationListRoute]). Above the holding cap, or
+     * without a usable signature, the full list is fetched rather than filtering a truncated raw
+     * window, so a page is never underfilled.
+     */
+    private suspend fun visibleRecents(
+        client: AppServerClient,
+        params: JsonObject?,
+        context: AdminRpcRequestContext,
+        hiddenAgents: HiddenAgentIndex?,
+        heldList: HeldListCache?,
+    ): JsonArray? {
+        val visibility = hiddenAgents ?: adminError("capability_unavailable: visible_only requires local agent visibility")
+        val request = VisiblePageRequest(
+            after = param(params, AdminParamKey("after"))?.let(::ConversationId),
+            limit = param(params, AdminParamKey("limit")),
+        )
+        val page: (JsonArray) -> JsonArray = { full -> visibleConversationPage(full, visibility.hiddenAgentIds(), context, request) }
+        val ownVisible = suspend { listConversations(client, JsonObject(mapOf("limit" to JsonPrimitive(Long.MAX_VALUE))))?.let(page) }
+        return if (heldList == null) ownVisible() else heldList.serve(fetchAll = { listAgentConversations(client) }, fromFull = page, fetchOwn = ownVisible)
     }
 
     /** The conversation list exactly as the client asked for it, from the App Server. */
