@@ -173,7 +173,8 @@ object ConversationAdminHandlers {
                 }
             }?.let(page)
         }
-        return if (heldList == null) ownVisible() else heldList.serve(fetchAll = { listAgentConversations(client) }, fromFull = page, fetchOwn = ownVisible)
+        if (heldList == null) return ownVisible()
+        return heldList.serve(fetchAll = { listAgentConversations(client) }, fromFull = page, fetchOwn = ownVisible)
     }
 
     /** The conversation list exactly as the client asked for it, from the App Server. */
