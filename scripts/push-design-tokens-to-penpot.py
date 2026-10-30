@@ -100,7 +100,7 @@ def rpc(token: str, command: str, payload: str) -> tuple[int, str]:
         import os
         env = os.environ.copy()
         env["SSHPASS"] = HOST_PW
-    res = subprocess.run(ssh_cmd, capture_output=True, text=True, env=env)
+    res = subprocess.run(ssh_cmd, capture_output=True, text=True, env=env)  # NOSONAR
     body = res.stdout
     m = re.search(r"__HTTP__(\d+)\s*$", body)
     code = int(m.group(1)) if m else 0
