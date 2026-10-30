@@ -116,7 +116,7 @@ object ConversationAdminHandlers {
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
                 if (wantsVisibleConversationPage(params)) {
-                    return@require visibleRecents(c, params, context, hiddenAgents, heldList)
+                    return@require hiddenAgents.visibleRecents(c, params, context, heldList)
                 }
                 val own = suspend { listConversations(c, params) }
                 // One agent's page (no summary search) is cut from the held full list: the App Server
@@ -151,14 +151,13 @@ object ConversationAdminHandlers {
      * without a usable signature, the full list is fetched rather than filtering a truncated raw
      * window, so a page is never underfilled.
      */
-    private suspend fun visibleRecents(
+    private suspend fun HiddenAgentIndex?.visibleRecents(
         client: AppServerClient,
         params: JsonObject?,
         context: AdminRpcRequestContext,
-        hiddenAgents: HiddenAgentIndex?,
         heldList: HeldListCache?,
     ): JsonArray? {
-        val visibility = hiddenAgents ?: adminError("capability_unavailable: visible_only requires local agent visibility")
+        val visibility = this ?: adminError("capability_unavailable: visible_only requires local agent visibility")
         val request = VisiblePageRequest(
             after = param(params, AdminParamKey("after"))?.let(::ConversationId),
             limit = param(params, AdminParamKey("limit")),
