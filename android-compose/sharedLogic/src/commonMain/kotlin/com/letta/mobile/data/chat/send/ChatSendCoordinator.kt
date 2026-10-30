@@ -555,7 +555,7 @@ class ChatSendCoordinator(
         // echo there confirms the failed prompt instead of leaving it for the user to retry.
         val otid = state.inFlightSend?.id?.value ?: state.otid ?: return
         val conversation = state.ownerConversationId.takeIf { it.isNotBlank() } ?: return
-        postSendReconciler.schedule(conversation, otid, reason = "post-expiry")
+        postSendReconciler.schedule(conversation, otid, reason = "post-expiry", skipWhileLive = false)
     }
 
     private fun resumed(state: ConversationTurnState) {

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -27,13 +28,17 @@ internal class PostSendReconciler(
         }
     }
 
-    /** Reads recent history on the configured delays after [reason], skipping while the stream is live. */
-    fun schedule(conversationId: String, otid: String, reason: String = "post-send") {
+    /**
+     * Reads recent history on the configured delays after [reason]. A post-send read is skipped
+     * while the stream is live, since live frames carry the echo. After an expiry the read is the
+     * only way to find an echo the dropped connection lost, so [skipWhileLive] is false there.
+     */
+    fun schedule(conversationId: String, otid: String, reason: String = "post-send", skipWhileLive: Boolean = true) {
         val sentAtMillis = currentTimeMillis()
         scope.launch {
             for (delayMs in delaysMs()) {
                 delay(delayMs.milliseconds)
-                if (hasLiveIngestSince(conversationId, sentAtMillis)) {
+                if (skipWhileLive && hasLiveIngestSince(conversationId, sentAtMillis)) {
                     Telemetry.event(
                         "AdminChatVM", "ws.postSendReconcile.skippedLiveStream",
                         "conversationId" attr conversationId,
@@ -49,7 +54,16 @@ internal class PostSendReconciler(
                         reason = "$reason-$delayMs",
                         forceRefresh = true,
                     )
-                }.onSuccess {
+                }.onSuccess { outcome ->
+                    if (outcome is RecentMessagesReconcileOutcome.Failed) {
+                        Telemetry.error(
+                            "AdminChatVM", "ws.postSendReconcile.failed", outcome.cause,
+                            "conversationId" attr conversationId,
+                            "otid" attr otid,
+                            "delayMs" attr delayMs,
+                        )
+                        return@onSuccess
+                    }
                     Telemetry.event(
                         "AdminChatVM", "ws.postSendReconcile.ok",
                         "conversationId" attr conversationId,
