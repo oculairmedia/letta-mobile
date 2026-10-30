@@ -47,6 +47,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
@@ -430,11 +431,14 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("one").join()
         val local = timelineRepository.externalLocals.single()
-        // Nothing is streaming, so the redial cannot carry the send: it is marked failed at once.
+        // The redial cannot carry the send, so it expires: at once, or after the redial timeout when
+        // the send still looks streaming. Run virtual time past that timeout and the reads' delays.
         coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "network lost", willReconnect = true))
-        advanceUntilIdle()
+        advanceTimeBy(45_000)
+        runCurrent()
 
-        assertEquals(listOf(local.otid), timelineRepository.failedLocals.map { it.otid })
+        val failed = timelineRepository.failedLocals.map { it.otid }
+        assertEquals("the expired send is marked failed", listOf(local.otid), failed)
         assertTrue(
             "an expired send must read history again: ${timelineRepository.recentReconciles.map { it.reason }}",
             timelineRepository.recentReconciles.any {
