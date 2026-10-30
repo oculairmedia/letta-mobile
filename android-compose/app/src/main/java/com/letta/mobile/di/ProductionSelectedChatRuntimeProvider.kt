@@ -144,8 +144,6 @@ internal class SelectedRuntimeWriter(
     ) = writer(attempt.conversation, attempt.agent).acceptPendingSend(attempt, content, attachments, accept)
     override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) =
         writer(attempt.conversation, attempt.agent).isPendingSendCurrent(attempt)
-    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) =
-        writer(attempt.conversation, attempt.agent).ownPendingSend(attempt, active)
     override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
         writer(attempt.conversation, attempt.agent).markPendingSend(attempt, delivery)
     override suspend fun appendExternalTransportLocal(

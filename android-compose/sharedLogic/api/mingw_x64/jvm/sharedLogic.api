@@ -48023,7 +48023,6 @@ public final class com/letta/mobile/data/timeline/AdmittedTimelineExternalWriter
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSendScoped (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileRecentMessages (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -48060,7 +48059,6 @@ public final class com/letta/mobile/data/timeline/CanonicalExternalTransportWrit
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSendScoped (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileRecentMessages (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -48076,14 +48074,14 @@ public final class com/letta/mobile/data/timeline/CanonicalPendingLocalStore {
 	public static final field LOST_ECHO_HORIZON_MILLIS J
 	public static final field MAX_BYTES I
 	public static final field MAX_RECORDS I
-	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun discardFailed (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun load (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun mark (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Ljava/lang/Long;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun mark$default (Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Ljava/lang/Long;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun retireLostEchoes (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun retireLostEchoes$default (Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun retireLostEchoes (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun retireLostEchoes$default (Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun save (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Record;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -48143,8 +48141,7 @@ public final class com/letta/mobile/data/timeline/CanonicalPendingLocalStore$Rec
 }
 
 public final class com/letta/mobile/data/timeline/CanonicalTimelineCoordinator {
-	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/TimelineTransport;Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/TimelineTransport;Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineBoundedStore;Lcom/letta/mobile/data/timeline/TimelineTransport;)V
 	public final fun acknowledgeSettlement (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lcom/letta/mobile/data/timeline/TimelineLiveFence;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun acquire (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun appendPending (Lcom/letta/mobile/data/timeline/CanonicalTimelineCoordinator$Owner;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Record;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -48355,9 +48352,7 @@ public final class com/letta/mobile/data/timeline/DeliveryState : java/lang/Enum
 }
 
 public final class com/letta/mobile/data/timeline/GenerationTimelineTransport : com/letta/mobile/data/timeline/TimelineTransport {
-	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineTransport;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/timeline/TimelineTransport;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getDispatchOwners ()Lcom/letta/mobile/data/timeline/api/PendingDispatchOwners;
+	public fun <init> (Lcom/letta/mobile/data/timeline/TimelineTransport;Lkotlinx/coroutines/CoroutineScope;)V
 	public fun getToolReturn-cWSMi4k (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listAgentMessages-bjCLa7g (Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listConversationMessagePage (Lcom/letta/mobile/data/timeline/TimelineRemotePageRequest;Lcom/letta/mobile/data/timeline/TimelinePageProgress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -50873,7 +50868,6 @@ public class com/letta/mobile/data/timeline/TimelineRepository : com/letta/mobil
 	public final fun observe (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/TimelineAcquisitionProvenance;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun observe (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun observe (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun peekCached (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/timeline/Timeline;
 	public final fun postHandlerCollapse (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -51615,10 +51609,6 @@ public final class com/letta/mobile/data/timeline/ToolReturnTruncationKt {
 	public static final field DEFAULT_MAX_INBOUND_TOOL_RETURN_BYTES I
 }
 
-public final class com/letta/mobile/data/timeline/api/PendingDispatchOwners {
-	public fun <init> ()V
-}
-
 public abstract interface class com/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter : com/letta/mobile/data/timeline/api/TimelinePendingSendTarget {
 	public abstract fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun markExternalTransportLocalFailed (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -51632,7 +51622,6 @@ public abstract interface class com/letta/mobile/data/timeline/api/TimelineExter
 public final class com/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter$DefaultImpls {
 	public static fun acceptPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun turnEnded (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun turnStarted (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun turnStarted$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalDeliveryWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -51671,7 +51660,6 @@ public final class com/letta/mobile/data/timeline/api/TimelineExternalTransportW
 	public static synthetic fun ingestExternalTransportMessage$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/LettaMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun reconcileRecentMessages$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZJLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun repairExpiredConversationCursorScoped (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun turnEnded (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -51723,13 +51711,11 @@ public abstract interface class com/letta/mobile/data/timeline/api/TimelinePendi
 	public fun acceptPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/timeline/api/TimelinePendingSendTarget$DefaultImpls {
 	public static fun acceptPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun isPendingSendCurrent (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendTarget;Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/timeline/headless/HeadlessReplayBisectResult {
@@ -52043,7 +52029,6 @@ public final class com/letta/mobile/data/timeline/headless/HeadlessTimelineStore
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markExternalTransportLocalSent (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun markPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun ownPendingSend (Lcom/letta/mobile/data/timeline/api/TimelinePendingSendAttempt;Lkotlin/jvm/functions/Function0;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSend (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileExternalTransportSendScoped (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reconcileRecentMessages (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;

@@ -75,11 +75,6 @@ class CanonicalExternalTransportWriter(
         }
     }
 
-    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) {
-        val scope = resolveScope(attempt.agent.value, attempt.conversation.value)
-        coordinator.dispatchOwners.retain(scope.backendId, scope.conversationId, attempt.identity.value, active)
-    }
-
     override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
         coordinator.markPending(
             owner(attempt.agent.value, attempt.conversation.value), attempt.identity.value, delivery, attempt.generation,

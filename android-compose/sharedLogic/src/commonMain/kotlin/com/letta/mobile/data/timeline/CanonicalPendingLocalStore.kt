@@ -1,7 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.timeline.api.PendingDispatchOwners
-
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.api.OutboxAdmission
 import com.letta.mobile.data.timeline.api.OutboxEntry
@@ -33,7 +31,6 @@ import kotlinx.serialization.encoding.Encoder
  */
 class CanonicalPendingLocalStore(
     private val store: TimelineBoundedStore,
-    private val dispatchOwners: PendingDispatchOwners = PendingDispatchOwners(),
     private val recoveryProtected: (String) -> Boolean = { false },
 ) {
     @Serializable
@@ -75,7 +72,7 @@ class CanonicalPendingLocalStore(
         store.transaction(scope) {
             val now = timelineCurrentTimeMillis()
             val previous = readOutbox(now)
-            val candidate = record.toOutboxEntry(now)
+            val candidate = record.toOutboxEntry(now).stampedHere()
             // A later send is not permission to discard an earlier, unconfirmed prompt.
             if (admitted(previous, candidate)) commit(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
         }
@@ -116,14 +113,14 @@ class CanonicalPendingLocalStore(
         store.transaction(scope) {
             val now = timelineCurrentTimeMillis()
             val previous = readOutbox(now)
-            val candidate = record.toOutboxEntry(now)
+            val candidate = record.toOutboxEntry(now).stampedHere()
             if (admitted(previous, candidate)) {
                 commit(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
                 return@transaction null to candidate
             }
             val existing = previous.first { it.otid == candidate.otid }
             val dispatched = existing.after(listOf(OutboxEvent.DispatchStart), now)?.sinceAttemptStart(existing)
-                ?: return@transaction null
+                ?.stampedHere() ?: return@transaction null
             commit(previous.replacing(existing.otid, dispatched))
             existing to dispatched
         }
@@ -144,25 +141,26 @@ class CanonicalPendingLocalStore(
 
     /**
      * Mark overdue unconfirmed sends as failed, retaining every prompt for explicit Retry or
-     * dismissal. A transport drop can leave either Sending or Sent without an echo.
+     * dismissal. A transport drop can leave either Sending or Sent without an echo. A send this
+     * process is still delivering while its conversation is [streaming] is not overdue.
      */
     suspend fun retireLostEchoes(
         scope: TimelineScope,
         loaded: List<Record>,
         now: TimelineInstant = timelineNow(),
-        horizonMillis: Long = LOST_ECHO_HORIZON_MILLIS,
+        streaming: Boolean = false,
     ): Int {
-        require(horizonMillis > 0)
         // Callers already hold a freshly loaded list, and a send enters its state no earlier than it
         // was sent, so a younger send cannot be stale: refresh runs on ordinary traffic and must not
         // bill a commit and a revision when nothing is.
-        if (loaded.none { mayBeStale(scope, it, now, horizonMillis) }) return 0
+        if (loaded.none { mayBeStale(it, now) }) return 0
         val nowMillis = now.epochMillis()
         return store.transaction(scope) {
             val previous = readOutbox(nowMillis)
             val next = previous.map { entry ->
-                entry.takeIf { it.state != OutboxState.Failed && unowned(scope, it.otid) }
-                    ?.takeIf { nowMillis - it.stateSinceMillis >= horizonMillis }
+                entry.takeIf { it.state != OutboxState.Failed && !recoveryProtected(it.otid) }
+                    ?.takeIf { !it.inFlightHere(nowMillis, LOST_ECHO_HORIZON_MILLIS, streaming) }
+                    ?.takeIf { nowMillis - it.stateSinceMillis >= LOST_ECHO_HORIZON_MILLIS }
                     ?.after(LOST_EVENTS[entry.state].orEmpty(), nowMillis)
                     ?: entry
             }
@@ -172,17 +170,26 @@ class CanonicalPendingLocalStore(
         }
     }
 
-    private fun unowned(scope: TimelineScope, otid: String): Boolean =
-        !recoveryProtected(otid) && !dispatchOwners.isActive(scope.backendId, scope.conversationId, otid)
+    /**
+     * The otids this process may still be delivering (see [OutboxEntry.inFlightHere]). Every other
+     * unconfirmed send belongs to no live attempt, so history decides it.
+     */
+    internal suspend fun inFlightHere(scope: TimelineScope, streaming: Boolean): Set<String> {
+        val now = timelineCurrentTimeMillis()
+        return store.read(scope) {
+            readOutbox(now).filter { it.inFlightHere(now, LOST_ECHO_HORIZON_MILLIS, streaming) }
+                .mapTo(mutableSetOf()) { it.otid }
+        }
+    }
 
     /**
-     * Whether [record] could be past the horizon: unconfirmed, unowned and sent long enough ago. An
+     * Whether [record] could be past the horizon: unconfirmed and sent long enough ago. An
      * unparsable timestamp is not evidence of staleness, so such a record is left alone.
      */
-    private fun mayBeStale(scope: TimelineScope, record: Record, now: TimelineInstant, horizonMillis: Long): Boolean {
-        if (record.delivery == Delivery.Failed || !unowned(scope, record.otid)) return false
+    private fun mayBeStale(record: Record, now: TimelineInstant): Boolean {
+        if (record.delivery == Delivery.Failed) return false
         val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
-        return timelineInstantDurationMillis(sent, now) >= horizonMillis
+        return timelineInstantDurationMillis(sent, now) >= LOST_ECHO_HORIZON_MILLIS
     }
 
     /**
@@ -197,7 +204,7 @@ class CanonicalPendingLocalStore(
             val entry = previous.firstOrNull { it.otid == otid } ?: return@transaction
             if (expectedAttempt != null && entry.attempt != expectedAttempt) return@transaction
             val next = entry.after(outcomeEvents(delivery)[entry.state].orEmpty(), now)?.sinceAttemptStart(entry)
-                ?: return@transaction
+                ?.stampedHere() ?: return@transaction
             commit(previous.replacing(otid, next))
         }
     }
@@ -208,7 +215,7 @@ class CanonicalPendingLocalStore(
         val previous = readOutbox(now)
         val failed = previous.singleOrNull { it.otid == otid && it.state == OutboxState.Failed } ?: return@transaction null
         check(failed.attempt < Long.MAX_VALUE)
-        val retry = failed.after(listOf(OutboxEvent.UserResendAnyway), now) ?: return@transaction null
+        val retry = failed.after(listOf(OutboxEvent.UserResendAnyway), now)?.stampedHere() ?: return@transaction null
         commit(previous.replacing(otid, retry))
         retry.toRecord()
     }
@@ -246,7 +253,7 @@ class CanonicalPendingLocalStore(
         internal suspend fun confirmEcho(transaction: TimelineStoreTransaction, otid: String): Boolean =
             confirmOutboxEcho(transaction, otid, timelineCurrentTimeMillis())
 
-        /** Fallback timeout for unowned, unconfirmed sends. */
+        /** How long a send counts as in flight without an echo, unless its conversation is streaming. */
         const val LOST_ECHO_HORIZON_MILLIS = 5L * 60L * 1000L
 
         const val MAX_RECORDS = OutboxTransitions.BUDGET

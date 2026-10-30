@@ -20,8 +20,6 @@ class AdmittedTimelineExternalWriter(
         admission.admitted(attempt.conversation.value) { delegate.acceptPendingSend(attempt, content, attachments, accept) }
     override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) =
         admission.admitted(attempt.conversation.value) { delegate.isPendingSendCurrent(attempt) }
-    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) =
-        admission.admitted(attempt.conversation.value) { delegate.ownPendingSend(attempt, active) }
     override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
         admission.admitted(attempt.conversation.value) { delegate.markPendingSend(attempt, delivery) }
     override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =

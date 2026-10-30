@@ -117,7 +117,6 @@ class PendingSendReconnectProjectionTest {
         advanceTimeBy(1.seconds)
         runCurrent()
         assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
-        assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
     }
 
     @Test fun failedRedialRecoveryReleasesLocalAndTransportOwnership() = runTest {
@@ -131,7 +130,6 @@ class PendingSendReconnectProjectionTest {
         f.channel.redials.emit(RedialWhileTurnActive("agent", FIRST.value, "turn", "run", 2))
         runCurrent()
         assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
-        assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
     }
 
     @Test fun hungRedialHistoryReadTimesOutAndReleasesOwnership() = runTest {
@@ -147,7 +145,6 @@ class PendingSendReconnectProjectionTest {
         advanceTimeBy(30.seconds)
         runCurrent()
         assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
-        assertFalse(f.dispatchOwners.isActive("backend", FIRST.value, "cm-test-1"))
     }
 
     // softs (#2258 deferred defect 1): the redial history read no longer holds the turn lock.
@@ -223,14 +220,18 @@ class PendingSendReconnectProjectionTest {
         screen.close()
     }
 
-    @Test fun replacementRecoveryKeepsOwnedSendUntilDispatchEnds() = runTest {
+    @Test fun replacementRecoveryKeepsALiveSendUntilItsProcessIsGone() = runTest {
         val f = Fixture(this)
         f.sendQueued("still active")
-        val replacement = CanonicalTimelineCoordinator(f.store, f.transport, f.dispatchOwners)
+        val replacement = CanonicalTimelineCoordinator(f.store, f.transport)
         val owner = replacement.acquire(f.scope(FIRST))
         assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
         assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.pending(FIRST).single().delivery)
+        // Within the horizon a retired sender's prompt stays in flight; a later process lets history decide.
         f.retireSender()
+        assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.pending(FIRST).single().delivery)
+        f.store.fromAnotherProcess(f.scope(FIRST))
         assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
         assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
     }
@@ -240,7 +241,7 @@ class PendingSendReconnectProjectionTest {
         f.sendQueued("accepted server turn")
         f.channel.busy = true
         f.retireSender(stopTransport = false)
-        val replacement = CanonicalTimelineCoordinator(f.store, f.transport, f.dispatchOwners)
+        val replacement = CanonicalTimelineCoordinator(f.store, f.transport)
         val owner = replacement.acquire(f.scope(FIRST))
         try {
             assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
@@ -248,6 +249,7 @@ class PendingSendReconnectProjectionTest {
         } finally {
             f.channel.busy = false
         }
+        f.store.fromAnotherProcess(f.scope(FIRST))
         assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
         assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
     }
@@ -404,7 +406,8 @@ class PendingSendReconnectProjectionTest {
         runCurrent()
         // Lose the send owner entirely: recovery cannot depend on its disconnect callback.
         f.retireSender()
-        val restarted = CanonicalTimelineCoordinator(f.store, f.transport, f.dispatchOwners)
+        f.store.fromAnotherProcess(f.scope(FIRST))
+        val restarted = CanonicalTimelineCoordinator(f.store, f.transport)
         val owner = restarted.acquire(f.scope(FIRST))
         f.history[FIRST] = listOf(
             f.user(HistoryUser(MessageId("persisted"), Prompt(MessageId("cm-test-3"), "persisted"), 10.seconds)),
@@ -443,8 +446,7 @@ class PendingSendReconnectProjectionTest {
                 )
             }
         }
-        val dispatchOwners = com.letta.mobile.data.timeline.api.PendingDispatchOwners()
-        private val coordinator = CanonicalTimelineCoordinator(store, transport, dispatchOwners)
+        private val coordinator = CanonicalTimelineCoordinator(store, transport)
         private val maintenance = IndexedCanonicalTimelineMaintenance(
             coordinator, test.backgroundScope, { _, _, _ -> }, { throw it },
         )
