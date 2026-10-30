@@ -7,8 +7,9 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.visibleConversationsInLists
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.util.runCatchingCancellable
 import com.letta.mobile.ui.chat.session.ChatActions
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 /** A routed conversation outside the recents page, fetched once; null when listed, in legacy mode or already failed. */
@@ -106,4 +107,19 @@ internal fun ChatActions.applyDraft(pending: PendingDraft) {
     updateComposerText(draft.text)
     draft.images.forEach(::attachImage)
     if (pending.sendNow) send()
+}
+
+/** [conversation]'s row: the listed one, else fetched once and listed; null (with the error shown) when the fetch fails. */
+internal suspend fun MutableStateFlow<TimelineConversationsState>.readSelectedConversation(
+    gateway: ChatGateway,
+    conversation: ConversationId,
+): Conversation? = value.record(conversation) ?: runCatchingCancellable {
+    gateway.getConversation(conversation.value)
+}.onFailure { failure -> update { it.failedToRead(conversation, failure) } }
+    .getOrNull()?.also { fetched -> update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) } }
+
+/** Shows [failure] only while [conversation] is still the selected one. */
+private fun TimelineConversationsState.failedToRead(conversation: ConversationId, failure: Throwable): TimelineConversationsState {
+    if (selected != conversation) return this
+    return copy(error = failure.message ?: "Could not list the conversations")
 }

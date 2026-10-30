@@ -278,19 +278,6 @@ class TimelineConversations(
     }
 }
 
-private suspend fun MutableStateFlow<TimelineConversationsState>.readSelectedConversation(
-    gateway: ChatGateway,
-    conversation: ConversationId,
-): Conversation? = value.record(conversation) ?: runCatchingCancellable {
-    gateway.getConversation(conversation.value)
-}.onFailure { failure ->
-    update { current ->
-        if (current.selected == conversation) current.copy(error = failure.message ?: "Could not list the conversations") else current
-    }
-}.getOrNull()?.also { fetched ->
-    update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
-}
-
 internal fun TimelineConversationsState.withDraft(conversation: ConversationId, draft: PendingDraft) =
     copy(drafts = drafts + (conversation to draft))
 
