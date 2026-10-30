@@ -136,18 +136,12 @@ fun SyncTimelineConversations(
     val reported = state.authoritativeConversationIds()
     SyncShellWorkspace(workspace, ShellChatSelection(session, state.selected, selected?.agentId, reported))
     LaunchedEffect(workspace, state.conversations, state.authoritativeAgents, state.authoritative) {
-        if (!state.authoritative) {
-            workspace.conversationsReported(state.conversations.associate { it.id to it.agentId }, state.authoritativeAgents)
-        }
+        workspace.reportPartial(state)
     }
     LaunchedEffect(workspace, selected?.agentId) { selected?.agentId?.let { workspace.focusedAgentId = it } }
     LaunchedEffect(owner, state.loaded, state.authoritativeAgents, workspace.focusedAgentId, visibleAgents) {
         val agent = workspace.focusedAgentId ?: return@LaunchedEffect
-        val live = owner?.takeIf { state.loaded } ?: return@LaunchedEffect
-        live.lists.prefetchPinnedAgents(live.pinnedAgents)
-        live.lists.focusAgent(agent)
-        // The current drawer has no paging affordance; read through only the focused agent.
-        while (live.lists.hasMore(agent) && live.state.value.error == null) live.lists.loadMore(agent)
+        owner?.takeIf { state.loaded }?.readThroughFocused(agent)
     }
     val chatShown = workspace.page is ShellDestination.Chat
     LaunchedEffect(owner, state.loaded, state.selected, workspace.focusedAgentId, chatShown) {
@@ -155,7 +149,21 @@ fun SyncTimelineConversations(
     }
 }
 
+/** Pinned agents' first pages, then every page of [agent]: the drawer has no paging affordance. */
+private suspend fun TimelineConversations.readThroughFocused(agent: AgentId) {
+    lists.prefetchPinnedAgents(pinnedAgents)
+    lists.focusAgent(agent)
+    while (lists.hasMore(agent) && state.value.error == null) lists.loadMore(agent)
+}
+
 /** A bounded recents window is never evidence that an absent conversation was deleted. */
+/** A partial (recents) catalog prunes only the owners whose pages are complete. */
+private fun ShellWorkspaceState.reportPartial(state: TimelineConversationsState) {
+    if (state.authoritative) return
+    conversationsReported(state.conversations.associate { it.id to it.agentId }, state.authoritativeAgents)
+}
+
+
 internal fun TimelineConversationsState.authoritativeConversationIds(): Set<ConversationId>? =
     conversations.takeIf { loaded && authoritative }?.mapTo(mutableSetOf()) { it.id }
 

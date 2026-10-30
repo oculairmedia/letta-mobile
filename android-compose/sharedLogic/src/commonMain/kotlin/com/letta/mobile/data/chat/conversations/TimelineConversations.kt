@@ -2,7 +2,6 @@ package com.letta.mobile.data.chat.conversations
 
 import com.letta.mobile.data.chat.branch.BranchDraft
 import com.letta.mobile.data.chat.branch.PendingDraft
-import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -11,7 +10,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.repository.observeConversationInvalidations
 import com.letta.mobile.data.shell.ShellChatPort
@@ -162,8 +160,7 @@ class TimelineConversations(
     fun openInitial(routed: ConversationId?, focused: AgentId?, createIfNone: Boolean) {
         val current = mutableState.value
         if (!current.awaitsFirstChat) return
-        // A routed conversation outside the recents page is fetched once; a failed fetch falls back.
-        val unlistedRoute = routed?.takeIf { it != failedInitialRoute && current.listed(it) == null && !lists.legacyMode }
+        val unlistedRoute = current.unlistedRoute(routed, failedInitialRoute, lists.legacyMode)
         if (unlistedRoute != null) {
             selectConversation(unlistedRoute) { initialRouteFailed(unlistedRoute, focused, createIfNone) }
             return
@@ -294,31 +291,6 @@ private suspend fun MutableStateFlow<TimelineConversationsState>.readSelectedCon
     update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
 }
 
-/** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
-private suspend fun ChatGateway.existingChat(
-    agent: AgentId,
-    state: MutableStateFlow<TimelineConversationsState>,
-    select: (ConversationId) -> Unit,
-): ConversationId? {
-    var after: ConversationId? = null
-    while (true) {
-        val request = AgentConversationPage(agent, after = after)
-        val page = listAgentConversations(request)
-        val own = page.filter { it.agentId == agent }.visibleConversationsInLists()
-        state.update { it.copy(conversations = it.conversations.keeping(own)) }
-        val newest = own.firstOrNull { it.archived != true }
-        if (newest != null) {
-            select(newest.id)
-            return newest.id
-        }
-        // A full page of archives is not proof that the agent has no active chat.
-        if (page.size < request.limit) return null
-        val next = page.lastOrNull()?.id
-        check(next != after) { "Conversation cursor did not advance" }
-        after = next
-    }
-}
-
 /** A conversation the owner made (a new chat or a branch) joins the top of the list and opens. */
 private fun MutableStateFlow<TimelineConversationsState>.opened(conversation: Conversation, draft: PendingDraft?) {
     update { current ->
@@ -349,21 +321,6 @@ private fun Conversation.shellRef() = ShellConversationRef(id, agentId, updatedA
 /** With no [expected] title, any; else only while the row still shows it. */
 private fun Conversation.showsTitle(expected: ConversationSummary?): Boolean = expected == null || summary.orEmpty() == expected.value
 
-private fun TimelineConversationsState.selectedRecord(): Conversation? = record(selected)
-
-private fun TimelineConversationsState.record(conversation: ConversationId?): Conversation? =
-    conversation?.let { id -> conversations.firstOrNull { it.id == id } }
-
-private fun TimelineConversationsState.edit(conversation: ConversationId, change: (Conversation) -> Conversation) =
-    copy(conversations = conversations.map { if (it.id == conversation) change(it) else it })
-
-/** The list without [conversation]; when it was the selected one, its agent's next active conversation is. */
-private fun TimelineConversationsState.without(conversation: ConversationId): TimelineConversationsState {
-    val remaining = conversations.filterNot { it.id == conversation }
-    val next = if (selected == conversation) record(conversation)?.agentId?.let { agent -> remaining.activeChatOf(agent) } else selected
-    return copy(conversations = remaining, selected = next, deleting = deleting - conversation)
-}
-
 /** The roster's name for [agent], for the chat's title. */
 private fun List<Agent>.nameOf(agent: AgentId): String = firstOrNull { it.id == agent }?.name.orEmpty()
 
@@ -375,29 +332,11 @@ private fun rosterNeedsConversationRefresh(previous: List<Agent>, next: List<Age
     return firstArrival || membershipChanged
 }
 
-/** This list, then the [others] it does not carry (newest first within each). */
-private fun List<Conversation>.keeping(others: List<Conversation>): List<Conversation> {
-    val ids = mapTo(mutableSetOf()) { it.id }
-    return this + others.filterNot { it.id in ids }
-}
-
 /** Loaded, with nothing selected and nothing being made: the first chat is still to open. */
 private val TimelineConversationsState.awaitsFirstChat: Boolean
     get() = loaded && isIdle
 
 private val TimelineConversationsState.isIdle: Boolean get() = selected == null && !creating
-
-/** [conversation] while the list carries it. */
-private fun TimelineConversationsState.listed(conversation: ConversationId?): ConversationId? = record(conversation)?.id
-
-/** [agent]'s newest active conversation in the list. */
-private fun TimelineConversationsState.activeChatOf(agent: AgentId): ConversationId? = conversations.activeChatOf(agent)
-
-private fun List<Conversation>.activeChatOf(agent: AgentId): ConversationId? =
-    firstOrNull { it.agentId == agent && it.archived != true }?.id
-
-/** A first chat may be made when the host asks for one and the last attempt did not fail. */
-private fun TimelineConversationsState.mayCreate(wanted: Boolean): Boolean = wanted && error == null
 
 /** What a timeline chat port takes from the shared [owner]: branching and `/recompile`, and the host's `/` [commands]. */
 class TimelineConversationChat(val owner: TimelineConversations, val commands: List<ChatHostCommand>)
