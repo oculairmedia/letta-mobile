@@ -297,7 +297,7 @@ private fun messageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     uiToolCalls: List<UiToolCall>?,
 ): List<UiImageAttachment> {
-    return if (uiToolCalls.orEmpty().any { it.name == "generate_image" }) {
+    return if (uiToolCalls.orEmpty().any { it.generatedImageAttachments.isNotEmpty() }) {
         emptyList()
     } else {
         attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
