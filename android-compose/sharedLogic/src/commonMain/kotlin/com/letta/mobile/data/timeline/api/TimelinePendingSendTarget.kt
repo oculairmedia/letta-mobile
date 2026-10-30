@@ -16,9 +16,6 @@ interface TimelinePendingSendTarget {
     /** Reject queued retries whose echo or dismissal already removed the pending attempt. */
     suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt): Boolean = true
 
-    /** Retain dispatch ownership independently of viewport and runtime replacement. */
-    suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) {}
-
     /** Apply an outcome to the identified retry generation. */
     suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: Delivery)
 }

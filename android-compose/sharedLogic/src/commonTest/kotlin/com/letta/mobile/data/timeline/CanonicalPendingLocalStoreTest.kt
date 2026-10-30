@@ -2,7 +2,7 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.timeline.api.OUTBOX_ADMISSION_MAX_BYTES
 import com.letta.mobile.data.timeline.api.OutboxState
-import com.letta.mobile.data.timeline.api.PendingDispatchOwners
+import com.letta.mobile.data.timeline.api.writeOutbox
 import com.letta.mobile.data.timeline.api.readOutbox
 import com.letta.mobile.data.timeline.api.encodeOutbox
 import com.letta.mobile.data.timeline.api.toOutboxEntry
@@ -173,23 +173,39 @@ class CanonicalPendingLocalStoreTest {
         assertEquals("2026-01-01T00:00:00Z", pending.load(scope).single().sentAt)
     }
 
-    @Test fun horizonRetiresAbandonedSendsButPreservesActiveDispatchesAndRetries() = runTest {
-        val dispatchOwners = PendingDispatchOwners()
-        val pending = CanonicalPendingLocalStore(Store(), dispatchOwners)
-        val scope = TimelineScope("horizon-backend", "conversation")
-        val record = CanonicalPendingLocalStore.Record("active", "prompt", emptyList(), "2026-01-01T00:00:00Z")
-        pending.save(scope, record)
-        pending.save(scope, record.copy(otid = "retry", attempt = 1))
-        pending.save(scope, record.copy(otid = "abandoned"))
-        var active = true
-        dispatchOwners.retain(scope.backendId, scope.conversationId, "active") { active }
-        dispatchOwners.retain(scope.backendId, scope.conversationId, "retry") { active }
-        val now = minutesFromNow(10)
-        assertEquals(1, pending.retireLostEchoes(scope, pending.load(scope), now))
-        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Sending, CanonicalPendingLocalStore.Delivery.Sending,
-            CanonicalPendingLocalStore.Delivery.Failed), pending.load(scope).map { it.delivery })
-        active = false
-        assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), now))
+    @Test fun aSendFromAProcessThatIsGoneIsLeftToHistoryAtOnce() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        val scope = TimelineScope("epoch-backend", "conversation")
+        pending.save(scope, CanonicalPendingLocalStore.Record("gone", "prompt", emptyList(), secondsAgo(30)))
+        store.fromAnotherProcess(scope)
+        assertEquals(emptySet(), pending.inFlightHere(scope, streaming = true))
+    }
+
+    @Test fun aYoungSendOfThisProcessIsStillInFlight() = runTest {
+        val pending = CanonicalPendingLocalStore(Store())
+        val scope = TimelineScope("epoch-backend", "conversation")
+        pending.save(scope, CanonicalPendingLocalStore.Record("live", "prompt", emptyList(), secondsAgo(30)))
+        assertEquals(setOf("live"), pending.inFlightHere(scope, streaming = false))
+        assertEquals(0, pending.retireLostEchoes(scope, pending.load(scope), minutesFromNow(0)))
+    }
+
+    @Test fun aSendOfThisProcessPastTheHorizonWithoutStreamingIsLost() = runTest {
+        val pending = CanonicalPendingLocalStore(Store())
+        val scope = TimelineScope("epoch-backend", "conversation")
+        pending.save(scope, CanonicalPendingLocalStore.Record("stale", "prompt", emptyList(), secondsAgo(600)))
+        assertEquals(emptySet(), pending.inFlightHere(scope, streaming = false))
+        assertEquals(1, pending.retireLostEchoes(scope, pending.load(scope), minutesFromNow(0)))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, pending.load(scope).single().delivery)
+    }
+
+    @Test fun aSendOfThisProcessPastTheHorizonStaysInFlightWhileItsTurnStreams() = runTest {
+        val pending = CanonicalPendingLocalStore(Store())
+        val scope = TimelineScope("epoch-backend", "conversation")
+        pending.save(scope, CanonicalPendingLocalStore.Record("long-turn", "prompt", emptyList(), secondsAgo(600)))
+        assertEquals(setOf("long-turn"), pending.inFlightHere(scope, streaming = true))
+        assertEquals(0, pending.retireLostEchoes(scope, pending.load(scope), minutesFromNow(0), streaming = true))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, pending.load(scope).single().delivery)
     }
 
     @Test fun anOlderPendingStoreIsReadAndReplacedOnTheFirstWrite() = runTest {
@@ -208,6 +224,9 @@ class CanonicalPendingLocalStoreTest {
         assertEquals(listOf("legacy", "new"), pending.load(scope).map { it.otid })
         assertEquals(expected, pending.load(scope).first())
     }
+
+    private fun secondsAgo(seconds: Long): String =
+        Instant.fromEpochMilliseconds(timelineCurrentTimeMillis() - seconds * 1_000L).toString()
 
     private fun minutesFromNow(minutes: Long): TimelineInstant =
         parseTimelineInstant(Instant.fromEpochMilliseconds(timelineCurrentTimeMillis() + minutes * 60_000L).toString())
@@ -261,5 +280,13 @@ class CanonicalPendingLocalStoreTest {
             }
             override suspend fun delete(identity: TimelineMessageId, reason: TimelineDurableDeleteReason): Unit = error("No history deletion expected")
         }
+    }
+}
+
+/** Rewrites every stored outbox entry as dispatched by a process that has since died. */
+internal suspend fun TimelineBoundedStore.fromAnotherProcess(scope: TimelineScope) {
+    transaction(scope) {
+        writeOutbox(readOutbox(timelineCurrentTimeMillis()).map { it.copy(dispatchEpoch = "a-previous-process") })
+        nextRevision()
     }
 }

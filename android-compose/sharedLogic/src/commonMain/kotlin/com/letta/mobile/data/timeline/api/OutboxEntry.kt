@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline.api
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.PendingImageSerializer
 import kotlinx.serialization.Serializable
+import kotlin.random.Random
 
 /**
  * Where one outbound prompt is in its delivery. Every move between states goes through
@@ -66,6 +67,11 @@ internal data class OutboxEntry(
     val failure: OutboxFailure? = null,
     /** Set by a retry of an [OutboxFailure.Unconfirmed] prompt: a probe that finds no echo requeues. */
     val resendOnNoEcho: Boolean = false,
+    /**
+     * The [PROCESS_DISPATCH_EPOCH] of the process that last acted on this attempt. Any other value,
+     * including null from an older build, means that process is gone and nothing is in flight.
+     */
+    val dispatchEpoch: String? = null,
 ) {
     init {
         require(otid.isNotBlank()) { "An outbox entry needs an otid" }
@@ -98,7 +104,22 @@ internal data class OutboxEntry(
         else -> this
     }
 
+    /** This entry as acted on by the running process. */
+    fun stampedHere(): OutboxEntry =
+        if (dispatchEpoch == PROCESS_DISPATCH_EPOCH) this else copy(dispatchEpoch = PROCESS_DISPATCH_EPOCH)
+
+    /**
+     * Whether this process may still be delivering the entry, so an absent echo is not yet evidence
+     * of loss: sent by this process and younger than [horizonMillis], or older while its
+     * conversation is still [streaming] (a long turn's prompt keeps its owner).
+     */
+    fun inFlightHere(nowMillis: Long, horizonMillis: Long, streaming: Boolean): Boolean =
+        state in IN_FLIGHT_STATES && dispatchEpoch == PROCESS_DISPATCH_EPOCH &&
+            (streaming || nowMillis - stateSinceMillis < horizonMillis)
+
     companion object {
+        private val IN_FLIGHT_STATES = setOf(OutboxState.Queued, OutboxState.Dispatching, OutboxState.Accepted)
+
         private val SENDING_STATES = setOf(
             OutboxState.Queued,
             OutboxState.Dispatching,
@@ -107,3 +128,6 @@ internal data class OutboxEntry(
         )
     }
 }
+
+/** Identifies this process in [OutboxEntry.dispatchEpoch]; a new one after every process start. */
+internal val PROCESS_DISPATCH_EPOCH: String = Random.nextLong().toULong().toString(16)

@@ -1,6 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.timeline.api.PendingDispatchOwners
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.AgentId
@@ -16,8 +15,6 @@ import kotlinx.coroutines.plus
 class GenerationTimelineTransport(
     private val delegate: TimelineTransport,
     parent: CoroutineScope,
-    /** Dispatch leases shared across replacement timeline generations. */
-    val dispatchOwners: PendingDispatchOwners = PendingDispatchOwners(),
 ) : TimelineTransport {
     private val job = SupervisorJob(parent.coroutineContext[Job])
     private val scope = parent + job

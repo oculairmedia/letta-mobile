@@ -126,7 +126,6 @@ class ChatSendCoordinator(
                 val pending = QueuedChatSend(
                     QueuedSendId(record.otid), QueueConversationId(conversation.value), record.content, record.attachments, record.attempt,
                 )
-                retainPendingOwner(pending)
                 queueDriver.submitLocked(pending)?.let { reportQueuedSend(pending, it) }
             }
         }
@@ -382,7 +381,6 @@ class ChatSendCoordinator(
             otid = pending.id.value,
             attachments = pending.attachments,
         )
-        retainPendingOwner(pending)
         if (clearComposer) foreground.clearComposer(ConversationId(pending.conversationId.value))
         postSendReconciler.schedule(pending.conversationId.value, pending.id.value)
         foreground.dispatched(ConversationId(pending.conversationId.value))
@@ -417,16 +415,6 @@ class ChatSendCoordinator(
             foreground.sendFailed(ConversationId(pending.conversationId.value),
                 "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
             null
-        }
-    }
-
-    private suspend fun retainPendingOwner(pending: QueuedChatSend) {
-        timelineRepository.ownPendingSend(pending.pendingAttempt(agentId)) {
-            val conversation = ConversationId(pending.conversationId.value)
-            val state = turnRegistry.peekState(conversation)
-            val queued = scope.isActive && queuedSends.queueFor(pending.conversationId).positionOf(pending.id) != null
-            val running = state?.inFlightSend == pending && !state.reachedTerminal && !state.pendingRecoveryExpired
-            queued || (running && (scope.isActive || wsChatBridge.hasActiveChatTurn(conversation.value)))
         }
     }
 

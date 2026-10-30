@@ -1,8 +1,6 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.attr
-import com.letta.mobile.data.timeline.api.PendingDispatchOwners
-import com.letta.mobile.data.timeline.api.PendingDispatchTimelineStore
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -14,10 +12,8 @@ import kotlinx.coroutines.sync.withLock
 class CanonicalTimelineCoordinator(
     private val store: TimelineBoundedStore,
     private val transport: TimelineTransport,
-    internal val dispatchOwners: PendingDispatchOwners = PendingDispatchOwners(),
 ) {
     internal val pendingStorage: TimelineBoundedStore get() = store
-    private val sessionStore = PendingDispatchTimelineStore(store, dispatchOwners)
     private val mutex = kotlinx.coroutines.sync.Mutex()
     private val owners = mutableMapOf<TimelineScope, Owner>()
     private var revoked = false
@@ -28,12 +24,9 @@ class CanonicalTimelineCoordinator(
         kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] = sender }
     }
 
-    internal suspend fun retryPending(owner: Owner, identity: MessageId): Boolean {
-        val scope = owner.selection.scope
-        return dispatchOwners.protecting(Triple(scope.backendId, scope.conversationId, identity.value)) {
-            echoArrivedBeforeRetry(owner, identity) || dispatchRetry(owner, identity)
-        }
-    }
+    // A failed prompt is never abandoned, and its retry is stamped as this process's own attempt.
+    internal suspend fun retryPending(owner: Owner, identity: MessageId): Boolean =
+        echoArrivedBeforeRetry(owner, identity) || dispatchRetry(owner, identity)
 
     /**
      * A failed prompt may have reached the host before contact was lost, and the App Server does
@@ -131,7 +124,7 @@ class CanonicalTimelineCoordinator(
     suspend fun acquire(scope: TimelineScope): Owner = mutex.withLock {
         check(!revoked) { "Canonical runtime generation revoked" }
         owners[scope]?.let { return@withLock it }
-        val session = CanonicalTimelineSession(sessionStore, transport, scope, enabled = true)
+        val session = CanonicalTimelineSession(store, transport, scope, enabled = true)
         val opened = session.open() as TimelineEngineOpen.Opened
         Owner(session, opened.selection).also { owners[scope] = it }
     }
@@ -320,9 +313,11 @@ class CanonicalTimelineSession(
     val settling = engine.settling
     private var recoveryCandidates = emptySet<MessageId>()
     private var recoveryHistoryStart: TimelineInstant? = null
-    private val dispatchOwners = (store as? PendingDispatchTimelineStore)?.dispatchOwners ?: PendingDispatchOwners()
     // Paging protection ends at the lost-echo horizon, even if the user never loads older pages.
-    private val pendingStore = CanonicalPendingLocalStore(store, dispatchOwners)
+    private val pendingStore = CanonicalPendingLocalStore(store)
+    // When this session last accepted a live frame of an unfinished turn (0: none). A turn still
+    // streaming keeps its prompt in flight past the lost-echo horizon.
+    private val lastFrameMillis = kotlinx.atomicfu.atomic(0L)
     private val pendingMutex = kotlinx.coroutines.sync.Mutex()
     private val mutablePending = kotlinx.coroutines.flow.MutableStateFlow<List<CanonicalPendingLocalStore.Record>>(emptyList())
     val pending: kotlinx.coroutines.flow.StateFlow<List<CanonicalPendingLocalStore.Record>> = mutablePending
@@ -375,18 +370,24 @@ class CanonicalTimelineSession(
         }).minWithOrNull(Comparator(::compareTimelineInstants))
         // The canonical writer already removed matching echoes from pending storage. Absence is
         // decisive once the loaded window spans a candidate's send time, even with more pages.
+        val streaming = streaming()
+        val inFlight = pendingStore.inFlightHere(scope, streaming)
         val abandoned = loaded.filter {
             MessageId(it.otid) in recoveryCandidates && it.delivery != CanonicalPendingLocalStore.Delivery.Failed &&
-                !dispatchOwners.isActive(scope.backendId, scope.conversationId, it.otid) &&
-                (historyPage?.hasMore == false || historyCovers(it.sentAt))
+                it.otid !in inFlight && (historyPage?.hasMore == false || historyCovers(it.sentAt))
         }
         abandoned.forEach {
             pendingStore.mark(scope, it.otid, CanonicalPendingLocalStore.Delivery.Failed, it.attempt)
         }
         recoveryCandidates -= abandoned.map { MessageId(it.otid) }.toSet()
         recoveryCandidates = recoveryCandidates.intersect(loaded.map { MessageId(it.otid) }.toSet())
-        val retired = pendingStore.retireLostEchoes(scope, loaded)
+        val retired = pendingStore.retireLostEchoes(scope, loaded, streaming = streaming)
         mutablePending.value = if (abandoned.isNotEmpty() || retired > 0) pendingStore.load(scope) else loaded
+    }
+
+    private fun streaming(): Boolean {
+        val last = lastFrameMillis.value
+        return last > 0 && timelineCurrentTimeMillis() - last < CanonicalPendingLocalStore.LOST_ECHO_HORIZON_MILLIS
     }
 
     private fun historyCovers(sentAt: String): Boolean {
@@ -434,6 +435,11 @@ class CanonicalTimelineSession(
 
     suspend fun ingest(fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean =
         engine.ingest(fence, frame).also { accepted ->
+            // Only turn content is streaming; a keepalive is not. A finished turn no longer streams,
+            // so its prompt is then judged by the horizon alone.
+            if (accepted && frame != TimelineStreamFrame.Heartbeat) {
+                lastFrameMillis.value = if (frame == TimelineStreamFrame.Done) 0L else timelineCurrentTimeMillis()
+            }
             // Token updates never read pending storage; only a durable completion can confirm echoes.
             if (accepted && frame == TimelineStreamFrame.Done) refreshPending()
         }

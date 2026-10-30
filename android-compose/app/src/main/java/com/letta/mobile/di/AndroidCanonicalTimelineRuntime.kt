@@ -21,15 +21,13 @@ class AndroidCanonicalTimelineRuntimeFactory(
     private val storage: TimelineOwnedStorageFactory,
     private val writers: CanonicalConversationWriters,
 ) {
-    private val dispatchOwners = com.letta.mobile.data.timeline.api.PendingDispatchOwners()
-
     fun captured(
         graph: com.letta.mobile.data.session.SessionGraph,
         settings: com.letta.mobile.data.repository.api.ISettingsRepository,
         ownerScope: kotlinx.coroutines.CoroutineScope,
     ): AndroidCanonicalTimelineRuntime {
         val remote = com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport(graph.channelTransport, settings)
-        val owned = com.letta.mobile.data.timeline.GenerationTimelineTransport(remote, ownerScope, dispatchOwners)
+        val owned = com.letta.mobile.data.timeline.GenerationTimelineTransport(remote, ownerScope)
         return AndroidCanonicalTimelineRuntime(
             graph.backendDescriptor.backendId.value,
             owned,
@@ -71,7 +69,7 @@ class AndroidCanonicalTimelineRuntime(
         bindings[scope]?.let { return@withLock it }
         // A scope never opened (or left mid-migration by an older build) is claimed without a copy.
         val lease = authority.claimCanonical(scope).also { authority.withLease(it) { } }
-        CanonicalTimelineCoordinator(storage.canonical(lease), transport, transport.dispatchOwners).also { bindings[scope] = it }
+        CanonicalTimelineCoordinator(storage.canonical(lease), transport).also { bindings[scope] = it }
     }
 
     class Binding(

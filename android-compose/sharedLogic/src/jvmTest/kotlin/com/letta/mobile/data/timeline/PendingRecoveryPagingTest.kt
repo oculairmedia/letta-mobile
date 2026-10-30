@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
@@ -8,8 +9,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CompletableDeferred
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.MessageId
-import com.letta.mobile.data.timeline.api.PendingDispatchOwners
-import com.letta.mobile.data.timeline.api.PendingDispatchTimelineStore
 import java.time.Instant
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,20 +50,34 @@ class PendingRecoveryPagingTest {
         assertTrue(f.session.pending.value.single().toRenderItem().message.isSendFailed)
     }
 
-    @Test fun activeRecoveryDispatchSurvivesCoveredHistoryAndHorizon() = runTest {
-        for (ageSeconds in listOf(120L, 600L)) {
-            val sentAt = Instant.now().minusSeconds(ageSeconds)
-            val f = Fixture(sentAt = sentAt, firstPageAt = sentAt)
-            f.active = true
-            val selection = f.open()
-            assertEquals(TimelineEnginePageOutcome.Applied, f.session.loadOlder(selection))
-            assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.session.pending.value.single().delivery)
-            f.active = false
-            // A live completion reuses the coverage already established by the loaded page.
-            val fence = f.session.beginLive(selection)
-            assertTrue(f.session.ingest(fence, TimelineStreamFrame.Done))
-            assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.session.pending.value.single().delivery)
-        }
+    @Test fun aYoungSendOfThisProcessSurvivesCoveredHistory() = runTest {
+        val sentAt = Instant.now().minusSeconds(120)
+        val f = Fixture(sentAt = sentAt, firstPageAt = sentAt, fromThisProcess = true)
+        val selection = f.open()
+        assertEquals(TimelineEnginePageOutcome.Applied, f.session.loadOlder(selection))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.session.pending.value.single().delivery)
+    }
+
+    @Test fun aSendOfThisProcessPastTheHorizonFailsWhenNothingStreams() = runTest {
+        val sentAt = Instant.now().minusSeconds(600)
+        val f = Fixture(sentAt = sentAt, firstPageAt = sentAt, fromThisProcess = true)
+        val selection = f.open()
+        assertEquals(TimelineEnginePageOutcome.Applied, f.session.loadOlder(selection))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.session.pending.value.single().delivery)
+    }
+
+    @Test fun aSendOfThisProcessPastTheHorizonSurvivesWhileItsTurnStreams() = runTest {
+        val sentAt = Instant.now().minusSeconds(600)
+        val f = Fixture(sentAt = sentAt, firstPageAt = sentAt, fromThisProcess = true)
+        val selection = f.open()
+        val fence = f.session.beginLive(selection)
+        val frame = AssistantMessage(id = "streamed", contentRaw = JsonPrimitive("still going"), runId = "long-run")
+        assertTrue(f.session.ingest(fence, TimelineStreamFrame.Message(frame)))
+        assertEquals(TimelineEnginePageOutcome.Applied, f.session.loadOlder(selection))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.session.pending.value.single().delivery)
+        // Once the turn completes nothing streams, and the coverage already loaded decides it.
+        assertTrue(f.session.ingest(fence, TimelineStreamFrame.Done))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.session.pending.value.single().delivery)
     }
 
     @Test fun laterPageEchoConfirmsWithoutPrematureFailure() = runTest {
@@ -147,11 +160,11 @@ class PendingRecoveryPagingTest {
         private val sentAt: Instant = Instant.now().minusSeconds(120),
         private val firstPageAt: Instant = sentAt.plusSeconds(60),
         private val delivery: CanonicalPendingLocalStore.Delivery = CanonicalPendingLocalStore.Delivery.Sending,
+        // Recovery candidates are, by default, sends of a process that has since died.
+        private val fromThisProcess: Boolean = false,
     ) {
         private val scope = TimelineScope("paging-recovery", "conversation", "agent")
         private val store = InMemoryTimelineStore()
-        private val dispatchOwners = PendingDispatchOwners()
-        var active = false
         var offline = false
         private val transport = object : TimelineTransport by unexpectedTimelineTransport() {
             override suspend fun listConversationMessagePage(
@@ -164,13 +177,13 @@ class PendingRecoveryPagingTest {
                 return TimelineRemotePageAdapter.fromMessages(request, listOf(message), hasMore = first)
             }
         }
-        val session = CanonicalTimelineSession(PendingDispatchTimelineStore(store, dispatchOwners), transport, scope, enabled = true)
+        val session = CanonicalTimelineSession(store, transport, scope, enabled = true)
 
         suspend fun open(): TimelineEngineSelection {
             CanonicalPendingLocalStore(store).save(scope, CanonicalPendingLocalStore.Record(
                 "pending-otid", "prompt", emptyList(), sentAt.toString(), delivery,
             ))
-            dispatchOwners.retain(scope.backendId, scope.conversationId, "pending-otid") { active }
+            if (!fromThisProcess) store.fromAnotherProcess(scope)
             return assertIs<TimelineEngineOpen.Opened>(session.open()).selection
         }
 
