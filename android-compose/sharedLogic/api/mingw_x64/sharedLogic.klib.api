@@ -758,6 +758,7 @@ final enum class com.letta.mobile.data.chat.runtime/SnapshotAvailability : kotli
 
 final enum class com.letta.mobile.data.chat.send/ServerQueueBlocker : kotlin/Enum<com.letta.mobile.data.chat.send/ServerQueueBlocker> { // com.letta.mobile.data.chat.send/ServerQueueBlocker|null[0]
     enum entry OtherClient // com.letta.mobile.data.chat.send/ServerQueueBlocker.OtherClient|null[0]
+    enum entry OwnRunningTurn // com.letta.mobile.data.chat.send/ServerQueueBlocker.OwnRunningTurn|null[0]
     enum entry OwnStoppingTurn // com.letta.mobile.data.chat.send/ServerQueueBlocker.OwnStoppingTurn|null[0]
 
     final val entries // com.letta.mobile.data.chat.send/ServerQueueBlocker.entries|#static{}entries[0]
@@ -22466,12 +22467,14 @@ sealed interface com.letta.mobile.data.transport/ServerFrame { // com.letta.mobi
     }
 
     final class TurnStarted : com.letta.mobile.data.transport/ServerFrame { // com.letta.mobile.data.transport/ServerFrame.TurnStarted|null[0]
-        constructor <init>(kotlin/Int = ..., kotlin/String = ..., kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long? = ...) // com.letta.mobile.data.transport/ServerFrame.TurnStarted.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long?){}[0]
+        constructor <init>(kotlin/Int = ..., kotlin/String = ..., kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.transport/ServerFrame.TurnStarted.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long?;kotlin.Boolean){}[0]
 
         final val agentId // com.letta.mobile.data.transport/ServerFrame.TurnStarted.agentId|{}agentId[0]
             final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.agentId.<get-agentId>|<get-agentId>(){}[0]
         final val conversationId // com.letta.mobile.data.transport/ServerFrame.TurnStarted.conversationId|{}conversationId[0]
             final fun <get-conversationId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+        final val dequeued // com.letta.mobile.data.transport/ServerFrame.TurnStarted.dequeued|{}dequeued[0]
+            final fun <get-dequeued>(): kotlin/Boolean // com.letta.mobile.data.transport/ServerFrame.TurnStarted.dequeued.<get-dequeued>|<get-dequeued>(){}[0]
         final val id // com.letta.mobile.data.transport/ServerFrame.TurnStarted.id|{}id[0]
             final fun <get-id>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.id.<get-id>|<get-id>(){}[0]
         final val runId // com.letta.mobile.data.transport/ServerFrame.TurnStarted.runId|{}runId[0]
@@ -22488,6 +22491,7 @@ sealed interface com.letta.mobile.data.transport/ServerFrame { // com.letta.mobi
             final fun <get-v>(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.TurnStarted.v.<get-v>|<get-v>(){}[0]
 
         final fun component1(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component1|component1(){}[0]
+        final fun component10(): kotlin/Boolean // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component10|component10(){}[0]
         final fun component2(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component2|component2(){}[0]
         final fun component3(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component3|component3(){}[0]
         final fun component4(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component4|component4(){}[0]
@@ -22496,7 +22500,7 @@ sealed interface com.letta.mobile.data.transport/ServerFrame { // com.letta.mobi
         final fun component7(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component7|component7(){}[0]
         final fun component8(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component8|component8(){}[0]
         final fun component9(): kotlin/Long? // com.letta.mobile.data.transport/ServerFrame.TurnStarted.component9|component9(){}[0]
-        final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ...): com.letta.mobile.data.transport/ServerFrame.TurnStarted // com.letta.mobile.data.transport/ServerFrame.TurnStarted.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long?){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin/Boolean = ...): com.letta.mobile.data.transport/ServerFrame.TurnStarted // com.letta.mobile.data.transport/ServerFrame.TurnStarted.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long?;kotlin.Boolean){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport/ServerFrame.TurnStarted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.TurnStarted.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.TurnStarted.toString|toString(){}[0]
@@ -22955,12 +22959,14 @@ sealed interface com.letta.mobile.data.transport/WsTimelineEvent { // com.letta.
     }
 
     final class TurnStarted : com.letta.mobile.data.transport/WsTimelineEvent { // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Boolean = ...) // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Boolean){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.Boolean){}[0]
 
         final val agentId // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.agentId|{}agentId[0]
             final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.agentId.<get-agentId>|<get-agentId>(){}[0]
         final val conversationId // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.conversationId|{}conversationId[0]
             final fun <get-conversationId>(): kotlin/String // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+        final val dequeued // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.dequeued|{}dequeued[0]
+            final fun <get-dequeued>(): kotlin/Boolean // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.dequeued.<get-dequeued>|<get-dequeued>(){}[0]
         final val isReplay // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.isReplay|{}isReplay[0]
             final fun <get-isReplay>(): kotlin/Boolean // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.isReplay.<get-isReplay>|<get-isReplay>(){}[0]
         final val runId // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.runId|{}runId[0]
@@ -22973,7 +22979,8 @@ sealed interface com.letta.mobile.data.transport/WsTimelineEvent { // com.letta.
         final fun component3(): kotlin/String // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.component3|component3(){}[0]
         final fun component4(): kotlin/String // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.component4|component4(){}[0]
         final fun component5(): kotlin/Boolean // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.component5|component5(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Boolean){}[0]
+        final fun component6(): kotlin/Boolean // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.component6|component6(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Boolean;kotlin.Boolean){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.transport/WsTimelineEvent.TurnStarted.toString|toString(){}[0]

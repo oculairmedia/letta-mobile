@@ -86,7 +86,11 @@ class ChatSendCoordinator(
 
     private val serverQueueMarks = ServerQueueMarks(
         queue = queuedSends,
-        sendOfTurn = { turnId -> turnRegistry.statesSnapshot.firstOrNull { it.turnId == turnId }?.inFlightSend },
+        sendOfTurn = { turnId ->
+            turnRegistry.statesSnapshot.firstOrNull {
+                it.turnId == turnId || it.inFlightSend?.id?.value == turnId
+            }?.inFlightSend
+        },
         sendOfConversation = { conversationId -> turnRegistry.peekState(ConversationId(conversationId))?.inFlightSend },
     )
 
@@ -363,6 +367,7 @@ class ChatSendCoordinator(
         )
         if (pending.attempt > 0 && !timelineRepository.isPendingSendCurrent(pending.pendingAttempt(agentId))) return true
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
+        val previousSend = state.inFlightSend?.takeUnless { state.reachedTerminal || it.id == pending.id }
         val accepted = reserveAndAcceptSend(pending, state) ?: return true
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
@@ -371,6 +376,7 @@ class ChatSendCoordinator(
             "accepted" attr accepted,
         )
         if (!accepted) return false
+        serverQueueMarks.rememberOwnTurn(previousSend)
 
         // A queued message gets its timeline row only now that it runs, so it lands after the
         // reply it waited behind rather than above it.
@@ -589,6 +595,7 @@ class ChatSendCoordinator(
      * otherwise accept any terminal, double-finishing the conversation.
      */
     private suspend fun handleTurnDoneFrame(event: WsTimelineEvent.TurnDone) {
+        serverQueueMarks.release(TurnTail(event.turnId, event.runId))
         val owner = turnRegistry.resolveTerminal(event)
         val stale = owner == null ||
             owner.isRetiredTurn(TurnTail(event.turnId, event.runId)) ||
@@ -675,6 +682,7 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleTurnStarted(event: WsTimelineEvent.TurnStarted) {
+        serverQueueMarks.onTurnStarted(event)
         val state = incoming.started(event, scope) ?: return
         resumed(state)
         val conversation = ConversationId(state.ownerConversationId)
@@ -789,6 +797,7 @@ class ChatSendCoordinator(
             foreground.queued(bounced, clearComposer = false)
             return
         }
+        serverQueueMarks.rememberOwnTurn(send)
         // Read before the terminal binds its identity: afterwards every state looks owned. A terminal
         // naming its turn is that turn's; one naming only a run is ours only if we track something.
         val owned = owner.isTracking || event.turnId.isNotBlank()

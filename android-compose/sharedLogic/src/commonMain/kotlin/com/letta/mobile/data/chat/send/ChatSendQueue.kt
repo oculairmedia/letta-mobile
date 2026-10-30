@@ -188,8 +188,8 @@ class ChatSendQueue {
 
 /**
  * What a send parked in the App Server's queue waits behind. The server
- * says only that the input is queued; this device knows when it just stopped a turn of its own
- * there, whose run can take a while to wind down (an on-device model finishing its generation).
+ * says only that the input is queued; local send evidence distinguishes this device's previous
+ * response, including a stopped run that can take a while to wind down.
  */
 enum class ServerQueueBlocker {
     /** Another client (a second device) runs the conversation's turn. */
@@ -197,4 +197,7 @@ enum class ServerQueueBlocker {
 
     /** This device's own turn, stopped, still finishing on the server. */
     OwnStoppingTurn,
+
+    /** This device's previously submitted response is still running or winding down. */
+    OwnRunningTurn,
 }

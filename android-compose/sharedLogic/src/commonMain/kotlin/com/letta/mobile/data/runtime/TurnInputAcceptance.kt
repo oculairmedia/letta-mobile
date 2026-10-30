@@ -94,6 +94,7 @@ internal sealed interface InputAcceptance {
 
 internal const val INPUT_REJECTED_FALLBACK_ERROR = "Input was rejected by the App Server"
 internal const val INPUT_QUEUED_REASON = "Queued behind an active turn or pending approval"
+internal const val INPUT_DEQUEUED_REASON = "Queued input started"
 internal const val INPUT_CONNECTION_LOST_REASON = "App Server connection lost before the input was accepted"
 internal const val QUEUED_INPUT_CANCELLED_REASON = "Queued input was cancelled by the App Server"
 
@@ -260,8 +261,8 @@ internal class QueuedInputTracker(val clientMessageId: String?) {
     }
 }
 
-internal fun TurnCommand.startedDraft(): RuntimeEventDraft =
-    lifecycleDraft(RuntimeRunStatus.Started)
+internal fun TurnCommand.startedDraft(dequeued: Boolean = false): RuntimeEventDraft =
+    lifecycleDraft(RuntimeRunStatus.Started, reason = INPUT_DEQUEUED_REASON.takeIf { dequeued })
 
 internal fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
     lifecycleDraft(RuntimeRunStatus.Completed, runId = runId)
@@ -345,11 +346,13 @@ internal suspend fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
     ownership: RunOwnership,
+    onDequeued: suspend () -> Unit,
 ): QueueRemovalDisposition? {
     lease.queuedInput.acknowledgement.awaitBefore(received, ownership)
     val removal = (received.frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
     if (removal == QueueRemovalDisposition.Dequeued && lease.queuedInput.markStarted()) {
         leaveQueued(lease, "update_queue")
+        onDequeued()
     }
     return removal
 }
