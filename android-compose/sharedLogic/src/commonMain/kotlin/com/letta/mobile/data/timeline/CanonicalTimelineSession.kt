@@ -371,11 +371,13 @@ class CanonicalTimelineSession(
         // The canonical writer already removed matching echoes from pending storage. Absence is
         // decisive once the loaded window spans a candidate's send time, even with more pages.
         val streaming = streaming()
-        val inFlight = pendingStore.inFlightHere(scope, streaming)
-        val abandoned = loaded.filter {
+        val covered = loaded.filter {
             MessageId(it.otid) in recoveryCandidates && it.delivery != CanonicalPendingLocalStore.Delivery.Failed &&
-                it.otid !in inFlight && (historyPage?.hasMore == false || historyCovers(it.sentAt))
+                (historyPage?.hasMore == false || historyCovers(it.sentAt))
         }
+        // Read which sends this process still delivers only when history would otherwise fail one.
+        val inFlight = if (covered.isEmpty()) emptySet() else pendingStore.inFlightHere(scope, streaming)
+        val abandoned = covered.filter { it.otid !in inFlight }
         abandoned.forEach {
             pendingStore.mark(scope, it.otid, CanonicalPendingLocalStore.Delivery.Failed, it.attempt)
         }

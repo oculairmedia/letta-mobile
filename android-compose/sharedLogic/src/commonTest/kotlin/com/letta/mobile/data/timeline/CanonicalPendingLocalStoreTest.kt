@@ -66,7 +66,8 @@ class CanonicalPendingLocalStoreTest {
         val pending = CanonicalPendingLocalStore(ledger)
         val scope = TimelineScope("backend", "conversation")
         val empty = CanonicalPendingLocalStore.Record("edge", "", emptyList(), "2026-09-08T00:00:00Z")
-        val overhead = encodeOutbox(listOf(empty.toOutboxEntry(timelineCurrentTimeMillis())))!!.size
+        // A saved prompt carries this process's dispatch epoch, so the budget counts it too.
+        val overhead = encodeOutbox(listOf(empty.toOutboxEntry(timelineCurrentTimeMillis()).stampedHere()))!!.size
         val edge = empty.copy(content = "x".repeat(OUTBOX_ADMISSION_MAX_BYTES - overhead))
         assertFailsWith<IllegalArgumentException> {
             pending.save(TimelineScope("backend", "other"), edge.copy(content = edge.content + "x"))
