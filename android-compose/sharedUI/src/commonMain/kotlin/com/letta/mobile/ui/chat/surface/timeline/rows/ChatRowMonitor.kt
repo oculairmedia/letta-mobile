@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.projection.monitorEvent
+import com.letta.mobile.data.chat.projection.monitorDisplayLines
 import com.letta.mobile.data.chat.projection.monitorEventCount
 import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.sharedui.resources.Res
@@ -36,6 +37,8 @@ import com.letta.mobile.sharedui.resources.rows_monitor_events
 import com.letta.mobile.sharedui.resources.rows_monitor_failed
 import com.letta.mobile.sharedui.resources.rows_monitor_label
 import com.letta.mobile.sharedui.resources.rows_monitor_watching
+import com.letta.mobile.sharedui.resources.rows_monitor_show_raw
+import com.letta.mobile.sharedui.resources.rows_monitor_hide_raw
 import com.letta.mobile.sharedui.resources.rows_task_id
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
@@ -56,7 +59,9 @@ import org.jetbrains.compose.resources.stringResource
 internal fun MonitorRow(notification: UiSubagentNotification, watcher: Boolean) {
     // A watch's chip keeps its state as new events replace its text; an event row is its event.
     var expanded by remember(notification.taskId, notification.result.takeUnless { watcher }) { mutableStateOf(false) }
-    val event = notification.monitorEvent().orEmpty()
+    val raw = notification.monitorEvent().orEmpty()
+    val lines = remember(raw) { monitorDisplayLines(raw) }
+    val event = lines.firstOrNull().orEmpty()
     val chip = if (watcher) monitorChipText(notification, event) else null
     val failed = notification.status.equals("failed", ignoreCase = true)
     val tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
@@ -90,7 +95,7 @@ internal fun MonitorRow(notification: UiSubagentNotification, watcher: Boolean) 
                 DisclosureChevron(expanded = expanded, compact = true, contentDescription = null)
             }
         }
-        if (expanded) MonitorDetails(event, notification)
+        if (expanded) MonitorDetails(raw, lines, notification)
     }
 }
 
@@ -128,10 +133,20 @@ private fun OneLine(text: String, style: TextStyle, modifier: Modifier) {
 }
 
 @Composable
-private fun MonitorDetails(event: String, notification: UiSubagentNotification) {
+private fun MonitorDetails(raw: String, lines: List<String>, notification: UiSubagentNotification) {
+    var showRaw by remember(raw) { mutableStateOf(false) }
     SelectionContainer {
-        Text(text = event, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = if (showRaw) raw else lines.joinToString("\n"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
+    Text(
+        text = stringResource(if (showRaw) Res.string.rows_monitor_hide_raw else Res.string.rows_monitor_show_raw),
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier.clickable { showRaw = !showRaw }.padding(LettaDimens.Space.xs),
+    )
     notification.taskId?.let {
         Text(
             text = stringResource(Res.string.rows_task_id, it),
