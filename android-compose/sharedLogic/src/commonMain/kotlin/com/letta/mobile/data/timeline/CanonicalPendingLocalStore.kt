@@ -12,13 +12,13 @@ import com.letta.mobile.data.timeline.api.OUTBOX_MAX_BYTES
 import com.letta.mobile.data.timeline.api.confirmOutboxEcho
 import com.letta.mobile.data.timeline.api.OutboxTransition
 import com.letta.mobile.data.timeline.api.OutboxTransitions
-import com.letta.mobile.data.timeline.api.encodeOutbox
-import com.letta.mobile.data.timeline.api.putOutbox
 import com.letta.mobile.data.timeline.api.readOutbox
 import com.letta.mobile.data.timeline.api.replacing
 import com.letta.mobile.data.timeline.api.toOutboxEntry
 import com.letta.mobile.data.timeline.api.writeOutbox
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.Decoder
@@ -81,32 +81,57 @@ class CanonicalPendingLocalStore(
         }
     }
 
-    internal suspend fun accept(scope: TimelineScope, record: Record, accept: () -> Boolean): Boolean = store.transaction(scope) {
+    /**
+     * Reserves the prompt, hands it to [accept] outside any store transaction, and releases the
+     * reservation when the transport refuses or throws, so a slow transport never holds the store.
+     * A process death after the reservation leaves a Dispatching prompt, which recovery resolves.
+     */
+    internal suspend fun accept(scope: TimelineScope, record: Record, accept: () -> Boolean): Boolean {
         require(record.otid.isNotBlank())
-        val now = timelineCurrentTimeMillis()
-        val previous = readOutbox(now)
-        val candidate = record.toOutboxEntry(now)
-        if (!admitted(previous, candidate)) return@transaction acceptExisting(previous, candidate, now, accept)
-        // The transaction reserves capacity while encoding checks every budget before acceptance.
-        val encoded = encodeOutbox(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
-        if (!accept()) return@transaction false
-        putOutbox(encoded)
-        nextRevision()
-        true
+        val reservation = reserve(scope, record)
+        val accepted = try {
+            accept()
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) { release(scope, reservation) }
+            throw failure
+        }
+        if (!accepted) release(scope, reservation)
+        return accepted
     }
 
-    /** A retry dispatching its queued prompt; any other repeat acceptance changes nothing. */
-    private suspend fun TimelineStoreTransaction.acceptExisting(
-        previous: List<OutboxEntry>,
-        candidate: OutboxEntry,
-        now: Long,
-        accept: () -> Boolean,
-    ): Boolean {
-        if (!accept()) return false
-        val existing = previous.first { it.otid == candidate.otid }
-        val dispatched = existing.after(listOf(OutboxEvent.DispatchStart), now)?.sinceAttemptStart(existing) ?: return true
-        commit(previous.replacing(existing.otid, dispatched))
-        return true
+    /**
+     * Admits a new prompt as Dispatching, or dispatches a queued retry, within the budgets checked
+     * before the transport is called. Returns the entry before and after; null when an existing
+     * prompt is not queued, which a repeat acceptance leaves unchanged.
+     */
+    private suspend fun reserve(scope: TimelineScope, record: Record): Pair<OutboxEntry?, OutboxEntry>? =
+        store.transaction(scope) {
+            val now = timelineCurrentTimeMillis()
+            val previous = readOutbox(now)
+            val candidate = record.toOutboxEntry(now)
+            if (admitted(previous, candidate)) {
+                commit(previous + candidate, OUTBOX_ADMISSION_MAX_BYTES)
+                return@transaction null to candidate
+            }
+            val existing = previous.first { it.otid == candidate.otid }
+            val dispatched = existing.after(listOf(OutboxEvent.DispatchStart), now)?.sinceAttemptStart(existing)
+                ?: return@transaction null
+            commit(previous.replacing(existing.otid, dispatched))
+            existing to dispatched
+        }
+
+    /** Undoes [reservation] only while the entry is still exactly what it wrote. */
+    private suspend fun release(scope: TimelineScope, reservation: Pair<OutboxEntry?, OutboxEntry>?) {
+        val (before, written) = reservation ?: return
+        store.transaction(scope) {
+            val previous = readOutbox(timelineCurrentTimeMillis())
+            if (previous.none { it == written }) return@transaction
+            val restored = when (before) {
+                null -> previous.filterNot { it.otid == written.otid }
+                else -> previous.replacing(written.otid, before)
+            }
+            commit(restored)
+        }
     }
 
     /**

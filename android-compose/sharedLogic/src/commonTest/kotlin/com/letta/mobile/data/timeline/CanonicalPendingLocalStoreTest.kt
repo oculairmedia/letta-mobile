@@ -12,6 +12,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlinx.datetime.Instant
 
 class CanonicalPendingLocalStoreTest {
@@ -118,6 +120,35 @@ class CanonicalPendingLocalStoreTest {
         assertEquals(CanonicalPendingLocalStore.Delivery.Sent, pending.load(scope).first().delivery)
     }
 
+    @Test fun theTransportIsCalledOutsideTheStoreTransaction() = runTest {
+        val store = Store()
+        val pending = CanonicalPendingLocalStore(store)
+        val scope = TimelineScope("backend", "conversation")
+        val record = CanonicalPendingLocalStore.Record("send", "hello", emptyList(), "2026-09-08T00:00:00Z")
+        var openDuringSend = -1
+        assertTrue(pending.accept(scope, record) { openDuringSend = store.open; true })
+        assertEquals(0, openDuringSend, "the store must not be held while the transport runs")
+        assertEquals(listOf(record), pending.load(scope))
+    }
+
+    @Test fun aRefusedOrFailedSendReleasesItsReservation() = runTest {
+        val pending = CanonicalPendingLocalStore(Store())
+        val scope = TimelineScope("backend", "conversation")
+        val record = CanonicalPendingLocalStore.Record("send", "hello", emptyList(), "2026-09-08T00:00:00Z")
+        assertFalse(pending.accept(scope, record) { false })
+        assertEquals(emptyList(), pending.load(scope))
+        assertFailsWith<IllegalStateException> { pending.accept(scope, record) { error("transport down") } }
+        assertEquals(emptyList(), pending.load(scope))
+        // A refused retry goes back to queued at its attempt, ready for the next dispatch.
+        pending.save(scope, record)
+        pending.mark(scope, record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+        val retry = assertNotNull(pending.retry(scope, record.otid))
+        assertFalse(pending.accept(scope, retry) { false })
+        assertEquals(listOf(retry), pending.load(scope))
+        assertTrue(pending.accept(scope, retry) { true })
+        assertEquals(1L, pending.load(scope).single().attempt)
+    }
+
     @Test fun aRetriedOldPromptAwaitsItsEchoFromTheRetryNotFromItsFirstSend() = runTest {
         val pending = CanonicalPendingLocalStore(Store())
         val scope = TimelineScope("backend", "conversation")
@@ -183,10 +214,15 @@ class CanonicalPendingLocalStoreTest {
         override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T =
             block(Transaction(values[scope].orEmpty().toMutableMap(), tools[scope]?.snapshot() ?: TestToolIndexState()))
 
+        /** Transactions currently running, to show the transport is never called inside one. */
+        var open = 0
+            private set
+
         override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
             val copy = values[scope].orEmpty().toMutableMap()
             val toolCopy = tools[scope]?.snapshot() ?: TestToolIndexState()
-            val result = block(Transaction(copy, toolCopy))
+            open++
+            val result = try { block(Transaction(copy, toolCopy)) } finally { open-- }
             values[scope] = copy
             tools[scope] = toolCopy
             return result
