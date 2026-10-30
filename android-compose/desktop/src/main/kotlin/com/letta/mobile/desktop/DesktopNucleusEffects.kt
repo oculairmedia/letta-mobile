@@ -10,6 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.setValue
 import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.application.NucleusApplicationScope
@@ -260,6 +262,9 @@ private fun DesktopIntegrationLifecycleEffect(
             disposeDesktopIntegrations(window, focusListener, hotKey)
         }
     }
+    // Explorer can stall BeginList for a minute, holding back the first paint on the UI thread;
+    // the Jump List has no teardown and its native bridge initializes COM, so any thread will do.
+    LaunchedEffect(Unit) { if (Platform.Current == Platform.Windows) withContext(Dispatchers.IO) { configureWindowsJumpList() } }
 }
 
 @Composable
@@ -469,23 +474,7 @@ private fun configureMediaControls(agentName: String, onActivate: () -> Unit) {
 
 private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Unit) {
     when (Platform.Current) {
-        Platform.Windows -> {
-            WindowsJumpListManager.setJumpList(
-                tasks = listOf(
-                    JumpListItem(
-                        title = "Open conversations",
-                        arguments = "meridian://conversations",
-                        description = "Show Letta Desktop conversations",
-                    ),
-                    JumpListItem(
-                        title = "Open settings",
-                        arguments = "meridian://settings",
-                        description = "Show Letta Desktop settings",
-                    ),
-                ),
-            )
-            WindowsBadgeManager.initialize(LETTA_WINDOWS_AUMID)
-        }
+        Platform.Windows ->WindowsBadgeManager.initialize(LETTA_WINDOWS_AUMID)
         Platform.MacOS -> {
             MacOsDockMenu.listener = { itemId ->
                 when (itemId) {
@@ -507,4 +496,13 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
         }
         else -> Unit
     }
+}
+
+private fun configureWindowsJumpList() {
+    WindowsJumpListManager.setJumpList(
+        tasks = listOf(
+            JumpListItem("Open conversations", "meridian://conversations", "Show Letta Desktop conversations"),
+            JumpListItem("Open settings", "meridian://settings", "Show Letta Desktop settings"),
+        ),
+    )
 }
