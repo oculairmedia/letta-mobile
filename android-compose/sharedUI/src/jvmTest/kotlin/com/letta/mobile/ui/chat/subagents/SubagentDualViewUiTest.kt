@@ -39,6 +39,8 @@ import kotlin.test.assertTrue
 class SubagentDualViewUiTest {
     private val child = SubagentView(AgentId("agent-child-1234"), ConversationId("conv-default-agent-child-1234"), "Audit the build")
 
+    private val second = SubagentView(AgentId("agent-second"), ConversationId("conv-default-agent-second"), "Second task")
+
     private val childState = ChatUiState(
         conversationState = ConversationState.Ready("conv-default-agent-child-1234"),
         isLoadingMessages = false,
@@ -50,6 +52,7 @@ class SubagentDualViewUiTest {
     private val opened = mutableListOf<SubagentView>()
     private val closed = mutableListOf<SubagentView>()
     private val sessions = SubagentViewSessions { view, _ ->
+        require(view == child || view == second) { "Unknown subagent conversation: $view" }
         opened += view
         SubagentViewSession(ChatSurfaceUiTest.TestPort(childState)) { closed += view }
     }
@@ -118,7 +121,7 @@ class SubagentDualViewUiTest {
     }
 
     @Test
-    fun compactSwitchesBetweenTheSubagentAndTheParent() = runComposeUiTest {
+    fun compactBackClosesTheSubagentAndReturnsToTheParent() = runComposeUiTest {
         val holder = SubagentDualViewHolder()
         show(holder, width = 400.dp)
         runOnIdle { holder.open(child) }
@@ -128,8 +131,35 @@ class SubagentDualViewUiTest {
         onNodeWithTag(SubagentDualViewTags.BACK_TO_PARENT).performClick()
         awaitText("PARENT")
         onNodeWithTag(SubagentDualViewTags.PANE).assertDoesNotExist()
-        // The tab stays: the subagent is one tap away.
+        onNodeWithTag(SubagentDualViewTags.STRIP).assertDoesNotExist()
+    }
+
+    @Test
+    fun compactOpeningAnotherChildReplacesTheFirst() = runComposeUiTest {
+        val holder = openTwo(width = 400.dp)
+        onNodeWithText("Audit the build").assertDoesNotExist()
+        runOnIdle { assertEquals(listOf(second), holder.state.views) }
+        // The replaced child's session is closed, not left reading in the background.
+        runOnIdle { assertEquals(listOf(child), closed) }
+    }
+
+    @Test
+    fun wideOpeningAnotherChildKeepsBothTabsAndParent() = runComposeUiTest {
+        val holder = openTwo(width = 1_200.dp)
+        onNodeWithText("Audit the build").assertExists()
+        onNodeWithTag(SubagentDualViewTags.PARENT).assertExists()
+        runOnIdle { assertEquals(listOf(child, second), holder.state.views) }
+    }
+
+    /** Opens the first child, then the second, at [width]; returns the holder once both have drawn. */
+    private fun ComposeUiTest.openTwo(width: Dp): SubagentDualViewHolder {
+        val holder = SubagentDualViewHolder()
+        show(holder, width = width)
+        runOnIdle { holder.open(child) }
         awaitText("Audit the build")
+        runOnIdle { holder.open(second) }
+        awaitText("Second task")
+        return holder
     }
 
     @Test
