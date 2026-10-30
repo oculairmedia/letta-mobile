@@ -19,14 +19,19 @@ INDEX = SPECS + "/README.md"
 NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+")
 
 
+BASELINE_RULES = (
+    (lambda entries: all(entry == entry.strip() for entry in entries),
+     "Wire-contract baseline entries must not have surrounding whitespace"),
+    (lambda entries: entries == sorted(set(entries)), "Wire-contract baseline must contain sorted, unique methods"),
+    (lambda entries: all(NAME.fullmatch(entry) for entry in entries), "Wire-contract baseline entries must be dotted method names"),
+)
+
+
 def read_baseline(text):
     entries = [line for line in text.splitlines() if line and not line.startswith("#")]
-    if any(entry != entry.strip() for entry in entries):
-        raise ValueError("Wire-contract baseline entries must not have surrounding whitespace")
-    if entries != sorted(set(entries)):
-        raise ValueError("Wire-contract baseline must contain sorted, unique methods")
-    if any(not NAME.fullmatch(entry) for entry in entries):
-        raise ValueError("Wire-contract baseline entries must be dotted method names")
+    for holds, message in BASELINE_RULES:
+        if not holds(entries):
+            raise ValueError(message)
     return set(entries)
 
 
@@ -53,42 +58,64 @@ def previous_baseline(root, diff_base):
 def contracts(root):
     specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md") if p != root / INDEX}
     fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")}
-    errors = []
-    for label, values in (("Specs without fixture", specs.keys() - fixtures.keys()), ("Fixtures without spec", fixtures.keys() - specs.keys())):
-        if values:
-            errors.append(label + ":\n" + "\n".join("  " + value for value in sorted(values)))
+    require_pairs(specs, fixtures)
+    return [contract_row(root, key, path, specs[key]) for key, path in sorted(fixtures.items())]
+
+
+def require_pairs(specs, fixtures):
+    errors = [
+        label + ":\n" + "\n".join("  " + value for value in sorted(values))
+        for label, values in (("Specs without fixture", specs.keys() - fixtures.keys()), ("Fixtures without spec", fixtures.keys() - specs.keys()))
+        if values
+    ]
     if errors:
         raise ValueError("\n".join(errors))
     if not fixtures:
         raise ValueError("Expected at least one wire-contract fixture")
-    rows = []
-    for key, path in sorted(fixtures.items()):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise ValueError(f"{path}: fixture must be a JSON object")
-        method = data.get("method")
-        version = data.get("version")
-        parts = key.split("/")
-        if len(parts) != 2 or method != parts[0] or not isinstance(method, str) or not NAME.fullmatch(method):
-            raise ValueError(f"{path}: method/path mismatch")
-        if type(version) is not int or version < 1 or not re.fullmatch(r"[a-z0-9-]+-v" + str(version), parts[1]):
-            raise ValueError(f"{path}: version/path mismatch")
-        cases = data.get("cases")
-        if not isinstance(cases, list) or not cases:
-            raise ValueError(f"{path}: expected non-empty cases")
-        names = set()
-        for case in cases:
-            if not isinstance(case, dict) or not isinstance(case.get("name"), str) or not case["name"] or case["name"] in names:
-                raise ValueError(f"{path}: cases need unique non-empty names")
-            names.add(case["name"])
-            for field in ("context", "host_state", "params", "expected_response"):
-                if not isinstance(case.get(field), dict):
-                    raise ValueError(f"{path}: case {case['name']} requires object {field}")
-        handler = data.get("handler")
-        if not isinstance(handler, str) or not (root / handler).resolve().is_relative_to(root.resolve()) or not (root / handler).is_file():
-            raise ValueError(f"{path}: handler must name a repository file")
-        rows.append((method, version, specs[key].relative_to(root).as_posix(), path.relative_to(root).as_posix(), handler))
-    return rows
+
+
+def contract_row(root, key, path, spec):
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: fixture must be a JSON object")
+    method, version = data.get("method"), data.get("version")
+    require_identity(path, key.split("/"), method, version)
+    require_cases(path, data.get("cases"))
+    handler = data.get("handler")
+    if not is_repository_file(root, handler):
+        raise ValueError(f"{path}: handler must name a repository file")
+    return (method, version, spec.relative_to(root).as_posix(), path.relative_to(root).as_posix(), handler)
+
+
+def require_identity(path, parts, method, version):
+    if len(parts) != 2 or not isinstance(method, str) or method != parts[0] or not NAME.fullmatch(method):
+        raise ValueError(f"{path}: method/path mismatch")
+    if type(version) is not int or version < 1 or not re.fullmatch(r"[a-z0-9-]+-v" + str(version), parts[1]):
+        raise ValueError(f"{path}: version/path mismatch")
+
+
+def require_cases(path, cases):
+    if not isinstance(cases, list) or not cases:
+        raise ValueError(f"{path}: expected non-empty cases")
+    names = set()
+    for case in cases:
+        name = case.get("name") if isinstance(case, dict) else None
+        if not isinstance(name, str) or not name or name in names:
+            raise ValueError(f"{path}: cases need unique non-empty names")
+        names.add(name)
+        missing = [field for field in CASE_FIELDS if not isinstance(case.get(field), dict)]
+        if missing:
+            raise ValueError(f"{path}: case {name} requires object {missing[0]}")
+
+
+def is_repository_file(root, handler):
+    if not isinstance(handler, str):
+        return False
+    target = root / handler
+    return target.resolve().is_relative_to(root.resolve()) and target.is_file()
+
+
+CASE_FIELDS = ("context", "host_state", "params", "expected_response")
 
 
 def render_index(rows):
