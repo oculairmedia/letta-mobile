@@ -209,6 +209,12 @@ val contractReferenceDocuments = files(
 contractReferenceJvmTests.configure {
     // Required CI runs these parity tests through jvmTest, including on docs-only changes.
     inputs.files(contractReferenceDocuments).withPathSensitivity(PathSensitivity.RELATIVE)
+    // The registry ratchet reads repository files outside the compiled test classes.
+    // Baseline-only changes must invalidate cached/up-to-date conformance results too.
+    inputs.file("../../scripts/ci/wire-contract-uncovered-baseline.txt")
+        .withPropertyName("wireContractUncoveredBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("src/commonTest/resources/contracts")
+        .withPropertyName("wireContractFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("letta.contractReferenceDocs.mode", "check")
     filter {
         excludeTestsMatching("com.letta.mobile.util.PaginationReplayFuzzCampaignRunnerTest")
