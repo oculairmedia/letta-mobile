@@ -24,22 +24,22 @@ import kotlin.test.assertTrue
 internal class ChatSendCoordinatorServerQueueTest : ChatSendCoordinatorServerQueueFixture() {
     @Test
     fun dequeuedStartClearsBannerBeforeReasoning() = runTest(UnconfinedTestDispatcher()) {
-        assertStartedInputClearsBanner("reasoning_message")
+        assertStartedInputClearsBanner(Frame.Reasoning)
     }
 
     @Test
     fun dequeuedStartClearsBannerBeforeAssistantText() = runTest(UnconfinedTestDispatcher()) {
-        assertStartedInputClearsBanner("assistant_message")
+        assertStartedInputClearsBanner(Frame.Assistant)
     }
 
     @Test
     fun canonicalReasoningClearsBannerWithOlderHost() = runTest(UnconfinedTestDispatcher()) {
-        assertFirstFrameClearsBanner("reasoning_message")
+        assertFirstFrameClearsBanner(Frame.Reasoning)
     }
 
     @Test
     fun canonicalAssistantTextClearsBannerWithOlderHost() = runTest(UnconfinedTestDispatcher()) {
-        assertFirstFrameClearsBanner("assistant_message")
+        assertFirstFrameClearsBanner(Frame.Assistant)
     }
 
     @Test
@@ -63,10 +63,10 @@ internal class ChatSendCoordinatorServerQueueTest : ChatSendCoordinatorServerQue
         val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
         val chat = coordinator(timeline, RecordingUiSink(), transport, backgroundScope) { CONVERSATION }
         chat.send("previous response").join()
-        chat.deliver(startFrame("previous-turn", "local-run-368"))
+        chat.deliver(startFrame(TurnRun("previous-turn", "local-run-368")))
         // The transport accepts the next input while the previous server run is still finishing.
         chat.send("it's gone").join()
-        chat.deliver(startFrame(LOCAL_TURN, "iroh-run-placeholder"))
+        chat.deliver(startFrame(TurnRun(LOCAL_TURN, "iroh-run-placeholder")))
         chat.lifecycle(RuntimeRunStatus.Running, localContext, INPUT_QUEUED_REASON)
 
         assertEquals(listOf("previous response", "it's gone"), transport.sentTexts)
@@ -79,12 +79,12 @@ internal class ChatSendCoordinatorServerQueueTest : ChatSendCoordinatorServerQue
         val transport = FakeChannelTransport(mutableListOf(true, false, true), activeChatTurn = true)
         val chat = coordinator(RecordingTimelineWriter(), RecordingUiSink(), transport, backgroundScope) { CONVERSATION }
         chat.send("previous response").join()
-        chat.deliver(startFrame("previous-turn", "local-run-368"))
+        chat.deliver(startFrame(TurnRun("previous-turn", "local-run-368")))
         chat.send("it's gone").join()
         assertEquals("it's gone", queue(chat)?.items?.single()?.text)
         transport.activeChatTurn = false
         chat.lifecycle(RuntimeRunStatus.Completed, localContext.copy(turnId = "previous-turn", runId = "local-run-368"))
-        chat.deliver(startFrame(LOCAL_TURN, "iroh-run-placeholder"))
+        chat.deliver(startFrame(TurnRun(LOCAL_TURN, "iroh-run-placeholder")))
         chat.lifecycle(RuntimeRunStatus.Running, localContext, INPUT_QUEUED_REASON)
 
         assertEquals(listOf("previous response", "it's gone", "it's gone"), transport.sentTexts)
@@ -97,11 +97,11 @@ internal class ChatSendCoordinatorServerQueueTest : ChatSendCoordinatorServerQue
         val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
         val chat = coordinator(RecordingTimelineWriter(), RecordingUiSink(), transport, backgroundScope) { CONVERSATION }
         chat.send("earlier local response").join()
-        chat.deliver(startFrame("earlier-local-turn", "local-run-367"))
+        chat.deliver(startFrame(TurnRun("earlier-local-turn", "local-run-367")))
         chat.lifecycle(RuntimeRunStatus.Completed, localContext.copy(turnId = "earlier-local-turn", runId = "local-run-367"))
-        chat.deliver(startFrame("other-device-turn", "local-run-368"))
+        chat.deliver(startFrame(TurnRun("other-device-turn", "local-run-368")))
         chat.send("it's gone").join()
-        chat.deliver(startFrame(LOCAL_TURN, "iroh-run-placeholder"))
+        chat.deliver(startFrame(TurnRun(LOCAL_TURN, "iroh-run-placeholder")))
         chat.lifecycle(RuntimeRunStatus.Running, localContext, INPUT_QUEUED_REASON)
 
         assertEquals(ServerQueueBlocker.OtherClient, queue(chat)?.queuedOnServerBehind)
@@ -110,9 +110,9 @@ internal class ChatSendCoordinatorServerQueueTest : ChatSendCoordinatorServerQue
     @Test
     fun replayAndPreviousTurnFramesDoNotClearTheQueuedInput() = runTest(UnconfinedTestDispatcher()) {
         val chat = queuedInput()
-        chat.deliver(textFrame("user_message", CLIENT_MESSAGE))
-        chat.deliver(textFrame("reasoning_message", CLIENT_MESSAGE), replay = true)
-        chat.deliver(textFrame("assistant_message", "previous-turn"))
+        chat.deliver(textFrame(Frame.User, CLIENT_MESSAGE))
+        chat.deliver(textFrame(Frame.Reasoning, CLIENT_MESSAGE), replay = true)
+        chat.deliver(textFrame(Frame.Assistant, "previous-turn"))
         chat.lifecycle(RuntimeRunStatus.Completed, localContext.copy(turnId = "previous-turn", runId = "local-run-368"))
         assertEquals("it's gone", queue(chat)?.queuedOnServer?.text)
     }
@@ -124,7 +124,7 @@ internal abstract class ChatSendCoordinatorServerQueueFixture : ChatSendCoordina
     private val ingest = IngestFrameDeduplicator()
     private val framePrefix = "queued-banner-${Random.nextLong()}"
 
-    protected suspend fun TestScope.assertStartedInputClearsBanner(type: String) {
+    protected suspend fun TestScope.assertStartedInputClearsBanner(type: Frame) {
         val chat = queuedInput()
         // update_queue itself is a passthrough event; the engine emits Started on its dequeued transition.
         chat.lifecycle(RuntimeRunStatus.Started, localContext)
@@ -135,7 +135,7 @@ internal abstract class ChatSendCoordinatorServerQueueFixture : ChatSendCoordina
         assertBannerCleared(chat)
     }
 
-    protected suspend fun TestScope.assertFirstFrameClearsBanner(type: String) {
+    protected suspend fun TestScope.assertFirstFrameClearsBanner(type: Frame) {
         val chat = queuedInput()
         chat.deliver(textFrame(type, CLIENT_MESSAGE))
         assertBannerCleared(chat)
@@ -147,7 +147,7 @@ internal abstract class ChatSendCoordinatorServerQueueFixture : ChatSendCoordina
         val chat = coordinator(timeline, RecordingUiSink(), transport, backgroundScope) { CONVERSATION }
         chat.send("it's gone").join()
         // Iroh announces its local identity before input acceptance; the host stamps text with the OTID.
-        chat.deliver(startFrame(LOCAL_TURN, "iroh-run-placeholder"))
+        chat.deliver(startFrame(TurnRun(LOCAL_TURN, "iroh-run-placeholder")))
         chat.lifecycle(RuntimeRunStatus.Running, localContext, INPUT_QUEUED_REASON)
         chat.lifecycle(RuntimeRunStatus.Completed, localContext.copy(turnId = "previous-turn", runId = "local-run-368"))
         assertEquals("it's gone", queue(chat)?.queuedOnServer?.text)
@@ -171,14 +171,14 @@ internal abstract class ChatSendCoordinatorServerQueueFixture : ChatSendCoordina
         if (!ingest.isDuplicate(event)) event.timelineEvent?.let { handleEvent(it) }
     }
 
-    protected fun textFrame(type: String, turn: String): ServerFrame = RuntimeEventServerFrameMapper.map(
+    protected fun textFrame(frame: Frame, turn: String): ServerFrame = RuntimeEventServerFrameMapper.map(
         RuntimeEventPayload.RemoteStreamFrame(
-            frameId = "frame-$type-$turn",
-            messageType = type,
+            frameId = "frame-${frame.wire}-$turn",
+            messageType = frame.wire,
             body = buildJsonObject {
-                put("message_type", type)
+                put("message_type", frame.wire)
                 put("turn_id", turn)
-                put("logical_message_id", "$framePrefix-$type-$turn")
+                put("logical_message_id", "$framePrefix-${frame.wire}-$turn")
                 put("text_seq", 1)
                 put("content", "reply")
                 put("reasoning", "thinking")
@@ -188,10 +188,16 @@ internal abstract class ChatSendCoordinatorServerQueueFixture : ChatSendCoordina
         localContext,
     ).single()
 
-    protected fun startFrame(turn: String, run: String) = ServerFrame.TurnStarted(
-        id = "start-$turn-$run", ts = "2026-10-30T18:55:00Z", agentId = "agent-1",
-        conversationId = CONVERSATION, turnId = turn, runId = run,
+    protected fun startFrame(turn: TurnRun) = ServerFrame.TurnStarted(
+        id = "start-${turn.turnId}-${turn.runId}", ts = "2026-10-30T18:55:00Z", agentId = "agent-1",
+        conversationId = CONVERSATION, turnId = turn.turnId, runId = turn.runId,
     )
+
+    /** A turn and the run it executes under, as the host stamps them on lifecycle frames. */
+    protected data class TurnRun(val turnId: String, val runId: String)
+
+    /** The stream message kinds these tests deliver, with their wire names. */
+    protected enum class Frame(val wire: String) { User("user_message"), Reasoning("reasoning_message"), Assistant("assistant_message") }
 
     protected fun queue(chat: ChatSendCoordinator) = chat.sendQueue.state.value[QueueConversationId(CONVERSATION)]
 
