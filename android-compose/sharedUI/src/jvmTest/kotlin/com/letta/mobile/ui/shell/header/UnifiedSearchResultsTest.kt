@@ -95,8 +95,9 @@ class UnifiedSearchResultsTest {
     fun persistedAgentPinsRemainAvailableWithoutAConversationOwner() = runComposeUiTest {
         val binding = ShellTimelineChatBinding<ChatSessionPort>(
             workspace = ShellWorkspaceState(), session = "offline", connection = BackendConnectionStatus.Unconfigured,
-            agents = emptyList(), prefs = ConversationManagementPrefs(), backend = { null },
-            open = { _, _, _ -> null }, close = {}, pinnedAgents = setOf(AgentId("pinned-offline")),
+            agents = emptyList(), preferences = com.letta.mobile.ui.shell.conversations.TimelineConversationPreferences(
+                ConversationManagementPrefs(), pinnedAgents = setOf(AgentId("pinned-offline")),
+            ), backend = { null }, open = { _, _, _ -> null }, close = {},
         )
         var pins = emptySet<String>()
         setContent { pins = rememberShellTimelineChat(binding).list.pinnedAgentIds }
@@ -137,7 +138,8 @@ class UnifiedSearchResultsTest {
         setContent {
             owner = rememberShellTimelineChat(ShellTimelineChatBinding<ChatSessionPort>(
                 workspace, "late-roster", BackendConnectionStatus.Connected("Iroh"), agents.value,
-                ConversationManagementPrefs(), backend = { gateway }, open = { _, _, _ -> null }, close = {},
+                com.letta.mobile.ui.shell.conversations.TimelineConversationPreferences(ConversationManagementPrefs()),
+                backend = { gateway }, open = { _, _, _ -> null }, close = {},
             )).owner
         }
         waitForIdle()

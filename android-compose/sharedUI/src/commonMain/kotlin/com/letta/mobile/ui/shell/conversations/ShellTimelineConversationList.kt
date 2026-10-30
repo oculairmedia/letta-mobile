@@ -210,14 +210,13 @@ class ShellTimelineChatBinding<P : ChatSessionPort>(
     val session: String,
     val connection: BackendConnectionStatus,
     val agents: List<Agent>,
-    val prefs: ConversationManagementPrefs,
+    /** Conversation management and the pinned agents that the first list waits for. */
+    val preferences: TimelineConversationPreferences,
     /** The live session's chat gateway for its conversations; null while there is none. */
     val backend: () -> ChatGateway?,
     /** A port for the owner's selected conversation in the given scope; null while there is no session. */
     val open: (TimelineConversations, TimelineChatTarget, CoroutineScope) -> P?,
     val close: (P) -> Unit,
-    val pinnedAgents: Set<AgentId> = emptySet(),
-    val pinsLoaded: Boolean = true,
 )
 
 /** The chat a host shows: the session's conversation owner, the drawer's list of it, and the selected conversation's port. */
@@ -238,10 +237,10 @@ class ShellTimelineChat<P : ChatSessionPort>(
 fun <P : ChatSessionPort> rememberShellTimelineChat(binding: ShellTimelineChatBinding<P>): ShellTimelineChat<P> {
     val owner = rememberTimelineConversations(
         binding.connection, binding.backend, binding.agents,
-        TimelineConversationPreferences(binding.prefs, binding.pinnedAgents, binding.pinsLoaded),
+        binding.preferences,
     )
     SyncTimelineConversations(binding.workspace, owner, binding.session, binding.agents)
-    val list = rememberShellTimelineConversationList(owner, binding.pinnedAgents)
+    val list = rememberShellTimelineConversationList(owner, binding.preferences.pinnedAgents)
     val target = remember(owner, list.state) { owner?.selectedTarget() }
     val open by rememberUpdatedState(binding.open)
     val close by rememberUpdatedState(binding.close)

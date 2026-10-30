@@ -101,7 +101,11 @@ internal fun webTimelineChat(
     session = webSessionKey(shell.backend.config.value),
     connection = connection,
     agents = shell.backend.agents.value,
-    prefs = app.conversationPrefs,
+    preferences = com.letta.mobile.ui.shell.conversations.TimelineConversationPreferences(management = app.conversationPrefs,
+        pinnedAgents = home.pinKeys.mapNotNull(com.letta.mobile.data.home.HomePinnedItem::parseAgentKey)
+            .mapTo(mutableSetOf()) { com.letta.mobile.data.model.AgentId(it) },
+        pinsLoaded = home.pinsLoaded,
+    ),
     backend = app.gateway::chatGateway,
     open = { owner, target, scope ->
         val model = shell.backend.agents.value.firstOrNull { it.id.value == target.agentId }?.model
@@ -109,9 +113,6 @@ internal fun webTimelineChat(
         app.gateway.chatBinding(target, model, chat)?.let { WebChatSessionPort(it, scope) }
     },
     close = WebChatSessionPort::close,
-    pinnedAgents = home.pinKeys.mapNotNull(com.letta.mobile.data.home.HomePinnedItem::parseAgentKey)
-        .mapTo(mutableSetOf()) { com.letta.mobile.data.model.AgentId(it) },
-    pinsLoaded = home.pinsLoaded,
 )
 
 /**

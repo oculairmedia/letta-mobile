@@ -7067,16 +7067,13 @@ public final class com/letta/mobile/ui/shell/conversations/ShellTimelineChat {
 
 public final class com/letta/mobile/ui/shell/conversations/ShellTimelineChatBinding {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/lang/String;Lcom/letta/mobile/data/model/BackendConnectionStatus;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Ljava/util/Set;Z)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/lang/String;Lcom/letta/mobile/data/model/BackendConnectionStatus;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Ljava/util/Set;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/lang/String;Lcom/letta/mobile/data/model/BackendConnectionStatus;Ljava/util/List;Lcom/letta/mobile/ui/shell/conversations/TimelineConversationPreferences;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;)V
 	public final fun getAgents ()Ljava/util/List;
 	public final fun getBackend ()Lkotlin/jvm/functions/Function0;
 	public final fun getClose ()Lkotlin/jvm/functions/Function1;
 	public final fun getConnection ()Lcom/letta/mobile/data/model/BackendConnectionStatus;
 	public final fun getOpen ()Lkotlin/jvm/functions/Function3;
-	public final fun getPinnedAgents ()Ljava/util/Set;
-	public final fun getPinsLoaded ()Z
-	public final fun getPrefs ()Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
+	public final fun getPreferences ()Lcom/letta/mobile/ui/shell/conversations/TimelineConversationPreferences;
 	public final fun getSession ()Ljava/lang/String;
 	public final fun getWorkspace ()Lcom/letta/mobile/data/shell/ShellWorkspaceState;
 }

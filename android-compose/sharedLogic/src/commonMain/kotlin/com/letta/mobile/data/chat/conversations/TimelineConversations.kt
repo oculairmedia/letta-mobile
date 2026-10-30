@@ -136,21 +136,10 @@ class TimelineConversations(
     private fun selectConversation(conversation: ConversationId, onMissing: () -> Unit) {
         mutableState.update { it.copy(selected = conversation) }
         scope.launch {
-            val row = readSelectedConversation(conversation)
+            val row = mutableState.readSelectedConversation(gateway, conversation)
             if (row == null) onMissing() else lists.focusAgent(row.agentId)
         }
     }
-
-    private suspend fun readSelectedConversation(conversation: ConversationId): Conversation? =
-        mutableState.value.record(conversation) ?: runCatchingCancellable {
-            gateway.getConversation(conversation.value)
-        }.onFailure { failure ->
-            mutableState.update { current ->
-                if (current.selected == conversation) current.copy(error = failure.message ?: LIST_FAILED) else current
-            }
-        }.getOrNull()?.also { fetched ->
-            mutableState.update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
-        }
 
     /**
      * [agent]'s chat when the shell finds none listed (an agent the roster did not carry yet, or a
@@ -173,9 +162,10 @@ class TimelineConversations(
     fun openInitial(routed: ConversationId?, focused: AgentId?, createIfNone: Boolean) {
         val current = mutableState.value
         if (!current.awaitsFirstChat) return
-        if (shouldResolveRoute(routed, current)) {
-            val route = requireNotNull(routed)
-            selectConversation(route) { initialRouteFailed(route, focused, createIfNone) }
+        // A routed conversation outside the recents page is fetched once; a failed fetch falls back.
+        val unlistedRoute = routed?.takeIf { it != failedInitialRoute && current.listed(it) == null && !lists.legacyMode }
+        if (unlistedRoute != null) {
+            selectConversation(unlistedRoute) { initialRouteFailed(unlistedRoute, focused, createIfNone) }
             return
         }
         val first = current.listed(routed) ?: focused?.let(current::activeChatOf)
@@ -184,12 +174,6 @@ class TimelineConversations(
             return
         }
         if (focused != null && current.mayCreate(createIfNone)) createConversationForAgent(focused)
-    }
-
-    private fun shouldResolveRoute(routed: ConversationId?, current: TimelineConversationsState): Boolean {
-        if (routed == null) return false
-        if (routed == failedInitialRoute) return false
-        return current.listed(routed) == null && !lists.legacyMode
     }
 
     private fun initialRouteFailed(route: ConversationId, focused: AgentId?, createIfNone: Boolean) {
@@ -232,8 +216,9 @@ class TimelineConversations(
         if (mutableState.value.creating) return
         mutableState.update { it.copy(creating = true, error = null) }
         scope.launch {
-            val opened = runCatchingCancellable { (if (findExisting) existingChat(agent) else null) ?: create(agent) }
-                .onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: CREATE_FAILED) } }
+            val opened = runCatchingCancellable {
+                (if (findExisting) gateway.existingChat(agent, mutableState, ::selectConversation) else null) ?: create(agent)
+            }.onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: CREATE_FAILED) } }
                 .getOrNull()
             val waiting = waitingForChat.toList()
             waitingForChat.clear()
@@ -242,41 +227,11 @@ class TimelineConversations(
         }
     }
 
-    /** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
-    private suspend fun existingChat(agent: AgentId): ConversationId? {
-        var after: ConversationId? = null
-        while (true) {
-            val request = AgentConversationPage(agent, after = after)
-            val page = gateway.listAgentConversations(request)
-            val own = page.filter { it.agentId == agent }.visibleConversationsInLists()
-            mutableState.update { it.copy(conversations = it.conversations.keeping(own)) }
-            val newest = own.firstOrNull { it.archived != true }
-            if (newest != null) {
-                selectConversation(newest.id)
-                return newest.id
-            }
-            // A full page of archives is not proof that the agent has no active chat.
-            if (page.size < request.limit) return null
-            val next = page.lastOrNull()?.id
-            check(next != after) { "Conversation cursor did not advance" }
-            after = next
-        }
-    }
-
     private suspend fun create(agent: AgentId): ConversationId {
         val extras = gateway as? ChatGatewayExtras ?: error(NO_CREATE)
         val created = extras.createConversation(agent.value)
-        opened(created, draft = null)
+        mutableState.opened(created, draft = null)
         return created.id
-    }
-
-    /** A conversation the owner made (a new chat or a branch) joins the top of the list and opens. */
-    private fun opened(conversation: Conversation, draft: PendingDraft?) {
-        mutableState.update { current ->
-            val listed = listOf(conversation) + current.conversations.filterNot { it.id == conversation.id }
-            val next = current.copy(conversations = listed, selected = conversation.id)
-            if (draft == null) next else next.withDraft(conversation.id, draft)
-        }
     }
 
     /** The list as the shared [management] reads and writes it. */
@@ -313,7 +268,7 @@ class TimelineConversations(
             }
         }
 
-        override suspend fun openBranch(branch: OpenedBranch) = opened(branch.conversation, branch.draft)
+        override suspend fun openBranch(branch: OpenedBranch) = mutableState.opened(branch.conversation, branch.draft)
 
         override fun showError(message: String) {
             mutableState.update { it.copy(notice = message) }
@@ -321,9 +276,55 @@ class TimelineConversations(
     }
 
     private companion object {
-        const val LIST_FAILED = "Could not list the conversations"
         const val CREATE_FAILED = "Could not start a new conversation"
         const val NO_CREATE = "This backend can't start a new conversation"
+    }
+}
+
+private suspend fun MutableStateFlow<TimelineConversationsState>.readSelectedConversation(
+    gateway: ChatGateway,
+    conversation: ConversationId,
+): Conversation? = value.record(conversation) ?: runCatchingCancellable {
+    gateway.getConversation(conversation.value)
+}.onFailure { failure ->
+    update { current ->
+        if (current.selected == conversation) current.copy(error = failure.message ?: "Could not list the conversations") else current
+    }
+}.getOrNull()?.also { fetched ->
+    update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
+}
+
+/** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
+private suspend fun ChatGateway.existingChat(
+    agent: AgentId,
+    state: MutableStateFlow<TimelineConversationsState>,
+    select: (ConversationId) -> Unit,
+): ConversationId? {
+    var after: ConversationId? = null
+    while (true) {
+        val request = AgentConversationPage(agent, after = after)
+        val page = listAgentConversations(request)
+        val own = page.filter { it.agentId == agent }.visibleConversationsInLists()
+        state.update { it.copy(conversations = it.conversations.keeping(own)) }
+        val newest = own.firstOrNull { it.archived != true }
+        if (newest != null) {
+            select(newest.id)
+            return newest.id
+        }
+        // A full page of archives is not proof that the agent has no active chat.
+        if (page.size < request.limit) return null
+        val next = page.lastOrNull()?.id
+        check(next != after) { "Conversation cursor did not advance" }
+        after = next
+    }
+}
+
+/** A conversation the owner made (a new chat or a branch) joins the top of the list and opens. */
+private fun MutableStateFlow<TimelineConversationsState>.opened(conversation: Conversation, draft: PendingDraft?) {
+    update { current ->
+        val listed = listOf(conversation) + current.conversations.filterNot { it.id == conversation.id }
+        val next = current.copy(conversations = listed, selected = conversation.id)
+        if (draft == null) next else next.withDraft(conversation.id, draft)
     }
 }
 

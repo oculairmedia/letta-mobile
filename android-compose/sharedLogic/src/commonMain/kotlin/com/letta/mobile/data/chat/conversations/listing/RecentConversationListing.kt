@@ -15,6 +15,7 @@ import com.letta.mobile.util.READ_THROUGH_PAGES
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import com.letta.mobile.util.runCatchingCancellable
+import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -59,16 +60,25 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
     private suspend fun refreshRecents() {
         try {
             recents = gateway.listRecentConversations()
-        } catch (failure: Exception) {
-            if (failure is CancellationException) throw failure
-            if (!isUnsupportedRecents(failure)) throw failure
-            legacyMode = true
-            Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr failure.message.orEmpty())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (unsupported: UnsupportedOperationException) {
+            fallBackToLegacy(unsupported.message)
+        } catch (failure: TimelineTransportHttpException) {
+            fallBackOrRethrow(failure)
         }
     }
 
-    private fun isUnsupportedRecents(failure: Exception): Boolean =
-        failure is UnsupportedOperationException || failure.message?.contains("capability_unavailable") == true
+    /** The host lacks visible recents (capability_unavailable); any other failure is a real one. */
+    private fun fallBackOrRethrow(failure: TimelineTransportHttpException) {
+        if (failure.message?.contains("capability_unavailable") != true) throw failure
+        fallBackToLegacy(failure.message)
+    }
+
+    private fun fallBackToLegacy(reason: String?) {
+        legacyMode = true
+        Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr reason.orEmpty())
+    }
 
     suspend fun rosterChanged(roster: List<Agent>): List<Conversation> = mutex.withLock {
         val visible = roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
@@ -82,9 +92,6 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
         knownHiddenAgents = (knownHiddenAgents + hidden) - restored
         conversations
     }
-
-    private fun hiddenAgentsIn(roster: List<Agent>): Set<AgentId> =
-        roster.mapTo(mutableSetOf()) { it.id } - roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
 
     suspend fun focus(agent: AgentId): List<Conversation> = mutex.withLock {
         if (!legacyMode && agent !in fleet.loadedAgents) {
@@ -161,12 +168,15 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
             .sortedWith(ConversationRecency.newestFirst).take(RECENTS_LIMIT)
     }
 
-    private fun isHiddenOwner(owner: AgentId, roster: List<Agent>): Boolean {
-        val known = roster.firstOrNull { it.id == owner } ?: return false
-        return listOf(known).visibleInLists().isEmpty()
-    }
-
     private companion object {
         const val RECENTS_LIMIT = 30
     }
+}
+
+private fun hiddenAgentsIn(roster: List<Agent>): Set<AgentId> =
+    roster.mapTo(mutableSetOf()) { it.id } - roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
+
+private fun isHiddenOwner(owner: AgentId, roster: List<Agent>): Boolean {
+    val known = roster.firstOrNull { it.id == owner } ?: return false
+    return listOf(known).visibleInLists().isEmpty()
 }
