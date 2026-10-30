@@ -25,7 +25,10 @@ import kotlin.test.assertTrue
 class ToolReturnedImageTimelineTest : TimelineStreamReducerFixture() {
     private val json = Json { ignoreUnknownKeys = true }
     private val image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
-    private val call = json.parseToJsonElement("""{"id":"call-row","message_type":"tool_call_message","tool_call":{"tool_call_id":"read-call","name":"Read","arguments":"{}"}}""").jsonObject
+    private val call = json.parseToJsonElement(
+        """{"id":"call-row","message_type":"tool_call_message",""" +
+            """"tool_call":{"tool_call_id":"read-call","name":"Read","arguments":"{}"}}""",
+    ).jsonObject
 
     private fun result(text: String): JsonObject = buildJsonObject {
         put("id", "return-row")
@@ -129,7 +132,8 @@ class ToolReturnedImageTimelineTest : TimelineStreamReducerFixture() {
     @Test
     fun snapshotEnrichmentRecoversImagesMissingFromLiveTextOnlyReturn() {
         val textOnlyReturn = json.parseToJsonElement(
-            """{"id":"return-row","message_type":"tool_return_message","tool_returns":[{"tool_call_id":"read-call","status":"success","tool_return":"[Image: pixel.png]"}]}""",
+            """{"id":"return-row","message_type":"tool_return_message",""" +
+                """"tool_returns":[{"tool_call_id":"read-call","status":"success","tool_return":"[Image: pixel.png]"}]}""",
         ).jsonObject
         val seeded = reduceEnvelopes(listOf(call, textOnlyReturn))
         assertTrue(seeded.events.single().attachments.isEmpty())
