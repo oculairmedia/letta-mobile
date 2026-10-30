@@ -87,25 +87,39 @@ def contract_row(root, key, path, spec):
     return (method, version, spec.relative_to(root).as_posix(), path.relative_to(root).as_posix(), handler)
 
 
+def _is_method(value):
+    return isinstance(value, str) and bool(NAME.fullmatch(value))
+
+
+def _is_version(value):
+    return type(value) is int and value >= 1
+
+
 def require_identity(path, parts, method, version):
-    if len(parts) != 2 or not isinstance(method, str) or method != parts[0] or not NAME.fullmatch(method):
+    """The fixture lives at <method>/<name>-v<version>.json and says so."""
+    path_method, path_name = (parts + ["", ""])[:2] if len(parts) == 2 else ("", "")
+    if not (_is_method(method) and method == path_method):
         raise ValueError(f"{path}: method/path mismatch")
-    if type(version) is not int or version < 1 or not re.fullmatch(r"[a-z0-9-]+-v" + str(version), parts[1]):
+    if not (_is_version(version) and re.fullmatch(r"[a-z0-9-]+-v" + str(version), path_name)):
         raise ValueError(f"{path}: version/path mismatch")
 
 
+def _case_name(case):
+    name = case.get("name") if isinstance(case, dict) else None
+    return name if isinstance(name, str) and name else None
+
+
 def require_cases(path, cases):
+    """At least one case; every case named uniquely and carrying each object field."""
     if not isinstance(cases, list) or not cases:
         raise ValueError(f"{path}: expected non-empty cases")
-    names = set()
-    for case in cases:
-        name = case.get("name") if isinstance(case, dict) else None
-        if not isinstance(name, str) or not name or name in names:
-            raise ValueError(f"{path}: cases need unique non-empty names")
-        names.add(name)
-        missing = [field for field in CASE_FIELDS if not isinstance(case.get(field), dict)]
+    names = [_case_name(case) for case in cases]
+    if None in names or len(set(names)) != len(names):
+        raise ValueError(f"{path}: cases need unique non-empty names")
+    for name, case in zip(names, cases):
+        missing = next((field for field in CASE_FIELDS if not isinstance(case.get(field), dict)), None)
         if missing:
-            raise ValueError(f"{path}: case {name} requires object {missing[0]}")
+            raise ValueError(f"{path}: case {name} requires object {missing}")
 
 
 def is_repository_file(root, handler):
