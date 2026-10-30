@@ -38,6 +38,8 @@ data class UnifiedSearchSources(
     val messageSearch: MessageSearchSource? = null,
     /** Explicit search demand can fill an initially partial conversation catalog. */
     val prepareConversations: (suspend (com.letta.mobile.data.model.AgentId?) -> Unit)? = null,
+    /** Preparation may publish partial rows; keep its warning visible until a successful retry. */
+    val conversationPreparationError: String? = null,
 ) {
     val messageCapabilities: MessageSearchCapabilities
         get() = messageSearch?.capabilities ?: MessageSearchCapabilities.NONE

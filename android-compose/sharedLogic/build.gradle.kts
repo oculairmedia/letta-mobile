@@ -198,6 +198,26 @@ kotlin {
     }
 }
 
+// Embed the canonical fixture for common tests, including targets without a filesystem resource API.
+val generateVisibleRecentsTestData = tasks.register("generateVisibleRecentsTestData") {
+    inputs.file(layout.projectDirectory.file("src/commonTest/resources/contracts/conversation.list/visible-recents-v1.json"))
+    outputs.file(layout.buildDirectory.file("generated/wireContractTests/VisibleRecentsContractText.kt"))
+    doLast {
+        val escaped = inputs.files.singleFile.readText()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("$", "\\$")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n")
+        val output = outputs.files.singleFile
+        output.parentFile.mkdirs()
+        output.writeText(
+            "package com.letta.mobile.data.transport.iroh\n\ninternal val visibleRecentsContractText: String = \"$escaped\"\n",
+        )
+    }
+}
+kotlin.sourceSets.getByName("commonTest").kotlin.srcDir(generateVisibleRecentsTestData.map { it.outputs.files.singleFile.parentFile })
+
 // Offline reference tooling reuses the two parity tests and their authoritative renderers.
 // Normal jvmTest keeps check mode; only the explicit write task changes Markdown bodies.
 val contractReferenceJvmTests = tasks.named<Test>("jvmTest")

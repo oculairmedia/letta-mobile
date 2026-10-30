@@ -77,7 +77,7 @@ class AgentConversationFleet(
         fresh.values.firstOrNull { it.failure != null }?.failure?.let { throw it }
         listed = listed + fresh.mapValues { (agent, rows) ->
             // Keep cached tails visible, but restart traversal behind the new head to avoid reconnect gaps.
-            (listed[agent] ?: AgentListing()).refreshed(rows).copy(cursor = rows.cursor)
+            (listed[agent] ?: AgentListing()).refreshed(rows).copy(cursor = rows.cursor, confirmedIds = rows.confirmedIds)
         }
         listed.merged()
     }
@@ -226,6 +226,7 @@ private data class AgentListing(
     val read: Boolean = false,
     val failure: Throwable? = null,
     val authoritative: Boolean = false,
+    val confirmedIds: Set<ConversationId> = emptySet(),
 ) {
     /** Replace an authoritative short read; otherwise keep already loaded older pages and their cursor. */
     fun refreshed(fresh: AgentListing): AgentListing {
@@ -238,6 +239,7 @@ private data class AgentListing(
             read = true,
             failure = null,
             authoritative = false,
+            confirmedIds = confirmedIds + fresh.confirmedIds,
         )
     }
 
@@ -245,9 +247,12 @@ private data class AgentListing(
     fun plus(agent: AgentId, page: List<Conversation>, full: Boolean): AgentListing {
         val ids = page.mapTo(mutableSetOf()) { it.id }
         val own = page.filter { it.agentId == agent }.visibleConversationsInLists()
+        val confirmed = confirmedIds + own.map { it.id }
+        // Cached tails survive a head refresh, but only rows seen in this traversal survive its end.
+        val retained = rows.filterNot { it.id in ids }.filter { full || it.id in confirmed }
         // The cursor is the page's last row as the server sent it, so a filtered row never stalls paging.
         return AgentListing(
-            rows = rows.filterNot { it.id in ids } + own,
+            rows = retained + own, confirmedIds = confirmed,
             cursor = page.lastOrNull()?.id?.takeIf { full }, read = true, authoritative = !full,
         )
     }

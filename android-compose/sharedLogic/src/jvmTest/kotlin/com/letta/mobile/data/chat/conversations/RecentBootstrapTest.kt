@@ -308,6 +308,134 @@ class RecentBootstrapTest {
         }
     }
 
+    @Test
+    fun archivedOnlyLegacyPageStillRestoresTheEagerCatalog() = runTest {
+        val archived = HostConversation("archived-only", a.value, archived = true).json()
+        val host = VisibleHost().apply {
+            extras += archived
+            recentsOverride = JsonArray(listOf(archived))
+        }
+        val owner = owner(host)
+        runCurrent()
+        assertTrue(owner.state.value.authoritative, "archived rows cannot come from visible recents")
+        assertEquals(roster.size, host.agentReads.size)
+        assertTrue(owner.state.value.conversations.any { it.id.value == "recent" })
+    }
+
+    @Test
+    fun hiddenOnlyLegacyPageStillRestoresTheEagerCatalog() = runTest {
+        val row = HostConversation("hidden-only", a.value).json()
+        val hidden = JsonObject(row + ("hidden" to JsonPrimitive(true)))
+        val host = VisibleHost().apply {
+            extras += hidden
+            recentsOverride = JsonArray(listOf(hidden))
+        }
+        val owner = owner(host)
+        runCurrent()
+        assertTrue(owner.state.value.authoritative, "hidden rows cannot come from visible recents")
+        assertEquals(roster.size, host.agentReads.size)
+    }
+
+    @Test
+    fun selectingAHiddenOwnersChatDoesNotReadItsSiblingConversations() = runTest {
+        val host = VisibleHost().apply { extras += HostConversation("hidden-sibling", a.value).json() }
+        val owner = owner(host)
+        runCurrent()
+        owner.roster = roster.map { if (it.id == a) it.copy(hidden = true) else it }
+        runCurrent()
+        host.calls.clear()
+        owner.selectConversation(ConversationId("recent"))
+        runCurrent()
+        assertEquals(emptyList(), host.agentReads, "the selected row is sufficient to open the hidden chat")
+        assertEquals("recent", owner.selectedTarget()?.conversationId)
+        assertFalse(owner.state.value.conversations.any { it.id.value == "hidden-sibling" })
+    }
+
+    @Test
+    fun partialSearchPublishesRowsAndAnErrorUntilTheFailedAgentIsRetried() = runTest {
+        val host = VisibleHost().apply {
+            failingAgents += a.value
+            extras += HostConversation("partial-match", b.value, summary = "Partial", archived = true).json()
+        }
+        val owner = owner(host)
+        runCurrent()
+        owner.lists.prepareSearch()
+        assertTrue(owner.state.value.conversations.any { it.summary == "Partial" })
+        assertTrue(owner.state.value.error != null, "partial results must not be presented as complete")
+        host.failingAgents.clear()
+        host.calls.clear()
+        owner.lists.prepareSearch()
+        assertEquals(listOf(a.value), host.agentReads, "retry must not refetch successful agents")
+        assertEquals(null, owner.state.value.error)
+    }
+
+    @Test
+    fun aMissingInitialRouteFallsBackToTheFocusedChatWithoutRetryingTheRoute() = runTest {
+        val host = VisibleHost()
+        val owner = owner(host)
+        runCurrent()
+        val missing = ConversationId("missing-route")
+        owner.openInitial(missing, b, createIfNone = false)
+        runCurrent()
+        assertEquals(ConversationId("older"), owner.selectedConversation)
+        assertEquals("older", owner.selectedTarget()?.conversationId)
+        owner.openInitial(missing, b, createIfNone = false)
+        runCurrent()
+        assertEquals(1, host.calls.count { it.first == "conversation.get" })
+    }
+
+    @Test
+    fun restoringVisibilityReadsOnlyTheRestoredAgentAndRestoresItsRows() = runTest {
+        val host = VisibleHost()
+        val owner = owner(host)
+        runCurrent()
+        owner.roster = roster.map { if (it.id == a) it.copy(hidden = true) else it }
+        runCurrent()
+        assertFalse(owner.state.value.conversations.any { it.id.value == "recent" })
+        host.calls.clear()
+        owner.roster = roster
+        runCurrent()
+        assertTrue(owner.state.value.conversations.any { it.id.value == "recent" })
+        assertEquals(listOf(a.value), host.agentReads)
+        assertEquals(0, host.recentsReads)
+    }
+
+    @Test
+    fun finishingARefreshedTraversalRemovesDeletedCachedTailRows() = runTest {
+        val host = VisibleHost().apply { extras += List(65) { HostConversation("extra-$it", a.value, archived = true).json() } }
+        val owner = owner(host)
+        runCurrent()
+        owner.lists.focusAgent(a)
+        while (owner.lists.hasMore(a)) owner.lists.loadMore(a)
+        assertTrue(owner.state.value.conversations.any { it.id.value == "extra-64" })
+        host.extras.removeAll { it.text("id") == "extra-64" }
+        owner.refresh()
+        assertTrue(owner.state.value.conversations.any { it.id.value == "extra-64" }, "cached tails remain until traversal finishes")
+        owner.lists.prepareSearch(a)
+        assertFalse(
+            owner.state.value.conversations.any { it.id.value == "extra-64" },
+            "an authoritative traversal cannot retain a deleted tail",
+        )
+        assertTrue(a in owner.state.value.authoritativeAgents)
+    }
+
+    @Test
+    fun capabilityUnavailableFakeFollowsTheCanonicalFixtureEnvelope() = runTest {
+        val root = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
+            .first { File(it, "scripts/ci/check-wire-contracts.py").isFile }
+        val contract = File(
+            root, "android-compose/sharedLogic/src/commonTest/resources/contracts/conversation.list/visible-recents-v1.json",
+        )
+        val expected = WireContractFixture(contract.readText()).response("no-index")
+        val reply = IrohHost().adminRpc(AppServerCommand.AdminRpc(
+            "fixture-probe", "conversation.list", JsonObject(mapOf("visible_only" to JsonPrimitive(true))),
+        ))
+        assertEquals("fixture-probe", reply.requestId)
+        assertEquals(expected.getValue("success").jsonPrimitive.booleanOrNull, reply.success)
+        assertEquals(expected["result"], reply.result)
+        assertEquals(expected.getValue("error").jsonPrimitive.content, reply.error)
+    }
+
     private fun TestScope.owner(host: VisibleHost, pins: Set<AgentId> = emptySet()) = TimelineConversations(
         backgroundScope, IrohAdminRpcChatGateway(AppServerClientChannel(host, backgroundScope)), roster, pinnedAgents = pins,
     )
@@ -325,6 +453,7 @@ private class VisibleHost(private val mode: String = "visible") : AppServerClien
     val calls = mutableListOf<Pair<String, JsonObject>>()
     val agentReads: List<String> get() = calls.mapNotNull { it.second["agent_id"]?.jsonPrimitive?.content }
     val recentsReads: Int get() = calls.count { it.first == "conversation.list" && it.second["agent_id"] == null }
+    var recentsOverride: JsonArray? = null
     var recentsGate: CompletableDeferred<Unit>? = null
     var agentGate: Pair<String, CompletableDeferred<Unit>>? = null
     private val rows: List<JsonObject>
@@ -409,7 +538,7 @@ private class VisibleHost(private val mode: String = "visible") : AppServerClien
         recentsGate?.await()
         return AppServerInboundFrame.AdminRpcResponse(
             command.requestId, response.getValue("success").jsonPrimitive.booleanOrNull == true,
-            result = response["result"], error = response["error"]?.jsonPrimitive?.content,
+            result = recentsOverride ?: response["result"], error = response["error"]?.jsonPrimitive?.content,
         )
     }
 

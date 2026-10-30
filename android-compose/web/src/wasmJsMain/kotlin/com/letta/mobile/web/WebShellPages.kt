@@ -114,6 +114,7 @@ private fun webSearchSources(shell: WebShell, page: WebPageInputs) = UnifiedSear
     agents = shell.backend.agents.value,
     agentId = shell.workspace.focusedAgentId?.value,
     prepareConversations = page.chat.owner?.lists?.let { it::prepareSearch },
+    conversationPreparationError = page.chat.list.state.searchError,
 )
 
 private fun webOverlayData(shell: WebShell, page: WebPageInputs) = ShellWorkspaceOverlayData(

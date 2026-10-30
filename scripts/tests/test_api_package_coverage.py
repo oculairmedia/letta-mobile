@@ -94,6 +94,28 @@ class PackageCoverageTest(unittest.TestCase):
         self.write('android-compose/example/build.gradle.kts', 'kotlin.srcDir("extra")')
         self.assertIn('custom source roots', self.problems())
 
+    def test_explicit_generated_common_test_root_is_not_published(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'kotlin.sourceSets.getByName("commonTest").kotlin.srcDir(generatedTests)')
+        self.write('android-compose/example/build/generated/tests/Fixture.kt', 'package tests.only\nval fixture = "data"')
+        self.assertEqual((1, []), coverage.check(self.root))
+
+    def test_explicit_production_root_still_fails_closed(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'kotlin.sourceSets.getByName("commonMain").kotlin.srcDir("extra")')
+        self.assertIn('custom source roots', self.problems())
+
+    def test_test_root_provider_cannot_hide_a_production_root(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'kotlin.sourceSets.getByName("commonTest").kotlin.srcDir('
+                   'kotlin.sourceSets.getByName("commonMain").kotlin.srcDir("extra"))')
+        self.assertIn('custom source roots', self.problems())
+
+    def test_dynamic_source_set_roots_still_fail_closed(self):
+        self.write('android-compose/example/build.gradle.kts',
+                   'kotlin.sourceSets.getByName(sourceSetName).kotlin.srcDir("extra")')
+        self.assertIn('custom source roots', self.problems())
+
     def test_unknown_source_set_fails_closed(self):
         self.source('newIntermediate', 'package example\nclass Intermediate')
         self.assertIn('unrecognized production source set', self.problems())

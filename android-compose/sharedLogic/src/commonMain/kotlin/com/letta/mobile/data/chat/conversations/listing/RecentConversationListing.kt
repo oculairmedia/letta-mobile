@@ -27,6 +27,9 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
         gateway.agentConversationReader(), AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
     )
     private var recents: List<Conversation> = emptyList()
+    private var knownHiddenAgents: Set<AgentId> = emptySet()
+    var searchFailures: Map<AgentId, Throwable> = emptyMap()
+        private set
     var legacyMode: Boolean = false
         private set
 
@@ -39,6 +42,7 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
     fun hasMore(agent: AgentId): Boolean = !legacyMode && fleet.hasMore(agent)
 
     suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit) = mutex.withLock {
+        knownHiddenAgents = knownHiddenAgents + hiddenAgentsIn(roster)
         if (!legacyMode) refreshRecents()
         if (legacyMode) {
             legacy.refresh(roster)
@@ -68,12 +72,19 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
 
     suspend fun rosterChanged(roster: List<Agent>): List<Conversation> = mutex.withLock {
         val visible = roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
-        val hidden = roster.mapTo(mutableSetOf()) { it.id } - visible
-        // A directory may still be arriving; the host already verified recents visibility.
+        val hidden = hiddenAgentsIn(roster)
+        val restored = knownHiddenAgents.intersect(visible)
+        // An arriving directory is not demand to read every agent; only visibility restoration is.
         fleet.retainAgents(fleet.loadedAgents - hidden)
         recents = recents.filterNot { it.agentId in hidden }
+        fleet.refreshAgents(restored)
+        recents = recents.filterNot { it.agentId in restored }
+        knownHiddenAgents = (knownHiddenAgents + hidden) - restored
         conversations
     }
+
+    private fun hiddenAgentsIn(roster: List<Agent>): Set<AgentId> =
+        roster.mapTo(mutableSetOf()) { it.id } - roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
 
     suspend fun focus(agent: AgentId): List<Conversation> = mutex.withLock {
         if (!legacyMode && agent !in fleet.loadedAgents) {
@@ -90,21 +101,26 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
 
     /** Search is the explicit user demand that permits reading previously unvisited agents. */
     suspend fun search(roster: List<Agent>, agent: AgentId?): List<Conversation> = mutex.withLock {
+        searchFailures = emptyMap()
         if (!legacyMode) {
-            var firstFailure: Throwable? = null
-            var successful = 0
-            for (id in roster.visibleInLists().map { it.id }.filter { agent == null || it == agent }) {
-                runCatchingCancellable { readAllAgentPages(id) }.onSuccess { successful++ }.onFailure { failure ->
-                    if (firstFailure == null) firstFailure = failure
-                    Telemetry.event(
-                        "Conversations", "list.agent_read_failed", "agentId" attr id.value, "reason" attr failure.message,
-                    )
-                }
-            }
-            if (successful == 0) firstFailure?.let { throw it }
+            readSearchAgents(roster.visibleInLists().map { it.id }.filter { agent == null || it == agent })
             recents = recents.filterNot { it.agentId in fleet.loadedAgents }
         }
         conversations
+    }
+
+    private suspend fun readSearchAgents(agents: List<AgentId>) {
+        val failures = mutableMapOf<AgentId, Throwable>()
+        for (id in agents) {
+            runCatchingCancellable { readAllAgentPages(id) }.onFailure { failure ->
+                failures[id] = failure
+                Telemetry.event(
+                    "Conversations", "list.agent_read_failed", "agentId" attr id.value, "reason" attr failure.message,
+                )
+            }
+        }
+        searchFailures = failures
+        if (failures.size == agents.size) failures.values.firstOrNull()?.let { throw it }
     }
 
     suspend fun changed(dirty: Map<ConversationId, AgentId?>, roster: List<Agent>): List<Conversation> = mutex.withLock {

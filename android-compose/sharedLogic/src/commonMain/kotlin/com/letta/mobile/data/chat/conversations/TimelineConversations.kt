@@ -56,6 +56,10 @@ data class TimelineConversationsState(
     val drafts: Map<ConversationId, PendingDraft> = emptyMap(),
     /** Failures the open chat shows in its composer (a branch, a rename, a delete). */
     val notice: String? = null,
+    /** Owners whose explicit search failed; successful owners' results remain searchable. */
+    val searchFailedAgents: Set<AgentId> = emptySet(),
+    /** A search-specific warning, independent of later chat or paging errors. */
+    val searchError: String? = null,
 ) {
     /** The chat is on its way: the list is loading, a chat is being made, or the selected one is opening; not after a failure. */
     val opening: Boolean get() = error == null && (!loaded || creating || selected != null)
@@ -97,6 +101,7 @@ class TimelineConversations(
 
     /** Who waits for the chat being made (or found): every caller gets it, not only the first. */
     private val waitingForChat = mutableListOf<(ConversationId) -> Unit>()
+    private var failedInitialRoute: ConversationId? = null
 
     init {
         scope.launch { refresh() }
@@ -126,21 +131,26 @@ class TimelineConversations(
 
     override val selectedConversation: ConversationId? get() = mutableState.value.selected
 
-    override fun selectConversation(conversation: ConversationId) {
+    override fun selectConversation(conversation: ConversationId) = selectConversation(conversation) {}
+
+    private fun selectConversation(conversation: ConversationId, onMissing: () -> Unit) {
         mutableState.update { it.copy(selected = conversation) }
         scope.launch {
-            val row = mutableState.value.record(conversation) ?: runCatchingCancellable {
-                gateway.getConversation(conversation.value)
-            }.onFailure { failure ->
-                mutableState.update { current ->
-                    if (current.selected == conversation) current.copy(error = failure.message ?: LIST_FAILED) else current
-                }
-            }.getOrNull()?.also { fetched ->
-                mutableState.update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
-            }
-            row?.let { lists.focusAgent(it.agentId) }
+            val row = readSelectedConversation(conversation)
+            if (row == null) onMissing() else lists.focusAgent(row.agentId)
         }
     }
+
+    private suspend fun readSelectedConversation(conversation: ConversationId): Conversation? =
+        mutableState.value.record(conversation) ?: runCatchingCancellable {
+            gateway.getConversation(conversation.value)
+        }.onFailure { failure ->
+            mutableState.update { current ->
+                if (current.selected == conversation) current.copy(error = failure.message ?: LIST_FAILED) else current
+            }
+        }.getOrNull()?.also { fetched ->
+            mutableState.update { it.copy(conversations = it.conversations.keeping(listOf(fetched))) }
+        }
 
     /**
      * [agent]'s chat when the shell finds none listed (an agent the roster did not carry yet, or a
@@ -164,7 +174,8 @@ class TimelineConversations(
         val current = mutableState.value
         if (!current.awaitsFirstChat) return
         if (shouldResolveRoute(routed, current)) {
-            selectConversation(requireNotNull(routed))
+            val route = requireNotNull(routed)
+            selectConversation(route) { initialRouteFailed(route, focused, createIfNone) }
             return
         }
         val first = current.listed(routed) ?: focused?.let(current::activeChatOf)
@@ -177,7 +188,15 @@ class TimelineConversations(
 
     private fun shouldResolveRoute(routed: ConversationId?, current: TimelineConversationsState): Boolean {
         if (routed == null) return false
+        if (routed == failedInitialRoute) return false
         return current.listed(routed) == null && !lists.legacyMode
+    }
+
+    private fun initialRouteFailed(route: ConversationId, focused: AgentId?, createIfNone: Boolean) {
+        if (mutableState.value.selected != route) return
+        failedInitialRoute = route
+        mutableState.update { it.copy(selected = null, error = if (focused == null) it.error else null) }
+        openInitial(null, focused, createIfNone)
     }
 
     override fun send(conversation: ConversationId, text: String) {

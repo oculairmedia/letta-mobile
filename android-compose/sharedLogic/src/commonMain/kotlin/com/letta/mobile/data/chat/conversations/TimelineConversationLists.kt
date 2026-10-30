@@ -64,10 +64,18 @@ class TimelineConversationLists internal constructor(
     }
 
     /** Loads the first page only for this agent, once per session. */
-    suspend fun focusAgent(agent: AgentId) = updateListing { listing.focus(agent) }
+    suspend fun focusAgent(agent: AgentId) {
+        if (!isVisibleAgent(agent)) return
+        updateListing { listing.focus(agent) }
+    }
+
+    private fun isVisibleAgent(agent: AgentId): Boolean = roster().visibleInLists().any { it.id == agent }
 
     /** Reads another page only for this agent. */
-    suspend fun loadMore(agent: AgentId) = updateListing { listing.loadMore(agent) }
+    suspend fun loadMore(agent: AgentId) {
+        if (!isVisibleAgent(agent)) return
+        updateListing { listing.loadMore(agent) }
+    }
 
     /** Newly pinned visible agents get only their first page, without another recents read. */
     suspend fun prefetchPinnedAgents(agents: Set<AgentId>) {
@@ -78,10 +86,18 @@ class TimelineConversationLists internal constructor(
     }
 
     /** Whether this agent still has unread pages. */
-    fun hasMore(agent: AgentId): Boolean = listing.hasMore(agent)
+    fun hasMore(agent: AgentId): Boolean = isVisibleAgent(agent) && listing.hasMore(agent)
 
     /** Explicit search demand reads unvisited agents; null scope searches the visible roster. */
-    suspend fun prepareSearch(agent: AgentId? = null) = updateListing { listing.search(roster(), agent) }
+    suspend fun prepareSearch(agent: AgentId? = null) = operations.withLock {
+        val result = runCatchingCancellable { listing.search(roster(), agent) }
+        publishRows(result.getOrElse { listing.conversations })
+        val failure = listing.searchFailures.values.firstOrNull() ?: result.exceptionOrNull()
+        val message = failure?.let { it.message ?: LIST_FAILED }
+        state.update {
+            it.copy(searchFailedAgents = listing.searchFailures.keys.toSet(), searchError = message, error = message)
+        }
+    }
 
     internal suspend fun rosterChanged() {
         if (legacyMode) refresh() else {
