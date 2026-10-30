@@ -63,6 +63,25 @@ class MonitorDisplayTest {
         assertEquals(listOf("1", "2", "3", "4", "5", "+2 more"), monitorDisplayLines("\n1\n2\n3\n4\n5\n6\n7\n"))
     }
 
+    @Test
+    fun multilineCommentsEntitiesEmphasisAndHeadingsAreCleaned() {
+        val lines = monitorDisplayLines(
+            "New PR comment from @bot: <!-- meta\nmore meta\n--> Checks passed\n" +
+                "Build &amp; test &lt;ok&gt;: *warning* raised\n" +
+                "### Release notes",
+        )
+        assertEquals(
+            listOf("New PR comment from @bot: Checks passed", "Build & test <ok>: warning raised", "Release notes"),
+            lines,
+        )
+    }
+
+    @Test
+    fun aTruncatedCommentCannotReachALaterCommentsClose() {
+        val lines = monitorDisplayLines("First item <!-- truncated\nSecond item\nThird <!-- closed --> item")
+        assertEquals(listOf("First item", "Second item", "Third item"), lines)
+    }
+
     private fun assertClean(text: String) {
         listOf("<!--", "<table", "[//]:", "![](", "](", "**", "https://", "(truncated)").forEach {
             assertFalse(text.contains(it), "Unexpected $it in $text")
