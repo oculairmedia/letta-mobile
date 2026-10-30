@@ -18,17 +18,4 @@ class IrohFramePublisherInitTest {
         }
         assertEquals("bufferCapacity must be positive", negativeException.message)
     }
-
-    @Test
-    fun overflowBroadcastRequiresPositiveBufferCapacity() {
-        val zeroException = assertFailsWith<IllegalArgumentException> {
-            BoundedOverflowBroadcast(bufferCapacity = 0)
-        }
-        assertEquals("bufferCapacity must be positive", zeroException.message)
-
-        val negativeException = assertFailsWith<IllegalArgumentException> {
-            BoundedOverflowBroadcast(bufferCapacity = -1)
-        }
-        assertEquals("bufferCapacity must be positive", negativeException.message)
-    }
 }
