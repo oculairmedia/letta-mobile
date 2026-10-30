@@ -77,6 +77,19 @@ class CommandReportMonospaceTest {
         assertEquals(listOf(PROSE), painted)
     }
 
+    @Test
+    fun anExpandedCompletedCardCollapsesOnlyFromItsSummaryRow() = runComposeUiTest {
+        show(notification(taskId = "bash_9"), mutableListOf())
+
+        // The summary row's chevron is the one collapse control; no "Hide full report" link repeats it.
+        onAllNodesWithText("Hide full report").assertCountEquals(0)
+        onAllNodesWithTag(ChatRowTestTags.TOOL_OUTPUT).assertCountEquals(1)
+
+        onNodeWithTag(ChatRowTestTags.COMPLETED_ACTIVITY_SUMMARY).performClick()
+        waitForIdle()
+        onAllNodesWithTag(ChatRowTestTags.TOOL_OUTPUT).assertCountEquals(0)
+    }
+
     private fun androidx.compose.ui.test.ComposeUiTest.show(notification: UiSubagentNotification, painted: MutableList<String>) {
         setContent {
             MaterialTheme {
