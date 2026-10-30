@@ -81,6 +81,7 @@ data class StoredImageAttachmentPointer(
     val uriOrUrl: String? = null,
     val thumbnailBase64: String? = null,
     val bodyReference: StoredImageBodyReference? = null,
+    /** The tool call whose return carried this image, so only that call shows it; null for message images. */
     val toolCallId: String? = null,
 )
 
