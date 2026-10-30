@@ -100,6 +100,12 @@ object ConversationAdminHandlers {
         registerConversationGetRoute(router, nativeClient)
     }
 
+    /**
+     * `visible_only: true` opts unfiltered, non-search requests into visible recents (default 30).
+     * Agent-free, hidden, archived and unauthorized rows are removed before cursor and limit.
+     * Requires the local agent visibility index; without it the opt-in request fails closed.
+     * Other requests retain the App Server contract. Recents share the per-agent held full list.
+     */
     private fun registerConversationListRoute(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
@@ -109,6 +115,25 @@ object ConversationAdminHandlers {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
+                if (wantsVisibleConversationPage(params)) {
+                    val visibility = hiddenAgents
+                        ?: adminError("capability_unavailable: visible_only requires local agent visibility")
+                    val page: (JsonArray) -> JsonArray = { full ->
+                        visibleConversationPage(
+                            full, visibility.hiddenAgentIds(), context,
+                            param(params, AdminParamKey("after"))?.let(::ConversationId),
+                            param(params, AdminParamKey("limit")),
+                        )
+                    }
+                    // Above the holding cap (or without a usable signature), fetch the full list rather
+                    // than filtering a truncated raw window. Never return an underfilled page.
+                    val ownVisible = suspend {
+                        listConversations(c, JsonObject(mapOf("limit" to JsonPrimitive(Long.MAX_VALUE))))?.let(page)
+                    }
+                    return@require if (heldList == null) ownVisible() else heldList.serve(
+                        fetchAll = { listAgentConversations(c) }, fromFull = page, fetchOwn = ownVisible,
+                    )
+                }
                 val own = suspend { listConversations(c, params) }
                 // One agent's page (no summary search) is cut from the held full list: the App Server
                 // re-reads every conversation record per list call, so per-agent calls cost the same as
