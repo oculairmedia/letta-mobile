@@ -505,12 +505,17 @@ internal data class CanonicalToolReturn(
 
 internal fun canonicalToolReturn(delta: JsonObject, defaultId: String? = null): CanonicalToolReturn {
     val returnObject = delta["tool_return"] as? JsonObject
+    val listedReturn = (delta["tool_returns"] as? JsonArray)?.firstOrNull() as? JsonObject
     return CanonicalToolReturn(
         toolCallId = delta.stringValue("tool_call_id")
             ?: returnObject?.stringValue("tool_call_id")
+            ?: listedReturn?.stringValue("tool_call_id")
             ?: defaultId.orEmpty(),
-        status = delta.stringValue("status") ?: returnObject?.stringValue("status") ?: "success",
+        status = delta.stringValue("status") ?: returnObject?.stringValue("status")
+            ?: listedReturn?.stringValue("status") ?: "success",
         body = delta["tool_return"]
+            ?: listedReturn?.get("tool_return")
+            ?: listedReturn?.get("func_response")
             ?: delta["output"]
             ?: delta["message"]
             ?: delta["content"],

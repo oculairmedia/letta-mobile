@@ -264,6 +264,11 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         val toolName = localMsg["toolName"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
         val isError = parseBooleanFlag(localMsg["isError"])
         val returnText = partsToText(parts)
+        val images = parts.mapNotNull { (it as? JsonObject)?.let(::normalizeImagePart) }
+        val returnBody: JsonElement = if (images.isEmpty()) JsonPrimitive(returnText) else buildJsonArray {
+            add(buildJsonObject { put("type", "text"); put("text", returnText) })
+            images.forEach { add(it) }
+        }
         val status = if (isError) "error" else "success"
         val tr = toolReturnInner(callId, status, JsonNull, JsonNull, returnText)
         val trMsg = buildJsonObject {
@@ -279,7 +284,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("run_id", ctx.projectedRunId)
             put("tool_call_id", callId)
             put("status", status)
-            put("tool_return", returnText)
+            put("tool_return", returnBody)
             put("stdout", JsonNull)
             put("stderr", JsonNull)
             put("tool_returns", JsonArray(listOf(tr)))
