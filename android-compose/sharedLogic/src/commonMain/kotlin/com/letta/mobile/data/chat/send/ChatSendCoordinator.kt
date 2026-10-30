@@ -550,6 +550,12 @@ class ChatSendCoordinator(
     private suspend fun expirePendingRecovery(state: ConversationTurnState) {
         state.pendingRecoveryExpired = true
         state.markPendingOutcome(timelineRepository, agentId, Delivery.Failed)
+        // The prompt may have reached the host before contact was lost. Recent history is read
+        // again after the redial, in this coordinator's scope and never under the turn lock: an
+        // echo there confirms the failed prompt instead of leaving it for the user to retry.
+        val otid = state.inFlightSend?.id?.value ?: state.otid ?: return
+        val conversation = state.ownerConversationId.takeIf { it.isNotBlank() } ?: return
+        postSendReconciler.schedule(conversation, otid, reason = "post-expiry")
     }
 
     private fun resumed(state: ConversationTurnState) {

@@ -411,6 +411,39 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `a send expired by a redial reads recent history again for its echo`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        val local = timelineRepository.externalLocals.single()
+        // Nothing is streaming, so the redial cannot carry the send: it is marked failed at once.
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "network lost", willReconnect = true))
+        advanceUntilIdle()
+
+        assertEquals(listOf(local.otid), timelineRepository.failedLocals.map { it.otid })
+        assertTrue(
+            "an expired send must read history again: ${timelineRepository.recentReconciles.map { it.reason }}",
+            timelineRepository.recentReconciles.any {
+                it.conversationId == "conv-1" && it.reason.startsWith("post-expiry-")
+            },
+        )
+    }
+
+    @Test
     fun `terminal disconnect with no active turn does not cleanup abandoned fragments`() = runTest {
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))

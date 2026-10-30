@@ -27,7 +27,8 @@ internal class PostSendReconciler(
         }
     }
 
-    fun schedule(conversationId: String, otid: String) {
+    /** Reads recent history on the configured delays after [reason], skipping while the stream is live. */
+    fun schedule(conversationId: String, otid: String, reason: String = "post-send") {
         val sentAtMillis = currentTimeMillis()
         scope.launch {
             for (delayMs in delaysMs()) {
@@ -45,7 +46,7 @@ internal class PostSendReconciler(
                     timelineRepository.reconcileRecentMessages(
                         agentId = agentId,
                         conversationId = conversationId,
-                        reason = "post-send-$delayMs",
+                        reason = "$reason-$delayMs",
                         forceRefresh = true,
                     )
                 }.onSuccess {
