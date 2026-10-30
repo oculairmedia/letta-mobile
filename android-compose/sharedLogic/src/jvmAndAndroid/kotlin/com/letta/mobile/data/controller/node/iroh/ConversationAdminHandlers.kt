@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.resolveConversationReadTarget
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -350,13 +351,15 @@ object ConversationAdminHandlers {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
+            val target = resolveConversationReadTarget(ConversationId(convId))
             val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
             val response = NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(
                         requestId = NativeAdmin.requestId(),
-                        conversationId = convId,
+                        conversationId = target?.first?.value ?: convId,
                         query = NativeAdmin.queryOf(
+                            "agent_id" to target?.second?.value,
                             "limit" to effectiveLimit,
                             "after" to param(params, AdminParamKey("after")),
                             "before" to param(params, AdminParamKey("before")),
@@ -453,6 +456,7 @@ object ConversationAdminHandlers {
         messageId: String,
         op: NativeAdminOp,
     ): JsonElement {
+        val target = resolveConversationReadTarget(ConversationId(conversationId))
         var before: String? = null
         val pageLimit = messageGetPageLimit()
         val maxPages = (MESSAGE_GET_MAX_SEARCHABLE_MESSAGES + pageLimit - 1) / pageLimit
@@ -461,8 +465,9 @@ object ConversationAdminHandlers {
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(
                         requestId = NativeAdmin.requestId(),
-                        conversationId = conversationId,
+                        conversationId = target?.first?.value ?: conversationId,
                         query = NativeAdmin.queryOf(
+                            "agent_id" to target?.second?.value,
                             "limit" to pageLimit.toString(),
                             "order" to "desc",
                             "before" to before,
@@ -497,7 +502,10 @@ object ConversationAdminHandlers {
     ): Boolean = oldestId == null || oldestId == previousBefore || pageSize < pageLimit
 
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
-        if (!context.canAccessConversation(conversationId)) {
+        val agentId = resolveConversationReadTarget(ConversationId(conversationId))?.second
+        val agentAllowed = agentId == null || context.authorizedAgentIds == null ||
+            IrohPeerCapabilities.isAgentInScope(context.authorizedAgentIds, agentId.value)
+        if (!context.canAccessConversation(conversationId) || !agentAllowed) {
             adminError("forbidden: conversation out of authorized scope")
         }
     }
