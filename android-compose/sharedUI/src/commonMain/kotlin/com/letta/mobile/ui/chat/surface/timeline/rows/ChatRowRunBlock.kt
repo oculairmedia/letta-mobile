@@ -276,7 +276,10 @@ private fun RunHeader(state: RunHeaderState) {
 @Composable
 private fun RunBody(body: RunBodyState, header: RunHeaderState, row: RunRowScope) {
     val steps = remember(body.messages) { compactRunSteps(body.messages) }
-    val lift by animateRunBodyLift(if (body.lifted) runHeaderFloor(header) + firstStepTop(steps) else 0.dp)
+    // Images stay visible when work folds away. Keep their top beat below the header's full bounds,
+    // using the same lift open and folded so settling does not introduce another geometry change.
+    val floor = if (steps.any { it.hasImages() }) 0.dp else runHeaderFloor(header)
+    val lift by animateRunBodyLift(if (body.lifted) floor + firstStepTop(steps) else 0.dp)
     Box(Modifier.fillMaxWidth().pullUp { lift }) {
         RunSteps(steps, body, row)
     }
@@ -310,14 +313,24 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
                 if (step.isWork()) {
                     RunWorkStep(positioned, body, row)
                     // Image output is conversation content, not work hidden by the run's disclosure.
-                    if (step is RunStep.ToolCalls) {
-                        step.calls.toolCalls.forEach { call -> ToolGeneratedImages(call, row.callbacks) }
-                    }
+                    RunStepImages(positioned, body, row)
                 } else {
                     RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
                 }
             }
         }
+    }
+}
+
+private fun RunStep.hasImages(): Boolean =
+    (this as? RunStep.ToolCalls)?.calls?.toolCalls?.any { it.generatedImageAttachments.isNotEmpty() } == true
+
+@Composable
+private fun RunStepImages(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
+    if (!positioned.step.hasImages()) return
+    val step = positioned.step as RunStep.ToolCalls
+    Column(modifier = positioned.workPadding(body)) {
+        step.calls.toolCalls.forEach { call -> ToolGeneratedImages(call, row.callbacks) }
     }
 }
 
@@ -330,11 +343,10 @@ private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: 
         exit = motion.expansionExit(),
         label = "runWorkStep",
     ) {
-        val indent = if (body.lifted) ChatRowSpacing.runStepIndent else 0.dp
         RunStepRow(
             positioned,
             row,
-            Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).padding(start = indent, top = positioned.top()),
+            Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body)),
         )
     }
 }
@@ -359,6 +371,11 @@ internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
 /** A run step and its place among the run's visible steps (the legacy row's group position). */
 @Immutable
 private class PositionedRunStep(val step: RunStep, val position: GroupPosition) {
+    fun workPadding(body: RunBodyState): Modifier {
+        val indent = if (body.lifted) ChatRowSpacing.runStepIndent else 0.dp
+        return Modifier.padding(start = indent, top = top())
+    }
+
     /** The legacy row beat above it: a tool summary always takes the grouped beat. */
     fun top(): Dp {
         val message = (step as? RunStep.Message)?.message ?: return ChatRowSpacing.grouped

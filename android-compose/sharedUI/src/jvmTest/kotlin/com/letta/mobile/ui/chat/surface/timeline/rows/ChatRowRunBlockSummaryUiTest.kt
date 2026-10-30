@@ -102,28 +102,45 @@ class ChatRowRunBlockSummaryUiTest {
             "Read output is conversation content, not hidden work: exactly one image must remain visible")
     }
 
+    private fun ComposeUiTest.assertFoldedImageGeometry() {
+        assertOneReadImage()
+        val image = onAllNodesWithContentDescription("Attached image", useUnmergedTree = true)
+            .fetchSemanticsNodes().single().boundsInRoot
+        val header = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
+        assertTrue(image.top >= header.bottom, "image overlaps run header: image=$image header=$header")
+    }
+
+    private fun ComposeUiTest.assertOpenedImageGeometry() {
+        assertOneReadImage()
+        val image = onAllNodesWithContentDescription("Attached image", useUnmergedTree = true)
+            .fetchSemanticsNodes().single().boundsInRoot
+        val step = onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNode().boundsInRoot
+        assertEquals(step.left, image.left, "image must share the tool step indent")
+        assertTrue(image.top >= step.bottom, "image must follow its tool step: image=$image step=$step")
+    }
+
     @Test
     fun aFoldedReadRunStillRendersExactlyOneImage() = runComposeUiTest {
         show(imageRun(), opened = false, environment = Environment(reducedMotion = true))
-        assertOneReadImage()
+        assertFoldedImageGeometry()
     }
 
     @Test
     fun anOpenedReadRunRendersExactlyOneImage() = runComposeUiTest {
         show(imageRun(), opened = true, environment = Environment(reducedMotion = true))
-        assertOneReadImage()
+        assertOpenedImageGeometry()
     }
 
     @Test
     fun aFoldedPointerReadRunStillRendersExactlyOneImage() = runComposeUiTest {
         show(imageRun(), opened = false, environment = Environment(reducedMotion = true, host = LettaHost.Pointer))
-        assertOneReadImage()
+        assertFoldedImageGeometry()
     }
 
     @Test
     fun anOpenedPointerReadRunRendersExactlyOneImage() = runComposeUiTest {
         show(imageRun(), opened = true, environment = Environment(reducedMotion = true, host = LettaHost.Pointer))
-        assertOneReadImage()
+        assertOpenedImageGeometry()
     }
 
     @Test
