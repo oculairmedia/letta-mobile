@@ -158,10 +158,7 @@ object ConversationAdminHandlers {
         heldList: HeldListCache?,
     ): JsonArray? {
         val visibility = this ?: adminError("capability_unavailable: visible_only requires local agent visibility")
-        val request = VisiblePageRequest(
-            after = param(params, AdminParamKey("after"))?.let(::ConversationId),
-            limit = param(params, AdminParamKey("limit")),
-        )
+        val request = param(params, AdminParamKey("after"))?.let(::ConversationId) to param(params, AdminParamKey("limit"))
         val page: (JsonArray) -> JsonArray = { full -> visibleConversationPage(full, visibility.hiddenAgentIds(), context, request) }
         val ownVisible = suspend { listConversations(client, JsonObject(mapOf("limit" to JsonPrimitive(Long.MAX_VALUE))))?.let(page) }
         return if (heldList == null) ownVisible() else heldList.serve(fetchAll = { listAgentConversations(client) }, fromFull = page, fetchOwn = ownVisible)

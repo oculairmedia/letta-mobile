@@ -8,15 +8,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
-/** Where a visible page starts and how many rows it takes, as the request named them. */
-internal class VisiblePageRequest(val after: ConversationId?, val limit: String?)
-
 /** Visible recents are filtered and scoped before cursor/limit, independently of legacy pages. */
 internal fun visibleConversationPage(
     full: JsonArray,
     hiddenAgents: Set<String>,
     context: AdminRpcRequestContext,
-    request: VisiblePageRequest,
+    request: Pair<ConversationId?, String?>,
 ): JsonArray = pageOf(visibleRows(full, hiddenAgents, context), request)
 
 /** Rows a caller may see in recents, newest first. */
@@ -43,11 +40,15 @@ private fun JsonObject.isInScope(context: AdminRpcRequestContext): Boolean =
     context.authorizedAgentIds?.contains(text("agent_id")) != false &&
         context.authorizedConversationIds?.contains(text("id")) != false
 
-/** Rows after the cursor (from the top when it is unknown), cut to the limit with App Server semantics. */
-private fun pageOf(rows: List<JsonObject>, request: VisiblePageRequest): JsonArray {
-    val cursor = request.after?.let { after -> rows.indexOfFirst { it.text("id") == after.value } } ?: -1
+/**
+ * Rows after the cursor (from the top when it is unknown), cut to the limit with App Server
+ * semantics. [request] is the cursor and the raw limit, as the caller named them.
+ */
+private fun pageOf(rows: List<JsonObject>, request: Pair<ConversationId?, String?>): JsonArray {
+    val (after, limit) = request
+    val cursor = after?.let { id -> rows.indexOfFirst { it.text("id") == id.value } } ?: -1
     val remaining = if (cursor >= 0) rows.drop(cursor + 1) else rows
-    val count = request.limit?.toLongOrNull()?.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())?.toInt()
+    val count = limit?.toLongOrNull()?.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())?.toInt()
         ?: VISIBLE_PAGE_DEFAULT
     val kept = if (count >= 0) count else (remaining.size.toLong() + count).coerceAtLeast(0).toInt()
     return JsonArray(remaining.take(kept))
