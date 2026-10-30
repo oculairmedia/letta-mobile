@@ -373,26 +373,51 @@ private class VisibleHost(private val mode: String = "visible") : AppServerClien
         params: JsonObject,
     ): AppServerInboundFrame.AdminRpcResponse {
         val agent = params.text("agent_id").takeIf { it.isNotEmpty() }
-        if (agent == null) {
-            val flag = params["visible_only"] as? JsonPrimitive
-            val optedIn = flag?.let { !it.isString && it.booleanOrNull == true } == true &&
-                listOf("agent_id", "summary_search", "archive_status", "order", "order_by").none { params[it] != null }
-            val case = when {
-                mode == "no-index" && optedIn -> "no-index"
-                mode == "legacy" || !optedIn -> "string-is-legacy"
-                mode == "window" -> "full-window"
-                params.text("after") == "recent" && params.text("limit") == "1" -> "after-visible"
-                params.text("after") == "unknown" -> "unknown-cursor"
-                else -> "visible"
-            }
-            val response = fixture.response(case)
-            // Hold the already-read list response so a concurrent creation can overtake it.
-            recentsGate?.await()
-            return AppServerInboundFrame.AdminRpcResponse(
-                command.requestId, response.getValue("success").jsonPrimitive.booleanOrNull == true,
-                result = response["result"], error = response["error"]?.jsonPrimitive?.content,
-            )
+        if (agent == null) return listRecents(command, params)
+        return listAgent(command, params, agent)
+    }
+
+    private fun optsIntoVisibleRecents(params: JsonObject): Boolean {
+        val flag = params["visible_only"] as? JsonPrimitive
+        val literalTrue = flag?.let { !it.isString && it.booleanOrNull == true } == true
+        return literalTrue && listOf("agent_id", "summary_search", "archive_status", "order", "order_by")
+            .none { params[it] != null }
+    }
+
+    private fun recentCase(params: JsonObject): String {
+        val optedIn = optsIntoVisibleRecents(params)
+        return when {
+            mode == "no-index" && optedIn -> "no-index"
+            mode == "legacy" || !optedIn -> "string-is-legacy"
+            mode == "window" -> "full-window"
+            else -> cursorCase(params)
         }
+    }
+
+    private fun cursorCase(params: JsonObject): String = when {
+        params.text("after") == "recent" && params.text("limit") == "1" -> "after-visible"
+        params.text("after") == "unknown" -> "unknown-cursor"
+        else -> "visible"
+    }
+
+    private suspend fun listRecents(
+        command: AppServerCommand.AdminRpc,
+        params: JsonObject,
+    ): AppServerInboundFrame.AdminRpcResponse {
+        val response = fixture.response(recentCase(params))
+        // Hold the already-read list response so a concurrent creation can overtake it.
+        recentsGate?.await()
+        return AppServerInboundFrame.AdminRpcResponse(
+            command.requestId, response.getValue("success").jsonPrimitive.booleanOrNull == true,
+            result = response["result"], error = response["error"]?.jsonPrimitive?.content,
+        )
+    }
+
+    private suspend fun listAgent(
+        command: AppServerCommand.AdminRpc,
+        params: JsonObject,
+        agent: String,
+    ): AppServerInboundFrame.AdminRpcResponse {
         if (agent == agentGate?.first) agentGate?.second?.await()
         if (agent in failingAgents) return AppServerInboundFrame.AdminRpcResponse(
             command.requestId, false, error = "app_server_error: conversation.list native command unsuccessful",
@@ -402,13 +427,17 @@ private class VisibleHost(private val mode: String = "visible") : AppServerClien
                 it.text("last_message_at").ifEmpty { it.text("updated_at").ifEmpty { it.text("created_at") } }
             }.thenBy { it.text("id") },
         )
+        return AppServerInboundFrame.AdminRpcResponse(
+            command.requestId, true, result = agentPage(own, params),
+        )
+    }
+
+    private fun agentPage(own: List<JsonObject>, params: JsonObject): JsonArray {
         val after = params.text("after").takeIf { it.isNotEmpty() }
         val cursor = if (after == null) -1 else own.indexOfFirst { it.text("id") == after }
         val tail = own.drop(cursor + 1)
         val limit = params.text("limit").toLongOrNull() ?: 20L
         val count = if (limit < 0) (tail.size.toLong() + limit).coerceAtLeast(0) else minOf(limit, tail.size.toLong())
-        return AppServerInboundFrame.AdminRpcResponse(
-            command.requestId, true, result = JsonArray(tail.take(count.toInt())),
-        )
+        return JsonArray(tail.take(count.toInt()))
     }
 }

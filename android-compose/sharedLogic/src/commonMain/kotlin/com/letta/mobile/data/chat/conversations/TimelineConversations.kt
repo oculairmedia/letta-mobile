@@ -163,8 +163,8 @@ class TimelineConversations(
     fun openInitial(routed: ConversationId?, focused: AgentId?, createIfNone: Boolean) {
         val current = mutableState.value
         if (!current.awaitsFirstChat) return
-        if (routed != null && current.listed(routed) == null && !lists.legacyMode) {
-            selectConversation(routed)
+        if (shouldResolveRoute(routed, current)) {
+            selectConversation(requireNotNull(routed))
             return
         }
         val first = current.listed(routed) ?: focused?.let(current::activeChatOf)
@@ -173,6 +173,11 @@ class TimelineConversations(
             return
         }
         if (focused != null && current.mayCreate(createIfNone)) createConversationForAgent(focused)
+    }
+
+    private fun shouldResolveRoute(routed: ConversationId?, current: TimelineConversationsState): Boolean {
+        if (routed == null) return false
+        return current.listed(routed) == null && !lists.legacyMode
     }
 
     override fun send(conversation: ConversationId, text: String) {

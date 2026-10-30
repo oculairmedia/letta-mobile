@@ -48,16 +48,19 @@ class TimelineConversationLists internal constructor(
                 publishRows(rows)
                 val settled = !listing.legacyMode || roster().isNotEmpty() || state.value.loaded
                 state.update { it.copy(loaded = settled, authoritative = listing.legacyMode && settled, error = null) }
-                if (settled && !bootstrapComplete) {
-                    if (!firstRowsPublished) {
-                        firstRowsPublished = true
-                        bootstrapEvent("list.first_rows_published", state.value.conversations.size)
-                    }
-                    bootstrapComplete = true
-                    bootstrapEvent("list.bootstrap_complete", state.value.conversations.size)
-                }
+                completeBootstrap(settled)
             }
             .onFailure { failure -> state.update { it.copy(error = failure.message ?: LIST_FAILED) } }
+    }
+
+    private fun completeBootstrap(settled: Boolean) {
+        if (!settled || bootstrapComplete) return
+        if (!firstRowsPublished) {
+            firstRowsPublished = true
+            bootstrapEvent("list.first_rows_published", state.value.conversations.size)
+        }
+        bootstrapComplete = true
+        bootstrapEvent("list.bootstrap_complete", state.value.conversations.size)
     }
 
     /** Loads the first page only for this agent, once per session. */

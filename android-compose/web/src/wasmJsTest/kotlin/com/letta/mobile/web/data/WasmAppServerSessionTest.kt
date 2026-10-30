@@ -45,6 +45,7 @@ import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.ui.chat.session.timelineModelSource
+import com.letta.mobile.ui.shell.conversations.TimelineConversationPreferences
 import com.letta.mobile.ui.shell.conversations.rememberShellTimelineConversationList
 import com.letta.mobile.ui.shell.conversations.rememberTimelineConversations
 import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
@@ -282,7 +283,7 @@ class WasmAppServerSessionTest {
                     connection = BackendConnectionStatus.Connected("App Server"),
                     backend = { gateway },
                     agents = roster,
-                    prefs = ConversationManagementPrefs(),
+                    preferences = TimelineConversationPreferences(ConversationManagementPrefs()),
                 )
                 owner = liveOwner
                 val list = rememberShellTimelineConversationList(liveOwner)

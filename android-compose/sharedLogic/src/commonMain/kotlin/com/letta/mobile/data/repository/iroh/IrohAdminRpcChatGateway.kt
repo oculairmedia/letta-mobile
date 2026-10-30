@@ -247,13 +247,21 @@ class IrohAdminRpcChatGateway(
             body = AdminRpcBody(params.toString()),
         )) ?: throw TimelineTransportHttpException(502, "Visible recents returned no result")
         // Legacy hosts ignore the flag. Inspect raw rows before the decoder discards agent-free workers.
-        if (result is JsonArray && result.any { row ->
-                row is JsonObject && com.letta.mobile.data.model.HiddenListFilter.isAgentFreeRow(row)
-            }) {
+        if (containsAgentFreeRows(result)) {
             throw UnsupportedOperationException("Host ignored visible_only")
         }
         return json.decodeConversationList(result, ::reportSkippedConversationRows)
             .onEach { agentIdByConversation[it.id] = it.agentId }
+    }
+
+    private fun containsAgentFreeRows(result: JsonElement): Boolean {
+        if (result !is JsonArray) return false
+        return result.any { isAgentFreeRow(it) }
+    }
+
+    private fun isAgentFreeRow(row: JsonElement): Boolean {
+        if (row !is JsonObject) return false
+        return com.letta.mobile.data.model.HiddenListFilter.isAgentFreeRow(row)
     }
 
     override suspend fun getConversation(conversationId: String): Conversation {

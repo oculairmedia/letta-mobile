@@ -39,16 +39,7 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
     fun hasMore(agent: AgentId): Boolean = !legacyMode && fleet.hasMore(agent)
 
     suspend fun refresh(roster: List<Agent>, pins: Set<AgentId>, publish: (List<Conversation>) -> Unit) = mutex.withLock {
-        if (!legacyMode) {
-            try {
-                recents = gateway.listRecentConversations()
-            } catch (failure: Exception) {
-                if (failure is CancellationException) throw failure
-                if (failure !is UnsupportedOperationException && failure.message?.contains("capability_unavailable") != true) throw failure
-                legacyMode = true
-                Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr failure.message.orEmpty())
-            }
-        }
+        if (!legacyMode) refreshRecents()
         if (legacyMode) {
             legacy.refresh(roster)
         } else {
@@ -60,6 +51,20 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
         }
         conversations
     }
+
+    private suspend fun refreshRecents() {
+        try {
+            recents = gateway.listRecentConversations()
+        } catch (failure: Exception) {
+            if (failure is CancellationException) throw failure
+            if (!isUnsupportedRecents(failure)) throw failure
+            legacyMode = true
+            Telemetry.event("Conversations", "list.legacy_fallback", "reason" attr failure.message.orEmpty())
+        }
+    }
+
+    private fun isUnsupportedRecents(failure: Exception): Boolean =
+        failure is UnsupportedOperationException || failure.message?.contains("capability_unavailable") == true
 
     suspend fun rosterChanged(roster: List<Agent>): List<Conversation> = mutex.withLock {
         val visible = roster.visibleInLists().mapTo(mutableSetOf()) { it.id }
@@ -89,10 +94,7 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
             var firstFailure: Throwable? = null
             var successful = 0
             for (id in roster.visibleInLists().map { it.id }.filter { agent == null || it == agent }) {
-                runCatchingCancellable {
-                    if (id !in fleet.loadedAgents) fleet.refreshAgents(setOf(id))
-                    while (fleet.hasMore(id)) fleet.loadMore(id)
-                }.onSuccess { successful++ }.onFailure { failure ->
+                runCatchingCancellable { readAllAgentPages(id) }.onSuccess { successful++ }.onFailure { failure ->
                     if (firstFailure == null) firstFailure = failure
                     Telemetry.event(
                         "Conversations", "list.agent_read_failed", "agentId" attr id.value, "reason" attr failure.message,
@@ -118,21 +120,34 @@ internal class RecentConversationListing(private val gateway: ChatGateway) {
                 if (row.agentId in fleet.loadedAgents) fleet.record(row)
                 refresh += requireNotNull(owner)
             } else {
-                val row = gateway.getConversation(id.value)
-                if (row.agentId in fleet.loadedAgents) {
-                    refresh += row.agentId
-                } else {
-                    val known = roster.firstOrNull { it.id == row.agentId }
-                    val hidden = known != null && listOf(known).visibleInLists().isEmpty()
-                    val shown = listOf(row).visibleConversationsInLists().filterNot { it.archived == true || hidden }
-                    recents = (shown + recents.filterNot { it.id == id })
-                        .sortedWith(ConversationRecency.newestFirst).take(RECENTS_LIMIT)
-                }
+                reconcileUnloadedRow(id, roster, refresh)
             }
         }
         fleet.refreshAgents(refresh)
         recents = recents.filterNot { it.agentId in refresh }
         conversations
+    }
+
+    private suspend fun readAllAgentPages(id: AgentId) {
+        if (id !in fleet.loadedAgents) fleet.refreshAgents(setOf(id))
+        while (fleet.hasMore(id)) fleet.loadMore(id)
+    }
+
+    private suspend fun reconcileUnloadedRow(id: ConversationId, roster: List<Agent>, refresh: MutableSet<AgentId>) {
+        val row = gateway.getConversation(id.value)
+        if (row.agentId in fleet.loadedAgents) {
+            refresh += row.agentId
+            return
+        }
+        val hidden = isHiddenOwner(row.agentId, roster)
+        val shown = listOf(row).visibleConversationsInLists().filterNot { it.archived == true || hidden }
+        recents = (shown + recents.filterNot { it.id == id })
+            .sortedWith(ConversationRecency.newestFirst).take(RECENTS_LIMIT)
+    }
+
+    private fun isHiddenOwner(owner: AgentId, roster: List<Agent>): Boolean {
+        val known = roster.firstOrNull { it.id == owner } ?: return false
+        return listOf(known).visibleInLists().isEmpty()
     }
 
     private companion object {

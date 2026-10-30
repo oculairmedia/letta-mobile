@@ -7236,8 +7236,17 @@ public final class com/letta/mobile/ui/shell/conversations/ShellTimelineConversa
 	public static final fun SyncTimelineConversations (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Lcom/letta/mobile/data/chat/conversations/TimelineConversations;Ljava/lang/String;Landroidx/compose/runtime/Composer;I)V
 	public static final fun rememberShellTimelineChat (Lcom/letta/mobile/ui/shell/conversations/ShellTimelineChatBinding;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/conversations/ShellTimelineChat;
 	public static final fun rememberShellTimelineConversationList (Lcom/letta/mobile/data/chat/conversations/TimelineConversations;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;
-	public static final fun rememberTimelineConversations (Lcom/letta/mobile/data/model/BackendConnectionStatus;Lkotlin/jvm/functions/Function0;Ljava/util/List;Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;ZLandroidx/compose/runtime/Composer;II)Lcom/letta/mobile/data/chat/conversations/TimelineConversations;
+	public static final fun rememberTimelineConversations (Lcom/letta/mobile/data/model/BackendConnectionStatus;Lkotlin/jvm/functions/Function0;Ljava/util/List;Lcom/letta/mobile/ui/shell/conversations/TimelineConversationPreferences;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/chat/conversations/TimelineConversations;
 	public static final fun shellComposerCommands (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lcom/letta/mobile/data/chat/conversations/TimelineConversations;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/shell/conversations/TimelineConversationPreferences {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;Ljava/util/Set;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getManagement ()Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
+	public final fun getPinnedAgents ()Ljava/util/Set;
+	public final fun getPinsLoaded ()Z
 }
 
 public final class com/letta/mobile/ui/shell/header/ComposableSingletons$ShellHeaderSearchBarKt {

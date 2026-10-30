@@ -154,6 +154,13 @@ private val NoConversations = TimelineConversationsState()
 @Composable
 private fun <T> StateFlow<T>?.collectOr(empty: T): T = this?.collectAsState()?.value ?: empty
 
+/** Conversation management and the pin snapshot that gates the initial session list. */
+class TimelineConversationPreferences(
+    val management: ConversationManagementPrefs,
+    val pinnedAgents: Set<AgentId> = emptySet(),
+    val pinsLoaded: Boolean = true,
+)
+
 /**
  * A session's shared conversation owner, rebuilt with each connection (a
  * reconnect is a new session) and running in this producer's scope, so it stops with the session.
@@ -164,10 +171,11 @@ fun rememberTimelineConversations(
     connection: BackendConnectionStatus,
     backend: () -> ChatGateway?,
     agents: List<Agent>,
-    prefs: ConversationManagementPrefs,
-    pinnedAgents: Set<AgentId> = emptySet(),
-    pinsLoaded: Boolean = true,
+    preferences: TimelineConversationPreferences,
 ): TimelineConversations? {
+    val prefs = preferences.management
+    val pinnedAgents = preferences.pinnedAgents
+    val pinsLoaded = preferences.pinsLoaded
     val roster by rememberUpdatedState(agents)
     val pins by rememberUpdatedState(pinnedAgents)
     val owner by produceState<TimelineConversations?>(null, connection, pinsLoaded) {
@@ -216,7 +224,8 @@ class ShellTimelineChat<P : ChatSessionPort>(
 @Composable
 fun <P : ChatSessionPort> rememberShellTimelineChat(binding: ShellTimelineChatBinding<P>): ShellTimelineChat<P> {
     val owner = rememberTimelineConversations(
-        binding.connection, binding.backend, binding.agents, binding.prefs, binding.pinnedAgents, binding.pinsLoaded,
+        binding.connection, binding.backend, binding.agents,
+        TimelineConversationPreferences(binding.prefs, binding.pinnedAgents, binding.pinsLoaded),
     )
     SyncTimelineConversations(binding.workspace, owner, binding.session)
     val list = rememberShellTimelineConversationList(owner)
