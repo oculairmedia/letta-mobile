@@ -47,6 +47,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
@@ -408,6 +409,91 @@ class WsChatSendCoordinatorTest {
         assertEquals(emptyList<FakeTimelineExternalTransportWriter.LocalMarker>(), timelineRepository.failedLocals)
         assertEquals(emptyList<String>(), timelineRepository.clearedActiveConversations)
         assertEquals(emptyList<FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup>(), timelineRepository.abandonedFragmentCleanups)
+    }
+
+    @Test
+    fun `a send expired by a redial reads recent history again for its echo`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        val local = timelineRepository.externalLocals.single()
+        // The redial cannot carry the send, so it expires: at once, or after the redial timeout when
+        // the send still looks streaming. Run virtual time past that timeout and the reads' delays.
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "network lost", willReconnect = true))
+        advanceTimeBy(45_000)
+        runCurrent()
+
+        val failed = timelineRepository.failedLocals.map { it.otid }
+        assertEquals("the expired send is marked failed", listOf(local.otid), failed)
+        assertTrue(
+            "an expired send must read history again: ${timelineRepository.recentReconciles.map { it.reason }}",
+            timelineRepository.recentReconciles.any {
+                it.conversationId == "conv-1" && it.reason.startsWith("post-expiry-")
+            },
+        )
+    }
+
+    @Test
+    fun `a frame of the expired turn does not skip the post-expiry history read`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "network lost", willReconnect = true))
+        runCurrent()
+        // Expiry is immediate, or follows the redial timeout when the send still looks streaming.
+        if (timelineRepository.failedLocals.isEmpty()) {
+            advanceTimeBy(30_100)
+            runCurrent()
+        }
+        assertEquals("the send expired", 1, timelineRepository.failedLocals.size)
+        assertTrue(
+            "no history read yet: ${timelineRepository.recentReconciles.map { it.reason }}",
+            timelineRepository.recentReconciles.none { it.reason.startsWith("post-expiry-") },
+        )
+
+        // A late frame of the expired turn arrives before its user echo has been seen.
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "late-1", contentRaw = JsonPrimitive("I"), runId = "run-app"),
+            ),
+        )
+        advanceTimeBy(10_000)
+        runCurrent()
+
+        assertTrue(
+            "a live frame must not skip the post-expiry read: ${timelineRepository.recentReconciles.map { it.reason }}",
+            timelineRepository.recentReconciles.any {
+                it.conversationId == "conv-1" && it.reason.startsWith("post-expiry-")
+            },
+        )
     }
 
     @Test
