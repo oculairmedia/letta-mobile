@@ -148,20 +148,19 @@ class CanonicalPendingLocalStore(
         scope: TimelineScope,
         loaded: List<Record>,
         now: TimelineInstant = timelineNow(),
-        horizonMillis: Long = LOST_ECHO_HORIZON_MILLIS,
         streaming: Boolean = false,
     ): Int {
-        require(horizonMillis > 0)
         // Callers already hold a freshly loaded list, and a send enters its state no earlier than it
         // was sent, so a younger send cannot be stale: refresh runs on ordinary traffic and must not
         // bill a commit and a revision when nothing is.
-        if (loaded.none { mayBeStale(it, now, horizonMillis) }) return 0
+        if (loaded.none { mayBeStale(it, now) }) return 0
         val nowMillis = now.epochMillis()
         return store.transaction(scope) {
             val previous = readOutbox(nowMillis)
             val next = previous.map { entry ->
-                entry.takeIf { it.state != OutboxState.Failed && unowned(it, nowMillis, horizonMillis, streaming) }
-                    ?.takeIf { nowMillis - it.stateSinceMillis >= horizonMillis }
+                entry.takeIf { it.state != OutboxState.Failed && !recoveryProtected(it.otid) }
+                    ?.takeIf { !it.inFlightHere(nowMillis, LOST_ECHO_HORIZON_MILLIS, streaming) }
+                    ?.takeIf { nowMillis - it.stateSinceMillis >= LOST_ECHO_HORIZON_MILLIS }
                     ?.after(LOST_EVENTS[entry.state].orEmpty(), nowMillis)
                     ?: entry
             }
@@ -171,21 +170,15 @@ class CanonicalPendingLocalStore(
         }
     }
 
-    private fun unowned(entry: OutboxEntry, nowMillis: Long, horizonMillis: Long, streaming: Boolean): Boolean =
-        !recoveryProtected(entry.otid) && !entry.inFlightHere(nowMillis, horizonMillis, streaming)
-
     /**
      * The otids this process may still be delivering (see [OutboxEntry.inFlightHere]). Every other
      * unconfirmed send belongs to no live attempt, so history decides it.
      */
-    internal suspend fun inFlightHere(
-        scope: TimelineScope,
-        streaming: Boolean,
-        horizonMillis: Long = LOST_ECHO_HORIZON_MILLIS,
-    ): Set<String> {
+    internal suspend fun inFlightHere(scope: TimelineScope, streaming: Boolean): Set<String> {
         val now = timelineCurrentTimeMillis()
         return store.read(scope) {
-            readOutbox(now).filter { it.inFlightHere(now, horizonMillis, streaming) }.mapTo(mutableSetOf()) { it.otid }
+            readOutbox(now).filter { it.inFlightHere(now, LOST_ECHO_HORIZON_MILLIS, streaming) }
+                .mapTo(mutableSetOf()) { it.otid }
         }
     }
 
@@ -193,10 +186,10 @@ class CanonicalPendingLocalStore(
      * Whether [record] could be past the horizon: unconfirmed and sent long enough ago. An
      * unparsable timestamp is not evidence of staleness, so such a record is left alone.
      */
-    private fun mayBeStale(record: Record, now: TimelineInstant, horizonMillis: Long): Boolean {
+    private fun mayBeStale(record: Record, now: TimelineInstant): Boolean {
         if (record.delivery == Delivery.Failed) return false
         val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
-        return timelineInstantDurationMillis(sent, now) >= horizonMillis
+        return timelineInstantDurationMillis(sent, now) >= LOST_ECHO_HORIZON_MILLIS
     }
 
     /**

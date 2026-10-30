@@ -48080,8 +48080,8 @@ public final class com/letta/mobile/data/timeline/CanonicalPendingLocalStore {
 	public final fun load (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun mark (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Ljava/lang/Long;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun mark$default (Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/lang/String;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Delivery;Ljava/lang/Long;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun retireLostEchoes (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;JZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun retireLostEchoes$default (Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;JZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun retireLostEchoes (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun retireLostEchoes$default (Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore;Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Ljava/util/List;Ljava/time/Instant;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun save (Lcom/letta/mobile/data/timeline/snapshot/TimelineScope;Lcom/letta/mobile/data/timeline/CanonicalPendingLocalStore$Record;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
