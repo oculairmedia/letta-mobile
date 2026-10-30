@@ -73,15 +73,15 @@ class SubagentDualViewHolder(initial: SubagentDualViewState = SubagentDualViewSt
     internal fun setCompact(value: Boolean) {
         if (compact == value) return
         compact = value
-        if (value) {
-            state = state.active?.takeIf { state.showsSubagent }?.let { SubagentDualViewState.Closed.open(it) }
-                ?: SubagentDualViewState.Closed
-        }
+        if (value) state = state.trimmedForCompact()
     }
 
     fun open(view: SubagentView) {
-        state = (if (compact) SubagentDualViewState.Closed else state).open(view)
+        state = openBase().open(view)
     }
+
+    /** Compact keeps one view at a time, so a new one starts from nothing. */
+    private fun openBase(): SubagentDualViewState = if (compact) SubagentDualViewState.Closed else state
 
     fun select(key: SubagentViewKey) {
         state = state.select(key)
@@ -171,6 +171,12 @@ fun SubagentDualViewFrame(
             }
         }
     }
+}
+
+/** The subagent being shown, alone; nothing when the parent was showing. */
+private fun SubagentDualViewState.trimmedForCompact(): SubagentDualViewState {
+    val shown = active?.takeIf { showsSubagent } ?: return SubagentDualViewState.Closed
+    return SubagentDualViewState.Closed.open(shown)
 }
 
 /** Where the dual view's parts go for one state and window width. */
