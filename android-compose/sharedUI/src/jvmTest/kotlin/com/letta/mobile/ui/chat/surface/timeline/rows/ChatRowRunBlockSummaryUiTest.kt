@@ -58,13 +58,16 @@ class ChatRowRunBlockSummaryUiTest {
         UiMessage(id = "a", role = "assistant", content = "Fixed it.", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID),
     )
 
+    /** How a test draws the run: the host idiom and whether motion is reduced. */
+    private data class Environment(val reducedMotion: Boolean = false, val host: LettaHost = LettaHost.Touch)
+
     private fun ComposeUiTest.show(
         item: ChatRenderItem, opened: Boolean, actions: RecordingChatActions = RecordingChatActions(),
-        reducedMotion: Boolean = false, host: LettaHost = LettaHost.Touch,
+        environment: Environment = Environment(),
     ) {
         val state = renderState(collapsedRunIds = if (opened) setOf(RUN_ID) else emptySet())
         setContent {
-            CompositionLocalProvider(LocalReducedMotion provides reducedMotion, LocalLettaHost provides host) {
+            CompositionLocalProvider(LocalReducedMotion provides environment.reducedMotion, LocalLettaHost provides environment.host) {
                 MaterialTheme {
                     Box(Modifier.width(400.dp).testTag(ROW)) {
                         RenderRow(item, rowContext(itemState = state, newestMessageId = "a"), rowCallbacks(actions))
@@ -101,25 +104,25 @@ class ChatRowRunBlockSummaryUiTest {
 
     @Test
     fun aFoldedReadRunStillRendersExactlyOneImage() = runComposeUiTest {
-        show(imageRun(), opened = false, reducedMotion = true)
+        show(imageRun(), opened = false, environment = Environment(reducedMotion = true))
         assertOneReadImage()
     }
 
     @Test
     fun anOpenedReadRunRendersExactlyOneImage() = runComposeUiTest {
-        show(imageRun(), opened = true, reducedMotion = true)
+        show(imageRun(), opened = true, environment = Environment(reducedMotion = true))
         assertOneReadImage()
     }
 
     @Test
     fun aFoldedPointerReadRunStillRendersExactlyOneImage() = runComposeUiTest {
-        show(imageRun(), opened = false, reducedMotion = true, host = LettaHost.Pointer)
+        show(imageRun(), opened = false, environment = Environment(reducedMotion = true, host = LettaHost.Pointer))
         assertOneReadImage()
     }
 
     @Test
     fun anOpenedPointerReadRunRendersExactlyOneImage() = runComposeUiTest {
-        show(imageRun(), opened = true, reducedMotion = true, host = LettaHost.Pointer)
+        show(imageRun(), opened = true, environment = Environment(reducedMotion = true, host = LettaHost.Pointer))
         assertOneReadImage()
     }
 

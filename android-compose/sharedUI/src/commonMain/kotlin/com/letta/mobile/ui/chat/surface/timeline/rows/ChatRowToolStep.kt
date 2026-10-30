@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -99,7 +100,6 @@ internal fun ToolStep(
     callbacks: ChatRowCallbacks,
     /** The call's state read with the run's approvals; classified from the call alone when null. */
     state: ToolTimelineState? = null,
-    showImages: Boolean = true,
 ) {
     val resolved = state ?: remember(toolCall) { classifyToolCallState(toolCall) }
     val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
@@ -122,9 +122,7 @@ internal fun ToolStep(
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
         ) {
-            ToolStepDetails(
-                toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure(), showImages = showImages,
-            )
+            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure())
         }
     }
 }
@@ -287,7 +285,7 @@ private fun warningInk(): Color {
 
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
-private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean, showImages: Boolean) {
+private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -301,7 +299,7 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, l
         }
         ToolStepInset(toolCall, callbacks, live, failed)
         ToolPreviewChips(toolCall, rememberToolStepLine(toolCall), callbacks)
-        if (showImages) ToolGeneratedImages(toolCall, callbacks)
+        if (LocalToolImagesInline.current) ToolGeneratedImages(toolCall, callbacks)
     }
 }
 
@@ -338,6 +336,12 @@ private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, c
         if (expanded) callbacks.actions.expandTruncatedToolResult(ChatMessageId(truncation.messageId))
     }
 }
+
+/**
+ * Whether a tool step draws its call's images inside its own details. A run block draws them
+ * outside its foldable work instead (so a folded run still shows them) and turns this off.
+ */
+internal val LocalToolImagesInline = staticCompositionLocalOf { true }
 
 @Composable
 internal fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {

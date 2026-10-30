@@ -188,7 +188,6 @@ internal fun RunToolSteps(
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
     modifier: Modifier = Modifier,
-    showImages: Boolean = true,
 ) {
     val toolCalls = calls.toolCalls
     if (toolCalls.isEmpty()) return
@@ -196,7 +195,7 @@ internal fun RunToolSteps(
         // Tagged inside: the run's work-step wrapper tags the outer node.
         Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_TOOL_STEPS)) {
             if (toolCalls.size > 1) StepGroupLabel(toolCalls)
-            ToolStepList(calls, callbacks, showImages = showImages)
+            ToolStepList(calls, callbacks)
         }
         // Each request keeps its own slot, so answering one folds its card away (animated) in place.
         calls.approvals.forEach { approval ->
@@ -228,7 +227,7 @@ private fun StepGroupLabel(toolCalls: List<UiToolCall>) {
  * and the lone tool line's sheet and disclosure.
  */
 @Composable
-internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier, showImages: Boolean = true) {
+internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
     val toolCalls: ImmutableList<UiToolCall> = calls.toolCalls
     val states = remember(toolCalls, calls.approvals) { toolCalls.map { call -> call.runState(calls.approvals.requestFor(call), toolCalls) } }
     val live = states.any { it == ToolTimelineState.Running }
@@ -238,7 +237,7 @@ internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modi
         toolCalls.forEachIndexed { index, call ->
             val disclosureKey = call.disclosureKey().ifBlank { "step:$index" }
             key(index, disclosureKey) {
-                ToolStep(call, disclosureKey, callbacks, state = states[index], showImages = showImages)
+                ToolStep(call, disclosureKey, callbacks, state = states[index])
             }
         }
     }
