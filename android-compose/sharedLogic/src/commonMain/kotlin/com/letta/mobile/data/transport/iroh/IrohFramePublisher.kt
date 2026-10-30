@@ -96,7 +96,7 @@ internal class IrohFramePublisher(
  * queryable through [replayCache] for reconciliation.
  */
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
-private class BoundedOverflowBroadcast(
+internal class BoundedOverflowBroadcast(
     private val bufferCapacity: Int,
 ) : SharedFlow<FrameCollectorOverflowIncident> {
     private val mutex = Mutex()
