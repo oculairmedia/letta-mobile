@@ -25,13 +25,16 @@ internal fun List<MessageContentPart.Image>.fillSizeOnlyPlaceholders(
     incoming: List<MessageContentPart.Image>,
 ): List<MessageContentPart.Image> {
     if (none { it.isSizeOnlyPlaceholder }) return this
-    val held = mapNotNullTo(HashSet()) { image -> image.base64.takeIf { it.isNotEmpty() } }
-    val pool = incoming.filterTo(ArrayList()) { it.base64.isNotEmpty() && it.base64 !in held }
+    val held = filter { it.base64.isNotEmpty() }.mapTo(HashSet()) { it.toolCallId to it.base64 }
+    val pool = incoming.filterTo(ArrayList()) { it.base64.isNotEmpty() && (it.toolCallId to it.base64) !in held }
     if (pool.isEmpty()) return this
     var filled = false
     val result = map { image ->
         if (!image.isSizeOnlyPlaceholder) return@map image
-        val sameType = pool.indices.filter { pool[it].mediaType.equals(image.mediaType, ignoreCase = true) }
+        val sameType = pool.indices.filter {
+            (image.toolCallId == null || pool[it].toolCallId == image.toolCallId) &&
+                pool[it].mediaType.equals(image.mediaType, ignoreCase = true)
+        }
         val pick = sameType.firstOrNull { pool[it].estimatedDecodedBytes() == image.storedByteSize }
             ?: sameType.firstOrNull()
             ?: return@map image
@@ -50,9 +53,10 @@ internal fun List<MessageContentPart.Image>.mergeIncomingImages(
     incoming: List<MessageContentPart.Image>,
 ): List<MessageContentPart.Image> {
     val filled = fillSizeOnlyPlaceholders(incoming)
-    if (filled === this) return (this + incoming).distinct()
-    val used = filled.mapNotNullTo(HashSet()) { image -> image.base64.takeIf { it.isNotEmpty() } }
-    return (filled + incoming.filterNot { it.base64.isNotEmpty() && it.base64 in used }).distinct()
+    val seen = HashSet<Pair<String?, String>>()
+    return (filled + incoming).filter { image ->
+        image.base64.isEmpty() || seen.add(image.toolCallId to image.base64)
+    }.distinct()
 }
 
 /**

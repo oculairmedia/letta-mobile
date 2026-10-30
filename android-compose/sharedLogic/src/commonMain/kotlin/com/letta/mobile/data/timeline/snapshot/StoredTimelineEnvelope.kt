@@ -81,6 +81,7 @@ data class StoredImageAttachmentPointer(
     val uriOrUrl: String? = null,
     val thumbnailBase64: String? = null,
     val bodyReference: StoredImageBodyReference? = null,
+    val toolCallId: String? = null,
 )
 
 /** Scoped ledger content identity, never a filesystem path. */

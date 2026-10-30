@@ -101,8 +101,11 @@ private fun com.letta.mobile.data.model.ToolCall.toNativeUiToolCall(data: ToolCa
 /** Attach tool-returned images to the call so they are not duplicated as message attachments. */
 internal fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
     attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    allowUnowned: Boolean,
 ): List<UiImageAttachment> =
-    attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
+    attachments.filter { it.toolCallId == effectiveId || (it.toolCallId == null && allowUnowned) }
+        .distinctBy { it.base64.takeIf(String::isNotEmpty) ?: it }
+        .map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
 
 /**
  * Approval chip for a TOOL_CALL event. An explicit

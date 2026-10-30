@@ -99,6 +99,7 @@ internal fun ToolStep(
     callbacks: ChatRowCallbacks,
     /** The call's state read with the run's approvals; classified from the call alone when null. */
     state: ToolTimelineState? = null,
+    showImages: Boolean = true,
 ) {
     val resolved = state ?: remember(toolCall) { classifyToolCallState(toolCall) }
     val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
@@ -121,7 +122,9 @@ internal fun ToolStep(
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
         ) {
-            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure())
+            ToolStepDetails(
+                toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure(), showImages = showImages,
+            )
         }
     }
 }
@@ -284,7 +287,7 @@ private fun warningInk(): Color {
 
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
-private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
+private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean, showImages: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -298,7 +301,7 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, l
         }
         ToolStepInset(toolCall, callbacks, live, failed)
         ToolPreviewChips(toolCall, rememberToolStepLine(toolCall), callbacks)
-        ToolGeneratedImages(toolCall, callbacks)
+        if (showImages) ToolGeneratedImages(toolCall, callbacks)
     }
 }
 
@@ -337,7 +340,7 @@ private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, c
 }
 
 @Composable
-private fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
+internal fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
     if (toolCall.generatedImageAttachments.isEmpty()) return
     val images = remember(toolCall.generatedImageAttachments) { toolCall.generatedImageAttachments.toImmutableList() }
     ChatImageAttachmentsGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())

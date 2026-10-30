@@ -209,6 +209,7 @@ internal object StoredEnvelopeFingerprint {
                 mix(attachment.byteSize)
                 mixString(attachment.uriOrUrl)
                 mixString(attachment.thumbnailBase64)
+                attachment.toolCallId?.let(::mixString)
                 attachment.bodyReference?.let {
                     mixString(it.sha256)
                     mix(it.decodedBytes)
@@ -258,6 +259,7 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
                 mediaType = it.mediaType,
                 byteSize = estimatedBytes,
                 thumbnailBase64 = thumbnail,
+                toolCallId = it.toolCallId,
             )
         },
     )
@@ -268,10 +270,10 @@ suspend fun TimelineEvent.Confirmed.toStoredTimelineEventWithImageBodies(
 ): StoredTimelineEvent = toStoredTimelineEvent().copy(
     attachments = attachments.mapNotNull { image ->
         if (image.base64.isEmpty()) {
-            image.storedByteSize?.let { StoredImageAttachmentPointer(image.mediaType, it) }
+            image.storedByteSize?.let { StoredImageAttachmentPointer(image.mediaType, it, toolCallId = image.toolCallId) }
         } else {
             val reference = bodies.persistImage(image.base64)
-            StoredImageAttachmentPointer(image.mediaType, reference.decodedBytes, bodyReference = reference)
+            StoredImageAttachmentPointer(image.mediaType, reference.decodedBytes, bodyReference = reference, toolCallId = image.toolCallId)
         }
     },
 )
@@ -434,9 +436,11 @@ fun StoredTimelineEvent.toConfirmedTimelineEvent(): TimelineEvent.Confirmed {
             // that an image is stored locally; renderers show a placeholder.
             val inline = pointer.thumbnailBase64
             if (inline != null) {
-                MessageContentPart.Image(base64 = inline, mediaType = pointer.mediaType, storedByteSize = null)
+                MessageContentPart.Image(base64 = inline, mediaType = pointer.mediaType, toolCallId = pointer.toolCallId)
             } else if (pointer.byteSize > 0) {
-                MessageContentPart.Image(base64 = "", mediaType = pointer.mediaType, storedByteSize = pointer.byteSize)
+                MessageContentPart.Image(
+                    base64 = "", mediaType = pointer.mediaType, storedByteSize = pointer.byteSize, toolCallId = pointer.toolCallId,
+                )
             } else {
                 null
             }

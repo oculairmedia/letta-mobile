@@ -420,7 +420,7 @@ data class ToolReturnMessage(
         }
 
     val attachments: List<MessageContentPart.Image>
-        get() = extractAttachments(toolReturnRaw)
+        get() = extractAttachments(toolReturnRaw).map { it.copy(toolCallId = toolCallId ?: toolReturn.toolCallId) }
 }
 
 /**

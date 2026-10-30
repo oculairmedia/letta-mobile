@@ -203,7 +203,7 @@ private fun TimelineEvent.Local.localUiToolCall(
         ToolCallRenderData(
             result = result,
             isError = isError,
-            generatedImageAttachments = tc.generatedImageAttachments(attachments),
+            generatedImageAttachments = tc.generatedImageAttachments(attachments, allowUnowned = toolCalls.size == 1),
             executionTimeMs = localExecutionTimeMs(ProjectedToolReturn(callId, result)),
             approvalDecision = chip,
             sourceAgentId = context.ownAgentId,
@@ -284,7 +284,7 @@ private fun TimelineEvent.Confirmed.confirmedUiToolCall(
         ToolCallRenderData(
             result = result,
             isError = isError,
-            generatedImageAttachments = tc.generatedImageAttachments(attachments),
+            generatedImageAttachments = tc.generatedImageAttachments(attachments, allowUnowned = toolCalls.size == 1),
             approvalDecision = chip,
             // Preserve the pointer marker so expanding the card can fetch the complete result body.
             resultTruncation = truncation?.let { UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen) },

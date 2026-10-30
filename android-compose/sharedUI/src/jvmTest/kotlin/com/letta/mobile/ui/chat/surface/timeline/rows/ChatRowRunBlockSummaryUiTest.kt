@@ -34,6 +34,8 @@ import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -56,10 +58,13 @@ class ChatRowRunBlockSummaryUiTest {
         UiMessage(id = "a", role = "assistant", content = "Fixed it.", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID),
     )
 
-    private fun ComposeUiTest.show(item: ChatRenderItem, opened: Boolean, actions: RecordingChatActions = RecordingChatActions(), reducedMotion: Boolean = false) {
+    private fun ComposeUiTest.show(
+        item: ChatRenderItem, opened: Boolean, actions: RecordingChatActions = RecordingChatActions(),
+        reducedMotion: Boolean = false, host: LettaHost = LettaHost.Touch,
+    ) {
         val state = renderState(collapsedRunIds = if (opened) setOf(RUN_ID) else emptySet())
         setContent {
-            CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
+            CompositionLocalProvider(LocalReducedMotion provides reducedMotion, LocalLettaHost provides host) {
                 MaterialTheme {
                     Box(Modifier.width(400.dp).testTag(ROW)) {
                         RenderRow(item, rowContext(itemState = state, newestMessageId = "a"), rowCallbacks(actions))
@@ -67,6 +72,55 @@ class ChatRowRunBlockSummaryUiTest {
                 }
             }
         }
+    }
+
+    private fun imageRun() = runOf(
+        UiMessage(
+            id = "read", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = RUN_ID,
+            toolCalls = listOf(UiToolCall(
+                name = "Read", arguments = """{"file_path":"/tmp/pixel.png"}""", result = "[Image: pixel.png]",
+                status = "success", toolCallId = "read-image",
+                generatedImageAttachments = listOf(com.letta.mobile.data.model.UiImageAttachment(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M9QDwADjgGAv7SktwAAAABJRU5ErkJggg==",
+                    "image/png",
+                )),
+            )),
+        ),
+        UiMessage(id = "a", role = "assistant", content = "Read done.", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID),
+    )
+
+    private fun ComposeUiTest.assertOneReadImage() {
+        awaitText("Read done.")
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithContentDescription("Attached image", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() ||
+                onAllNodesWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
+        }
+        assertEquals(1, onAllNodesWithContentDescription("Attached image", useUnmergedTree = true).fetchSemanticsNodes().size,
+            "Read output is conversation content, not hidden work: exactly one image must remain visible")
+    }
+
+    @Test
+    fun aFoldedReadRunStillRendersExactlyOneImage() = runComposeUiTest {
+        show(imageRun(), opened = false, reducedMotion = true)
+        assertOneReadImage()
+    }
+
+    @Test
+    fun anOpenedReadRunRendersExactlyOneImage() = runComposeUiTest {
+        show(imageRun(), opened = true, reducedMotion = true)
+        assertOneReadImage()
+    }
+
+    @Test
+    fun aFoldedPointerReadRunStillRendersExactlyOneImage() = runComposeUiTest {
+        show(imageRun(), opened = false, reducedMotion = true, host = LettaHost.Pointer)
+        assertOneReadImage()
+    }
+
+    @Test
+    fun anOpenedPointerReadRunRendersExactlyOneImage() = runComposeUiTest {
+        show(imageRun(), opened = true, reducedMotion = true, host = LettaHost.Pointer)
+        assertOneReadImage()
     }
 
     @Test

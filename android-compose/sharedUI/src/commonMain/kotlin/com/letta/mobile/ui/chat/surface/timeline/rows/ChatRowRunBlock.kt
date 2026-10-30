@@ -308,6 +308,10 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
                 val positioned = PositionedRunStep(step, stepPosition(index, steps.size))
                 if (step.isWork()) {
                     RunWorkStep(positioned, body, row)
+                    // Image output is conversation content, not work hidden by the run's disclosure.
+                    if (step is RunStep.ToolCalls) {
+                        step.calls.toolCalls.forEach { call -> ToolGeneratedImages(call, row.callbacks) }
+                    }
                 } else {
                     RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
                 }
@@ -372,6 +376,7 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
             context = row.context,
             callbacks = row.callbacks,
             modifier = modifier,
+            showImages = false,
         )
     }
 }

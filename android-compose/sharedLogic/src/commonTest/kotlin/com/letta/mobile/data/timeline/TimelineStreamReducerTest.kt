@@ -2,7 +2,6 @@ package com.letta.mobile.data.timeline
 
 
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -130,8 +129,8 @@ class TimelineStreamReducerTest : TimelineStreamReducerFixture() {
         val output = reduce(prev = seeded, frame = toolReturn)
 
         val event = output.next.events.single() as TimelineEvent.Confirmed
-        event.attachments shouldBe listOf(
-            MessageContentPart.Image(base64 = "STREAM_TOOL_IMAGE+/==", mediaType = "image/png")
+        event.attachments.map { it.base64 to it.mediaType } shouldBe listOf(
+            "STREAM_TOOL_IMAGE+/==" to "image/png"
         )
     }
 
@@ -176,8 +175,8 @@ class TimelineStreamReducerTest : TimelineStreamReducerFixture() {
 
         val event = output.next.events.single() as TimelineEvent.Confirmed
         event.toolReturnContentByCallId["call-generate-image"].orEmpty().contains("gpt-image-2-medium") shouldBe true
-        event.attachments shouldBe listOf(
-            MessageContentPart.Image(base64 = "STREAM_GENERATED_IMAGE+/==", mediaType = "image/png")
+        event.attachments.map { it.base64 to it.mediaType } shouldBe listOf(
+            "STREAM_GENERATED_IMAGE+/==" to "image/png"
         )
     }
 

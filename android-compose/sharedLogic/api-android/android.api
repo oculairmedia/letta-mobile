@@ -25574,17 +25574,19 @@ public abstract class com/letta/mobile/data/model/MessageContentPart {
 }
 
 public final class com/letta/mobile/data/model/MessageContentPart$Image : com/letta/mobile/data/model/MessageContentPart {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/Long;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/MessageContentPart$Image;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/MessageContentPart$Image;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBase64 ()Ljava/lang/String;
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getStoredByteSize ()Ljava/lang/Long;
+	public final fun getToolCallId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public final fun toDataUrl ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
@@ -50918,20 +50920,22 @@ public final class com/letta/mobile/data/timeline/snapshot/SnapshotStructuralSum
 
 public final class com/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer {
 	public static final field Companion Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer$Companion;
-	public fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;)V
-	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()J
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;
-	public final fun copy (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/snapshot/StoredImageAttachmentPointer;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBodyReference ()Lcom/letta/mobile/data/timeline/snapshot/StoredImageBodyReference;
 	public final fun getByteSize ()J
 	public final fun getMediaType ()Ljava/lang/String;
 	public final fun getThumbnailBase64 ()Ljava/lang/String;
+	public final fun getToolCallId ()Ljava/lang/String;
 	public final fun getUriOrUrl ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

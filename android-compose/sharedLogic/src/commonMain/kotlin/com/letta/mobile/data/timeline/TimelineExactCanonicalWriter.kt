@@ -104,7 +104,7 @@ class TimelineExactCanonicalWriter(
             toolReturnIsErrorByCallId = (ownerEvent.toolReturnIsErrorByCallId +
                 (callId to (returned.isErr == true || returned.status == "error"))).toTimelinePersistentMap(),
             toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
-            attachments = (ownerEvent.attachments + returned.attachments).distinct().toTimelinePersistentList(),
+            attachments = ownerEvent.attachments.mergeIncomingImages(returned.attachments).toTimelinePersistentList(),
         )
         val merged = mergeEvent(transaction, enriched)
         return CanonicalToolIndex.observe(transaction, callId, owner, true) || merged
@@ -159,7 +159,7 @@ class TimelineExactCanonicalWriter(
                 toolReturnIsErrorByCallId = (merged.toolReturnIsErrorByCallId +
                     (callId to (deferred.message.isErr == true || deferred.message.status == "error"))).toTimelinePersistentMap(),
                 toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
-                attachments = (merged.attachments + deferred.message.attachments).distinct().toTimelinePersistentList(),
+                attachments = merged.attachments.mergeIncomingImages(deferred.message.attachments).toTimelinePersistentList(),
             )
             transaction.deleteEvidence(deferredReturnKey(callId))
         }
@@ -191,7 +191,7 @@ class TimelineExactCanonicalWriter(
             if (attachment.bodyReference == null && attachment.thumbnailBase64 == null &&
                 oldAttachment?.bodyReference != null && oldAttachment.mediaType == attachment.mediaType &&
                 oldAttachment.byteSize == attachment.byteSize
-            ) oldAttachment else attachment
+            ) oldAttachment.copy(toolCallId = attachment.toolCallId) else attachment
         })
         val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), retained).encodeToByteArray()
         if (historicalBytes != null && bytes.contentEquals(historicalBytes)) return indexed
