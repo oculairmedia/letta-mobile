@@ -15,6 +15,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
+import kotlinx.coroutines.flow.first
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.timeline.CanonicalExternalTransportWriter
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
@@ -37,7 +40,6 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.DockedReplyCard
 import com.letta.mobile.ui.chat.surface.DockedReplyParams
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,7 +49,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.JsonPrimitive
 import java.lang.reflect.Proxy
-import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -98,10 +99,6 @@ class PendingTimelineActionsUiTest {
         }
         val coordinator = CanonicalTimelineCoordinator(store, historyTransport(false))
         val owner = runBlocking { coordinator.acquire(scope) }
-        // Retry must get as far as the transaction, rather than returning false for no sender.
-        CanonicalExternalTransportWriter(coordinator, { _, _ -> scope },
-            IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it }))
-            .bindPendingRetry(AgentId("agent")) { _, _ -> }
         val record = CanonicalPendingLocalStore.Record("throwing", "prompt", emptyList(), "2026-10-28T12:00:00Z")
         val presentation = runBlocking {
             coordinator.appendPending(owner, record)
@@ -137,20 +134,13 @@ class PendingTimelineActionsUiTest {
         }
     }
 
-    @Test fun rejectedRetryAfterSuspensionKeepsVisibleFeedback() = runComposeUiTest {
+    @Test fun aQueuedRetryThatCannotBeDispatchedOffersRetryAgain() = runComposeUiTest {
         val scope = TimelineScope("suspended-rejection", "conversation", "agent")
         val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(), historyTransport(false))
         val owner = runBlocking { coordinator.acquire(scope) }
         val writer = CanonicalExternalTransportWriter(coordinator, { _, _ -> scope },
             IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it }))
-        val started = CompletableDeferred<Unit>()
-        val finish = CompletableDeferred<Unit>()
-        writer.bindPendingRetry(AgentId("agent")) { _, _ ->
-            started.complete(Unit)
-            finish.await()
-            error("sender unavailable")
-        }
         val record = CanonicalPendingLocalStore.Record("rejected", "prompt", emptyList(), "2026-10-28T12:00:00Z")
         val presentation = runBlocking {
             coordinator.appendPending(owner, record)
@@ -161,13 +151,18 @@ class PendingTimelineActionsUiTest {
             showTimeline(presentation, scope, docked = false)
             awaitRetry()
             onNodeWithText("Retry").performClick()
-            waitUntil(timeoutMillis = 10_000) { main.drain(); started.isCompleted }
             waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText("Retry").fetchSemanticsNodes().isEmpty() }
-            finish.complete(Unit)
-            waitUntil(timeoutMillis = 10_000) {
-                main.drain()
-                onAllNodesWithText("Couldn’t retry this message. Try again.").fetchSemanticsNodes().isNotEmpty()
+            // The retry waits in the outbox for the agent's sender, which here cannot submit it.
+            val queued = runBlocking { writer.queuedRetries(AgentId("agent")).first { it.isNotEmpty() } }
+            assertEquals(
+                listOf(ConversationId(scope.conversationId) to record.otid),
+                queued.map { (conversation, retry) -> conversation to retry.otid },
+            )
+            val attempt = queued.single().second.attempt
+            runBlocking {
+                coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Failed, attempt)
             }
+            awaitRetry()
             onNodeWithText("Retry").assertIsEnabled()
         } finally {
             runBlocking { presentation.close() }
@@ -190,9 +185,13 @@ class PendingTimelineActionsUiTest {
         val row = record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed).toRenderItem()
         try {
             setContent { MaterialTheme { PendingPromptActions(row, presentation) } }
-            // Another path settles the prompt first, so the dismiss on screen is refused. (Only a retry
-            // can move a failed prompt back to Sending; a Sending report no longer does.)
-            if (!retry) runBlocking { CanonicalPendingLocalStore(store).discardFailed(scope, record.otid) }
+            // Another path acts on the prompt first, so the action on screen is refused: a retry is
+            // already queued, or the prompt was already discarded. (Only a retry can move a failed
+            // prompt back to Sending; a Sending report no longer does.)
+            runBlocking {
+                if (retry) assertTrue(presentation.retry(MessageId(record.otid)))
+                else CanonicalPendingLocalStore(store).discardFailed(scope, record.otid)
+            }
             val button = if (retry) "Retry" else "Dismiss"
             onNodeWithText(button).performClick()
             val message = if (retry) "Couldn’t retry this message. Try again." else "Couldn’t dismiss this message. Try again."
@@ -214,14 +213,6 @@ class PendingTimelineActionsUiTest {
         val owner = runBlocking { coordinator.acquire(scope) }
         val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it })
         val writer = CanonicalExternalTransportWriter(coordinator, { _, _ -> scope }, maintenance)
-        val retried = CopyOnWriteArrayList<Pair<String, String>>()
-        val retryStarted = CompletableDeferred<Unit>()
-        val finishRetry = CompletableDeferred<Unit>()
-        writer.bindPendingRetry(AgentId("agent")) { conversation, record ->
-            retryStarted.complete(Unit)
-            finishRetry.await()
-            retried += conversation.value to record.otid
-        }
         val record = CanonicalPendingLocalStore.Record("own-otid", "Prompt to dismiss", emptyList(), "2026-10-28T12:00:00Z")
         val presentation = runBlocking {
             coordinator.appendPending(owner, record)
@@ -233,12 +224,14 @@ class PendingTimelineActionsUiTest {
             showTimeline(presentation, scope, docked)
             assertFailedRow(presentation, inHistory)
             onNodeWithText("Retry").performClick()
-            waitUntil(timeoutMillis = 10_000) { main.drain(); retryStarted.isCompleted }
             waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText("Retry").fetchSemanticsNodes().isEmpty() }
             assertEquals(CanonicalPendingLocalStore.Delivery.Sending, owner.session.pending.value.single().delivery)
-            finishRetry.complete(Unit)
-            waitUntil(timeoutMillis = 10_000) { main.drain(); retried.isNotEmpty() }
-            assertEquals(listOf(scope.conversationId to record.otid), retried.toList())
+            // The retry is queued for this conversation's sender, keeping the prompt's identity.
+            val queued = runBlocking { writer.queuedRetries(AgentId("agent")).first { it.isNotEmpty() } }
+            assertEquals(
+                listOf(scope.conversationId to record.otid),
+                queued.map { (conversation, retry) -> conversation.value to retry.otid },
+            )
             runBlocking { coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Failed) }
             awaitRetry()
             onNodeWithText("Dismiss").performClick()

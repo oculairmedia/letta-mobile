@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -24,7 +25,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -116,22 +119,44 @@ class ChatSendCoordinator(
     )
 
     init {
-        timelineRepository.bindPendingRetry(AgentId(agentId)) { conversation, record ->
-            scope.coroutineContext.ensureActive()
-            turnStateMutex.withLock {
-                val config = validatedActiveConfig(conversation) ?: error("No active backend")
-                check(queueTurns.ensureConnected(config, clientVersion)) { "Chat channel is not connected" }
-                prepareConversation(conversation.value)
-                healStaleVisualPresence(conversation)
-                val pending = QueuedChatSend(
-                    QueuedSendId(record.otid), QueueConversationId(conversation.value), record.content, record.attachments, record.attempt,
-                )
-                queueDriver.submitLocked(pending)?.let { reportQueuedSend(pending, it) }
+        scope.launch {
+            // A Retry queues its prompt in the outbox. Each queued attempt is submitted here once,
+            // including retries queued before this coordinator subscribed.
+            val submitted = mutableSetOf<String>()
+            timelineRepository.queuedRetries(AgentId(agentId)).collect { queued ->
+                submitted.retainAll(queued.mapTo(mutableSetOf()) { (_, record) -> "${record.otid}#${record.attempt}" })
+                queued.forEach { (conversation, record) ->
+                    if (submitted.add("${record.otid}#${record.attempt}")) submitQueuedRetry(conversation, record)
+                }
             }
         }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
                 contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
+            }
+        }
+    }
+
+    /** A retry that cannot even be queued for dispatch never left: it fails as not accepted. */
+    private suspend fun submitQueuedRetry(conversation: ConversationId, record: CanonicalPendingLocalStore.Record) {
+        val pending = QueuedChatSend(
+            QueuedSendId(record.otid), QueueConversationId(conversation.value),
+            record.content, record.attachments, record.attempt,
+        )
+        try {
+            turnStateMutex.withLock {
+                val config = validatedActiveConfig(conversation) ?: error("No active backend")
+                check(queueTurns.ensureConnected(config, clientVersion)) { "Chat channel is not connected" }
+                prepareConversation(conversation.value)
+                healStaleVisualPresence(conversation)
+                queueDriver.submitLocked(pending)?.let { reportQueuedSend(pending, it) }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Telemetry.error("AdminChatVM", "ws.retry.submitFailed", failure, "otid" attr record.otid)
+            withContext(NonCancellable) {
+                timelineRepository.markPendingSend(pending.pendingAttempt(agentId), Delivery.Failed)
             }
         }
     }

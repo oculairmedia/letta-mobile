@@ -133,8 +133,7 @@ internal class SelectedRuntimeWriter(
     private val pendingRetry: TimelinePendingRetryBinding = TimelinePendingRetryBinding(),
     private val resolve: suspend (String) -> TimelineExternalTransportWriter,
 ) : TimelineExternalTransportWriter {
-    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
-        pendingRetry.bind(agent, sender)
+    override fun queuedRetries(agent: AgentId) = pendingRetry.queuedRetries(agent)
     private suspend fun writer(id: ConversationId, suppliedAgent: AgentId?): TimelineExternalTransportWriter {
         require(suppliedAgent == null || suppliedAgent.value == agent) { "Foreign agent on captured writer" }
         return resolve(id.value).also(pendingRetry::resolved)

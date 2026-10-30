@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -88,8 +89,8 @@ class SelectedRuntimeBindingTest {
         coVerify(exactly = 1) { delegate.repairExpiredConversationCursorScoped("agent", "conversation", 12L) }
     }
 
-    @Test fun readyBindsRetryBeforeAnyCapturedWriterOperation() = retryAfterRecreation(open = false)
-    @Test fun openBindsRetryBeforeAnyCapturedWriterOperation() = retryAfterRecreation(open = true)
+    @Test fun readyResolvedConversationJoinsQueuedRetries() = retryAfterRecreation(open = false)
+    @Test fun openResolvedConversationJoinsQueuedRetries() = retryAfterRecreation(open = true)
 
     private fun retryAfterRecreation(open: Boolean) = runTest {
         val delegate = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
@@ -106,13 +107,17 @@ class SelectedRuntimeBindingTest {
             parent = this, agent = "agent", hooks = ConversationBindHooks(bind = { binding }, retire = {}),
         )
         val agent = com.letta.mobile.data.model.AgentId("agent")
-        val sender: suspend (
-            com.letta.mobile.data.model.ConversationId, com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Record,
-        ) -> Unit = { _, _ -> }
+        val retry = com.letta.mobile.data.model.ConversationId("persisted-conversation") to
+            com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Record(
+                "retry-otid", "prompt", emptyList(), "2026-01-01T00:00:00Z", attempt = 1,
+            )
+        every { delegate.queuedRetries(agent) } returns MutableStateFlow(listOf(retry))
         try {
-            captured.writer.bindPendingRetry(agent, sender)
+            // The sender subscribes before any conversation resolves; later ones still reach it.
+            val retries = captured.writer.queuedRetries(agent)
+            assertEquals(emptyList(), retries.first())
             if (open) captured.open("persisted-conversation", null, this) else captured.ready("persisted-conversation")
-            io.mockk.verify(exactly = 1) { delegate.bindPendingRetry(agent, sender) }
+            assertEquals(listOf(retry), retries.first())
         } finally {
             captured.retire()
         }
