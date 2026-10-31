@@ -91,14 +91,17 @@ private class MemoryPageLayout(
 )
 
 /** The graph's per-node looks and live positions, shared by the canvas and reveal-on-select. */
-private class MemoryGraphRuntime(val looks: Map<String, MemoryNodeLook>, val live: MemoryGraphLiveLayout, val compact: Boolean)
+private class MemoryGraphRuntime(val looks: Map<String, MemoryNodeLook>, val live: MemoryGraphLiveLayout, val compact: Boolean) {
+    /** How much of the canvas's bottom a phone's sheet covers (px, margin included); 0 without one. */
+    var coveredPx by mutableIntStateOf(0)
+}
 
 @Composable
 private fun rememberMemoryGraphRuntime(layout: MemoryPageLayout, compact: Boolean): MemoryGraphRuntime {
     val state = layout.state
     val looks = remember(state.view, state.parity.memory) { MemoryNodeLooks.build(state.view, state.parity.memory) }
     val live = rememberMemoryGraphLiveLayout(state.view, state.layout, looks, motion = !layout.reducedMotion)
-    return MemoryGraphRuntime(looks, live, compact)
+    return remember(looks, live, compact) { MemoryGraphRuntime(looks, live, compact) }
 }
 
 @Composable
@@ -129,10 +132,10 @@ private fun CompactMemoryLayout(layout: MemoryPageLayout, maxHeight: Dp) {
     val selection = layout.state.selection
     // The sheet's height (with its margin), so the graph is framed above it and the fit button sits on it.
     var sheetPx by remember { mutableIntStateOf(0) }
-    val coveredPx = if (selection != null) sheetPx else 0
-    FrameSelectionAboveSheet(MemoryFraming(layout.state, runtime.live, layout.reducedMotion), viewportState, coveredPx)
+    runtime.coveredPx = if (selection != null) sheetPx else 0
+    FrameSelectionAboveSheet(MemoryFraming(layout.state, runtime.live, layout.reducedMotion), viewportState, runtime.coveredPx)
     Box(Modifier.fillMaxSize()) {
-        MemoryGraphArea(layout, runtime, viewportState, Modifier.fillMaxSize(), coveredPx)
+        MemoryGraphArea(layout, runtime, viewportState, Modifier.fillMaxSize())
         if (selection != null) {
             // Editing may take the full height (keyboard up); reading keeps the
             // top of the graph visible so the selected node stays in view.
@@ -170,9 +173,8 @@ private fun MemoryNodeCardFor(
 }
 
 /**
- * The legend/filter row, then the canvas below it, so the chrome never overlaps the graph.
- * [coveredPx] is how much of the canvas's bottom a phone's sheet covers; framing and the fit
- * button stay above it.
+ * The legend/filter row, then the canvas below it, so the chrome never overlaps the graph. On a
+ * phone, framing and the fit button stay above the part the sheet covers ([MemoryGraphRuntime.coveredPx]).
  */
 @Composable
 private fun MemoryGraphArea(
@@ -180,7 +182,6 @@ private fun MemoryGraphArea(
     runtime: MemoryGraphRuntime,
     viewportState: MemoryGraphViewportState,
     modifier: Modifier = Modifier,
-    coveredPx: Int = 0,
 ) {
     val state = layout.state
     Column(modifier) {
@@ -193,7 +194,7 @@ private fun MemoryGraphArea(
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             MemoryGraphBody(layout, runtime, viewportState)
-            if (!state.view.isEmpty) MemoryGraphControls(state, viewportState, runtime.compact, coveredPx)
+            if (!state.view.isEmpty) MemoryGraphControls(state, viewportState, runtime.compact, runtime.coveredPx)
         }
     }
 }
