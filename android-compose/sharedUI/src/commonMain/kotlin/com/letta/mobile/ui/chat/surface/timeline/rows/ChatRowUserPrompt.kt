@@ -280,8 +280,9 @@ private fun PromptImages(message: UiMessage, callbacks: ChatRowCallbacks) {
     // prompt never eats the reply's room; the row in the list keeps them full size.
     val docked = Modifier.dockedCompaction(LocalDockedPromptCompaction.current, ChatRowDimens.dockedPromptImageMaxHeight)
     // Touch draws them as the legacy Android bubble did: across the bubble's width, large
-    // enough to look at (letta-mobile-bglj6.1.9); desktop keeps its compact strip.
-    if (touchStyle()) {
+    // enough to look at (letta-mobile-bglj6.1.9). A single image uses its aspect on every host;
+    // multiple pointer images keep their compact strip.
+    if (touchStyle() || images.size == 1) {
         ChatPromptImageGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = docked.fillMaxWidth())
     } else {
         ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap), modifier = docked)

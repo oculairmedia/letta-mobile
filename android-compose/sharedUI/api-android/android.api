@@ -10701,6 +10701,7 @@ public final class com/letta/mobile/ui/theme/ChatRowDimens {
 	public final fun getDockedPromptImageMaxHeight-D9Ej5fM ()F
 	public final fun getImageGridHeight-D9Ej5fM ()F
 	public final fun getImageSingleHeight-D9Ej5fM ()F
+	public final fun getImageSingleMaxHeight-D9Ej5fM ()F
 	public final fun getPromptExpandedMaxHeight-D9Ej5fM ()F
 	public final fun getPromptGridCellHeight-D9Ej5fM ()F
 	public final fun getThumbnailHeight-D9Ej5fM ()F
