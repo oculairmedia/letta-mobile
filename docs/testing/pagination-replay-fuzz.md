@@ -15,7 +15,7 @@ cd android-compose
 Strict detekt (sharedLogic, JDK 21):
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parchitecture.strict=true
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt
 ```
 
 ## Seeds and volume

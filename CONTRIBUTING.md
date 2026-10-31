@@ -49,8 +49,9 @@ The repo admin runs this once to apply / re-apply branch protection on the remot
 
 ### Linters must measure the intended code
 
-- Run `JAVA_HOME=<jdk-21> ./gradlew detekt -Parchitecture.strict=true` from
-  `android-compose/`. Without strict mode, ordinary detekt findings are advisory locally.
+- Run `JAVA_HOME=<jdk-21> ./gradlew detekt` from `android-compose/`. Findings
+  outside the baseline fail by default, as in CI. Use `-Pdetekt.lenient=true`
+  for exploratory runs that report ordinary detekt findings without failing.
 - Aggregate detekt explicitly includes every existing `src/<sourceSet>/kotlin`
   and `java` directory, including Android `root`, `release`, other flavours,
   tests and KMP targets. Generated/build directories remain excluded.

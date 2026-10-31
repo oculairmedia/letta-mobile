@@ -112,10 +112,9 @@ subprojects {
         tasks.withType<Detekt>().configureEach {
             // Detekt 1.x supports JVM targets through 22; analysis does not need the Gradle runtime target.
             jvmTarget = "17"
-            // Local runs stay advisory by default. CI's `detekt` job passes
-            // -Parchitecture.strict=true, so a finding outside the baseline fails it.
+            // Fail on findings by default; exploratory runs can opt out explicitly.
             // guardrailDetekt (quality/detekt-rules) sets ignoreFailures = false itself.
-            ignoreFailures = providers.gradleProperty("architecture.strict").orNull != "true"
+            ignoreFailures = providers.gradleProperty("detekt.lenient").orNull == "true"
             exclude("**/build/**", "**/generated/**", "**/ksp/**")
             reports {
                 sarif.required.set(true)
@@ -129,7 +128,7 @@ subprojects {
 }
 
 val advisoryDetekt = tasks.register("advisoryDetekt") {
-    description = "Run configured Detekt checks and emit SARIF/XML/HTML reports without blocking by default."
+    description = "Run configured Detekt checks and emit SARIF/XML/HTML reports."
     group = "verification"
 }
 

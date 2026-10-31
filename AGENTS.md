@@ -61,7 +61,7 @@ A green task with no analysed files or no selected tests is not verification.
 | `test` | `android.yml` | PRs + main pushes touching the workflow's paths | Required aggregate of `test-workload`, `api-docs`, `api-contract-windows` and `web-wasm`; all four must explicitly succeed. The workload runs policy/docs checks, the **parity guardrails** (`parity_gates.py`, `platform-ui-gate.sh --enforce`, `baseline-ratchet-guard.py`, the `Shared implementation searched:` PR line; see "No unshared frontend or logic" below), the stateful-mock gate and a Gradle graph: `:app:compileSideloadDebugKotlin :core:android-data:testDebugUnitTest :app:testRootDebugUnitTest :app:testScreenshot :build-logic:test checkArchitectureBoundaries apiCheck :architecture-tests:test :architecture-tests:architectureTest :architecture-tests:structureReport :quality:detekt-rules:check` (the last includes blocking `guardrailDetekt` on changed Kotlin code). API signatures are checked on Linux and Windows; KDoc/package coverage and generated-reference checks also gate this status. Additive tasks from `scripts/ci/changed-gradle-modules.sh` (`:feature-chat`, `:designsystem`, `:sharedUI:jvmTest`, `:desktop:test`, `:cli`, `:plugin-*`, …): **all of them on every main push**; on a PR, those of every changed module and of every module that depends on it, transitively (a `sharedLogic` change runs them all; letta-mobile-l8lcn). |
 | `shared-multiplatform` | `android.yml` | same | Bounded `:sharedLogic:jvmTest`, `:appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest`, host-native/WASM test compiles for `:core:runtime` and `:sharedLogic`, WASM main/test compiles for `:sharedUI`, and `sharedLogic/karma.config.test.cjs`. Browser tests run only in `web-wasm`. Not `:sharedLogic:allTests` (hostNativeTest hangs) or `:desktop:test`. |
 | `build-apk-pass` | `android.yml` | same | `:app:assembleRootDebug`. `:app:assemblePlayRelease` + APK size/R8 validation run on **main pushes only**; on PRs that matrix leg skips its build but still reports success. |
-| `detekt` | `android.yml` | PRs + main pushes touching the workflow's paths, after the other three | `./gradlew detekt -Parchitecture.strict=true` against each module's `detekt-baseline.xml`: only findings not already in the baseline fail, wherever they are (a finding in a file the PR never touched still blocks). Covers `app`, `core:android-data`, `designsystem`, `feature-chat`, `quality:detekt-rules`, and every `src/<sourceSet>/kotlin` dir of `sharedLogic`, `sharedUI`, `plugin-view`, `desktop`, `web` (by4vm.65). |
+| `detekt` | `android.yml` | PRs + main pushes touching the workflow's paths, after the other three | `./gradlew detekt --continue -Parchitecture.strict=true` against each module's `detekt-baseline.xml`: only findings not already in the baseline fail, wherever they are (a finding in a file the PR never touched still blocks). Covers `app`, `core:android-data`, `designsystem`, `feature-chat`, `quality:detekt-rules`, and every `src/<sourceSet>/kotlin` dir of `sharedLogic`, `sharedUI`, `plugin-view`, `desktop`, `web` (by4vm.65). |
 
 **Not required, but honest** (they go red on a real problem; fix it, don't wave it through):
 
@@ -205,7 +205,7 @@ fi
 #    Pre-fix them at dev cost, not after CI flags them.
 # detekt on JDK 21; strict = what the CI `detekt` job runs (new findings fail,
 # baselined ones don't). Fix new findings; never lower thresholds.
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parchitecture.strict=true
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt
 # CodeScene delta — the same analysis the "CodeScene Code Health Review"
 # PR check runs, but local. Needs the `cs` CLI + CS_ACCESS_TOKEN (PAT from
 # https://codescene.io/users/me/pat); skips silently when absent. The
@@ -726,8 +726,9 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew detekt
   ```
   Each detekt module has a `detekt-baseline.xml` holding its pre-existing findings. CI's
-  `detekt` job (required) runs with `-Parchitecture.strict=true` and fails
-  on any finding outside the baseline; without that property local runs only report. Fix new
+  `detekt` job (required) retains `-Parchitecture.strict=true`, but ordinary detekt
+  tasks fail on findings outside the baseline by default. Use `-Pdetekt.lenient=true`
+  for exploratory local runs that only report ordinary detekt findings. Fix new
   findings; regenerate a baseline (`./gradlew detektBaseline`, JDK 21) only to accept debt
   deliberately, in its own commit. `guardrailDetekt` (`detekt-guardrails.yml`, changed files,
   no baseline) runs inside the required `test` job.
