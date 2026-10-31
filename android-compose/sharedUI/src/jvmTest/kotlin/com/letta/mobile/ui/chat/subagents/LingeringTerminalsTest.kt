@@ -17,6 +17,20 @@ import kotlin.test.Test
  */
 class LingeringTerminalsTest {
 
+    /** Structured maintenance types are hidden; ordinary work with the same display text remains visible. */
+    @Test
+    fun structuredMaintenanceTypesAreExcludedFromSharedChipProjection() {
+        val snapshot = persistentListOf(
+            running("reflection").copy(subagentType = "Reflection"),
+            running("integration").copy(subagentType = "Reflection integration"),
+            terminal("finished-reflection", ActiveSubagent.Status.COMPLETED, 1_000L).copy(subagentType = "Reflection"),
+            running("memory").copy(subagentType = "Memory"),
+            running("ordinary").copy(description = "Reflection integration"),
+        )
+
+        assertEquals(listOf("ordinary"), snapshot.withLingeringTerminals(1_001L).map { it.id })
+    }
+
     private fun running(id: String) = ActiveSubagent(
         id = id,
         description = "desc $id",
