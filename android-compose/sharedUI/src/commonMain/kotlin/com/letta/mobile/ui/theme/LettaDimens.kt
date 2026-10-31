@@ -223,6 +223,12 @@ object LettaDimens {
 
         /** Dividers and hairlines against a surface. */
         const val hairline: Float = 0.5f
+
+        /**
+         * Quiet text one step below `onSurfaceVariant`: section labels, and the secondary ink on a
+         * bubble whose content colour is not a theme role. Also `customColors.onSurfaceMutedColor`.
+         */
+        const val muted: Float = 0.72f
     }
 
     /**

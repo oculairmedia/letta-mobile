@@ -139,7 +139,7 @@ fun lettaCustomColors(scheme: ColorScheme): CustomColors =
         agentAColor = Color(0xFF8B7CF0),
         agentBColor = Color(0xFF4C9AFF),
         agentCColor = Color(0xFFE36FB3),
-        onSurfaceMutedColor = scheme.onSurfaceVariant.copy(alpha = 0.72f),
+        onSurfaceMutedColor = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.muted),
         categoryPersonaColor = Color(LettaColorTokens.DARK_CATEGORY_PERSONA),
         categoryHumanColor = Color(LettaColorTokens.DARK_CATEGORY_HUMAN),
         categoryOnboardingColor = Color(LettaColorTokens.DARK_CATEGORY_ONBOARDING),

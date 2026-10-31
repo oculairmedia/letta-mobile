@@ -3,6 +3,7 @@ package com.letta.mobile.ui.pairing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PendingInvite
 import com.letta.mobile.data.pairing.access
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
 
 /**
  * Settings > Paired devices: THIS DEVICE / OTHER DEVICES
@@ -52,11 +54,11 @@ fun PairedDevicesList(
             Text(PairingStrings.NO_DEVICES, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         groups.thisDevice?.let { self ->
-            GroupLabel(PairingStrings.THIS_DEVICE)
+            LettaSectionLabel(PairingStrings.THIS_DEVICE, contentPadding = PaddingValues())
             DeviceRow(self, statusLine = PairingStrings.ACTIVE_NOW, modifier = Modifier.testTag(PairingTags.THIS_DEVICE))
         }
         if (groups.others.isNotEmpty()) {
-            GroupLabel(PairingStrings.OTHER_DEVICES)
+            LettaSectionLabel(PairingStrings.OTHER_DEVICES, contentPadding = PaddingValues())
             groups.others.forEach { device ->
                 RevocableDeviceRow(device, revoking = device.nodeId in state.revoking, nowMs = nowMs, onRevoke = actions.onRevokeDevice)
             }
@@ -72,11 +74,6 @@ fun PairedDevicesList(
         }
         PendingInvites(state.pending.filterNot { it.inviteId == onScreenInviteId }, state.cancelling, nowMs, actions.onRevokeInvite)
     }
-}
-
-@Composable
-private fun GroupLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

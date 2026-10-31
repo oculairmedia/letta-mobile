@@ -318,7 +318,7 @@ Touch text-selection and menu-density adaptation. Provide toolbar/quote-sink bin
 
 # Package com.letta.mobile.ui.theme
 
-Material theme construction, semantic colors, dimensions, motion and accessibility policy. Integrate through SharedMaterialTheme and accessibility preference/policy locals; platform preference observation belongs to actuals and domain behavior must not depend on color or motion tokens.
+Material theme construction, semantic colors, dimensions, motion and accessibility policy. Integrate through SharedMaterialTheme and accessibility preference/policy locals; platform preference observation belongs to actuals and domain behavior must not depend on color or motion tokens. The package also holds the design-system primitives built only from these tokens (section label and header, the pill family, spinner and busy bar), so every page reaches them through the theme import it already has instead of a new, cyclic edge to ui.components.
 
 # Package com.letta.mobile.ui.document.workspace
 

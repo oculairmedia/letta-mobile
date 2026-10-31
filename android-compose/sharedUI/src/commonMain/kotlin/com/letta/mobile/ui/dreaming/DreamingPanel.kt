@@ -39,9 +39,9 @@ import com.letta.mobile.data.dreaming.DreamingActions
 import com.letta.mobile.data.dreaming.DreamingController
 import com.letta.mobile.data.dreaming.DreamingState
 import com.letta.mobile.data.dreaming.DreamTrigger
-import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.ui.shell.pages.memfs.MemfsFileDiffView
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.util.time.TimeLabels
 
 object DreamingTags {
     const val PANEL = "dreaming_panel"
@@ -229,7 +229,7 @@ private fun DreamDetail(detail: DreamDetailState, onBack: () -> Unit) {
 
 /** "5m ago", "just now", or the raw stamp when it is not an instant. */
 private fun ageText(timestamp: String): String {
-    val age = relativeAgeLabel(timestamp)
+    val age = TimeLabels.ageLabel(timestamp)
     return when {
         age == timestamp -> timestamp
         age == NOW -> "just now"

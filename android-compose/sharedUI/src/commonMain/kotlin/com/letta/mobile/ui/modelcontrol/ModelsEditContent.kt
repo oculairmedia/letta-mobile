@@ -3,6 +3,7 @@ package com.letta.mobile.ui.modelcontrol
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +36,7 @@ import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.ui.components.picker.LettaPickerSearchField
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -143,13 +145,18 @@ private fun EmptyHint(text: String) {
 
 @Composable
 private fun SectionHeading(key: String, title: String) {
-    ProviderCapsTitle(
-        title = title,
+    LettaSectionLabel(
+        text = title,
         modifier = Modifier
             .fillMaxWidth()
             .semantics { heading() }
-            .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs)
             .testTag("${ModelsEditTags.SECTION_PREFIX}$key"),
+        contentPadding = PaddingValues(
+            start = LettaDimens.Space.lg,
+            end = LettaDimens.Space.lg,
+            top = LettaDimens.Space.md,
+            bottom = LettaDimens.Space.xs,
+        ),
     )
 }
 

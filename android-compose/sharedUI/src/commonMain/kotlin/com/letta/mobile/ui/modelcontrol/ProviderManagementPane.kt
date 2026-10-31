@@ -31,7 +31,8 @@ import com.letta.mobile.data.repository.modelcontrol.VisibleSection
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
-import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.theme.LettaSectionLabel
+import com.letta.mobile.ui.theme.lettaSectionTitle
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -184,7 +185,7 @@ private fun LazyListScope.providerGroup(
     actions: ProviderManagementActions,
 ) {
     if (sections.isEmpty()) return
-    item("label-$title") { LettaSectionLabel("$title (${sections.size})") }
+    item("label-$title") { LettaSectionLabel(lettaSectionTitle(title, sections.size)) }
     sections.forEach { visible -> providerSection(visible, expanded = state.isExpanded(visible.section), busy = state.busy, actions) }
 }
 

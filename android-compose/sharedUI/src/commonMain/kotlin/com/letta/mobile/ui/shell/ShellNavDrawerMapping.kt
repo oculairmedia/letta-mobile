@@ -19,9 +19,9 @@ import com.letta.mobile.ui.shell.sidebar.ShellCanvasRowModel
 import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
-import com.letta.mobile.ui.shell.sidebar.ShellRelativeTime
 import com.letta.mobile.ui.shell.sidebar.ShellSidebarMapping
 import com.letta.mobile.data.home.conversationRecency
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Instant
 
 /** What a host knows about navigation, in platform-neutral terms: the drawer's input. */
@@ -84,7 +84,7 @@ object ShellNavDrawerMapping {
             markers = input.conversationMarkers,
             parentIds = input.conversationParents,
         )
-        val timeLabel = { raw: String -> ShellRelativeTime.compact(raw, now) }
+        val timeLabel = { raw: String -> TimeLabels.ageLabel(raw, now) }
         val panel = ShellAgentPanelState(
             agent = input.agent.copy(identity = input.agent.identity ?: agentId?.let { input.identities[it] }),
             hiddenSections = input.hiddenSections,
@@ -125,7 +125,7 @@ object ShellNavDrawerMapping {
                 ShellCanvasRowModel(
                     id = canvas.id,
                     title = canvas.title,
-                    timeLabel = ShellRelativeTime.compact(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
+                    timeLabel = TimeLabels.age(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
                     archived = canvas.id in input.archivedCanvasIds,
                 )
             }

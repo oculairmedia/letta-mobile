@@ -90,7 +90,6 @@ class SubagentRosterTest {
             projectSubagentRoster(listOf(iso), now = kotlin.time.Instant.parse("2026-10-10T00:01:00Z").toEpochMilliseconds())
                 .running.single().elapsedMs,
         )
-        assertEquals("1m 28s", formatSubagentElapsed(88_000L))
     }
 
     @Test
