@@ -89,7 +89,17 @@ class FrameMascotHostTest {
         scene.advanceTo(1_016_000_000L)
         assertEquals(0.016f, scene.advanced, 1e-6f)
         scene.advanceTo(61_016_000_000L)
-        assertEquals(0.116f, scene.advanced, 1e-6f)
+        assertEquals(0.066f, scene.advanced, 1e-6f)
+    }
+
+    // A loop starting again after a rest steps one frame, not the time it was away.
+    @Test
+    fun aResumedSceneStepsOneFrame() {
+        val scene = RecordingScene()
+        scene.advanceTo(1_000_000_000L)
+        scene.resume()
+        scene.advanceTo(1_040_000_000L)
+        assertEquals(1f / 60f, scene.advanced, 1e-6f)
     }
 
     @Test

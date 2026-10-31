@@ -254,18 +254,6 @@ class FleetModelsTest {
         assertEquals("3 agents · 4 conversations", FleetSummary(totalAgents = 3, totalConversations = 4).subtitle)
     }
 
-    @Test
-    fun relativeAgeUsesCompactUnits() {
-        assertEquals("now", relativeAge(now, now))
-        assertEquals("5m", relativeAge(Instant.parse("2026-07-26T11:55:00Z"), now))
-        assertEquals("3h", relativeAge(Instant.parse("2026-07-26T09:00:00Z"), now))
-        assertEquals("2d", relativeAge(Instant.parse("2026-07-24T12:00:00Z"), now))
-        assertEquals("1w", relativeAge(Instant.parse("2026-07-18T12:00:00Z"), now))
-        assertEquals("2mo", relativeAge(Instant.parse("2026-05-26T12:00:00Z"), now))
-        assertEquals("Queued", relativeAgeLabel("Queued", now))
-        assertEquals("3h", relativeAgeLabel("2026-07-26T09:00:00Z", now))
-    }
-
     private fun stat(name: String, count: Int, last: Instant?) = FleetAgentStat(
         agentId = name,
         name = name,

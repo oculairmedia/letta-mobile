@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 
@@ -82,7 +82,7 @@ fun PairDevicePanel(
     val state = view.state
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
         Text(PairingStrings.INVITE_TITLE, style = MaterialTheme.typography.titleLarge)
-        if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (state.busy) LettaBusyBar()
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag(PairingTags.INVITE_ERROR))
         }

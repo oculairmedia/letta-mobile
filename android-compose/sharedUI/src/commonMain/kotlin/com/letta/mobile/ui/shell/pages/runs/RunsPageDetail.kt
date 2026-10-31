@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.runs.RunDetail
@@ -19,6 +18,7 @@ import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.settings.ActionButton
 import com.letta.mobile.ui.settings.SettingsHeader
 import com.letta.mobile.ui.settings.SettingsSection
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags inside the run detail. */
@@ -35,7 +35,7 @@ internal fun RunDetailPane(state: RunsPageState, actions: RunsPageActions) {
     InspectorPane(title = DETAIL_TITLE, onClose = actions.onCloseRun, testTag = RunsPageTags.DETAIL) {
         val detail = state.monitor.detail
         if (detail == null) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(LettaDimens.Space.lg))
+            LettaBusyBar(Modifier.padding(LettaDimens.Space.lg))
             return@InspectorPane
         }
         Column(

@@ -35,6 +35,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaStatusLabel
 
 private val pagePadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
 
@@ -265,10 +266,7 @@ private fun CardDescription(text: String) {
 /** "✓ Connected" */
 @Composable
 private fun ConnectedBadge() {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Icon(LettaIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconSm))
-        Text(ModelControlStrings.CONNECTED_BADGE, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-    }
+    LettaStatusLabel(ModelControlStrings.CONNECTED_BADGE, MaterialTheme.colorScheme.primary, icon = LettaIcons.Check)
 }
 
 @Composable

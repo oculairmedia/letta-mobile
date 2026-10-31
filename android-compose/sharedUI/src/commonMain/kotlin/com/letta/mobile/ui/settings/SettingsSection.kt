@@ -21,7 +21,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -75,6 +74,7 @@ import com.letta.mobile.ui.host.showPasteBlockedHint
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.ClipboardTextRead
 import com.letta.mobile.ui.text.readPlainText
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 
@@ -323,9 +323,9 @@ object SettingsScope {
         ) {
             val fraction = row.fraction
             if (fraction != null) {
-                LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                LettaBusyBar(progress = { fraction })
             } else {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                LettaBusyBar()
             }
             row.label?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }

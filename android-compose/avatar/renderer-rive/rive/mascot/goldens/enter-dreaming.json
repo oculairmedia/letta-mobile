@@ -213,20 +213,20 @@
       "spacing": "hold"
     },
     "Placement.scaleX": {
-      "max_delta": 0.0369,
+      "max_delta": 0.0249,
       "overshoot_pct": 0.0,
-      "peak": 1.039,
+      "peak": 1.0267,
       "peak_frame": 4,
-      "range": 0.0617,
-      "settle_frame": 26,
+      "range": 0.0494,
+      "settle_frame": 29,
       "spacing": "ease-in"
     },
     "Placement.scaleY": {
-      "max_delta": 0.0341,
-      "overshoot_pct": 174.72,
-      "peak": 0.9606,
+      "max_delta": 0.0225,
+      "overshoot_pct": 88.07,
+      "peak": 0.973,
       "peak_frame": 4,
-      "range": 0.057,
+      "range": 0.0446,
       "settle_frame": 28,
       "spacing": "ease-in"
     },

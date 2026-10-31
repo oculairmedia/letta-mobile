@@ -18,7 +18,6 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Unarchive
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,6 +51,7 @@ import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /** What a conversation row can do besides open (the roster's selection opens it); a null rename or pin is one the host does not offer. */
@@ -241,11 +241,7 @@ private fun RowMarkIcon(icon: ImageVector, description: String, tag: String) {
 @Composable
 private fun ConversationLeadingIcon(model: ShellConversationRowModel, hovered: Boolean, onArchiveToggle: () -> Unit) {
     when {
-        model.deleting -> CircularProgressIndicator(
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            strokeWidth = LettaDimens.Space.hair,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        model.deleting -> LettaSpinner()
         hovered -> ArchiveToggleIcon(archived = model.archived, noun = "chat", onToggle = onArchiveToggle)
         else -> Icon(
             imageVector = if (model.thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,

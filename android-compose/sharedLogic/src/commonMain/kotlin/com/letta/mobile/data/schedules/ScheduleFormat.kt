@@ -4,6 +4,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toLocalDateTime
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.math.abs
 import kotlin.time.Instant
 
@@ -73,16 +74,6 @@ object ScheduleFormat {
         return if (future) "in $body" else "$body ago"
     }
 
-    /** `1m 12s`, `340ms`, `2h 5m` — a finished run's duration. */
-    fun duration(millis: Long): String {
-        if (millis < 1_000) return "${millis}ms"
-        var seconds = millis / 1_000
-        val hours = seconds / 3_600; seconds %= 3_600
-        val minutes = seconds / 60; seconds %= 60
-        return when {
-            hours > 0 -> "${hours}h ${minutes}m"
-            minutes > 0 -> "${minutes}m ${seconds}s"
-            else -> "${seconds}s"
-        }
-    }
+    /** `1m 12s`, `340ms`, `2h 5m` — a finished run's duration: [TimeLabels.duration]. */
+    fun duration(millis: Long): String = TimeLabels.duration(millis)
 }

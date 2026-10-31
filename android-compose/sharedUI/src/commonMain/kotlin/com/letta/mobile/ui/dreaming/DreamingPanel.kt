@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,9 +38,10 @@ import com.letta.mobile.data.dreaming.DreamingActions
 import com.letta.mobile.data.dreaming.DreamingController
 import com.letta.mobile.data.dreaming.DreamingState
 import com.letta.mobile.data.dreaming.DreamTrigger
-import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.ui.shell.pages.memfs.MemfsFileDiffView
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.util.time.TimeLabels
 
 object DreamingTags {
     const val PANEL = "dreaming_panel"
@@ -140,7 +140,7 @@ private fun DreamStatus(state: DreamingState, notes: DreamingHostNotes) {
         Text(live?.let(DreamingStrings::live) ?: DreamingStrings.NOW_IDLE, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         // The bar's slot is always there: a dream starting or ending changes only what it draws.
         Box(Modifier.fillMaxWidth().height(LettaDimens.Space.xs)) {
-            if (live != null) LinearProgressIndicator(Modifier.fillMaxWidth().testTag(DreamingTags.PROGRESS))
+            if (live != null) LettaBusyBar(Modifier.testTag(DreamingTags.PROGRESS))
         }
         state.lastRun?.let { Hint(DreamingStrings.lastDream(it.summary, ageText(it.timestamp))) }
         state.settings.settings?.let { Hint(DreamingStrings.triggerSentence(it.trigger, it.stepCount)) }
@@ -229,7 +229,7 @@ private fun DreamDetail(detail: DreamDetailState, onBack: () -> Unit) {
 
 /** "5m ago", "just now", or the raw stamp when it is not an instant. */
 private fun ageText(timestamp: String): String {
-    val age = relativeAgeLabel(timestamp)
+    val age = TimeLabels.ageLabel(timestamp)
     return when {
         age == timestamp -> timestamp
         age == NOW -> "just now"

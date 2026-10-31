@@ -1116,6 +1116,11 @@ public final class com/letta/mobile/ui/chat/AgentOrbKt {
 	public static final fun agentOrbBrush (I)Landroidx/compose/ui/graphics/Brush;
 }
 
+public final class com/letta/mobile/ui/chat/AgentTileStillKt {
+	public static final field AGENT_TILE_OVERSCALE F
+	public static final fun agentTileStill (Lcom/letta/mobile/avatar/core/model/MascotIdentity;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/ImageBitmap;
+}
+
 public final class com/letta/mobile/ui/chat/ChatLayoutKt {
 	public static final fun getChatColumnMaxWidth ()F
 }
@@ -2217,7 +2222,6 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$-1144760461$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-145576189$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-491711505$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1449840956$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowImageViewerKt {
@@ -2319,7 +2323,6 @@ public final class com/letta/mobile/ui/components/ImageDropOverlayKt {
 public final class com/letta/mobile/ui/components/LettaCatalogKt {
 	public static final fun LettaCatalogCard-lVb_Clg (Ljava/lang/String;Ljava/lang/String;JLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaInfoBox (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaPill-3IgeMak (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getLettaCatalogGridPadding ()Landroidx/compose/foundation/layout/PaddingValues;
 }
 
@@ -2346,7 +2349,6 @@ public final class com/letta/mobile/ui/components/LettaInlineErrorTags {
 public final class com/letta/mobile/ui/components/LettaListPartsKt {
 	public static final fun LettaEmptyHint (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaListRow (Lcom/letta/mobile/ui/components/LettaListRowSpec;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/LettaListRowDefaults {
@@ -4778,16 +4780,16 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryBlockDi
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt;
 	public fun <init> ()V
-	public final fun getLambda$-2056150377$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-774473774$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$284266688$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-166897746$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1397351094$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$496283159$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt;
 	public fun <init> ()V
-	public final fun getLambda$-1857052433$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1750554699$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$989746989$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEditorPaneKt {
@@ -4804,7 +4806,9 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryPageChr
 
 public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
 	public static final field $stable I
-	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;JJJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;JJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun accentColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryAccentRole;)J
+	public final fun categoryColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryCategory;)J
 	public final fun component1 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3-0d7_KjU ()J
@@ -4813,23 +4817,20 @@ public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
 	public final fun component6-0d7_KjU ()J
 	public final fun component7-0d7_KjU ()J
 	public final fun component8-0d7_KjU ()J
-	public final fun component9-0d7_KjU ()J
-	public final fun copy-uN6SlqM (Ljava/util/Map;Ljava/util/Map;JJJJJJJ)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
-	public static synthetic fun copy-uN6SlqM$default (Lcom/letta/mobile/ui/memory/MemoryGraphPalette;Ljava/util/Map;Ljava/util/Map;JJJJJJJILjava/lang/Object;)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
+	public final fun copy-GklG2IY (Ljava/util/Map;Ljava/util/Map;JJJJJJ)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
+	public static synthetic fun copy-GklG2IY$default (Lcom/letta/mobile/ui/memory/MemoryGraphPalette;Ljava/util/Map;Ljava/util/Map;JJJJJJILjava/lang/Object;)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccents ()Ljava/util/Map;
+	public final fun getCategories ()Ljava/util/Map;
 	public final fun getEdge-0d7_KjU ()J
-	public final fun getKinds ()Ljava/util/Map;
+	public final fun getEdgeHighlight-0d7_KjU ()J
 	public final fun getLabel-0d7_KjU ()J
-	public final fun getLabelChip-0d7_KjU ()J
 	public final fun getLabelMuted-0d7_KjU ()J
 	public final fun getNodeRing-0d7_KjU ()J
 	public final fun getSelectionRing-0d7_KjU ()J
-	public final fun getStatuses ()Ljava/util/Map;
-	public final fun getTrack-0d7_KjU ()J
 	public fun hashCode ()I
 	public final fun kindColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryGraphNodeKind;)J
 	public final fun nodeColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryGraphNode;)J
-	public final fun statusColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryChannelStatus;)J
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -4844,6 +4845,7 @@ public final class com/letta/mobile/ui/memory/MemoryGraphViewportState {
 	public final fun getLimits ()Lcom/letta/mobile/data/memory/graph/MemoryGraphZoomLimits;
 	public final fun getSize ()Lcom/letta/mobile/data/memory/graph/MemoryGraphSize;
 	public final fun getViewport ()Lcom/letta/mobile/data/memory/graph/MemoryGraphViewport;
+	public final fun reveal (Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun sync (Lcom/letta/mobile/data/memory/graph/MemoryGraphLayout;Lcom/letta/mobile/data/memory/graph/MemoryGraphSize;)V
 	public final fun transform-Wko1d7g (JJF)V
 	public final fun zoomBy (F)V
@@ -9289,7 +9291,6 @@ public final class com/letta/mobile/ui/shell/rail/ShellAgentRailActions {
 public final class com/letta/mobile/ui/shell/rail/ShellAgentRailKt {
 	public static final fun ShellAgentRail (Lcom/letta/mobile/ui/shell/rail/ShellAgentRailState;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun ShellRailAgentTile-djqs-MU (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FFLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
-	public static final fun ShellThinkingRing--orJrPs (FLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun railScrollFades (Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/lazy/LazyListState;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/Modifier;
 }
 
@@ -9414,6 +9415,10 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailMapping {
 	public final fun entry (Lcom/letta/mobile/data/agents/AgentRailGroup;ILcom/letta/mobile/ui/shell/rail/ShellRailFocus;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
 	public final fun groups (Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
 	public final fun recency (Ljava/lang/String;)Lkotlin/time/Instant;
+}
+
+public final class com/letta/mobile/ui/shell/rail/ShellThinkingAuraKt {
+	public static final fun ShellThinkingAura-icBs0wY (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FLandroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/shell/scaffold/LettaPageScaffoldDefaults {
@@ -10069,13 +10074,6 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellPanelAgent {
 	public final fun getOrbIndex ()I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/shell/sidebar/ShellRelativeTime {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ShellRelativeTime;
-	public final fun compact (Ljava/lang/String;Lkotlin/time/Instant;)Ljava/lang/String;
-	public final fun compact (Lkotlin/time/Instant;Lkotlin/time/Instant;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellRenameChatDialogKt {
@@ -10840,6 +10838,7 @@ public final class com/letta/mobile/ui/theme/ChatRowDimens {
 	public final fun getDockedPromptImageMaxHeight-D9Ej5fM ()F
 	public final fun getImageGridHeight-D9Ej5fM ()F
 	public final fun getImageSingleHeight-D9Ej5fM ()F
+	public final fun getImageSingleMaxHeight-D9Ej5fM ()F
 	public final fun getPromptExpandedMaxHeight-D9Ej5fM ()F
 	public final fun getPromptGridCellHeight-D9Ej5fM ()F
 	public final fun getThumbnailHeight-D9Ej5fM ()F
@@ -11094,6 +11093,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Alpha {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Alpha;
 	public static final field disabled F
 	public static final field hairline F
+	public static final field muted F
 }
 
 public final class com/letta/mobile/ui/theme/LettaDimens$Control {
@@ -11107,6 +11107,9 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Control {
 	public final fun getIconButtonSm-D9Ej5fM ()F
 	public final fun getIconSm-D9Ej5fM ()F
 	public final fun getMinTouchTarget-D9Ej5fM ()F
+	public final fun getSpinnerLg-D9Ej5fM ()F
+	public final fun getSpinnerMd-D9Ej5fM ()F
+	public final fun getSpinnerSm-D9Ej5fM ()F
 }
 
 public final class com/letta/mobile/ui/theme/LettaDimens$Orb {
@@ -11172,6 +11175,8 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Stroke {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Stroke;
 	public final fun getHairline-D9Ej5fM ()F
+	public final fun getSpinner-D9Ej5fM ()F
+	public final fun getSpinnerLg-D9Ej5fM ()F
 }
 
 public final class com/letta/mobile/ui/theme/LettaDimens$Type {
@@ -11179,6 +11184,25 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Type {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Type;
 	public final fun getCaption-XSAIIZE ()J
 	public final fun getMicro-XSAIIZE ()J
+}
+
+public final class com/letta/mobile/ui/theme/LettaPillsKt {
+	public static final fun LettaChip (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaOutlinedPill (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaPill-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaStatusLabel-sW7UJKQ (Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaTonalPill (Ljava/lang/String;Lcom/letta/mobile/ui/theme/pill/LettaPillColors;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/graphics/vector/ImageVector;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/theme/LettaProgressKt {
+	public static final fun LettaBusyBar (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaSpinner-9IZ8Weo (Landroidx/compose/ui/Modifier;FJLandroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/theme/LettaSectionLabelKt {
+	public static final fun LettaSectionHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
+	public static final fun lettaSectionTitle (Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/theme/PlatformAccessibility_jvmKt {
@@ -11231,30 +11255,17 @@ public final class com/letta/mobile/ui/theme/TouchComposerDimens {
 	public final fun getSheetListMaxHeight-D9Ej5fM ()F
 }
 
-public final class com/letta/mobile/ui/theme/graph/GraphDimens {
+public final class com/letta/mobile/ui/theme/pill/LettaPillColors {
 	public static final field $stable I
-	public static final field DIMMED_ALPHA F
-	public static final field DIMMED_EDGE_ALPHA F
-	public static final field EDGE_ALPHA F
-	public static final field FOCUSED_EDGE_ALPHA F
-	public static final field HALO_ALPHA F
-	public static final field INSTANCE Lcom/letta/mobile/ui/theme/graph/GraphDimens;
-	public static final field LABEL_CHIP_ALPHA F
-	public final fun getEdge-D9Ej5fM ()F
-	public final fun getEdgeFocused-D9Ej5fM ()F
-	public final fun getFitPadding-D9Ej5fM ()F
-	public final fun getFitPaddingCompact-D9Ej5fM ()F
-	public final fun getHalo-D9Ej5fM ()F
-	public final fun getLabelChipPadX-D9Ej5fM ()F
-	public final fun getLabelChipPadY-D9Ej5fM ()F
-	public final fun getLabelFocusedWidth-D9Ej5fM ()F
-	public final fun getLabelGap-D9Ej5fM ()F
-	public final fun getLabelWidth-D9Ej5fM ()F
-	public final fun getRootRim-D9Ej5fM ()F
-	public final fun getSelectionGap-D9Ej5fM ()F
-	public final fun getSelectionRing-D9Ej5fM ()F
-	public final fun getStatusDot-D9Ej5fM ()F
-	public final fun getUsageGap-D9Ej5fM ()F
-	public final fun getUsageStroke-D9Ej5fM ()F
+	public synthetic fun <init> (JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-0d7_KjU ()J
+	public final fun component2-0d7_KjU ()J
+	public final fun copy--OWjLjI (JJ)Lcom/letta/mobile/ui/theme/pill/LettaPillColors;
+	public static synthetic fun copy--OWjLjI$default (Lcom/letta/mobile/ui/theme/pill/LettaPillColors;JJILjava/lang/Object;)Lcom/letta/mobile/ui/theme/pill/LettaPillColors;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContainer-0d7_KjU ()J
+	public final fun getContent-0d7_KjU ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 

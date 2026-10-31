@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,7 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_attached_image
@@ -32,6 +36,7 @@ import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 /**
  * Decodes a base64 attachment once per payload. Null for an empty (stored-pointer) or
@@ -67,7 +72,7 @@ internal fun ChatImageAttachmentsGrid(
         ChatPromptImageGrid(tap, modifier)
         return
     }
-    val cellHeight = if (images.size == 1) ChatRowDimens.imageSingleHeight else ChatRowDimens.imageGridHeight
+    val cellHeight = if (images.size == 1) null else ChatRowDimens.imageGridHeight
     val openLabel = stringResource(Res.string.rows_attached_image)
     Row(
         modifier = modifier.testTag(ChatRowTestTags.IMAGE_GRID),
@@ -76,9 +81,9 @@ internal fun ChatImageAttachmentsGrid(
         images.take(ChatRowDimens.gridMaxImages).forEachIndexed { index, attachment ->
             ChatAttachmentImage(
                 attachment = attachment,
+                cellHeight = cellHeight,
                 modifier = Modifier
                     .weight(1f)
-                    .height(cellHeight)
                     .clickable(onClickLabel = openLabel) { tap.open(index) },
             )
         }
@@ -106,9 +111,9 @@ internal fun ChatPromptImageGrid(
         images.take(ChatRowDimens.promptGridMaxImages).forEachIndexed { index, attachment ->
             ChatAttachmentImage(
                 attachment = attachment,
+                cellHeight = if (single) null else ChatRowDimens.promptGridCellHeight,
                 modifier = Modifier
                     .weight(1f)
-                    .height(if (single) ChatRowDimens.imageSingleHeight else ChatRowDimens.promptGridCellHeight)
                     .clickable(onClickLabel = openLabel) { tap.open(index) },
             )
         }
@@ -134,6 +139,7 @@ internal fun ChatImageThumbnailStrip(
         images.take(ChatRowDimens.stripMaxImages).forEachIndexed { index, attachment ->
             ChatAttachmentImage(
                 attachment = attachment,
+                cellHeight = ChatRowDimens.thumbnailHeight,
                 modifier = Modifier
                     .size(width = ChatRowDimens.thumbnailWidth, height = ChatRowDimens.thumbnailHeight)
                     .clickable(onClickLabel = openLabel) { tap.open(index) },
@@ -154,12 +160,20 @@ internal fun ChatImageThumbnailStrip(
 internal fun ChatAttachmentImage(
     attachment: UiImageAttachment,
     modifier: Modifier = Modifier,
+    cellHeight: Dp? = null,
 ) {
     val bitmap = rememberAttachmentBitmap(attachment)
+    // Unknown aspect (loading, failure or stored pointer) keeps the old 220dp placeholder.
+    // Fixed cells are reserved for multiple images and the compact thumbnail strip.
+    val size = when {
+        cellHeight != null -> Modifier.height(cellHeight)
+        bitmap == null -> Modifier.height(ChatRowDimens.imageSingleHeight)
+        else -> Modifier.attachmentAspectSize(bitmap)
+    }
     // Touch: the legacy cell (Radius.sm, no border); the pointer host keeps its outlined card.
     val touch = touchStyle()
     Surface(
-        modifier = modifier,
+        modifier = modifier.then(size),
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = if (touch) RoundedCornerShape(LettaDimens.Radius.sm) else MaterialTheme.shapes.medium,
         border = if (touch) null else BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
@@ -171,7 +185,7 @@ internal fun ChatAttachmentImage(
                 // screen reader rather than decorative.
                 contentDescription = stringResource(Res.string.rows_attached_image),
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
             )
         } else if (attachment.storedByteSize != null) {
             Box(contentAlignment = Alignment.Center) {
@@ -184,4 +198,18 @@ internal fun ChatAttachmentImage(
             }
         }
     }
+}
+
+/** A single image owns its column width; only portrait images need a letterboxed height cap. */
+private fun Modifier.attachmentAspectSize(bitmap: ImageBitmap): Modifier = fillMaxWidth().layout { measurable, constraints ->
+    val naturalHeight = (constraints.maxWidth.toFloat() * bitmap.height / bitmap.width).roundToInt()
+    val cappedHeight = if (bitmap.height > bitmap.width) {
+        minOf(naturalHeight, ChatRowDimens.imageSingleMaxHeight.roundToPx())
+    } else {
+        naturalHeight
+    }
+    // A very wide image still keeps a visible, tappable strip (it fits whole, letterboxed).
+    val height = constraints.constrainHeight(maxOf(cappedHeight, LettaDimens.Control.minTouchTarget.roundToPx()))
+    val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+    layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
 }

@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaMenuItem
-import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.components.list.RosterActions
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListTag
