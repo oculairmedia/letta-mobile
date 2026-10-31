@@ -273,7 +273,11 @@ jobs:
           git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null \
             || git fetch --no-tags origin "${BASE_REF}"
 
-      - name: Reject raised parity baselines
+      - name: Self-test baseline ratchet guard
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v
+
+      - name: Reject raised parity and detekt baselines
         if: github.event_name == 'pull_request'
         working-directory: ${{ github.workspace }}
         env:
@@ -294,6 +298,25 @@ jobs:
           PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
           export PR_BODY
           bash scripts/ci/agents-policy-check.sh --require-shared-search
+
+      - name: Test the test-weakening guard
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts/tests -p test_test_weakening_guard.py -v
+
+      # Fetch the current body just like the shared-search check so editing it and
+      # rerunning the job can explain a deliberate test change.
+      - name: Guard against test weakening
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
+          export PR_BODY
+          python3 scripts/ci/test-weakening-guard.py --diff-base "$BASE_SHA"
 
       # Every push to main runs the full additive set; a PR runs the changed modules and,
       # transitively, every module that depends on them (letta-mobile-l8lcn).

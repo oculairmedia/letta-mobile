@@ -1,6 +1,18 @@
 # Shrink-only baselines guarded by scripts/ci/baseline-ratchet-guard.py (letta-mobile-ewtaq).
 # <kind> <path>: set = lines only removed; count = lines only removed or lowered; grow-only = lines
 # only added. Entries may be added here; an entry may never be removed or change kind.
+# detekt = XML IDs only removed, including manually suppressed IDs. Newly listed files are
+# compared with the diff base; new files must have no IDs, even in newly added modules.
+detekt android-compose/app/detekt-baseline.xml
+detekt android-compose/core/android-data/detekt-baseline.xml
+detekt android-compose/designsystem/detekt-baseline.xml
+detekt android-compose/desktop/detekt-baseline.xml
+detekt android-compose/feature-chat/detekt-baseline.xml
+detekt android-compose/plugin-view/detekt-baseline.xml
+detekt android-compose/quality/detekt-rules/detekt-baseline.xml
+detekt android-compose/sharedLogic/detekt-baseline.xml
+detekt android-compose/sharedUI/detekt-baseline.xml
+detekt android-compose/web/detekt-baseline.xml
 count android-compose/architecture-tests/duplicate-code-baseline.txt
 count scripts/ci/parity/platform-code-baseline.txt
 count scripts/ci/platform-ui-allowlist.txt
