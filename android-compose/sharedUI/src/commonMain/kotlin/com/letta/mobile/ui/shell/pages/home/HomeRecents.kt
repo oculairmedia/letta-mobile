@@ -11,7 +11,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomeShortcut
-import com.letta.mobile.data.home.relativeAgeLabel
+import com.letta.mobile.util.time.TimeLabels
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -59,7 +59,7 @@ private fun RecentRow(conversation: FleetRecentConversation, page: HomePageScope
     RosterListRow(
         spec = LettaListRowSpec(
             title = conversation.title,
-            trailing = relativeAgeLabel(conversation.updatedAtLabel),
+            trailing = TimeLabels.ageLabel(conversation.updatedAtLabel),
             subtitle = subtitle.ifBlank { null },
         ),
         row = RosterRowState(onClick = { page.navigation.onOpenConversation(conversation) }),

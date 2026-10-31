@@ -75,7 +75,7 @@ fun AgentMessageProvenanceLabel(
         contentColor != null -> contentColor
         else -> MaterialTheme.colorScheme.tertiary
     }
-    val muted = contentColor?.copy(alpha = IN_BUBBLE_MUTED_ALPHA) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val muted = contentColor?.copy(alpha = LettaDimens.Alpha.muted) ?: MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = Modifier
@@ -123,9 +123,6 @@ fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Col
         }
     }
 }
-
-/** The quiet text's strength against a bubble's content colour. */
-private const val IN_BUBBLE_MUTED_ALPHA = 0.72f
 
 /** The header's two inks: the agent names (and failures), and the quiet text around them. */
 private data class ProvenanceHeaderColors(val tint: Color, val muted: Color)

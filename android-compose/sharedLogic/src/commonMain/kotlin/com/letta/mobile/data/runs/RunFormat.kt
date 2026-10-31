@@ -2,24 +2,14 @@ package com.letta.mobile.data.runs
 
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.Step
-import kotlin.math.roundToLong
+import com.letta.mobile.util.time.TimeLabels
 
 /** The words the Runs page shows for a run and its steps (one place, so every host reads alike). */
 object RunFormat {
-    /** "850 ms", "4.2 s", "3 m 12 s"; null when the host did not time the run. */
+    /** "850ms", "4.2s", "3m 12s" ([TimeLabels.duration] with tenths); null when the host did not time the run. */
     fun duration(nanos: Long?): String? {
         val ns = nanos?.takeIf { it >= 0 } ?: return null
-        val millis = ns / NANOS_PER_MILLI
-        return when {
-            millis < MILLIS_PER_SECOND -> "$millis ms"
-            millis < MILLIS_PER_MINUTE -> tenthsOfSeconds(millis)
-            else -> "${millis / MILLIS_PER_MINUTE} m ${(millis % MILLIS_PER_MINUTE) / MILLIS_PER_SECOND} s"
-        }
-    }
-
-    private fun tenthsOfSeconds(millis: Long): String {
-        val tenths = (millis / MILLIS_PER_TENTH.toDouble()).roundToLong()
-        return "${tenths / TENTHS_PER_SECOND}.${tenths % TENTHS_PER_SECOND} s"
+        return TimeLabels.duration(ns / NANOS_PER_MILLI, tenths = true)
     }
 
     /** The row's second line: status, stop reason and duration, whichever the host reported. */
@@ -39,10 +29,6 @@ object RunFormat {
     private fun Step.tokenCount(): Int? = totalTokens ?: listOfNotNull(promptTokens, completionTokens).takeIf { it.isNotEmpty() }?.sum()
 
     private const val NANOS_PER_MILLI = 1_000_000L
-    private const val MILLIS_PER_SECOND = 1_000L
-    private const val MILLIS_PER_MINUTE = 60_000L
-    private const val MILLIS_PER_TENTH = 100L
-    private const val TENTHS_PER_SECOND = 10L
     private const val SHORT_ID = 8
     private const val SEPARATOR = " · "
     private const val UNKNOWN = "unknown"

@@ -60,6 +60,8 @@ import com.letta.mobile.sharedui.resources.canvas_plugin_status_running
 import com.letta.mobile.sharedui.resources.canvas_plugin_untitled
 import com.letta.mobile.ui.canvas.LocalCanvasCompact
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import com.composables.icons.lucide.Box as LucideBox
@@ -270,21 +272,17 @@ private fun toneColor(tone: PluginStatusTone): Color = when (tone) {
 private fun PluginBadge(badge: PluginCardBadge, modifier: Modifier) {
     val (label, icon) = badgeContent(badge)
     val fault = badge == PluginCardBadge.FAULT
-    Surface(
+    val scheme = MaterialTheme.colorScheme
+    LettaTonalPill(
+        text = stringResource(label),
+        colors = if (fault) {
+            LettaPillColors(scheme.errorContainer, scheme.onErrorContainer)
+        } else {
+            LettaPillColors(scheme.secondaryContainer, scheme.onSecondaryContainer)
+        },
         modifier = modifier,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = if (fault) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = if (fault) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-        ) {
-            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
-            Text(text = stringResource(label), style = MaterialTheme.typography.labelSmall, maxLines = 1)
-        }
-    }
+        icon = icon,
+    )
 }
 
 private fun badgeContent(badge: PluginCardBadge): Pair<StringResource, ImageVector> = when (badge) {

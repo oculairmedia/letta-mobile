@@ -3,25 +3,10 @@ package com.letta.mobile.ui.shell.sidebar
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class ShellSidebarMappingTest {
     private val now = Instant.parse("2026-10-07T12:00:00Z")
-
-    @Test
-    fun relativeTimeUsesTheCompactBuckets() {
-        assertEquals("now", ShellRelativeTime.compact(now - 30.seconds, now))
-        assertEquals("4m", ShellRelativeTime.compact(now - 4.minutes, now))
-        assertEquals("13h", ShellRelativeTime.compact(now - 13.hours, now))
-        assertEquals("2d", ShellRelativeTime.compact(now - 2.days, now))
-        assertEquals("3w", ShellRelativeTime.compact(now - 21.days, now))
-        assertEquals("2mo", ShellRelativeTime.compact(now - 61.days, now))
-        assertEquals("now", ShellRelativeTime.compact(now + 5.minutes, now))
-    }
 
     /** letta-mobile-ckmub.3.10: a host's sidebar input becomes the panel it draws (the desktop's binding). */
     @Test
@@ -51,12 +36,6 @@ class ShellSidebarMappingTest {
         assertEquals("Forked from Shipping notes", fork.subtitle)
         assertEquals(listOf(true, false), state.canvases.map { it.selected })
         assertEquals(listOf(false, true), state.canvases.map { it.archived })
-    }
-
-    @Test
-    fun relativeTimeParsesIsoAndPassesOtherTextThrough() {
-        assertEquals("1h", ShellRelativeTime.compact("2026-10-07T11:00:00Z", now))
-        assertEquals("Remote", ShellRelativeTime.compact("Remote", now))
     }
 
     @Test

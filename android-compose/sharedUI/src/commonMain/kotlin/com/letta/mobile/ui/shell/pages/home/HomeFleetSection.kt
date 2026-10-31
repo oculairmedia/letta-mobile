@@ -34,7 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.home.FleetAgentStat
 import com.letta.mobile.data.home.FleetSortKey
-import com.letta.mobile.data.home.relativeAge
+import com.letta.mobile.util.time.TimeLabels
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
@@ -139,7 +139,7 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
                 FleetCell(agent.modelLabel, Modifier.width(ModelWidth))
                 FleetCell(agent.conversationCount.toString(), Modifier.width(CountWidth), strong = agent.conversationCount > 0, align = TextAlign.End)
             }
-            FleetCell(agent.lastActivity?.let { relativeAge(it) } ?: DASH, Modifier.width(TimeWidth), align = TextAlign.End)
+            FleetCell(agent.lastActivity?.let { TimeLabels.age(it) } ?: DASH, Modifier.width(TimeWidth), align = TextAlign.End)
             if (page.wide) {
                 Box(Modifier.width(SparkWidth), contentAlignment = Alignment.CenterEnd) {
                     FleetBarSpark(values = agent.activityByHour, modifier = Modifier.width(SparkBarsWidth).height(LettaDimens.Space.lg))

@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +27,7 @@ import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaStatusLabel
 
 /*
  * letta-mobile-ckmub.3.12.1: the one row anatomy every settings row shares. A label, a one-line
@@ -104,20 +102,12 @@ internal fun RowWordsColumn(words: RowWords, enabled: Boolean, modifier: Modifie
 /** A status as a dot, a glyph for its tone and its words: never colour alone. */
 @Composable
 internal fun SettingsStatusBadge(status: SettingsStatus, modifier: Modifier = Modifier) {
-    val color = status.tone.color(MaterialTheme.colorScheme.onSurfaceVariant)
-    Row(
+    LettaStatusLabel(
+        text = status.text,
+        color = status.tone.color(MaterialTheme.colorScheme.onSurfaceVariant),
         modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        val glyph = status.tone.glyph
-        if (glyph != null) {
-            Icon(glyph, contentDescription = null, tint = color, modifier = Modifier.size(LettaDimens.Control.iconSm))
-        } else {
-            Box(Modifier.size(LettaDimens.Space.sm).background(color, CircleShape))
-        }
-        Text(status.text, style = MaterialTheme.typography.bodyMedium, color = color)
-    }
+        icon = status.tone.glyph,
+    )
 }
 
 /** A fixed-height placeholder row, so the page does not jump when the real rows arrive. */

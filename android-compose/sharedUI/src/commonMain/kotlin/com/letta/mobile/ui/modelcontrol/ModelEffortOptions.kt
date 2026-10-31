@@ -48,7 +48,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
-import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons

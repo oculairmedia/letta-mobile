@@ -5,7 +5,7 @@ import androidx.compose.runtime.remember
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsMapping
-import com.letta.mobile.ui.shell.sidebar.ShellRelativeTime
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Clock
 
 /**
@@ -27,7 +27,7 @@ internal fun rememberAgentRecentInteractions(state: AgentScaffoldRuntimeState): 
             conversations = RecentInteractionsMapping.rows(
                 conversations = conversations.toChatConversationSummaries(),
                 openConversationId = openId,
-                timeLabel = { ShellRelativeTime.compact(it, now) },
+                timeLabel = { TimeLabels.ageLabel(it, now) },
             ),
             onOpenConversation = { id -> switch(agentId, id, agentName) },
             onNewThread = { switch(agentId, null, agentName) },
