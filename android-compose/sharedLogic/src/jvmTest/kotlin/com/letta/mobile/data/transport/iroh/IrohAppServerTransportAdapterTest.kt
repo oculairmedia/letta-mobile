@@ -23,13 +23,10 @@ class IrohAppServerTransportAdapterTest {
                 address = "wss://example.com"
             )
             val scope: CoroutineScope = TestScope()
-            val protocol = object : AppServerProtocol {
-                override val id: String = "dummy"
-            }
 
             // Act & Assert
             val exception = assertFailsWith<IllegalArgumentException> {
-                adapter.createTransport(invalidEndpoint, scope, protocol)
+                adapter.createTransport(invalidEndpoint, scope, AppServerProtocol)
             }
 
             assertTrue(exception.message!!.contains("IrohAppServerTransportAdapter only handles 'iroh' scheme"))
