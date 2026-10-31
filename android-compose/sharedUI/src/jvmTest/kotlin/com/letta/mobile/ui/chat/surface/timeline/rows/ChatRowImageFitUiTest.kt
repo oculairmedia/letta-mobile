@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -25,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -112,7 +115,7 @@ class ChatRowImageFitUiTest {
     private fun checkSquare(environment: Environment) {
         for (kind in RowKind.entries) {
             runDesktopComposeUiTest(width = 1100, height = 1600) {
-                show(environment, kind, listOf(square))
+                val tappedIndex = show(environment, kind, listOf(square))
                 awaitImages(1)
                 val bounds = imageBounds()
                 val column = onNodeWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -125,6 +128,7 @@ class ChatRowImageFitUiTest {
                 onNode(
                     hasClickAction() and hasAnyAncestor(hasTestTag(ChatRowTestTags.IMAGE_GRID)), useUnmergedTree = true,
                 ).performClick()
+                assertEquals(0, tappedIndex.value, "viewer opens the tapped square")
                 onNodeWithContentDescription("Close image viewer").assertExists().performClick()
                 onNodeWithContentDescription("Close image viewer").assertDoesNotExist()
             }
@@ -150,7 +154,7 @@ class ChatRowImageFitUiTest {
     private fun checkGrid(environment: Environment) {
         for (kind in RowKind.entries) {
             runDesktopComposeUiTest(width = 1100, height = 1600) {
-                show(environment, kind, listOf(square, tall))
+                val tappedIndex = show(environment, kind, listOf(square, tall))
                 awaitImages(2)
                 val images = onAllNodesWithContentDescription(IMAGE_DESCRIPTION, useUnmergedTree = true).fetchSemanticsNodes()
                 if (kind == RowKind.Prompt && environment.host == LettaHost.Pointer) {
@@ -160,6 +164,7 @@ class ChatRowImageFitUiTest {
                     }
                     assertPaintedAspect(0, 1f)
                     assertPaintedAspect(1, 0.5f)
+                    assertImageTaps(tappedIndex, kind)
                     return@runDesktopComposeUiTest
                 }
                 val column = onNodeWithTag(ChatRowTestTags.IMAGE_GRID, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -175,6 +180,7 @@ class ChatRowImageFitUiTest {
                 }
                 assertPaintedAspect(0, 1f)
                 assertPaintedAspect(1, 0.5f)
+                assertImageTaps(tappedIndex, kind)
             }
         }
     }
@@ -191,11 +197,28 @@ class ChatRowImageFitUiTest {
         }
     }
 
-    private fun ComposeUiTest.show(environment: Environment, kind: RowKind, attachments: List<UiImageAttachment>) {
+    private fun ComposeUiTest.assertImageTaps(tappedIndex: MutableState<Int?>, kind: RowKind) {
+        for (index in 0 until 2) {
+            tappedIndex.value = null
+            onAllNodesWithContentDescription(IMAGE_DESCRIPTION, useUnmergedTree = true)[index]
+                .performTouchInput { click() }
+            assertEquals(index, tappedIndex.value, "$kind viewer opens tapped image $index")
+            onNodeWithContentDescription("Close image viewer").assertExists().performClick()
+            onNodeWithContentDescription("Close image viewer").assertDoesNotExist()
+        }
+    }
+
+    private fun ComposeUiTest.show(
+        environment: Environment, kind: RowKind, attachments: List<UiImageAttachment>,
+    ): MutableState<Int?> {
+        val tappedIndex = mutableStateOf<Int?>(null)
         var viewer by mutableStateOf<Pair<List<UiImageAttachment>, Int>?>(null)
         val callbacks = ChatRowCallbacks(
             actions = RecordingChatActions(), host = ChatSurfaceHost(),
-            onImageTap = { images, index -> viewer = images to index },
+            onImageTap = { images, index ->
+                tappedIndex.value = index
+                viewer = images to index
+            },
         )
         setContent {
             CompositionLocalProvider(LocalLettaHost provides environment.host, LocalReducedMotion provides true) {
@@ -206,12 +229,12 @@ class ChatRowImageFitUiTest {
                     }
                     viewer?.let { (images, index) ->
                         assertEquals(attachments, images, "viewer receives this row's images")
-                        assertEquals(0, index, "viewer opens the tapped square")
                         ChatImageViewer(images, index) { viewer = null }
                     }
                 }
             }
         }
+        return tappedIndex
     }
 
     private fun row(kind: RowKind, attachments: List<UiImageAttachment>): ChatRenderItem {
