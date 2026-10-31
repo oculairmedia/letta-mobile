@@ -36,7 +36,7 @@ internal class SubagentSnapshotAbsence {
         }
         val absentMs = since?.let { now - it } ?: 0L
         val silentMs = now - record.lastSeenEpochMs
-        if (visible && absentMs >= ABSENCE_GRACE_MS && silentMs >= ABSENCE_GRACE_MS) return true
+        if (visible && pastGrace(absentMs, silentMs)) return true
         Telemetry.event(
             DurableSubagentRegistry.TAG,
             "reconcile.absenceRetained",
@@ -50,10 +50,24 @@ internal class SubagentSnapshotAbsence {
         return false
     }
 
+    /** A positive sighting of [key] (any accepted observation) restarts its absence clock. */
+    fun seen(key: SubagentChipKey) {
+        if (key in absentSince) absentSince[key] = null
+    }
+
+    /** Forget [key] entirely, e.g. when its record leaves the registry. */
+    fun forget(key: SubagentChipKey) {
+        absentSince.remove(key)
+    }
+
     /** Forget removed and terminal keys so the evidence cannot outgrow the live registry. */
     fun retainKeys(keys: Set<SubagentChipKey>) {
         absentSince.keys.retainAll(keys)
     }
+
+    /** Both the snapshot absence and the silence have lasted the whole grace period. */
+    private fun pastGrace(absentMs: Long, silentMs: Long): Boolean =
+        minOf(absentMs, silentMs) >= ABSENCE_GRACE_MS
 
     private companion object {
         const val ABSENCE_GRACE_MS = 30 * 60_000L

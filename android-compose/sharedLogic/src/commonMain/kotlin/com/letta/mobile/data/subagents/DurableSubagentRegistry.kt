@@ -195,6 +195,8 @@ class DurableSubagentRegistry(
 
         val merged = existing.mergedWith(observation, now)
         entries[observation.key] = merged
+        // Any accepted sighting, even from an incomplete snapshot, is positive evidence of life.
+        snapshotAbsence.seen(observation.key)
         // PR #1077 review (P2): capacity must be re-checked on every ACCEPTED
         // transition, not only on insert. A burst of >maxEntries simultaneously
         // live chips is deliberately allowed to exceed the cap (live chips are
@@ -547,6 +549,8 @@ class DurableSubagentRegistry(
         while (entries.size > maxEntries && evictable.hasNext()) {
             val victim = evictable.next()
             entries.remove(victim.key)
+            // A later chip reusing this key must not inherit the evicted one's absence clock.
+            snapshotAbsence.forget(victim.key)
             evicted += victim
         }
         evicted.forEach { victim ->

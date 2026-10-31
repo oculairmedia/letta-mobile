@@ -14,6 +14,11 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -110,6 +115,20 @@ class SubagentLifecycleTest {
         assertEquals(SubagentChipState.ORPHANED, record().state)
     }
 
+    /** A sighting in a snapshot that cannot prove absence (mixed scope) still restarts the absence clock. */
+    @Test
+    fun aSightingInAnIncompleteSnapshotRestartsTheAbsenceClock() {
+        snapshot("call")
+        snapshot()
+        now += ABSENCE_MS - 60_000L
+        // Mixed-scope frame: "call" is listed with a foreign entry, so it is not a complete snapshot,
+        // but the call is positively seen.
+        source.ingestReceived(AppServerProtocol.decodeFrame(mixedScopeFrame("call")))
+        now += 60_000L + 1
+        snapshot()
+        assertEquals(SubagentChipState.RUNNING, record().state, "a fresh sighting must not orphan on the next omission")
+    }
+
     /** Only the exact parent and conversation can supply absence evidence. */
     @Test
     fun omissionsAreScopedToExactParentAndConversation() {
@@ -164,6 +183,15 @@ class SubagentLifecycleTest {
 
     private fun frame(ids: List<String>) =
         AppServerProtocol.decodeFrame(wireFrame(ids, "parent", "conv")).frame
+
+    /** "call" under this parent plus one entry claiming another parent: valid sighting, incomplete snapshot. */
+    private fun mixedScopeFrame(id: String): String {
+        val own = Json.parseToJsonElement(wireFrame(listOf(id), "parent", "conv")).jsonObject
+        val foreign = Json.parseToJsonElement(wireFrame(listOf("foreign"), "other-parent", "conv"))
+            .jsonObject.getValue("subagents").jsonArray
+        val mixed = JsonArray(own.getValue("subagents").jsonArray + foreign)
+        return JsonObject(own + ("subagents" to mixed) + ("idempotency_key" to JsonPrimitive("mixed:$now"))).toString()
+    }
 
     private fun wireFrame(ids: List<String>, agent: String, conversation: String): String = buildJsonObject {
         put("type", "update_subagent_state")
