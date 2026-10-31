@@ -208,7 +208,8 @@ private fun Modifier.attachmentAspectSize(bitmap: ImageBitmap): Modifier = fillM
     } else {
         naturalHeight
     }
-    val height = constraints.constrainHeight(cappedHeight)
+    // A very wide image still keeps a visible, tappable strip (it fits whole, letterboxed).
+    val height = constraints.constrainHeight(maxOf(cappedHeight, LettaDimens.Control.minTouchTarget.roundToPx()))
     val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
     layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
 }

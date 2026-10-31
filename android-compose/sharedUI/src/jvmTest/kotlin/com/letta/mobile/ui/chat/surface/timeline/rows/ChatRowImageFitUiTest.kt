@@ -78,6 +78,16 @@ class ChatRowImageFitUiTest {
     fun desktopGridFitsWholeImagesInUniformCells() = checkGrid(desktop)
 
     @Test
+    fun aVeryWideImageKeepsAVisibleTappableStrip() {
+        runDesktopComposeUiTest(width = 1100, height = 1600) {
+            show(phone, RowKind.Message, listOf(imageAttachment(4000, 2)))
+            awaitImages(1)
+            val minPx = with(density) { LettaDimens.Control.minTouchTarget.toPx() }
+            assertTrue(imageBounds().height >= minPx - 1f, "a 2000:1 image must not collapse to 0 px")
+        }
+    }
+
+    @Test
     fun storedPointersKeepThePlaceholderHeight() = checkPlaceholder(UiImageAttachment("", "image/png", storedByteSize = 100))
 
     @Test
