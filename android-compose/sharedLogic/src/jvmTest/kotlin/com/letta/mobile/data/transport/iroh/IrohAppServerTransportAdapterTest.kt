@@ -6,13 +6,14 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class IrohAppServerTransportAdapterTest {
     @Test
-    fun `createTransport throws exception when scheme is not iroh`() {
+    fun `createTransport throws exception when scheme is not iroh`() = runTest {
         // Arrange
         val endpoint = Endpoint.bind(EndpointOptions())
         try {
@@ -22,7 +23,6 @@ class IrohAppServerTransportAdapterTest {
                 address = "wss://example.com"
             )
             val scope: CoroutineScope = TestScope()
-            // Using a dummy stub since we can't use mockk for this test properly right now
             val protocol = object : AppServerProtocol {
                 override val id: String = "dummy"
             }
