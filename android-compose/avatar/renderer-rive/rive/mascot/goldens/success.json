@@ -93,19 +93,19 @@
       "spacing": "hold"
     },
     "Body.y": {
-      "max_delta": 20.9936,
+      "max_delta": 20.9887,
       "overshoot_pct": 0.0,
       "peak": -48.0,
       "peak_frame": 19,
-      "range": 54.0,
+      "range": 53.9951,
       "settle_frame": 57,
       "spacing": "ease-in"
     },
     "Face.rotation": {
       "max_delta": 0.0271,
       "overshoot_pct": 0.0,
-      "peak": -0.0349,
-      "peak_frame": 6,
+      "peak": 0.0349,
+      "peak_frame": 19,
       "range": 0.0698,
       "settle_frame": 38,
       "spacing": "ease-in"
@@ -120,11 +120,11 @@
       "spacing": "hold"
     },
     "Face.y": {
-      "max_delta": 20.9936,
+      "max_delta": 20.9887,
       "overshoot_pct": 0.0,
       "peak": -48.0,
       "peak_frame": 19,
-      "range": 54.0,
+      "range": 53.9951,
       "settle_frame": 57,
       "spacing": "ease-in"
     },
@@ -246,7 +246,7 @@
       "spacing": "hold"
     },
     "Trail1.opacity": {
-      "max_delta": 0.0933,
+      "max_delta": 0.094,
       "overshoot_pct": 0.0,
       "peak": 0.28,
       "peak_frame": 7,

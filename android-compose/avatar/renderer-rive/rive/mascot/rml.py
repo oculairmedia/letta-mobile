@@ -179,9 +179,14 @@ def transition(*parts, **opts):
     to_id, duration_ms, bezier = parts[0], parts[1], parts[2]
     condition = parts[3] if len(parts) > 3 else opts.get("condition")
     exit_time = opts.get("exit_time", False)
+    # `after_ms`: an exit-time GATE rather than an end - the transition may fire once the outgoing
+    # animation has played that many milliseconds, and not before (its conditions still apply).
+    after_ms = opts.get("after_ms")
     attrs = f'stateToId="{to_id}" duration="{duration_ms}"'
     if exit_time:
         attrs += ' enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"'
+    elif after_ms:
+        attrs += f' enableExitTime="true" exitTime="{after_ms}"'
     eased = bool(bezier) and duration_ms > 0
     if eased:
         attrs += ' interpolationType="cubic"'

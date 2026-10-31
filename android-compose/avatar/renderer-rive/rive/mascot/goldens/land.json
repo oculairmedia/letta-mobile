@@ -190,20 +190,20 @@
       "spacing": "hold"
     },
     "Squash.scaleX": {
-      "max_delta": 0.1602,
+      "max_delta": 0.0957,
       "overshoot_pct": 0.0,
-      "peak": 1.18,
+      "peak": 1.156,
       "peak_frame": 3,
-      "range": 0.24,
+      "range": 0.216,
       "settle_frame": 17,
       "spacing": "ease-in"
     },
     "Squash.scaleY": {
-      "max_delta": 0.1357,
+      "max_delta": 0.0811,
       "overshoot_pct": 0.0,
-      "peak": 0.8475,
+      "peak": 0.8678,
       "peak_frame": 3,
-      "range": 0.2163,
+      "range": 0.196,
       "settle_frame": 17,
       "spacing": "ease-in"
     },
