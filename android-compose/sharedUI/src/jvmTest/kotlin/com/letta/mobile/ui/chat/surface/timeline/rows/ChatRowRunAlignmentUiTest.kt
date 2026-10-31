@@ -99,11 +99,16 @@ class ChatRowRunAlignmentUiTest {
                 assertEquals(2, steps.size, "@ $width")
                 val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
                 val indent = if (width < LettaSizingTokens.COMPACT_WIDTH_BREAKPOINT) 0f else ChatRowSpacing.runStepIndent.value
+                val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 steps.forEach { step ->
                     val tools = step.boundsInRoot
                     // Wide steps keep their indent; compact steps use the full run width.
                     assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the step row is inset: ${tools.right} vs ${block.right}")
                     assertTrue(abs(tools.left - block.left - indent) < TOLERANCE_PX, "incorrect tool step indent (@ $width)")
+                    // Wide: the step still sits under the summary's label, whatever spacing the summary uses.
+                    if (indent > 0f) {
+                        assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label (@ $width)")
+                    }
                 }
             }
         }
