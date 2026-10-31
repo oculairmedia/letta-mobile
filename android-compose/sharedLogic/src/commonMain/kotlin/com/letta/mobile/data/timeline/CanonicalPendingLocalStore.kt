@@ -209,7 +209,15 @@ class CanonicalPendingLocalStore(
         }
     }
 
-    // Resends at once, as before; reading history first arrives with the outbox worker.
+    /** Prompts a Retry queued that no dispatch has started yet, oldest first. */
+    internal suspend fun queuedRetries(scope: TimelineScope): List<Record> {
+        val now = timelineCurrentTimeMillis()
+        return store.read(scope) {
+            readOutbox(now).filter { it.state == OutboxState.Queued && it.attempt > 0 }.map { it.toRecord() }
+        }
+    }
+
+    /** Queues a failed prompt's next attempt; the agent's send coordinator dispatches it. */
     internal suspend fun retry(scope: TimelineScope, otid: String): Record? = store.transaction(scope) {
         val now = timelineCurrentTimeMillis()
         val previous = readOutbox(now)

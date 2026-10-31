@@ -4,7 +4,6 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.api.TimelineIngestSources
@@ -53,8 +52,7 @@ class CanonicalExternalTransportWriter(
     private val maintenance: CanonicalTimelineMaintenance,
     private val now: () -> String = { timelineNow().toString() },
 ) : TimelineExternalTransportWriter {
-    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
-        coordinator.bindPendingRetry(agent, sender)
+    override fun queuedRetries(agent: AgentId) = coordinator.queuedRetries(agent)
 
     override suspend fun acceptPendingSend(
         attempt: TimelinePendingSendAttempt,
@@ -67,11 +65,14 @@ class CanonicalExternalTransportWriter(
         accept,
     )
 
+    /**
+     * A retry is current only while it still waits in the outbox. Once one dispatcher has started
+     * it, or an echo or dismissal settled it, every other dispatcher drops its copy.
+     */
     override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt): Boolean {
         val scope = resolveScope(attempt.agent.value, attempt.conversation.value)
-        return CanonicalPendingLocalStore(coordinator.pendingStorage).load(scope).any {
-            it.otid == attempt.identity.value && it.attempt == attempt.generation &&
-                it.delivery == CanonicalPendingLocalStore.Delivery.Sending
+        return CanonicalPendingLocalStore(coordinator.pendingStorage).queuedRetries(scope).any {
+            it.otid == attempt.identity.value && it.attempt == attempt.generation
         }
     }
 
