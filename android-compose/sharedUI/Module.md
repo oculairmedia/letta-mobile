@@ -320,6 +320,10 @@ Touch text-selection and menu-density adaptation. Provide toolbar/quote-sink bin
 
 Material theme construction, semantic colors, dimensions, motion and accessibility policy. Integrate through SharedMaterialTheme and accessibility preference/policy locals; platform preference observation belongs to actuals and domain behavior must not depend on color or motion tokens.
 
+# Package com.letta.mobile.ui.theme.graph
+
+Tokens for node-link graph views drawn on a Canvas (the memory graph): edge strokes, node rings, label chips, fit padding and the focus/dim emphasis alphas. Read them through GraphDimens from draw passes; colours stay in MaterialTheme and the graph's palette.
+
 # Package com.letta.mobile.ui.document.workspace
 
 The shared DocumentWorkspace composes the existing note editor and bounded reference preview beneath one LettaPageScaffold. Compact controls and a wide presentation rail switch Note/References over one current document without saving on presentation changes. Explicit note operations use the workspace scope, which survives both presentation and compact/wide layout changes; interrupted navigation writes still use the shared session reconciliation barrier. Preview open actions always use the shared controller and its required trusted opener; absent reference support is explicit. Owners must await controller close before unmounting. This composition has no production host route yet; host authorization, browser storage interoperability and compaction raw-ID correction remain activation prerequisites.

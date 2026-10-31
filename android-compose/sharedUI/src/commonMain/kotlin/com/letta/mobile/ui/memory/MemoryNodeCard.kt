@@ -1,8 +1,6 @@
 package com.letta.mobile.ui.memory
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -11,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -22,35 +18,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.data.memory.MemoryGraphNodeKind
+import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.graph.MemoryNodeContent
-import com.letta.mobile.data.memory.graph.MemoryNodeSelection
 import com.letta.mobile.data.memory.graph.MemoryPageActions
+import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.customColors
-
-/** What the node card renders: the selection plus graph-derived decoration. */
-@Immutable
-internal data class MemoryNodeCardState(
-    val selection: MemoryNodeSelection,
-    val degree: Int,
-    val accent: Color,
-)
 
 /**
- * The selected node's card: identity, stats, and its full contents. Memory
- * blocks load their complete value and, when the backend can commit a write,
- * offer Edit, which swaps the body for [MemoryNodeEditorPane].
+ * The selected node's inspector: identity, then what is useful about this kind of node (the
+ * agent's context window and blocks, a block's size against its limit, a schedule's cron and next
+ * run, a channel's status and address), then its contents. Blocks load their full value and, when
+ * the backend can commit a write, offer Edit, which swaps the body for [MemoryNodeEditorPane].
  */
 @Composable
 internal fun MemoryNodeCardContent(
@@ -59,35 +49,73 @@ internal fun MemoryNodeCardContent(
     modifier: Modifier = Modifier,
 ) {
     val selection = card.selection
+    val palette = rememberMemoryGraphPalette()
     Column(
         modifier = modifier.padding(LettaDimens.Space.lg),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        MemoryNodeCardHeader(selection, card.accent, onClose = actions::clearSelection)
-        MemoryNodeStats(selection, card.degree)
+        MemoryNodeCardHeader(card, onClose = actions::clearSelection)
+        MemoryNodeKindFacts(card, palette, actions::selectNode)
         val editor = selection.editor
-        if (editor != null) {
-            MemoryNodeEditorPane(selection, editor, actions)
-        } else {
-            MemoryNodeBody(selection, actions)
+        when {
+            editor != null -> MemoryNodeEditorPane(selection, editor, actions)
+            selection.detail.kind.isRoot() -> Unit
+            else -> MemoryNodeBody(card, actions)
         }
     }
 }
 
 @Composable
-private fun MemoryNodeCardHeader(selection: MemoryNodeSelection, accent: Color, onClose: () -> Unit) {
-    val detail = selection.detail
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        Box(Modifier.size(LettaDimens.Space.md).clip(CircleShape).background(accent))
-        Column(Modifier.weight(1f)) {
-            Text(detail.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun ColumnScope.MemoryNodeKindFacts(card: MemoryNodeCardState, palette: MemoryGraphPalette, onOpen: (String) -> Unit) {
+    when (val item = card.item) {
+        is MemoryParityItem.Schedule -> MemoryScheduleFacts(item)
+        is MemoryParityItem.Channel -> MemoryChannelFacts(item, palette)
+        is MemoryParityItem.Skill -> MemorySkillFacts(item)
+        is MemoryParityItem.MemoryBlock -> MemoryBlockFacts(card)
+        null -> if (card.selection.detail.kind.isRoot()) {
+            // The agent's lists can outgrow a phone's bottom sheet: they scroll inside it.
+            Column(
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            ) {
+                MemoryAgentFacts(card, palette, onOpen)
+            }
+        }
+    }
+}
+
+private fun MemoryGraphNodeKind.isRoot(): Boolean = this == MemoryGraphNodeKind.Agent || this == MemoryGraphNodeKind.Backend
+
+@Composable
+private fun MemoryNodeCardHeader(card: MemoryNodeCardState, onClose: () -> Unit) {
+    val detail = card.selection.detail
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+                LettaSwatch(card.accent)
+                Text(
+                    kindOverline(detail.kind).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = card.accent,
+                )
+            }
             Text(
-                detail.subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                detail.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
+            card.meaningfulSubtitle?.let { subtitle ->
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         IconButton(onClick = onClose) {
             Icon(LettaIcons.Close, contentDescription = "Close")
@@ -95,44 +123,39 @@ private fun MemoryNodeCardHeader(selection: MemoryNodeSelection, accent: Color, 
     }
 }
 
-@Composable
-private fun MemoryNodeStats(selection: MemoryNodeSelection, degree: Int) {
-    val detail = selection.detail
-    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
-        MemoryNodeStat("Type", memoryNodeKindLabel(detail.kind))
-        MemoryNodeStat("Links", degree.toString())
-        MemoryNodeStat("Chars", selection.displayText.length.toString())
-        detail.limit?.let { MemoryNodeStat("Limit", it.toString()) }
-        if (detail.readOnly) MemoryNodeStat("Access", "Read-only")
-    }
+private fun kindOverline(kind: MemoryGraphNodeKind): String = when (kind) {
+    MemoryGraphNodeKind.Memory -> "Memory block"
+    else -> memoryNodeKindLabel(kind)
 }
 
+/** The node's text (a block's full value, a schedule's message), then edit/delete for a writable block. */
 @Composable
-private fun MemoryNodeStat(label: String, value: String) {
-    Column {
-        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun ColumnScope.MemoryNodeBody(selection: MemoryNodeSelection, actions: MemoryPageActions) {
+private fun ColumnScope.MemoryNodeBody(card: MemoryNodeCardState, actions: MemoryPageActions) {
+    val selection = card.selection
     when (val content = selection.content) {
         MemoryNodeContent.Loading -> MemoryNodeLoading()
         is MemoryNodeContent.Failed -> MemoryNodeLoadFailed(content.message, actions::retryContent)
-        else -> MemoryNodeText(selection.displayText, monospace = content is MemoryNodeContent.Loaded)
+        else -> MemoryNodeValue(card, monospace = content is MemoryNodeContent.Loaded)
     }
-    selection.detail.metadataLabels.takeIf { it.isNotEmpty() }?.let { labels ->
-        Text(labels.joinToString("  ·  "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (selection.canEdit || selection.canDelete) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            if (selection.canDelete) {
-                MemoryCardAction(LettaIcons.Delete, "Delete", actions::requestDelete, MaterialTheme.colorScheme.error)
-            }
-            if (selection.canEdit) {
-                MemoryCardAction(LettaIcons.Edit, "Edit", actions::beginEdit)
-            }
+    if (selection.canEdit || selection.canDelete) MemoryNodeActions(card, actions)
+}
+
+/** The node's text, under a "Value" heading for a block; schedules and channels say it all in their facts. */
+@Composable
+private fun ColumnScope.MemoryNodeValue(card: MemoryNodeCardState, monospace: Boolean) {
+    if (card.item is MemoryParityItem.Schedule || card.item is MemoryParityItem.Channel) return
+    if (card.item is MemoryParityItem.MemoryBlock) LettaSectionLabel("Value")
+    MemoryNodeText(card.selection.displayText, monospace = monospace)
+}
+
+@Composable
+private fun MemoryNodeActions(card: MemoryNodeCardState, actions: MemoryPageActions) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        if (card.selection.canDelete) {
+            MemoryCardAction(LettaIcons.Delete, "Delete", actions::requestDelete, MaterialTheme.colorScheme.error)
+        }
+        if (card.selection.canEdit) {
+            MemoryCardAction(LettaIcons.Edit, "Edit", actions::beginEdit)
         }
     }
 }

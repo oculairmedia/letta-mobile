@@ -28,13 +28,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.memory.MemoryParityAgentOption
 import com.letta.mobile.data.memory.MemoryParityControllerState
-import com.letta.mobile.data.memory.MemorySummaryMetric
+import com.letta.mobile.data.memory.MemoryParitySummary
+import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
@@ -63,7 +65,7 @@ internal fun MemoryPageChrome(
     ) {
         MemoryHeaderRow(parity, actions, options)
         parity.errorMessage?.let { MemoryErrorBanner(it) }
-        MemorySummaryStrip(parity.memory.summary.metrics)
+        MemorySummaryStrip(parity.memory.summary)
     }
 }
 
@@ -128,20 +130,26 @@ private fun MemoryAgentPicker(
     }
 }
 
+/**
+ * Counts with grouped digits, then the context window as a meter ("801 / 1,000,000 tokens") on
+ * its own line, capped at the side pane's width so it reads the same on a phone and a desktop.
+ */
 @Composable
-private fun MemorySummaryStrip(metrics: List<MemorySummaryMetric>) {
+private fun MemorySummaryStrip(summary: MemoryParitySummary) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         verticalAlignment = Alignment.Bottom,
     ) {
-        metrics.forEach { metric ->
+        summary.metrics.filter { it.kind != MemorySummaryMetricKind.Context }.forEach { metric ->
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.Bottom) {
-                Text(metric.value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                val value = metric.value.toIntOrNull()?.let(::lettaCount) ?: metric.value
+                Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(metric.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
             }
         }
     }
+    MemoryContextMeter(summary, Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth).fillMaxWidth())
 }
 
 /**  (S13): the page's load failure, as every page shows one. */

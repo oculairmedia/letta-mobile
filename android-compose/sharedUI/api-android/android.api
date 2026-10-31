@@ -4639,16 +4639,16 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryBlockDi
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt;
 	public fun <init> ()V
-	public final fun getLambda$-166897746$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1397351094$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$496283159$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-2056150377$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-774473774$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$284266688$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt;
 	public fun <init> ()V
+	public final fun getLambda$-1857052433$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1750554699$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$989746989$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeEditorPaneKt {
@@ -4665,9 +4665,7 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryPageChr
 
 public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
 	public static final field $stable I
-	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;JJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun accentColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryAccentRole;)J
-	public final fun categoryColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryCategory;)J
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;JJJJJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3-0d7_KjU ()J
@@ -4676,20 +4674,23 @@ public final class com/letta/mobile/ui/memory/MemoryGraphPalette {
 	public final fun component6-0d7_KjU ()J
 	public final fun component7-0d7_KjU ()J
 	public final fun component8-0d7_KjU ()J
-	public final fun copy-GklG2IY (Ljava/util/Map;Ljava/util/Map;JJJJJJ)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
-	public static synthetic fun copy-GklG2IY$default (Lcom/letta/mobile/ui/memory/MemoryGraphPalette;Ljava/util/Map;Ljava/util/Map;JJJJJJILjava/lang/Object;)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
+	public final fun component9-0d7_KjU ()J
+	public final fun copy-uN6SlqM (Ljava/util/Map;Ljava/util/Map;JJJJJJJ)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
+	public static synthetic fun copy-uN6SlqM$default (Lcom/letta/mobile/ui/memory/MemoryGraphPalette;Ljava/util/Map;Ljava/util/Map;JJJJJJJILjava/lang/Object;)Lcom/letta/mobile/ui/memory/MemoryGraphPalette;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAccents ()Ljava/util/Map;
-	public final fun getCategories ()Ljava/util/Map;
 	public final fun getEdge-0d7_KjU ()J
-	public final fun getEdgeHighlight-0d7_KjU ()J
+	public final fun getKinds ()Ljava/util/Map;
 	public final fun getLabel-0d7_KjU ()J
+	public final fun getLabelChip-0d7_KjU ()J
 	public final fun getLabelMuted-0d7_KjU ()J
 	public final fun getNodeRing-0d7_KjU ()J
 	public final fun getSelectionRing-0d7_KjU ()J
+	public final fun getStatuses ()Ljava/util/Map;
+	public final fun getTrack-0d7_KjU ()J
 	public fun hashCode ()I
 	public final fun kindColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryGraphNodeKind;)J
 	public final fun nodeColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryGraphNode;)J
+	public final fun statusColor-vNxB06k (Lcom/letta/mobile/data/memory/MemoryChannelStatus;)J
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -4704,7 +4705,6 @@ public final class com/letta/mobile/ui/memory/MemoryGraphViewportState {
 	public final fun getLimits ()Lcom/letta/mobile/data/memory/graph/MemoryGraphZoomLimits;
 	public final fun getSize ()Lcom/letta/mobile/data/memory/graph/MemoryGraphSize;
 	public final fun getViewport ()Lcom/letta/mobile/data/memory/graph/MemoryGraphViewport;
-	public final fun reveal (Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun sync (Lcom/letta/mobile/data/memory/graph/MemoryGraphLayout;Lcom/letta/mobile/data/memory/graph/MemoryGraphSize;)V
 	public final fun transform-Wko1d7g (JJF)V
 	public final fun zoomBy (F)V
@@ -11082,5 +11082,32 @@ public final class com/letta/mobile/ui/theme/TouchComposerDimens {
 	public final fun getSheetItemPressedCorner-D9Ej5fM ()F
 	public final fun getSheetItemPressedElevation-D9Ej5fM ()F
 	public final fun getSheetListMaxHeight-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/theme/graph/GraphDimens {
+	public static final field $stable I
+	public static final field DIMMED_ALPHA F
+	public static final field DIMMED_EDGE_ALPHA F
+	public static final field EDGE_ALPHA F
+	public static final field FOCUSED_EDGE_ALPHA F
+	public static final field HALO_ALPHA F
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/graph/GraphDimens;
+	public static final field LABEL_CHIP_ALPHA F
+	public final fun getEdge-D9Ej5fM ()F
+	public final fun getEdgeFocused-D9Ej5fM ()F
+	public final fun getFitPadding-D9Ej5fM ()F
+	public final fun getFitPaddingCompact-D9Ej5fM ()F
+	public final fun getHalo-D9Ej5fM ()F
+	public final fun getLabelChipPadX-D9Ej5fM ()F
+	public final fun getLabelChipPadY-D9Ej5fM ()F
+	public final fun getLabelFocusedWidth-D9Ej5fM ()F
+	public final fun getLabelGap-D9Ej5fM ()F
+	public final fun getLabelWidth-D9Ej5fM ()F
+	public final fun getRootRim-D9Ej5fM ()F
+	public final fun getSelectionGap-D9Ej5fM ()F
+	public final fun getSelectionRing-D9Ej5fM ()F
+	public final fun getStatusDot-D9Ej5fM ()F
+	public final fun getUsageGap-D9Ej5fM ()F
+	public final fun getUsageStroke-D9Ej5fM ()F
 }
 
