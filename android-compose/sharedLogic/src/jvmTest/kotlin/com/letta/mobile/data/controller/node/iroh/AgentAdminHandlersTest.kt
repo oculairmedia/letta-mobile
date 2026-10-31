@@ -12,7 +12,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import java.nio.file.Files
-import java.io.File
 
 class AgentAdminHandlersTest {
 
