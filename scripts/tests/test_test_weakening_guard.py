@@ -136,5 +136,25 @@ class FixtureDiffTest(unittest.TestCase):
                 self.assertEqual("explicit", guard.pr_body())
 
 
+class InputValidationTest(unittest.TestCase):
+    def test_long_reason_lines_finish_quickly(self):
+        import subprocess
+        code = (
+            "import importlib.util; "
+            f"spec = importlib.util.spec_from_file_location('guard', {str(GUARD_PATH)!r}); "
+            "guard = importlib.util.module_from_spec(spec); spec.loader.exec_module(guard); "
+            "assert not guard.valid_reason('Test change reason:' + ' ' * 1000000); "
+            "assert not guard.valid_reason(' ' * 1000000 + 'wrong'); "
+            "assert guard.valid_reason(' ' * 1000000 + 'Test change reason: ' + 'x' * 20)"
+        )
+        subprocess.run([sys.executable, "-c", code], check=True, timeout=3)
+
+    def test_option_like_diff_base_is_rejected_before_git(self):
+        with patch.object(guard, "git") as git:
+            with self.assertRaisesRegex(ValueError, "diff-base must not start"):
+                guard.check(Path("/fixture"), "--help")
+            git.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

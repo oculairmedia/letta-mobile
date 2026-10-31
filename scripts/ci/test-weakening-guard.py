@@ -20,8 +20,6 @@ import sys
 # One list shared by Kotlin and Python. The wildcard covers assertEquals, assertTrue, etc.
 ASSERTION_CALLS = ("assert*", "verify", "expectThat", "shouldBe")
 REASON_MIN_LENGTH = 20
-REASON_LINE = re.compile(r"^\s*Test change reason:\s*(.*?)\s*$")
-KOTLIN_TEST_PATH = re.compile(r"(?:^|/)src/(?:[^/]*Test[^/]*|test|androidTest)/.*\.kt$")
 KOTLIN_TOKEN = re.compile(r'//[^\n]*|/\*[\s\S]*?\*/|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
 KOTLIN_CLASS = re.compile(r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)\b[^{}]*\{")
 KOTLIN_TEST = re.compile(r"@(?:[\w.]+\.)?Test\b(?:(?!\b(?:fun|class|object|interface)\b|[{};])[\s\S])*?\bfun\s+(?:<[^>]+>\s*)?(`[^`]+`|[A-Za-z_]\w*)\s*\(")
@@ -30,9 +28,25 @@ CALL = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
 INFIX_SHOULD_BE = re.compile(r"\bshouldBe\b(?!\s*\()")
 
 
+def kotlin_test_path(path):
+    # The original path pattern permits one final newline, but not one in the file path.
+    path = path.removesuffix("\n")
+    if not path.endswith(".kt"):
+        return False
+    parts = path.split("/")
+    last_newline = path.rfind("\n")
+    offset = 0
+    for parent, source_set, _ in zip(parts, parts[1:], parts[2:]):
+        after_source_set = offset + len(parent) + len(source_set) + 2
+        if parent == "src" and ("Test" in source_set or source_set == "test") and after_source_set > last_newline:
+            return True
+        offset += len(parent) + 1
+    return False
+
+
 def is_test_path(path: str) -> bool:
     name = Path(path).name
-    return bool(KOTLIN_TEST_PATH.search(path)) or (
+    return kotlin_test_path(path) or (
         path.startswith("scripts/") and name.endswith(".py")
         and (name.startswith("test_") or name.endswith("_test.py"))
     )
@@ -46,15 +60,13 @@ def empty_record():
     return {"tests": Counter(), "assertions": 0, "skips": Counter()}
 
 
-def kotlin_records(source: str):
+def clean_kotlin_token(match):
     # A sentinel shorter than the literal preserves offsets.
-    def clean(match):
-        token = match.group()
-        return ('UNUSED' + ' ' * (len(token) - 6)) if token == '"unused"' else re.sub(r"[^\n]", " ", token)
+    token = match.group()
+    return ('UNUSED' + ' ' * (len(token) - 6)) if token == '"unused"' else re.sub(r"[^\n]", " ", token)
 
-    text = KOTLIN_TOKEN.sub(clean, source)
-    skip_pattern = KOTLIN_SKIP.pattern.replace("UNUSED_STRING", "UNUSED")
-    records = defaultdict(empty_record)
+
+def kotlin_classes(text):
     classes = []
     for match in KOTLIN_CLASS.finditer(text):
         depth = 1
@@ -63,82 +75,125 @@ def kotlin_records(source: str):
             depth += (text[pos] == "{") - (text[pos] == "}")
             pos += 1
         classes.append((match.start(), pos, match.group(1)))
+    return classes
 
-    def owner(pos):
-        candidates = [(start, name) for start, end, name in classes if start <= pos < end]
-        return max(candidates)[1] if candidates else "<top-level>"
 
+def kotlin_owner(classes, pos):
+    candidates = [(start, name) for start, end, name in classes if start <= pos < end]
+    return max(candidates)[1] if candidates else "<top-level>"
+
+
+def count_kotlin_tests(text, classes, records):
     for match in KOTLIN_TEST.finditer(text):
-        records[owner(match.start())]["tests"][match.group(1).strip('`')] += 1
+        records[kotlin_owner(classes, match.start())]["tests"][match.group(1).strip('`')] += 1
+
+
+def count_assertions(text, classes, records):
     for match in CALL.finditer(text):
         if assertion_name(match.group(1)):
-            records[owner(match.start())]["assertions"] += 1
+            records[kotlin_owner(classes, match.start())]["assertions"] += 1
     for match in INFIX_SHOULD_BE.finditer(text):
-        records[owner(match.start())]["assertions"] += 1
+        records[kotlin_owner(classes, match.start())]["assertions"] += 1
+
+
+def is_test_fun(text, match, end):
+    boundary = max(text.rfind(char, 0, match.start()) for char in "{};")
+    return bool(re.search(r"@(?:[\w.]+\.)?Test\b", text[boundary + 1:end]))
+
+
+def disable_annotation(text, match, classes):
+    # Annotations count only when attached to a test function or test class.
+    declaration = re.search(r"\b(fun|class|object|interface)\s+(?:<[^>]+>\s*)?(`[^`]+`|[A-Za-z_]\w*)", text[match.end():])
+    if not declaration:
+        return None
+    end = match.end() + declaration.start()
+    if re.search(r"[{};]", text[match.end():end]):
+        return None
+    if declaration.group(1) != "fun":
+        return declaration.group(2), True
+    if is_test_fun(text, match, end):
+        return kotlin_owner(classes, match.start()), False
+    return None
+
+
+def count_kotlin_disables(text, classes, records):
+    skip_pattern = KOTLIN_SKIP.pattern.replace("UNUSED_STRING", "UNUSED")
     for match in re.finditer(skip_pattern, text):
         kind = match.group(1) or match.group(2) or "Suppress(unused)"
-        if match.group(2):
-            key = owner(match.start())
-            if records[key]["tests"]:
-                records[key]["skips"][kind] += 1
+        target = (kotlin_owner(classes, match.start()), True) if match.group(2) else disable_annotation(text, match, classes)
+        if target is None:
             continue
-        # Annotations count only when attached to a test function or test class.
-        declaration = re.search(r"\b(fun|class|object|interface)\s+(?:<[^>]+>\s*)?(`[^`]+`|[A-Za-z_]\w*)", text[match.end():])
-        if not declaration:
-            continue
-        end = match.end() + declaration.start()
-        between = text[match.end():end]
-        if re.search(r"[{};]", between):
-            continue
-        if declaration.group(1) != "fun":
-            key = declaration.group(2)
-            if records[key]["tests"]:
-                records[key]["skips"][kind] += 1
-        else:
-            boundary = max(text.rfind(char, 0, match.start()) for char in "{};")
-            annotations = text[boundary + 1:end]
-            if re.search(r"@(?:[\w.]+\.)?Test\b", annotations):
-                records[owner(match.start())]["skips"][kind] += 1
+        key, requires_tests = target
+        if not requires_tests or records[key]["tests"]:
+            records[key]["skips"][kind] += 1
+
+
+def kotlin_records(source: str):
+    text = KOTLIN_TOKEN.sub(clean_kotlin_token, source)
+    classes = kotlin_classes(text)
+    records = defaultdict(empty_record)
+    count_kotlin_tests(text, classes, records)
+    count_assertions(text, classes, records)
+    count_kotlin_disables(text, classes, records)
     return records
+
+
+def decorator_name(node):
+    if isinstance(node, ast.Call):
+        return decorator_name(node.func)
+    if isinstance(node, ast.Attribute):
+        return decorator_name(node.value) + "." + node.attr
+    return node.id if isinstance(node, ast.Name) else ""
+
+
+def count_python_decorators(decorators, owner, records):
+    for decorator in decorators:
+        name = decorator_name(decorator)
+        if name.split('.')[-1] in ("skip", "skipIf", "skipUnless", "skipif"):
+            records[owner]["skips"][name] += 1
+
+
+def count_python_call(node, owner, records):
+    name = decorator_name(node.func).split('.')[-1]
+    if assertion_name(name):
+        records[owner]["assertions"] += 1
+    if name in ("skip", "skipTest"):
+        records[owner]["skips"][name] += 1
+
+
+def count_python_node(node, owner, records):
+    if isinstance(node, ast.Assert):
+        records[owner]["assertions"] += 1
+    elif isinstance(node, ast.Call):
+        count_python_call(node, owner, records)
+
+
+def count_python_assertions(body, owner, records):
+    for statement in body:
+        for child in ast.walk(statement):
+            count_python_node(child, owner, records)
+
+
+def scan_python_function(node, owner, records):
+    if node.name.startswith("test"):
+        records[owner]["tests"][node.name] += 1
+        count_python_decorators(node.decorator_list, owner, records)
+    count_python_assertions(node.body, owner, records)
+
+
+def scan_python_body(body, owner, records):
+    for node in body:
+        if isinstance(node, ast.ClassDef):
+            count_python_decorators(node.decorator_list, node.name, records)
+            scan_python_body(node.body, node.name, records)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            scan_python_function(node, owner, records)
 
 
 def python_records(source: str, path: str):
     tree = ast.parse(source, filename=path)
     records = defaultdict(empty_record)
-
-    def decorator_name(node):
-        if isinstance(node, ast.Call):
-            return decorator_name(node.func)
-        if isinstance(node, ast.Attribute):
-            return decorator_name(node.value) + "." + node.attr
-        return node.id if isinstance(node, ast.Name) else ""
-
-    def scan(body, owner):
-        for node in body:
-            if isinstance(node, ast.ClassDef):
-                key = node.name
-                for dec in node.decorator_list:
-                    name = decorator_name(dec)
-                    if name.split('.')[-1] in ("skip", "skipIf", "skipUnless", "skipif"):
-                        records[key]["skips"][name] += 1
-                scan(node.body, key)
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name.startswith("test"):
-                    records[owner]["tests"][node.name] += 1
-                    for dec in node.decorator_list:
-                        name = decorator_name(dec)
-                        if name.split('.')[-1] in ("skip", "skipIf", "skipUnless", "skipif"):
-                            records[owner]["skips"][name] += 1
-                for child in (item for statement in node.body for item in ast.walk(statement)):
-                    if isinstance(child, ast.Assert):
-                        records[owner]["assertions"] += 1
-                    elif isinstance(child, ast.Call):
-                        name = decorator_name(child.func).split('.')[-1]
-                        if assertion_name(name):
-                            records[owner]["assertions"] += 1
-                        if name == "skip" or name == "skipTest":
-                            records[owner]["skips"][name] += 1
-    scan(tree.body, "<top-level>")
+    scan_python_body(tree.body, "<top-level>", records)
     return records
 
 
@@ -161,10 +216,14 @@ def records_for(root, revision, paths):
     return combined
 
 
+def needs_event_body(body, event):
+    return not body and bool(event) and Path(event).is_file()
+
+
 def pr_body():
     body = os.environ.get("PR_BODY", "")
     event = os.environ.get("GITHUB_EVENT_PATH", "")
-    if not body and event and Path(event).is_file():
+    if needs_event_body(body, event):
         with open(event, encoding="utf-8") as stream:
             body = (json.load(stream).get("pull_request") or {}).get("body") or ""
     return body
@@ -172,15 +231,20 @@ def pr_body():
 
 def valid_reason(body):
     for line in body.splitlines():
-        match = REASON_LINE.fullmatch(line)
-        if match and len(match.group(1).strip()) >= REASON_MIN_LENGTH:
+        prefix, separator, reason = line.lstrip().partition("Test change reason:")
+        if not prefix and separator and len(reason.strip()) >= REASON_MIN_LENGTH:
             return True
     return False
 
 
-def check(root, ref):
-    resolved = git(root, "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}").decode().strip()
-    base = git(root, "merge-base", resolved, "HEAD").decode().strip()
+def resolve_base(root, ref):
+    if ref.startswith("-"):
+        raise ValueError("diff-base must not start with '-'")
+    resolved = git(root, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{ref}^{{commit}}").decode().strip()
+    return git(root, "merge-base", resolved, "HEAD").decode().strip()
+
+
+def changed_test_paths(root, base):
     # Disable rename detection: the source and destination must both be compared.
     changed = git(root, "diff", "--name-status", "-z", "--no-renames", base, "HEAD").decode().split("\0")
     before, after = set(), set()
@@ -191,21 +255,42 @@ def check(root, ref):
             before.add(path)
         if status in ("M", "A", "T"):
             after.add(path)
-    old = records_for(root, base, before)
-    new = records_for(root, "HEAD", after)
+    return before, after
+
+
+def collect_records(root, ref):
+    base = resolve_base(root, ref)
+    before, after = changed_test_paths(root, base)
+    return records_for(root, base, before), records_for(root, "HEAD", after), bool(before)
+
+
+def compare_tests(name, old, new):
+    problems = [f"{name}: @Test/test function removed or renamed: {test} ({count})"
+                for test, count in sorted((old["tests"] - new["tests"]).items())]
+    old_count, new_count = old["assertions"], new["assertions"]
+    if new_count < old_count:
+        problems.append(f"{name}: assertion calls decreased: {old_count} -> {new_count}")
+    return problems
+
+
+def compare_disables(name, old, new):
+    return [f"{name}: test disable added: {marker} ({count})"
+            for marker, count in sorted((new["skips"] - old["skips"]).items())]
+
+
+def compare_records(old, new, has_before):
     problems = []
     for name in sorted(old):
-        for test, count in sorted((old[name]["tests"] - new[name]["tests"]).items()):
-            problems.append(f"{name}: @Test/test function removed or renamed: {test} ({count})")
-        old_count, new_count = old[name]["assertions"], new[name]["assertions"]
-        if new_count < old_count:
-            problems.append(f"{name}: assertion calls decreased: {old_count} -> {new_count}")
-    # Compare disables in existing classes across all changed test files.
-    if before:
+        problems.extend(compare_tests(name, old[name], new[name]))
+    if has_before:
         for name in sorted(old):
-            for marker, count in sorted((new[name]["skips"] - old[name]["skips"]).items()):
-                problems.append(f"{name}: test disable added: {marker} ({count})")
+            problems.extend(compare_disables(name, old[name], new[name]))
     return problems
+
+
+def check(root, ref):
+    old, new, has_before = collect_records(root, ref)
+    return compare_records(old, new, has_before)
 
 
 def main():
