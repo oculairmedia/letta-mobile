@@ -3,6 +3,10 @@
 package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
@@ -32,15 +36,24 @@ class CanvasPhoneTypingLayoutUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller, layout = CanvasLayout.COMPACT) }
         awaitCanvasReady()
-        mainClock.advanceTimeBy(1_000)
-        waitForIdle()
+        awaitCanvasUi("compact canvas toolbar") {
+            onAllNodes(hasContentDescription("Add")).fetchSemanticsNodes().isNotEmpty()
+        }
 
         onNodeWithContentDescription("Add").performClick()
+        awaitCanvasUi("shape insertion menu") {
+            onAllNodes(hasText("Rectangle")).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithText("Rectangle").performClick()
-        waitUntil(timeoutMillis = 5000) {
+        awaitCanvasUi("new rectangle") {
             controller.state.value.elements.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
         }
-        waitForIdle()
+        awaitCanvasUi("shape insertion menu dismissed") {
+            onAllNodes(hasText("Rectangle")).fetchSemanticsNodes().isEmpty()
+        }
+        awaitCanvasUi("focused shape text editor") {
+            onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
+        }
 
         // The caret is in the new shape: the tool bar is gone and the slim bar is there instead.
         onNodeWithContentDescription("Add").assertDoesNotExist()
@@ -56,8 +69,13 @@ class CanvasPhoneTypingLayoutUiTest {
 
         // Everything else is one menu away.
         onNodeWithContentDescription("More shape actions").performClick()
+        awaitCanvasUi("shape actions menu") {
+            onAllNodes(hasText("Bring to front")).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithText("Bring to front").assertExists()
         onNodeWithText("Delete").performClick()
-        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.none { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE } }
+        awaitCanvasUi("rectangle deleted") {
+            controller.state.value.elements.none { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
+        }
     }
 }
