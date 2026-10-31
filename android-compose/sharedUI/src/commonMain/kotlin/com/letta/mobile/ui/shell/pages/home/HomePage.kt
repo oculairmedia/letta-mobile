@@ -38,7 +38,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The Home page shared by Android, desktop and web: the mobile dashboard
- * (global search, a drag-to-reorder grid of pinned shortcuts and agents, backend stat widgets and a
+ * (global search, recent conversations, pinned shortcuts and agents, backend counters and a
  * quick-chat composer) merged with the desktop fleet view (recent conversations across every agent
  * and the sortable agent table).
  *
@@ -46,8 +46,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * and the host's navigation go out through [callbacks] and presentation choices come in through
  * [options]. At or above [LettaDimens.Pane.wideBreakpoint] the page is one scrolling column with the
  * composer up top and the full fleet table; below it the composer docks at the bottom like a phone
- * chat bar and the page leads with running work and recent conversations, then an agent avatar row
- * and a one-line stats strip ([homeCompactDashboard]).
+ * chat bar. Either way the page leads with running work and recent conversations, then an agent
+ * avatar row and a one-line stats strip ([homeSections]); counters never repeat.
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.
@@ -190,7 +190,7 @@ private fun CompactHomeLayout(page: HomePageScope) {
                 contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
             ) {
                 if (page.hasCompactHeader) item { HomeHeader(page) }
-                if (page.state.search.isActive) homeSearchResults(page) else homeCompactDashboard(page)
+                if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
             }
         }
         if (!page.state.search.isActive) {
@@ -199,10 +199,8 @@ private fun CompactHomeLayout(page: HomePageScope) {
     }
 }
 
-/** Wide: pins first (what the user chose), then the counters, then what the fleet has been doing. */
+/** Wide: the phone's sections (work in flight, recents, agents, counters, pins), then the full fleet table. */
 private fun LazyListScope.homeDashboard(page: HomePageScope) {
-    homePinnedSection(page)
-    item { HomeStatTiles(page) }
-    homeRecentConversations(page)
+    homeSections(page)
     homeFleetSection(page)
 }
