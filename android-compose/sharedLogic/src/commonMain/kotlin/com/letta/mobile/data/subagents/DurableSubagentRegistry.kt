@@ -1,6 +1,8 @@
 package com.letta.mobile.data.subagents
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
@@ -49,6 +51,7 @@ class DurableSubagentRegistry(
     private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
 ) {
     private val lock = SynchronizedObject()
+    private val snapshotAbsence = SubagentSnapshotAbsence()
 
     /** Insertion-ordered so eviction and snapshots are deterministic. */
     private val entries = LinkedHashMap<SubagentChipKey, SubagentChipRecord>()
@@ -367,6 +370,43 @@ class DurableSubagentRegistry(
         return result
     }
 
+    /**
+     * Reconcile an exact parent's live snapshot conservatively. Only chips previously
+     * visible in a snapshot can orphan after sustained absence and silence. A fresh
+     * snapshot must confirm the absence; a timer alone is not evidence of absence.
+     * Visibility and absence evidence reset on host restart; the durable TTL remains
+     * the fallback for rehydrated or stream-only chips.
+     */
+    internal fun reconcileSnapshot(
+        conversationId: ConversationId,
+        agentId: AgentId,
+        liveToolCallIds: Set<String>,
+        generation: Long,
+    ): ReconcileResult {
+        val result = synchronized(lock) {
+            val now = clock()
+            val scoped = entries.values.filter {
+                it.conversationId == conversationId.value && it.agentId == agentId.value && !it.state.isTerminal
+            }
+            val liveKeys = liveToolCallIds.mapTo(HashSet()) { SubagentChipKey(conversationId.value, agentId.value, it) }
+            val orphaned = snapshotAbsence.orphaned(scoped, liveKeys, now).map { record ->
+                record.copy(
+                    state = SubagentChipState.ORPHANED,
+                    generation = maxOf(record.generation, generation),
+                    terminalAtEpochMs = now,
+                ).also { entries[it.key] = it }
+            }
+            if (orphaned.isNotEmpty()) {
+                enforceCapacityLocked()
+                persistLocked()
+            }
+            snapshotAbsence.retainKeys(entries.filterValues { !it.state.isTerminal }.keys)
+            ReconcileResult(orphaned, liveRetained = scoped.size - orphaned.size)
+        }
+        reportReconciled(conversationId.value, generation, result)
+        return result
+    }
+
     private fun reconcileLocked(
         conversationId: String,
         liveToolCallIds: Set<String>,
@@ -540,6 +580,7 @@ class DurableSubagentRegistry(
     fun clear() {
         synchronized(lock) {
             entries.clear()
+            snapshotAbsence.retainKeys(emptySet())
             persistLocked()
         }
     }
@@ -555,10 +596,9 @@ class DurableSubagentRegistry(
         const val MAX_ENTRIES = 512
 
         /**
-         * A live chip unobserved for this long is ended as
-         * stale. Six hours is far beyond any subagent run seen in the live
-         * registry, so it only catches chips whose worker is gone; the zombies it
-         * targets were days to weeks old.
+         * Fallback for a live chip unobserved this long. Silence alone is not
+         * worker-death evidence, so this stays conservative. Previously snapshot-visible
+         * chips may orphan sooner through bounded, confirmed snapshot absence.
          */
         const val STALE_RUNNING_AFTER_MS: Long = 6 * 60 * 60 * 1000L
     }
