@@ -128,7 +128,7 @@ class FixtureDiffTest(unittest.TestCase):
 
     def test_event_fallback(self):
         from tempfile import TemporaryDirectory
-        with TemporaryDirectory(dir="/tmp/agent-scratch/gate-test-guard") as temp:
+        with TemporaryDirectory() as temp:
             event = Path(temp) / "event.json"
             event.write_text(json.dumps({"pull_request": {"body": REASON}}))
             with patch.dict(os.environ, {"PR_BODY": "", "GITHUB_EVENT_PATH": str(event)}, clear=True):
