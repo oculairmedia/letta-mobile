@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.chat.tools.ToolInset
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolInsetView
-import com.letta.mobile.ui.components.LettaPill
+import com.letta.mobile.ui.theme.LettaPill
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.serialization.json.Json

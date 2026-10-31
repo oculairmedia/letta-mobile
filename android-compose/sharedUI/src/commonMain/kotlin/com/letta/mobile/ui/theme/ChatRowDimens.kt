@@ -20,8 +20,11 @@ object ChatRowDimens {
     /** Chat-anchored A2UI stays bounded; past this the surface scrolls internally. */
     val a2uiMaxHeight: Dp = 360.dp
 
-    /** One attached image gets the room to be looked at. */
+    /** Placeholder height until an attached image has a decoded aspect ratio. */
     val imageSingleHeight: Dp = 220.dp
+
+    /** Portrait attachments fit whole inside this cap; square and landscape images follow their width. */
+    val imageSingleMaxHeight: Dp = 400.dp
 
     /** Each cell when several images share a row. */
     val imageGridHeight: Dp = 128.dp

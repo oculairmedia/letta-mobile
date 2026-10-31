@@ -355,26 +355,3 @@ private fun resolveAgentName(agentId: String, roster: Agent?, conversations: Lis
         conversation.agentName.takeIf { it.isNotBlank() && it != agentId }
     } ?: agentId
 }
-
-/** Compact age label ("now", "5m", "3h", "2d", "1w", "2mo") matching the rail timestamp idiom. */
-fun relativeAge(at: Instant, now: Instant = Clock.System.now()): String {
-    val seconds = (now - at).inWholeSeconds
-    return when {
-        seconds < SECONDS_PER_MINUTE -> "now"
-        seconds < SECONDS_PER_HOUR -> "${seconds / SECONDS_PER_MINUTE}m"
-        seconds < SECONDS_PER_DAY -> "${seconds / SECONDS_PER_HOUR}h"
-        seconds < SECONDS_PER_WEEK -> "${seconds / SECONDS_PER_DAY}d"
-        seconds < SECONDS_PER_MONTH -> "${seconds / SECONDS_PER_WEEK}w"
-        else -> "${seconds / SECONDS_PER_MONTH}mo"
-    }
-}
-
-/** [relativeAge] for a raw label; a label that is not an ISO instant is returned unchanged. */
-fun relativeAgeLabel(label: String, now: Instant = Clock.System.now()): String =
-    parseConversationInstant(label)?.let { relativeAge(it, now) } ?: label
-
-private const val SECONDS_PER_MINUTE = 60L
-private const val SECONDS_PER_HOUR = 3_600L
-private const val SECONDS_PER_DAY = 86_400L
-private const val SECONDS_PER_WEEK = 604_800L
-private const val SECONDS_PER_MONTH = 2_592_000L

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +36,7 @@ import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Callbacks of [ProviderSignInDialog]; [bind] wires them to the shared sign-in controller. */
@@ -219,7 +219,7 @@ private fun Progress(label: String) {
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         modifier = Modifier.fillMaxWidth().testTag(ProviderSignInTags.STATUS).semantics { liveRegion = LiveRegionMode.Polite },
     ) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        LettaBusyBar()
         Hint(label)
     }
 }

@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -90,6 +89,7 @@ import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource
@@ -159,7 +159,7 @@ private fun ColumnScope.PickerContent(state: WorkingDirectoryPickerState, action
         PathRow(state, actions)
         PickerToolbar(state, actions, host)
         PickerError(state.error)
-        if (state.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg))
+        if (state.isLoading) LettaBusyBar(Modifier.padding(horizontal = LettaDimens.Space.lg))
         PickerList(state, actions)
         PickerFooter(state, actions)
     }

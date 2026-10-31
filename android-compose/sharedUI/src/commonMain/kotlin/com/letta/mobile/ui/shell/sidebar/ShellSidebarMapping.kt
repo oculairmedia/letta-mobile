@@ -8,6 +8,7 @@ import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Instant
 
 /** Which conversations a host marks: the open one, the one whose agent is working, those being deleted. */
@@ -50,7 +51,7 @@ data class ShellSidebarInput(
 object ShellSidebarMapping {
     /** The agent panel a host's [input] draws, its times relative to [now]. */
     fun panelState(input: ShellSidebarInput, now: Instant): ShellAgentPanelState {
-        val timeLabel = { raw: String -> ShellRelativeTime.compact(raw, now) }
+        val timeLabel = { raw: String -> TimeLabels.ageLabel(raw, now) }
         return ShellAgentPanelState(
             agent = input.agent,
             mode = input.mode,
@@ -65,7 +66,7 @@ object ShellSidebarMapping {
                 ShellCanvasRowModel(
                     id = canvas.id,
                     title = canvas.title,
-                    timeLabel = ShellRelativeTime.compact(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
+                    timeLabel = TimeLabels.age(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
                     selected = canvas.id == input.activeCanvasId,
                     archived = canvas.id in input.archivedCanvasIds,
                 )
@@ -80,7 +81,7 @@ object ShellSidebarMapping {
      * [conversations] as panel rows, the pinned ones first and the settled ones last (each group
      * keeps its order).
      * [timeLabel] turns a summary's `updatedAtLabel` into the row's trailing time (see
-     * [ShellRelativeTime.compact]).
+     * [TimeLabels.ageLabel]).
      */
     fun conversationRows(
         conversations: List<ChatConversationSummary>,
@@ -113,32 +114,4 @@ object ShellSidebarMapping {
     /** The preview line under a title: trimmed, and blank for the loading placeholder. */
     fun cleanPreview(raw: String): String =
         raw.trim().takeUnless { it.equals(LOADING_PREVIEW, ignoreCase = true) }.orEmpty()
-}
-
-/** Compact relative time labels for list rows: now / 5m / 2h / 4d / 3w / 2mo. */
-object ShellRelativeTime {
-    private const val MINUTE = 60L
-    private const val HOUR = 3_600L
-    private const val DAY = 86_400L
-    private const val WEEK = 604_800L
-    private const val MONTH = 2_592_000L
-
-    /** [raw] (an ISO-8601 instant) relative to [now]; text that is not an instant comes back unchanged. */
-    fun compact(raw: String, now: Instant): String {
-        val instant = runCatching { Instant.parse(raw) }.getOrNull() ?: return raw
-        return compact(instant, now)
-    }
-
-    /** [instant] relative to [now]; a time in the future reads "now". */
-    fun compact(instant: Instant, now: Instant): String {
-        val seconds = (now - instant).inWholeSeconds
-        return when {
-            seconds < MINUTE -> "now"
-            seconds < HOUR -> "${seconds / MINUTE}m"
-            seconds < DAY -> "${seconds / HOUR}h"
-            seconds < WEEK -> "${seconds / DAY}d"
-            seconds < MONTH -> "${seconds / WEEK}w"
-            else -> "${seconds / MONTH}mo"
-        }
-    }
 }

@@ -183,16 +183,6 @@ class CanonicalPendingLocalStore(
     }
 
     /**
-     * Whether [record] could be past the horizon: unconfirmed and sent long enough ago. An
-     * unparsable timestamp is not evidence of staleness, so such a record is left alone.
-     */
-    private fun mayBeStale(record: Record, now: TimelineInstant): Boolean {
-        if (record.delivery == Delivery.Failed) return false
-        val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
-        return timelineInstantDurationMillis(sent, now) >= LOST_ECHO_HORIZON_MILLIS
-    }
-
-    /**
      * Apply a transport outcome to the expected retry generation while retaining unconfirmed
      * messages. Only an explicit Retry moves a failed record back to Sending, so a late Sent
      * cannot undo a failure.
@@ -209,7 +199,15 @@ class CanonicalPendingLocalStore(
         }
     }
 
-    // Resends at once, as before; reading history first arrives with the outbox worker.
+    /** Prompts a Retry queued that no dispatch has started yet, oldest first. */
+    internal suspend fun queuedRetries(scope: TimelineScope): List<Record> {
+        val now = timelineCurrentTimeMillis()
+        return store.read(scope) {
+            readOutbox(now).filter { it.state == OutboxState.Queued && it.attempt > 0 }.map { it.toRecord() }
+        }
+    }
+
+    /** Queues a failed prompt's next attempt; the agent's send coordinator dispatches it. */
     internal suspend fun retry(scope: TimelineScope, otid: String): Record? = store.transaction(scope) {
         val now = timelineCurrentTimeMillis()
         val previous = readOutbox(now)
@@ -259,6 +257,16 @@ class CanonicalPendingLocalStore(
         const val MAX_RECORDS = OutboxTransitions.BUDGET
         const val MAX_BYTES = OUTBOX_MAX_BYTES
     }
+}
+
+/**
+ * Whether [record] could be past the horizon: unconfirmed and sent long enough ago. An
+ * unparsable timestamp is not evidence of staleness, so such a record is left alone.
+ */
+private fun mayBeStale(record: CanonicalPendingLocalStore.Record, now: TimelineInstant): Boolean {
+    if (record.delivery == CanonicalPendingLocalStore.Delivery.Failed) return false
+    val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
+    return timelineInstantDurationMillis(sent, now) >= CanonicalPendingLocalStore.LOST_ECHO_HORIZON_MILLIS
 }
 
 /** Refuses a conflicting or over-budget prompt; false when the same prompt is already pending. */

@@ -429,17 +429,12 @@ private fun TransportedMascot(
 private fun SeatedCharacter(seated: SeatedMascot, boxSize: Dp, sceneKey: String, live: Boolean) {
     val seat = seated.seat
     val size = boxSize * seat.overscale
-    if (!live) {
-        MascotInPlace(seated.agentId, seated.identity, size = size, live = false, onClick = seat.onClick)
-        return
-    }
-    MascotLive(
-        seated.agentId,
-        seated.identity,
-        size = size,
-        onClick = seat.onClick,
-        sceneKey = sceneKey,
-        touch = seat.touch,
+    MascotLiveSwap(
+        live = live,
+        liveContent = {
+            MascotLive(seated.agentId, seated.identity, size = size, onClick = seat.onClick, sceneKey = sceneKey, touch = seat.touch)
+        },
+        stillContent = { MascotInPlace(seated.agentId, seated.identity, size = size, live = false, onClick = seat.onClick) },
     )
 }
 

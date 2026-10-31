@@ -16,7 +16,6 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -44,6 +43,7 @@ import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterSection
 import com.letta.mobile.ui.components.list.RosterSelection
 import com.letta.mobile.ui.components.list.RosterSpec
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -72,7 +72,7 @@ internal fun MemfsHeader(page: MemfsPageScope) {
         }
         MemfsTabs(page)
         if (page.state.isLoading || page.state.history.loading) {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
+            LettaBusyBar()
         }
     }
 }

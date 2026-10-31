@@ -21,7 +21,7 @@ import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
 import com.letta.mobile.ui.ambient.ThinkingGlowStyle
-import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton

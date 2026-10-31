@@ -34,7 +34,7 @@ import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaPill
+import com.letta.mobile.ui.theme.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshIconButton
 import com.letta.mobile.ui.components.list.RosterRowState

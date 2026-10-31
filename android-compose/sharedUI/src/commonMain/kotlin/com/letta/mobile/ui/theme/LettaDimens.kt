@@ -103,6 +103,15 @@ object LettaDimens {
 
         /** The smallest hit target of a whole tappable row (a settings row): the platform minimum. */
         val minTouchTarget: Dp = 48.dp
+
+        /**
+         * Spinner sizes, by role (see LettaSpinner): inside a line of text or a chip, in place of
+         * an icon, and a pane loading in place of its content. The first two are the glyph sizes
+         * they stand in for; [spinnerLg] is Material's own indicator diameter.
+         */
+        val spinnerSm: Dp = iconSm
+        val spinnerMd: Dp = icon
+        val spinnerLg: Dp = 40.dp
     }
 
     /** Agent orb sizes. The rail slot is wider than the orb so a selection marker fits beside it. */
@@ -142,6 +151,10 @@ object LettaDimens {
      */
     object Stroke {
         val hairline: Dp = 1.dp
+
+        /** A spinner's arc, not a border: [spinner] for the small and medium sizes, [spinnerLg] for the large. */
+        val spinner: Dp = 2.dp
+        val spinnerLg: Dp = 4.dp
     }
 
     /**
@@ -223,6 +236,12 @@ object LettaDimens {
 
         /** Dividers and hairlines against a surface. */
         const val hairline: Float = 0.5f
+
+        /**
+         * Quiet text one step below `onSurfaceVariant`: section labels, and the secondary ink on a
+         * bubble whose content colour is not a theme role. Also `customColors.onSurfaceMutedColor`.
+         */
+        const val muted: Float = 0.72f
     }
 
     /**

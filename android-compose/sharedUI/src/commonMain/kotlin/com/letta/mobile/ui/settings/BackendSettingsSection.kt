@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 
@@ -211,7 +211,7 @@ private fun TestConnectionRow(test: ConnectionTest, enabled: Boolean, onTest: ()
         when (test) {
             ConnectionTest.Idle -> Unit
             ConnectionTest.Testing -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                CircularProgressIndicator(Modifier.size(LettaDimens.Control.iconSm), strokeWidth = LettaDimens.Space.hair)
+                LettaSpinner(size = LettaDimens.Control.spinnerSm)
                 Text("Testing…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             is ConnectionTest.Done -> SettingsStatusBadge(test.badge)

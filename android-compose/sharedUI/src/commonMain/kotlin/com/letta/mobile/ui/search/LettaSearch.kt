@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 import com.letta.mobile.ui.theme.LettaDimens
@@ -188,7 +190,7 @@ internal fun LettaSearchScaffold(
                 sections.forEach { section ->
                     if (config.showSectionHeaders && section.title.isNotBlank()) {
                         item(key = "header-${section.title}") {
-                            LettaSearchSectionHeader(section.title)
+                            LettaSectionLabel(section.title, contentPadding = SearchSectionPadding)
                         }
                     }
                     items(
@@ -209,7 +211,7 @@ internal fun LettaSearchScaffold(
             Column(modifier = listModifier.verticalScroll(rememberScrollState())) {
                 sections.forEach { section ->
                     if (config.showSectionHeaders && section.title.isNotBlank()) {
-                        LettaSearchSectionHeader(section.title)
+                        LettaSectionLabel(section.title, contentPadding = SearchSectionPadding)
                     }
                     section.rows.forEach { row ->
                         LettaSearchResultRow(row = row, onClick = { onRowSelected(row) })
@@ -434,7 +436,7 @@ private fun LettaSearchRecentsStrip(
     rows: List<LettaSearchRow>,
     onRowSelected: (LettaSearchRow) -> Unit,
 ) {
-    LettaSearchSectionHeader(title)
+    LettaSectionLabel(title, contentPadding = SearchSectionPadding)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -473,22 +475,6 @@ private fun LettaSearchRecentsStrip(
             }
         }
     }
-}
-
-@Composable
-private fun LettaSearchSectionHeader(title: String) {
-    Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
-            start = LettaDimens.Space.md,
-            end = LettaDimens.Space.md,
-            top = LettaDimens.Space.sm,
-            bottom = LettaDimens.Space.hair,
-        ),
-    )
 }
 
 @Composable
@@ -679,6 +665,14 @@ private const val ScrimAlpha = 0.45f
 // Panel geometry: reading-width decisions, not points on the spacing scale, so
 // they are named here rather than tokenised.
 private val DropdownMinWidth = 280.dp
+
+/** A results section's label sits on the rows' own inset. */
+private val SearchSectionPadding = PaddingValues(
+    start = LettaDimens.Space.md,
+    end = LettaDimens.Space.md,
+    top = LettaDimens.Space.sm,
+    bottom = LettaDimens.Space.hair,
+)
 private val DropdownMaxWidth = 360.dp
 private val DropdownMaxResultsHeight = 320.dp
 private val PopoverMinWidth = 520.dp

@@ -23,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -73,6 +72,7 @@ import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.timeline.timelineLogger
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaSpinner
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -1221,12 +1221,7 @@ internal fun A2uiButton(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (inFlight) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(LettaDimens.Control.icon)
-                            .testTag(A2uiTestTags.BUTTON_PROGRESS),
-                        strokeWidth = LettaDimens.Space.hair,
-                    )
+                    LettaSpinner(Modifier.testTag(A2uiTestTags.BUTTON_PROGRESS))
                 }
                 Text(
                     text = label,

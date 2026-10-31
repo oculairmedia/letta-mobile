@@ -17,8 +17,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,7 +25,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.ui.components.isPointerHost
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +56,9 @@ import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.components.picker.PickerTags
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.providers.icons.ProviderIcons
+import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 
 /** Callbacks of [ModelPickerContent]; [bind] wires the controller-owned ones. */
 data class ModelPickerActions(
@@ -343,27 +342,14 @@ private const val DETAIL_SEPARATOR = "·"
 /** Touch: the effort in force with a chevron; a tap opens the model's options sheet. */
 @Composable
 private fun EffortPill(entry: ModelPickerEntry, effort: String?, onClick: () -> Unit) {
-    Surface(
+    LettaChip(
+        text = effortLabel(effort),
         onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        trailingIcon = LettaIcons.ChevronRight,
         modifier = Modifier
             .semantics { contentDescription = ModelControlStrings.effortOptionsOf(entry.displayName) }
             .testTag("${ModelEffortTags.PILL_PREFIX}${entry.value}"),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(effortLabel(effort), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Icon(
-                LettaIcons.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Control.iconSm),
-            )
-        }
-    }
+    )
 }
 
 /**
@@ -415,10 +401,7 @@ private fun PickerFooter(state: ModelPickerState, actions: ModelPickerActions) {
             modifier = Modifier.testTag(ModelPickerTags.REFRESH),
         ) {
             if (state.refreshing) {
-                CircularProgressIndicator(
-                    strokeWidth = LettaDimens.Space.hair,
-                    modifier = Modifier.size(LettaDimens.Control.icon).testTag(ModelPickerTags.REFRESH_PROGRESS),
-                )
+                LettaSpinner(Modifier.testTag(ModelPickerTags.REFRESH_PROGRESS))
             } else {
                 Icon(LettaIcons.Refresh, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
             }
