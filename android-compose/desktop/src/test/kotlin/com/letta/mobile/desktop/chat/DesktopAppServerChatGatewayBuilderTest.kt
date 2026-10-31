@@ -325,13 +325,13 @@ class DesktopAppServerChatGatewayBuilderTest {
         override suspend fun input(command: AppServerCommand.Input) = Unit
 
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("not needed")
+            throw NotImplementedError("not needed")
 
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("not needed")
+            throw NotImplementedError("not needed")
 
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("not needed")
+            throw NotImplementedError("not needed")
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
@@ -375,21 +375,21 @@ class DesktopAppServerChatGatewayBuilderTest {
         }
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-            error("not needed for auth handshake tests")
+            throw NotImplementedError("not needed for auth handshake tests")
 
-        override suspend fun input(command: AppServerCommand.Input) = error("not needed for auth handshake tests")
+        override suspend fun input(command: AppServerCommand.Input) = throw NotImplementedError("not needed for auth handshake tests")
 
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("not needed for auth handshake tests")
+            throw NotImplementedError("not needed for auth handshake tests")
 
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("not needed for auth handshake tests")
+            throw NotImplementedError("not needed for auth handshake tests")
 
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("not needed for auth handshake tests")
+            throw NotImplementedError("not needed for auth handshake tests")
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
-            error("not needed for auth handshake tests")
+            throw NotImplementedError("not needed for auth handshake tests")
     }
 }
 
