@@ -165,9 +165,6 @@ internal class MemoryGraphPhysics private constructor(
         }
     }
 
-    /** An edge's two node indices, or nothing for a self-loop or an edge to a node not in the view. */
-    private fun springOf(from: Int?, to: Int?): List<Int> = listOfNotNull(from, to).takeIf { it.size == 2 && from != to }.orEmpty()
-
     /** Place every node; returns whether anything starts away from the target (so should move). */
     private fun seed(target: MemoryGraphLayout, start: MemoryGraphPhysicsStart): Boolean {
         val centre = target.bounds.center
@@ -198,6 +195,9 @@ internal data class MemoryGraphPhysicsStart(
     val bloom: Boolean,
     val motion: Boolean,
 )
+
+/** An edge's two node indices, or nothing for a self-loop or an edge to a node not in the view. */
+private fun springOf(from: Int?, to: Int?): List<Int> = listOfNotNull(from, to).takeIf { it.size == 2 && from != to }.orEmpty()
 
 private const val SETTLE_SPEED = 0.04f
 private const val MAX_TICKS_PER_HEAT = 360

@@ -11179,32 +11179,6 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Type {
 	public final fun getMicro-XSAIIZE ()J
 }
 
-public final class com/letta/mobile/ui/theme/MemoryGraphDimens {
-	public static final field $stable I
-	public static final field DIMMED_ALPHA F
-	public static final field DIMMED_EDGE_ALPHA F
-	public static final field EDGE_ALPHA F
-	public static final field FOCUSED_EDGE_ALPHA F
-	public static final field HALO_ALPHA F
-	public static final field INSTANCE Lcom/letta/mobile/ui/theme/MemoryGraphDimens;
-	public static final field LABEL_CHIP_ALPHA F
-	public final fun getEdge-D9Ej5fM ()F
-	public final fun getEdgeFocused-D9Ej5fM ()F
-	public final fun getFitPadding-D9Ej5fM ()F
-	public final fun getHalo-D9Ej5fM ()F
-	public final fun getLabelChipPadX-D9Ej5fM ()F
-	public final fun getLabelChipPadY-D9Ej5fM ()F
-	public final fun getLabelFocusedWidth-D9Ej5fM ()F
-	public final fun getLabelGap-D9Ej5fM ()F
-	public final fun getLabelWidth-D9Ej5fM ()F
-	public final fun getRootRim-D9Ej5fM ()F
-	public final fun getSelectionGap-D9Ej5fM ()F
-	public final fun getSelectionRing-D9Ej5fM ()F
-	public final fun getStatusDot-D9Ej5fM ()F
-	public final fun getUsageGap-D9Ej5fM ()F
-	public final fun getUsageStroke-D9Ej5fM ()F
-}
-
 public final class com/letta/mobile/ui/theme/PlatformAccessibility_jvmKt {
 	public static final fun jvmOsHighContrast ()Z
 	public static final fun jvmOsReducedMotion ()Z
@@ -11253,5 +11227,31 @@ public final class com/letta/mobile/ui/theme/TouchComposerDimens {
 	public final fun getSheetItemPressedCorner-D9Ej5fM ()F
 	public final fun getSheetItemPressedElevation-D9Ej5fM ()F
 	public final fun getSheetListMaxHeight-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/theme/graph/GraphDimens {
+	public static final field $stable I
+	public static final field DIMMED_ALPHA F
+	public static final field DIMMED_EDGE_ALPHA F
+	public static final field EDGE_ALPHA F
+	public static final field FOCUSED_EDGE_ALPHA F
+	public static final field HALO_ALPHA F
+	public static final field INSTANCE Lcom/letta/mobile/ui/theme/graph/GraphDimens;
+	public static final field LABEL_CHIP_ALPHA F
+	public final fun getEdge-D9Ej5fM ()F
+	public final fun getEdgeFocused-D9Ej5fM ()F
+	public final fun getFitPadding-D9Ej5fM ()F
+	public final fun getHalo-D9Ej5fM ()F
+	public final fun getLabelChipPadX-D9Ej5fM ()F
+	public final fun getLabelChipPadY-D9Ej5fM ()F
+	public final fun getLabelFocusedWidth-D9Ej5fM ()F
+	public final fun getLabelGap-D9Ej5fM ()F
+	public final fun getLabelWidth-D9Ej5fM ()F
+	public final fun getRootRim-D9Ej5fM ()F
+	public final fun getSelectionGap-D9Ej5fM ()F
+	public final fun getSelectionRing-D9Ej5fM ()F
+	public final fun getStatusDot-D9Ej5fM ()F
+	public final fun getUsageGap-D9Ej5fM ()F
+	public final fun getUsageStroke-D9Ej5fM ()F
 }
 

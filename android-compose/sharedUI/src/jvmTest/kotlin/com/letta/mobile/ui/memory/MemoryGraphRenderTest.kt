@@ -76,7 +76,8 @@ class MemoryGraphRenderTest {
             mainClock.advanceTimeBy(BLOOM_SETTLE_MILLIS)
             waitForIdle()
             val image = onRoot().captureToImage().toAwtImage()
-            val out = File("build/memory-graph-render").apply { mkdirs() }.resolve("memory-${shot.widthDp}dp-${if (nodeId == AGENT) "agent" else "block"}.png")
+            val name = if (nodeId == AGENT) "agent" else "block"
+            val out = File("build/memory-graph-render").apply { mkdirs() }.resolve("memory-${shot.widthDp}dp-$name.png")
             ImageIO.write(image, "png", out)
             assertTrue(out.length() > 0)
         }
