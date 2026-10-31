@@ -212,10 +212,6 @@ private fun turnHasLiveTool(newestReply: UiMessage?, state: ChatUiState): Boolea
 private fun runningToolNameOf(activity: ActiveRunActivity, state: ChatUiState, busy: Boolean): String? =
     (activity.runningToolName ?: state.pendingTools.lastOrNull()?.name).takeIf { busy }
 
-private fun ChatRenderItem.messagesInOrder(): List<UiMessage> = when (this) {
-    is ChatRenderItem.Single -> listOf(message)
-    is ChatRenderItem.RunBlock -> messages.map { it.first }
-}
 
 private fun UiMessage.isPrompt(): Boolean = role == "user" && subagentNotification == null
 

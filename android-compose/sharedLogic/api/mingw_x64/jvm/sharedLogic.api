@@ -9366,6 +9366,11 @@ public abstract interface class com/letta/mobile/data/chat/projection/ChatRender
 	public abstract fun getBoundaryTimestamp ()Ljava/lang/String;
 	public abstract fun getKey ()Ljava/lang/String;
 	public abstract fun getStableItemDiscriminator ()Ljava/lang/String;
+	public fun messagesInOrder ()Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/chat/projection/ChatRenderItem$DefaultImpls {
+	public static fun messagesInOrder (Lcom/letta/mobile/data/chat/projection/ChatRenderItem;)Ljava/util/List;
 }
 
 public final class com/letta/mobile/data/chat/projection/ChatRenderItem$RunBlock : com/letta/mobile/data/chat/projection/ChatRenderItem {
@@ -9385,6 +9390,7 @@ public final class com/letta/mobile/data/chat/projection/ChatRenderItem$RunBlock
 	public final fun getRunId ()Ljava/lang/String;
 	public fun getStableItemDiscriminator ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun messagesInOrder ()Ljava/util/List;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -9409,6 +9415,7 @@ public final class com/letta/mobile/data/chat/projection/ChatRenderItem$Single :
 	public final fun getStableRunId ()Ljava/lang/String;
 	public final fun getStableRunKey ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun messagesInOrder ()Ljava/util/List;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -9512,6 +9519,7 @@ public final class com/letta/mobile/data/chat/projection/MessageActionPolicyKt {
 }
 
 public final class com/letta/mobile/data/chat/projection/MessageGroupingKt {
+	public static final fun chronologicalMessages (Ljava/util/List;)Ljava/util/List;
 	public static final fun deduplicateRenderItemsByMessageId (Ljava/util/List;)Ljava/util/List;
 	public static final fun deduplicateRenderKeys (Ljava/util/List;)Ljava/util/List;
 	public static final fun groupMessagesForRender (Ljava/util/List;)Ljava/util/List;
