@@ -301,7 +301,7 @@ fun Iterable<ActiveSubagent>.hasVisibleActiveSubagentBarEntries(): Boolean =
     any { it.isSelf || !it.isHiddenReflection() }
 
 /**
- * The LINGERING-terminal visibility rule.
+ * The shared chip projection: hide structured maintenance types, then apply terminal linger.
  *
  * Pure, testable transform over a snapshot of subagents (which may carry both
  * running and recently-terminal entries, each terminal one stamped with
@@ -309,7 +309,8 @@ fun Iterable<ActiveSubagent>.hasVisibleActiveSubagentBarEntries(): Boolean =
  * just-completed/failed chip stays reviewable for a short dwell instead of
  * vanishing instantly:
  *
- *  - Still-running chips ([ActiveSubagent.isActive]) always pass — the
+ *  - Structured reflection/memory/dream entries never pass, regardless of display text.
+ *  - Visible still-running chips ([ActiveSubagent.isActive]) always pass — the
  *    unchanged active-only behaviour.
  *  - Terminal chips pass only while inside their linger window, i.e. until
  *    `terminalAt + `[ActiveSubagent.TERMINAL_LINGER_MS]` <= now`. After that
@@ -325,6 +326,7 @@ fun Iterable<ActiveSubagent>.hasVisibleActiveSubagentBarEntries(): Boolean =
 fun ImmutableList<ActiveSubagent>.withLingeringTerminals(now: Long): ImmutableList<ActiveSubagent> =
     filter { entry ->
         when {
+            entry.isHiddenReflection() -> false
             entry.isActive -> true
             entry.isTerminal -> {
                 val stampedAt = entry.terminalAt ?: return@filter false

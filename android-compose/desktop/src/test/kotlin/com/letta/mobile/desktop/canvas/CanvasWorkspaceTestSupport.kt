@@ -15,6 +15,19 @@ internal fun ComposeUiTest.awaitCanvasReady() {
     }
 }
 
+/** Drives frames across UI transitions, even when the controller state already matches. */
+internal fun ComposeUiTest.awaitCanvasUi(
+    conditionDescription: String,
+    timeoutMillis: Long = 5_000,
+    condition: () -> Boolean,
+) {
+    waitUntil(conditionDescription = conditionDescription, timeoutMillis = timeoutMillis) {
+        mainClock.advanceTimeByFrame()
+        condition()
+    }
+    waitForIdle()
+}
+
 /** Opens an item in the canvas workspace overflow menu. */
 internal fun ComposeUiTest.openMenuItem(label: String) {
     onNodeWithContentDescription("More").performClick()
