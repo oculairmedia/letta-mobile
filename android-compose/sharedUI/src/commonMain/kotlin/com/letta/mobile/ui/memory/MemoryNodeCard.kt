@@ -30,11 +30,11 @@ import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.graph.MemoryNodeContent
 import com.letta.mobile.data.memory.graph.MemoryPageActions
-import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.text.LettaSelectionContainer
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
 
 /**
  * The selected node's inspector: identity, then what is useful about this kind of node (the

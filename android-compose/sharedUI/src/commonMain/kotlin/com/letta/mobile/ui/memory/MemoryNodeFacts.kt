@@ -21,12 +21,12 @@ import com.letta.mobile.ui.components.LettaFactRow
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaMeter
-import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.components.lettaFraction
 import com.letta.mobile.ui.components.lettaPercent
 import com.letta.mobile.ui.components.lettaUsage
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
 
 /** The context window as a meter: "801 / 1,000,000 tokens · 0.1%". */
 @Composable
