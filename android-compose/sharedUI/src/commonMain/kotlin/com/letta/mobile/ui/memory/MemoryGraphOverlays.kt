@@ -1,15 +1,10 @@
 package com.letta.mobile.ui.memory
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,28 +13,32 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphView
+import com.letta.mobile.ui.components.LettaSwatch
+import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Entity-type filter (desktop's "Entity Types" bar): one chip per node kind in
- * the graph. The last enabled kind cannot be switched off.
+ * The legend, which is also the kind filter: one chip per node kind in the graph, its swatch the
+ * nodes' colour and its count how many there are. The last enabled kind cannot be switched off.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MemoryKindFilterBar(
     view: MemoryGraphView,
+    counts: Map<MemoryGraphNodeKind, Int>,
     onToggle: (MemoryGraphNodeKind) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = rememberMemoryGraphPalette()
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
+    // Wraps onto a second line on a phone rather than hiding kinds off the edge.
+    FlowRow(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         view.kindsPresent.forEach { kind ->
@@ -47,13 +46,13 @@ internal fun MemoryKindFilterBar(
             FilterChip(
                 selected = enabled,
                 onClick = { onToggle(kind) },
-                label = { Text(memoryNodeKindLabel(kind), style = MaterialTheme.typography.labelMedium) },
+                label = {
+                    val count = counts[kind]?.let { " " + lettaCount(it) }.orEmpty()
+                    Text(memoryNodeKindLabel(kind) + count, style = MaterialTheme.typography.labelMedium)
+                },
                 leadingIcon = {
                     val swatch = palette.kindColor(kind)
-                    Box(
-                        Modifier.size(LettaDimens.Space.sm).clip(CircleShape)
-                            .background(if (enabled) swatch else swatch.copy(alpha = LettaDimens.Alpha.disabled)),
-                    )
+                    LettaSwatch(if (enabled) swatch else swatch.copy(alpha = LettaDimens.Alpha.disabled))
                 },
                 modifier = Modifier.semantics { role = Role.Checkbox },
             )

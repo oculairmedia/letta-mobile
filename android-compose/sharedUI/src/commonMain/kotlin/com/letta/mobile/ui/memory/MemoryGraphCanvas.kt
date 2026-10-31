@@ -1,53 +1,59 @@
 package com.letta.mobile.ui.memory
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import com.letta.mobile.data.memory.graph.MemoryGraphHitTarget
-import com.letta.mobile.data.memory.graph.MemoryGraphHitTest
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
 import com.letta.mobile.data.memory.graph.MemoryGraphNodeMetrics
 import com.letta.mobile.data.memory.graph.MemoryGraphSize
 import com.letta.mobile.data.memory.graph.MemoryGraphView
+import com.letta.mobile.data.memory.graph.MemoryGraphViewport
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.math.exp
+import kotlin.math.max
+import kotlin.math.sqrt
 
 @Immutable
 internal data class MemoryGraphCanvasParams(
     val view: MemoryGraphView,
+    /** The controller's settled layout: what a fit frames. */
     val layout: MemoryGraphLayout,
+    val live: MemoryGraphLiveLayout,
+    val looks: Map<String, MemoryNodeLook>,
+    /** Below the wide breakpoint: resting labels take the narrower cap so a phone keeps its graph. */
+    val compact: Boolean,
     val selectedNodeId: String?,
     val onNodeTap: (String?) -> Unit,
 )
 
 /**
- * The full memory graph on one Canvas: straight edges, degree-sized dots in
- * category/kind colours, constant-size labels. Pinch/drag (or wheel/drag) moves
- * the viewport; a tap resolves the nearest node through the shared hit test,
- * whose reach never drops below a 48dp touch target.
+ * The full memory graph on one Canvas. Nodes sit where [MemoryGraphLiveLayout] puts them: they
+ * bloom open, can be dragged (neighbours follow, then everything settles) and are drawn by
+ * [drawGraph]. Pinch/drag on empty graph (or wheel/drag) moves the viewport; hovering a node with
+ * a pointer focuses it; a tap selects the nearest node within a 48dp touch target.
  */
 @Composable
 internal fun MemoryGraphCanvas(
@@ -56,76 +62,94 @@ internal fun MemoryGraphCanvas(
     modifier: Modifier = Modifier,
 ) {
     val palette = rememberMemoryGraphPalette()
-    val labels = rememberNodeLabels(params.view, palette)
     val density = LocalDensity.current
-    val minTouchPx = with(density) { MemoryGraphNodeMetrics.MIN_TOUCH_RADIUS * this.density }
-    val labelGapPx = with(density) { LettaDimens.Space.xs.toPx() }
+    // A docked inspector can leave a wide window's graph phone-narrow: label by the canvas's own width.
+    val narrowCanvas = with(density) { viewportState.size.width.toDp() } < LettaDimens.Pane.wideBreakpoint
+    val labels = rememberMemoryNodeLabels(params.view, palette, params.compact || narrowCanvas)
+    val neighbours = remember(params.view) { params.view.adjacency() }
+    val minTouchPx = MemoryGraphNodeMetrics.MIN_TOUCH_RADIUS * density.density
+    var hoveredId by remember { mutableStateOf<String?>(null) }
     val current by rememberUpdatedState(params)
+    val hit = remember(viewportState) {
+        { point: Offset -> current.nodeAt(point, viewportState.viewport, minTouchPx) }
+    }
     LaunchedEffect(params.layout) { viewportState.sync(params.layout, viewportState.size) }
     Canvas(
         modifier = modifier
             .clipToBounds()
             .onSizeChanged { viewportState.sync(current.layout, MemoryGraphSize(it.width.toFloat(), it.height.toFloat())) }
-            .graphGestures(viewportState)
+            .graphGestures(viewportState, onHover = { point -> hoveredId = point?.let(hit) })
+            .nodeDrag(viewportState, hit) { current.live }
             // Keyed on the viewport holder and reading [current]: a reload must not restart
-            // (and drop) an in-flight tap.
-            .pointerInput(viewportState) {
-                // No onDoubleTap: it would hold every single tap for the
-                // double-tap timeout. Zoom lives on pinch, wheel and the buttons.
-                detectTapGestures { offset ->
-                    val target = MemoryGraphHitTarget(current.view, current.layout, viewportState.viewport, minTouchPx)
-                    current.onNodeTap(MemoryGraphHitTest.nodeAt(offset.toPoint(), target))
-                }
-            }
+            // (and drop) an in-flight tap. No onDoubleTap: it would hold every tap for the timeout.
+            .pointerInput(viewportState) { detectTapGestures { offset -> current.onNodeTap(hit(offset)) } }
+            .pointerHoverIcon(if (hoveredId != null) PointerIcon.Hand else PointerIcon.Default)
             .semantics { contentDescription = "Memory graph, ${params.view.nodes.size} nodes" },
     ) {
-        val frame = GraphFrame(params, viewportState.viewport, palette, labels, this.density)
-        drawEdges(frame)
-        drawNodes(frame, labelGapPx)
+        val scene = GraphScene(params.view, neighbours, params.looks, labels, palette, params.selectedNodeId, hoveredId)
+        drawGraph(GraphFrame(scene, params.live.layout, viewportState.viewport))
     }
 }
 
-/** Labels are measured once per graph/theme, not per frame. */
-@Composable
-private fun rememberNodeLabels(view: MemoryGraphView, palette: MemoryGraphPalette): Map<String, TextLayoutResult> {
-    val measurer = rememberTextMeasurer()
-    val typography = MaterialTheme.typography
-    val maxWidthPx = with(LocalDensity.current) { LettaDimens.Pane.nodeLabelMaxWidth.roundToPx() }
-    return remember(view, palette, typography, maxWidthPx) {
-        view.nodes.associate { node ->
-            val hub = isHub(node, view)
-            val style = if (hub) {
-                typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = palette.label)
-            } else {
-                typography.labelSmall.copy(color = palette.labelMuted)
-            }
-            node.id to measureLabel(measurer, node.title, style, maxWidthPx)
+/** The nearest node whose drawn radius (or the touch radius) covers [point], on the live layout. */
+private fun MemoryGraphCanvasParams.nodeAt(point: Offset, viewport: MemoryGraphViewport, minTouchPx: Float): String? {
+    val positions = live.layout
+    var best: String? = null
+    var bestDistance = Float.MAX_VALUE
+    view.nodes.forEach { node ->
+        val centre = positions[node.id]?.let(viewport::toScreen) ?: return@forEach
+        val dx = point.x - centre.x
+        val dy = point.y - centre.y
+        val distance = sqrt(dx * dx + dy * dy)
+        val reach = max((looks[node.id]?.radius ?: MemoryNodeLooks.SMALL_RADIUS) * viewport.scale, minTouchPx)
+        if (distance <= reach && distance < bestDistance) {
+            bestDistance = distance
+            best = node.id
         }
     }
+    return best
 }
 
-private fun measureLabel(measurer: TextMeasurer, text: String, style: TextStyle, maxWidthPx: Int): TextLayoutResult =
-    measurer.measure(
-        text = text,
-        style = style,
-        overflow = TextOverflow.Ellipsis,
-        maxLines = 1,
-        constraints = Constraints(maxWidth = maxWidthPx),
-    )
+/**
+ * A drag that starts on a node moves the node (pinned, so neighbours follow) instead of the
+ * view. It consumes its moves, which cancels the pan detector and the tap for that gesture.
+ */
+private fun Modifier.nodeDrag(
+    state: MemoryGraphViewportState,
+    hit: (Offset) -> String?,
+    live: () -> MemoryGraphLiveLayout,
+): Modifier = pointerInput(state) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val nodeId = hit(down.position) ?: return@awaitEachGesture
+        val start = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() } ?: return@awaitEachGesture
+        live().drag(nodeId, state.viewport.toLayout(start.position.toPoint()))
+        drag(start.id) { change ->
+            live().drag(nodeId, state.viewport.toLayout(change.position.toPoint()))
+            change.consume()
+        }
+        live().endDrag()
+    }
+}
 
-/** Pinch/drag on touch, drag + wheel on desktop. */
-private fun Modifier.graphGestures(state: MemoryGraphViewportState): Modifier =
+/** Pinch/drag on touch, drag + wheel on desktop; pointer hover reports where it is (null on exit). */
+private fun Modifier.graphGestures(state: MemoryGraphViewportState, onHover: (Offset?) -> Unit): Modifier =
     pointerInput(state) {
         detectTransformGestures { centroid, pan, zoom, _ -> state.transform(centroid, pan, zoom) }
     }.pointerInput(state) {
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent()
-                if (event.type != PointerEventType.Scroll) continue
                 val change = event.changes.firstOrNull() ?: continue
-                val factor = exp(-change.scrollDelta.y * WHEEL_ZOOM_RATE)
-                state.transform(change.position, Offset.Zero, factor)
-                change.consume()
+                when (event.type) {
+                    PointerEventType.Scroll -> {
+                        state.transform(change.position, Offset.Zero, exp(-change.scrollDelta.y * WHEEL_ZOOM_RATE))
+                        change.consume()
+                    }
+                    PointerEventType.Move -> onHover(if (change.pressed) null else change.position)
+                    PointerEventType.Exit -> onHover(null)
+                    else -> Unit
+                }
             }
         }
     }

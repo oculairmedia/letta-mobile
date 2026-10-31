@@ -14,6 +14,7 @@ import com.letta.mobile.data.memory.graph.MemoryGraphPoint
 import com.letta.mobile.data.memory.graph.MemoryGraphSize
 import com.letta.mobile.data.memory.graph.MemoryGraphViewport
 import com.letta.mobile.data.memory.graph.MemoryGraphZoomLimits
+import com.letta.mobile.ui.theme.graph.GraphDimens
 
 /**
  * Pan/zoom state for the memory graph canvas. The math lives in sharedLogic
@@ -95,10 +96,7 @@ fun rememberMemoryGraphViewportState(): MemoryGraphViewportState {
     return remember(density.density) {
         MemoryGraphViewportState(
             limits = MemoryGraphZoomLimits.forDensity(density.density),
-            fitPaddingPx = FIT_PADDING_LAYOUT_UNITS * density.density,
+            fitPaddingPx = with(density) { GraphDimens.fitPadding.toPx() },
         )
     }
 }
-
-/** Room around a fitted graph for edge labels and the filter overlay. */
-private const val FIT_PADDING_LAYOUT_UNITS = 48f
