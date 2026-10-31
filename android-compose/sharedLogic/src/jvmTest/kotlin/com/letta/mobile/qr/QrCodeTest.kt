@@ -8,6 +8,7 @@ import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 /**
  * letta-mobile-gw0h1: smoke tests for the QR encoder + renderer. The encoder
@@ -102,6 +103,25 @@ class QrCodeTest {
         } finally {
             tmp.delete()
         }
+    }
+
+
+    @Test
+    fun renderPngRejectsInvalidScale() {
+        val matrix = QrCode.encode("test")
+        val ex = assertFailsWith<IllegalArgumentException> {
+            QrRenderer.renderPng(matrix, scale = 0, quietZone = 4)
+        }
+        assertTrue(ex.message?.contains("scale must be >= 1") == true, ex.message)
+    }
+
+    @Test
+    fun renderPngRejectsInvalidQuietZone() {
+        val matrix = QrCode.encode("test")
+        val ex = assertFailsWith<IllegalArgumentException> {
+            QrRenderer.renderPng(matrix, scale = 8, quietZone = -1)
+        }
+        assertTrue(ex.message?.contains("quietZone must be >= 0") == true, ex.message)
     }
 
     private fun decodeMatrix(matrix: QrCode.Matrix): String {

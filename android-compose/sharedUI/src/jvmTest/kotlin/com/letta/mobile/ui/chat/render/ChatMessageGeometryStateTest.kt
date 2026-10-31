@@ -74,6 +74,20 @@ class ChatMessageGeometryStateTest {
     }
 
     @Test
+    fun `maxEntries zero is accepted`() {
+        ChatMessageGeometryState(maxEntries = 0)
+    }
+
+    @Test
+    fun `Int MIN_VALUE maxEntries is rejected with a clear message`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            ChatMessageGeometryState(maxEntries = Int.MIN_VALUE)
+        }
+        assertEquals("maxEntries must be >= 0 (got ${Int.MIN_VALUE})", ex.message)
+    }
+
+
+    @Test
     fun `dedup on identical signature does not bust the LRU bound`() {
         val state = ChatMessageGeometryState(maxEntries = 2)
         val sig = signature()
