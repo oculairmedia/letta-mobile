@@ -152,7 +152,7 @@ class InputValidationTest(unittest.TestCase):
 
     def test_option_like_diff_base_is_rejected_before_git(self):
         with patch.object(guard, "git") as git:
-            with self.assertRaisesRegex(ValueError, "diff-base must not start"):
+            with self.assertRaisesRegex(ValueError, "diff-base must be a branch, tag or commit name"):
                 guard.check(Path("/fixture"), "--help")
             git.assert_not_called()
 
