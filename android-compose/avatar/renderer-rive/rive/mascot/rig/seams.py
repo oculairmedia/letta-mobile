@@ -41,9 +41,27 @@ from typing import NamedTuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from timeline import PROP_NAMES, ROTATION_KEYS, num, prop_name, property_key, read_keys  # noqa: E402
+from timeline import PROP_NAMES, ROTATION_KEYS, num, prop_name, property_key, read_keys, sample  # noqa: E402
 
 NESTED_FIRE = 401  # callbacks have no value; never a seam
+
+# The two kinds of property a blend cannot carry. Everything else is a *pose* property: it moves
+# on screen, so a state change that moves it has to take at least MIN_TRANSITION_MS
+# (rig/constants.py) - a pose that changes in one frame is a pop, whatever reason is signed.
+#
+#   SWEEP_KEYS  a number that indexes something: the plate's `expr` (NestedNumber.value) picks a
+#               glyph by band, so a blend between 2 and 9 shows glyphs 3, 4, ... 8 on the way.
+#               It may only ever cut, and nothing may blend across a change in it.
+#   SWAP_KEYS   a reference: Solo.activeComponentId. It has no in-between, so a blend just swaps
+#               it on the first frame; a cut and a blend look the same.
+SWEEP_KEYS = {239}
+SWAP_KEYS = {296}
+DISCRETE_KEYS = SWEEP_KEYS | SWAP_KEYS
+
+
+def is_pose(key):
+    """True for a property that moves on screen and therefore blends (see DISCRETE_KEYS)."""
+    return key not in DISCRETE_KEYS
 
 POSITION_KEYS = {13, 14, 24, 25, 83, 85, 87}          # x / y / vertex x / y / handle distances
 SCALE_KEYS = {16, 17, 18, 46}                          # scaleX, scaleY, opacity, gradient opacity
@@ -80,11 +98,24 @@ def display(key, value):
 
 # --- the animation index --------------------------------------------------------------------
 class Span(NamedTuple):
-    """What one keyed property does over one animation: its ends, and where they are."""
+    """What one keyed property does over one animation: its ends, where they are, and the keys
+    themselves (timeline.py's Key tuples, for sampling the value at any frame)."""
     first: object
     last: object
     first_frame: int
     last_frame: int
+    keys: tuple = ()
+
+    def at(self, frame):
+        """The value at `frame`, as Rive plays it (timeline.sample: leaving-key easing)."""
+        if not self.keys or not isinstance(self.first, (int, float)):
+            held = [k for k in self.keys if k.frame <= frame]
+            return held[-1].value if held else self.first
+        return sample(self.keys, frame)[0]
+
+    def values(self, lo, hi):
+        """Every value the property takes over frames lo..hi (inclusive), sampled per frame."""
+        return [self.at(f) for f in range(max(0, lo), max(lo, hi) + 1)]
 
 
 @dataclass(repr=False, eq=False, slots=True)
@@ -154,7 +185,8 @@ def keyed_spans(anim):
             key = property_key(kp.get("propertyKey"))
             keys = read_keys(kp) if key not in (-1, NESTED_FIRE) else []
             if keys:
-                props[(ko.get("objectId"), key)] = Span(keys[0].value, keys[-1].value, keys[0].frame, keys[-1].frame)
+                props[(ko.get("objectId"), key)] = Span(keys[0].value, keys[-1].value, keys[0].frame,
+                                                        keys[-1].frame, tuple(keys))
     return props
 
 
@@ -224,6 +256,144 @@ def _handoff(a, b, prop, span):
     return Cross(prop[0], prop[1], span.last, target, d, eps, hand_back) if d > eps else None
 
 
+# --- what a state change moves, frame by frame ---------------------------------------------------
+# crossings() above weighs the two ENDS of a hand-off: the last key of the outgoing animation
+# against the first of the incoming one. That is only what happens when the outgoing animation
+# is left at its end - an exit-time transition out of a one-shot. Every other way out fires at
+# whatever frame the request arrives: a loop is left mid-bob, mid-lean, mid-turn, and a one-shot
+# interrupted by another request is left wherever it got to. Its last key says nothing about
+# that frame. pose_moves() weighs every frame the source can actually be left at.
+class Move(NamedTuple):
+    """One pose property a state change moves, in its worst case."""
+    obj: str
+    key: int
+    from_value: object
+    to_value: object
+    delta: float
+    eps: float
+    kind: str           # "seam" (both key it), "hand-back" (only the source), "hand-in" (only the target)
+
+    @property
+    def normalised(self):
+        return self.delta / self.eps if self.eps else self.delta
+
+    @property
+    def hand_back(self):
+        return self.kind == "hand-back"
+
+
+def departure_values(anim, span, depart):
+    """The values `span` can be left at. `depart` is "end" (an exit-time transition out of a
+    one-shot: its end only), an int (an exit-time gate in frames: any frame from that one on), or
+    None (any frame at all - a loop, or a request that can arrive at any moment)."""
+    if anim.loop != "oneShot":
+        return span.values(0, anim.duration)
+    if depart == "end":
+        return [span.at(anim.duration)]
+    return span.values(depart or 0, anim.duration)
+
+
+def _worst(values, target):
+    """(the value furthest from `target`, how far) over a list of departure values."""
+    pairs = [(v, _delta(v, target)) for v in values]
+    return max(pairs, key=lambda p: p[1]) if pairs else (target, 0.0)
+
+
+def pose_moves(index, from_anim, to_anim, depart=None):
+    """Every POSE property (seams.is_pose) a change from `from_anim` to `to_anim` moves past its
+    epsilon, from the worst frame the source can be left at. Discrete properties are not here:
+    they cannot blend, so they are what a cut is for (see sweeps() for the other half)."""
+    a, b = index.get(from_anim), index.get(to_anim)
+    if a is None or b is None:
+        return []
+    out = []
+    for prop in sorted(set(a.props) | set(b.props), key=lambda p: (p[0], p[1])):
+        if not is_pose(prop[1]):
+            continue
+        move = _pose_move(a, b, prop, depart)
+        if move is not None:
+            out.append(move)
+    return out
+
+
+def _pose_ends(a, b, prop, depart):
+    """(the worst value the change leaves `prop` at, the value it goes to, the kind of move), or
+    None when only one side keys a property that has no rest value to weigh it against."""
+    if prop in a.props and prop in b.props:
+        to = b.props[prop].at(0)
+        return _worst(departure_values(a, a.props[prop], depart), to)[0], to, "seam"
+    rest = rest_value(prop[1])
+    if rest is None:
+        return None
+    if prop in a.props:
+        return _worst(departure_values(a, a.props[prop], depart), rest)[0], rest, "hand-back"
+    return rest, b.props[prop].at(0), "hand-in"
+
+
+def _pose_move(a, b, prop, depart):
+    ends = _pose_ends(a, b, prop, depart)
+    if ends is None:
+        return None
+    v, to, kind = ends
+    d, eps = _delta(v, to), epsilon(prop[1])
+    return Move(prop[0], prop[1], v, to, d, eps, kind) if d > eps else None
+
+
+class Blend(NamedTuple):
+    """A transition's blend as sweeps() weighs it: how long it takes, and where its source can be
+    left (as departure_values() takes it)."""
+    ms: int
+    depart: object = None
+
+    @property
+    def frames(self):
+        return max(1, round(self.ms * 60 / 1000))
+
+
+def sweeps(index, from_anim, to_anim, blend):
+    """Every SWEEP property (an index, `expr`) a blend of `ms` would interpolate across a change.
+
+    During a blend the outgoing animation keeps playing and the incoming one starts from frame 0,
+    and Rive mixes the two numbers: if they differ anywhere in that window, the index passes
+    through every value between them. A property only one side keys is mixed against whatever the
+    layers below hold, which no blend can know - so it counts as a sweep too."""
+    if blend.ms <= 0:
+        return []
+    a, b = index.get(from_anim), index.get(to_anim)
+    if a is None or b is None:
+        return []
+    swept = (_sweep(a, b, prop, blend) for prop in sorted(set(a.props) | set(b.props))
+             if prop[1] in SWEEP_KEYS)
+    return [m for m in swept if m is not None]
+
+
+def _one_sided_sweep(a, b, prop):
+    """A sweep property only one side keys: mixed against the layers below, so always a sweep."""
+    v = (a if prop in a.props else b).props[prop].first
+    return Move(prop[0], prop[1], v if prop in a.props else None, v if prop in b.props else None,
+                1.0, 0.0, "sweep")
+
+
+def _outgoing_window(a, span, blend):
+    """The values the outgoing animation plays through over an n-frame blend that leaves it at
+    `depart` (a loop can be left anywhere, so all of them)."""
+    if a.loop != "oneShot":
+        return set(span.values(0, a.duration))
+    lo = a.duration if blend.depart == "end" else (blend.depart or 0)
+    return set(span.values(lo, lo + blend.frames))
+
+
+def _sweep(a, b, prop, blend):
+    if prop not in a.props or prop not in b.props:
+        return _one_sided_sweep(a, b, prop)
+    incoming = set(b.props[prop].values(0, blend.frames - 1))
+    outgoing = _outgoing_window(a, a.props[prop], blend)
+    if len(incoming | outgoing) <= 1:
+        return None
+    v0, v1 = sorted(outgoing)[0], sorted(incoming)[-1]
+    return Move(prop[0], prop[1], v0, v1, _delta(v0, v1), 0.0, "sweep")
+
+
 # --- the transitions of a document ------------------------------------------------------------
 class Trans(NamedTuple):
     """One way out of one state, as the document writes it."""
@@ -235,6 +405,19 @@ class Trans(NamedTuple):
     to_anim: str
     ms: int
     kind: str
+    after: int = None     # an exit-time gate in frames (`exitTime` in ms, not a percentage)
+
+    @property
+    def depart(self):
+        """Where the source can be left, as departure_values() takes it."""
+        return "end" if self.kind == "exit" else self.after
+
+
+def _gate(t):
+    """The exit-time gate of a transition in frames, when it has one that is not its end."""
+    if t.get("enableExitTime") == "true" and t.get("exitTimeIsPercetange") != "true":
+        return round(int(t.get("exitTime", 0)) * 60 / 1000)
+    return None
 
 
 def _kind(t):
@@ -272,7 +455,8 @@ def layer_transitions(machine, layer):
                       int(t.get("duration", 0)), "any")
                 for t in any_transitions for node, aid in states if node != t.get("stateToId")]
     own = [Trans(machine, name, st.get("id"), t.get("stateToId"), st.get("animationId"),
-                 anim_of.get(t.get("stateToId")), int(t.get("duration", 0)), _kind(t))
+                 anim_of.get(t.get("stateToId")), int(t.get("duration", 0)),
+                 "enum" if _gate(t) is not None and _kind(t) == "exit" else _kind(t), _gate(t))
            for st in layer.findall("AnimationState") for t in st.findall("StateTransition")]
     return expanded + own
 
@@ -319,7 +503,9 @@ def ledger(document, marks=None):
     root = parse(document)
     index = animation_index(root)
     marks, holds = cut_marks() if marks is None else marks
-    rows = [row for t in transitions(root) if t.ms == 0 for row in seam_rows(index, t, (marks, holds))]
+    below = keyed_below(root, index)
+    rows = [row for t in transitions(root)
+            for row in seam_rows(index, t, (marks, holds), below.get((t.machine, t.layer), set()))]
     rows.sort(key=lambda r: (-r.normalised, r.layer, r.frm, r.to, r.obj, r.prop))
     return rows
 
@@ -329,21 +515,68 @@ def _signature(marks, t):
     return marks.get((t.layer, t.from_node, t.to_node), marks.get((t.layer, None, t.to_node)))
 
 
-def seam_rows(index, t, signatures):
-    """The ledger rows of one 0 ms transition: one per property its hand-off moves."""
-    reason, held = (_signature(m, t) for m in signatures)
+def keyed_below(document, index):
+    """{(machine, layer): every (object, property) some EARLIER layer of that machine keys}.
+
+    Layers apply in order, each over the ones before it. A property only the outgoing animation
+    keys is handed back to whatever the layers below put there - or, when none of them keys it,
+    it simply holds its last value (nothing writes it), which is no snap at all."""
+    out = {}
+    for sm in parse(document).iter("StateMachine"):
+        seen = set()
+        for layer in sm.findall("StateMachineLayer"):
+            out[(sm.get("name", "?"), layer.get("name", "?"))] = set(seen)
+            seen |= _layer_props(layer, index)
+    return out
+
+
+def _layer_props(layer, index):
+    """Every (object, property) some animation of one state machine layer keys."""
+    anims = (index.get(st.get("animationId")) for st in layer.findall("AnimationState"))
+    return {prop for a in anims if a is not None for prop in a.props}
+
+
+def _pose_rows(index, t, held, below):
+    """[(move, signature)] for the pose properties a transition moves: its hand-backs onto a
+    property a layer below keys (signed by `hold=True`), and, under the floor, everything else."""
+    from rig.constants import MIN_TRANSITION_MS
+    under_floor = t.ms < MIN_TRANSITION_MS
     rows = []
-    for c in crossings(index, t.from_anim, t.to_anim):
-        # A cut signature covers the hard cut it sits on, never the hand-back underneath it: what
-        # the lower layers do with a property nobody keys is not the transition's to give. A
-        # hand-back needs its own signature (`hold=True`), which says the pose the one-shot lets
-        # go of is the pose the layers below are already holding.
-        signed = held if c.hand_back else reason
-        rows.append(Row(t.machine, t.layer, _anim_name(index, t.from_anim),
-                        _anim_name(index, t.to_anim), t.kind, t.ms, c.obj, prop_name(c.key),
-                        c.from_value, c.to_value, c.delta, c.normalised, c.hand_back,
-                        bool(signed), signed))
+    for m in pose_moves(index, t.from_anim, t.to_anim, t.depart):
+        if m.hand_back and (m.obj, m.key) in below:
+            rows.append((m, held))
+        elif not m.hand_back and under_floor:
+            rows.append((m, None))
     return rows
+
+
+def _cut_rows(index, t, reason, held):
+    """[(crossing, signature)] for the discrete properties a 0 ms transition swaps. A cut
+    signature covers the hard cut it sits on, never the hand-back underneath it."""
+    if t.ms:
+        return []
+    return [(c, held if c.hand_back else reason) for c in crossings(index, t.from_anim, t.to_anim)
+            if not is_pose(c.key)]
+
+
+def seam_rows(index, t, signatures, below=frozenset()):
+    """The ledger rows of one transition, under the blend policy rig/layers.py enforces:
+
+      - under MIN_TRANSITION_MS, every pose property it moves from any frame its source can be
+        left at (pose_moves) - never signed by a cut;
+      - at ANY duration, every hand-back of a pose property a layer below also keys: Rive plays
+        the outgoing animation at full weight for the whole blend and lets the layers below have
+        the property only when it ends, so a duration does not soften one. Signed by `hold=True`
+        when the layers below are holding that pose by design;
+      - at 0 ms, every discrete property it swaps (a glyph, a reference) - signed by `cut=True`;
+      - with a duration, every index it would sweep (sweeps) - never signed."""
+    reason, held = (_signature(m, t) for m in signatures)
+    moves = _pose_rows(index, t, held, below) + _cut_rows(index, t, reason, held)
+    moves += [(m, None) for m in sweeps(index, t.from_anim, t.to_anim, Blend(t.ms, t.depart))]
+    return [Row(t.machine, t.layer, _anim_name(index, t.from_anim), _anim_name(index, t.to_anim),
+                t.kind, t.ms, c.obj, prop_name(c.key), c.from_value, c.to_value, c.delta,
+                c.normalised, c.hand_back, bool(signed), signed)
+            for c, signed in moves]
 
 
 def _anim_name(index, aid):

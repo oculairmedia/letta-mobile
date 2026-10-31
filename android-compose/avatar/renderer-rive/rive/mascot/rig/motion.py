@@ -38,9 +38,10 @@ from rig.ids import (
     AUTO_X, AUTO_Y, BODY_NODE, BONE_BASE, BONE_CROWN, BREATH_CALM_ANIM, DRAG_ANIM, DRAG_REST_ANIM,
     ERROR_ANIM, ERROR_CALM_ANIM, FACE, FLASH_REST_ANIM, GLOSS, HALO, IDLE_BEATS, IDLE_GLANCE_ANIM,
     JOYSTICK, PEEK_NODE, PET_ANIM, PET_FACE_ANIM, PET_REST_ANIM, PLATE_BLINK, PLATE_EXPR,
-    REACT_CALM_ANIM, REACT_REST_ANIM, RESTING, SHAPES, SQUASH_NODE, SUCCESS_ANIM, SUCCESS_CALM_ANIM,
-    SUSTAINED, TINT, WANDER_GLANCE, WANDER_PEEK, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT, WANDER_SPIN,
-    calm_state_anim, enter_anim, react_anim, root_state_anim, shape_anim,
+    REACT_CALM_ANIM, REACT_EXPR, REACT_REST_ANIM, RESTING, SHAPES, SQUASH_NODE, SUCCESS_ANIM,
+    SUCCESS_CALM_ANIM, SUSTAINED, TINT, WANDER_GLANCE, WANDER_PEEK, WANDER_SLEEP_SHIFT,
+    WANDER_SLEEP_WAIT, WANDER_SPIN, DRAG_FACE_ANIM, ERROR_FACE_ANIM, SUCCESS_FACE_ANIM,
+    calm_state_anim, enter_anim, react_anim, react_face_anim, root_state_anim, shape_anim,
 )
 
 
@@ -416,8 +417,7 @@ def momentary_animations():
     hop = [(0, 0, EMPH_ACCEL), (f(10), 6, STD_DECEL), (f(37.5), -48, EMPH_ACCEL), (f(70), 4, EMPH_DECEL), (f(87.5), -1, M3_STANDARD), (S, 0)]
     success_keys = {
         BODY_NODE: {Y: hop},
-        FACE: {Y: hop, ROT: [(0, 0, EMPH_ACCEL), (f(10), rad(-2), STD_DECEL), (f(37.5), rad(2), EMPH_ACCEL), (f(70), rad(-1), EMPH_DECEL), (f(87.5), 0, M3_STANDARD), (S, 0)]},
-        PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}
+        FACE: {Y: hop, ROT: [(0, 0, EMPH_ACCEL), (f(10), rad(-2), STD_DECEL), (f(37.5), rad(2), EMPH_ACCEL), (f(70), rad(-1), EMPH_DECEL), (f(87.5), 0, M3_STANDARD), (S, 0)]}}
     # Squash and stretch, volume preserved: crouch before the jump, stretch on the way up,
     # neutral at the apex, stretch falling, squash on landing, elastic settle. The plate joins in.
     # SPEC 10.5 success deformation keys (S, L, H); the inflate node holds 1 while the bones own the body.
@@ -436,15 +436,20 @@ def momentary_animations():
     ex = [(0, 0, STANDARD), (g(16.6667), -24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), -12, STANDARD), (g(66.6667), 0, None), (E, 0)]
     ey = [(0, 0, STANDARD), (g(16.6667), 24, STANDARD), (g(33.3333), 24, STANDARD), (g(50), 24, STANDARD), (g(66.6667), 24, None), (E, 24)]
     er = [(0, 0, STANDARD), (g(16.6667), rad(-7), STANDARD), (g(33.3333), rad(7), STANDARD), (g(50), rad(-3), STANDARD), (g(66.6667), rad(5), None), (E, rad(5))]
-    error_keys = {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er}, PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}}
+    error_keys = {BODY_NODE: {X: ex, Y: ey}, FACE: {X: ex, Y: ey, ROT: er}}
     merge(error_keys, bone_pose([(0, 1, 0, 0, STANDARD), (g(16.6667), 1.07, 0, 0, STANDARD), (g(33.3333), 0.97, 0, 0, STANDARD),
                                  (g(50), 1.04, 0, 0, STANDARD), (g(66.6667), 1, 0, 0, None), (E, 1, 0, 0)]))
     error_keys[INFLATE_NODE] = {SX: 1, SY: 1}
     error = animation("ErrorFlash", ERROR_ANIM, E, error_keys)
-    drag_keys = {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}, INFLATE_NODE: {SX: 1, SY: 1}}
+    drag_keys = {INFLATE_NODE: {SX: 1, SY: 1}}
     merge(drag_keys, bone_pose([(0, round(1 / 0.92, 4), -0.008, 0, None)]))   # vertical compression, horizontal spread
     drag = animation("Dragged", DRAG_ANIM, 1, drag_keys)
-    return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error, animation("DragRest", DRAG_REST_ANIM, 1, {}), drag]
+    # The glyphs of the three, on their own layers (FlashFace, DragFace): the body halves above
+    # blend in and out, and a blended `expr` would sweep through every glyph index in between.
+    faces = [animation("SuccessFace", SUCCESS_FACE_ANIM, S, {PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}}),
+             animation("ErrorFace", ERROR_FACE_ANIM, E, {PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}}),
+             animation("DraggedFace", DRAG_FACE_ANIM, 1, {PLATE_EXPR: {NESTED_VALUE: EXPR["dragged"]}})]
+    return [animation("FlashRest", FLASH_REST_ANIM, 1, {}), success, error, animation("DragRest", DRAG_REST_ANIM, 1, {}), drag] + faces
 
 
 def idle_variety_animations():
@@ -525,7 +530,8 @@ def idle_variety_animations():
 #
 # Ownership, so nothing fights over a property: the reactions key only SQUASH_NODE (pivot at the
 # feet, keyed by Pet and React and nothing else), PEEK_NODE (in the face chain, React only), the
-# Base bone's shear (rest 0 in every loop), the plate's `expr` and blink. They never key Face,
+# Base bone's shear (rest 0 in every loop), and - on ReactFace, their own one-shots - the plate's
+# `expr` and blink (a blended `expr` sweeps every glyph between, and the motion blends in). They never key Face,
 # Body or the joystick - the Expression layer holds those at per-state poses, and a one-shot that
 # let go of them at a 0 ms exit would snap the state's pose back in.
 #
@@ -557,13 +563,19 @@ def pet_animations():
     return [animation("PetRest", PET_REST_ANIM, 1, {}), pet, face]
 
 
+_REACT_FACES = []   # the glyph halves react_animations() writes after the motion ones
+
+
 def _react(name, n, keys, expr=None):
-    """One reaction one-shot; `expr` shows that glyph for its whole length under the shutter."""
-    fires = {}
+    """One reaction one-shot - the motion only. `expr` shows that glyph for its whole length under
+    the shutter, on the ReactFace layer: its own one-shot, of the same length, so the glyph can
+    cut while the motion blends (a blended `expr` sweeps through every glyph in between)."""
     if expr:
-        merge(keys, {PLATE_EXPR: {NESTED_VALUE: EXPR[expr]}})
-        fires = {PLATE_BLINK: [0, max(1, n - 5)]}
-    return animation("React_" + name, react_anim[name], n, keys, fires=fires)
+        assert REACT_EXPR[name] == expr, f"rig/ids.py REACT_EXPR disagrees about {name}"
+        _REACT_FACES.append(animation("ReactFace_" + name, react_face_anim[name], n,
+                                      {PLATE_EXPR: {NESTED_VALUE: EXPR[expr]}},
+                                      fires={PLATE_BLINK: [0, max(1, n - 5)]}))
+    return animation("React_" + name, react_anim[name], n, keys)
 
 
 def _flip_keys(n, crouch, land, hop):
@@ -594,6 +606,7 @@ def react_animations():
     Durations are exact milliseconds (frames(), not beat()): a reaction answers something that
     just happened, and stretching it by BEAT_TEMPO would make the answer late."""
     out = [animation("ReactRest", REACT_REST_ANIM, 1, {})]
+    _REACT_FACES.clear()
     sq = lambda keys: squash(SQUASH_NODE, keys)
 
     # poke 420 ms: squish toward the impact, startled, rebound, settle.
@@ -681,4 +694,4 @@ def react_animations():
     k = {SQUASH_NODE: {SX: sxk, SY: sy},
          PEEK_NODE: {Y: [(0, 0, SINE), (30, 10, None), (54, 10, BACK_OUT), (70, 0, None), (n, 0)]}}
     out.append(_react("trick3", n, k, "trick"))
-    return out
+    return out + list(_REACT_FACES)

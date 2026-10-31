@@ -25,10 +25,10 @@ there are no star imports, so the definition of anything is one jump away.
 | `rig/face.py` | The face assembly: the FacePlacement > HostTurn > Turn > Arc > Face chain that carries the plate, the TurnX/TurnY pose ranges, the trails, `spin_keys()` | yes |
 | `rig/plate.py` | The Plate component: glyph per state, mouth morph, pupil overlay, tunable ranges, and the plate's own four layers (Expression, Blink, AutoBlink, Saccade) | yes |
 | `rig/motion.py` | Every root animation: sustained loops (`STATE_ROWS` / `sustained_rest`), the 90 entries, the flashes, the nine idle beats, wander | yes |
-| `rig/machine.py` | The `Avatar` state machine: twelve layers, their states and transitions, and the file's hover/drag listeners | yes |
+| `rig/machine.py` | The `Avatar` state machine: fifteen layers, their states and transitions, and the file's hover/drag listeners | yes |
 | `rig/contract.py` | The `Avatar` view-model contract as data: every property, its type, range and writer, plus the enum keys. `gen_scene.py` emits the newer properties from it; `check_contract.py` holds the built file, `RiveAvatarContract.kt` and the MASCOT.md / ARTIST.md tables to it | when the contract changes |
 | `rig/layers.py` | Typed layer builder (`Layer` / `State` / `Exit` / `OnEnum` / `OnBool` / `OnTrigger` / `OnInput` / `Raw`). Validates targets, weights and exit-time-on-a-loop in Python instead of at runtime | rarely |
-| `rig/seams.py` | The seam ledger and the blend policy: what each animation leaves a property at, what the next one picks it up at, and which 0 ms hand-offs tear. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses an unsigned one. A hard cut is signed `cut=True`, a deliberate hand-back `hold=True`, both with a reason | rarely |
+| `rig/seams.py` | The seam ledger and the blend policy: what each animation can be left at (any frame of a loop or an interrupted one-shot, not just its last key), what the next one picks it up at, which hand-offs move a pose in under `MIN_TRANSITION_MS`, which blends would sweep the glyph index, and which hand-backs snap to a lower layer. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses the first two outright. A discrete swap (a glyph) is signed `cut=True`, a deliberate hand-back `hold=True`, both with a reason | rarely |
 | `rig/chart.py` | Timing charts, both ways: `Chart(extremes, breakdown, spacing).keys()` authors a beat as poses and spacing (the in-betweens are real keys, not a bezier's guess), `Chart.of(keys)` / `Chart.of_samples(values)` read a curve or a telemetry series back and classify it (ease-in / ease-out / s / linear / hold / pop), `chart.text()` draws the margin chart | yes |
 | `rig/probe.py` | The probe list: which node properties telemetry exposes (name, object, property key, unit) and `inject()`, which adds the view-model numbers and the two-way binds to a built document. Probe ids (`1:900+`) are deliberately outside `ids.py` - they must never be pushed | add probes |
 | `rml.py` | RML primitives: Rive property keys, view-model ids, easing tokens, XML builders (keyframes, animations, states, transitions). No mascot knowledge | rarely |
@@ -122,9 +122,21 @@ Two checks run before that without being asked: `rig/ids.py` raises on a duplica
 and `rig/layers.py` raises on a layer whose transition leaves its own layer, whose weight sits on
 a non-random state, whose random state has fewer than two weighted ways out, or whose exit-time
 transition hangs off a looping animation - and, once `gen_scene.py` has handed it the animation
-index, on a 0 ms transition that tears a property both animations key, unless that transition is
-signed `cut=True` with a reason (`python -m rig.seams` lists every seam and says which are signed;
-the unsigned count is pinned at zero by `test_rig.py`).
+index, on the blend policy:
+
+- **The minimum transition time.** No transition shorter than `MIN_TRANSITION_MS` (100 ms, six
+  frames; `rig/constants.py`) may move a pose property, weighed from EVERY frame its source can be
+  left at - a loop is left mid-bob, an entry mid-turn - not just from its last key. No signature
+  excuses it: a pose that changes in one frame always reads as a glitch.
+- **Discrete swaps say so.** A 0 ms change of a glyph index or a Solo reference is signed
+  `cut=True` with a reason.
+- **No blend sweeps an index.** A transition with a duration may not interpolate `expr` across a
+  change - it would show every glyph in between. That is why a one-shot that shows a glyph keeps it
+  on a layer of its own that cuts (`FlashFace`, `DragFace`, `ReactFace`, `PetFace`), and why the
+  blend into an entry (100 ms) has to end by the entry's `expr` flip at frame 6.
+
+`python -m rig.seams` lists every finding and says which are signed; `test_rig.py` pins the
+unsigned count, which is all hand-backs (see the gotcha below) and may only go down.
 A refactor that is meant to change nothing should also
 survive a byte check against the committed file:
 
@@ -251,17 +263,20 @@ Root state machine `Avatar`, layers in order:
 | Layer | Drives | Design |
 |---|---|---|
 | `Shape` | body vertices | enum `shape`, 240 ms |
-| `Expression` | body/face motion, tint, gloss pulse, `expr`, facing | one `State<X>` loop per sustained state; **every change runs `Enter_<from>_<to>`** (90 one-shots, ids 3:250-3:339, nodes 3:350-3:439): plate blink at frame 0, `expr` flipped at frame 3 under the shut eye, facing eased to the target. The SPEC §3 pairs carry designed motion and cut into the target; generic ones hold and blend in over <=120 ms. No AnyState. |
+| `Expression` | body/face motion, tint, gloss pulse, `expr`, facing | one `State<X>` loop per sustained state; **every change runs `Enter_<from>_<to>`** (90 one-shots, ids 3:250-3:339, nodes 3:350-3:439): plate blink at frame 0, `expr` flipped at frame 6 under the shut eye, facing eased to the target. A loop blends into the entry over `MIN_TRANSITION_MS` (100 ms - it is left mid-bob, and it used to snap to the entry's frame 0 in one frame); the entry hands off at the floor (designed pairs) or over <=120 ms (generic). A request during an entry interrupts it only after its flip (an exit-time gate at 100 ms), so the blend never mixes two glyph indices. No AnyState. |
 | `Breath` | gloss opacity | loop |
 | `Blink` | plate blink | contract trigger |
 | `Hover` | perk-up: tall stretch, face lift, tilt of interest; attentive hold (beat tempo) | Rest -> Perk -> Held -> Rest on `hovered` (file listeners); exit blends 220-260 ms |
-| `Flash` | success/error | triggers; success 800 ms hop + spin with trails, error 600 ms shake; self-returning |
-| `Drag` | `expr` dragged | boolean + dragStart/dragEnd listeners |
+| `Flash` | success/error motion | triggers, blended in over 100 ms; success 800 ms hop + spin with trails, error 600 ms shake; self-returning |
+| `FlashFace` | `expr` success/error | the same triggers, cut: the flash glyph (or, with `reduceMotion`, `SuccessCalm` / `ErrorCalm` under a blink) |
+| `Drag` | inflate, bones | boolean (in over 100 ms, out 350 ms) + dragStart/dragEnd listeners |
+| `DragFace` | `expr` dragged | the same boolean, cut |
 | `IdleVariety` | face, body, joystick | four waits of unequal length (6.1 / 8 / 10.7 / 14 s) picked at random, then one of nine beats by weight (glance, tilt, look-around, shift, stretch, sigh, shiver, wobble, bounce); beats blend in 160 ms / out 320 ms over Breath and the host turn. `BEAT_TEMPO` 1.4 stretches every beat. Parked asleep (sleeping or dreaming); held by `reduceMotion` |
 | `Wander` | joystick | four waits of unequal length (9.3 / 12 / 17.5 / 24 s) at random, then glance 55 % / peek 35 % / spin 10 %; beats blend in 200 ms / out 320 ms. Parked asleep (a slow shift every ~30 s); held by `reduceMotion` or `working` |
 | `Pet` | Squash (rotation, x) | `petting` (and not `reduceMotion`): a 1.8 s side sway about the feet with a purr shiver; blends in 250 / out 320 ms |
 | `PetFace` | `expr` content | `petting`: the content glyph, cut in and out under a blink (a blended `expr` sweeps through every glyph between) |
-| `React` | Squash, Peek, Base bone, `expr` | one one-shot per trigger, fired from AnyState and self-returning at rest: `poke` `dizzy` `sent` `toolStart` `toolDone` `wake` `yawn`, `land` by `impact` band (soft / mid / hard), `trick` by `trickId` band (0..3). With `reduceMotion`, every trigger plays `ReactCalm`: one blink |
+| `React` | Squash, Peek, Base bone | one one-shot per trigger, fired from AnyState over 100 ms and self-returning at rest: `poke` `dizzy` `sent` `toolStart` `toolDone` `wake` `yawn`, `land` by `impact` band (soft / mid / hard), `trick` by `trickId` band (0..3) |
+| `ReactFace` | `expr` | the same triggers, cut: the reaction's glyph under its blinks (`ReactFace_<r>`), home for a reaction without one; with `reduceMotion`, every trigger plays `ReactCalm`: one blink |
 
 With `reduceMotion` on, `Expression` blends (300 ms) each loop to its `Calm_<state>` twin - the
 same pose with the bob, inflate, light and gaze drift held - and entries hand off to the twin in
@@ -341,6 +356,19 @@ plate 7:10-7:15.
   bezier away and the key silently falls back to the animation default. That is how `IdleWobble`'s
   face rocked on `SOFT_OUT` while its body rocked on `SINE` - the same authored curve, 2.7x the
   snap on the half that was meant to lag. Copy the pattern in `spin_keys`, not the typo.
+- **A blend does not soften a hand-back.** While a transition runs, Rive plays the OUTGOING
+  animation at full weight and mixes the incoming one over it. If the incoming state keys a
+  property the outgoing one does, that is a cross-fade. If it does not (a one-shot handing a node
+  back to a rest state that keys nothing), nothing is mixed: the outgoing pose holds for the
+  whole blend and the layers below take the property in one frame at its end. Probed: ErrorFlash
+  -> FlashRest at 160 ms held the 24 px drop for ten frames, then dropped it in one. A hand-back
+  is cured by ending where the layers below are, never by a duration - and a property no lower
+  layer keys simply holds its last value (no snap at all), which is why the Expression layer's
+  entries may leave tint or gloss unkeyed.
+- A 0 ms state change lands in one frame, and the source it leaves is rarely at its last key. The
+  ledger used to weigh only last key against first key, which is always equal for a loop, so every
+  sustained state's 0 ms cut into its entries passed - while the app saw the bob (up to 11 px)
+  snap to rest in one frame. `rig/seams.py pose_moves()` weighs every frame a source can be left at.
 - The CLI compiles every `*.rml` in the directory; scratch fragments go elsewhere.
 - PowerShell `>` writes UTF-16; redirect from bash.
 
@@ -392,7 +420,7 @@ Must:
 - [x] `shape` enum wired as a vertex morph (Shape layer)
 - [x] `mouthOpen` / `lookX` / `lookY` scrub pose-range timelines through range-mapper converters (no keyframe hops); facing is a Joystick
 - [x] `dragged` / `hovered` written by file listeners and by the app
-- [x] One SM `Avatar`, twelve layers (nine until te3n1.5; this line said ten)
+- [x] One SM `Avatar`, fifteen layers (twelve until the minimum transition time split the glyphs of Flash, Drag and React onto their own layers; nine until te3n1.5)
 - [x] Glyphs in a `Solo` (keyed `activeComponentId`), mouths opacity-switched per SPEC §4
 - [x] `check_contract.py` passes on the shipped `.riv`
 - [x] Feathering is stroke-only and rendered through the Rive Renderer on both targets
