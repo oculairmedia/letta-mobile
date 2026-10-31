@@ -20,6 +20,9 @@ import sys
 # One list shared by Kotlin and Python. The wildcard covers assertEquals, assertTrue, etc.
 ASSERTION_CALLS = ("assert*", "verify", "expectThat", "shouldBe")
 REASON_MIN_LENGTH = 20
+# Branch, tag, remote and SHA names with ~/^ suffixes: nothing git could read as an option.
+SAFE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/~^-]{0,199}")
+COMMIT_SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 KOTLIN_TOKEN = re.compile(r'//[^\n]*|/\*[\s\S]*?\*/|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
 KOTLIN_CLASS = re.compile(r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)\b[^{}]*\{")
 KOTLIN_TEST = re.compile(r"@(?:[\w.]+\.)?Test\b(?:(?!\b(?:fun|class|object|interface)\b|[{};])[\s\S])*?\bfun\s+(?:<[^>]+>\s*)?(`[^`]+`|[A-Za-z_]\w*)\s*\(")
@@ -38,7 +41,7 @@ def kotlin_test_path(path):
     offset = 0
     for parent, source_set, _ in zip(parts, parts[1:], parts[2:]):
         after_source_set = offset + len(parent) + len(source_set) + 2
-        if parent == "src" and ("Test" in source_set or source_set == "test") and after_source_set > last_newline:
+        if parent == "src" and is_test_source_set(source_set) and after_source_set > last_newline:
             return True
         offset += len(parent) + 1
     return False
@@ -229,18 +232,28 @@ def pr_body():
     return body
 
 
+def is_test_source_set(name):
+    return "Test" in name or name == "test"
+
+
+def reason_on_line(line):
+    """The text after a leading 'Test change reason:' marker, or None when the line has none."""
+    prefix, separator, reason = line.lstrip().partition("Test change reason:")
+    return reason.strip() if separator and not prefix else None
+
+
 def valid_reason(body):
-    for line in body.splitlines():
-        prefix, separator, reason = line.lstrip().partition("Test change reason:")
-        if not prefix and separator and len(reason.strip()) >= REASON_MIN_LENGTH:
-            return True
-    return False
+    reasons = (reason_on_line(line) for line in body.splitlines())
+    return any(reason is not None and len(reason) >= REASON_MIN_LENGTH for reason in reasons)
 
 
 def resolve_base(root, ref):
-    if ref.startswith("-"):
-        raise ValueError("diff-base must not start with '-'")
+    """The merge base of HEAD and [ref]; only verified SHAs are passed on to git."""
+    if not SAFE_REF.fullmatch(ref):
+        raise ValueError("diff-base must be a branch, tag or commit name (no leading '-')")
     resolved = git(root, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{ref}^{{commit}}").decode().strip()
+    if not COMMIT_SHA.fullmatch(resolved):
+        raise ValueError(f"diff-base does not resolve to a commit: {ref!r}")
     return git(root, "merge-base", resolved, "HEAD").decode().strip()
 
 

@@ -34,7 +34,8 @@ class FixtureDiffTest(unittest.TestCase):
 
         def fake_git(root, *args):
             if args[0] == "rev-parse":
-                return b"resolved\n"
+                # Real git prints the full commit SHA; the guard rejects anything else.
+                return b"0123456789abcdef0123456789abcdef01234567\n"
             if args[0] == "merge-base":
                 return b"base\n"
             if args[0] == "diff":
