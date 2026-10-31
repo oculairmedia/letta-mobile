@@ -118,7 +118,8 @@ sources are cited in `MOTION-REFERENCES.md`.
   flips the glyph at frame 6 while the eye is shut, turning the facing to the new state's;
   the SPEC §3 pairs carry designed body/face motion, the rest travel the held pose to the next.
   Each loop has a `Calm_<state>` twin - the same pose, held - that `reduceMotion` blends to.
-  Inside `Plate`, glyph switches are instant cuts - the shutter is what hides them), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
+  Inside `Plate`, a glyph switch is instant - the shutter is what hides it - while the mouth and
+  the card ease over 100 ms; no state change moves a pose in under 100 ms), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning; its glyph is on `FlashFace`, as `Drag`'s and `React`'s are on `DragFace` / `ReactFace`),
   `Drag` (boolean + the file's dragStart/dragEnd listeners), `IdleVariety` (four waits of
   6.1–14 s, then one of nine beats), `Breath` (gloss opacity), `Blink`, `Hover` (perk-up, then an
   attentive hold), and te3n1.5's `Pet` (side sway), `PetFace` (content glyph) and `React` (one

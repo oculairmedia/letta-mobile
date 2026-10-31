@@ -58,8 +58,9 @@ BLEND = {"beat_in": 160, "beat_out": 320, "wander_in": 200, "wander_out": 320, "
          "calm": 300, "pet_in": 250, "pet_out": 320}
 
 
-# reduceMotion: an entry hands off to the calm twin over at most this many ms (te3n1.5).
-CALM_HANDOFF = 80
+# reduceMotion: an entry hands off to the calm twin over at most this many ms (te3n1.5). It was
+# 80; the minimum transition time (MIN_TRANSITION_MS, below) raised it.
+CALM_HANDOFF = 100
 
 
 def beat(ms):
@@ -200,26 +201,48 @@ BLINK_SHUT, BLINK_FRAMES = 4, 15   # frames to fully shut / total
 BLINK_FLIP = 6                     # entries flip the glyph here: the plate sees the trigger a frame or two late
 
 
+# The minimum transition time: no change of state may move a pose in less than this. At 0 ms a
+# state change lands in ONE frame, and a pose that jumps in one frame always reads as a glitch -
+# the loop being left mid-bob, mid-lean, mid-turn snaps to the next animation's frame 0. Every
+# transition that moves a pose property blends for at least this long; rig/layers.py refuses one
+# that does not, from any frame its source can be left at (rig/seams.py pose_moves), and no
+# signature excuses it. Only discrete properties still cut - the glyph index `expr` (a blend would
+# sweep through every glyph between) and a Solo reference (it has no in-between).
+#
+# 100 ms is six frames at 60 fps - long enough that the eye reads travel, not a jump, and short
+# enough not to blur a request into lag. It is also the ceiling for the blend INTO an entry: the
+# entry flips `expr` at BLINK_FLIP, and that flip must land after the blend has finished, or the
+# blend mixes the old index with the new one and sweeps (rig/layers.py refuses that too).
+MIN_TRANSITION_MS = 100
+
+
+# An entry may be interrupted by the next request only after its glyph has flipped: before the
+# flip, the entry still shows the old glyph, and a blend into the next entry (which starts on the
+# NEW one) would mix the two indices. A request inside that window waits these few ms.
+ENTRY_FLIP_MS = round(BLINK_FLIP * 1000 / 60)
+assert MIN_TRANSITION_MS <= ENTRY_FLIP_MS, "the blend into an entry must end before its expr flip"
+
+
 INK = "FF111111"
 
 
 PLATE_WHITE = "FFF7F7F7"
 
 
-EXPRESSION_CUT = "the plate's expression matrix: the swap is instant under the blink shutter"
-
-
 def expression_layer(*parts):
-    """The XML of an expression layer: one state per STATES entry, every other state one cut away.
+    """The XML of an expression layer: one state per STATES entry, every other state one blend away.
 
-    Explicit matrix, instant cuts: the root hides every swap inside a blink shutter, and an
-    AnyState fan-out would keep re-entering the current state (a self-blend that fades the glyph).
-    Every state is signed `cut=True` once, which is what lets the blend policy in rig/layers.py
-    accept a matrix of 0 ms transitions that swap a glyph and a mouth outright.
+    Explicit matrix: an AnyState fan-out would keep re-entering the current state (a self-blend
+    that fades the glyph). Each swap blends over MIN_TRANSITION_MS: the glyph is a Solo reference,
+    which has no in-between, so it swaps on the first frame of the blend - under the blink the
+    root fires - while the mouth fades and the card eases to its scale for the new state, instead
+    of popping in one frame (they are not under the shutter: it squashes the glyph only). The
+    input itself never sweeps: the root keys `expr` only on layers that hold it still across a
+    blend, or cut it (rig/layers.py refuses a blend that would sweep it).
     """
     name, lid, input_id, anim_ids, node_ids = parts
-    states = [State(anim_ids[s], node_ids[s], i, cut=True, reason=EXPRESSION_CUT,
-                    transitions=[OnInput(node_ids[t], input_id, EXPR[t], 0)
+    states = [State(anim_ids[s], node_ids[s], i,
+                    transitions=[OnInput(node_ids[t], input_id, EXPR[t], MIN_TRANSITION_MS)
                                  for t in STATES if t != s])
               for i, s in enumerate(STATES)]
     return Layer(name, lid, node_ids["idle"], states=states).rml()

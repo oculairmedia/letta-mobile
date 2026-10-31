@@ -66,7 +66,7 @@
   "scenario": "enter-listening",
   "signature": {
     "Arc.y": {
-      "max_delta": 0.1554,
+      "max_delta": 0.1009,
       "overshoot_pct": 0.0,
       "peak": -7.0,
       "peak_frame": 17,
@@ -102,11 +102,11 @@
       "spacing": "ease-out"
     },
     "Face.rotation": {
-      "max_delta": 0.0452,
+      "max_delta": 0.0354,
       "overshoot_pct": 49.99,
       "peak": -0.0524,
       "peak_frame": 13,
-      "range": 0.0698,
+      "range": 0.0643,
       "settle_frame": 16,
       "spacing": "ease-in"
     },
@@ -120,16 +120,16 @@
       "spacing": "hold"
     },
     "Face.y": {
-      "max_delta": 12.2984,
+      "max_delta": 9.9,
       "overshoot_pct": 7.07,
       "peak": -16.0,
       "peak_frame": 13,
-      "range": 19.0,
-      "settle_frame": 50,
-      "spacing": "pop"
+      "range": 18.0523,
+      "settle_frame": 51,
+      "spacing": "ease-in"
     },
     "Joystick.x": {
-      "max_delta": 0.0356,
+      "max_delta": 0.0295,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 19,
@@ -147,7 +147,7 @@
       "spacing": "hold"
     },
     "Lean.rotation": {
-      "max_delta": 0.0031,
+      "max_delta": 0.0026,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 19,
@@ -255,7 +255,7 @@
       "spacing": "hold"
     },
     "Turn.rotation": {
-      "max_delta": 0.0087,
+      "max_delta": 0.0072,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 19,
@@ -264,7 +264,7 @@
       "spacing": "ease-in"
     },
     "Turn.scaleX": {
-      "max_delta": 0.0147,
+      "max_delta": 0.0121,
       "overshoot_pct": 0.0,
       "peak": 1.0,
       "peak_frame": 19,
@@ -273,7 +273,7 @@
       "spacing": "ease-in"
     },
     "Turn.x": {
-      "max_delta": 2.4911,
+      "max_delta": 2.0631,
       "overshoot_pct": 0.0,
       "peak": 0.0,
       "peak_frame": 19,

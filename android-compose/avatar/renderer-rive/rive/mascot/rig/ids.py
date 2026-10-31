@@ -505,4 +505,27 @@ react_anim = {r: alloc(3, "React_" + r) for r in REACTIONS}
 react_node = {r: alloc(3, "React_" + r + "Node") for r in REACTIONS}
 
 
+# The face halves of the Flash, Drag and React layers (the minimum transition time). Those three
+# one-shots used to key the plate's `expr` alongside the body, which forced their transitions to
+# cut: a blended `expr` sweeps through every glyph index between. Their glyph now lives on a layer
+# of its own that cuts (as PetFace's always has), and the body half blends like everything else.
+FLASH_FACE_REST_NODE = alloc(3, "FlashFaceRestNode")
+SUCCESS_FACE_ANIM, SUCCESS_FACE_NODE = alloc(3, "SuccessFace"), alloc(3, "SuccessFaceNode")
+ERROR_FACE_ANIM, ERROR_FACE_NODE = alloc(3, "ErrorFace"), alloc(3, "ErrorFaceNode")
+DRAG_FACE_ANIM, DRAG_FACE_NODE, DRAG_FACE_REST_NODE = (alloc(3, "DraggedFace"), alloc(3, "DraggedFaceNode"),
+                                                       alloc(3, "DraggedFaceRestNode"))
+REACT_FACE_REST_NODE = alloc(3, "ReactFaceRestNode")
+
+
+# The reactions that show a glyph of their own, and that glyph's state (rig/motion.py).
+REACT_EXPR = {"poke": "startled", "dizzy": "dizzy", "wake": "startled", "yawn": "yawning",
+              "trick0": "trick", "trick1": "trick", "trick2": "trick", "trick3": "trick"}
+
+
+react_face_anim = {r: alloc(3, "ReactFace_" + r) for r in REACT_EXPR}
+
+
+react_face_node = {r: alloc(3, "ReactFace_" + r + "Node") for r in REACT_EXPR}
+
+
 _OWNER = _check_unique()

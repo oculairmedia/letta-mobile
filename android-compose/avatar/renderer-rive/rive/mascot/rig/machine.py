@@ -17,7 +17,8 @@ from textwrap import indent
 
 from rml import (BIND_BOOL, EASE_OUT, SOFT_OUT, SPRING, VM_BLINK, VM_DRAGGED, VM_ERROR, VM_HOVER,
                  VM_SHAPE, VM_STATE, VM_SUCCESS, bind, when_bool, when_enum, when_number, when_trigger)
-from rig.constants import BLEND, CALM_HANDOFF, DEFAULT_SHAPE, DESIGNED_PAIRS, IDLE_WAITS, WANDER_WAITS
+from rig.constants import (BLEND, CALM_HANDOFF, DEFAULT_SHAPE, DESIGNED_PAIRS, ENTRY_FLIP_MS, IDLE_WAITS,
+                           MIN_TRANSITION_MS, WANDER_WAITS)
 from rig.ids import (
     BLINK_ANIM, BLINK_NODE, BLINK_REST_ANIM, BLINK_REST_NODE, BREATH_ANIM, BREATH_CALM_ANIM,
     BREATH_CALM_NODE, BREATH_NODE, DRAG_ANIM, DRAG_NODE, DRAG_REST_ANIM, DRAG_REST_NODE, ERROR_ANIM,
@@ -32,6 +33,9 @@ from rig.ids import (
     WANDER_SLEEP_WAIT_NODE, WANDER_SPIN, WANDER_SPIN_NODE, WANDER_WAIT_A, calm_state_anim,
     calm_state_node, enter_anim, enter_node, react_anim, react_node, root_state_anim,
     root_state_node, shape_anim, shape_enum_ids, shape_node, state_enum_ids,
+    DRAG_FACE_ANIM, DRAG_FACE_NODE, DRAG_FACE_REST_NODE, ERROR_FACE_ANIM, ERROR_FACE_NODE,
+    FLASH_FACE_REST_NODE, REACT_EXPR, REACT_FACE_REST_NODE, SUCCESS_FACE_ANIM, SUCCESS_FACE_NODE,
+    react_face_anim, react_face_node,
 )
 from rig.layers import Exit, Layer, OnBool, OnEnum, OnTrigger, State, When
 from rig.motion import enter_duration
@@ -40,6 +44,18 @@ VM_REDUCE, VM_PETTING = VM_NEW["reduceMotion"], VM_NEW["petting"]
 
 # Layer ids for te3n1.5's three layers (the original ten are 3:1..3:10, written inline).
 PET_LAYER, PET_FACE_LAYER, REACT_LAYER = "3:11", "3:12", "3:13"
+
+
+# The face halves of Flash, Drag and React (the minimum transition time): the glyph that cuts.
+FLASH_FACE_LAYER, DRAG_FACE_LAYER, REACT_FACE_LAYER = "3:14", "3:15", "3:16"
+
+
+# A blend at the floor (rig/constants.py MIN_TRANSITION_MS), for the state changes that used to cut.
+FLOOR = (MIN_TRANSITION_MS, EASE_OUT)
+
+
+# A glyph swap: the only thing still allowed to change in one frame (rig/seams.py SWEEP_KEYS).
+GLYPH_CUT = "the glyph index `expr` cannot blend (it would sweep every glyph between); nothing else is keyed"
 
 
 def _shape_layer():
@@ -51,30 +67,43 @@ def _shape_layer():
 
 def _expression_layer():
     # No AnyState fan-out: Rive evaluates AnyState before a state's own transitions, which would
-    # swallow the entries. Every sustained state cuts (0 ms) into the entry for the requested
-    # state; the entry hands off to the sustained loop at its end. Designed entries land on the
-    # target's rest and cut; generic ones blend the hand-off so held face/body/tint ease in.
-    ENTRY_CUT = "hidden by the blink shutter: the entry fires the blink at frame 0"
-    LANDS = "the designed entry lands on the target's rest pose"
+    # swallow the entries. Every sustained state blends (MIN_TRANSITION_MS) into the entry for the
+    # requested state; the entry hands off to the sustained loop at its end.
+    #
+    # Nothing here cuts any more. A sustained loop is left at whatever frame the request arrives -
+    # mid-bob, mid-lean, mid-turn - and the entry starts from the state's REST pose, so a 0 ms cut
+    # snapped that pose in one frame (the blink only ever hid the glyph swap, never the body). The
+    # glyph swap itself stays instant, inside the entry: `expr` holds the old index until
+    # BLINK_FLIP and flips under the shut eye, and the blend into the entry is over by then
+    # (MIN_TRANSITION_MS <= ENTRY_FLIP_MS), so the blend never mixes two indices.
+    #
+    # An entry interrupted by the next request blends too, but only once its own glyph has
+    # flipped (`after_ms=ENTRY_FLIP_MS`): until then it still shows the old glyph while the next
+    # entry starts on the new one. A request inside those first 100 ms waits for the flip.
     #
     # reduceMotion (te3n1.5): every sustained loop has a calm twin - the same pose held at the
     # loop's frame 0 - and `reduceMotion` blends between the two. An entry hands off to the twin
-    # instead of the loop while it is on, over at most CALM_HANDOFF ms.
-    entries = lambda st: [OnEnum(enter_node[(st, to)], state_enum_ids[to], 0, None, cut=True, reason=ENTRY_CUT)
-                          for to in SUSTAINED if to != st]
+    # instead of the loop while it is on, over CALM_HANDOFF ms.
+    def entries(st, gated=False):
+        if gated:
+            # Linear, not eased: there are len(SUSTAINED)**2 of these, every eased transition
+            # carries its own interpolator object in the .riv, and over 100 ms the curve is moot.
+            return [When(enter_node[(st, to)], (when_enum(VM_STATE, state_enum_ids[to]),), MIN_TRANSITION_MS,
+                         after_ms=ENTRY_FLIP_MS) for to in SUSTAINED if to != st]
+        return [OnEnum(enter_node[(st, to)], state_enum_ids[to], *FLOOR) for to in SUSTAINED if to != st]
     states = []
     for i, st in enumerate(SUSTAINED):
         own = entries(st) + [OnBool(calm_state_node[st], VM_REDUCE, "true", BLEND["calm"], SOFT_OUT)]
         states.append(State(root_state_anim[st], root_state_node[st], i, transitions=own))
     for j, ((frm, to), nid) in enumerate(enter_node.items()):
-        # An entry can be interrupted by any other request (through that state's own entry).
+        # A designed entry lands on the target's rest and hands off at the floor; a generic one
+        # blends its hand-off over up to 120 ms so held face/body/tint ease in.
         designed = (frm, to) in DESIGNED_PAIRS
-        hand_off = (0, None) if designed else (min(120, enter_duration(frm, to).ms), EASE_OUT)
-        calm_off = (0, None) if designed else (min(CALM_HANDOFF, hand_off[0]), EASE_OUT)
-        why = LANDS if designed else None
-        own = [When(calm_state_node[to], (when_bool(VM_REDUCE, "true"),), *calm_off, exit=True, cut=designed, reason=why),
-               Exit(root_state_node[to], *hand_off, cut=designed, reason=why)]
-        own += entries(to)
+        hand_off = FLOOR if designed else (max(MIN_TRANSITION_MS, min(120, enter_duration(frm, to).ms)), EASE_OUT)
+        calm_off = (max(MIN_TRANSITION_MS, min(CALM_HANDOFF, hand_off[0])), EASE_OUT)
+        own = [When(calm_state_node[to], (when_bool(VM_REDUCE, "true"),), *calm_off, exit=True),
+               Exit(root_state_node[to], *hand_off)]
+        own += entries(to, gated=True)
         states.append(State(enter_anim[(frm, to)], nid, len(SUSTAINED) + j, reset=True, transitions=own))
     base = len(SUSTAINED) + len(enter_node)
     for i, st in enumerate(SUSTAINED):
@@ -99,8 +128,10 @@ def _static_layers():
     hover = Layer(
         "Hover", "3:4", HOVER_REST_NODE,
         states=[
+            # The perk starts at rest, but the layers below do not hold rest (breath, the state's
+            # pose), so it blends in at the floor rather than taking those values in one frame.
             State(HOVER_REST_ANIM, HOVER_REST_NODE, 0,
-                  transitions=[OnBool(HOVER_NODE, VM_HOVER, "true", 0, None)]),
+                  transitions=[OnBool(HOVER_NODE, VM_HOVER, "true", MIN_TRANSITION_MS, SOFT_OUT)]),
             # Perk hands off to the attentive hold at its end; leaving hover blends out (220/260 ms)
             # because these keys sit on top of Breath and the host's turn.
             State(HOVER_ANIM, HOVER_NODE, 1, reset=True,
@@ -108,45 +139,62 @@ def _static_layers():
                                OnBool(HOVER_REST_NODE, VM_HOVER, "false", 220, SOFT_OUT)]),
             State(HOVER_HELD_ANIM, HOVER_HELD_NODE, 2,
                   transitions=[OnBool(HOVER_REST_NODE, VM_HOVER, "false", BLEND["hover_out"], SOFT_OUT)])]).rml()
-    # A flash is fired, not requested: it starts from wherever the character is, so the trigger
-    # cuts. Interrupting one flash with the other cuts across the error drop (24 px) on purpose -
-    # the new flash re-poses the body from its own frame 0.
-    FLASH_CUT = "trigger flash, self-returning: it re-poses from its own frame 0"
-    ERROR_HOLD = ("error flash holds its drop; `state` settles to error behind it, so the "
-                  "Expression layer is already holding that pose when Flash lets go")
-    # Under reduceMotion the two flashes keep their meaning and lose their motion: the glyph under
-    # a blink, no hop, no spin, no shake (te3n1.5). The calm ones cut out at their end: a blended
-    # `expr` would sweep through every glyph index between the flash's and the state's.
+    # A flash is fired, not requested: it starts from wherever the character is - mid-bob,
+    # mid-turn, mid-drop - so it blends in at the floor rather than cutting to its own frame 0.
+    # Interrupting one flash with the other blends across the error drop the same way.
+    #
+    # Its glyph is the FlashFace layer's (below), which cuts: a blended `expr` would sweep through
+    # every glyph index between the state's and the flash's.
     calm_off = when_bool(VM_REDUCE, "false")
     calm_on = when_bool(VM_REDUCE, "true")
-    CALM_END = "calm flash: only `expr` is keyed, and the state's own glyph is back under the blink"
-    # A calm flash fired over a running ErrorFlash (reduceMotion switched on mid-shake) lets go of
-    # the error drop; the hand-back is the ERROR_HOLD one, the error pose is what lies underneath.
-    CALM_OVER_ERROR = "calm flash over ErrorFlash: " + ERROR_HOLD
+    # Under reduceMotion the two flashes keep their meaning and lose their motion: the glyph under
+    # a blink, no hop, no spin, no shake (te3n1.5) - FlashFace plays SuccessCalm / ErrorCalm. A
+    # calm trigger fired over a running flash (reduceMotion switched on mid-shake) no longer cuts
+    # the motion off: letting go mid-shake would hand the body back to the layers below in one
+    # frame, however long the blend, so the running flash finishes instead.
+    ERROR_HOLD = ("error flash holds its drop; `state` settles to error behind it, so the "
+                  "Expression layer is already holding that pose when Flash lets go")
     flash = Layer(
         "Flash", "3:6", FLASH_REST_NODE,
-        any_transitions=[When(SUCCESS_NODE, (when_trigger(VM_SUCCESS), calm_off), cut=True, reason=FLASH_CUT),
-                         When(ERROR_NODE, (when_trigger(VM_ERROR), calm_off), cut=True, reason=FLASH_CUT),
-                         When(SUCCESS_CALM_NODE, (when_trigger(VM_SUCCESS), calm_on), cut=True, hold=True,
-                              reason=CALM_OVER_ERROR),
-                         When(ERROR_CALM_NODE, (when_trigger(VM_ERROR), calm_on), cut=True, hold=True,
-                              reason=CALM_OVER_ERROR)],
+        any_transitions=[When(SUCCESS_NODE, (when_trigger(VM_SUCCESS), calm_off), MIN_TRANSITION_MS, SOFT_OUT),
+                         When(ERROR_NODE, (when_trigger(VM_ERROR), calm_off), MIN_TRANSITION_MS, SOFT_OUT)],
         states=[State(FLASH_REST_ANIM, FLASH_REST_NODE, 0),
                 State(SUCCESS_ANIM, SUCCESS_NODE, 1, reset=True,
                       transitions=[Exit(FLASH_REST_NODE, 120, SOFT_OUT)]),
+                # A hand-back, and a duration would not soften it (Rive holds the outgoing pose at
+                # full weight until a blend ends): it is pose-neutral only because the host sets
+                # `state` to error with the trigger.
                 State(ERROR_ANIM, ERROR_NODE, 2, reset=True,
-                      transitions=[Exit(FLASH_REST_NODE, 0, cut=True, hold=True,
-                                        reason=ERROR_HOLD)]),
+                      transitions=[Exit(FLASH_REST_NODE, 0, hold=True, reason=ERROR_HOLD)])]).rml()
+    flash_face = Layer(
+        "FlashFace", FLASH_FACE_LAYER, FLASH_FACE_REST_NODE,
+        any_transitions=[When(SUCCESS_FACE_NODE, (when_trigger(VM_SUCCESS), calm_off), cut=True, reason=GLYPH_CUT),
+                         When(ERROR_FACE_NODE, (when_trigger(VM_ERROR), calm_off), cut=True, reason=GLYPH_CUT),
+                         When(SUCCESS_CALM_NODE, (when_trigger(VM_SUCCESS), calm_on), cut=True, reason=GLYPH_CUT),
+                         When(ERROR_CALM_NODE, (when_trigger(VM_ERROR), calm_on), cut=True, reason=GLYPH_CUT)],
+        states=[State(FLASH_REST_ANIM, FLASH_FACE_REST_NODE, 0),
+                State(SUCCESS_FACE_ANIM, SUCCESS_FACE_NODE, 1, reset=True,
+                      transitions=[Exit(FLASH_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)]),
+                State(ERROR_FACE_ANIM, ERROR_FACE_NODE, 2, reset=True,
+                      transitions=[Exit(FLASH_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)]),
                 State(SUCCESS_CALM_ANIM, SUCCESS_CALM_NODE, 3, reset=True,
-                      transitions=[Exit(FLASH_REST_NODE, 0, cut=True, reason=CALM_END)]),
+                      transitions=[Exit(FLASH_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)]),
                 State(ERROR_CALM_ANIM, ERROR_CALM_NODE, 4, reset=True,
-                      transitions=[Exit(FLASH_REST_NODE, 0, cut=True, reason=CALM_END)])]).rml()
+                      transitions=[Exit(FLASH_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)])]).rml()
+    # The grab squash springs in at the floor (it was 80 ms); the dragged glyph is DragFace's.
     drag = Layer(
         "Drag", "3:7", DRAG_REST_NODE,
-        any_transitions=[OnBool(DRAG_NODE, VM_DRAGGED, "true", 80, SPRING),
+        any_transitions=[OnBool(DRAG_NODE, VM_DRAGGED, "true", MIN_TRANSITION_MS, SPRING),
                          OnBool(DRAG_REST_NODE, VM_DRAGGED, "false", 350, SOFT_OUT)],
         states=[State(DRAG_REST_ANIM, DRAG_REST_NODE, 0), State(DRAG_ANIM, DRAG_NODE, 1)]).rml()
-    return breath, blink, hover, flash, drag
+    drag_face = Layer(
+        "DragFace", DRAG_FACE_LAYER, DRAG_FACE_REST_NODE,
+        states=[State(DRAG_REST_ANIM, DRAG_FACE_REST_NODE, 0,
+                      transitions=[OnBool(DRAG_FACE_NODE, VM_DRAGGED, "true", 0, None, cut=True, reason=GLYPH_CUT)]),
+                State(DRAG_FACE_ANIM, DRAG_FACE_NODE, 1,
+                      transitions=[OnBool(DRAG_FACE_REST_NODE, VM_DRAGGED, "false", 0, None, cut=True,
+                                          reason=GLYPH_CUT)])]).rml()
+    return breath, blink, hover, flash, flash_face, drag, drag_face
 
 
 def _park():
@@ -287,33 +335,44 @@ def _band(prop, lo, hi):
 
 
 def _react_layer():
-    """React (te3n1.5): one one-shot per trigger, fired from wherever the character is.
+    """React (te3n1.5) and ReactFace: one one-shot per trigger, fired from wherever the character is.
 
-    Like a flash, a reaction is fired, not requested: every trigger cuts into its one-shot from any
-    state (a new poke restarts a poke), and each one-shot starts and ends at rest so the way home is
-    a 0 ms cut too. With reduceMotion on, every trigger plays ReactCalm instead: one blink."""
-    REACT_CUT = "trigger reaction, self-returning: it re-poses from its own frame 0"
-    HOME = "the reaction ends at rest; only `expr` is left, and the state's glyph is back under the blink"
+    A reaction is fired, not requested: every trigger blends into its one-shot from any state at
+    the floor (a new poke restarts a poke), because the character it lands on is mid-sway or
+    mid-reaction, not at rest. Each one-shot ends at rest, so the way home moves nothing.
+
+    The glyph a reaction shows is ReactFace's, which cuts: a blended `expr` would sweep through
+    every glyph between. A reaction without a glyph sends ReactFace home, so a glyph never outlives
+    the reaction that showed it. With reduceMotion on, every trigger plays ReactCalm there instead:
+    one blink, no motion."""
     full, calm = when_bool(VM_REDUCE, "false"), when_bool(VM_REDUCE, "true")
-    fired = []
-    for trig, r in _SIMPLE_REACTIONS:
-        fired.append(When(react_node[r], (when_trigger(VM_NEW[trig]), full), cut=True, reason=REACT_CUT))
-    for r, lo, hi in _LAND_TIERS:
-        fired.append(When(react_node[r], (when_trigger(VM_NEW["land"]), full) + _band(VM_NEW["impact"], lo, hi),
-                          cut=True, reason=REACT_CUT))
+    fires = [(r, (when_trigger(VM_NEW[trig]),)) for trig, r in _SIMPLE_REACTIONS]
+    fires += [(r, (when_trigger(VM_NEW["land"]),) + _band(VM_NEW["impact"], lo, hi)) for r, lo, hi in _LAND_TIERS]
     for k in range(4):
         lo, hi = (None if k == 0 else k - 0.5), (None if k == 3 else k + 0.5)
-        fired.append(When(react_node[f"trick{k}"], (when_trigger(VM_NEW["trick"]), full) + _band(VM_NEW["trickId"], lo, hi),
-                          cut=True, reason=REACT_CUT))
+        fires.append((f"trick{k}", (when_trigger(VM_NEW["trick"]),) + _band(VM_NEW["trickId"], lo, hi)))
     triggers = [t for t, _ in _SIMPLE_REACTIONS] + ["land", "trick"]
-    fired += [When(REACT_CALM_NODE, (when_trigger(VM_NEW[t]), calm), cut=True, reason=REACT_CUT) for t in triggers]
+
+    # The motion: in at the floor. Under reduceMotion a trigger leaves a running reaction to
+    # finish (it ends at rest); cutting it off mid-move would hand Squash back in one frame.
+    moved = [When(react_node[r], (c[0], full) + c[1:], MIN_TRANSITION_MS, SOFT_OUT) for r, c in fires]
     states = [State(REACT_REST_ANIM, REACT_REST_NODE, 0)]
-    states += [State(react_anim[r], react_node[r], 1 + i, reset=True,
-                     transitions=[Exit(REACT_REST_NODE, 0, cut=True, reason=HOME)])
+    states += [State(react_anim[r], react_node[r], 1 + i, reset=True, transitions=[Exit(REACT_REST_NODE)])
                for i, r in enumerate(REACTIONS)]
-    states.append(State(REACT_CALM_ANIM, REACT_CALM_NODE, 1 + len(REACTIONS), reset=True,
-                        transitions=[Exit(REACT_REST_NODE, 0, cut=True, reason=HOME)]))
-    return Layer("React", REACT_LAYER, REACT_REST_NODE, any_transitions=fired, states=states).rml()
+    react = Layer("React", REACT_LAYER, REACT_REST_NODE, any_transitions=moved, states=states).rml()
+
+    # The glyph: cut, always.
+    shown = [When(react_face_node[r] if r in REACT_EXPR else REACT_FACE_REST_NODE, (c[0], full) + c[1:],
+                  cut=True, reason=GLYPH_CUT) for r, c in fires]
+    shown += [When(REACT_CALM_NODE, (when_trigger(VM_NEW[t]), calm), cut=True, reason=GLYPH_CUT) for t in triggers]
+    home = lambda: [Exit(REACT_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)]
+    face_states = [State(REACT_REST_ANIM, REACT_FACE_REST_NODE, 0)]
+    face_states += [State(react_face_anim[r], react_face_node[r], 1 + i, reset=True, transitions=home())
+                    for i, r in enumerate(r for r in REACTIONS if r in REACT_EXPR)]
+    face_states.append(State(REACT_CALM_ANIM, REACT_CALM_NODE, 1 + len(REACT_EXPR), reset=True, transitions=home()))
+    face = Layer("ReactFace", REACT_FACE_LAYER, REACT_FACE_REST_NODE, any_transitions=shown,
+                 states=face_states).rml()
+    return react, face
 
 
 def root_machine():
@@ -322,9 +381,12 @@ def root_machine():
     te3n1.5's three layers (Pet, PetFace, React) go last: they key only nodes nobody else keys
     (Squash, Peek) plus `expr`, so they sit on top of everything without fighting it."""
     to_park, from_park = _park()
-    breath, blink, hover, flash, drag = _static_layers()
+    breath, blink, hover, flash, flash_face, drag, drag_face = _static_layers()
     pet, pet_face = _pet_layers()
-    layers = [_shape_layer(), _expression_layer(), breath, blink, hover, flash, drag,
+    react, react_face = _react_layer()
+    # Each face layer sits right above its motion half, so `expr` keeps the priority it had when
+    # the two were one layer: React > PetFace > Drag > Flash > Expression.
+    layers = [_shape_layer(), _expression_layer(), breath, blink, hover, flash, flash_face, drag, drag_face,
               _idle_layer(to_park, from_park), _wander_layer(to_park, from_park),
-              pet, pet_face, _react_layer(), _listeners()]
+              pet, pet_face, react, react_face, _listeners()]
     return f'<StateMachine name="Avatar" id="{SM}">\n' + "\n".join(indent(layer, "    ") for layer in layers) + '\n</StateMachine>'
