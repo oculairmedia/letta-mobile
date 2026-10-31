@@ -183,16 +183,6 @@ class CanonicalPendingLocalStore(
     }
 
     /**
-     * Whether [record] could be past the horizon: unconfirmed and sent long enough ago. An
-     * unparsable timestamp is not evidence of staleness, so such a record is left alone.
-     */
-    private fun mayBeStale(record: Record, now: TimelineInstant): Boolean {
-        if (record.delivery == Delivery.Failed) return false
-        val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
-        return timelineInstantDurationMillis(sent, now) >= LOST_ECHO_HORIZON_MILLIS
-    }
-
-    /**
      * Apply a transport outcome to the expected retry generation while retaining unconfirmed
      * messages. Only an explicit Retry moves a failed record back to Sending, so a late Sent
      * cannot undo a failure.
@@ -267,6 +257,16 @@ class CanonicalPendingLocalStore(
         const val MAX_RECORDS = OutboxTransitions.BUDGET
         const val MAX_BYTES = OUTBOX_MAX_BYTES
     }
+}
+
+/**
+ * Whether [record] could be past the horizon: unconfirmed and sent long enough ago. An
+ * unparsable timestamp is not evidence of staleness, so such a record is left alone.
+ */
+private fun mayBeStale(record: CanonicalPendingLocalStore.Record, now: TimelineInstant): Boolean {
+    if (record.delivery == CanonicalPendingLocalStore.Delivery.Failed) return false
+    val sent = runCatching { parseTimelineInstant(record.sentAt) }.getOrNull() ?: return false
+    return timelineInstantDurationMillis(sent, now) >= CanonicalPendingLocalStore.LOST_ECHO_HORIZON_MILLIS
 }
 
 /** Refuses a conflicting or over-budget prompt; false when the same prompt is already pending. */
