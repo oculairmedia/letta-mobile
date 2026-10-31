@@ -62,6 +62,12 @@ sealed interface ChatRenderItem {
     /** True if [messageId] appears anywhere inside this render item. */
     fun containsMessageId(messageId: String): Boolean
 
+    /** The messages this item draws, oldest first. */
+    fun messagesInOrder(): List<UiMessage> = when (this) {
+        is Single -> listOf(message)
+        is RunBlock -> messages.map { it.first }
+    }
+
     /**
      * A single, stand-alone message bubble.
      *
@@ -284,6 +290,10 @@ fun groupMessagesForRender(
     }
     return deduplicateRenderKeys(out)
 }
+
+/** The messages of newest-first render [items] (a render model's order), oldest first. */
+fun chronologicalMessages(items: List<ChatRenderItem>): List<UiMessage> =
+    items.asReversed().flatMap { it.messagesInOrder() }
 
 /**
  *  (defensive hardening): guarantee that every render
