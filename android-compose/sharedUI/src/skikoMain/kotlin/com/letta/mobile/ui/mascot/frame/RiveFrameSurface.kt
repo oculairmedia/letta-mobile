@@ -137,8 +137,12 @@ private class RiveRenderTarget(
  * pointer event [RiveFrameScene.wake]s it. The last frame stays on screen meanwhile.
  */
 internal suspend fun RiveFrameScene.playFrames(visible: State<Boolean>, frame: suspend (nowNanos: Long) -> Unit) {
+    resume()
     while (true) {
-        if (!visible.value) snapshotFlow { visible.value }.first { it }
+        if (!visible.value) {
+            snapshotFlow { visible.value }.first { it }
+            resume()
+        }
         if (settled) awaitMotion()
         frame(withFrameNanos { it })
     }
