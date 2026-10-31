@@ -182,15 +182,21 @@ class TestTimeline(unittest.TestCase):
 class TestSeams(unittest.TestCase):
     """The seam ledger and the blend policy (MOTION-PIPELINE step A)."""
 
-    # Every seam in the committed scene.rml that nobody has signed. It is zero, and it stays zero.
-    # It was 61, all hand-backs: a one-shot ended holding Face/Body where the state that followed
-    # never keyed it, so the pose snapped back to rest at a 0 ms hand-off. 57 of those were the
-    # generic entries, which now travel the source state's held pose to the target's rest
-    # (letta-mobile-r4bbm); the remaining four are the error flash, three of them signed
-    # `hold=True` because the Expression layer underneath is holding that same pose, and one that
-    # became an ordinary signed cut once SuccessFlash keyed Body.y again (letta-mobile-uesod).
-    # A new hard cut is refused outright by the Layer policy; a new hand-back fails here.
-    UNEXPLAINED = 0
+    # Every seam in the committed scene.rml that nobody has signed. The ledger got stricter with
+    # the minimum transition time (rig/constants.py MIN_TRANSITION_MS): it now weighs every frame
+    # a source can be left at, not its last key, and hand-backs at ANY duration - Rive plays the
+    # outgoing animation at full weight for the whole blend and lets the layers below have the
+    # property only when it ends, so a blend does not soften one.
+    #
+    # Under that ledger the scene before the floor had 1924 sub-100 ms hand-offs that moved a pose
+    # (AnyState expanded) and 291 hand-back rows. Every one of the first kind is gone and the gate
+    # in rig/layers.py refuses a new one outright. What is pinned here is the rest of the second
+    # kind: 195 rows, all a higher layer letting go of a node a lower layer also keys - an idle or
+    # wander beat dropped mid-move by reduceMotion or sleep, hover/drag/pet out, one reaction
+    # interrupting another that keyed something it does not. A duration cannot fix those; the
+    # one-shot has to end where the layers below are, or the two layers stop sharing the node.
+    # The number may only go down.
+    UNEXPLAINED = 195
 
     @classmethod
     def setUpClass(cls):
@@ -214,12 +220,14 @@ class TestSeams(unittest.TestCase):
         self.assertEqual(
             len(self.loose), self.UNEXPLAINED,
             f"the seam ledger now finds {len(self.loose)} unsigned seams, not {self.UNEXPLAINED}.\n"
-            f"Either a 0 ms hand-off was added across a real delta (blend it, or mark the "
-            f"transition cut=True with a reason), or one was fixed - in which case move the pin.\n"
+            f"Either a hand-back was added (end the one-shot where the layers below are, or sign "
+            f"it hold=True when they hold that pose by design), or one was fixed - move the pin "
+            f"down.\n"
             f"python -m rig.seams prints this list:\n{listing}")
 
-    def test_the_policy_refuses_a_hard_cut_and_takes_a_signed_one(self):
+    def test_the_floor_refuses_a_one_frame_pose_change_signed_or_not(self):
         from rml import Y, animation
+        from rig.constants import MIN_TRANSITION_MS
         from rig.layers import Layer, OnBool, State
         from rig.seams import animation_index
 
@@ -229,20 +237,76 @@ class TestSeams(unittest.TestCase):
         layer = lambda t: Layer("Synthetic", "9:10", "9:20",
                                 states=[State("9:1", "9:20", 0, transitions=[t]),
                                         State("9:2", "9:21", 1)])
-        # Up leaves the node at -40, Down starts it at 0: 40 px across a 0 ms cut.
+        # Up leaves the node anywhere in 0..-40, Down starts it at 0: up to 40 px in one frame.
         with self.assertRaises(ValueError) as caught:
             layer(OnBool("9:21", "1:8", "true", 0, None)).rml(seams=index)
         message = str(caught.exception)
-        for expected in ("Synthetic", "9:20", "9:21", "9:90", "y", "40"):
+        for expected in ("Synthetic", "9:20", "9:21", "9:90", "y", "40", f"{MIN_TRANSITION_MS} ms floor"):
             self.assertIn(expected, message, f"the refusal should name {expected}: {message}")
-        # Signed, it is the author's decision and the layer builds.
-        signed = layer(OnBool("9:21", "1:8", "true", 0, None, cut=True, reason="a test cut"))
-        self.assertIn('duration="0"', signed.rml(seams=index))
-        # A blend is never a seam, signed or not.
-        self.assertIn('duration="200"', layer(OnBool("9:21", "1:8", "true", 200, None)).rml(seams=index))
-        # And a signature with nothing to say is refused too.
+        # A signature no longer excuses a pose: cut=True is for discrete properties only.
         with self.assertRaises(ValueError):
-            layer(OnBool("9:21", "1:8", "true", 0, None, cut=True)).rml(seams=index)
+            layer(OnBool("9:21", "1:8", "true", 0, None, cut=True, reason="a test cut")).rml(seams=index)
+        # Nor does a blend that is shorter than the floor.
+        with self.assertRaises(ValueError):
+            layer(OnBool("9:21", "1:8", "true", MIN_TRANSITION_MS - 1, None)).rml(seams=index)
+        # At the floor it builds.
+        self.assertIn(f'duration="{MIN_TRANSITION_MS}"',
+                      layer(OnBool("9:21", "1:8", "true", MIN_TRANSITION_MS, None)).rml(seams=index))
+
+    def test_a_discrete_swap_may_cut_when_signed_and_an_index_may_not_blend(self):
+        from rml import NESTED_VALUE, animation
+        from rig.layers import Layer, OnBool, State
+        from rig.seams import animation_index
+
+        index = animation_index("\n".join([
+            animation("GlyphA", "9:3", 10, {"9:91": {NESTED_VALUE: 2}}),
+            animation("GlyphB", "9:4", 10, {"9:91": {NESTED_VALUE: 9}})]))
+        layer = lambda t: Layer("Synthetic", "9:11", "9:22",
+                                states=[State("9:3", "9:22", 0, transitions=[t]),
+                                        State("9:4", "9:23", 1)])
+        with self.assertRaises(ValueError):          # unsigned: say why
+            layer(OnBool("9:23", "1:8", "true", 0, None)).rml(seams=index)
+        signed = layer(OnBool("9:23", "1:8", "true", 0, None, cut=True, reason="a glyph swap"))
+        self.assertIn('duration="0"', signed.rml(seams=index))
+        with self.assertRaises(ValueError) as caught:  # a blend would show glyphs 3..8 on the way
+            layer(OnBool("9:23", "1:8", "true", 200, None)).rml(seams=index)
+        self.assertIn("sweeps", str(caught.exception))
+        with self.assertRaises(ValueError):          # and a signature with nothing to say
+            layer(OnBool("9:23", "1:8", "true", 0, None, cut=True)).rml(seams=index)
+
+    def test_leaving_a_loop_mid_bob_is_weighed_not_just_its_last_key(self):
+        """The bug the floor exists for: StateIdle's last key equals Enter_idle_thinking's first,
+        so an ends-only check passed a 0 ms cut - but the loop is left wherever the request lands,
+        up to 11 px into its bob, and that snapped in one frame."""
+        from rig.ids import enter_anim, enter_node, root_state_anim, root_state_node, state_enum_ids
+        from rig.layers import Layer, OnEnum, State, When
+        from rig.seams import animation_index
+        from rml import VM_STATE, when_enum
+
+        index = animation_index(SCENE)
+        idle, entry = root_state_node["idle"], enter_node[("idle", "thinking")]
+        nxt = enter_node[("thinking", "speaking")]
+
+        def layer(into, onward=()):
+            return Layer("Expression", "9:12", idle, states=[
+                State(root_state_anim["idle"], idle, 0, transitions=[into]),
+                State(enter_anim[("idle", "thinking")], entry, 1, transitions=list(onward)),
+                State(enter_anim[("thinking", "speaking")], nxt, 2)])
+        cut = OnEnum(entry, state_enum_ids["thinking"], 0, None, cut=True, reason="the old blink excuse")
+        with self.assertRaises(ValueError) as caught:
+            layer(cut).rml(seams=index)
+        self.assertIn("StateIdle", str(caught.exception))
+        # The blend into an entry must be over before the entry flips `expr`, or it sweeps.
+        with self.assertRaises(ValueError):
+            layer(OnEnum(entry, state_enum_ids["thinking"], 150)).rml(seams=index)
+        ok = OnEnum(entry, state_enum_ids["thinking"], 100)
+        layer(ok).rml(seams=index)
+        # An entry interrupted before its flip would blend two indices; gated past it, it is fine.
+        onward = lambda gate: When(nxt, (when_enum(VM_STATE, state_enum_ids["speaking"]),), 100, None,
+                                   after_ms=gate)
+        with self.assertRaises(ValueError):
+            layer(ok, [onward(None)]).rml(seams=index)
+        layer(ok, [onward(100)]).rml(seams=index)
 
 
 if __name__ == "__main__":
