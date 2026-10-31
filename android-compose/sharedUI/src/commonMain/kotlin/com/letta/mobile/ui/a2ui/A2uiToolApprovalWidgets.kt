@@ -37,6 +37,7 @@ import com.letta.mobile.data.a2ui.A2uiActionOrigin
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -297,7 +298,7 @@ internal fun ToolApprovalRiskPill(
     risk: ToolApprovalRisk,
     style: ToolApprovalRiskStyle,
 ) {
-    LettaTonalPill(risk.label, style.pillContainer, style.pillContent)
+    LettaTonalPill(risk.label, LettaPillColors(style.pillContainer, style.pillContent))
 }
 
 @Composable

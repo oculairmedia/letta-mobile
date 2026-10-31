@@ -34,6 +34,7 @@ import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 
 /** Rows of [ProviderManagementPane]: the provider card header, its action strip, and one model. */
 
@@ -101,8 +102,7 @@ private fun StatusDot(connected: Boolean) {
 private fun CountPill(section: ProviderSection) {
     LettaTonalPill(
         text = "${section.exposedCount} / ${section.models.size}",
-        container = MaterialTheme.colorScheme.surfaceContainerHighest,
-        content = MaterialTheme.colorScheme.onSurfaceVariant,
+        colors = LettaPillColors(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.colorScheme.onSurfaceVariant),
     )
 }
 

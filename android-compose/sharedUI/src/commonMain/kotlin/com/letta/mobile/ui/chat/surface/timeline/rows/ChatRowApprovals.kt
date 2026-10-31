@@ -88,6 +88,7 @@ import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTonalPill
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -386,8 +387,10 @@ private fun ApprovalToolCallCard(toolCall: UiApprovalToolCall) {
 private fun RequestingInputChip() {
     LettaTonalPill(
         text = stringResource(Res.string.rows_requesting_input),
-        container = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = LettaDimens.Alpha.muted),
-        content = MaterialTheme.colorScheme.onSecondaryContainer,
+        colors = LettaPillColors(
+            container = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = LettaDimens.Alpha.muted),
+            content = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
         modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT),
     )
 }

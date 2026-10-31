@@ -29,6 +29,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
@@ -57,8 +58,7 @@ class LettaPrimitivesTest {
                     LettaPill("tag", MaterialTheme.colorScheme.secondary, Modifier.testTag("tinted"))
                     LettaTonalPill(
                         "Active",
-                        MaterialTheme.colorScheme.tertiaryContainer,
-                        MaterialTheme.colorScheme.onTertiaryContainer,
+                        LettaPillColors(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
                         Modifier.testTag("tonal"),
                     )
                     LettaOutlinedPill("Read only", Modifier.testTag("outlined"))
@@ -117,9 +117,9 @@ class LettaPrimitivesTest {
                     LettaPill("git", scheme.secondary)
                     LettaPill("v1.2.0", scheme.tertiary)
                     LettaPill("Fault", scheme.error, icon = LettaIcons.Check)
-                    LettaTonalPill("Active", scheme.tertiaryContainer, scheme.onTertiaryContainer)
-                    LettaTonalPill("Paused", scheme.secondaryContainer, scheme.onSecondaryContainer)
-                    LettaTonalPill("12 / 80", scheme.surfaceContainerHighest, scheme.onSurfaceVariant)
+                    LettaTonalPill("Active", LettaPillColors(scheme.tertiaryContainer, scheme.onTertiaryContainer))
+                    LettaTonalPill("Paused", LettaPillColors(scheme.secondaryContainer, scheme.onSecondaryContainer))
+                    LettaTonalPill("12 / 80", LettaPillColors(scheme.surfaceContainerHighest, scheme.onSurfaceVariant))
                     LettaOutlinedPill("Full access")
                     LettaChip("High", onClick = {}, trailingIcon = LettaIcons.ChevronRight)
                 }

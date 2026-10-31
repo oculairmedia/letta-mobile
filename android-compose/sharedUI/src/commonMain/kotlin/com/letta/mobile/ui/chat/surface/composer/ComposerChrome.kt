@@ -42,6 +42,7 @@ import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -102,8 +103,7 @@ internal fun ComposerWorkingDirectoryRow(
 private fun ComposerWorktreeBadge(name: String) {
     LettaTonalPill(
         text = stringResource(Res.string.composer_worktree_badge, name),
-        container = MaterialTheme.colorScheme.tertiaryContainer,
-        content = MaterialTheme.colorScheme.onTertiaryContainer,
+        colors = LettaPillColors(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
         modifier = Modifier.testTag(ComposerWorktreeTags.BADGE),
     )
 }

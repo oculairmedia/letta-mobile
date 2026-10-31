@@ -107,7 +107,6 @@ internal fun SettingsStatusBadge(status: SettingsStatus, modifier: Modifier = Mo
         color = status.tone.color(MaterialTheme.colorScheme.onSurfaceVariant),
         modifier = modifier,
         icon = status.tone.glyph,
-        style = MaterialTheme.typography.bodyMedium,
     )
 }
 

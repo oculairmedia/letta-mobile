@@ -40,6 +40,7 @@ import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.ui.theme.LettaTonalPill
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -162,13 +163,13 @@ internal fun A2uiScheduleCard(
 @Composable
 internal fun ScheduleStatusPill(status: ScheduleStatus) {
     val scheme = MaterialTheme.colorScheme
-    val (container, content) = when (status) {
-        ScheduleStatus.Active -> scheme.tertiaryContainer to scheme.onTertiaryContainer
-        ScheduleStatus.Paused -> scheme.secondaryContainer to scheme.onSecondaryContainer
-        ScheduleStatus.Failed -> scheme.errorContainer to scheme.onErrorContainer
-        ScheduleStatus.Idle -> scheme.surfaceVariant to scheme.onSurfaceVariant
+    val colors = when (status) {
+        ScheduleStatus.Active -> LettaPillColors(scheme.tertiaryContainer, scheme.onTertiaryContainer)
+        ScheduleStatus.Paused -> LettaPillColors(scheme.secondaryContainer, scheme.onSecondaryContainer)
+        ScheduleStatus.Failed -> LettaPillColors(scheme.errorContainer, scheme.onErrorContainer)
+        ScheduleStatus.Idle -> LettaPillColors(scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
-    LettaTonalPill(status.label, container, content)
+    LettaTonalPill(status.label, colors)
 }
 
 @Composable

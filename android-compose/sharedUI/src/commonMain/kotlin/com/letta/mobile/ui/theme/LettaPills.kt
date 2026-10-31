@@ -18,8 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 
 /*
  * The pill family: every small label that sits beside content (a tag, a status, a count, a scope)
@@ -27,7 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
  * always agree. Pick the variant by what carries the colour:
  *
  *   LettaPill          a role colour tints the fill, the hairline and the words (tags, kinds)
- *   LettaTonalPill     a container / on-container pair (a status: tertiaryContainer, errorContainer)
+ *   LettaTonalPill     a LettaPillColors container / on-container pair (a status, a badge)
  *   LettaOutlinedPill  no colour: a neutral, read-only scope
  *   LettaChip          the tonal pill as a control: it opens something, with a 48dp touch target
  *   LettaStatusLabel   no container: a dot or a glyph, then the words, in one colour
@@ -49,8 +49,8 @@ fun LettaPill(text: String, color: Color, modifier: Modifier = Modifier, icon: I
 
 /** A pill on a container role pair: a status ("Active" on tertiaryContainer), a badge, a worktree name. */
 @Composable
-fun LettaTonalPill(text: String, container: Color, content: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    PillSurface(container, content, modifier, border = null) { PillContent(text, icon) }
+fun LettaTonalPill(text: String, colors: LettaPillColors, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    PillSurface(colors.container, colors.content, modifier, border = null) { PillContent(text, icon) }
 }
 
 /** A neutral read-only pill outlined in outlineVariant, for a scope or a property spelled out in words. */
@@ -82,16 +82,10 @@ fun LettaChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, 
 
 /**
  * A status in words after a dot, or after [icon] when the tone has a glyph, all in [color] and with
- * no container ("✓ Connected", "• Syncing"). [style] is the words' role, so it can match its row.
+ * no container ("✓ Connected", "• Syncing").
  */
 @Composable
-fun LettaStatusLabel(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    style: TextStyle = MaterialTheme.typography.labelMedium,
-) {
+fun LettaStatusLabel(text: String, color: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -102,7 +96,7 @@ fun LettaStatusLabel(
         } else {
             Box(Modifier.size(LettaDimens.Space.sm).background(color, CircleShape))
         }
-        Text(text, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
