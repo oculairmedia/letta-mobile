@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,6 +38,7 @@ import com.letta.mobile.sharedui.resources.notebook_note_clean
 import com.letta.mobile.sharedui.resources.notebook_note_conflict
 import com.letta.mobile.sharedui.resources.notebook_note_not_found
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -147,7 +147,7 @@ private fun NotePersistenceAction(session: NotebookNoteSession, state: NotebookN
 
 @Composable
 private fun NoteStatus(state: NotebookNoteState) {
-    if (state.loading || state.saving) LinearProgressIndicator(Modifier.fillMaxWidth())
+    if (state.loading || state.saving) LettaBusyBar()
     val status = when {
         state.saving -> Res.string.notebook_note_saving
         state.loading -> Res.string.notebook_note_loading

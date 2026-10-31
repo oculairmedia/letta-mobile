@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
@@ -40,6 +39,7 @@ import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.settingsLists
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** The sub-pages of Providers, in navigation order. */
@@ -193,7 +193,7 @@ private fun PageColumn(context: ProviderPageContext, page: ProviderSettingsPage,
 /** Progress, then the last outcome; the sign-in dialog and an open form show their own. */
 @Composable
 private fun PageStatus(state: ProviderManagementState) {
-    if (state.loading || state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    if (state.loading || state.busy) LettaBusyBar()
     val dialogOpen = state.signIn != null || state.oauth.provider != null
     if (!dialogOpen) ModelControlNotice(error = state.error.takeIf { state.form == null }, message = state.message)
 }

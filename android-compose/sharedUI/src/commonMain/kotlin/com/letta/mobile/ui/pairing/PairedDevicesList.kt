@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.pairing
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +25,7 @@ import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PendingInvite
 import com.letta.mobile.data.pairing.access
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaOutlinedPill
 import com.letta.mobile.ui.theme.LettaSectionLabel
 
 /**
@@ -94,16 +94,7 @@ private fun DeviceRow(device: PairedDevice, statusLine: String, modifier: Modifi
 /** A read-only label chip: the scope is spelled out in text, never colour alone. */
 @Composable
 private fun ScopeChip(text: String) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        border = BorderStroke(LettaDimens.Space.hair / 2, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-        )
-    }
+    LettaOutlinedPill(text)
 }
 
 @Composable

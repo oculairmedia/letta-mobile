@@ -16,7 +16,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -36,6 +35,7 @@ import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.ui.components.picker.LettaPickerSearchField
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.icons.LettaIcons
@@ -92,7 +92,7 @@ fun ColumnScope.ModelsEditContent(
             search = PickerSearch(ModelControlStrings.SEARCH_MODELS, autoFocus = autoFocusSearch),
             fieldModifier = Modifier.testTag(ModelsEditTags.SEARCH),
         )
-        if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (state.loading) LettaBusyBar()
         ModelControlNotice(error = state.error, message = null)
         LazyColumn(modifier = Modifier.weight(1f, fill = false).fillMaxWidth()) {
             exposureSections(state, actions.onExposedChange)

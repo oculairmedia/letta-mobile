@@ -3,7 +3,6 @@ package com.letta.mobile.ui.shell.workspace
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,6 +53,8 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import org.jetbrains.compose.resources.stringResource
 
 /** Where a conversation's board is kept, and how its edits and presence reach other devices. */
@@ -222,7 +223,7 @@ private class BoardInputs(val session: CanvasSession?, val board: ShellChatBoard
 private fun ConversationBoard(inputs: BoardInputs, actions: ChatCanvasActions) {
     val session = inputs.session
     if (session == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LettaSpinner(size = LettaDimens.Control.spinnerLg) }
         return
     }
     CanvasWorkspace(

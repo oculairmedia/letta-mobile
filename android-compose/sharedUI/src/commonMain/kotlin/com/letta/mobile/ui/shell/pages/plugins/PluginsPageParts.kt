@@ -37,6 +37,7 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaConfirmTags
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaPill
 
 @Composable
 internal fun PluginsError(message: String, onDismiss: () -> Unit) {
@@ -137,9 +138,8 @@ private fun PluginRowEnd(plugin: PluginSummary, busy: Boolean, actions: PluginsP
 /** The plugin is faulted, or its health check failed: the reason, in the error colour. */
 @Composable
 private fun FaultBadge(id: PluginId, reason: String) {
-    Text(
-        FAULT,
-        style = MaterialTheme.typography.labelSmall,
+    LettaPill(
+        text = FAULT,
         color = MaterialTheme.colorScheme.error,
         modifier = Modifier.testTag(PluginsPageTags.fault(id)).semantics(mergeDescendants = true) { contentDescription = "$FAULT: $reason" },
     )

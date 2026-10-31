@@ -20,7 +20,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +35,7 @@ import com.letta.mobile.data.diff.DiffLineKind
 import com.letta.mobile.data.memory.memfs.MemfsCommit
 import com.letta.mobile.data.memory.memfs.MemfsFileChange
 import com.letta.mobile.data.memory.memfs.MemfsFileDiff
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -119,7 +119,7 @@ internal fun MemfsDiffPane(page: MemfsPageScope) {
                 modifier = Modifier.weight(1f),
             )
         }
-        if (history.diffLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (history.diffLoading) LettaBusyBar()
         history.diffError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(LettaDimens.Space.lg)) }
         if (history.hasEmptyDiff) MemfsDetailHint(EMPTY_COMMIT)
         LazyColumn(contentPadding = HistoryPadding, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {

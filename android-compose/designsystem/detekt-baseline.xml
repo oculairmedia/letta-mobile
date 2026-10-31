@@ -84,7 +84,6 @@
     <ID>UnusedImports:LatencyText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
     <ID>UnusedImports:LettaSearchBar.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:MarkdownText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
-    <ID>UnusedImports:RotationalLoader.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:ScrollToBottomFab.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:ScrollToBottomFabRenderingTest.kt$import androidx.compose.ui.test.onNodeWithTag</ID>
     <ID>UnusedImports:StarterPrompts.kt$import androidx.compose.ui.unit.dp</ID>
@@ -121,7 +120,6 @@
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageActionButtonsPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageBubblePreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageSenderPreview()</ID>
-    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun RotationalLoaderPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun StatusTimelinePreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun TelemetryGridPreview()</ID>
     <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun ThinkingSectionPreview()</ID>

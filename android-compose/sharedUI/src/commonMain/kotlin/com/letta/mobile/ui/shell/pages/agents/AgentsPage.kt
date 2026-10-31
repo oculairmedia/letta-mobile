@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,6 +21,7 @@ import com.letta.mobile.ui.shell.rail.ShellAgentLibrary
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags of the agents page. */
@@ -78,7 +78,7 @@ private fun AgentsPageBody(state: AgentsPageState, actions: ShellAgentRailAction
     when {
         error != null && state.agents.isEmpty() -> Column(still) { AgentsPageError(error, onReload) }
         state.agents.isEmpty() && state.loading -> Column(still) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().testTag(AgentsPageTags.LOADING))
+            LettaBusyBar(Modifier.testTag(AgentsPageTags.LOADING))
         }
         state.agents.isEmpty() -> Column(still) { AgentsPageEmpty() }
         else -> Column(Modifier.fillMaxSize()) {

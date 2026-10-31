@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaSectionHeader
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
@@ -369,7 +369,7 @@ private fun <T> RosterHeader(section: RosterSection<T>, listTag: RosterListTag) 
 @Composable
 private fun RosterEmptyState(options: RosterOptions, empty: (@Composable () -> Unit)?) {
     if (options.loading) {
-        LinearProgressIndicator(Modifier.fillMaxWidth().padding(LettaDimens.Space.sm).testTag(options.testTag.loading))
+        LettaBusyBar(Modifier.padding(LettaDimens.Space.sm).testTag(options.testTag.loading))
     } else {
         Box(Modifier.fillMaxWidth().testTag(options.testTag.empty)) { empty?.invoke() }
     }

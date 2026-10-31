@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -31,6 +30,7 @@ import com.letta.mobile.data.repository.modelcontrol.VisibleSection
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.theme.lettaSectionTitle
 import com.letta.mobile.ui.icons.LettaIcons
@@ -94,7 +94,7 @@ fun ProviderManagementPane(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize().testTag(ProviderManagementTags.PANE)) {
-        if (state.loading || state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (state.loading || state.busy) LettaBusyBar()
         ModelControlNotice(error = state.error, message = state.message)
         PaneToolbar(state, actions)
         val visible = state.visible

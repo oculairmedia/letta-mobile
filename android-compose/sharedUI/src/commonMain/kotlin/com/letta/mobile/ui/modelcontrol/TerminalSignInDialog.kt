@@ -3,7 +3,6 @@ package com.letta.mobile.ui.modelcontrol
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,6 +17,7 @@ import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -50,7 +50,7 @@ internal fun TerminalSignInDialog(
         Text(ModelControlStrings.SIGN_IN_STEP_2, style = MaterialTheme.typography.bodyMedium)
         CommandLine(provider.displayName)
         Text(ModelControlStrings.SIGN_IN_STEP_3, style = MaterialTheme.typography.bodyMedium)
-        if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (state.busy) LettaBusyBar()
         val notice = state.error ?: state.message
         notice?.let {
             Text(

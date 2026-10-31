@@ -2,7 +2,6 @@ package com.letta.mobile.ui.shell.workspace
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -10,6 +9,8 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 
 /** A conversation that has not opened: whether it is on its way, the connection, and why it failed. */
 @Immutable
@@ -24,7 +25,7 @@ data class ShellChatWaiting(
 fun ShellChatWaitingPage(waiting: ShellChatWaiting, actions: BackendConnectionNoticeActions, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         if (waiting.opening) {
-            CircularProgressIndicator()
+            LettaSpinner(size = LettaDimens.Control.spinnerLg)
         } else {
             BackendConnectionNotice(
                 status = waiting.connection,
