@@ -46,7 +46,8 @@ import com.letta.mobile.ui.theme.customColors
 
 /**
  * The "New schedule" form: name, prompt and the cron builder with a live
- * preview of the next runs. A [LettaPaneKind.Modal]: a sheet on a phone, a dialog on a pointer.
+ * preview of the next runs, starting from [initial] (a slot tapped on the calendar prefills its
+ * time). A [LettaPaneKind.Modal]: a sheet on a phone, a dialog on a pointer.
  * [onSubmit] receives a complete draft only.
  */
 @Composable
@@ -54,8 +55,9 @@ internal fun ScheduleFormPane(
     clock: ScheduleClock,
     onDismiss: () -> Unit,
     onSubmit: (ScheduleFormDraft) -> Unit,
+    initial: ScheduleFormDraft = ScheduleFormDraft(),
 ) {
-    var draft by remember { mutableStateOf(ScheduleFormDraft()) }
+    var draft by remember { mutableStateOf(initial) }
     LettaPane(
         kind = LettaPaneKind.Modal,
         onDismiss = onDismiss,

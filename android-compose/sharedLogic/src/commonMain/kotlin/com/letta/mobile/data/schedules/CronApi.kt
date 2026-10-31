@@ -43,4 +43,11 @@ data class CronTask(
     val timezone: String? = null,
     val recurring: Boolean = false,
     val prompt: String? = null,
+    /** `active`, `paused`, `completed` or `cancelled` when the backend reports it (see [com.letta.mobile.data.model.CronTaskStatus]). */
+    val status: String? = null,
+    /** ISO-8601 instant of the last fire, when the backend records one. */
+    @SerialName("last_fired_at") val lastFiredAt: String? = null,
+    /** ISO-8601 instant of the last fire the scheduler skipped, when the backend records one. */
+    @SerialName("missed_at") val missedAt: String? = null,
+    @SerialName("fire_count") val fireCount: Int = 0,
 )

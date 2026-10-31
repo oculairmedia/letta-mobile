@@ -5879,48 +5879,193 @@ public final class com/letta/mobile/ui/runtime/AgentDefaultsLocalKt {
 	public static final fun getLocalAgentDefaults ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
-public final class com/letta/mobile/ui/schedules/AgendaRowParams {
+public final class com/letta/mobile/ui/schedules/CalendarBadge {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/schedules/ScheduleRun;Ljava/lang/String;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function0;)V
-	public final fun component1 ()Lcom/letta/mobile/data/schedules/ScheduleRun;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Lkotlin/time/Instant;
-	public final fun component4 ()Lkotlinx/datetime/TimeZone;
-	public final fun component5 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Lcom/letta/mobile/data/schedules/ScheduleRun;Ljava/lang/String;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/schedules/AgendaRowParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/AgendaRowParams;Lcom/letta/mobile/data/schedules/ScheduleRun;Ljava/lang/String;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/AgendaRowParams;
+	public synthetic fun <init> (Landroidx/compose/ui/graphics/vector/ImageVector;JLjava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun component2-0d7_KjU ()J
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy-bw27NRU (Landroidx/compose/ui/graphics/vector/ImageVector;JLjava/lang/String;)Lcom/letta/mobile/ui/schedules/CalendarBadge;
+	public static synthetic fun copy-bw27NRU$default (Lcom/letta/mobile/ui/schedules/CalendarBadge;Landroidx/compose/ui/graphics/vector/ImageVector;JLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarBadge;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getNow ()Lkotlin/time/Instant;
-	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
-	public final fun getRun ()Lcom/letta/mobile/data/schedules/ScheduleRun;
-	public final fun getSubtitle ()Ljava/lang/String;
-	public final fun getZone ()Lkotlinx/datetime/TimeZone;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getTint-0d7_KjU ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/schedules/AgendaViewParams {
+public final class com/letta/mobile/ui/schedules/CalendarColumn {
 	public static final field $stable I
-	public fun <init> (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component2 ()Lkotlinx/datetime/LocalDate;
-	public final fun component3 ()Lkotlinx/datetime/LocalDate;
-	public final fun component4 ()Lkotlin/time/Instant;
-	public final fun component5 ()Lkotlinx/datetime/TimeZone;
-	public final fun component6 ()Lkotlin/jvm/functions/Function1;
-	public final fun component7 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/schedules/AgendaViewParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/AgendaViewParams;Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/AgendaViewParams;
+	public fun <init> (Lkotlinx/datetime/LocalDate;Z)V
+	public final fun component1 ()Lkotlinx/datetime/LocalDate;
+	public final fun component2 ()Z
+	public final fun copy (Lkotlinx/datetime/LocalDate;Z)Lcom/letta/mobile/ui/schedules/CalendarColumn;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/CalendarColumn;Lkotlinx/datetime/LocalDate;ZILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarColumn;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDefs ()Ljava/util/List;
-	public final fun getNow ()Lkotlin/time/Instant;
-	public final fun getOnRunClick ()Lkotlin/jvm/functions/Function1;
-	public final fun getOnSelectDate ()Lkotlin/jvm/functions/Function1;
-	public final fun getSelectedDate ()Lkotlinx/datetime/LocalDate;
-	public final fun getToday ()Lkotlinx/datetime/LocalDate;
-	public final fun getZone ()Lkotlinx/datetime/TimeZone;
+	public final fun getDate ()Lkotlinx/datetime/LocalDate;
+	public fun hashCode ()I
+	public final fun isToday ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarDayPartsKt {
+	public static final fun CalendarColumnsRow (ILandroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarDateBadge (IZZLandroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarDayHeader (Ljava/lang/String;Lcom/letta/mobile/ui/schedules/CalendarColumn;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarDots (Ljava/util/List;Landroidx/compose/ui/Modifier;ILandroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarNowDivider (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarWeekStrip (Ljava/util/List;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarDimens {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/CalendarDimens;
+	public final fun getAgendaTimeWidth-D9Ej5fM ()F
+	public final fun getDot-D9Ej5fM ()F
+	public final fun getEventHeight-D9Ej5fM ()F
+	public final fun getEventStripe-D9Ej5fM ()F
+	public final fun getGutterWidth-D9Ej5fM ()F
+	public final fun getHourHeight-D9Ej5fM ()F
+	public final fun getMonthCellCompactHeight-D9Ej5fM ()F
+	public final fun getMonthCellHeight-D9Ej5fM ()F
+	public final fun getNowDot-D9Ej5fM ()F
+	public final fun getRailDockBreakpoint-D9Ej5fM ()F
+	public final fun getWeekGridMinWidth-D9Ej5fM ()F
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarEventBlockKt {
+	public static final fun CalendarEventBlock (Lcom/letta/mobile/ui/schedules/CalendarEventSpec;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun getLocalCalendarAccent ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarEventSpec {
+	public static final field $stable I
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/ui/schedules/CalendarTone;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/ui/schedules/CalendarBadge;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;JLcom/letta/mobile/ui/schedules/CalendarTone;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/ui/schedules/CalendarBadge;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-0d7_KjU ()J
+	public final fun component3 ()Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lcom/letta/mobile/ui/schedules/CalendarBadge;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun copy-sW7UJKQ (Ljava/lang/String;JLcom/letta/mobile/ui/schedules/CalendarTone;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/ui/schedules/CalendarBadge;Ljava/lang/String;)Lcom/letta/mobile/ui/schedules/CalendarEventSpec;
+	public static synthetic fun copy-sW7UJKQ$default (Lcom/letta/mobile/ui/schedules/CalendarEventSpec;Ljava/lang/String;JLcom/letta/mobile/ui/schedules/CalendarTone;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/ui/schedules/CalendarBadge;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarEventSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccent-0d7_KjU ()J
+	public final fun getBadge ()Lcom/letta/mobile/ui/schedules/CalendarBadge;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getLeading ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getTone ()Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public final fun getTrailing ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarGlyphs {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/CalendarGlyphs;
+	public final fun getFailed ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getRunning ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSkipped ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getSucceeded ()Landroidx/compose/ui/graphics/vector/ImageVector;
+	public final fun getUnknown ()Landroidx/compose/ui/graphics/vector/ImageVector;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarMonthDay {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/ui/schedules/CalendarColumn;ZZLjava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/ui/schedules/CalendarColumn;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/ui/schedules/CalendarColumn;ZZLjava/lang/String;)Lcom/letta/mobile/ui/schedules/CalendarMonthDay;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/CalendarMonthDay;Lcom/letta/mobile/ui/schedules/CalendarColumn;ZZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarMonthDay;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColumn ()Lcom/letta/mobile/ui/schedules/CalendarColumn;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getInMonth ()Z
+	public final fun getSelected ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarMonthGridKt {
+	public static final fun CalendarMonthGrid (Lcom/letta/mobile/ui/schedules/CalendarMonthSpec;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarMonthSpec {
+	public static final field $stable I
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;FLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCellHeight-D9Ej5fM ()F
+	public final fun getDays ()Ljava/util/List;
+	public final fun getWeekdays ()Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarSlot {
+	public static final field $stable I
+	public fun <init> (III)V
+	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun copy (III)Lcom/letta/mobile/ui/schedules/CalendarSlot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/CalendarSlot;IIIILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarSlot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLane ()I
+	public final fun getLanes ()I
+	public final fun getMinuteOfDay ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarStripDay {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/ui/schedules/CalendarColumn;Ljava/lang/String;ZLjava/util/List;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/ui/schedules/CalendarColumn;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/ui/schedules/CalendarColumn;Ljava/lang/String;ZLjava/util/List;Ljava/lang/String;)Lcom/letta/mobile/ui/schedules/CalendarStripDay;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/CalendarStripDay;Lcom/letta/mobile/ui/schedules/CalendarColumn;Ljava/lang/String;ZLjava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarStripDay;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColumn ()Lcom/letta/mobile/ui/schedules/CalendarColumn;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getDots ()Ljava/util/List;
+	public final fun getSelected ()Z
+	public final fun getWeekday ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarTimeGridKt {
+	public static final fun CalendarNowLine (ILandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarTimeGrid (Lcom/letta/mobile/ui/schedules/CalendarTimeGridSpec;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun calendarSlot (Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/schedules/CalendarSlot;)Landroidx/compose/ui/Modifier;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarTimeGridSpec {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function1;Ljava/lang/Integer;ILkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function1;Ljava/lang/Integer;ILkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getColumns ()Ljava/util/List;
+	public final fun getHourLabel ()Lkotlin/jvm/functions/Function1;
+	public final fun getInitialMinute ()I
+	public final fun getNowMinute ()Ljava/lang/Integer;
+	public final fun getOnEmptySlot ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarTone : java/lang/Enum {
+	public static final field Faded Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public static final field Highlighted Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public static final field Past Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public static final field Upcoming Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/schedules/CalendarTone;
+	public static fun values ()[Lcom/letta/mobile/ui/schedules/CalendarTone;
 }
 
 public final class com/letta/mobile/ui/schedules/ComposableSingletons$ScheduleHistoryViewKt {
@@ -5930,18 +6075,43 @@ public final class com/letta/mobile/ui/schedules/ComposableSingletons$ScheduleHi
 	public final fun getLambda$2025850832$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/schedules/ComposableSingletons$ScheduleMonthCalendarKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/ComposableSingletons$ScheduleMonthCalendarKt;
+	public fun <init> ()V
+	public final fun getLambda$220528978$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/schedules/ComposableSingletons$ScheduleRailKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/ComposableSingletons$ScheduleRailKt;
 	public fun <init> ()V
+	public final fun getLambda$-2080867209$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-572382300$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1972168577$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
-public final class com/letta/mobile/ui/schedules/ScheduleAgendaViewKt {
-	public static final fun AgendaDateStrip (Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
-	public static final fun AgendaDayCell (Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
-	public static final fun AgendaRow (Lcom/letta/mobile/ui/schedules/AgendaRowParams;Landroidx/compose/runtime/Composer;I)V
-	public static final fun AgendaView (Lcom/letta/mobile/ui/schedules/AgendaViewParams;Landroidx/compose/runtime/Composer;I)V
+public final class com/letta/mobile/ui/schedules/ScheduleAgendaListKt {
+	public static final fun ScheduleAgendaList (Lcom/letta/mobile/ui/schedules/ScheduleCalendarParams;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/schedules/ScheduleCalendarActions {
+	public static final field $stable I
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)V
+	public final fun getOnEmptySlot ()Lkotlin/jvm/functions/Function2;
+	public final fun getOnOpenDay ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnRunClick ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnScheduleClick ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnSelectDate ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/letta/mobile/ui/schedules/ScheduleCalendarParams {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lcom/letta/mobile/data/schedules/ScheduleClock;Ljava/util/Map;Lcom/letta/mobile/ui/schedules/ScheduleCalendarActions;)V
+	public final fun getActions ()Lcom/letta/mobile/ui/schedules/ScheduleCalendarActions;
+	public final fun getCadenceById ()Ljava/util/Map;
+	public final fun getClock ()Lcom/letta/mobile/data/schedules/ScheduleClock;
+	public final fun getDays ()Ljava/util/List;
+	public final fun getSelected ()Lkotlinx/datetime/LocalDate;
+	public final fun getToday ()Lkotlinx/datetime/LocalDate;
 }
 
 public final class com/letta/mobile/ui/schedules/ScheduleHistoryViewKt {
@@ -5949,6 +6119,10 @@ public final class com/letta/mobile/ui/schedules/ScheduleHistoryViewKt {
 	public static final fun ReliabilityStrip (Ljava/util/List;ILandroidx/compose/runtime/Composer;II)V
 	public static final fun StatCell-FNF3uiM (Ljava/lang/String;Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
 	public static final fun StatsCard (Lcom/letta/mobile/data/schedules/HistorySummary;Landroidx/compose/runtime/Composer;I)V
+}
+
+public final class com/letta/mobile/ui/schedules/ScheduleMonthCalendarKt {
+	public static final fun ScheduleMonthCalendar (Lcom/letta/mobile/ui/schedules/ScheduleCalendarParams;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/schedules/ScheduleRailKt {
@@ -5960,10 +6134,11 @@ public final class com/letta/mobile/ui/schedules/ScheduleRailKt {
 
 public final class com/letta/mobile/ui/schedules/ScheduleRailParams {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Ljava/util/Map;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/ui/schedules/ScheduleRailState;
 	public final fun component10 ()Lkotlin/jvm/functions/Function2;
+	public final fun component11 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/util/List;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Lcom/letta/mobile/data/schedules/HistorySummary;
@@ -5972,9 +6147,10 @@ public final class com/letta/mobile/ui/schedules/ScheduleRailParams {
 	public final fun component7 ()Lkotlin/jvm/functions/Function1;
 	public final fun component8 ()Lkotlin/jvm/functions/Function0;
 	public final fun component9 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/ui/schedules/ScheduleRailParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/ScheduleRailParams;Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/ScheduleRailParams;
+	public final fun copy (Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Ljava/util/Map;)Lcom/letta/mobile/ui/schedules/ScheduleRailParams;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/ScheduleRailParams;Lcom/letta/mobile/ui/schedules/ScheduleRailState;Ljava/util/List;Ljava/util/Map;Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/ScheduleRailParams;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentNames ()Ljava/util/Map;
 	public final fun getDefs ()Ljava/util/List;
 	public final fun getDefsById ()Ljava/util/Map;
 	public final fun getHistory ()Lcom/letta/mobile/data/schedules/HistorySummary;
@@ -6035,118 +6211,41 @@ public final class com/letta/mobile/ui/schedules/ScheduleRailText {
 	public static final field CONTROL_NOTE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/ScheduleRailText;
 	public final fun cadence (Lcom/letta/mobile/data/schedules/ScheduleDef;)Ljava/lang/String;
+	public final fun cadence (Lcom/letta/mobile/data/schedules/ScheduleDef;Lkotlinx/datetime/TimeZone;)Ljava/lang/String;
 	public final fun nextRunHeadline (Lkotlin/time/Instant;Lkotlin/time/Instant;)Ljava/lang/String;
 	public final fun nextToFire (Ljava/util/List;Lkotlin/time/Instant;)Ljava/lang/String;
+	public final fun outcomeNote (Lcom/letta/mobile/data/schedules/RunStatus;)Ljava/lang/String;
 	public final fun relativeOrDash (Lkotlin/time/Instant;Lkotlin/time/Instant;)Ljava/lang/String;
 	public final fun status (Z)Ljava/lang/String;
+	public final fun whenLabel (Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlinx/datetime/TimeZone;)Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/schedules/ScheduleTimelineViewKt {
-	public static final fun LegendItem-3J-VO9M (JLjava/lang/String;ZLandroidx/compose/runtime/Composer;I)V
-	public static final fun TimelineDayCell (Lcom/letta/mobile/ui/schedules/TimelineDayCellParams;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun TimelineLegend (Landroidx/compose/runtime/Composer;I)V
-	public static final fun TimelineView (Lcom/letta/mobile/ui/schedules/TimelineViewParams;Landroidx/compose/runtime/Composer;I)V
+public final class com/letta/mobile/ui/schedules/ScheduleRunText {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/ScheduleRunText;
+	public final fun clock (I)Ljava/lang/String;
+	public final fun dayHeading (Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;)Ljava/lang/String;
+	public final fun describe (Lcom/letta/mobile/data/schedules/ScheduleRun;Lkotlinx/datetime/TimeZone;Lkotlin/time/Instant;)Ljava/lang/String;
+	public final fun describeBand (Lcom/letta/mobile/data/schedules/CalendarBand;Ljava/lang/String;)Ljava/lang/String;
+	public final fun longDate (Lkotlinx/datetime/LocalDate;)Ljava/lang/String;
+	public final fun outcome (Lcom/letta/mobile/data/schedules/RunStatus;)Ljava/lang/String;
+	public final fun runCount (I)Ljava/lang/String;
+	public final fun shortTime (Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;)Ljava/lang/String;
+	public final fun trailing (Lcom/letta/mobile/data/schedules/ScheduleRun;Lkotlin/time/Instant;)Ljava/lang/String;
+	public final fun window (II)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/schedules/ScheduleViewSupportKt {
-	public static final field GRID_HOURS I
-	public static final field HOUR_LABEL_STEP I
-	public static final field WEEK_GRID_MAX_PER_DAY I
-	public static final fun agendaStatusLabel (Lcom/letta/mobile/data/schedules/ScheduleRun;Lkotlin/time/Instant;Landroidx/compose/runtime/Composer;I)Lkotlin/Pair;
-	public static final fun dayHeading (Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;)Ljava/lang/String;
-	public static final fun fullWeekday (I)Ljava/lang/String;
-	public static final fun getHOUR_HEIGHT ()F
-	public static final fun monthDayLabel (Lkotlinx/datetime/LocalDate;)Ljava/lang/String;
+	public static final fun bandEventSpec (Lcom/letta/mobile/data/schedules/CalendarBand;Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/schedules/CalendarEventSpec;
+	public static final fun outcomeBadge (Lcom/letta/mobile/data/schedules/RunStatus;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/schedules/CalendarBadge;
+	public static final fun runEventSpec (Lcom/letta/mobile/data/schedules/ScheduleRun;Lkotlinx/datetime/TimeZone;Lkotlin/time/Instant;ZLandroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/schedules/CalendarEventSpec;
+	public static final fun scheduleAccent (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)J
 	public static final fun statusColor (Lcom/letta/mobile/data/schedules/RunStatus;Landroidx/compose/runtime/Composer;I)J
+	public static final fun tone (Lcom/letta/mobile/data/schedules/RunStatus;)Lcom/letta/mobile/ui/schedules/CalendarTone;
 }
 
-public final class com/letta/mobile/ui/schedules/ScheduleWeekViewKt {
-	public static final fun WeekRunBar (Lcom/letta/mobile/ui/schedules/WeekRunBarParams;Landroidx/compose/runtime/Composer;I)V
-	public static final fun WeekView (Lcom/letta/mobile/ui/schedules/WeekViewParams;Landroidx/compose/runtime/Composer;I)V
-}
-
-public final class com/letta/mobile/ui/schedules/TimelineDayCellParams {
-	public static final field $stable I
-	public fun <init> (Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;ZFLjava/util/List;)V
-	public final fun component1 ()Lkotlinx/datetime/LocalDate;
-	public final fun component2 ()Lkotlinx/datetime/LocalDate;
-	public final fun component3 ()Z
-	public final fun component4 ()F
-	public final fun component5 ()Ljava/util/List;
-	public final fun copy (Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;ZFLjava/util/List;)Lcom/letta/mobile/ui/schedules/TimelineDayCellParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/TimelineDayCellParams;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;ZFLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/TimelineDayCellParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDate ()Lkotlinx/datetime/LocalDate;
-	public final fun getHighFreq ()Z
-	public final fun getNowFrac ()F
-	public final fun getTicks ()Ljava/util/List;
-	public final fun getToday ()Lkotlinx/datetime/LocalDate;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/schedules/TimelineViewParams {
-	public static final field $stable I
-	public fun <init> (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component2 ()Lkotlinx/datetime/LocalDate;
-	public final fun component3 ()Lkotlinx/datetime/LocalDate;
-	public final fun component4 ()Lkotlin/time/Instant;
-	public final fun component5 ()Lkotlinx/datetime/TimeZone;
-	public final fun component6 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/schedules/TimelineViewParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/TimelineViewParams;Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/TimelineViewParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDefs ()Ljava/util/List;
-	public final fun getNow ()Lkotlin/time/Instant;
-	public final fun getOnLaneClick ()Lkotlin/jvm/functions/Function1;
-	public final fun getToday ()Lkotlinx/datetime/LocalDate;
-	public final fun getWeekStart ()Lkotlinx/datetime/LocalDate;
-	public final fun getZone ()Lkotlinx/datetime/TimeZone;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/schedules/WeekRunBarParams {
-	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/schedules/ScheduleRun;IZLkotlin/jvm/functions/Function0;)V
-	public final fun component1 ()Lcom/letta/mobile/data/schedules/ScheduleRun;
-	public final fun component2 ()I
-	public final fun component3 ()Z
-	public final fun component4 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Lcom/letta/mobile/data/schedules/ScheduleRun;IZLkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/schedules/WeekRunBarParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/WeekRunBarParams;Lcom/letta/mobile/data/schedules/ScheduleRun;IZLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/WeekRunBarParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getEmphasized ()Z
-	public final fun getMinuteOfDay ()I
-	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
-	public final fun getRun ()Lcom/letta/mobile/data/schedules/ScheduleRun;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/schedules/WeekViewParams {
-	public static final field $stable I
-	public fun <init> (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component2 ()Lkotlinx/datetime/LocalDate;
-	public final fun component3 ()Lkotlinx/datetime/LocalDate;
-	public final fun component4 ()Lkotlin/time/Instant;
-	public final fun component5 ()Lkotlinx/datetime/TimeZone;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/schedules/WeekViewParams;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/schedules/WeekViewParams;Ljava/util/List;Lkotlinx/datetime/LocalDate;Lkotlinx/datetime/LocalDate;Lkotlin/time/Instant;Lkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/WeekViewParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDefs ()Ljava/util/List;
-	public final fun getNow ()Lkotlin/time/Instant;
-	public final fun getOnRunClick ()Lkotlin/jvm/functions/Function1;
-	public final fun getSelectedId ()Ljava/lang/String;
-	public final fun getToday ()Lkotlinx/datetime/LocalDate;
-	public final fun getWeekStart ()Lkotlinx/datetime/LocalDate;
-	public final fun getZone ()Lkotlinx/datetime/TimeZone;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
+public final class com/letta/mobile/ui/schedules/ScheduleWeekCalendarKt {
+	public static final fun ScheduleWeekCalendar (Lcom/letta/mobile/ui/schedules/ScheduleCalendarParams;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/search/LettaSearchAction {
@@ -8651,22 +8750,22 @@ public final class com/letta/mobile/ui/shell/pages/runs/RunsPageTags {
 public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$ScheduleFormPaneKt;
 	public fun <init> ()V
-	public final fun getLambda$-1816012046$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-1965687008$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1111039225$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-532217994$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1139151756$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1273364922$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1460782587$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$139905082$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1666363867$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$599428627$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$660611885$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$976145756$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1798217837$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$338603605$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
-public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$SchedulesPagePartsKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$SchedulesPagePartsKt;
+public final class com/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$SchedulesPageHeaderKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/schedules/ComposableSingletons$SchedulesPageHeaderKt;
 	public fun <init> ()V
-	public final fun getLambda$-184873298$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1814908523$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$941386964$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1185704907$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$143213523$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1799522860$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/schedules/CronTaskId {
@@ -8781,9 +8880,13 @@ public final class com/letta/mobile/ui/shell/pages/schedules/SchedulesPageTags {
 	public static final field NEW Ljava/lang/String;
 	public static final field NEXT_WEEK Ljava/lang/String;
 	public static final field PAGE Ljava/lang/String;
+	public static final field PAUSED_FILTER Ljava/lang/String;
 	public static final field PREVIOUS_WEEK Ljava/lang/String;
 	public static final field RANGE Ljava/lang/String;
 	public static final field RULES Ljava/lang/String;
+	public static final field TODAY Ljava/lang/String;
+	public static final field VIEW_BAR Ljava/lang/String;
+	public static final field ZONE Ljava/lang/String;
 	public final fun agent (Ljava/lang/String;)Ljava/lang/String;
 	public final fun cadence (Ljava/lang/String;)Ljava/lang/String;
 	public final fun rule (Ljava/lang/String;)Ljava/lang/String;

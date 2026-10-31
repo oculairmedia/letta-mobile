@@ -41829,6 +41829,129 @@ public final class com/letta/mobile/data/schedules/AgendaDay {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/schedules/CalendarBand {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;II)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()I
+	public final fun component6 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;II)Lcom/letta/mobile/data/schedules/CalendarBand;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CalendarBand;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;IIILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CalendarBand;
+	public final fun count (Lcom/letta/mobile/data/schedules/RunStatus;)I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getCount ()I
+	public final fun getFirstMinute ()I
+	public final fun getLastMinute ()I
+	public final fun getNext ()Lcom/letta/mobile/data/schedules/ScheduleRun;
+	public final fun getPaused ()Z
+	public final fun getRuns ()Ljava/util/List;
+	public final fun getScheduleId ()Ljava/lang/String;
+	public final fun getScheduleName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/CalendarDay {
+	public fun <init> (Lkotlinx/datetime/LocalDate;Ljava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Lkotlinx/datetime/LocalDate;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Lkotlinx/datetime/LocalDate;Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/schedules/CalendarDay;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CalendarDay;Lkotlinx/datetime/LocalDate;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CalendarDay;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentIds ()Ljava/util/List;
+	public final fun getBands ()Ljava/util/List;
+	public final fun getDate ()Lkotlinx/datetime/LocalDate;
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getEvents ()Ljava/util/List;
+	public final fun getFailedCount ()I
+	public final fun getRunCount ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/schedules/CalendarEntry {
+	public abstract fun getMinuteOfDay ()I
+}
+
+public final class com/letta/mobile/data/schedules/CalendarEntry$Band : com/letta/mobile/data/schedules/CalendarEntry {
+	public fun <init> (Lcom/letta/mobile/data/schedules/CalendarBand;)V
+	public final fun component1 ()Lcom/letta/mobile/data/schedules/CalendarBand;
+	public final fun copy (Lcom/letta/mobile/data/schedules/CalendarBand;)Lcom/letta/mobile/data/schedules/CalendarEntry$Band;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CalendarEntry$Band;Lcom/letta/mobile/data/schedules/CalendarBand;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CalendarEntry$Band;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBand ()Lcom/letta/mobile/data/schedules/CalendarBand;
+	public fun getMinuteOfDay ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/CalendarEntry$Event : com/letta/mobile/data/schedules/CalendarEntry {
+	public fun <init> (Lcom/letta/mobile/data/schedules/CalendarEvent;)V
+	public final fun component1 ()Lcom/letta/mobile/data/schedules/CalendarEvent;
+	public final fun copy (Lcom/letta/mobile/data/schedules/CalendarEvent;)Lcom/letta/mobile/data/schedules/CalendarEntry$Event;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CalendarEntry$Event;Lcom/letta/mobile/data/schedules/CalendarEvent;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CalendarEntry$Event;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEvent ()Lcom/letta/mobile/data/schedules/CalendarEvent;
+	public fun getMinuteOfDay ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/CalendarEvent {
+	public fun <init> (Lcom/letta/mobile/data/schedules/ScheduleRun;III)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/schedules/ScheduleRun;IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/schedules/ScheduleRun;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun copy (Lcom/letta/mobile/data/schedules/ScheduleRun;III)Lcom/letta/mobile/data/schedules/CalendarEvent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CalendarEvent;Lcom/letta/mobile/data/schedules/ScheduleRun;IIIILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CalendarEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLane ()I
+	public final fun getLanes ()I
+	public final fun getMinuteOfDay ()I
+	public final fun getRun ()Lcom/letta/mobile/data/schedules/ScheduleRun;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/CalendarLabels {
+	public static final field INSTANCE Lcom/letta/mobile/data/schedules/CalendarLabels;
+	public final fun hourLabel (I)Ljava/lang/String;
+	public final fun zoneLabel (Lkotlinx/datetime/TimeZone;Lkotlin/time/Instant;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/CalendarQuery {
+	public fun <init> (Lcom/letta/mobile/data/schedules/ScheduleClock;Ljava/util/Map;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/schedules/ScheduleClock;Ljava/util/Map;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/schedules/ScheduleClock;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun component3 ()Z
+	public final fun copy (Lcom/letta/mobile/data/schedules/ScheduleClock;Ljava/util/Map;Z)Lcom/letta/mobile/data/schedules/CalendarQuery;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CalendarQuery;Lcom/letta/mobile/data/schedules/ScheduleClock;Ljava/util/Map;ZILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CalendarQuery;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClock ()Lcom/letta/mobile/data/schedules/ScheduleClock;
+	public final fun getHistory ()Ljava/util/Map;
+	public final fun getIncludePaused ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/schedules/CalendarRange {
+	public static final field AGENDA_DAYS I
+	public static final field INSTANCE Lcom/letta/mobile/data/schedules/CalendarRange;
+	public final fun dates (Lcom/letta/mobile/data/schedules/SchedulesView;Lkotlinx/datetime/LocalDate;)Ljava/util/List;
+	public final fun label (Lcom/letta/mobile/data/schedules/SchedulesView;Lkotlinx/datetime/LocalDate;Z)Ljava/lang/String;
+	public static synthetic fun label$default (Lcom/letta/mobile/data/schedules/CalendarRange;Lcom/letta/mobile/data/schedules/SchedulesView;Lkotlinx/datetime/LocalDate;ZILjava/lang/Object;)Ljava/lang/String;
+	public final fun month (Lkotlinx/datetime/LocalDate;)Ljava/util/List;
+	public final fun shift (Lcom/letta/mobile/data/schedules/SchedulesView;Lkotlinx/datetime/LocalDate;I)Lkotlinx/datetime/LocalDate;
+	public final fun week (Lkotlinx/datetime/LocalDate;)Ljava/util/List;
+}
+
 public abstract interface class com/letta/mobile/data/schedules/CronApi : java/lang/AutoCloseable {
 	public fun close ()V
 	public abstract fun createCron (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -41931,9 +42054,13 @@ public abstract interface class com/letta/mobile/data/schedules/CronScheduleSour
 
 public final class com/letta/mobile/data/schedules/CronTask {
 	public static final field Companion Lcom/letta/mobile/data/schedules/CronTask$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()I
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -41942,17 +42069,21 @@ public final class com/letta/mobile/data/schedules/CronTask {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Z
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Lcom/letta/mobile/data/schedules/CronTask;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CronTask;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CronTask;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Lcom/letta/mobile/data/schedules/CronTask;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/CronTask;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/schedules/CronTask;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
 	public final fun getCron ()Ljava/lang/String;
 	public final fun getDescription ()Ljava/lang/String;
+	public final fun getFireCount ()I
 	public final fun getId ()Ljava/lang/String;
+	public final fun getLastFiredAt ()Ljava/lang/String;
+	public final fun getMissedAt ()Ljava/lang/String;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getPrompt ()Ljava/lang/String;
 	public final fun getRecurring ()Z
+	public final fun getStatus ()Ljava/lang/String;
 	public final fun getTimezone ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -41989,22 +42120,25 @@ public final class com/letta/mobile/data/schedules/HistorySummary {
 }
 
 public final class com/letta/mobile/data/schedules/RunRecord {
-	public fun <init> (Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lkotlin/time/Instant;
 	public final fun component3 ()Z
 	public final fun component4 ()Ljava/lang/Long;
 	public final fun component5 ()Ljava/lang/Integer;
 	public final fun component6 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;)Lcom/letta/mobile/data/schedules/RunRecord;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/RunRecord;Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/RunRecord;
+	public final fun component7 ()Z
+	public final fun copy (Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Z)Lcom/letta/mobile/data/schedules/RunRecord;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/RunRecord;Ljava/lang/String;Lkotlin/time/Instant;ZLjava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/schedules/RunRecord;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDurationMillis ()Ljava/lang/Long;
 	public final fun getError ()Ljava/lang/String;
 	public final fun getExitCode ()Ljava/lang/Integer;
 	public final fun getInstant ()Lkotlin/time/Instant;
 	public final fun getScheduleId ()Ljava/lang/String;
+	public final fun getSkipped ()Z
+	public final fun getStatus ()Lcom/letta/mobile/data/schedules/RunStatus;
 	public final fun getSucceeded ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -42014,11 +42148,25 @@ public final class com/letta/mobile/data/schedules/RunStatus : java/lang/Enum {
 	public static final field Done Lcom/letta/mobile/data/schedules/RunStatus;
 	public static final field Failed Lcom/letta/mobile/data/schedules/RunStatus;
 	public static final field Next Lcom/letta/mobile/data/schedules/RunStatus;
+	public static final field Paused Lcom/letta/mobile/data/schedules/RunStatus;
 	public static final field Running Lcom/letta/mobile/data/schedules/RunStatus;
+	public static final field Skipped Lcom/letta/mobile/data/schedules/RunStatus;
+	public static final field Unrecorded Lcom/letta/mobile/data/schedules/RunStatus;
 	public static final field Upcoming Lcom/letta/mobile/data/schedules/RunStatus;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isPast ()Z
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/schedules/RunStatus;
 	public static fun values ()[Lcom/letta/mobile/data/schedules/RunStatus;
+}
+
+public final class com/letta/mobile/data/schedules/ScheduleCalendar {
+	public static final field COLLAPSE_MIN_GAP_MINUTES I
+	public static final field COLLAPSE_RUNS_PER_DAY I
+	public static final field EVENT_SPAN_MINUTES I
+	public static final field INSTANCE Lcom/letta/mobile/data/schedules/ScheduleCalendar;
+	public final fun collapses (Ljava/util/List;)Z
+	public final fun days (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/schedules/CalendarQuery;)Ljava/util/List;
+	public final fun layoutLanes (Ljava/util/List;)Ljava/util/List;
 }
 
 public final class com/letta/mobile/data/schedules/ScheduleClock {
@@ -42058,9 +42206,10 @@ public final class com/letta/mobile/data/schedules/ScheduleCreateRequest {
 }
 
 public final class com/letta/mobile/data/schedules/ScheduleDef {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/time/Instant;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/time/Instant;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Lkotlin/time/Instant;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Lkotlin/time/Instant;
@@ -42068,14 +42217,17 @@ public final class com/letta/mobile/data/schedules/ScheduleDef {
 	public final fun component6 ()Lkotlin/time/Instant;
 	public final fun component7 ()I
 	public final fun component8 ()Lkotlinx/datetime/TimeZone;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;)Lcom/letta/mobile/data/schedules/ScheduleDef;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleDef;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleDef;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/time/Instant;)Lcom/letta/mobile/data/schedules/ScheduleDef;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleDef;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ZLkotlin/time/Instant;ILkotlinx/datetime/TimeZone;Ljava/lang/String;Lkotlin/time/Instant;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleDef;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActive ()Z
+	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getCron ()Ljava/lang/String;
 	public final fun getFireCount ()I
 	public final fun getId ()Ljava/lang/String;
 	public final fun getLastFiredAt ()Lkotlin/time/Instant;
+	public final fun getMissedAt ()Lkotlin/time/Instant;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getOneShotAt ()Lkotlin/time/Instant;
 	public final fun getRecurring ()Z
@@ -42224,8 +42376,8 @@ public final class com/letta/mobile/data/schedules/ScheduleReliability {
 }
 
 public final class com/letta/mobile/data/schedules/ScheduleRun {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Lkotlin/time/Instant;
@@ -42233,9 +42385,11 @@ public final class com/letta/mobile/data/schedules/ScheduleRun {
 	public final fun component5 ()Ljava/lang/Long;
 	public final fun component6 ()Ljava/lang/Integer;
 	public final fun component7 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;)Lcom/letta/mobile/data/schedules/ScheduleRun;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleRun;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleRun;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/schedules/ScheduleRun;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/schedules/ScheduleRun;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Lcom/letta/mobile/data/schedules/RunStatus;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/schedules/ScheduleRun;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getDurationMillis ()Ljava/lang/Long;
 	public final fun getError ()Ljava/lang/String;
 	public final fun getExitCode ()Ljava/lang/Integer;
@@ -42275,6 +42429,7 @@ public final class com/letta/mobile/data/schedules/ScheduleTiming$Recurring : co
 public final class com/letta/mobile/data/schedules/SchedulesPageModel {
 	public static final field INSTANCE Lcom/letta/mobile/data/schedules/SchedulesPageModel;
 	public final fun defs (Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/data/schedules/ScheduleClock;)Ljava/util/List;
+	public final fun draftAt (Lkotlinx/datetime/LocalDate;I)Lcom/letta/mobile/data/schedules/ScheduleFormDraft;
 	public final fun fullMonth (I)Ljava/lang/String;
 	public final fun weekRangeLabel (Lkotlinx/datetime/LocalDate;)Ljava/lang/String;
 }
@@ -42282,8 +42437,8 @@ public final class com/letta/mobile/data/schedules/SchedulesPageModel {
 public final class com/letta/mobile/data/schedules/SchedulesView : java/lang/Enum {
 	public static final field Agenda Lcom/letta/mobile/data/schedules/SchedulesView;
 	public static final field History Lcom/letta/mobile/data/schedules/SchedulesView;
+	public static final field Month Lcom/letta/mobile/data/schedules/SchedulesView;
 	public static final field Rules Lcom/letta/mobile/data/schedules/SchedulesView;
-	public static final field Timeline Lcom/letta/mobile/data/schedules/SchedulesView;
 	public static final field Week Lcom/letta/mobile/data/schedules/SchedulesView;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getHasRange ()Z

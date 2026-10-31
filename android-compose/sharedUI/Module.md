@@ -200,7 +200,7 @@ Composition-local access to host-supplied per-agent defaults. Provide [LocalAgen
 
 # Package com.letta.mobile.ui.schedules
 
-Agenda, week, timeline and history views. View parameter models and selection callbacks are the integration seams; cron execution, persistence and backend schedule mutations stay upstream.
+Agenda, week, month and history views, and the calendar primitives they are built from (CalendarTimeGrid with its now line, CalendarEventBlock, CalendarWeekStrip, CalendarMonthGrid, sized by CalendarDimens) - schedule-agnostic, reusable by any calendar surface. View parameter models, event specs and selection callbacks are the integration seams; cron execution, persistence and backend schedule mutations stay upstream.
 
 # Package com.letta.mobile.ui.search
 
