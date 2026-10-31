@@ -41,7 +41,7 @@ def kotlin_test_path(path):
     offset = 0
     for parent, source_set, _ in zip(parts, parts[1:], parts[2:]):
         after_source_set = offset + len(parent) + len(source_set) + 2
-        if parent == "src" and is_test_source_set(source_set) and after_source_set > last_newline:
+        if is_test_source_dir(parent, source_set) and after_source_set > last_newline:
             return True
         offset += len(parent) + 1
     return False
@@ -234,6 +234,11 @@ def pr_body():
 
 def is_test_source_set(name):
     return "Test" in name or name == "test"
+
+
+def is_test_source_dir(parent, source_set):
+    """`src/<test source set>`: the directory pair that marks a Kotlin test source tree."""
+    return parent == "src" and is_test_source_set(source_set)
 
 
 def reason_on_line(line):
