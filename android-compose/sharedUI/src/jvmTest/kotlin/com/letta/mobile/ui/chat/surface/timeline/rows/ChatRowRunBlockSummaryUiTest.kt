@@ -59,7 +59,7 @@ class ChatRowRunBlockSummaryUiTest {
     )
 
     /** How a test draws the run: the host idiom and whether motion is reduced. */
-    private data class Environment(val reducedMotion: Boolean = false, val host: LettaHost = LettaHost.Touch)
+    private data class Environment(val reducedMotion: Boolean = false, val host: LettaHost = LettaHost.Touch, val widthDp: Int = 400)
 
     private fun ComposeUiTest.show(
         item: ChatRenderItem, opened: Boolean, actions: RecordingChatActions = RecordingChatActions(),
@@ -69,7 +69,7 @@ class ChatRowRunBlockSummaryUiTest {
         setContent {
             CompositionLocalProvider(LocalReducedMotion provides environment.reducedMotion, LocalLettaHost provides environment.host) {
                 MaterialTheme {
-                    Box(Modifier.width(400.dp).testTag(ROW)) {
+                    Box(Modifier.width(environment.widthDp.dp).testTag(ROW)) {
                         RenderRow(item, rowContext(itemState = state, newestMessageId = "a"), rowCallbacks(actions))
                     }
                 }
@@ -133,13 +133,13 @@ class ChatRowRunBlockSummaryUiTest {
 
     @Test
     fun aFoldedPointerReadRunStillRendersExactlyOneImage() = runComposeUiTest {
-        show(imageRun(), opened = false, environment = Environment(reducedMotion = true, host = LettaHost.Pointer))
+        show(imageRun(), opened = false, environment = Environment(reducedMotion = true, host = LettaHost.Pointer, widthDp = 900))
         assertFoldedImageGeometry()
     }
 
     @Test
     fun anOpenedPointerReadRunRendersExactlyOneImage() = runComposeUiTest {
-        show(imageRun(), opened = true, environment = Environment(reducedMotion = true, host = LettaHost.Pointer))
+        show(imageRun(), opened = true, environment = Environment(reducedMotion = true, host = LettaHost.Pointer, widthDp = 900))
         assertOpenedImageGeometry()
     }
 
@@ -165,7 +165,7 @@ class ChatRowRunBlockSummaryUiTest {
 
     @Test
     fun anOpenedRunBlockListsItsStepsUnderTheLine() = runComposeUiTest {
-        show(run, opened = true)
+        show(run, opened = true, environment = Environment(widthDp = 900))
         awaitText("Fixed it.")
 
         // ckmub.1.2: the steps list straight under the line; no "Ran 2 commands" group row.
