@@ -12,6 +12,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -22,6 +27,10 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.chat.send.ServerQueueBlocker
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
+
+private val QUEUED_ON_SERVER_DISPLAY_DELAY = 1.seconds
 
 /** What the queued-sends panel can do; shared by the Android and desktop hosts. */
 data class QueuedSendActions(
@@ -79,18 +88,32 @@ fun QueuedSendsPanel(
     actions: QueuedSendActions,
     modifier: Modifier = Modifier,
 ) {
-    if (queue.isEmpty) return
+    val showOnServer = rememberQueuedOnServerVisible(queue.queuedOnServer?.id)
+    val displayedQueue = if (showOnServer) queue else queue.copy(queuedOnServer = null)
+    if (displayedQueue.isEmpty) return
     Surface(
         modifier = modifier.fillMaxWidth().testTag(QueuedSendsPanelTestTags.PANEL),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
-            QueuedSendsHeader(queue, actions.onResume)
-            queue.queuedOnServer?.let { QueuedOnServerRow(it, queue.queuedOnServerBehind) }
-            queue.items.forEachIndexed { index, item -> QueuedSendRow(item, position = index + 1, actions) }
+            QueuedSendsHeader(displayedQueue, actions.onResume)
+            displayedQueue.queuedOnServer?.let { QueuedOnServerRow(it, displayedQueue.queuedOnServerBehind) }
+            displayedQueue.items.forEachIndexed { index, item -> QueuedSendRow(item, position = index + 1, actions) }
         }
     }
+}
+
+@Composable
+private fun rememberQueuedOnServerVisible(id: QueuedSendId?): Boolean {
+    var visible by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(id) {
+        if (id != null) {
+            delay(QUEUED_ON_SERVER_DISPLAY_DELAY)
+            visible = true
+        }
+    }
+    return visible
 }
 
 @Composable

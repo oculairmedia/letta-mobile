@@ -87,6 +87,7 @@ class QueuedSendsPanelTest {
     @Test
     fun `a send parked on the server behind another client shows as queued on server`() {
         render(ConversationSendQueue(queuedOnServer = send("s", "sent from phone")))
+        afterServerQueueDelay()
 
         composeRule.onNodeWithText("1 message queued").assertIsDisplayed()
         composeRule.onNodeWithTag("queued_send_on_server").assertIsDisplayed()
@@ -103,6 +104,7 @@ class QueuedSendsPanelTest {
                 queuedOnServerBehind = ServerQueueBlocker.OwnStoppingTurn,
             ),
         )
+        afterServerQueueDelay()
 
         composeRule.onNodeWithText(QUEUED_BEHIND_OWN_STOP_LABEL).assertIsDisplayed()
         composeRule.onNodeWithText(QUEUED_ON_SERVER_LABEL).assertDoesNotExist()
@@ -126,4 +128,10 @@ class QueuedSendsPanelTest {
 
     private fun send(id: String, text: String) =
         QueuedChatSend(id = QueuedSendId(id), conversationId = QueueConversationId("conv-1"), text = text)
+
+    /** A server-queued send shows only after it stays queued for the panel's display delay (letta-mobile-emoq9). */
+    private fun afterServerQueueDelay() {
+        composeRule.mainClock.advanceTimeBy(1_500L)
+        composeRule.waitForIdle()
+    }
 }

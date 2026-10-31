@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -150,6 +151,7 @@ internal class RunStepDisclosure(
  * through here, so the run's rows read alike.
  */
 @Composable
+@NonRestartableComposable
 internal fun RunStepListRow(spec: RunStepRowSpec, disclosure: RunStepDisclosure?, modifier: Modifier = Modifier) {
     val stateText = disclosure?.let { stringResource(if (it.expanded) it.labels.expandedState else it.labels.collapsedState) }
     LettaListRow(
@@ -195,7 +197,7 @@ internal fun RunToolSteps(
         // Tagged inside: the run's work-step wrapper tags the outer node.
         Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_TOOL_STEPS)) {
             if (toolCalls.size > 1) StepGroupLabel(toolCalls)
-            ToolStepList(calls, callbacks)
+            ToolStepList(calls, RunRowScope(context, callbacks))
         }
         // Each request keeps its own slot, so answering one folds its card away (animated) in place.
         calls.approvals.forEach { approval ->
@@ -227,7 +229,7 @@ private fun StepGroupLabel(toolCalls: List<UiToolCall>) {
  * and the lone tool line's sheet and disclosure.
  */
 @Composable
-internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
+internal fun ToolStepList(calls: ToolRunCalls, row: RunRowScope, modifier: Modifier = Modifier) {
     val toolCalls: ImmutableList<UiToolCall> = calls.toolCalls
     val states = remember(toolCalls, calls.approvals) { toolCalls.map { call -> call.runState(calls.approvals.requestFor(call), toolCalls) } }
     val live = states.any { it == ToolTimelineState.Running }
@@ -237,7 +239,7 @@ internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modi
         toolCalls.forEachIndexed { index, call ->
             val disclosureKey = call.disclosureKey().ifBlank { "step:$index" }
             key(index, disclosureKey) {
-                ToolStep(call, disclosureKey, callbacks, state = states[index])
+                ToolStep(call, disclosureKey, row.callbacks, presentation = states[index] to row.context.compactRunWidth)
             }
         }
     }
