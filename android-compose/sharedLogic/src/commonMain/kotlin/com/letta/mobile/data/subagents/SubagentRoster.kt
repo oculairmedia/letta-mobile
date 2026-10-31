@@ -175,12 +175,3 @@ fun SubagentEntry.startedAtEpochMs(): Long? {
     return runCatching { Instant.parse(raw).toEpochMilliseconds() }.getOrNull()
 }
 
-/** "1m 28s" / "12s" / "1h 4m". */
-fun formatSubagentElapsed(ms: Long): String {
-    val seconds = ms / 1_000
-    return when {
-        seconds >= 3_600 -> "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"
-        seconds >= 60 -> "${seconds / 60}m ${seconds % 60}s"
-        else -> "${seconds}s"
-    }
-}

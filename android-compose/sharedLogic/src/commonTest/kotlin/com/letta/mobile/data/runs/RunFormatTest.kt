@@ -10,15 +10,15 @@ class RunFormatTest {
     @Test
     fun durationsReadInTheirUnit() {
         assertNull(RunFormat.duration(null))
-        assertEquals("850 ms", RunFormat.duration(850_000_000))
-        assertEquals("4.2 s", RunFormat.duration(4_210_000_000))
-        assertEquals("3 m 12 s", RunFormat.duration(192_000_000_000))
+        assertEquals("850ms", RunFormat.duration(850_000_000))
+        assertEquals("4.2s", RunFormat.duration(4_210_000_000))
+        assertEquals("3m 12s", RunFormat.duration(192_000_000_000))
     }
 
     @Test
     fun aRowSaysItsStatusStopReasonAndDuration() {
         val run = Run(id = "run-1", agentId = "a", status = "failed", stopReason = "error", totalDurationNs = 850_000_000)
-        assertEquals("failed · error · 850 ms", RunFormat.summaryLine(run))
+        assertEquals("failed · error · 850ms", RunFormat.summaryLine(run))
         assertEquals("completed", RunFormat.summaryLine(Run(id = "r", agentId = "a", status = "completed", stopReason = "completed")))
         assertEquals("unknown", RunFormat.summaryLine(Run(id = "r", agentId = "a")))
     }

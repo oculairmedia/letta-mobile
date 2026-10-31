@@ -20,20 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
-
-/** Upper-case section label used by sidebars and lists ("PINNED", "CANVASES"). */
-@Composable
-fun LettaSectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(top = LettaDimens.Space.md, start = LettaDimens.Space.xs, bottom = LettaDimens.Space.hair),
-    )
-}
 
 /** The quiet one-liner an empty section shows ("No chats"). */
 @Composable

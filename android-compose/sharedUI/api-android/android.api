@@ -2346,7 +2346,6 @@ public final class com/letta/mobile/ui/components/LettaInlineErrorTags {
 public final class com/letta/mobile/ui/components/LettaListPartsKt {
 	public static final fun LettaEmptyHint (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun LettaListRow (Lcom/letta/mobile/ui/components/LettaListRowSpec;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
-	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/LettaListRowDefaults {
@@ -9929,13 +9928,6 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellPanelAgent {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/shell/sidebar/ShellRelativeTime {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ShellRelativeTime;
-	public final fun compact (Ljava/lang/String;Lkotlin/time/Instant;)Ljava/lang/String;
-	public final fun compact (Lkotlin/time/Instant;Lkotlin/time/Instant;)Ljava/lang/String;
-}
-
 public final class com/letta/mobile/ui/shell/sidebar/ShellRenameChatDialogKt {
 	public static final fun ShellRenameChatDialog (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
 }
@@ -10952,6 +10944,7 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Alpha {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Alpha;
 	public static final field disabled F
 	public static final field hairline F
+	public static final field muted F
 }
 
 public final class com/letta/mobile/ui/theme/LettaDimens$Control {
@@ -11037,6 +11030,12 @@ public final class com/letta/mobile/ui/theme/LettaDimens$Type {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/LettaDimens$Type;
 	public final fun getCaption-XSAIIZE ()J
 	public final fun getMicro-XSAIIZE ()J
+}
+
+public final class com/letta/mobile/ui/theme/LettaSectionLabelKt {
+	public static final fun LettaSectionHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Integer;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaSectionLabel (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
+	public static final fun lettaSectionTitle (Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/theme/ReducedMotionKt {

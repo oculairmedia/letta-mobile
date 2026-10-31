@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -119,15 +120,12 @@ internal fun ComposerPopover(
     }
 }
 
-/** A popover's section header ("EFFORT"). */
+/** A popover's section header ("EFFORT"): the shared section label on the popover's inset. */
 @Composable
 internal fun ComposerPopoverHeader(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
+    LettaSectionLabel(
+        text = text,
+        contentPadding = PaddingValues(
             start = LettaDimens.Space.lg,
             end = LettaDimens.Space.lg,
             top = LettaDimens.Space.sm,

@@ -55,7 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomeStatTile
-import com.letta.mobile.data.home.relativeAgeLabel
+import com.letta.mobile.util.time.TimeLabels
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.home.subtitle
 import com.letta.mobile.ui.home.FleetBarSpark
@@ -305,7 +305,7 @@ private fun RecentConversationRow(conversation: FleetRecentConversation, page: H
             }
         }
         if (page.wide) MutedCell(conversation.agentName, Modifier.width(RecentAgentWidth))
-        MutedCell(relativeAgeLabel(conversation.updatedAtLabel), Modifier.width(LettaDimens.Orb.railSlotWidth), TextAlign.End)
+        MutedCell(TimeLabels.ageLabel(conversation.updatedAtLabel), Modifier.width(LettaDimens.Orb.railSlotWidth), TextAlign.End)
     }
 }
 

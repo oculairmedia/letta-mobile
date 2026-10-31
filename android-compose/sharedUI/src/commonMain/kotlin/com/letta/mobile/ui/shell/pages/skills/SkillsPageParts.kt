@@ -48,7 +48,9 @@ import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.lettaSectionTitle
 
 @Composable
 internal fun SkillsHeader(page: SkillsPageScope) {
@@ -116,12 +118,8 @@ internal fun SkillsPageRowContent(row: SkillsPageRow, page: SkillsPageScope) {
         is SkillsPageRow.SectionHeader -> SectionHeader(row, page)
         is SkillsPageRow.Info -> LettaInfoBox(row.message, Modifier.testTag(row.key), contentPadding = NoPadding)
         is SkillsPageRow.ActionError -> ActionErrorNotice(row.message, page)
-        is SkillsPageRow.Group -> Text(
-            row.label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // A category inside Skills or Tools: the shared section label, under the section's title.
+        is SkillsPageRow.Group -> LettaSectionLabel(row.label, contentPadding = NoPadding)
         is SkillsPageRow.SkillCards -> CardRow(row.skills, page) { skill, modifier -> SkillCard(skill, page, modifier) }
         is SkillsPageRow.ToolCards -> CardRow(row.tools, page) { tool, modifier -> ToolCard(tool, page, modifier) }
         is SkillsPageRow.ToolTags -> ToolTagChips(row, page)
@@ -145,7 +143,7 @@ private fun SectionHeader(row: SkillsPageRow.SectionHeader, page: SkillsPageScop
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "${row.section.label} · ${row.count}",
+            lettaSectionTitle(row.section.label, row.count),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),

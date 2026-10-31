@@ -34,7 +34,6 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.subagents.SubagentRoster
 import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.data.subagents.SubagentRosterStatus
-import com.letta.mobile.data.subagents.formatSubagentElapsed
 import com.letta.mobile.data.subagents.projectSubagentRoster
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
@@ -50,6 +49,7 @@ import com.letta.mobile.ui.components.list.RosterSelection
 import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Clock
 
 /** Opens a subagent's own conversation from the roster. */
@@ -315,7 +315,7 @@ fun SubagentRosterItem.subtitle(): String {
     val parts = mutableListOf<String>()
     typeLabel.takeIf { it.isNotBlank() }?.let(parts::add)
     if (status.isTerminal) parts += statusWord(status)
-    elapsedMs?.let { parts += formatSubagentElapsed(it) }
+    elapsedMs?.let { parts += TimeLabels.duration(it) }
     toolCallCount?.takeIf { it > 0 }?.let { parts += if (it == 1) "1 tool" else "$it tools" }
     model?.let(parts::add)
     if (status == SubagentRosterStatus.QUIET) parts += "quiet"
