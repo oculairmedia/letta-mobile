@@ -32,7 +32,6 @@ import com.letta.mobile.data.home.FleetOverview
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.FleetSummary
-import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageReducer
 import com.letta.mobile.data.home.HomePageState
@@ -163,22 +162,32 @@ class HomePageTest {
         assertEquals(listOf("loadIfStale", "loadIfStale"), actions.events)
     }
 
+    /** letta-mobile-ob7z8: composer, running work, then recents as the body; every counter shown once. */
     @Test
-    fun theWidePageShowsTheFleetDashboardAndPins() = runComposeUiTest {
+    fun theWidePageLeadsWithTheComposerAndRecentsAndShowsEachCounterOnce() = runComposeUiTest {
         show(baseState())
         onNodeWithText("Home").assertExists()
-        onNodeWithText("1 agents · 3 conversations").assertExists()
-        onNodeWithTag(HomePageTags.pin(toolsPin)).assertExists()
-        assertEquals(2, onAllNodesWithText("12").fetchSemanticsNodes().size, "the pinned Tools tile and the Tools stat tile")
-        onNodeWithTag(HomePageTags.STATS).assertExists()
-        onNodeWithTag(HomePageTags.recent(recent)).assertExists()
-        onNodeWithText("Booked the train").assertExists()
+        onNodeWithText("1 agents · 3 conversations").assertDoesNotExist()
+        val order = listOf(
+            HomePageTags.COMPOSER,
+            HomePageTags.NOW_STRIP,
+            HomePageTags.RECENTS,
+            HomePageTags.recentDay("TODAY"),
+            HomePageTags.recent(recent),
+            HomePageTags.AGENT_ROW,
+            HomePageTags.STATS_STRIP,
+        ).map { onNodeWithTag(it).getUnclippedBoundsInRoot().top }
+        assertEquals(order.sorted(), order, "composer, now, recents, agents, then the stats strip")
+        onNodeWithTag(HomePageTags.PINNED_GRID).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.pin(toolsPin)).assertDoesNotExist()
+        assertEquals(1, onAllNodesWithText("12").fetchSemanticsNodes().size, "the Tools figure appears once, in the strip")
+        onNodeWithText("Scout · Booked the train").assertExists()
     }
 
     @Test
     fun rowsAndTilesNavigate() = runComposeUiTest {
         show(baseState())
-        onNodeWithTag(HomePageTags.pin(toolsPin)).performClick()
+        onNodeWithTag(HomePageTags.stat("Tools")).performClick()
         onNodeWithTag(HomePageTags.recent(recent)).performClick()
         scrollTo(HomePageTags.agentRow(scout))
         onNodeWithTag(HomePageTags.agentRow(scout)).performClick()
@@ -196,7 +205,9 @@ class HomePageTest {
     @Test
     fun editingPinsUnpinsAndAddsShortcuts() = runComposeUiTest {
         show(baseState())
-        onNodeWithTag(HomePageTags.EDIT_PINS).performClick()
+        onNodeWithTag(HomePageTags.STATS_MENU).performClick()
+        onNodeWithTag(HomePageTags.CUSTOMIZE).performClick()
+        onNodeWithTag(HomePageTags.EDIT_PINS).assertExists()
         onNodeWithTag(HomePageTags.unpin(toolsPin)).performClick()
         onNodeWithTag(HomePageTags.ADD_PIN).performClick()
         onNodeWithTag(HomePageTags.addShortcut(HomeShortcut.SCHEDULES)).performClick()
@@ -225,7 +236,6 @@ class HomePageTest {
             HomePageTags.COMPOSER,
         ).map { onNodeWithTag(it).getUnclippedBoundsInRoot().top }
         assertEquals(order.sorted(), order, "now, recents, agents, stats, then the docked composer")
-        onNodeWithTag(HomePageTags.STATS).assertDoesNotExist()
         onNodeWithTag(HomePageTags.sort(FleetSortKey.Conversations)).assertDoesNotExist()
         onNodeWithText("1 running · Scout").assertExists()
 
@@ -336,10 +346,9 @@ class HomePageTest {
 
     @Test
     fun fleetRecentAndPinnedAgentRowsUseTheAgentAvatar() = runComposeUiTest {
-        val pinned = HomePinnedItem.Agent(HomeAgentRef("a-1", "Scout"))
         val state = HomePageReducer.withPersistedAgentNames(baseState(pins = listOf(HomePinnedItem.agentKey("a-1"))), mapOf("a-1" to "Scout"))
         show(state)
-        avatarInside(HomePageTags.pin(pinned)).assertExists()
+        avatarInside(HomePageTags.agentAvatar("a-1")).assertExists()
         avatarInside(HomePageTags.recent(recent)).assertExists()
         scrollTo(HomePageTags.agentRow(scout))
         avatarInside(HomePageTags.agentRow(scout)).assertExists()
