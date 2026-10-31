@@ -1,7 +1,9 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppServerSubagentSnapshotAdapter
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentParentIdentity
 import com.letta.mobile.data.model.SubagentStatus
@@ -18,6 +20,8 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -31,7 +35,7 @@ import kotlinx.serialization.json.contentOrNull
  * dispatch/notification stream events, not LettaShim HTTP.
  *
  * State is durable and keyed by the exact parent and dispatch. A snapshot can
- * omit a background task, so only explicit lifecycle evidence ends its chip.
+ * omit a task once, so absence must be confirmed over time before ending its chip.
  *
  * Pass a registry backed by
  * [com.letta.mobile.data.subagents.FileSubagentRegistryStore] to get restart
@@ -56,8 +60,8 @@ class ControllerSubagentRegistrySource(
     /**
      * Fold one authoritative `update_subagent_state` snapshot in.
      *
-     * Listed statuses are authoritative; an omitted entry is retained because
-     * background tasks may be absent from a later parent turn's snapshot.
+     * Listed statuses are authoritative. Omitted entries are retained until the
+     * registry has bounded evidence of both snapshot absence and silence.
      */
     fun ingest(frame: AppServerInboundFrame) {
         when (frame) {
@@ -207,10 +211,11 @@ class ControllerSubagentRegistrySource(
     private fun ingestSubagentState(frame: AppServerInboundFrame.UpdateSubagentState) {
         val conversationId = frame.runtime.conversationId
         val agentId = frame.runtime.agentId
-        for (raw in frame.subagents) {
-            val entry = AppServerSubagentSnapshotAdapter.toEntry(
-                raw, SubagentParentIdentity(conversationId, agentId),
-            ) ?: continue
+        val observations = frame.subagents.mapNotNull { raw ->
+            AppServerSubagentSnapshotAdapter.toEntry(raw, SubagentParentIdentity(conversationId, agentId))
+                ?.let { raw to it }
+        }
+        for ((raw, entry) in observations) {
             registry.observe(
                 SubagentChipObservation.fromEntry(
                     entry = entry,
@@ -221,17 +226,45 @@ class ControllerSubagentRegistrySource(
                 ).withNativeTodos(raw),
             )
         }
-        // Snapshots can omit background tasks; absence is not terminal evidence.
+        // Preserve positive observations under the runtime envelope's scope, as before.
+        // A malformed/mixed-scope snapshot cannot establish that a worker is absent.
+        val complete = observations.size == frame.subagents.size && observations.all { (_, entry) ->
+            entry.parentAgentId == agentId && entry.parentConversationId == conversationId
+        }
+        val orphaned = if (complete) {
+            registry.reconcileSnapshot(
+                ConversationId(conversationId), AgentId(agentId),
+                observations.mapTo(HashSet()) { it.second.toolCallId }, frame.eventSeq,
+            ).orphaned
+        } else {
+            emptyList()
+        }
         val changed = SubagentConversationKey(agentId, conversationId)
-        val expired = registry.expireStale()
+        val expired = orphaned + registry.expireStale()
         changeListener?.onConversationChanged(changed)
         notifyExpired(expired.filterNot { SubagentConversationKey(it.agentId, it.conversationId) == changed })
     }
 
     fun ingestReceived(received: AppServerReceivedFrame) = ingest(received.frame)
 
-    fun start(scope: CoroutineScope, events: Flow<AppServerReceivedFrame>): Job =
-        scope.launch { events.collect { ingestReceived(it) } }
+    /**
+     * Collect App Server events and sweep stale chips every ten minutes, even while idle.
+     * The caller's scope supplies the scheduler; the registry supplies its injected clock.
+     * Cancelling the returned job or finishing the event stream also stops the sweep.
+     */
+    fun start(scope: CoroutineScope, events: Flow<AppServerReceivedFrame>): Job = scope.launch {
+        val sweep = launch {
+            while (true) {
+                delay(10.minutes)
+                notifyExpired(registry.expireStale())
+            }
+        }
+        try {
+            events.collect { ingestReceived(it) }
+        } finally {
+            sweep.cancel()
+        }
+    }
 
     /**
      * Fold a weaker producer's view in. Precedence is
