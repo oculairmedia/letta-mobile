@@ -82,7 +82,8 @@ fun PointerTooltipArea(
     fun onHover(event: PointerEvent) {
         cursor = event.changes.first().position
         cancelHide()
-        if (visible || event.changes.any { it.pressed } || jobs[0]?.isActive == true) return
+        val showing = visible || jobs[0]?.isActive == true
+        if (showing || event.changes.any { it.pressed }) return
         jobs[0] = scope.launch {
             delay(delayMillis.toLong())
             visible = true
