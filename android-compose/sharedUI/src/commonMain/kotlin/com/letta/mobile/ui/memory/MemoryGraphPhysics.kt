@@ -166,7 +166,7 @@ internal class MemoryGraphPhysics private constructor(
     }
 
     /** An edge's two node indices, or nothing for a self-loop or an edge to a node not in the view. */
-    private fun springOf(from: Int?, to: Int?): List<Int> = if (from == null || to == null || from == to) emptyList() else listOf(from, to)
+    private fun springOf(from: Int?, to: Int?): List<Int> = listOfNotNull(from, to).takeIf { it.size == 2 && from != to }.orEmpty()
 
     /** Place every node; returns whether anything starts away from the target (so should move). */
     private fun seed(target: MemoryGraphLayout, start: MemoryGraphPhysicsStart): Boolean {
