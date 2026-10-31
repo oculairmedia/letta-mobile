@@ -4,17 +4,15 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CompletableDeferred
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import kotlinx.coroutines.flow.first
 import com.letta.mobile.data.model.MessageId
 import java.time.Instant
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
@@ -117,17 +115,18 @@ class PendingRecoveryPagingTest {
         }
         val coordinator = CanonicalTimelineCoordinator(store, transport)
         val owner = coordinator.acquire(scope)
-        var resent = false
-        coordinator.bindPendingRetry(AgentId("agent")) { _, _ -> resent = true }
 
         assertTrue(coordinator.retryPending(owner, MessageId(record.otid)))
 
-        assertFalse(resent, "a prompt whose echo is already in history must not be sent again")
+        assertEquals(
+            emptyList(), coordinator.queuedRetries(AgentId("agent")).first(),
+            "a prompt whose echo is already in history must not be sent again",
+        )
         assertTrue(owner.session.pending.value.isEmpty())
         assertTrue(CanonicalPendingLocalStore(store).load(scope).isEmpty())
     }
 
-    @Test fun suspendedRetryAdmissionCannotBeRetiredAsAnOldLostEcho() = runTest {
+    @Test fun aQueuedRetryWaitsInTheOutboxAndIsNotRetiredAsAnOldLostEcho() = runTest {
         val scope = TimelineScope("admission-recovery", "conversation", "agent")
         val store = InMemoryTimelineStore()
         val transport = object : TimelineTransport by unexpectedTimelineTransport() {
@@ -139,20 +138,20 @@ class PendingRecoveryPagingTest {
         CanonicalPendingLocalStore(store).save(scope, record)
         val coordinator = CanonicalTimelineCoordinator(store, transport)
         val owner = coordinator.acquire(scope)
-        val entered = CompletableDeferred<Unit>()
-        val finish = CompletableDeferred<Unit>()
-        coordinator.bindPendingRetry(AgentId("agent")) { _, _ -> entered.complete(Unit); finish.await() }
-        val retry = backgroundScope.launch { assertTrue(coordinator.retryPending(owner, MessageId(record.otid))) }
-        runCurrent()
-        assertTrue(entered.isCompleted)
-        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
-        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, owner.session.pending.value.single().delivery)
-        finish.complete(Unit)
-        retry.join()
+        // No sender has subscribed: the retry is still queued, durably, for whichever one does.
+        assertTrue(coordinator.retryPending(owner, MessageId(record.otid)))
+        val queued = coordinator.queuedRetries(AgentId("agent")).first()
+        assertEquals(listOf(ConversationId("conversation") to "retry"), queued.map { (c, r) -> c to r.otid })
+        assertEquals(1L, queued.single().second.attempt)
+        assertEquals(emptyList(), coordinator.queuedRetries(AgentId("another-agent")).first())
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         // The retry is a new attempt: its echo horizon starts now, not at the prompt's first send.
         assertEquals(CanonicalPendingLocalStore.Delivery.Sending, owner.session.pending.value.single().delivery)
         assertEquals(1L, owner.session.pending.value.single().attempt)
+        // Once dispatch starts it is no longer queued, so no second sender submits it again.
+        CanonicalPendingLocalStore(store).accept(scope, queued.single().second) { true }
+        owner.session.markPending(record.otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 1)
+        assertEquals(emptyList(), coordinator.queuedRetries(AgentId("agent")).first())
     }
 
     private class Fixture(

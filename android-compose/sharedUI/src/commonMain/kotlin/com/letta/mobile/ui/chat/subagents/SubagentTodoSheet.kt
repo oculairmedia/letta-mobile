@@ -44,6 +44,11 @@ import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Immutable
 data class SubagentTodoSheetTarget(
@@ -169,6 +174,22 @@ fun subagentTodoSheetStateFrom(result: Result<List<SubagentTodo>>): SubagentTodo
         },
     )
 
+/** How long an open sheet waits for its checklist before it says so instead of spinning. */
+internal val TODOS_DEADLINE: Duration = 8.seconds
+
+/**
+ * [load]'s result, or a failure once [deadline] passes. The load runs in [owner] (the sheet's own
+ * effect scope) and only the wait is timed: a round trip that does not answer cancellation (a
+ * transport blocked under it) still cannot hold the sheet on its spinner.
+ */
+internal suspend fun <T> loadWithin(owner: CoroutineScope, deadline: Duration, load: suspend () -> Result<T>): Result<T> {
+    val pending = owner.async { load() }
+    return withTimeoutOrNull(deadline) { pending.await() } ?: run {
+        pending.cancel()
+        Result.failure(IllegalStateException("No answer from this subagent's todo list"))
+    }
+}
+
 /** Where an open sheet's checklist comes from: one round-trip per opened target. */
 fun interface SubagentTodoLoader {
     suspend fun todos(target: SubagentTodoSheetTarget): Result<List<SubagentTodo>>
@@ -188,7 +209,7 @@ fun SubagentTodoSheetHost(
 ) {
     var state by remember(target.toolCallId) { mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading) }
     LaunchedEffect(loader, target.toolCallId) {
-        state = subagentTodoSheetStateFrom(loader.todos(target))
+        state = subagentTodoSheetStateFrom(loadWithin(this, TODOS_DEADLINE) { loader.todos(target) })
     }
     SubagentTodoSheet(
         description = target.description,

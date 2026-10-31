@@ -10,7 +10,6 @@ import com.letta.mobile.ui.components.PreviewLiveStatusTextContent
 import com.letta.mobile.ui.components.PreviewMessageActionButtonsContent
 import com.letta.mobile.ui.components.PreviewMessageBubbleContent
 import com.letta.mobile.ui.components.PreviewMessageSenderContent
-import com.letta.mobile.ui.components.PreviewRotationalLoaderContent
 import com.letta.mobile.ui.components.PreviewStatusTimelineContent
 import com.letta.mobile.ui.components.PreviewThinkingSectionContent
 import org.junit.Ignore
@@ -55,11 +54,6 @@ class PreviewScreenshotTest {
     @Test
     fun errorDialog() {
         paparazzi.snapshot { PreviewErrorDialogContent() }
-    }
-
-    @Test
-    fun rotationalLoader() {
-        paparazzi.snapshot { PreviewRotationalLoaderContent() }
     }
 
     @Test

@@ -13,7 +13,6 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -30,6 +29,7 @@ import com.letta.mobile.data.memory.memfs.MemfsNavigation
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaConfirmTags
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -38,7 +38,7 @@ import com.letta.mobile.ui.theme.customColors
 internal fun MemfsEditorPane(editor: MemfsEditor, page: MemfsPageScope) {
     Column(Modifier.fillMaxSize().testTag(MemfsPageTags.EDITOR)) {
         MemfsEditorToolbar(editor, page)
-        if (editor.loading || editor.saving) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (editor.loading || editor.saving) LettaBusyBar()
         if (editor.conflict) ConflictBanner(page)
         editor.error?.let { message ->
             Text(

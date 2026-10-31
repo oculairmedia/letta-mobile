@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.horizontalScroll
@@ -54,6 +55,7 @@ import com.composables.icons.lucide.StickyNote
 import com.composables.icons.lucide.Type
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
@@ -484,7 +486,8 @@ private fun Toggle(label: String, icon: ImageVector, selected: Boolean, onClick:
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // The shared section label, flush with the controls it names.
+    LettaSectionLabel(text, contentPadding = PaddingValues())
 }
 
 @Composable

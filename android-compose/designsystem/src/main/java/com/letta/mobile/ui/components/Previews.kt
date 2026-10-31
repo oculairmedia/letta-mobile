@@ -165,22 +165,6 @@ private fun ErrorDialogPreview() = PreviewErrorDialogContent()
 
 @PreviewLightDark
 @Composable
-internal fun PreviewRotationalLoaderContent() {
-    LettaTheme(dynamicColor = false) {
-        Surface {
-            Box(modifier = Modifier.padding(32.dp)) {
-                RotationalLoader()
-            }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun RotationalLoaderPreview() = PreviewRotationalLoaderContent()
-
-@PreviewLightDark
-@Composable
 internal fun PreviewAccordionsContent() {
     LettaTheme(dynamicColor = false) {
         Surface {

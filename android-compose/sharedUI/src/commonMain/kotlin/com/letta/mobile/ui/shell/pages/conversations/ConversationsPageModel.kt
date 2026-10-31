@@ -7,8 +7,8 @@ import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks
 import com.letta.mobile.ui.shell.sidebar.ShellConversationRowModel
-import com.letta.mobile.ui.shell.sidebar.ShellRelativeTime
 import com.letta.mobile.ui.shell.sidebar.ShellSidebarMapping
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Instant
 
 /** One agent's conversations on the fleet conversations page, headed by the agent's name. */
@@ -70,7 +70,7 @@ data class ConversationsPageInput(
 /** Pure mapping from [ConversationsPageInput] to [ConversationsPageState]. */
 object ConversationsPageMapping {
     fun state(input: ConversationsPageInput, now: Instant): ConversationsPageState {
-        val timeLabel = { raw: String -> ShellRelativeTime.compact(raw, now) }
+        val timeLabel = { raw: String -> TimeLabels.ageLabel(raw, now) }
         val marks = ShellConversationMarks(pinnedIds = input.pinnedIds)
         val visible = input.conversations.filter { input.archiveFilter.admits(it.archived) }
         val rows = ShellSidebarMapping.conversationRows(visible, marks, timeLabel)

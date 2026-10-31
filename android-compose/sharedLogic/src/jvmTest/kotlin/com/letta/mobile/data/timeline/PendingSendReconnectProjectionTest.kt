@@ -69,6 +69,8 @@ class PendingSendReconnectProjectionTest {
         f.failed(FIRST, retry)
         f.channel.busy = true
         assertTrue(screen.retry(retry.otid))
+        // The retry waits in the outbox until the sender's subscription submits it.
+        runCurrent()
         assertEquals(1, f.sender.sendQueue.state.value[QueueConversationId(FIRST.value)]?.items?.size)
         if (dismiss) {
             f.writer.markPendingSend(com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt(
@@ -296,12 +298,12 @@ class PendingSendReconnectProjectionTest {
     }
 
     @Test fun retryReachesCapturedSenderThroughAnUnrecognisedWrapperWriter() = runTest {
-        // ChatSendCoordinator binds before the first conversation is acquired or sent to.
+        // ChatSendCoordinator subscribes before the first conversation is acquired or sent to.
         val f = Fixture(this)
         f.sendQueued("retry through wrapper")
         f.dropAndReconnect()
         val screen = f.screen(FIRST)
-        assertTrue(screen.retry(MessageId("cm-test-1")), "Retry binding must cross any writer wrapper")
+        assertTrue(screen.retry(MessageId("cm-test-1")), "Queued retries must cross any writer wrapper")
         runCurrent()
         assertEquals(
             listOf(AcceptedSend(FIRST, MessageId("cm-test-1")), AcceptedSend(FIRST, MessageId("cm-test-1"))),
@@ -458,8 +460,7 @@ class PendingSendReconnectProjectionTest {
         )
         val writer = object : TimelineExternalTransportWriter by admitted {
             private val pendingRetry = TimelinePendingRetryBinding()
-            override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
-                pendingRetry.bind(agent, sender)
+            override fun queuedRetries(agent: AgentId) = pendingRetry.queuedRetries(agent)
             override suspend fun acceptPendingSend(
                 attempt: TimelinePendingSendAttempt, content: String, attachments: List<MessageContentPart.Image>, accept: () -> Boolean,
             ) = admitted.also(pendingRetry::resolved).acceptPendingSend(attempt, content, attachments, accept)

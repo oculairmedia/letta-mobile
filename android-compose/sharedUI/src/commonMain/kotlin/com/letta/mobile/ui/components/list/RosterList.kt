@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -27,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
@@ -42,7 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaMenuItem
-import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.theme.LettaBusyBar
+import com.letta.mobile.ui.theme.LettaSectionHeader
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LocalRowHoldDrag
@@ -359,19 +358,18 @@ private const val CURSOR_ALPHA = 0.6f
 
 @Composable
 private fun <T> RosterHeader(section: RosterSection<T>, listTag: RosterListTag) {
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag(listTag.header(section.key)),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LettaSectionLabel(section.title.orEmpty(), Modifier.weight(1f))
-        section.headerEnd?.let { end -> Box(Modifier.padding(top = LettaDimens.Space.md, end = LettaDimens.Space.xs)) { end() } }
-    }
+    val end = section.headerEnd
+    LettaSectionHeader(
+        title = section.title.orEmpty(),
+        modifier = Modifier.testTag(listTag.header(section.key)),
+        action = end?.let { { Box(Modifier.padding(end = LettaDimens.Space.xs)) { it() } } },
+    )
 }
 
 @Composable
 private fun RosterEmptyState(options: RosterOptions, empty: (@Composable () -> Unit)?) {
     if (options.loading) {
-        LinearProgressIndicator(Modifier.fillMaxWidth().padding(LettaDimens.Space.sm).testTag(options.testTag.loading))
+        LettaBusyBar(Modifier.padding(LettaDimens.Space.sm).testTag(options.testTag.loading))
     } else {
         Box(Modifier.fillMaxWidth().testTag(options.testTag.empty)) { empty?.invoke() }
     }

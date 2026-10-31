@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,6 +49,7 @@ import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -172,7 +172,7 @@ internal fun TimelineWaitingState(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             modifier = Modifier.padding(LettaDimens.Space.xl),
         ) {
-            CircularProgressIndicator()
+            LettaSpinner(size = LettaDimens.Control.spinnerLg)
             Text(
                 text = stringResource(Res.string.timeline_subagent_waiting),
                 style = MaterialTheme.typography.bodyLarge,

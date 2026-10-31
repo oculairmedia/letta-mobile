@@ -158,7 +158,9 @@ private fun runDesktopApplication(
                     ) {
                         LaunchedEffect(Unit) {
                             activationHandler.attach(window)
-                            window.minimumSize = Dimension(960, 640)
+                            // Phone-narrow: below LettaDimens.Pane.wideBreakpoint the shell folds into
+                            // its compact layout (drawer, minimal header), as on a phone.
+                            window.minimumSize = Dimension(360, 560)
                             // Windows 11 standard rounded corners + outline on the
                             // undecorated frame.
                             DesktopWindowsChrome.applyStandardChrome(window)

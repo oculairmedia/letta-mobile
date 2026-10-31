@@ -514,20 +514,20 @@ class DesktopAppServerChatGatewayTest {
         override val isConnected: Flow<Boolean> get() = connected
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-            TODO("not needed for App Server gateway tests")
+            error("not needed for App Server gateway tests")
 
-        override suspend fun input(command: AppServerCommand.Input) = TODO("not needed for App Server gateway tests")
+        override suspend fun input(command: AppServerCommand.Input) = error("not needed for App Server gateway tests")
 
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            TODO("not needed for App Server gateway tests")
+            error("not needed for App Server gateway tests")
 
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            TODO("not needed for App Server gateway tests")
+            error("not needed for App Server gateway tests")
 
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            TODO("not needed for App Server gateway tests")
+            error("not needed for App Server gateway tests")
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
-            TODO("not needed for App Server gateway tests")
+            error("not needed for App Server gateway tests")
     }
 }

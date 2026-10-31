@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +54,7 @@ import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
+import com.letta.mobile.ui.theme.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
@@ -278,7 +278,7 @@ private fun CompactControls(model: AgentContextCardModel, onCompact: () -> Unit)
         modifier = Modifier.fillMaxWidth().testTag(AgentContextTags.COMPACT),
     ) {
         if (busy) {
-            CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.iconSm), strokeWidth = LettaDimens.Stroke.hairline)
+            LettaSpinner(size = LettaDimens.Control.spinnerSm)
             Spacer(Modifier.width(LettaDimens.Space.sm))
         }
         Text(text = if (busy) AgentContextStrings.COMPACTING else AgentContextStrings.COMPACT)

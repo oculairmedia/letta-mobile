@@ -4,7 +4,6 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.home.conversationRecency
-import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.MessageSearchCapabilities
@@ -17,6 +16,7 @@ import com.letta.mobile.ui.search.LettaSearchLeading
 import com.letta.mobile.ui.search.LettaSearchRow
 import com.letta.mobile.ui.search.LettaSearchScope
 import com.letta.mobile.ui.search.LettaSearchSection
+import com.letta.mobile.util.time.TimeLabels
 
 /** A page the palette can go to ("Settings", "Providers"); [id] is the host's own name for it. */
 data class UnifiedSearchDestination(val id: String, val label: String)
@@ -174,7 +174,7 @@ object UnifiedShellSearch {
                     label = conversation.displayTitle(),
                     // Scoped to one agent, every row would repeat the agent name you already gave.
                     sublabel = agentNameOf(conversation).takeIf { scopedAgentId == null },
-                    meta = relativeAgeLabel(conversation.updatedAtLabel),
+                    meta = TimeLabels.ageLabel(conversation.updatedAtLabel),
                     leading = orbFor(RowOwner(conversation.agentId, agentNameOf(conversation))),
                 )
             }
@@ -193,7 +193,7 @@ object UnifiedShellSearch {
                         id = rowId(UnifiedSearchKind.Messages, "${hit.conversationId}$MESSAGE_ID_SEPARATOR${hit.messageId ?: index}"),
                         label = snippet(hit, asked),
                         sublabel = conversation?.displayTitle(),
-                        meta = hit.date?.let(::relativeAgeLabel),
+                        meta = hit.date?.let { TimeLabels.ageLabel(it) },
                         leading = orbFor(RowOwner(hit.agentId ?: conversation?.agentId)),
                     )
                 }

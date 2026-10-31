@@ -103,7 +103,7 @@ class ShellRailMascotStillUiTest {
         assertEquals(8, collapsedRailEntries(roster, focus).size, "100 agents feed at most eight collapsed entries")
         assertEquals(0, host.surfaceCalls, "collapsed rail tiles never draw live mascot scenes")
         assertEquals(0, captures[0])
-        onNodeWithTag("shell-thinking-ring-Agent 000").assertExists()
+        onNodeWithTag("shell-thinking-aura-Agent 000").assertExists()
 
         expanded = true
         mainClock.advanceTimeByFrame()

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,6 +34,7 @@ import com.letta.mobile.data.pairing.PairingState
 import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 
 /** What the joining device can do from the status card and the scanner. */
 class PairingScanActions(
@@ -110,7 +110,7 @@ private fun TrustPrompt(state: PairingState.ConfirmHost, actions: PairingScanAct
 
 @Composable
 private fun VerifyingContent(onCancel: () -> Unit) {
-    CircularProgressIndicator()
+    LettaSpinner(size = LettaDimens.Control.spinnerLg)
     Column(
         modifier = Modifier.testTag(PairingTags.VERIFYING),
         horizontalAlignment = Alignment.CenterHorizontally,

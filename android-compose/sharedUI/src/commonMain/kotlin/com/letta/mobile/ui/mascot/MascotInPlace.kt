@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.mascot
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
@@ -10,6 +13,7 @@ import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
  * [agentId]'s mascot drawn where it is, by the one live-or-still rule: the live scene while [live]
@@ -27,15 +31,32 @@ internal fun MascotInPlace(
     /** Live, the character answers gestures (see [MascotLive]); a still only clicks. */
     touch: MascotTouch = MascotTouch.answering(onClick),
 ) {
-    if (live) {
-        MascotLive(agentId, identity, size = size, onClick = onClick, touch = touch)
-        return
-    }
-    Box(Modifier.requiredSize(size), contentAlignment = Alignment.Center) {
-        MascotStill(agentId, identity, size = size)
-        if (onClick != null) MascotHitArea(size, onClick)
+    MascotLiveSwap(
+        live = live,
+        liveContent = { MascotLive(agentId, identity, size = size, onClick = onClick, touch = touch) },
+        stillContent = {
+            Box(Modifier.requiredSize(size), contentAlignment = Alignment.Center) {
+                MascotStill(agentId, identity, size = size)
+                if (onClick != null) MascotHitArea(size, onClick)
+            }
+        },
+    )
+}
+
+/**
+ * Still and live cross-fade rather than cut: the two are different poses of one character (and the
+ * live scene's first frame lands a frame or two after it is composed), so a cut reads as a glitch.
+ */
+@Composable
+internal fun MascotLiveSwap(live: Boolean, liveContent: @Composable () -> Unit, stillContent: @Composable () -> Unit) {
+    val spec = if (LocalReducedMotion.current) snap<Float>() else tween(LIVE_SWAP_MS)
+    Crossfade(targetState = live, animationSpec = spec, label = "mascotLiveSwap") { isLive ->
+        if (isLive) liveContent() else stillContent()
     }
 }
+
+/** How long a still and the live scene cross-fade; a state change never lands in one frame. */
+private const val LIVE_SWAP_MS = 220
 
 /**
  * What a drawn mascot shows, in semantics: the identity it is drawn in and whether it moves. Every
