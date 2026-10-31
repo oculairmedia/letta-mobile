@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.memory.MemoryChannelStatus
+import com.letta.mobile.data.memory.MemoryGraphEdge
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
@@ -45,14 +46,15 @@ internal class GraphFrame(
 
     fun screen(nodeId: String): Offset? = layout[nodeId]?.let(viewport::toScreen)?.let { Offset(it.x, it.y) }
 
-    fun radiusOf(nodeId: String): Float = (scene.looks[nodeId]?.radius ?: MemoryNodeLooks.SMALL_RADIUS) * viewport.scale
+    fun radiusOf(node: MemoryGraphNode): Float = (scene.looks[node.id]?.radius ?: MemoryNodeLooks.SMALL_RADIUS) * viewport.scale
 
-    fun alphaOf(nodeId: String): Float = if (isLit(nodeId)) 1f else GraphDimens.DIMMED_ALPHA
+    fun alphaOf(node: MemoryGraphNode): Float = if (isLit(node)) 1f else GraphDimens.DIMMED_ALPHA
 
     /** Nothing has focus, or this node is the focus or one of its neighbours. */
-    fun isLit(nodeId: String): Boolean = focusId == null || nodeId in focusSet
+    fun isLit(node: MemoryGraphNode): Boolean = focusId == null || node.id in focusSet
 
-    fun edgeLit(fromId: String, toId: String): Boolean = focusId != null && (fromId == focusId || toId == focusId)
+    /** The edge touches the focus. */
+    fun edgeLit(edge: MemoryGraphEdge): Boolean = focusId != null && (edge.fromId == focusId || edge.toId == focusId)
 
     fun showsLabel(node: MemoryGraphNode): Boolean =
         labelsEverything || node.id in focusSet || node.kind == MemoryGraphNodeKind.Agent || node.kind == MemoryGraphNodeKind.Backend
@@ -76,7 +78,7 @@ private fun DrawScope.drawEdges(frame: GraphFrame) {
         path.moveTo(from.x, from.y)
         val control = bowControl(from, to)
         path.quadraticTo(control.x, control.y, to.x, to.y)
-        val look = edgeLook(frame, edge.fromId, edge.toId)
+        val look = edgeLook(frame, edge)
         drawPath(path = path, color = look.colour, alpha = look.alpha, style = Stroke(width = look.width.toPx(), cap = StrokeCap.Round))
     }
 }
@@ -84,10 +86,10 @@ private fun DrawScope.drawEdges(frame: GraphFrame) {
 /** How one edge draws: lit in the far node's colour when it touches the focus, dimmed when another node has it. */
 private class EdgeLook(val colour: Color, val alpha: Float, val width: Dp)
 
-private fun edgeLook(frame: GraphFrame, fromId: String, toId: String): EdgeLook {
+private fun edgeLook(frame: GraphFrame, edge: MemoryGraphEdge): EdgeLook {
     val palette = frame.scene.palette
-    if (frame.edgeLit(fromId, toId)) {
-        val far = frame.scene.view.node(toId)?.let(palette::nodeColor) ?: palette.edge
+    if (frame.edgeLit(edge)) {
+        val far = frame.scene.view.node(edge.toId)?.let(palette::nodeColor) ?: palette.edge
         return EdgeLook(far.copy(alpha = GraphDimens.FOCUSED_EDGE_ALPHA), 1f, GraphDimens.edgeFocused)
     }
     val alpha = if (frame.focusId != null) GraphDimens.DIMMED_EDGE_ALPHA else 1f
@@ -106,7 +108,7 @@ private class NodePaint(val colour: Color, val centre: Offset, val radius: Float
 
 private fun DrawScope.drawNode(frame: GraphFrame, node: MemoryGraphNode, centre: Offset) {
     val palette = frame.scene.palette
-    val paint = NodePaint(palette.nodeColor(node), centre, frame.radiusOf(node.id), frame.alphaOf(node.id))
+    val paint = NodePaint(palette.nodeColor(node), centre, frame.radiusOf(node), frame.alphaOf(node))
     if (node.id == frame.focusId) {
         drawCircle(paint.colour.copy(alpha = GraphDimens.HALO_ALPHA), radius = paint.radius + GraphDimens.halo.toPx(), center = centre)
     }
@@ -158,7 +160,7 @@ private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode) {
     val pad = Offset(GraphDimens.labelChipPadX.toPx(), GraphDimens.labelChipPadY.toPx())
     val chipSize = Size(text.size.width + pad.x * 2f, text.size.height + pad.y * 2f)
     val chip = labelChipTopLeft(frame, node, centre, chipSize) ?: return
-    val alpha = frame.alphaOf(node.id)
+    val alpha = frame.alphaOf(node)
     drawRoundRect(frame.scene.palette.labelChip, chip, chipSize, CornerRadius(chipSize.height / 2f), alpha = alpha)
     drawText(text, topLeft = chip + pad, alpha = alpha)
 }
@@ -171,14 +173,14 @@ private fun DrawScope.labelChipTopLeft(frame: GraphFrame, node: MemoryGraphNode,
     val neighbours = frame.scene.neighbours[node.id].orEmpty().mapNotNull(frame::screen)
     val direction = MemoryLabelPlacement.direction(centre, neighbours)
     val arcGap = if (frame.scene.looks[node.id]?.usage != null) GraphDimens.usageGap.toPx() else 0f
-    val reach = frame.radiusOf(node.id) + GraphDimens.labelGap.toPx() + arcGap
+    val reach = frame.radiusOf(node) + GraphDimens.labelGap.toPx() + arcGap
     val placed = MemoryLabelPlacement.topLeft(centre, reach, direction, chip)
     val inset = GraphDimens.labelGap.toPx()
     val clamped = Offset(
         placed.x.coerceIn(inset, (size.width - chip.width - inset).coerceAtLeast(inset)),
         placed.y.coerceIn(inset, (size.height - chip.height - inset).coerceAtLeast(inset)),
     )
-    return clamped.takeIf { it == placed || frame.isLit(node.id) }
+    return clamped.takeIf { it == placed || frame.isLit(node) }
 }
 
 /** Undirected adjacency, built once per view: label placement and focus both read it. */

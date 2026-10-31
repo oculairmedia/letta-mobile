@@ -50,9 +50,10 @@ internal class MemoryGraphLiveLayout {
         wake()
     }
 
-    fun drag(nodeId: String, point: MemoryGraphPoint) {
+    /** Hold node [id] at [point] (layout space) while the rest follow. */
+    fun drag(id: String, point: MemoryGraphPoint) {
         val sim = physics ?: return
-        sim.pin(nodeId, point)
+        sim.pin(id, point)
         layout = sim.snapshot()
         wake()
     }

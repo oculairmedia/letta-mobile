@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.graph.MemoryGraphBounds
 import com.letta.mobile.data.memory.graph.MemoryGraphPoint
 import com.letta.mobile.data.memory.graph.MemoryPageState
@@ -28,7 +29,7 @@ internal fun FrameSelectionAboveSheet(framing: MemoryFraming, viewportState: Mem
         snapshotFlow { viewportState.size }.first { it.width > 0f && it.height > 0f }
         // The effect can run before this frame's SideEffects: take the sheet's height from here.
         viewportState.insets = viewportState.insets.copy(bottom = coveredPx.toFloat())
-        val ids = nodeId?.let { selectionIds(framing.state, it) }
+        val ids = nodeId?.let(framing.state.view::node)?.let { selectionIds(framing.state, it) }
         when {
             ids != null -> framing.boundsOf(ids)?.let { viewportState.frame(it, framing.reducedMotion) }
             framedSelection -> viewportState.frame(framing.state.layout.bounds, framing.reducedMotion)
@@ -38,9 +39,9 @@ internal fun FrameSelectionAboveSheet(framing: MemoryFraming, viewportState: Mem
 }
 
 /** The node and everything it links to. */
-private fun selectionIds(state: MemoryPageState, nodeId: String): Set<String> =
-    state.view.edges.mapNotNullTo(mutableSetOf(nodeId)) { edge ->
-        when (nodeId) {
+private fun selectionIds(state: MemoryPageState, node: MemoryGraphNode): Set<String> =
+    state.view.edges.mapNotNullTo(mutableSetOf(node.id)) { edge ->
+        when (node.id) {
             edge.fromId -> edge.toId
             edge.toId -> edge.fromId
             else -> null
