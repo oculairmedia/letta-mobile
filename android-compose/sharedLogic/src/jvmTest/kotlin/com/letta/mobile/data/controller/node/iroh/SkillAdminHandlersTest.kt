@@ -8,12 +8,11 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class SkillAdminHandlersTest {
 
-    private val expectedErrorMessage = "capability_unavailable: skill.install requires skill_path (or name) for App Server v2 skill_enable; agent-scoped shim install is retired"
+    private val expectedErrorMessage = "capability_unavailable: skill.install requires " +
+        "skill_path (or name) for App Server v2 skill_enable; agent-scoped shim install is retired"
 
     @Test
     fun `skill install requires skill_path or name - wrong param`() = runTest {
