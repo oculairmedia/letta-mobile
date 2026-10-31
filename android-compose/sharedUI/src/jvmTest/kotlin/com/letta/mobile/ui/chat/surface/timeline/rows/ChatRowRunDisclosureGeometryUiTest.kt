@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -53,12 +54,12 @@ class ChatRowRunDisclosureGeometryUiTest {
 
     private data class Environment(val width: Dp, val host: LettaHost)
 
-    private fun ComposeUiTest.show(environment: Environment) {
+    private fun ComposeUiTest.show(environment: Environment, item: ChatRenderItem = run) {
         setContent {
             CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaHost provides environment.host) {
                 MaterialTheme {
                     Box(Modifier.width(environment.width)) {
-                        RenderRow(run, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "answer"))
+                        RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "answer"))
                     }
                 }
             }
@@ -88,6 +89,60 @@ class ChatRowRunDisclosureGeometryUiTest {
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
         val detailIndent = bounds(ChatRowTestTags.TOOL_OUTPUT).left - bounds(ChatRowTestTags.TOOL_CARD_TOGGLE).left
         assertNear(ChatRowSpacing.runStepDetailIndent, detailIndent)
+    }
+
+    @Test
+    fun openDetailsInAMessageWithProseFollowTheRunWidth() {
+        val inline = ChatRenderItem.RunBlock(
+            runId = RUN_ID,
+            messages = listOf(
+                UiMessage(
+                    id = "answer", role = "assistant", content = "Done.", timestamp = "2026-10-11T16:00:09Z", runId = RUN_ID,
+                    toolCalls = listOf(UiToolCall(
+                        name = "Bash", arguments = """{"command":"ls"}""", result = "ok", status = "success", toolCallId = "inline-call",
+                    )),
+                ) to GroupPosition.None,
+            ),
+        )
+        for (width in listOf(599.dp, 600.dp)) {
+            for (host in listOf(LettaHost.Touch, LettaHost.Pointer)) {
+                runDesktopComposeUiTest(width = 1400, height = 900) {
+                    show(Environment(width, host), inline)
+                    onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+                    val expected = if (width < 600.dp) 0.dp else ChatRowSpacing.runStepDetailIndent
+                    val indent = bounds(ChatRowTestTags.TOOL_OUTPUT).left - bounds(ChatRowTestTags.TOOL_CARD_TOGGLE).left
+                    assertNear(expected, indent)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun openDetailsAndWorkStepsFollowWidthChanges() {
+        for (host in listOf(LettaHost.Touch, LettaHost.Pointer)) {
+            runDesktopComposeUiTest(width = 1400, height = 900) {
+                val width = mutableStateOf(599.dp)
+                setContent {
+                    CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaHost provides host) {
+                        MaterialTheme {
+                            Box(Modifier.width(width.value)) {
+                                RenderRow(run, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID))))
+                            }
+                        }
+                    }
+                }
+                onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+                for (next in listOf(599.dp, 600.dp, 599.dp)) {
+                    runOnIdle { width.value = next }
+                    waitForIdle()
+                    assertWorkIndent(if (next < 600.dp) 0.dp else ChatRowSpacing.runStepIndent)
+                    val expected = if (next < 600.dp) 0.dp else ChatRowSpacing.runStepDetailIndent
+                    val indent = bounds(ChatRowTestTags.TOOL_OUTPUT).left - bounds(ChatRowTestTags.TOOL_CARD_TOGGLE).left
+                    assertNear(expected, indent)
+                    assertChevronColumn()
+                }
+            }
+        }
     }
 
     private fun checkWidths(widths: List<Dp>, assertion: ComposeUiTest.() -> Unit) {

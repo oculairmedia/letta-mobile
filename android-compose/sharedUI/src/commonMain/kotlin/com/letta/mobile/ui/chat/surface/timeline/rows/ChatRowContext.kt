@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
@@ -18,7 +19,7 @@ import kotlinx.collections.immutable.persistentMapOf
  * The slim, stable per-row inputs. Rows read only this (never the
  * whole ChatUiState) so a streaming tick on the newest row doesn't recompose settled rows.
  */
-@Immutable
+@Stable
 internal data class ChatRowContext(
     val itemState: ChatRenderItemState,
     /** The assistant message currently streaming, or null when the run is idle. */
@@ -36,6 +37,8 @@ internal data class ChatRowContext(
     val newestMessageId: String? = null,
     /** Rows these options hide draw nothing (reasoning, compactions, usage). */
     val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
+    /** The enclosing run's width, read only by indentation modifiers during measurement. */
+    val compactRunWidth: State<Boolean>? = null,
 ) {
     /** True on the row holding the conversation's newest message. */
     val isNewest: Boolean get() = newestMessageId != null

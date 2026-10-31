@@ -81,7 +81,7 @@ internal fun RunSummaryLine(state: RunHeaderState) {
             )
             .padding(
                 start = ChatRowSpacing.runHeaderHorizontal,
-                end = ChatRowSpacing.runDisclosureEndInset,
+                end = LettaDimens.Space.sm,
                 top = ChatRowSpacing.runHeaderVertical,
                 bottom = ChatRowSpacing.runHeaderVertical,
             ),

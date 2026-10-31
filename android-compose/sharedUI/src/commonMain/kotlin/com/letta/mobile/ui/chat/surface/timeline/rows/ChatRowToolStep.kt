@@ -15,6 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.NonRestartableComposable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,7 +39,6 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.gaze.AttentionKey
 import com.letta.mobile.avatar.core.gaze.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
@@ -99,10 +100,10 @@ internal fun ToolStep(
     toolCall: UiToolCall,
     disclosureKey: String,
     callbacks: ChatRowCallbacks,
-    /** The call's state read with the run's approvals; classified from the call alone when null. */
-    state: ToolTimelineState? = null,
+    /** The run's approval-aware state and width; standalone calls use their own state and usual inset. */
+    presentation: Pair<ToolTimelineState, State<Boolean>?>? = null,
 ) {
-    val resolved = state ?: remember(toolCall) { classifyToolCallState(toolCall) }
+    val resolved = presentation?.first ?: remember(toolCall) { classifyToolCallState(toolCall) }
     val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
     val toggled by expansions.toggled.collectAsState()
     val isExpanded = expansions.isExpanded(disclosureKey, toolCall.shouldInitiallyExpand(), toggled)
@@ -123,7 +124,7 @@ internal fun ToolStep(
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
         ) {
-            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure())
+            ToolStepDetails(toolCall, callbacks, resolved, presentation?.second)
         }
     }
 }
@@ -198,6 +199,7 @@ private fun noteOf(line: ToolStepLine, state: ToolTimelineState): StepNote? {
  * depends on its state, and the spinner's slot is kept when it settles, so the words never move.
  */
 @Composable
+@NonRestartableComposable
 private fun ToolStepLineRow(spec: StepLineSpec, disclosure: RunStepDisclosure?) {
     Row(
         modifier = Modifier
@@ -205,7 +207,7 @@ private fun ToolStepLineRow(spec: StepLineSpec, disclosure: RunStepDisclosure?) 
             .heightIn(min = ChatRowSpacing.toolStepMinHeight)
             .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
             .then(if (disclosure != null) Modifier.stepToggle(disclosure) else Modifier.semantics { disabled() })
-            .padding(start = LettaDimens.Space.sm, end = ChatRowSpacing.runDisclosureEndInset),
+            .padding(horizontal = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
@@ -286,13 +288,21 @@ private fun warningInk(): Color {
 
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
-private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
-    val indent = if (LocalCompactRunWidth.current) 0.dp else ChatRowSpacing.runStepDetailIndent
+@NonRestartableComposable
+private fun ToolStepDetails(
+    toolCall: UiToolCall,
+    callbacks: ChatRowCallbacks,
+    state: ToolTimelineState,
+    compactRunWidth: State<Boolean>?,
+) {
+    val live = state == ToolTimelineState.Running || toolCall.isStreaming()
+    val failed = state.isFailure()
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ChatRowTestTags.TOOL_CARD_BODY)
-            .padding(start = indent, end = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
+            .runWidthPadding(ChatRowSpacing.runStepDetailIndent, compactRunWidth)
+            .padding(end = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         toolCall.agentMessageProvenance?.let { provenance ->
