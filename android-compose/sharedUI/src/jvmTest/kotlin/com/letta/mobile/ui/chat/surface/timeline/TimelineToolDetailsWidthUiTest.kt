@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
 /** The same open tool output has identical indentation through every shared timeline caller. */
 class TimelineToolDetailsWidthUiTest {
     private val call = UiToolCall(
-        name = "Bash", arguments = """{"command":"ls"}""", result = OUTPUT,
+        name = "Bash", arguments = """{"command":"ls"}""", result = LONG_OUTPUT,
         status = "success", toolCallId = "width-call",
     )
     private val message = UiMessage(
@@ -77,8 +77,9 @@ class TimelineToolDetailsWidthUiTest {
             }
         }
         onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE)[0].performClick()
-        onNodeWithText(OUTPUT, useUnmergedTree = true).assertExists()
+        onNodeWithText(OUTPUT, substring = true, useUnmergedTree = true).assertExists()
         assertIndent(expectedIndent)
+        assertOutputWithin(width)
     }
 
     @Composable
@@ -116,9 +117,19 @@ class TimelineToolDetailsWidthUiTest {
         assertTrue(abs(expected.value - actual.value) <= TOLERANCE_DP, "expected indent $expected, actual $actual")
     }
 
+    /** Long output must wrap inside the row: its right edge never passes the row's own width. */
+    private fun ComposeUiTest.assertOutputWithin(width: Dp) {
+        val row = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE)[0].getUnclippedBoundsInRoot()
+        val output = onNodeWithTag(ChatRowTestTags.TOOL_OUTPUT).getUnclippedBoundsInRoot()
+        assertTrue(output.right <= row.left + width + TOLERANCE_DP.dp, "output overflows: right ${output.right}, row width $width")
+    }
+
     private companion object {
         const val RUN_ID = "width-run"
         const val OUTPUT = "tool-width-output"
+        // One unbroken line far wider than any test width, so the output must be width-constrained.
+        val LONG_OUTPUT = OUTPUT + " " + "x".repeat(LONG_OUTPUT_CHARS)
+        const val LONG_OUTPUT_CHARS = 600
         const val WINDOW_WIDTH_PX = 1200
         const val WINDOW_HEIGHT_PX = 900
         const val TOLERANCE_DP = 0.5f
