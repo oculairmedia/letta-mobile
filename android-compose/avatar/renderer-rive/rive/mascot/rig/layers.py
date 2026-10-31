@@ -17,9 +17,11 @@ animation; a randomWeight only means anything leaving a random="true" state, and
 needs at least two weighted ways out; every transition must target a state in its own layer.
 
 The blend policy (MOTION-PIPELINE step A) is the fourth check. Given an animation index from
-rig/seams.py, `Layer.rml()` refuses a 0 ms transition whose two animations key the same property
-at different values - that value tears at the cut - unless the transition, or the state it leaves,
-says `cut=True, reason="..."`. The index arrives either per call (`layer.rml(seams=index)`) or
+rig/seams.py, `Layer.rml()` refuses a transition shorter than MIN_TRANSITION_MS (rig/constants.py)
+that moves a pose property from any frame its source can be left at - nothing excuses that, a pose
+that changes in one frame is a pop; a 0 ms swap of a discrete property (a glyph) unless the
+transition, or the state it leaves, says `cut=True, reason="..."`; and any blend that would sweep
+the glyph index `expr` through the values between (see _check_blends). The index arrives either per call (`layer.rml(seams=index)`) or
 through the module-level `set_animation_index()`, which gen_scene.py and rig/plate.py set once
 from the animation XML they have just built. The marks are also recorded in `CUT_MARKS` so
 `python -m rig.seams` can say which seams are accounted for.
@@ -30,7 +32,7 @@ from dataclasses import dataclass, field
 from rml import (EASE_OUT, VM_STATE, anim_state, bool_transition, enum_transition,
                  exit_transition, input_transition, layer_frame, transition, trigger_transition,
                  weighted)
-from rig.seams import crossings, prop_name as _prop
+from rig.seams import Blend, crossings, is_pose, pose_moves, prop_name as _prop, sweeps
 
 # The animation index every Layer.rml() validates against, when the caller has set one. It is
 # module-level on purpose: the layer builders are called deep inside rig/machine.py and
@@ -170,15 +172,29 @@ class When:
     cut: bool = False
     reason: str = None
     hold: bool = False
+    # An exit-time gate: the transition may only fire once the state's animation has played this
+    # many ms (an entry that must not be interrupted before its glyph has flipped).
+    after_ms: int = None
 
     def rml(self):
-        t = transition(self.to, self.ms, self.bezier, "\n".join(self.conditions), exit_time=self.exit)
+        t = transition(self.to, self.ms, self.bezier, "\n".join(self.conditions), exit_time=self.exit,
+                       after_ms=self.after_ms)
         return weighted(t, self.weight) if self.weight is not None else t
 
 
 def _waits_for_end(t):
     """True for a transition that fires at its state's exit time: an Exit, or a When(exit=True)."""
     return isinstance(t, Exit) or getattr(t, "exit", False)
+
+
+def _departure(t):
+    """Where a transition can leave its source animation, as rig/seams.py departure_values()
+    takes it: "end" for an exit-time transition, the gate in frames for an `after_ms` one, None
+    (any frame) for everything that fires on a request."""
+    if _waits_for_end(t):
+        return "end"
+    after = getattr(t, "after_ms", None)
+    return round(after * 60 / 1000) if after else None
 
 
 @dataclass(frozen=True)
@@ -326,38 +342,78 @@ class Layer:
             table[(self.name, source, t.to)] = reason
 
     def _check_blends(self, index):
-        """Refuse a 0 ms transition that tears a property both animations key, unless it is
-        signed `cut=True` with a reason.
+        """The blend policy, three rules, each against what the two animations really key:
 
-        Only the transition's own two animations are weighed here. A hand-back - a one-shot
-        that ends holding a property its target does not key, so the layers below take it back
-        at the cut - is a layering question rather than a transition one, and belongs to the
-        ledger (`python -m rig.seams`), not to this gate."""
+        1. The floor. A transition shorter than MIN_TRANSITION_MS (rig/constants.py) may not move
+           a pose property (rig/seams.py is_pose) - from ANY frame its source can be left at, not
+           just the source's last key: a loop is left mid-bob, an entry mid-turn. No signature
+           excuses it; a pose that changes in one frame is a pop. Hand-backs (the source keys a
+           property, the target does not) are the ledger's: no duration helps one, see below.
+        2. A cut across a discrete property (a glyph index, a reference) is the design only when
+           it says so: `cut=True` with a reason, as before.
+        3. No blend may sweep an index: a transition with a duration must not interpolate `expr`
+           across a change (rig/seams.py sweeps) - that shows every glyph in between.
+        Hand-backs remain the ledger's (`python -m rig.seams`): whether one snaps depends on
+        whether a layer BELOW keys the property, and a blend does not soften it - Rive plays the
+        outgoing animation at full weight for the whole blend and lets go at its end. The cure is
+        a one-shot that ends where the layers below are (or `hold=True` when it does by design)."""
         signed = self._signed()       # always: building the layer records its signatures
         if not index:
             return
         anim_of = {s.node: s.anim for s in self.states}
         for src, t, cut, _reason in signed:
-            if t.ms or cut:
-                continue
+            target = anim_of.get(t.to)
             for s in self._sources(src, t):
-                self._check_seam(index, s, t, anim_of.get(t.to))
+                self._check_floor(index, s, t, target)
+                if not t.ms and not cut:
+                    self._check_seam(index, s, t, target)
+                self._check_sweep(index, s, t, target)
 
     def _sources(self, src, t):
         """The states a transition can leave from: its own state, or every other state for AnyState."""
         return [s for s in ([src] if src is not None else self.states) if s.node != t.to]
 
+    def _check_floor(self, index, s, t, target_anim):
+        from rig.constants import MIN_TRANSITION_MS as floor
+        if t.ms >= floor:
+            return
+        # Hand-backs are not weighed here: a blend cannot soften one (Rive keeps playing the
+        # outgoing animation at full weight until the blend ends, and only then lets the layers
+        # below have the property), so the floor does nothing for it. That is a question about
+        # the layers below, which only the whole document can answer - the ledger's.
+        m = next((m for m in pose_moves(index, s.anim, target_anim, _departure(t)) if not m.hand_back), None)
+        if m is None:
+            return
+        raise ValueError(
+            f'layer "{self.name}": {s.node} -> {t.to} takes {t.ms} ms, under the '
+            f'{floor} ms floor, but it moves object {m.obj} {_prop(m.key)} from '
+            f'{m.from_value} ({_name(index, s.anim)}) to {m.to_value} '
+            f'({_name(index, target_anim)}): a {m.kind} of {m.delta:g}, '
+            f'{m.normalised:.1f}x the {m.eps:g} tolerance. A pose may not change in one frame - '
+            f'blend it over at least {floor} ms (cut=True does not excuse a pose).')
+
     def _check_seam(self, index, s, t, target_anim):
-        c = next((c for c in crossings(index, s.anim, target_anim) if not c.hand_back), None)
+        c = next((c for c in crossings(index, s.anim, target_anim)
+                  if not c.hand_back and not is_pose(c.key)), None)
         if c is None:
             return
         raise ValueError(
             f'layer "{self.name}": {s.node} -> {t.to} is a 0 ms cut, but '
             f'{_name(index, s.anim)} leaves object {c.obj} '
             f'{_prop(c.key)} at {c.from_value} and {_name(index, target_anim)} '
-            f'starts it at {c.to_value} (delta {c.delta:g}, '
-            f'{c.normalised:.1f}x the {c.eps:g} tolerance). Blend it, or mark the '
-            f'transition cut=True with a reason.')
+            f'starts it at {c.to_value}. A discrete swap is fine under a cut, but say so: '
+            f'mark the transition cut=True with a reason.')
+
+    def _check_sweep(self, index, s, t, target_anim):
+        m = next(iter(sweeps(index, s.anim, target_anim, Blend(t.ms, _departure(t)))), None)
+        if m is None:
+            return
+        raise ValueError(
+            f'layer "{self.name}": {s.node} -> {t.to} blends {t.ms} ms across object {m.obj} '
+            f'{_prop(m.key)} ({m.from_value} in {_name(index, s.anim)}, {m.to_value} in '
+            f'{_name(index, target_anim)}): a blended index sweeps through every value between. '
+            f'Keep the index constant across the blend (flip it inside the animation, after the '
+            f'blend) or move it to a layer of its own that cuts.')
 
     def _check_target(self, frm, t, known):
         if t.to not in known:
