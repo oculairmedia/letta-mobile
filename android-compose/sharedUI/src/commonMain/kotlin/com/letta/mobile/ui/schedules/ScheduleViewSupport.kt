@@ -1,13 +1,13 @@
 package com.letta.mobile.ui.schedules
 
 import androidx.compose.material3.MaterialTheme
-import com.letta.mobile.data.model.AgentId
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.schedules.CalendarBand
 import com.letta.mobile.data.schedules.RunStatus
+import com.letta.mobile.data.schedules.ScheduleAgentId
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.ui.theme.customColors
@@ -24,14 +24,14 @@ import kotlin.time.Instant
  * shows until someone picks one). A schedule with no agent takes the theme's primary.
  */
 @Composable
-fun scheduleAccent(agent: AgentId?): Color {
+fun scheduleAccent(agent: ScheduleAgentId?): Color {
     if (agent == null) return MaterialTheme.colorScheme.primary
     return LocalCalendarAccent.current(agent.value) ?: Color(MascotIdentity.seeded(agent.value).argb)
 }
 
 /** [scheduleAccent] for a schedule's raw agent id as the server sends it. */
 @Composable
-internal fun scheduleAccentOfRaw(raw: String?): Color = scheduleAccent(raw?.let(::AgentId))
+internal fun scheduleAccentOfRaw(raw: String?): Color = scheduleAccent(raw?.let(::ScheduleAgentId))
 
 /** The colour of a run's status dot (the run detail, the history). */
 @Composable
