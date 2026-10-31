@@ -20,3 +20,4 @@ count scripts/ci/platform-ui-allowlist.txt
 grow-only scripts/ci/parity/parity-contracts.txt
 set scripts/ci/parity/mirror-name-baseline.txt
 set scripts/ci/parity/parity-exemptions.txt
+set scripts/ci/tree-hygiene-baseline.txt
