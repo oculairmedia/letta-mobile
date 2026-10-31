@@ -48,7 +48,7 @@ import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStatTile
-import com.letta.mobile.data.home.relativeAgeLabel
+import com.letta.mobile.util.time.TimeLabels
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.ui.components.DisclosureChevron
@@ -137,7 +137,7 @@ private fun CompactRecentRow(conversation: FleetRecentConversation, page: HomePa
     RosterListRow(
         spec = LettaListRowSpec(
             title = conversation.title,
-            trailing = relativeAgeLabel(conversation.updatedAtLabel),
+            trailing = TimeLabels.ageLabel(conversation.updatedAtLabel),
             subtitle = subtitle.ifBlank { null },
         ),
         row = RosterRowState(onClick = { page.navigation.onOpenConversation(conversation) }),
