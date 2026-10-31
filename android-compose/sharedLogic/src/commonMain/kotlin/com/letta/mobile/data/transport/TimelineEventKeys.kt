@@ -24,7 +24,9 @@ internal object TimelineEventKeys {
      * the turn regardless of how it reached us.
      */
     fun key(event: WsTimelineEvent, fallbackConversationId: String?): String? = when (event) {
-        is WsTimelineEvent.TurnStarted -> with(event) { "started|$conversationId|$turnId|$runId" }
+        is WsTimelineEvent.TurnStarted -> with(event) {
+            "started|$conversationId|$turnId|$runId" + if (dequeued) "|dequeued" else ""
+        }
         is WsTimelineEvent.MessageDelta -> messageKey(event, fallbackConversationId)
         is WsTimelineEvent.StopReason -> with(event) { "stop|$turnId|$runId|$stopReason" }
         is WsTimelineEvent.UsageStatistics -> with(event) {

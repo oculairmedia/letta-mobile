@@ -213,6 +213,8 @@ sealed interface WsTimelineEvent {
         // shim regression.
         val runId: String,
         val isReplay: Boolean = false,
+        /** Distinguishes an input starting after queueing from the pre-acceptance start. */
+        val dequeued: Boolean = false,
     ) : WsTimelineEvent
 
     /**
@@ -425,6 +427,7 @@ private fun ServerFrame.TurnStarted.turnStartedEvent(isReplay: Boolean): WsTimel
         conversationId = conversationId,
         runId = runId,
         isReplay = isReplay,
+        dequeued = dequeued,
     )
 
 /** Turn-lifecycle bookends plus the bare stop/usage/subscribe envelopes. */
