@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.schedules
 
 import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.data.model.AgentId
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -23,10 +24,14 @@ import kotlin.time.Instant
  * shows until someone picks one). A schedule with no agent takes the theme's primary.
  */
 @Composable
-fun scheduleAccent(agentId: String?): Color {
-    if (agentId == null) return MaterialTheme.colorScheme.primary
-    return LocalCalendarAccent.current(agentId) ?: Color(MascotIdentity.seeded(agentId).argb)
+fun scheduleAccent(agent: AgentId?): Color {
+    if (agent == null) return MaterialTheme.colorScheme.primary
+    return LocalCalendarAccent.current(agent.value) ?: Color(MascotIdentity.seeded(agent.value).argb)
 }
+
+/** [scheduleAccent] for a schedule's raw agent id as the server sends it. */
+@Composable
+internal fun scheduleAccentOfRaw(raw: String?): Color = scheduleAccent(raw?.let(::AgentId))
 
 /** The colour of a run's status dot (the run detail, the history). */
 @Composable
@@ -65,7 +70,7 @@ fun RunStatus.tone(): CalendarTone = when (this) {
 @Composable
 fun runEventSpec(run: ScheduleRun, zone: TimeZone, now: Instant, showTime: Boolean = true): CalendarEventSpec = CalendarEventSpec(
     title = run.scheduleName,
-    accent = scheduleAccent(run.agentId),
+    accent = scheduleAccentOfRaw(run.agentId),
     tone = run.status.tone(),
     leading = if (showTime) ScheduleRunText.shortTime(run.instant, zone) else null,
     badge = outcomeBadge(run.status),
@@ -83,7 +88,7 @@ fun bandEventSpec(band: CalendarBand, cadence: String?): CalendarEventSpec {
     }
     return CalendarEventSpec(
         title = band.scheduleName,
-        accent = scheduleAccent(band.agentId),
+        accent = scheduleAccentOfRaw(band.agentId),
         tone = tone,
         trailing = "×${band.count}",
         badge = if (failed > 0) CalendarBadge(CalendarGlyphs.Failed, MaterialTheme.colorScheme.error, "$failed failed") else null,

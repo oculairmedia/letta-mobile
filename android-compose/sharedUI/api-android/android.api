@@ -6116,7 +6116,7 @@ public final class com/letta/mobile/ui/schedules/ScheduleViewSupportKt {
 	public static final fun bandEventSpec (Lcom/letta/mobile/data/schedules/CalendarBand;Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/schedules/CalendarEventSpec;
 	public static final fun outcomeBadge (Lcom/letta/mobile/data/schedules/RunStatus;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/schedules/CalendarBadge;
 	public static final fun runEventSpec (Lcom/letta/mobile/data/schedules/ScheduleRun;Lkotlinx/datetime/TimeZone;Lkotlin/time/Instant;ZLandroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/schedules/CalendarEventSpec;
-	public static final fun scheduleAccent (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)J
+	public static final fun scheduleAccent-LCWQUKQ (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)J
 	public static final fun statusColor (Lcom/letta/mobile/data/schedules/RunStatus;Landroidx/compose/runtime/Composer;I)J
 	public static final fun tone (Lcom/letta/mobile/data/schedules/RunStatus;)Lcom/letta/mobile/ui/schedules/CalendarTone;
 }

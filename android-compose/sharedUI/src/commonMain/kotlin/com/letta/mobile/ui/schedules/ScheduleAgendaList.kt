@@ -86,7 +86,7 @@ private fun RunRow(entry: CalendarEntry.Event, params: ScheduleCalendarParams) {
         ),
         onClick = { params.actions.onRunClick(run) },
         modifier = Modifier.heightIn(min = LettaDimens.Control.minTouchTarget),
-        leading = { AgendaLeading(ScheduleFormat.timeOfDay(run.instant, params.clock.zone), scheduleAccent(run.agentId)) },
+        leading = { AgendaLeading(ScheduleFormat.timeOfDay(run.instant, params.clock.zone), scheduleAccentOfRaw(run.agentId)) },
         end = outcomeBadge(run.status)?.let { badge -> { BadgeIcon(badge) } },
     )
 }
@@ -110,7 +110,7 @@ private fun BandRow(band: CalendarBand, params: ScheduleCalendarParams) {
         leading = {
             val allDay = band.firstMinute < MINUTES && band.lastMinute >= LAST_HOUR_MINUTE
             val window = if (allDay) "All day" else ScheduleRunText.window(band.firstMinute, band.lastMinute)
-            AgendaLeading(window, scheduleAccent(band.agentId))
+            AgendaLeading(window, scheduleAccentOfRaw(band.agentId))
         },
     )
 }

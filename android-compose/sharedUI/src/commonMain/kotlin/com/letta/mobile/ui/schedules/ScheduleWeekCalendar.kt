@@ -74,7 +74,7 @@ private fun stripDay(day: CalendarDay, params: ScheduleCalendarParams) = Calenda
     column = CalendarColumn(day.date, day.date == params.today),
     weekday = ScheduleFormat.weekdayShort(day.date.dayOfWeek).take(1),
     selected = day.date == params.selected,
-    dots = day.agentIds.map { scheduleAccent(it) },
+    dots = day.agentIds.map { scheduleAccentOfRaw(it) },
     description = "${ScheduleRunText.longDate(day.date)}, ${ScheduleRunText.runCount(day.runCount)}",
 )
 

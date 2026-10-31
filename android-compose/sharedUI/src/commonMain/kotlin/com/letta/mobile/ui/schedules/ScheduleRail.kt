@@ -242,7 +242,7 @@ private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) 
         BackToOverview("Back", params.onBackToOverview)
         Spacer(Modifier.height(LettaDimens.Space.md))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(LettaDimens.Control.iconSm).clip(CircleShape).background(scheduleAccent(run.agentId)))
+            Box(Modifier.size(LettaDimens.Control.iconSm).clip(CircleShape).background(scheduleAccentOfRaw(run.agentId)))
             Spacer(Modifier.width(LettaDimens.Space.sm))
             Text(
                 run.scheduleName,

@@ -45,7 +45,7 @@ fun ScheduleMonthCalendar(params: ScheduleCalendarParams, modifier: Modifier = M
             ScheduleAgendaList(dayParams) {
                 item(key = "month-grid") {
                     MonthGrid(params, CalendarDimens.monthCellCompactHeight, onSelect = params.actions.onSelectDate) { day ->
-                        CalendarDots(day.agentIds.map { scheduleAccent(it) })
+                        CalendarDots(day.agentIds.map { scheduleAccentOfRaw(it) })
                     }
                 }
             }
