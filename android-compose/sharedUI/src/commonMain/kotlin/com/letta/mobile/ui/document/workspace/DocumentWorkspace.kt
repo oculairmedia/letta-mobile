@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -44,6 +43,7 @@ import com.letta.mobile.sharedui.resources.document_workspace_unsupported_refere
 import com.letta.mobile.ui.canvas.notes.NotebookNoteEditorContent
 import com.letta.mobile.ui.canvas.references.NotebookReferencePreview
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -94,7 +94,7 @@ private fun WorkspaceHeader(controller: DocumentWorkspaceController, state: Docu
                 Text(stringResource(Res.string.document_workspace_close))
             }
         }
-        if (state.transitioning) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (state.transitioning) LettaBusyBar()
         WorkspaceProblem(state.problem)
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,7 +24,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.runtime.CommandActivity
 import com.letta.mobile.data.runtime.CommandState
 import com.letta.mobile.data.runtime.LiveCompaction
@@ -54,6 +52,7 @@ import com.letta.mobile.sharedui.resources.run_status_tool
 import com.letta.mobile.sharedui.resources.run_status_waiting
 import com.letta.mobile.sharedui.resources.run_status_working
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -155,7 +154,7 @@ private fun PhaseRow(phase: PhaseLabel, now: () -> Long) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(SPINNER_SIZE), strokeWidth = SPINNER_STROKE)
+        LettaSpinner(size = LettaDimens.Control.spinnerSm)
         Text(
             text = phaseText(phase, now),
             style = MaterialTheme.typography.bodySmall,
@@ -198,7 +197,7 @@ private fun CompactionRow(compaction: LiveCompaction) {
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         modifier = Modifier.testTag(RunStatusTestTags.COMPACTION),
     ) {
-        if (compaction.running) CircularProgressIndicator(Modifier.size(SPINNER_SIZE), strokeWidth = SPINNER_STROKE)
+        if (compaction.running) LettaSpinner(size = LettaDimens.Control.spinnerSm)
         Text(
             text = compactionText(compaction),
             style = MaterialTheme.typography.bodySmall,
@@ -244,7 +243,7 @@ private fun CommandCard(command: CommandActivity, onDismiss: () -> Unit) {
     ) {
         Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                if (command.running) CircularProgressIndicator(Modifier.size(SPINNER_SIZE), strokeWidth = SPINNER_STROKE)
+                if (command.running) LettaSpinner(size = LettaDimens.Control.spinnerSm)
                 Text(
                     text = stringResource(command.headline(), command.input.ifBlank { "command" }),
                     style = MaterialTheme.typography.labelMedium,
@@ -289,5 +288,3 @@ private const val MILLIS_PER_SECOND = 1_000L
 private const val COUNTDOWN_TICK_MS = 250L
 private const val OUTPUT_MAX_LINES = 12
 private const val DIM_ALPHA = 0.6f
-private val SPINNER_SIZE = 12.dp
-private val SPINNER_STROKE = 1.5.dp

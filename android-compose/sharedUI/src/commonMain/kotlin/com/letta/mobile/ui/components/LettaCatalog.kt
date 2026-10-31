@@ -27,8 +27,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 /*
  * Building blocks for the catalog-style pages (Channels, Skills, Tools, ...) on desktop and
- * Android: an accent card, tinted pills and an empty-state box; the sectioned card grid is a
- * RosterList with columns (letta-mobile-ckmub.3.25). Everything
+ * Android: an accent card and an empty-state box; their pills are the theme's LettaPill family.
+ * The sectioned card grid is a RosterList with columns (letta-mobile-ckmub.3.25). Everything
  * reads the design tokens (MaterialTheme shapes / colorScheme, LettaDimens).
  */
 
@@ -80,26 +80,6 @@ fun LettaCatalogCard(
     }
 }
 
-/** A small tinted pill (tags, status, type labels). */
-@Composable
-fun LettaPill(text: String, color: Color, modifier: Modifier = Modifier) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = color.copy(alpha = PILL_FILL_ALPHA),
-        contentColor = color,
-        border = BorderStroke(LettaDimens.Stroke.hairline, color.copy(alpha = PILL_BORDER_ALPHA)),
-        modifier = modifier,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
-        )
-    }
-}
-
 /** A full-width informational / empty-state box, padded by [contentPadding]. */
 @Composable
 fun LettaInfoBox(
@@ -126,7 +106,5 @@ val LettaCatalogGridPadding: PaddingValues =
 
 private const val CARD_BORDER_ALPHA = 0.6f
 private const val AVATAR_ALPHA = 0.2f
-private const val PILL_FILL_ALPHA = 0.12f
-private const val PILL_BORDER_ALPHA = 0.18f
 private const val INFO_FILL_ALPHA = 0.42f
 private const val INFO_BORDER_ALPHA = 0.48f

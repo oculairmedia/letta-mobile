@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +32,7 @@ import com.letta.mobile.sharedui.resources.canvas_viewer_load_failed
 import com.letta.mobile.sharedui.resources.canvas_viewer_retry
 import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceLoadState
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -132,7 +132,7 @@ fun CanvasWorkspace(
             if (sessionLoadState == CanvasWorkspaceLoadState.Ready) {
                 CanvasWorkspaceBoard(host, boardModifier, prepareViewerChange)
             } else {
-                Box(boardModifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                Box(boardModifier.fillMaxSize(), contentAlignment = Alignment.Center) { LettaSpinner(size = LettaDimens.Control.spinnerLg) }
             }
         }
     }
@@ -201,7 +201,7 @@ private fun CanvasWorkspaceBoard(
                         CanvasBoardChrome(board, insert)
                     }
                 } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LettaSpinner(size = LettaDimens.Control.spinnerLg) }
                 }
             }
         }

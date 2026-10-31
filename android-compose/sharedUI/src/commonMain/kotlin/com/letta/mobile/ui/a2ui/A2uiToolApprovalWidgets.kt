@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiActionOrigin
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.ui.theme.LettaTonalPill
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -296,17 +297,7 @@ internal fun ToolApprovalRiskPill(
     risk: ToolApprovalRisk,
     style: ToolApprovalRiskStyle,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = style.pillContainer,
-    ) {
-        Text(
-            text = risk.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = style.pillContent,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-        )
-    }
+    LettaTonalPill(risk.label, style.pillContainer, style.pillContent)
 }
 
 @Composable

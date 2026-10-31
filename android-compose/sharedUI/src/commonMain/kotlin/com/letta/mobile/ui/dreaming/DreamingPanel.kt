@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -40,6 +39,7 @@ import com.letta.mobile.data.dreaming.DreamingController
 import com.letta.mobile.data.dreaming.DreamingState
 import com.letta.mobile.data.dreaming.DreamTrigger
 import com.letta.mobile.ui.shell.pages.memfs.MemfsFileDiffView
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.util.time.TimeLabels
 
@@ -140,7 +140,7 @@ private fun DreamStatus(state: DreamingState, notes: DreamingHostNotes) {
         Text(live?.let(DreamingStrings::live) ?: DreamingStrings.NOW_IDLE, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         // The bar's slot is always there: a dream starting or ending changes only what it draws.
         Box(Modifier.fillMaxWidth().height(LettaDimens.Space.xs)) {
-            if (live != null) LinearProgressIndicator(Modifier.fillMaxWidth().testTag(DreamingTags.PROGRESS))
+            if (live != null) LettaBusyBar(Modifier.testTag(DreamingTags.PROGRESS))
         }
         state.lastRun?.let { Hint(DreamingStrings.lastDream(it.summary, ageText(it.timestamp))) }
         state.settings.settings?.let { Hint(DreamingStrings.triggerSentence(it.trigger, it.stepCount)) }

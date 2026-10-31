@@ -41,6 +41,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
+import com.letta.mobile.ui.theme.LettaTonalPill
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -99,20 +100,12 @@ internal fun ComposerWorkingDirectoryRow(
 /** The worktree the working directory is in, as a small tonal label beside the path. */
 @Composable
 private fun ComposerWorktreeBadge(name: String) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+    LettaTonalPill(
+        text = stringResource(Res.string.composer_worktree_badge, name),
+        container = MaterialTheme.colorScheme.tertiaryContainer,
+        content = MaterialTheme.colorScheme.onTertiaryContainer,
         modifier = Modifier.testTag(ComposerWorktreeTags.BADGE),
-    ) {
-        Text(
-            text = stringResource(Res.string.composer_worktree_badge, name),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-        )
-    }
+    )
 }
 
 /** Test tags of the working-directory row's worktree badge. */

@@ -19,7 +19,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,6 +39,7 @@ import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.ui.theme.LettaTonalPill
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -161,27 +161,14 @@ internal fun A2uiScheduleCard(
 
 @Composable
 internal fun ScheduleStatusPill(status: ScheduleStatus) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = when (status) {
-            ScheduleStatus.Active -> MaterialTheme.colorScheme.tertiaryContainer
-            ScheduleStatus.Paused -> MaterialTheme.colorScheme.secondaryContainer
-            ScheduleStatus.Failed -> MaterialTheme.colorScheme.errorContainer
-            ScheduleStatus.Idle -> MaterialTheme.colorScheme.surfaceVariant
-        },
-    ) {
-        Text(
-            text = status.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = when (status) {
-                ScheduleStatus.Active -> MaterialTheme.colorScheme.onTertiaryContainer
-                ScheduleStatus.Paused -> MaterialTheme.colorScheme.onSecondaryContainer
-                ScheduleStatus.Failed -> MaterialTheme.colorScheme.onErrorContainer
-                ScheduleStatus.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-        )
+    val scheme = MaterialTheme.colorScheme
+    val (container, content) = when (status) {
+        ScheduleStatus.Active -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+        ScheduleStatus.Paused -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        ScheduleStatus.Failed -> scheme.errorContainer to scheme.onErrorContainer
+        ScheduleStatus.Idle -> scheme.surfaceVariant to scheme.onSurfaceVariant
     }
+    LettaTonalPill(status.label, container, content)
 }
 
 @Composable

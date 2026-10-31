@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -42,6 +41,7 @@ import com.letta.mobile.ui.chat.render.ToolOutputSyntaxColors
 import com.letta.mobile.ui.chat.render.cachedToolOutputHighlightSpans
 import com.letta.mobile.ui.chat.render.toolOutputSyntaxColors
 import com.letta.mobile.ui.host.InspectorPane
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -73,7 +73,7 @@ fun WorkspaceFileViewer(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.xl),
         )
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = LettaDimens.Space.xs))
+        if (state.loading) LettaBusyBar(Modifier.padding(top = LettaDimens.Space.xs))
         FileViewerBody(state, actions)
     }
 }

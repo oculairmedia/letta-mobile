@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
@@ -170,7 +170,7 @@ fun <T> ColumnScope.LettaPickerContent(
         }
         slots.header?.invoke(this)
         if (spec.load == PickerLoad.Loading && !layout.isEmpty) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().testTag(LettaPickerTags.LOADING))
+            LettaBusyBar(Modifier.testTag(LettaPickerTags.LOADING))
         }
         PickerList(PickerListModel(spec, layout, highlight.intValue, listState), callbacks, slots, Modifier.weight(1f, fill = false))
         (spec.load as? PickerLoad.Failed)?.let { PickerError(it.message, spec.tags.error) }
@@ -262,7 +262,7 @@ private fun <T> LazyListScope.emptyLine(spec: LettaPickerSpec<T>) {
             modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.lg).testTag(spec.tags.empty),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            if (spec.load == PickerLoad.Loading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag(LettaPickerTags.LOADING))
+            if (spec.load == PickerLoad.Loading) LettaBusyBar(Modifier.testTag(LettaPickerTags.LOADING))
             if (empty.title.isNotEmpty()) {
                 Text(empty.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

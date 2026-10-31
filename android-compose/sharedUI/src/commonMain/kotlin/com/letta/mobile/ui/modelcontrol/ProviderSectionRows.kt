@@ -33,6 +33,7 @@ import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaTonalPill
 
 /** Rows of [ProviderManagementPane]: the provider card header, its action strip, and one model. */
 
@@ -98,13 +99,10 @@ private fun StatusDot(connected: Boolean) {
 /** "12 / 80" — exposed over total models, so a half-hidden provider reads at a glance. */
 @Composable
 private fun CountPill(section: ProviderSection) {
-    Text(
+    LettaTonalPill(
         text = "${section.exposedCount} / ${section.models.size}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.small)
-            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+        container = MaterialTheme.colorScheme.surfaceContainerHighest,
+        content = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

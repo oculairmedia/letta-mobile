@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -44,6 +43,7 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaConfirmTags
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -163,7 +163,7 @@ private fun VaultHeader(page: AgentVaultPageScope) {
             }
         }
         Text(STORAGE_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (page.state.load == AgentVaultLoad.Loading || page.state.saving) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (page.state.load == AgentVaultLoad.Loading || page.state.saving) LettaBusyBar()
         if (page.state.error != null) VaultError(page)
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
@@ -42,6 +41,7 @@ import com.letta.mobile.sharedui.resources.notebook_reference_refresh
 import com.letta.mobile.sharedui.resources.notebook_reference_unavailable
 import com.letta.mobile.sharedui.resources.notebook_reference_unsupported
 import com.letta.mobile.ui.markdown.SharedMarkdownText
+import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -92,7 +92,7 @@ private fun ReferenceStatus(phase: NotebookReferencePhase) {
         NotebookReferencePhase.FAILED -> Res.string.notebook_reference_failed
         else -> null
     }
-    if (phase == NotebookReferencePhase.LOADING) LinearProgressIndicator(Modifier.fillMaxWidth())
+    if (phase == NotebookReferencePhase.LOADING) LettaBusyBar()
     label?.let { Text(stringResource(it), style = MaterialTheme.typography.bodyMedium) }
 }
 
