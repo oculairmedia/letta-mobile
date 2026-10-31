@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.shell.ShellLongPressMenu
+import com.letta.mobile.ui.shell.shellHoverTimeLabel
 
 /**
  *  (hard cut S3, primitive P1): the one container contract.
@@ -119,8 +120,8 @@ data class LettaConfirmTags(
 
 /**
  * The platform's containers. Every parameter defaults to the shared touch implementation, so a
- * platform overrides only what it draws differently (desktop: its own alert window, cursor tooltips,
- * right-click row menus).
+ * platform overrides only what it draws differently (desktop: its own alert window and right-click
+ * row menus; every pointer host has cursor tooltips).
  */
 @Immutable
 class LettaHost(
@@ -166,8 +167,15 @@ class LettaHost(
         /** Android's host: sheets, long-press menus, no hover. */
         val Touch = LettaHost()
 
-        /** A pointer host with the shared containers (web); desktop adds its window-level pieces. */
-        val Pointer = LettaHost(input = LettaInput.Pointer)
+        /**
+         * A pointer host with the shared containers and hover tooltips/cards (web); desktop adds its
+         * window-level pieces and its own hover-card time label.
+         */
+        val Pointer = LettaHost(
+            input = LettaInput.Pointer,
+            tooltip = pointerTooltip,
+            hoverCard = pointerHoverCard { shellHoverTimeLabel(it) },
+        )
     }
 }
 
