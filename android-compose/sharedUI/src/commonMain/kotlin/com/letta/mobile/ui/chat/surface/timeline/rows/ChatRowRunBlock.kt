@@ -404,7 +404,10 @@ internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
 private class PositionedRunStep(val step: RunStep, val position: GroupPosition) {
     fun workPadding(body: RunBodyState, compactWidth: State<Boolean>?): Modifier {
         val indent = if (body.lifted) ChatRowSpacing.runStepIndent else 0.dp
-        return Modifier.runWidthPadding(indent, compactWidth, top = top())
+        val calls = (step as? RunStep.ToolCalls)?.calls
+        // Keep an approval's column width: widening it can unwrap its command and move its actions.
+        val approval = calls != null && calls.approvals.any { it.isWaitingOn(calls.toolCalls) }
+        return Modifier.runWidthPadding(indent, compactWidth.takeUnless { approval }, top = top())
     }
 
     /** The legacy row beat above it: a tool summary always takes the grouped beat. */

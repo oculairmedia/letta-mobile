@@ -14,6 +14,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Dp
@@ -21,7 +22,10 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevronDefaults
 import com.letta.mobile.ui.host.LettaHost
@@ -70,6 +74,58 @@ class ChatRowRunDisclosureGeometryUiTest {
 
     @Test
     fun compactRunChevronsShareOneColumn() = checkWidths(listOf(360.dp, 599.dp)) { assertChevronColumn() }
+
+    @Test
+    fun aMessageToolApprovalKeepsItsCardPositionAndWrappedHeight() = runDesktopComposeUiTest {
+        showApproval(inRun = true)
+        val slot = bounds(ChatRowTestTags.APPROVAL_SLOT)
+        val command = onNodeWithText("$ ./gradlew :feature-chat:testDebugUnitTest", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        println("approval geometry: slot=$slot command=$command block=${bounds(ChatRowTestTags.RUN_BLOCK)}")
+        assertNear(172.dp, slot.bottom - slot.top)
+        assertNear(ChatRowSpacing.runStepIndent, slot.left - bounds(ChatRowTestTags.RUN_BLOCK).left)
+        assertNear(60.dp, slot.top - bounds(ChatRowTestTags.RUN_BLOCK).top)
+        assertNear(bounds(ChatRowTestTags.TOOL_CARD_TOGGLE).bottom, slot.top)
+        assertNear(32.dp, command.bottom - command.top)
+    }
+
+    @Test
+    fun aStandaloneMessageKeepsItsApprovalGeometryWhenToolDetailsOpen() = runDesktopComposeUiTest {
+        showApproval(inRun = false)
+        val before = bounds(ChatRowTestTags.APPROVAL_SLOT)
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+        val after = bounds(ChatRowTestTags.APPROVAL_SLOT)
+        val panel = bounds(ChatRowTestTags.TOOL_OUTPUT)
+        val command = bounds(ChatRowTestTags.TOOL_COMMAND)
+        assertNear(0.dp, after.left)
+        assertNear(before.bottom - before.top, after.bottom - after.top)
+        assertNear(bounds(ChatRowTestTags.TOOL_CARD_BODY).bottom, after.top)
+        assertTrue(after.top > before.top, "opening the tool details must move the approval card down")
+        assertNear(ChatRowSpacing.runStepDetailIndent, panel.left - bounds(ChatRowTestTags.TOOL_CARD_TOGGLE).left)
+        assertNear(12.dp, command.left - panel.left)
+    }
+
+    private fun ComposeUiTest.showApproval(inRun: Boolean) {
+        val arguments = """{"command":"./gradlew :feature-chat:testDebugUnitTest"}"""
+        val message = UiMessage(
+            id = "approval", role = "assistant", content = "", timestamp = "2026-10-11T16:04:02Z", runId = RUN_ID,
+            toolCalls = listOf(UiToolCall(name = "Bash", arguments = arguments, result = null, toolCallId = "approval-call")),
+            approvalRequest = UiApprovalRequest(
+                requestId = "approval-request",
+                toolCalls = listOf(UiApprovalToolCall(toolCallId = "approval-call", name = "Bash", arguments = arguments)),
+                details = PendingApprovalDetails(approvalId = "approval-request", toolCallId = "approval-call", toolName = "Bash"),
+            ),
+        )
+        setContent {
+            CompositionLocalProvider(LocalReducedMotion provides true, LocalLettaHost provides LettaHost.Touch) {
+                MaterialTheme {
+                    // The command fits on one line only if the approval group loses its inset.
+                    Box(Modifier.width(400.dp)) {
+                        RenderRow(ChatRenderItem.Single(message, GroupPosition.None, stableRunId = RUN_ID.takeIf { inRun }), rowContext())
+                    }
+                }
+            }
+        }
+    }
 
     @Test
     fun wideRunChevronsShareOneColumn() = checkWidths(listOf(600.dp, 1200.dp)) { assertChevronColumn() }
