@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -40,6 +41,7 @@ import com.letta.mobile.ui.host.LocalLettaHost
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /** letta-mobile-ckmub.3.16: the shared Schedules page on a desktop pane and a phone. */
@@ -59,7 +61,7 @@ class SchedulesPageTest {
         state: SchedulesPageState,
         actions: SchedulesPageActions = SchedulesPageActions(),
         width: Dp = WIDE,
-        initialView: SchedulesView = SchedulesView.Week,
+        initialView: SchedulesView? = SchedulesView.Week,
     ) {
         // Pointer containers (dialogs) everywhere, the phone's sheet included: the test draws no window insets.
         val host = LettaHost.Pointer.copy(sheet = LettaPaneDefaults.Dialog)
@@ -82,6 +84,7 @@ class SchedulesPageTest {
             onNodeWithTag(SchedulesPageTags.tab(view)).performClick()
             onNodeWithTag(SchedulesPageTags.view(view)).assertExists()
         }
+        onNodeWithTag(SchedulesPageTags.tab(SchedulesView.Rules)).performClick()
         onNodeWithTag(SchedulesPageTags.rule("c1")).assertExists()
         onNodeWithTag(SchedulesPageTags.rule("c2")).assertExists()
     }
@@ -106,7 +109,7 @@ class SchedulesPageTest {
         onNodeWithTag(SchedulesPageTags.FORM_NAME).performTextInput("Briefing")
         onNodeWithTag(SchedulesPageTags.FORM_PROMPT).performTextInput("Brief me")
         onNodeWithTag(SchedulesPageTags.cadence("Hourly")).performClick()
-        onNodeWithText("Every hour at :00").assertExists()
+        onNodeWithText("Every hour").assertExists()
         onNodeWithTag(SchedulesPageTags.cadence("Daily")).performClick()
         onNodeWithTag(SchedulesPageTags.FORM_SUBMIT).assertIsEnabled().performClick()
         assertEquals(listOf(ScheduleCreateRequest("a1", "Briefing", "Brief me", "0 9 * * *", "UTC")), created)
@@ -203,6 +206,38 @@ class SchedulesPageTest {
         show(state(focusedAgentId = null, library = library), SchedulesPageActions(onSelectAgent = { selected += it }))
         onNodeWithTag(SchedulesPageTags.agent("a2")).performClick()
         assertEquals(listOf("a2"), selected)
+    }
+
+    @Test
+    fun aPhoneOpensOnTheAgendaWithTheSwitcherAtTheBottom() = runComposeUiTest {
+        show(state(), width = COMPACT, initialView = null)
+        onNodeWithTag(SchedulesPageTags.view(SchedulesView.Agenda)).assertExists()
+        onNodeWithTag(SchedulesPageTags.VIEW_BAR).assertExists()
+        onNodeWithTag(SchedulesPageTags.tab(SchedulesView.Week)).performClick()
+        onNodeWithTag(SchedulesPageTags.view(SchedulesView.Week)).assertExists()
+    }
+
+    @Test
+    fun aWidePageOpensOnTheWeekAndNamesTheZone() = runComposeUiTest {
+        show(state(), initialView = null)
+        onNodeWithTag(SchedulesPageTags.view(SchedulesView.Week)).assertExists()
+        onNodeWithTag(SchedulesPageTags.VIEW_BAR).assertDoesNotExist()
+        onNodeWithText("Times in UTC").assertExists()
+        onNodeWithTag(SchedulesPageTags.tab(SchedulesView.Month)).performClick()
+        onNodeWithText("October 2026").assertExists()
+        onNodeWithTag(SchedulesPageTags.NEXT_WEEK).performClick()
+        onNodeWithText("November 2026").assertExists()
+        onNodeWithTag(SchedulesPageTags.TODAY).performClick()
+        onNodeWithText("October 2026").assertExists()
+    }
+
+    @Test
+    fun pausedSchedulesCanBeHidden() = runComposeUiTest {
+        val paused = digest.copy(status = "paused")
+        show(state(crons = listOf(standup, paused)), width = COMPACT, initialView = SchedulesView.Agenda)
+        assertTrue(onAllNodesWithText("Digest").fetchSemanticsNodes().isNotEmpty(), "a paused schedule shows faded by default")
+        onNodeWithTag(SchedulesPageTags.PAUSED_FILTER).performClick()
+        assertTrue(onAllNodesWithText("Digest").fetchSemanticsNodes().isEmpty(), "and hides with the filter")
     }
 
     private companion object {

@@ -68,7 +68,7 @@ class ScheduleLogicTest {
         assertEquals("Every minute", CronSchedule.describe(CronSchedule.parse("* * * * *")!!))
         assertEquals("Every 15 minutes", CronSchedule.describe(CronSchedule.parse("*/15 * * * *")!!))
         assertEquals("Every day at 9:00 AM", CronSchedule.describe(CronSchedule.parse("0 9 * * *")!!))
-        assertEquals("Weekdays at 8:30 AM", CronSchedule.describe(CronSchedule.parse("30 8 * * 1-5")!!))
+        assertEquals("Every weekday at 8:30 AM", CronSchedule.describe(CronSchedule.parse("30 8 * * 1-5")!!))
         assertEquals("Every hour at :05", CronSchedule.describe(CronSchedule.parse("5 * * * *")!!))
     }
 

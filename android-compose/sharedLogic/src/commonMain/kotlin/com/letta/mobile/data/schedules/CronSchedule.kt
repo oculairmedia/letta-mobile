@@ -136,66 +136,11 @@ object CronSchedule {
     }
 
     /**
-     * A human-readable summary of [expr] for the cron-builder preview and rule
-     * rows, e.g. "Every 15 minutes", "Every day at 9:00 AM", "Weekdays at
-     * 8:30 AM". Falls back to the raw expression for shapes it can't phrase.
+     * A human-readable summary of [expr] for the cron-builder preview and every schedule row, e.g.
+     * "Every 15 minutes", "Every weekday at 9:00 AM", "Every 2 hours, 9 AM to 5 PM on weekdays".
+     * Falls back to the raw expression for shapes it can't phrase (see [CronPhrase]).
      */
-    fun describe(expr: CronExpr): String {
-        val minutesFull = coversRange(expr.minutes, MIN_MINUTE, MAX_MINUTE)
-        val hoursFull = coversRange(expr.hours, MIN_HOUR, MAX_HOUR)
-        val anyDay = !expr.domRestricted && !expr.dowRestricted
-        val minuteStep = arithmeticStep(expr.minutes, MIN_MINUTE, MAX_MINUTE)
-        val singleMinute = expr.minutes.singleOrNull()
-        val singleHour = expr.hours.singleOrNull()
-
-        // Sub-hour cadences.
-        if (minutesFull && hoursFull && anyDay) return "Every minute"
-        if (minuteStep != null && minuteStep > 1 && hoursFull && anyDay) {
-            return "Every $minuteStep minutes"
-        }
-        if (singleMinute != null && hoursFull && anyDay) {
-            return "Every hour at :${ScheduleFormat.pad2(singleMinute)}"
-        }
-
-        // Fixed time-of-day cadences.
-        if (singleMinute != null && singleHour != null) {
-            val clock = ScheduleFormat.clockLabel(singleHour, singleMinute)
-            return when {
-                anyDay -> "Every day at $clock"
-                expr.dowRestricted && !expr.domRestricted ->
-                    "${weekdayPhrase(expr.isoDaysOfWeek)} at $clock"
-                expr.domRestricted && !expr.dowRestricted -> {
-                    val days = expr.daysOfMonth.sorted().joinToString(", ")
-                    "Monthly on day $days at $clock"
-                }
-                else -> "At $clock"
-            }
-        }
-        return expr.raw
-    }
-
-    private fun weekdayPhrase(isoDays: Set<Int>): String {
-        val sorted = isoDays.sorted()
-        if (sorted == listOf(1, 2, 3, 4, 5)) return "Weekdays"
-        if (sorted == listOf(6, 7)) return "Weekends"
-        if (sorted.size == 7) return "Every day"
-        return sorted.joinToString(", ") { ScheduleFormat.weekdayShort(it) }
-    }
-
-    /** Exact arithmetic step (e.g. a step of 15) starting at [min], else null. */
-    private fun arithmeticStep(values: Set<Int>, min: Int, max: Int): Int? {
-        val sorted = values.sorted()
-        if (sorted.size < 2 || sorted.first() != min) return null
-        val step = sorted[1] - sorted[0]
-        if (step <= 0) return null
-        if (sorted.zipWithNext().any { (a, b) -> b - a != step }) return null
-        // Must extend to the end of the range (a true `*/step`).
-        if (sorted.last() + step <= max) return null
-        return step
-    }
-
-    private fun coversRange(values: Set<Int>, min: Int, max: Int): Boolean =
-        values.size == (max - min + 1)
+    fun describe(expr: CronExpr): String = CronPhrase.describe(expr)
 
     private fun dayMatches(expr: CronExpr, date: LocalDate): Boolean {
         val domOk = date.day in expr.daysOfMonth

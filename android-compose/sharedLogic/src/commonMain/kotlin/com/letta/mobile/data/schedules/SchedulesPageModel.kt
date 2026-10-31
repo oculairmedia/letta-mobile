@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.ScheduledMessage
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.plus
 import kotlin.time.Instant
 
@@ -16,16 +17,19 @@ import kotlin.time.Instant
  * Android and web project schedules the same way.
  */
 
-/** The page's views. [Rules] lists every schedule definition; [hasRange] views page through weeks. */
+/**
+ * The page's views: the calendar ([Agenda], [Week], [Month]), every schedule definition ([Rules],
+ * labelled "List") and run reliability ([History]). [hasRange] views page through dates.
+ */
 enum class SchedulesView(val label: String) {
-    Week("Week"),
     Agenda("Agenda"),
-    Timeline("Timeline"),
+    Week("Week"),
+    Month("Month"),
+    Rules("List"),
     History("History"),
-    Rules("Rules"),
     ;
 
-    val hasRange: Boolean get() = this == Week || this == Timeline
+    val hasRange: Boolean get() = this == Agenda || this == Week || this == Month
 }
 
 /**
@@ -69,6 +73,22 @@ data class ScheduleFormDraft(
 }
 
 object SchedulesPageModel {
+    /**
+     * A new-schedule draft started from an empty calendar slot: weekly on [date]'s weekday at
+     * [hour]:00, the closest recurring shape to "at this time" (the native route makes recurring
+     * schedules only).
+     */
+    fun draftAt(date: LocalDate, hour: Int): ScheduleFormDraft = ScheduleFormDraft(
+        cadence = CronBuilderState(
+            cadence = CronCadence.Weekly,
+            minute = 0,
+            hour = hour.coerceIn(0, LAST_HOUR),
+            daysOfWeek = setOf(date.dayOfWeek.isoDayNumber),
+        ),
+    )
+
+    private const val LAST_HOUR = 23
+
     /**
      * Every schedule the page shows: the cron tasks (scoped to [focusedAgentId] when set; a cron with
      * no agent belongs to every agent), then the native schedule-admin schedules not already
