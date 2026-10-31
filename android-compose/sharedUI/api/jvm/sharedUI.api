@@ -5909,9 +5909,25 @@ public final class com/letta/mobile/ui/schedules/CalendarColumn {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/schedules/CalendarDateTone : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/ui/schedules/CalendarDateTone$Companion;
+	public static final field Dim Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+	public static final field Plain Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+	public static final field Selected Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+	public static final field Today Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+	public static fun values ()[Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+}
+
+public final class com/letta/mobile/ui/schedules/CalendarDateTone$Companion {
+	public final fun of (ZZZ)Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+	public static synthetic fun of$default (Lcom/letta/mobile/ui/schedules/CalendarDateTone$Companion;ZZZILjava/lang/Object;)Lcom/letta/mobile/ui/schedules/CalendarDateTone;
+}
+
 public final class com/letta/mobile/ui/schedules/CalendarDayPartsKt {
 	public static final fun CalendarColumnsRow (ILandroidx/compose/ui/Modifier;Ljava/lang/String;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
-	public static final fun CalendarDateBadge (IZZLandroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
+	public static final fun CalendarDateBadge (ILcom/letta/mobile/ui/schedules/CalendarDateTone;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun CalendarDayHeader (Ljava/lang/String;Lcom/letta/mobile/ui/schedules/CalendarColumn;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun CalendarDots (Ljava/util/List;Landroidx/compose/ui/Modifier;ILandroidx/compose/runtime/Composer;II)V
 	public static final fun CalendarNowDivider (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V

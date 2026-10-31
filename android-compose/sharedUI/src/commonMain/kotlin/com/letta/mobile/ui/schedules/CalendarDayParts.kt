@@ -31,22 +31,44 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
 /**
- * A day's number in a circle: filled with the primary colour when [selected], primary text when it
- * is today. The day headers, the week strip and the month grid all draw their date with it.
+ * How a date badge reads, strongest first: the selected day, today, a day outside the month shown
+ * (dimmed), any other day.
+ */
+enum class CalendarDateTone {
+    Selected,
+    Today,
+    Dim,
+    Plain,
+    ;
+
+    companion object {
+        fun of(isToday: Boolean, selected: Boolean = false, dim: Boolean = false): CalendarDateTone = when {
+            selected -> Selected
+            isToday -> Today
+            dim -> Dim
+            else -> Plain
+        }
+    }
+}
+
+/**
+ * A day's number in a circle: filled with the primary colour when selected, primary text when it
+ * is today ([CalendarDateTone]). The day headers, the week strip and the month grid all draw their
+ * date with it.
  */
 @Composable
-fun CalendarDateBadge(number: Int, isToday: Boolean, selected: Boolean, modifier: Modifier = Modifier, dim: Boolean = false) {
+fun CalendarDateBadge(number: Int, tone: CalendarDateTone, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val fill = when {
-        selected -> scheme.primary
-        isToday -> scheme.primary.copy(alpha = TODAY_BADGE_ALPHA)
+    val fill = when (tone) {
+        CalendarDateTone.Selected -> scheme.primary
+        CalendarDateTone.Today -> scheme.primary.copy(alpha = TODAY_BADGE_ALPHA)
         else -> Color.Transparent
     }
-    val text = when {
-        selected -> scheme.onPrimary
-        isToday -> scheme.primary
-        dim -> MaterialTheme.customColors.onSurfaceMutedColor
-        else -> scheme.onSurface
+    val text = when (tone) {
+        CalendarDateTone.Selected -> scheme.onPrimary
+        CalendarDateTone.Today -> scheme.primary
+        CalendarDateTone.Dim -> MaterialTheme.customColors.onSurfaceMutedColor
+        CalendarDateTone.Plain -> scheme.onSurface
     }
     Box(modifier.size(LettaDimens.Orb.sm).clip(CircleShape).background(fill), contentAlignment = Alignment.Center) {
         Text("$number", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = text)
@@ -70,7 +92,7 @@ fun CalendarDayHeader(weekday: String, column: CalendarColumn, modifier: Modifie
             style = MaterialTheme.typography.labelSmall,
             color = if (column.isToday) MaterialTheme.colorScheme.primary else MaterialTheme.customColors.onSurfaceMutedColor,
         )
-        CalendarDateBadge(column.date.day, isToday = column.isToday, selected = false)
+        CalendarDateBadge(column.date.day, CalendarDateTone.of(column.isToday))
     }
 }
 
@@ -134,7 +156,7 @@ fun CalendarWeekStrip(days: List<CalendarStripDay>, onSelect: (CalendarStripDay)
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             ) {
                 Text(day.weekday, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-                CalendarDateBadge(day.column.date.day, isToday = day.column.isToday, selected = day.selected)
+                CalendarDateBadge(day.column.date.day, CalendarDateTone.of(day.column.isToday, selected = day.selected))
                 CalendarDots(day.dots)
             }
         }

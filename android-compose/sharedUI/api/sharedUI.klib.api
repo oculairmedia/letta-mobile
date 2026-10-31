@@ -533,6 +533,23 @@ final enum class com.letta.mobile.ui.providers.icons/ProviderBrand : kotlin/Enum
     final fun values(): kotlin/Array<com.letta.mobile.ui.providers.icons/ProviderBrand> // com.letta.mobile.ui.providers.icons/ProviderBrand.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.ui.schedules/CalendarDateTone : kotlin/Enum<com.letta.mobile.ui.schedules/CalendarDateTone> { // com.letta.mobile.ui.schedules/CalendarDateTone|null[0]
+    enum entry Dim // com.letta.mobile.ui.schedules/CalendarDateTone.Dim|null[0]
+    enum entry Plain // com.letta.mobile.ui.schedules/CalendarDateTone.Plain|null[0]
+    enum entry Selected // com.letta.mobile.ui.schedules/CalendarDateTone.Selected|null[0]
+    enum entry Today // com.letta.mobile.ui.schedules/CalendarDateTone.Today|null[0]
+
+    final val entries // com.letta.mobile.ui.schedules/CalendarDateTone.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.schedules/CalendarDateTone> // com.letta.mobile.ui.schedules/CalendarDateTone.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.ui.schedules/CalendarDateTone // com.letta.mobile.ui.schedules/CalendarDateTone.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.ui.schedules/CalendarDateTone> // com.letta.mobile.ui.schedules/CalendarDateTone.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.ui.schedules/CalendarDateTone.Companion|null[0]
+        final fun of(kotlin/Boolean, kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.ui.schedules/CalendarDateTone // com.letta.mobile.ui.schedules/CalendarDateTone.Companion.of|of(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    }
+}
+
 final enum class com.letta.mobile.ui.schedules/CalendarTone : kotlin/Enum<com.letta.mobile.ui.schedules/CalendarTone> { // com.letta.mobile.ui.schedules/CalendarTone|null[0]
     enum entry Faded // com.letta.mobile.ui.schedules/CalendarTone.Faded|null[0]
     enum entry Highlighted // com.letta.mobile.ui.schedules/CalendarTone.Highlighted|null[0]
@@ -12642,7 +12659,7 @@ final fun com.letta.mobile.ui.providers.icons/com_letta_mobile_ui_providers_icon
 final fun com.letta.mobile.ui.providers.icons/com_letta_mobile_ui_providers_icons_ProviderIcons$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.providers.icons/com_letta_mobile_ui_providers_icons_ProviderIcons$stableprop_getter|com_letta_mobile_ui_providers_icons_ProviderIcons$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.providers.icons/com_letta_mobile_ui_providers_icons_ProviderIdentity$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.providers.icons/com_letta_mobile_ui_providers_icons_ProviderIdentity$stableprop_getter|com_letta_mobile_ui_providers_icons_ProviderIdentity$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.schedules/CalendarColumnsRow(kotlin/Int, androidx.compose.ui/Modifier?, kotlin/String?, kotlin/Function4<androidx.compose.foundation.layout/ColumnScope, kotlin/Int, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.schedules/CalendarColumnsRow|CalendarColumnsRow(kotlin.Int;androidx.compose.ui.Modifier?;kotlin.String?;kotlin.Function4<androidx.compose.foundation.layout.ColumnScope,kotlin.Int,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
-final fun com.letta.mobile.ui.schedules/CalendarDateBadge(kotlin/Int, kotlin/Boolean, kotlin/Boolean, androidx.compose.ui/Modifier?, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.schedules/CalendarDateBadge|CalendarDateBadge(kotlin.Int;kotlin.Boolean;kotlin.Boolean;androidx.compose.ui.Modifier?;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.schedules/CalendarDateBadge(kotlin/Int, com.letta.mobile.ui.schedules/CalendarDateTone, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.schedules/CalendarDateBadge|CalendarDateBadge(kotlin.Int;com.letta.mobile.ui.schedules.CalendarDateTone;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.schedules/CalendarDayHeader(kotlin/String, com.letta.mobile.ui.schedules/CalendarColumn, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.schedules/CalendarDayHeader|CalendarDayHeader(kotlin.String;com.letta.mobile.ui.schedules.CalendarColumn;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.schedules/CalendarDots(kotlin.collections/List<androidx.compose.ui.graphics/Color>, androidx.compose.ui/Modifier?, kotlin/Int, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.schedules/CalendarDots|CalendarDots(kotlin.collections.List<androidx.compose.ui.graphics.Color>;androidx.compose.ui.Modifier?;kotlin.Int;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.schedules/CalendarEventBlock(com.letta.mobile.ui.schedules/CalendarEventSpec, kotlin/Function0<kotlin/Unit>?, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.schedules/CalendarEventBlock|CalendarEventBlock(com.letta.mobile.ui.schedules.CalendarEventSpec;kotlin.Function0<kotlin.Unit>?;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]

@@ -100,7 +100,7 @@ private fun MonthCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
-        CalendarDateBadge(day.column.date.day, isToday = day.column.isToday, selected = false, dim = !day.inMonth)
+        CalendarDateBadge(day.column.date.day, CalendarDateTone.of(day.column.isToday, dim = !day.inMonth))
         content(day)
     }
 }

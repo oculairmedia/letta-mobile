@@ -27,6 +27,11 @@ object CalendarLabels {
             minutes % 60 == 0 -> "UTC$sign${minutes / 60}"
             else -> "UTC$sign${minutes / 60}:${ScheduleFormat.pad2(minutes % 60)}"
         }
-        return if (zone == TimeZone.UTC || zone.id == "UTC" || zone.id == "Z") offset else "$offset · ${zone.id}"
+        return if (isUtc(zone)) offset else "$offset · ${zone.id}"
     }
+
+    private val UTC_IDS = setOf("UTC", "Z")
+
+    /** UTC itself, under any of its names: its label is the offset alone. */
+    private fun isUtc(zone: TimeZone): Boolean = zone == TimeZone.UTC || zone.id in UTC_IDS
 }

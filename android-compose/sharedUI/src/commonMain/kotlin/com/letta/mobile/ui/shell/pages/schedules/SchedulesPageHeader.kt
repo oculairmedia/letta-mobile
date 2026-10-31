@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,33 +72,50 @@ internal fun SchedulesHeader(params: SchedulesHeaderParams) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = inset, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        if (params.options.showTitle || params.onNew != null) SchedulesTitleRow(params)
-        if (params.wide) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SchedulesTabs(params.view, params.onView, Modifier.weight(1f))
-                RangeNavigation(params.range, params.view.hasRange, compact = false)
-                // Touch pulls the body down instead (SchedulesMainContent's LettaRefreshable).
-                LettaRefreshAction(refreshing = params.refresh.refreshing, onRefresh = params.refresh.onRefresh)
-            }
-        } else if (params.view.hasRange) {
-            RangeNavigation(params.range, shown = true, compact = true)
-        }
-        if (params.view.hasRange) {
-            Text(
-                "Times in ${params.range.zone}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.customColors.onSurfaceMutedColor,
-                modifier = Modifier.testTag(SchedulesPageTags.ZONE),
-            )
-        }
+        SchedulesTitleRow(params)
+        if (params.wide) SchedulesWideRangeRow(params) else SchedulesPhoneRangeRow(params)
+        SchedulesZoneLine(params)
     }
+}
+
+/** The view tabs with the range beside them, and the refresh icon pointer hosts reload with. */
+@Composable
+private fun SchedulesWideRangeRow(params: SchedulesHeaderParams) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        SchedulesTabs(params.view, params.onView, Modifier.weight(1f))
+        RangeNavigation(params.range, params.view.hasRange, compact = false)
+        // Touch pulls the body down instead (SchedulesMainContent's LettaRefreshable).
+        LettaRefreshAction(refreshing = params.refresh.refreshing, onRefresh = params.refresh.onRefresh)
+    }
+}
+
+/** A phone's range alone (its tabs are in [SchedulesViewBar]), on views that have one. */
+@Composable
+private fun SchedulesPhoneRangeRow(params: SchedulesHeaderParams) {
+    if (!params.view.hasRange) return
+    RangeNavigation(params.range, shown = true, compact = true)
+}
+
+/** The zone the times are read in, on views that show times. */
+@Composable
+private fun SchedulesZoneLine(params: SchedulesHeaderParams) {
+    if (!params.view.hasRange) return
+    Text(
+        "Times in ${params.range.zone}",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.customColors.onSurfaceMutedColor,
+        modifier = Modifier.testTag(SchedulesPageTags.ZONE),
+    )
 }
 
 @Composable
 private fun SchedulesTitleRow(params: SchedulesHeaderParams) {
+    val showTitle = params.options.showTitle
+    if (!showTitle && params.onNew == null) return
+    val title = if (showTitle) "Schedules" else ""
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            if (params.options.showTitle) "Schedules" else "",
+            title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -137,14 +155,17 @@ private fun SchedulesTabs(view: SchedulesView, onView: (SchedulesView) -> Unit, 
  */
 @Composable
 private fun RangeNavigation(range: SchedulesRange, shown: Boolean, compact: Boolean) {
+    val rowModifier = if (compact) Modifier.fillMaxWidth() else Modifier
+    val labelStyle = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium
+    val onToday = if (shown) range.onToday else NO_OP
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = (if (compact) Modifier.fillMaxWidth() else Modifier).alpha(if (shown) 1f else 0f),
+        modifier = rowModifier.alpha(if (shown) 1f else 0f),
     ) {
         LettaChipTab(
             text = "Today",
             active = false,
-            onClick = { if (shown) range.onToday() },
+            onClick = onToday,
             modifier = Modifier.testTag(SchedulesPageTags.TODAY),
         )
         IconButton(onClick = { range.onShift(-1) }, enabled = shown, modifier = Modifier.testTag(SchedulesPageTags.PREVIOUS_WEEK)) {
@@ -152,17 +173,25 @@ private fun RangeNavigation(range: SchedulesRange, shown: Boolean, compact: Bool
         }
         Text(
             range.label,
-            style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+            style = labelStyle,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = (if (compact) Modifier.weight(1f) else Modifier).testTag(SchedulesPageTags.RANGE),
+            modifier = rangeLabelModifier(compact).testTag(SchedulesPageTags.RANGE),
         )
         IconButton(onClick = { range.onShift(1) }, enabled = shown, modifier = Modifier.testTag(SchedulesPageTags.NEXT_WEEK)) {
             Icon(Lucide.ChevronRight, contentDescription = "Next")
         }
     }
+}
+
+private val NO_OP: () -> Unit = {}
+
+/** A phone's range label takes the row's middle; beside the tabs it is as wide as its text. */
+private fun RowScope.rangeLabelModifier(compact: Boolean): Modifier {
+    if (!compact) return Modifier
+    return Modifier.weight(1f)
 }
 
 /** What the filter row shows: the library's agents, and the paused toggle when any schedule is paused. */
@@ -184,26 +213,30 @@ internal fun SchedulesFilters(params: SchedulesFilterParams) {
             .padding(horizontal = LettaDimens.Space.lg).padding(bottom = LettaDimens.Space.sm),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (state.showsAgentChips) {
-            state.library.agents.forEach { agent ->
-                val id = agent.id.value
-                LettaChipTab(
-                    text = agent.name,
-                    active = id == state.library.selectedAgentId,
-                    onClick = { params.onSelectAgent(id) },
-                    modifier = Modifier.testTag(SchedulesPageTags.agent(id)),
-                )
-            }
-        }
-        params.showPaused?.let { shown ->
-            LettaChipTab(
-                text = if (shown) "Paused: shown" else "Paused: hidden",
-                active = shown,
-                onClick = params.onTogglePaused,
-                modifier = Modifier.testTag(SchedulesPageTags.PAUSED_FILTER),
-            )
-        }
+        SchedulesAgentChips(params)
+        params.showPaused?.let { shown -> SchedulesPausedChip(shown, params.onTogglePaused) }
     }
+}
+
+@Composable
+private fun SchedulesAgentChips(params: SchedulesFilterParams) {
+    val library = params.state.library
+    if (!params.state.showsAgentChips) return
+    library.agents.forEach { agent ->
+        val id = agent.id.value
+        LettaChipTab(
+            text = agent.name,
+            active = id == library.selectedAgentId,
+            onClick = { params.onSelectAgent(id) },
+            modifier = Modifier.testTag(SchedulesPageTags.agent(id)),
+        )
+    }
+}
+
+@Composable
+private fun SchedulesPausedChip(shown: Boolean, onToggle: () -> Unit) {
+    val text = if (shown) "Paused: shown" else "Paused: hidden"
+    LettaChipTab(text = text, active = shown, onClick = onToggle, modifier = Modifier.testTag(SchedulesPageTags.PAUSED_FILTER))
 }
 
 /** A phone's view switcher: every view as an equal, finger-sized segment along the bottom edge. */

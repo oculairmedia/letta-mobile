@@ -188,7 +188,7 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
             val body = SchedulesBody(input.state, data, view, calendar, selectedId, input.actions.onRefresh)
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 SchedulesMainContent(body, Modifier.weight(1f).fillMaxHeight())
-                if (docked && (ui.rail !is ScheduleRailState.Overview || view.docksOverview)) ScheduleRail(railParams(ui, input))
+                if (docked && ui.railShows(view)) ScheduleRail(railParams(ui, input))
             }
             if (!wide) SchedulesViewBar(view, ui::selectView)
         }
@@ -198,6 +198,12 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
             }
         }
     }
+}
+
+/** Whether a docked rail shows: always for a schedule's detail, for the overview only on views that dock it. */
+private fun SchedulesPageUi.railShows(view: SchedulesView): Boolean {
+    if (rail !is ScheduleRailState.Overview) return true
+    return view.docksOverview
 }
 
 private fun headerParams(ui: SchedulesPageUi, input: SchedulesPageInput, view: SchedulesView, wide: Boolean) = SchedulesHeaderParams(
