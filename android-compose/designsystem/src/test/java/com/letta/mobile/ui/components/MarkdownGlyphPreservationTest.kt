@@ -2,7 +2,7 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import com.letta.mobile.ui.theme.LettaTheme
 import org.intellij.markdown.ast.getTextInNode
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
@@ -26,7 +26,7 @@ class MarkdownGlyphPreservationTest {
         val text = "Press ` Enter ` to continue"
 
         assertEquals(text, autolinkBareUrls(text))
-        assertRenderedTextContains(text, "Press", "Enter", "to continue")
+        assertRenderedTextContains(text, "Press", " Enter ", "to continue")
     }
 
     @Test
