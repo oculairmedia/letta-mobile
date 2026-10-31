@@ -8,6 +8,7 @@ import com.letta.mobile.data.storage.KeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -58,6 +59,7 @@ class KeyValueCanvasStorageTest {
             }
         }
         val storage = KeyValueCanvasStorage(backing, clock = { 1 })
+        val health = storage.documents as CanvasStorageHealth
         val session = CanvasSession.create(storage.documents, CanvasCreateOptions(opLog = storage.opLog))
         val baseline = session.sceneJsonOrEmpty()
         val draft = """{"bgColor":"#f7f3eaff","elements":[{"id":"draft","type":"rect"}]}"""
@@ -66,6 +68,7 @@ class KeyValueCanvasStorageTest {
             val before = writes
             assertFailsWith<IllegalStateException> { session.applyLocalScene(draft, baseJson = baseline) }
             assertTrue(writes > before, "each retry must reach the backing store")
+            assertFalse(health.awaitDurableSave(session.canvasId), "the barrier reports swallowed write failures")
             assertTrue(storage.opLog.unsettled(session.canvasId).isNotEmpty(), "failed writes cannot settle edits")
             assertEquals(baseline, KeyValueCanvasStorage(store).documents.get(session.canvasId)?.sceneJson)
         }
@@ -75,6 +78,7 @@ class KeyValueCanvasStorageTest {
         assertTrue(session.applyLocalScene(draft).isEmpty(), "journal recovery leaves no new drawing ops to generate")
         assertTrue(writes > before)
         assertTrue(storage.opLog.unsettled(session.canvasId).isEmpty())
+        assertTrue(health.awaitDurableSave(session.canvasId), "a completed retry repairs the failed barrier")
         assertEquals(diagnostic, storage.storageFaults.value.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED })
         val restarted = CanvasSession.open(KeyValueCanvasStorage(store).documents, session.canvasId)!!
         assertTrue(restarted.sceneJsonOrEmpty().contains("draft"))

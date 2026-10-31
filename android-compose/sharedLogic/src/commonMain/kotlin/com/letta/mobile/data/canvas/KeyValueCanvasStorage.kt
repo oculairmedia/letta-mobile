@@ -9,6 +9,8 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.storage.AssetStore
 import com.letta.mobile.data.storage.KeyValueStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -102,6 +104,10 @@ private class StorageIo(val store: KeyValueStore, val faults: CanvasStorageFault
 
 /** The boards, one JSON value per board under [KeyValueCanvasStorage.BOARD_PREFIX]. */
 private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument>, CanvasStorageHealth {
+    private val failedWrites = MutableStateFlow<Set<CanvasId>>(emptySet())
+
+    override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = canvasId !in failedWrites.value
+
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = io.faults.faults
 
     override fun saveFailureGeneration(canvasId: CanvasId): Long = io.faults.saveFailureGeneration(canvasId)
@@ -118,9 +124,11 @@ private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument
 
     override suspend fun write(doc: CanvasDocument) {
         val entry = StoredEntry.board(doc.id)
-        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, Unit) {
+        val saved = io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, false) {
             io.store.put(entry.key, LettaJson.persisted.encodeToString(CanvasDocument.serializer(), doc))
+            true
         }
+        failedWrites.update { if (saved) it - doc.id else it + doc.id }
     }
 }
 

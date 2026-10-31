@@ -58,6 +58,29 @@ class CanvasSessionTest {
     }
 
     @Test
+    fun aLateFailureAfterDurabilityDoesNotRejectASettledDrawing() = runTest {
+        val backing = InMemoryCanvasDocumentStore()
+        val faults = CanvasStorageFaults()
+        val store = object : CanvasDocumentStore by backing, CanvasStorageHealth {
+            override val storageFaults = faults.faults
+            override fun saveFailureGeneration(canvasId: CanvasId): Long = faults.saveFailureGeneration(canvasId)
+        }
+        val backingLog = InMemoryCanvasOpLog()
+        val log = object : CanvasOpLog by backingLog {
+            override suspend fun settle(canvasId: CanvasId, opIds: Collection<com.letta.mobile.data.model.CanvasOpId>) {
+                backingLog.settle(canvasId, opIds)
+                // An older asynchronous save reports failure after this drawing reached storage.
+                faults.record(CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, "doc", canvasId, null, "older write", 1))
+            }
+        }
+        val session = CanvasSession.create(store, CanvasCreateOptions(opLog = log))
+        session.applyLocalScene("""{"elements":[{"id":"durable"}]}""")
+        assertTrue(backing.get(session.canvasId)!!.sceneJson.contains("durable"))
+        assertTrue(log.unsettled(session.canvasId).isEmpty())
+        assertTrue(faults.saveFailureGeneration(session.canvasId) > 0)
+    }
+
+    @Test
     fun drawingBaselinePreservesUnseenRemoteEditsAndUsesTheSessionClock() = runTest {
         val baseline = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"rect","x":1}]}"""
         val session = CanvasSession.create(

@@ -372,6 +372,7 @@ class CanvasWorkspaceDrawingHandoffTest {
         val faults = CanvasStorageFaults()
         override val storageFaults = faults.faults
         override fun saveFailureGeneration(canvasId: CanvasId): Long = faults.saveFailureGeneration(canvasId)
+        override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = !reportFaultOnly
         val writes = AtomicInteger()
         val loads = AtomicInteger()
         val failures = AtomicInteger()
