@@ -35,9 +35,6 @@ import kotlinx.coroutines.launch
 // Tooltips and hover cards for every pointer host: desktop and web share this code. The hover
 // lifecycle mirrors foundation's desktop-only TooltipArea, so desktop looks and behaves as it did.
 
-/** Where a pointer tooltip opens: at the cursor, or centred under its control. */
-enum class PointerTooltipPosition { Cursor, BelowAnchor }
-
 // Snappy: 450ms read as "the tooltip is broken" on quick hovers.
 private const val TOOLTIP_SHOW_DELAY_MS = 150
 
