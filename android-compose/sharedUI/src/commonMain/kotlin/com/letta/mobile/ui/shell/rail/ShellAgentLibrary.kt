@@ -27,6 +27,7 @@ import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.search.TextMatch
+import com.letta.mobile.ui.chat.AgentThinkingAura
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterActions
@@ -156,11 +157,11 @@ private fun SpaceHeaderEnd(count: Int, working: Boolean) {
     }
 }
 
-/** The agent's mascot (or gradient orb); a live mascot shows thinking itself, the orb wears the ring. */
+/** The agent's mascot (or gradient orb) on its still; thinking glows behind it. */
 @Composable
 private fun LibraryAgentTile(entry: ShellRailEntry) {
     Box(contentAlignment = Alignment.Center) {
-        if (entry.thinking && entry.identity == null) ShellThinkingRing(diameter = LettaDimens.Orb.md)
+        if (entry.thinking) AgentThinkingAura(entry.identity, entry.orbStyle, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
         ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
     }
 }

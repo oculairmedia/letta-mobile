@@ -1,13 +1,8 @@
 package com.letta.mobile.ui.shell.rail
 
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,12 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -51,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.chat.AgentThinkingAura
 import com.letta.mobile.ui.components.lettaFadingEdges
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LettaHoverCard
@@ -182,14 +173,16 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
                 contentAlignment = Alignment.Center,
             ) {
                 if (entry.selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
-                ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
-                // Rail mascots stay on their cached still, so the thinking badge remains visible.
+                // Rail mascots stay on their cached still; thinking glows behind the character.
                 if (entry.thinking) {
-                    ShellThinkingRing(
-                        diameter = LettaDimens.Orb.md,
-                        modifier = Modifier.testTag("shell-thinking-ring-${entry.key}"),
+                    AgentThinkingAura(
+                        identity = entry.identity,
+                        orbStyle = entry.orbStyle,
+                        size = LettaDimens.Orb.lg,
+                        modifier = Modifier.testTag("shell-thinking-aura-${entry.key}"),
                     )
                 }
+                ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
             }
         }
     }
@@ -218,33 +211,6 @@ fun ShellRailAgentTile(
             fontWeight = FontWeight.SemiBold,
             color = Color.White,
         )
-    }
-}
-
-/** Orbiting comet ring: the gradient orb's "thinking" indicator (continuous motion reads as working). */
-@Composable
-fun ShellThinkingRing(diameter: Dp, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "thinking")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = FULL_TURN,
-        animationSpec = infiniteRepeatable(tween(ORBIT_MS, easing = LinearEasing)),
-        label = "thinkingOrbit",
-    )
-    val primary = MaterialTheme.colorScheme.primary
-    Canvas(modifier = modifier.size(diameter)) {
-        val strokeWidth = LettaDimens.Space.hair.toPx()
-        val radius = (size.minDimension - strokeWidth) / 2f
-        // A faint full track so it reads as a ring, then the tail building to the head at the seam.
-        drawCircle(color = primary.copy(alpha = TRACK_ALPHA), radius = radius, style = Stroke(width = strokeWidth))
-        rotate(angle) {
-            drawCircle(
-                brush = Brush.sweepGradient(0.0f to Color.Transparent, TAIL_START to Color.Transparent, 1.0f to primary),
-                radius = radius,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-            )
-            drawCircle(color = primary, radius = strokeWidth * HEAD_SCALE, center = Offset(center.x + radius, center.y))
-        }
     }
 }
 
@@ -317,8 +283,3 @@ private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) 
 }
 
 private const val FADE_MS = 250
-private const val ORBIT_MS = 1200
-private const val FULL_TURN = 360f
-private const val TRACK_ALPHA = 0.18f
-private const val TAIL_START = 0.35f
-private const val HEAD_SCALE = 0.9f

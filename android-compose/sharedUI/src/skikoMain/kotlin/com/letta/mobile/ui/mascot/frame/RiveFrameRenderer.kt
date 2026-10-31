@@ -125,6 +125,15 @@ abstract class RiveFrameScene {
         }
     }
 
+    /**
+     * The frame loop is starting again after it stopped asking for frames (the mascot rested, or was
+     * out of sight): the next advance is one frame's step, not the time it was away - a 100 ms step
+     * at once is the character jumping.
+     */
+    internal fun resume() {
+        motion.update { it.copy(resuming = true) }
+    }
+
     /** Suspends while the scene is [settled]. */
     internal suspend fun awaitMotion() {
         motion.first { it.moving }
@@ -154,8 +163,8 @@ abstract class RiveFrameScene {
     private companion object {
         const val NANOS_PER_SECOND = 1e9f
 
-        /** A tab or window that stopped drawing for a while comes back with one step of motion. */
-        const val MAX_STEP_SECONDS = 0.1f
+        /** A slow frame advances at most this much: a longer step reads as a jump, not as motion. */
+        const val MAX_STEP_SECONDS = 0.05f
 
         /** A settled scene picks up where it stopped: its first step back is one 60 Hz frame. */
         const val ONE_FRAME_SECONDS = 1f / 60f
