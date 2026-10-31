@@ -164,19 +164,37 @@ def baseline_drift(root: Path, ref: str, path: str, kind: str) -> list[str]:
     return [f"{p}\n      -> {FIX[kind]}" for p in found]
 
 
+def unlisted_detekt_baselines(root: Path, config: dict[str, str], config_name: str) -> list[str]:
+    """Every detekt baseline in the tree must be registered, so none can grow unguarded."""
+    paths = (current.relative_to(root).as_posix() for current in sorted(root.glob(DETEKT_BASELINE_GLOB)))
+    return [
+        f"{path}: detekt baseline must be listed as '{DETEKT_KIND} {path}' in {config_name}"
+        for path in paths
+        if config.get(path) != DETEKT_KIND
+    ]
+
+
+def is_guarded(path: str, kind: str, base_config: dict[str, str]) -> bool:
+    """Existing ratchets compare with the base; detekt baselines are compared even when new."""
+    return path in base_config or kind == DETEKT_KIND
+
+
+def drift_problems(root: Path, ref: str, config: dict[str, str], base_config: dict[str, str]) -> list[str]:
+    problems: list[str] = []
+    for path, kind in sorted(config.items()):
+        if not is_guarded(path, kind, base_config):
+            print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")
+            continue
+        problems += baseline_drift(root, ref, path, kind)
+    return problems
+
+
 def problems_for(root: Path, ref: str, config_name: str) -> tuple[list[str], int]:
     config = parse_config((root / config_name).read_text(encoding="utf-8"))
     base_config = parse_config(git_show(root, ref, config_name) or "")
     problems = dropped_ratchets(config_name, base_config, config)
-    for current in sorted(root.glob(DETEKT_BASELINE_GLOB)):
-        path = current.relative_to(root).as_posix()
-        if config.get(path) != DETEKT_KIND:
-            problems.append(f"{path}: detekt baseline must be listed as '{DETEKT_KIND} {path}' in {config_name}")
-    for path, kind in sorted(config.items()):
-        if path in base_config or kind == DETEKT_KIND:
-            problems += baseline_drift(root, ref, path, kind)
-        else:
-            print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")
+    problems += unlisted_detekt_baselines(root, config, config_name)
+    problems += drift_problems(root, ref, config, base_config)
     return problems, len(config)
 
 
