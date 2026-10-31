@@ -1116,6 +1116,11 @@ public final class com/letta/mobile/ui/chat/AgentOrbKt {
 	public static final fun agentOrbBrush (I)Landroidx/compose/ui/graphics/Brush;
 }
 
+public final class com/letta/mobile/ui/chat/AgentTileStillKt {
+	public static final field AGENT_TILE_OVERSCALE F
+	public static final fun agentTileStill (Lcom/letta/mobile/avatar/core/model/MascotIdentity;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/ImageBitmap;
+}
+
 public final class com/letta/mobile/ui/chat/ChatLayoutKt {
 	public static final fun getChatColumnMaxWidth ()F
 }
@@ -9147,7 +9152,6 @@ public final class com/letta/mobile/ui/shell/rail/ShellAgentRailActions {
 public final class com/letta/mobile/ui/shell/rail/ShellAgentRailKt {
 	public static final fun ShellAgentRail (Lcom/letta/mobile/ui/shell/rail/ShellAgentRailState;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 	public static final fun ShellRailAgentTile-djqs-MU (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FFLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
-	public static final fun ShellThinkingRing--orJrPs (FLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun railScrollFades (Landroidx/compose/ui/Modifier;Landroidx/compose/foundation/lazy/LazyListState;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/Modifier;
 }
 
@@ -9272,6 +9276,10 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailMapping {
 	public final fun entry (Lcom/letta/mobile/data/agents/AgentRailGroup;ILcom/letta/mobile/ui/shell/rail/ShellRailFocus;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
 	public final fun groups (Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
 	public final fun recency (Ljava/lang/String;)Lkotlin/time/Instant;
+}
+
+public final class com/letta/mobile/ui/shell/rail/ShellThinkingAuraKt {
+	public static final fun ShellThinkingAura-icBs0wY (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FLandroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/shell/scaffold/LettaPageScaffoldDefaults {
