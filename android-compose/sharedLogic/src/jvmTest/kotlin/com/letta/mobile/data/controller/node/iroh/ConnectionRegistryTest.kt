@@ -175,6 +175,8 @@ class ConnectionRegistryTest {
         val result = runCatching { registry.claim(FakeViewer("")) }
 
         assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        assertEquals("viewer endpoint identity must not be blank", result.exceptionOrNull()?.message)
         assertEquals(0, registry.conversationCount())
     }
 }
