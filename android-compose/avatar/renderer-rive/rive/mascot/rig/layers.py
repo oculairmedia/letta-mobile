@@ -360,28 +360,28 @@ class Layer:
         signed = self._signed()       # always: building the layer records its signatures
         if not index:
             return
-        from rig.constants import MIN_TRANSITION_MS
         anim_of = {s.node: s.anim for s in self.states}
         for src, t, cut, _reason in signed:
+            target = anim_of.get(t.to)
             for s in self._sources(src, t):
-                target = anim_of.get(t.to)
-                depart = _departure(t)
-                if t.ms < MIN_TRANSITION_MS:
-                    self._check_floor(index, s, t, target, depart, MIN_TRANSITION_MS)
+                self._check_floor(index, s, t, target)
                 if not t.ms and not cut:
                     self._check_seam(index, s, t, target)
-                self._check_sweep(index, s, t, target, depart)
+                self._check_sweep(index, s, t, target)
 
     def _sources(self, src, t):
         """The states a transition can leave from: its own state, or every other state for AnyState."""
         return [s for s in ([src] if src is not None else self.states) if s.node != t.to]
 
-    def _check_floor(self, index, s, t, target_anim, depart, floor):
+    def _check_floor(self, index, s, t, target_anim):
+        from rig.constants import MIN_TRANSITION_MS as floor
+        if t.ms >= floor:
+            return
         # Hand-backs are not weighed here: a blend cannot soften one (Rive keeps playing the
         # outgoing animation at full weight until the blend ends, and only then lets the layers
         # below have the property), so the floor does nothing for it. That is a question about
         # the layers below, which only the whole document can answer - the ledger's.
-        m = next((m for m in pose_moves(index, s.anim, target_anim, depart) if not m.hand_back), None)
+        m = next((m for m in pose_moves(index, s.anim, target_anim, _departure(t)) if not m.hand_back), None)
         if m is None:
             return
         raise ValueError(
@@ -404,8 +404,8 @@ class Layer:
             f'starts it at {c.to_value}. A discrete swap is fine under a cut, but say so: '
             f'mark the transition cut=True with a reason.')
 
-    def _check_sweep(self, index, s, t, target_anim, depart):
-        m = next(iter(sweeps(index, s.anim, target_anim, t.ms, depart)), None)
+    def _check_sweep(self, index, s, t, target_anim):
+        m = next(iter(sweeps(index, s.anim, target_anim, t.ms, _departure(t))), None)
         if m is None:
             return
         raise ValueError(

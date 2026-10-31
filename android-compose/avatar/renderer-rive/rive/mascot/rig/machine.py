@@ -51,7 +51,10 @@ FLASH_FACE_LAYER, DRAG_FACE_LAYER, REACT_FACE_LAYER = "3:14", "3:15", "3:16"
 
 
 # A blend at the floor (rig/constants.py MIN_TRANSITION_MS), for the state changes that used to cut.
-FLOOR = (MIN_TRANSITION_MS, EASE_OUT)
+# Linear, not eased: there are hundreds of these (every state into every entry, every entry's
+# hand-offs), each eased transition carries its own interpolator object in the .riv - it is
+# downloaded on the web, under the mascot's bundle budget - and over 100 ms the curve is moot.
+FLOOR = (MIN_TRANSITION_MS, None)
 
 
 # A glyph swap: the only thing still allowed to change in one frame (rig/seams.py SWEEP_KEYS).
@@ -86,8 +89,7 @@ def _expression_layer():
     # instead of the loop while it is on, over CALM_HANDOFF ms.
     def entries(st, gated=False):
         if gated:
-            # Linear, not eased: there are len(SUSTAINED)**2 of these, every eased transition
-            # carries its own interpolator object in the .riv, and over 100 ms the curve is moot.
+            # Linear, like FLOOR: there are len(SUSTAINED)**2 of these.
             return [When(enter_node[(st, to)], (when_enum(VM_STATE, state_enum_ids[to]),), MIN_TRANSITION_MS,
                          after_ms=ENTRY_FLIP_MS) for to in SUSTAINED if to != st]
         return [OnEnum(enter_node[(st, to)], state_enum_ids[to], *FLOOR) for to in SUSTAINED if to != st]
@@ -100,7 +102,7 @@ def _expression_layer():
         # blends its hand-off over up to 120 ms so held face/body/tint ease in.
         designed = (frm, to) in DESIGNED_PAIRS
         hand_off = FLOOR if designed else (max(MIN_TRANSITION_MS, min(120, enter_duration(frm, to).ms)), EASE_OUT)
-        calm_off = (max(MIN_TRANSITION_MS, min(CALM_HANDOFF, hand_off[0])), EASE_OUT)
+        calm_off = (max(MIN_TRANSITION_MS, min(CALM_HANDOFF, hand_off[0])), FLOOR[1])
         own = [When(calm_state_node[to], (when_bool(VM_REDUCE, "true"),), *calm_off, exit=True),
                Exit(root_state_node[to], *hand_off)]
         own += entries(to, gated=True)
@@ -334,6 +336,41 @@ def _band(prop, lo, hi):
     return tuple(out)
 
 
+def _react_fires():
+    """[(reaction, its trigger conditions)] for every reaction one-shot, before reduceMotion."""
+    fires = [(r, (when_trigger(VM_NEW[trig]),)) for trig, r in _SIMPLE_REACTIONS]
+    fires += [(r, (when_trigger(VM_NEW["land"]),) + _band(VM_NEW["impact"], lo, hi)) for r, lo, hi in _LAND_TIERS]
+    for k in range(4):
+        lo, hi = (None if k == 0 else k - 0.5), (None if k == 3 else k + 0.5)
+        fires.append((f"trick{k}", (when_trigger(VM_NEW["trick"]),) + _band(VM_NEW["trickId"], lo, hi)))
+    return fires
+
+
+def _react_motion_layer(fires, full):
+    # The motion: in at the floor. Under reduceMotion a trigger leaves a running reaction to
+    # finish (it ends at rest); cutting it off mid-move would hand Squash back in one frame.
+    moved = [When(react_node[r], (c[0], full) + c[1:], MIN_TRANSITION_MS, SOFT_OUT) for r, c in fires]
+    states = [State(REACT_REST_ANIM, REACT_REST_NODE, 0)]
+    states += [State(react_anim[r], react_node[r], 1 + i, reset=True, transitions=[Exit(REACT_REST_NODE)])
+               for i, r in enumerate(REACTIONS)]
+    return Layer("React", REACT_LAYER, REACT_REST_NODE, any_transitions=moved, states=states).rml()
+
+
+def _react_face_layer(fires, full):
+    # The glyph: cut, always.
+    calm = when_bool(VM_REDUCE, "true")
+    triggers = [t for t, _ in _SIMPLE_REACTIONS] + ["land", "trick"]
+    shown = [When(react_face_node[r] if r in REACT_EXPR else REACT_FACE_REST_NODE, (c[0], full) + c[1:],
+                  cut=True, reason=GLYPH_CUT) for r, c in fires]
+    shown += [When(REACT_CALM_NODE, (when_trigger(VM_NEW[t]), calm), cut=True, reason=GLYPH_CUT) for t in triggers]
+    home = lambda: [Exit(REACT_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)]
+    states = [State(REACT_REST_ANIM, REACT_FACE_REST_NODE, 0)]
+    states += [State(react_face_anim[r], react_face_node[r], 1 + i, reset=True, transitions=home())
+               for i, r in enumerate(r for r in REACTIONS if r in REACT_EXPR)]
+    states.append(State(REACT_CALM_ANIM, REACT_CALM_NODE, 1 + len(REACT_EXPR), reset=True, transitions=home()))
+    return Layer("ReactFace", REACT_FACE_LAYER, REACT_FACE_REST_NODE, any_transitions=shown, states=states).rml()
+
+
 def _react_layer():
     """React (te3n1.5) and ReactFace: one one-shot per trigger, fired from wherever the character is.
 
@@ -345,34 +382,8 @@ def _react_layer():
     every glyph between. A reaction without a glyph sends ReactFace home, so a glyph never outlives
     the reaction that showed it. With reduceMotion on, every trigger plays ReactCalm there instead:
     one blink, no motion."""
-    full, calm = when_bool(VM_REDUCE, "false"), when_bool(VM_REDUCE, "true")
-    fires = [(r, (when_trigger(VM_NEW[trig]),)) for trig, r in _SIMPLE_REACTIONS]
-    fires += [(r, (when_trigger(VM_NEW["land"]),) + _band(VM_NEW["impact"], lo, hi)) for r, lo, hi in _LAND_TIERS]
-    for k in range(4):
-        lo, hi = (None if k == 0 else k - 0.5), (None if k == 3 else k + 0.5)
-        fires.append((f"trick{k}", (when_trigger(VM_NEW["trick"]),) + _band(VM_NEW["trickId"], lo, hi)))
-    triggers = [t for t, _ in _SIMPLE_REACTIONS] + ["land", "trick"]
-
-    # The motion: in at the floor. Under reduceMotion a trigger leaves a running reaction to
-    # finish (it ends at rest); cutting it off mid-move would hand Squash back in one frame.
-    moved = [When(react_node[r], (c[0], full) + c[1:], MIN_TRANSITION_MS, SOFT_OUT) for r, c in fires]
-    states = [State(REACT_REST_ANIM, REACT_REST_NODE, 0)]
-    states += [State(react_anim[r], react_node[r], 1 + i, reset=True, transitions=[Exit(REACT_REST_NODE)])
-               for i, r in enumerate(REACTIONS)]
-    react = Layer("React", REACT_LAYER, REACT_REST_NODE, any_transitions=moved, states=states).rml()
-
-    # The glyph: cut, always.
-    shown = [When(react_face_node[r] if r in REACT_EXPR else REACT_FACE_REST_NODE, (c[0], full) + c[1:],
-                  cut=True, reason=GLYPH_CUT) for r, c in fires]
-    shown += [When(REACT_CALM_NODE, (when_trigger(VM_NEW[t]), calm), cut=True, reason=GLYPH_CUT) for t in triggers]
-    home = lambda: [Exit(REACT_FACE_REST_NODE, 0, cut=True, reason=GLYPH_CUT)]
-    face_states = [State(REACT_REST_ANIM, REACT_FACE_REST_NODE, 0)]
-    face_states += [State(react_face_anim[r], react_face_node[r], 1 + i, reset=True, transitions=home())
-                    for i, r in enumerate(r for r in REACTIONS if r in REACT_EXPR)]
-    face_states.append(State(REACT_CALM_ANIM, REACT_CALM_NODE, 1 + len(REACT_EXPR), reset=True, transitions=home()))
-    face = Layer("ReactFace", REACT_FACE_LAYER, REACT_FACE_REST_NODE, any_transitions=shown,
-                 states=face_states).rml()
-    return react, face
+    fires, full = _react_fires(), when_bool(VM_REDUCE, "false")
+    return _react_motion_layer(fires, full), _react_face_layer(fires, full)
 
 
 def root_machine():

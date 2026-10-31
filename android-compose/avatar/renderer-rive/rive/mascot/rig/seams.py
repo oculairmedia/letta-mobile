@@ -316,20 +316,26 @@ def pose_moves(index, from_anim, to_anim, depart=None):
     return out
 
 
-def _pose_move(a, b, prop, depart):
-    eps, rest = epsilon(prop[1]), rest_value(prop[1])
+def _pose_ends(a, b, prop, depart):
+    """(the worst value the change leaves `prop` at, the value it goes to, the kind of move), or
+    None when only one side keys a property that has no rest value to weigh it against."""
     if prop in a.props and prop in b.props:
-        v, d = _worst(departure_values(a, a.props[prop], depart), b.props[prop].at(0))
-        to, kind = b.props[prop].at(0), "seam"
-    elif prop in a.props:
-        if rest is None:
-            return None
-        (v, d), to, kind = _worst(departure_values(a, a.props[prop], depart), rest), rest, "hand-back"
-    else:
-        if rest is None:
-            return None
-        v, to, kind = rest, b.props[prop].at(0), "hand-in"
-        d = _delta(v, to)
+        to = b.props[prop].at(0)
+        return _worst(departure_values(a, a.props[prop], depart), to)[0], to, "seam"
+    rest = rest_value(prop[1])
+    if rest is None:
+        return None
+    if prop in a.props:
+        return _worst(departure_values(a, a.props[prop], depart), rest)[0], rest, "hand-back"
+    return rest, b.props[prop].at(0), "hand-in"
+
+
+def _pose_move(a, b, prop, depart):
+    ends = _pose_ends(a, b, prop, depart)
+    if ends is None:
+        return None
+    v, to, kind = ends
+    d, eps = _delta(v, to), epsilon(prop[1])
     return Move(prop[0], prop[1], v, to, d, eps, kind) if d > eps else None
 
 
@@ -344,24 +350,36 @@ def sweeps(index, from_anim, to_anim, ms, depart=None):
     if a is None or b is None or ms <= 0:
         return []
     n = max(1, round(ms * 60 / 1000))
-    out = []
-    for prop in sorted(set(a.props) | set(b.props)):
-        if prop[1] not in SWEEP_KEYS:
-            continue
-        if prop not in a.props or prop not in b.props:
-            side = a if prop in a.props else b
-            v = side.props[prop].first
-            out.append(Move(prop[0], prop[1], v if side is a else None, v if side is b else None,
-                            1.0, 0.0, "sweep"))
-            continue
-        incoming = set(b.props[prop].values(0, n - 1))
-        lo = 0 if depart is None or a.loop != "oneShot" else (a.duration if depart == "end" else depart)
-        outgoing = set(a.props[prop].values(lo, lo + n)) if a.loop == "oneShot" else set(
-            a.props[prop].values(0, a.duration))
-        if len(incoming | outgoing) > 1:
-            v0, v1 = sorted(outgoing)[0], sorted(incoming)[-1]
-            out.append(Move(prop[0], prop[1], v0, v1, _delta(v0, v1), 0.0, "sweep"))
-    return out
+    swept = (_sweep(a, b, prop, n, depart) for prop in sorted(set(a.props) | set(b.props))
+             if prop[1] in SWEEP_KEYS)
+    return [m for m in swept if m is not None]
+
+
+def _one_sided_sweep(a, b, prop):
+    """A sweep property only one side keys: mixed against the layers below, so always a sweep."""
+    v = (a if prop in a.props else b).props[prop].first
+    return Move(prop[0], prop[1], v if prop in a.props else None, v if prop in b.props else None,
+                1.0, 0.0, "sweep")
+
+
+def _outgoing_window(a, span, depart, n):
+    """The values the outgoing animation plays through over an n-frame blend that leaves it at
+    `depart` (a loop can be left anywhere, so all of them)."""
+    if a.loop != "oneShot":
+        return set(span.values(0, a.duration))
+    lo = a.duration if depart == "end" else (depart or 0)
+    return set(span.values(lo, lo + n))
+
+
+def _sweep(a, b, prop, n, depart):
+    if prop not in a.props or prop not in b.props:
+        return _one_sided_sweep(a, b, prop)
+    incoming = set(b.props[prop].values(0, n - 1))
+    outgoing = _outgoing_window(a, a.props[prop], depart, n)
+    if len(incoming | outgoing) <= 1:
+        return None
+    v0, v1 = sorted(outgoing)[0], sorted(incoming)[-1]
+    return Move(prop[0], prop[1], v0, v1, _delta(v0, v1), 0.0, "sweep")
 
 
 # --- the transitions of a document ------------------------------------------------------------
@@ -503,6 +521,29 @@ def keyed_below(document, index):
     return out
 
 
+def _pose_rows(index, t, held, below):
+    """[(move, signature)] for the pose properties a transition moves: its hand-backs onto a
+    property a layer below keys (signed by `hold=True`), and, under the floor, everything else."""
+    from rig.constants import MIN_TRANSITION_MS
+    under_floor = t.ms < MIN_TRANSITION_MS
+    rows = []
+    for m in pose_moves(index, t.from_anim, t.to_anim, t.depart):
+        if m.hand_back and (m.obj, m.key) in below:
+            rows.append((m, held))
+        elif not m.hand_back and under_floor:
+            rows.append((m, None))
+    return rows
+
+
+def _cut_rows(index, t, reason, held):
+    """[(crossing, signature)] for the discrete properties a 0 ms transition swaps. A cut
+    signature covers the hard cut it sits on, never the hand-back underneath it."""
+    if t.ms:
+        return []
+    return [(c, held if c.hand_back else reason) for c in crossings(index, t.from_anim, t.to_anim)
+            if not is_pose(c.key)]
+
+
 def seam_rows(index, t, signatures, below=frozenset()):
     """The ledger rows of one transition, under the blend policy rig/layers.py enforces:
 
@@ -514,19 +555,8 @@ def seam_rows(index, t, signatures, below=frozenset()):
         when the layers below are holding that pose by design;
       - at 0 ms, every discrete property it swaps (a glyph, a reference) - signed by `cut=True`;
       - with a duration, every index it would sweep (sweeps) - never signed."""
-    from rig.constants import MIN_TRANSITION_MS
     reason, held = (_signature(m, t) for m in signatures)
-    moves = []
-    for m in pose_moves(index, t.from_anim, t.to_anim, t.depart):
-        if m.hand_back:
-            if (m.obj, m.key) in below:
-                moves.append((m, held))
-        elif t.ms < MIN_TRANSITION_MS:
-            moves.append((m, None))
-    if t.ms == 0:
-        # A cut signature covers the hard cut it sits on, never the hand-back underneath it.
-        moves += [(c, held if c.hand_back else reason) for c in crossings(index, t.from_anim, t.to_anim)
-                  if not is_pose(c.key)]
+    moves = _pose_rows(index, t, held, below) + _cut_rows(index, t, reason, held)
     moves += [(m, None) for m in sweeps(index, t.from_anim, t.to_anim, t.ms, t.depart)]
     return [Row(t.machine, t.layer, _anim_name(index, t.from_anim), _anim_name(index, t.to_anim),
                 t.kind, t.ms, c.obj, prop_name(c.key), c.from_value, c.to_value, c.delta,
