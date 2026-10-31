@@ -100,8 +100,8 @@ internal fun ToolStep(
     toolCall: UiToolCall,
     disclosureKey: String,
     callbacks: ChatRowCallbacks,
-    /** The run's approval-aware state and width; standalone calls use their own state and usual inset. */
-    presentation: Pair<ToolTimelineState, State<Boolean>?>? = null,
+    /** The run's approval-aware state and measured width; standalone calls measure their own width. */
+    presentation: Pair<ToolTimelineState, State<Int>?>? = null,
 ) {
     val resolved = presentation?.first ?: remember(toolCall) { classifyToolCallState(toolCall) }
     val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
@@ -293,7 +293,7 @@ private fun ToolStepDetails(
     toolCall: UiToolCall,
     callbacks: ChatRowCallbacks,
     state: ToolTimelineState,
-    compactRunWidth: State<Boolean>?,
+    runWidthPx: State<Int>?,
 ) {
     val live = state == ToolTimelineState.Running || toolCall.isStreaming()
     val failed = state.isFailure()
@@ -301,7 +301,11 @@ private fun ToolStepDetails(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ChatRowTestTags.TOOL_CARD_BODY)
-            .runWidthPadding(ChatRowSpacing.runStepDetailIndent, compactRunWidth)
+            .runWidthPadding(
+                ChatRowSpacing.runStepDetailIndent,
+                runWidthPx,
+                preserveIndent = state == ToolTimelineState.AwaitingApproval,
+            )
             .padding(end = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {

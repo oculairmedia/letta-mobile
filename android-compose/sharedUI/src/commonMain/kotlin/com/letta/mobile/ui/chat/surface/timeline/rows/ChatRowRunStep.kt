@@ -19,15 +19,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.NonRestartableComposable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
@@ -46,6 +52,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSizingTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.StringResource
@@ -239,10 +246,32 @@ internal fun ToolStepList(calls: ToolRunCalls, row: RunRowScope, modifier: Modif
         toolCalls.forEachIndexed { index, call ->
             val disclosureKey = call.disclosureKey().ifBlank { "step:$index" }
             key(index, disclosureKey) {
-                ToolStep(call, disclosureKey, row.callbacks, presentation = states[index] to row.context.compactRunWidth)
+                ToolStep(call, disclosureKey, row.callbacks, presentation = states[index] to row.context.runWidthPx)
             }
         }
     }
+}
+
+/**
+ * Indents work and details only at wide widths, unless an approval needs its existing inset.
+ * Standalone steps use their own constraints; run steps use the width before their parent's inset,
+ * so a wide run at the breakpoint stays wide at every indentation level.
+ */
+internal fun Modifier.runWidthPadding(
+    indent: Dp,
+    runWidthPx: State<Int>?,
+    top: Dp = 0.dp,
+    preserveIndent: Boolean = false,
+): Modifier = layout { measurable, constraints ->
+    val compact = !preserveIndent &&
+        (runWidthPx?.value ?: constraints.maxWidth).toDp() < LettaSizingTokens.COMPACT_WIDTH_BREAKPOINT.dp
+    val startPx = if (compact) 0 else indent.roundToPx()
+    val topPx = top.roundToPx()
+    val placeable = measurable.measure(constraints.offset(horizontal = -startPx, vertical = -topPx))
+    layout(
+        constraints.constrainWidth(placeable.width + startPx),
+        constraints.constrainHeight(placeable.height + topPx),
+    ) { placeable.placeRelative(startPx, topPx) }
 }
 
 private val RUN_GLYPH_STROKE = 1.5.dp
