@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CronSchedule
 import com.letta.mobile.data.schedules.HistorySummary
+import com.letta.mobile.data.schedules.RunStatus
 import com.letta.mobile.data.schedules.ScheduleDef
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.ScheduleProjection
@@ -84,6 +85,8 @@ data class ScheduleRailParams(
     val onBackToOverview: () -> Unit,
     val onDelete: (String) -> Unit,
     val onTogglePause: ((String, Boolean) -> Unit)? = null,
+    /** Agent names by id, for the detail's "Agent" row. */
+    val agentNames: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -102,7 +105,7 @@ fun ScheduleRail(params: ScheduleRailParams, modifier: Modifier = Modifier.width
         when (val rail = params.rail) {
             ScheduleRailState.Overview -> ScheduleOverviewRail(params)
             is ScheduleRailState.Detail -> params.defsById[rail.scheduleId]?.let { ScheduleDetailRail(it, params) } ?: ScheduleOverviewRail(params)
-            is ScheduleRailState.Run -> ScheduleRunDetailRail(rail.run, params.zone, params.onBackToOverview)
+            is ScheduleRailState.Run -> ScheduleRunDetailRail(rail.run, params)
         }
     }
 }
@@ -115,9 +118,12 @@ fun ScheduleOverviewRail(params: ScheduleRailParams) {
         RailLabel("OVERVIEW")
         Spacer(Modifier.height(LettaDimens.Space.md))
         Row(Modifier.fillMaxWidth()) {
-            StatCell("${history.totalRuns}", "runs · 30d", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
-            StatCell(history.overallSuccessRate?.let { "${(it * 100).toInt()}%" } ?: "—", "success", MaterialTheme.customColors.successColor, Modifier.weight(1f))
-            StatCell("—", "avg", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+            val active = params.defs.count { it.active }
+            val next = params.defs.mapNotNull { ScheduleProjection.nextRun(it, params.now) }.minOrNull()
+            StatCell("${params.defs.size}", "schedules", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+            StatCell("$active", "active", MaterialTheme.customColors.successColor, Modifier.weight(1f))
+            val nextLabel = ScheduleRailText.relativeOrDash(params.now, next)
+            StatCell(nextLabel, "next run", MaterialTheme.customColors.runningColor, Modifier.weight(1f))
         }
         Spacer(Modifier.height(LettaDimens.Space.md))
         val nextId = remember(params.defs, params.now) { ScheduleRailText.nextToFire(params.defs, params.now) }
@@ -126,13 +132,13 @@ fun ScheduleOverviewRail(params: ScheduleRailParams) {
             RosterSpec(
                 sections = sections,
                 key = ScheduleDef::id,
-                selection = RosterSelection(isSelected = { it.id == nextId }, onSelect = { params.onSelectSchedule(it.id) }),
+                selection = RosterSelection(isSelected = { false }, onSelect = { params.onSelectSchedule(it.id) }),
                 options = RosterOptions(testTag = RosterListTag(ScheduleRailTags.ACTIVE_LIST)),
             ),
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) { def, row ->
             RosterListRow(
-                spec = LettaListRowSpec(title = def.name, subtitle = ScheduleRailText.cadence(def), emphasized = true),
+                spec = LettaListRowSpec(title = def.name, subtitle = ScheduleRailText.cadence(def, params.zone), emphasized = true),
                 row = row,
                 slots = RosterRowSlots(end = { NextRunLabel(def, params.now, isNext = def.id == nextId) }),
             )
@@ -143,7 +149,7 @@ fun ScheduleOverviewRail(params: ScheduleRailParams) {
 @Composable
 private fun NextRunLabel(def: ScheduleDef, now: Instant, isNext: Boolean) {
     Text(
-        ScheduleRailText.relativeOrDash(now, ScheduleProjection.nextRun(def, now)),
+        if (def.active) ScheduleRailText.relativeOrDash(now, ScheduleProjection.nextRun(def, now)) else ScheduleRailText.status(false),
         style = MaterialTheme.typography.labelMedium,
         color = if (isNext) MaterialTheme.customColors.runningColor else MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -157,13 +163,13 @@ private fun ScheduleDetailRail(def: ScheduleDef, params: ScheduleRailParams) {
         Spacer(Modifier.height(LettaDimens.Space.md))
         Text(def.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(LettaDimens.Space.sm))
-        StatusBadge(ScheduleRailText.status(def.active))
+        StatusBadge(ScheduleRailText.status(def.active), def.active)
         Spacer(Modifier.height(LettaDimens.Space.lg))
         NextRunCard(def, params.now, params.zone)
         Spacer(Modifier.height(LettaDimens.Space.lg))
-        ScheduleDefRow("Cadence", ScheduleRailText.cadence(def))
-        ScheduleDefRow("Agent", def.name)
-        ScheduleDefRow("If missed", "Skip — don't catch up")
+        ScheduleDefRow("Repeats", ScheduleRailText.cadence(def, params.zone))
+        def.agentId?.let { ScheduleDefRow("Agent", params.agentNames[it] ?: it) }
+        def.cron?.let { ScheduleDefRow("Cron", "$it · ${def.zone.id}") }
         Spacer(Modifier.height(LettaDimens.Space.lg))
         reliability?.takeIf { it.total > 0 }?.let { ReliabilityBlock(it) }
         DetailControls(def, params)
@@ -171,10 +177,11 @@ private fun ScheduleDetailRail(def: ScheduleDef, params: ScheduleRailParams) {
 }
 
 @Composable
-private fun StatusBadge(label: String) {
+private fun StatusBadge(label: String, active: Boolean) {
     val shape = RoundedCornerShape(LettaDimens.Radius.sm)
-    Box(Modifier.clip(shape).border(1.dp, MaterialTheme.customColors.successColor, shape).padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.successColor)
+    val color = if (active) MaterialTheme.customColors.successColor else MaterialTheme.customColors.onSurfaceMutedColor
+    Box(Modifier.clip(shape).border(1.dp, color, shape).padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = color)
     }
 }
 
@@ -191,7 +198,7 @@ private fun NextRunCard(def: ScheduleDef, now: Instant, zone: TimeZone) {
             Text(ScheduleRailText.nextRunHeadline(now, next), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             if (next != null) {
                 Text(
-                    "${ScheduleFormat.dateLabel(next, zone)} ${ScheduleFormat.timeOfDay(next, zone)} · ${def.zone.id}",
+                    ScheduleRailText.whenLabel(next, zone, def.zone),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -229,28 +236,45 @@ private fun DetailControls(def: ScheduleDef, params: ScheduleRailParams) {
 }
 
 @Composable
-private fun ScheduleRunDetailRail(run: ScheduleRun, zone: TimeZone, onBack: () -> Unit) {
+private fun ScheduleRunDetailRail(run: ScheduleRun, params: ScheduleRailParams) {
+    val def = params.defsById[run.scheduleId]
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        BackToOverview("Back", onBack)
+        BackToOverview("Back", params.onBackToOverview)
         Spacer(Modifier.height(LettaDimens.Space.md))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(LettaDimens.Control.iconSm).clip(CircleShape).background(statusColor(run.status)))
+            Box(Modifier.size(LettaDimens.Control.iconSm).clip(CircleShape).background(scheduleAccentOfRaw(run.agentId)))
             Spacer(Modifier.width(LettaDimens.Space.sm))
-            Text(run.scheduleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                run.scheduleName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
         Spacer(Modifier.height(LettaDimens.Space.md))
-        ScheduleDefRow("When", "${ScheduleFormat.dateLabel(run.instant, zone)} · ${ScheduleFormat.timeOfDay(run.instant, zone)}")
-        ScheduleDefRow("Status", run.status.name)
+        ScheduleDefRow("When", ScheduleRailText.whenLabel(run.instant, params.zone, def?.zone ?: params.zone))
+        ScheduleDefRow("Outcome", ScheduleRunText.outcome(run.status) + ScheduleRailText.outcomeNote(run.status))
+        def?.let { ScheduleDefRow("Repeats", ScheduleRailText.cadence(it, params.zone)) }
+        run.agentId?.let { ScheduleDefRow("Agent", params.agentNames[it] ?: it) }
         run.durationMillis?.let { ScheduleDefRow("Duration", ScheduleFormat.duration(it)) }
-        Spacer(Modifier.height(LettaDimens.Space.md))
-        RailLabel("OUTPUT LOG")
-        Spacer(Modifier.height(LettaDimens.Space.xs))
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(LettaDimens.Space.md)) {
-            Text(
-                run.error ?: "No captured output for this run yet.",
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = if (run.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        run.error?.let { error ->
+            Spacer(Modifier.height(LettaDimens.Space.md))
+            RailLabel("ERROR")
+            Spacer(Modifier.height(LettaDimens.Space.xs))
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.sm))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(LettaDimens.Space.md),
+            ) {
+                Text(
+                    error,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        if (def != null) {
+            Spacer(Modifier.height(LettaDimens.Space.lg))
+            OutlinedButton(onClick = { params.onSelectSchedule(def.id) }, modifier = Modifier.fillMaxWidth()) { Text("Schedule details") }
         }
     }
 }
@@ -289,10 +313,33 @@ object ScheduleRailText {
     fun cadence(def: ScheduleDef): String =
         def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time"
 
+    /**
+     * [cadence], naming the schedule's own zone when it differs from the viewer's: a cron is read in
+     * the zone it was written for, so "Every day at 12:30 PM UTC" explains a run shown at 8:30 AM.
+     */
+    fun cadence(def: ScheduleDef, viewerZone: TimeZone): String =
+        if (def.cron != null && def.zone != viewerZone) "${cadence(def)} ${def.zone.id}" else cadence(def)
+
     fun relativeOrDash(now: Instant, next: Instant?): String =
         if (next != null) ScheduleFormat.relative(now, next) else "—"
 
     fun status(active: Boolean): String = if (active) "Active" else "Paused"
+
+    /**
+     * "Wed, Oct 28 9:00 AM", in the viewer's [zone]; when the schedule keeps another zone, its own
+     * clock follows ("· 1:00 PM UTC") so a cron written in that zone still reads right.
+     */
+    fun whenLabel(instant: Instant, zone: TimeZone, scheduleZone: TimeZone): String {
+        val local = "${ScheduleFormat.dateLabel(instant, zone)} ${ScheduleFormat.timeOfDay(instant, zone)}"
+        return if (scheduleZone == zone) local else "$local · ${ScheduleFormat.timeOfDay(instant, scheduleZone)} ${scheduleZone.id}"
+    }
+
+    /** Why an outcome reads as it does, when that is not obvious. */
+    fun outcomeNote(status: RunStatus): String = when (status) {
+        RunStatus.Unrecorded -> " — the server keeps no record of this run"
+        RunStatus.Paused -> " — resume the schedule for it to run"
+        else -> ""
+    }
 
     fun nextRunHeadline(now: Instant, next: Instant?): String =
         if (next != null) "Runs ${ScheduleFormat.relative(now, next)}" else "No upcoming run"

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.schedules
 
+import com.letta.mobile.data.model.CronTaskStatus
 import com.letta.mobile.data.model.ScheduledMessage
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -13,12 +14,29 @@ import kotlin.time.Instant
 
 /**
  * Status of a single materialized run (drives the color in every view).
- *  - [Done] / [Failed]   — a past run, succeeded or missed/errored.
- *  - [Running]           — firing right now.
- *  - [Next]              — the soonest upcoming run (amber emphasis).
+ *  - [Done] / [Failed] / [Skipped] — a past run the backend recorded: it ran, it errored, or the
+ *    scheduler skipped it.
+ *  - [Unrecorded]        — a past slot the cron expected but no record covers: the outcome is
+ *    unknown, so it is never shown as a success.
+ *  - [Running]           — fired within the last moments.
+ *  - [Next]              — the soonest upcoming run.
  *  - [Upcoming]          — a future run beyond the next one.
+ *  - [Paused]            — a future slot of a paused schedule: it will not fire unless resumed.
  */
-enum class RunStatus { Done, Failed, Running, Next, Upcoming }
+enum class RunStatus {
+    Done,
+    Failed,
+    Skipped,
+    Unrecorded,
+    Running,
+    Next,
+    Upcoming,
+    Paused,
+    ;
+
+    /** True for a slot at or before now: a recorded outcome or an unrecorded one. */
+    val isPast: Boolean get() = this == Done || this == Failed || this == Skipped || this == Unrecorded
+}
 
 /**
  * Platform-neutral view of a schedule, decoupled from the [CronTask] wire
@@ -36,6 +54,10 @@ data class ScheduleDef(
     val lastFiredAt: Instant? = null,
     val fireCount: Int = 0,
     val zone: TimeZone = TimeZone.UTC,
+    /** The agent the schedule prompts, when the backend says. */
+    val agentId: String? = null,
+    /** The last fire the scheduler skipped, when the backend records one. */
+    val missedAt: Instant? = null,
 ) {
     val recurring: Boolean get() = cron != null
 }
@@ -48,7 +70,16 @@ data class RunRecord(
     val durationMillis: Long? = null,
     val exitCode: Int? = null,
     val error: String? = null,
-)
+    /** The scheduler skipped this run (missed while the host slept, or overlapped). */
+    val skipped: Boolean = false,
+) {
+    val status: RunStatus
+        get() = when {
+            skipped -> RunStatus.Skipped
+            succeeded -> RunStatus.Done
+            else -> RunStatus.Failed
+        }
+}
 
 /** A single materialized run placed on a view. */
 data class ScheduleRun(
@@ -59,6 +90,7 @@ data class ScheduleRun(
     val durationMillis: Long? = null,
     val exitCode: Int? = null,
     val error: String? = null,
+    val agentId: String? = null,
 )
 
 /** Agenda: the time-ordered runs of one day. */
@@ -151,26 +183,26 @@ object ScheduleProjection {
         // schedule (Codex review #16b). Resolve it to a single bounded instant
         // instead: cron=null + oneShotAt = the next occurrence from [now], so it
         // materializes exactly once and never recurs.
+        val base = ScheduleDef(
+            id = id,
+            name = displayName,
+            cron = rawCron,
+            oneShotAt = null,
+            active = status == null || status == CronTaskStatus.ACTIVE,
+            lastFiredAt = lastFiredAt.toInstantOrNull(),
+            fireCount = fireCount,
+            zone = taskZone,
+            agentId = agentId,
+            missedAt = missedAt.toInstantOrNull(),
+        )
         return if (recurring || rawCron == null) {
-            ScheduleDef(
-                id = id,
-                name = displayName,
-                cron = rawCron,
-                oneShotAt = null,
-                active = true,
-                zone = taskZone,
-            )
+            base
         } else {
-            ScheduleDef(
-                id = id,
-                name = displayName,
-                cron = null,
-                oneShotAt = CronSchedule.parse(rawCron)?.let { CronSchedule.nextRun(it, now, taskZone) },
-                active = true,
-                zone = taskZone,
-            )
+            base.copy(cron = null, oneShotAt = CronSchedule.parse(rawCron)?.let { CronSchedule.nextRun(it, now, taskZone) })
         }
     }
+
+    private fun String?.toInstantOrNull(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
 
     fun toScheduleDefs(crons: List<CronTask>, zone: TimeZone, now: Instant): List<ScheduleDef> =
         crons.map { it.toScheduleDef(zone, now) }
@@ -202,6 +234,7 @@ object ScheduleProjection {
             oneShotAt = oneShot,
             active = true,
             zone = viewerZone,
+            agentId = agentId,
         )
     }
 
@@ -218,7 +251,7 @@ object ScheduleProjection {
     }
 
     /** Materialize a schedule's runs within `[start, end)`. */
-    private fun runsBetween(def: ScheduleDef, start: Instant, end: Instant): List<Instant> = when {
+    internal fun runsBetween(def: ScheduleDef, start: Instant, end: Instant): List<Instant> = when {
         // Paused schedules don't project future runs (Codex review #15). Past
         // runs still surface via the History overlay, which doesn't go through
         // this path.
@@ -229,7 +262,12 @@ object ScheduleProjection {
         else -> emptyList()
     }
 
-    private fun classify(
+    /**
+     * The status of [def]'s slot at [instant]. A past slot is [RunStatus.Done] / [RunStatus.Failed] /
+     * [RunStatus.Skipped] only when a [RunRecord] or the schedule's own last-fired / missed instant
+     * says so; otherwise its outcome is unknown ([RunStatus.Unrecorded]), never assumed a success.
+     */
+    internal fun classify(
         def: ScheduleDef,
         instant: Instant,
         now: Instant,
@@ -238,12 +276,9 @@ object ScheduleProjection {
     ): ScheduleRun {
         val record = history[def.id]?.firstOrNull { sameMinute(it.instant, instant, def.zone) }
         val status = when {
-            record != null -> if (record.succeeded) RunStatus.Done else RunStatus.Failed
-            (instant - now).inWholeSeconds in -RUNNING_WINDOW_SECONDS..RUNNING_WINDOW_SECONDS && def.active ->
-                RunStatus.Running
-            instant <= now -> RunStatus.Done
-            isGlobalNext -> RunStatus.Next
-            else -> RunStatus.Upcoming
+            record != null -> record.status
+            instant > now -> futureStatus(def.active, isGlobalNext)
+            else -> pastStatus(def, instant, now)
         }
         return ScheduleRun(
             scheduleId = def.id,
@@ -253,7 +288,21 @@ object ScheduleProjection {
             durationMillis = record?.durationMillis,
             exitCode = record?.exitCode,
             error = record?.error,
+            agentId = def.agentId,
         )
+    }
+
+    private fun futureStatus(active: Boolean, isGlobalNext: Boolean): RunStatus = when {
+        !active -> RunStatus.Paused
+        isGlobalNext -> RunStatus.Next
+        else -> RunStatus.Upcoming
+    }
+
+    private fun pastStatus(def: ScheduleDef, instant: Instant, now: Instant): RunStatus = when {
+        def.lastFiredAt?.let { sameMinute(it, instant, def.zone) } == true -> RunStatus.Done
+        def.missedAt?.let { sameMinute(it, instant, def.zone) } == true -> RunStatus.Skipped
+        def.active && (now - instant).inWholeSeconds <= RUNNING_WINDOW_SECONDS -> RunStatus.Running
+        else -> RunStatus.Unrecorded
     }
 
     private fun sameMinute(a: Instant, b: Instant, zone: TimeZone): Boolean {
@@ -360,8 +409,8 @@ object ScheduleProjection {
         val perSchedule = defs.map { def ->
             val records = history[def.id]?.sortedBy { it.instant }.orEmpty()
             if (records.isNotEmpty()) {
-                val succeeded = records.count { it.succeeded }
-                val failed = records.size - succeeded
+                val succeeded = records.count { it.status == RunStatus.Done }
+                val failed = records.count { it.status == RunStatus.Failed }
                 val recent = records.takeLast(squares)
                 ScheduleReliability(
                     scheduleId = def.id,
@@ -369,13 +418,13 @@ object ScheduleProjection {
                     total = records.size,
                     succeeded = succeeded,
                     failed = failed,
-                    squares = recent.map { it.succeeded },
+                    squares = recent.map { if (it.skipped) null else it.succeeded },
                     recentRuns = recent.takeLast(5).reversed().map {
                         ScheduleRun(
                             scheduleId = def.id,
                             scheduleName = def.name,
                             instant = it.instant,
-                            status = if (it.succeeded) RunStatus.Done else RunStatus.Failed,
+                            status = it.status,
                             durationMillis = it.durationMillis,
                             exitCode = it.exitCode,
                             error = it.error,
@@ -409,7 +458,7 @@ object ScheduleProjection {
         )
     }
 
-    private fun globalNextInstant(defs: List<ScheduleDef>, now: Instant): Instant? =
+    internal fun globalNextInstant(defs: List<ScheduleDef>, now: Instant): Instant? =
         defs.mapNotNull { nextRun(it, now) }.minOrNull()
 
     /** The Monday on or before [date] (week grids start on Monday). */
