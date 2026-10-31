@@ -339,18 +339,30 @@ def _pose_move(a, b, prop, depart):
     return Move(prop[0], prop[1], v, to, d, eps, kind) if d > eps else None
 
 
-def sweeps(index, from_anim, to_anim, ms, depart=None):
+class Blend(NamedTuple):
+    """A transition's blend as sweeps() weighs it: how long it takes, and where its source can be
+    left (as departure_values() takes it)."""
+    ms: int
+    depart: object = None
+
+    @property
+    def frames(self):
+        return max(1, round(self.ms * 60 / 1000))
+
+
+def sweeps(index, from_anim, to_anim, blend):
     """Every SWEEP property (an index, `expr`) a blend of `ms` would interpolate across a change.
 
     During a blend the outgoing animation keeps playing and the incoming one starts from frame 0,
     and Rive mixes the two numbers: if they differ anywhere in that window, the index passes
     through every value between them. A property only one side keys is mixed against whatever the
     layers below hold, which no blend can know - so it counts as a sweep too."""
-    a, b = index.get(from_anim), index.get(to_anim)
-    if a is None or b is None or ms <= 0:
+    if blend.ms <= 0:
         return []
-    n = max(1, round(ms * 60 / 1000))
-    swept = (_sweep(a, b, prop, n, depart) for prop in sorted(set(a.props) | set(b.props))
+    a, b = index.get(from_anim), index.get(to_anim)
+    if a is None or b is None:
+        return []
+    swept = (_sweep(a, b, prop, blend) for prop in sorted(set(a.props) | set(b.props))
              if prop[1] in SWEEP_KEYS)
     return [m for m in swept if m is not None]
 
@@ -362,20 +374,20 @@ def _one_sided_sweep(a, b, prop):
                 1.0, 0.0, "sweep")
 
 
-def _outgoing_window(a, span, depart, n):
+def _outgoing_window(a, span, blend):
     """The values the outgoing animation plays through over an n-frame blend that leaves it at
     `depart` (a loop can be left anywhere, so all of them)."""
     if a.loop != "oneShot":
         return set(span.values(0, a.duration))
-    lo = a.duration if depart == "end" else (depart or 0)
-    return set(span.values(lo, lo + n))
+    lo = a.duration if blend.depart == "end" else (blend.depart or 0)
+    return set(span.values(lo, lo + blend.frames))
 
 
-def _sweep(a, b, prop, n, depart):
+def _sweep(a, b, prop, blend):
     if prop not in a.props or prop not in b.props:
         return _one_sided_sweep(a, b, prop)
-    incoming = set(b.props[prop].values(0, n - 1))
-    outgoing = _outgoing_window(a, a.props[prop], depart, n)
+    incoming = set(b.props[prop].values(0, blend.frames - 1))
+    outgoing = _outgoing_window(a, a.props[prop], blend)
     if len(incoming | outgoing) <= 1:
         return None
     v0, v1 = sorted(outgoing)[0], sorted(incoming)[-1]
@@ -514,11 +526,14 @@ def keyed_below(document, index):
         seen = set()
         for layer in sm.findall("StateMachineLayer"):
             out[(sm.get("name", "?"), layer.get("name", "?"))] = set(seen)
-            for st in layer.findall("AnimationState"):
-                a = index.get(st.get("animationId"))
-                if a is not None:
-                    seen |= set(a.props)
+            seen |= _layer_props(layer, index)
     return out
+
+
+def _layer_props(layer, index):
+    """Every (object, property) some animation of one state machine layer keys."""
+    anims = (index.get(st.get("animationId")) for st in layer.findall("AnimationState"))
+    return {prop for a in anims if a is not None for prop in a.props}
 
 
 def _pose_rows(index, t, held, below):
@@ -557,7 +572,7 @@ def seam_rows(index, t, signatures, below=frozenset()):
       - with a duration, every index it would sweep (sweeps) - never signed."""
     reason, held = (_signature(m, t) for m in signatures)
     moves = _pose_rows(index, t, held, below) + _cut_rows(index, t, reason, held)
-    moves += [(m, None) for m in sweeps(index, t.from_anim, t.to_anim, t.ms, t.depart)]
+    moves += [(m, None) for m in sweeps(index, t.from_anim, t.to_anim, Blend(t.ms, t.depart))]
     return [Row(t.machine, t.layer, _anim_name(index, t.from_anim), _anim_name(index, t.to_anim),
                 t.kind, t.ms, c.obj, prop_name(c.key), c.from_value, c.to_value, c.delta,
                 c.normalised, c.hand_back, bool(signed), signed)

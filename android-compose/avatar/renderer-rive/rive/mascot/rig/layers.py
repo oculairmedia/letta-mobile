@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from rml import (EASE_OUT, VM_STATE, anim_state, bool_transition, enum_transition,
                  exit_transition, input_transition, layer_frame, transition, trigger_transition,
                  weighted)
-from rig.seams import crossings, is_pose, pose_moves, prop_name as _prop, sweeps
+from rig.seams import Blend, crossings, is_pose, pose_moves, prop_name as _prop, sweeps
 
 # The animation index every Layer.rml() validates against, when the caller has set one. It is
 # module-level on purpose: the layer builders are called deep inside rig/machine.py and
@@ -405,7 +405,7 @@ class Layer:
             f'mark the transition cut=True with a reason.')
 
     def _check_sweep(self, index, s, t, target_anim):
-        m = next(iter(sweeps(index, s.anim, target_anim, t.ms, _departure(t))), None)
+        m = next(iter(sweeps(index, s.anim, target_anim, Blend(t.ms, _departure(t)))), None)
         if m is None:
             return
         raise ValueError(
