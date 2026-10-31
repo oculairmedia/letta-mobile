@@ -42,6 +42,9 @@ object GraphDimens {
     /** Room around a fitted graph for labels hung outside nodes and the overlays. */
     val fitPadding: Dp = 88.dp
 
+    /** The same on a phone, where labels are clamped inside the canvas instead. */
+    val fitPaddingCompact: Dp = 40.dp
+
     /** An unfocused node or label while another node has focus. */
     const val DIMMED_ALPHA: Float = 0.22f
 

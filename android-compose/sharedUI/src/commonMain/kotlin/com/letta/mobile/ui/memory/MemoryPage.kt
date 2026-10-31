@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.memory
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,14 +16,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
-import com.letta.mobile.data.memory.graph.MemoryGraphPoint
 import com.letta.mobile.data.memory.graph.MemoryNodeSelection
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
@@ -32,7 +35,6 @@ import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.LettaSidePane
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
-import kotlinx.coroutines.flow.first
 
 /**
  * The memory page shared by Android and desktop: overview chrome, the full
@@ -73,7 +75,7 @@ fun MemoryPage(
 
 /**
  * Host presentation choices: [showTitle] false when the host already titles
- * the screen; [reducedMotion] (or [LocalReducedMotion]) turns the reveal-selected-node pan into a
+ * the screen; [reducedMotion] (or [LocalReducedMotion]) turns phone framing of the selection into a
  * jump and keeps the graph still: no bloom on open, no neighbours drifting after a drag.
  */
 @Immutable
@@ -125,9 +127,12 @@ private fun CompactMemoryLayout(layout: MemoryPageLayout, maxHeight: Dp) {
     val viewportState = rememberMemoryGraphViewportState()
     val runtime = rememberMemoryGraphRuntime(layout, compact = true)
     val selection = layout.state.selection
-    RevealSelectedNode(layout, runtime.live, viewportState)
+    // The sheet's height (with its margin), so the graph is framed above it and the fit button sits on it.
+    var sheetPx by remember { mutableIntStateOf(0) }
+    val coveredPx = if (selection != null) sheetPx else 0
+    FrameSelectionAboveSheet(MemoryFraming(layout.state, runtime.live, layout.reducedMotion), viewportState, coveredPx)
     Box(Modifier.fillMaxSize()) {
-        MemoryGraphArea(layout, runtime, viewportState, Modifier.fillMaxSize())
+        MemoryGraphArea(layout, runtime, viewportState, Modifier.fillMaxSize(), coveredPx)
         if (selection != null) {
             // Editing may take the full height (keyboard up); reading keeps the
             // top of the graph visible so the selected node stays in view.
@@ -139,6 +144,7 @@ private fun CompactMemoryLayout(layout: MemoryPageLayout, maxHeight: Dp) {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .onSizeChanged { sheetPx = it.height }
                     .padding(LettaDimens.Space.sm)
                     .heightIn(max = cap),
             ) {
@@ -148,21 +154,6 @@ private fun CompactMemoryLayout(layout: MemoryPageLayout, maxHeight: Dp) {
                 }
             }
         }
-    }
-}
-
-/** Pan the tapped node into the strip the bottom card leaves uncovered. */
-@Composable
-private fun RevealSelectedNode(layout: MemoryPageLayout, live: MemoryGraphLiveLayout, viewportState: MemoryGraphViewportState) {
-    val nodeId = layout.state.selectedNodeId
-    LaunchedEffect(nodeId) {
-        if (nodeId == null) return@LaunchedEffect
-        // Wait for the canvas to be measured (and fitted) before panning against its size.
-        val size = snapshotFlow { viewportState.size }.first { it.width > 0f && it.height > 0f }
-        // Mid-bloom the node is still travelling: aim at where it settles.
-        val point = (if (live.isSettled) live.layout[nodeId] else null) ?: layout.state.layout[nodeId] ?: return@LaunchedEffect
-        val target = MemoryGraphPoint(size.width / 2f, size.height * REVEAL_HEIGHT_FRACTION)
-        viewportState.reveal(point, target, layout.reducedMotion)
     }
 }
 
@@ -178,52 +169,88 @@ private fun MemoryNodeCardFor(
     MemoryNodeCardContent(card = card, actions = actions, modifier = modifier)
 }
 
+/**
+ * The legend/filter row, then the canvas below it, so the chrome never overlaps the graph.
+ * [coveredPx] is how much of the canvas's bottom a phone's sheet covers; framing and the fit
+ * button stay above it.
+ */
 @Composable
 private fun MemoryGraphArea(
     layout: MemoryPageLayout,
     runtime: MemoryGraphRuntime,
     viewportState: MemoryGraphViewportState,
     modifier: Modifier = Modifier,
+    coveredPx: Int = 0,
 ) {
     val state = layout.state
-    val actions = layout.actions
-    Box(modifier) {
-        when {
-            state.view.isEmpty && state.parity.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-            state.view.isEmpty -> EmptyMemoryGraph(Modifier.align(Alignment.Center))
-            else -> MemoryGraphCanvas(
-                params = MemoryGraphCanvasParams(
-                    view = state.view,
-                    layout = state.layout,
-                    live = runtime.live,
-                    looks = runtime.looks,
-                    compact = runtime.compact,
-                    selectedNodeId = state.selectedNodeId,
-                    onNodeTap = { nodeId -> if (nodeId == null) actions.clearSelection() else actions.selectNode(nodeId) },
-                ),
-                viewportState = viewportState,
-                modifier = Modifier.fillMaxSize(),
+    Column(modifier) {
+        if (!state.view.isEmpty) {
+            MemoryKindFilterBar(
+                view = state.view,
+                counts = state.parity.memory.graph.nodes.groupingBy { it.kind }.eachCount(),
+                onToggle = layout.actions::toggleKind,
             )
         }
-        if (!state.view.isEmpty) {
-            Row(
-                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(LettaDimens.Space.sm),
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                verticalAlignment = Alignment.Top,
-            ) {
-                // The weighted Box caps the chips; the scroll row inside wraps them,
-                // so drags over empty graph beside the chips still pan.
-                Box(Modifier.weight(1f)) {
-                    MemoryKindFilterBar(
-                        view = state.view,
-                        counts = state.parity.memory.graph.nodes.groupingBy { it.kind }.eachCount(),
-                        onToggle = actions::toggleKind,
-                    )
-                }
-                MemoryGraphZoomControls(viewportState = viewportState, onFit = { viewportState.fit(state.layout) })
-            }
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            MemoryGraphBody(layout, runtime, viewportState)
+            if (!state.view.isEmpty) MemoryGraphControls(state, viewportState, runtime.compact, coveredPx)
         }
     }
+}
+
+@Composable
+private fun BoxScope.MemoryGraphBody(layout: MemoryPageLayout, runtime: MemoryGraphRuntime, viewportState: MemoryGraphViewportState) {
+    val state = layout.state
+    val actions = layout.actions
+    when {
+        state.view.isEmpty && state.parity.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+        state.view.isEmpty -> EmptyMemoryGraph(Modifier.align(Alignment.Center))
+        else -> MemoryGraphCanvas(
+            params = MemoryGraphCanvasParams(
+                view = state.view,
+                layout = state.layout,
+                live = runtime.live,
+                looks = runtime.looks,
+                compact = runtime.compact,
+                selectedNodeId = state.selectedNodeId,
+                onNodeTap = { nodeId -> if (nodeId == null) actions.clearSelection() else actions.selectNode(nodeId) },
+            ),
+            viewportState = viewportState,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+/**
+ * Wide: zoom in/out/fit at the canvas's top-right. Phone: only fit (pinch zooms), at the
+ * bottom-right just above the sheet; framing reserves that corner and the sheet.
+ */
+@Composable
+private fun BoxScope.MemoryGraphControls(
+    state: MemoryPageState,
+    viewportState: MemoryGraphViewportState,
+    compact: Boolean,
+    coveredPx: Int,
+) {
+    val density = LocalDensity.current
+    val gap = LettaDimens.Space.sm
+    val reservePx = with(density) { (LettaDimens.Control.minTouchTarget + gap * 2).toPx() }
+    SideEffect {
+        viewportState.compact = compact
+        viewportState.insets = if (compact) MemoryGraphInsets(right = reservePx, bottom = coveredPx.toFloat()) else MemoryGraphInsets.None
+    }
+    val covered = with(density) { coveredPx.toDp() }
+    val placement = if (compact) {
+        Modifier.align(Alignment.BottomEnd).padding(end = gap, bottom = covered + gap)
+    } else {
+        Modifier.align(Alignment.TopEnd).padding(gap)
+    }
+    MemoryGraphZoomControls(
+        viewportState = viewportState,
+        onFit = { viewportState.fit(state.layout) },
+        fitOnly = compact,
+        modifier = placement,
+    )
 }
 
 @Composable
@@ -232,4 +259,3 @@ private fun EmptyMemoryGraph(modifier: Modifier = Modifier) {
 }
 
 private const val CARD_READ_HEIGHT_FRACTION = 0.6f
-private const val REVEAL_HEIGHT_FRACTION = 0.26f

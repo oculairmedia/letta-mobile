@@ -9,8 +9,10 @@ import com.letta.mobile.data.memory.MemoryParityGraph
 import com.letta.mobile.data.memory.graph.MemoryGraphLayout
 import com.letta.mobile.data.memory.graph.MemoryGraphLayoutEngine
 import com.letta.mobile.data.memory.graph.MemoryGraphPoint
+import com.letta.mobile.data.memory.graph.MemoryGraphSize
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import com.letta.mobile.data.memory.graph.MemoryGraphViews
+import com.letta.mobile.data.memory.graph.MemoryGraphZoomLimits
 import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.components.lettaPercent
 import com.letta.mobile.ui.components.lettaUsage
@@ -79,6 +81,19 @@ class MemoryGraphPhysicsTest {
         assertFalse(sim.tick())
         assertEquals(pin, sim.snapshot()["leaf-1"])
         assertEquals(target["leaf-2"], sim.snapshot()["leaf-2"], "nothing else drifts")
+    }
+
+    @Test
+    fun framingKeepsTheGraphOutOfTheSheetAndTheFitCorner() = kotlinx.coroutines.runBlocking {
+        val state = MemoryGraphViewportState(MemoryGraphZoomLimits.forDensity(2f), fitPaddingPx = 176f, compactFitPaddingPx = 80f)
+        state.sync(target, MemoryGraphSize(720f, 1220f))
+        state.compact = true
+        state.insets = MemoryGraphInsets(right = 128f, bottom = 800f)
+        state.frame(target.bounds, reducedMotion = true)
+        target.positions.values.map(state.viewport::toScreen).forEach { point ->
+            assertTrue(point.x in 0f..(720f - 128f), "x ${point.x} is under the fit corner")
+            assertTrue(point.y in 0f..(1220f - 800f), "y ${point.y} is under the sheet")
+        }
     }
 
     @Test

@@ -3,8 +3,11 @@ package com.letta.mobile.ui.memory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,10 +27,9 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The legend, which is also the kind filter: one chip per node kind in the graph, its swatch the
+ * The legend, which is also the kind filter, above the canvas: one chip per node kind in the graph, its swatch the
  * nodes' colour and its count how many there are. The last enabled kind cannot be switched off.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MemoryKindFilterBar(
     view: MemoryGraphView,
@@ -36,9 +38,9 @@ internal fun MemoryKindFilterBar(
     modifier: Modifier = Modifier,
 ) {
     val palette = rememberMemoryGraphPalette()
-    // Wraps onto a second line on a phone rather than hiding kinds off the edge.
-    FlowRow(
-        modifier = modifier,
+    // One row above the canvas (never over it), scrolling sideways when a phone is too narrow.
+    Row(
+        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.lg),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         view.kindsPresent.forEach { kind ->
@@ -60,11 +62,15 @@ internal fun MemoryKindFilterBar(
     }
 }
 
-/** Zoom in / out / fit. Buttons keep pan/zoom reachable without a pinch or wheel. */
+/**
+ * Zoom in / out / fit: buttons keep pan/zoom reachable without a pinch or wheel. [fitOnly] (a
+ * phone, where pinch zooms) keeps just the fit button.
+ */
 @Composable
 internal fun MemoryGraphZoomControls(
     viewportState: MemoryGraphViewportState,
     onFit: () -> Unit,
+    fitOnly: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -74,11 +80,13 @@ internal fun MemoryGraphZoomControls(
         modifier = modifier,
     ) {
         Column {
-            IconButton(onClick = { viewportState.zoomBy(ZOOM_STEP) }) {
-                Icon(LettaIcons.ZoomIn, contentDescription = "Zoom in")
-            }
-            IconButton(onClick = { viewportState.zoomBy(1f / ZOOM_STEP) }) {
-                Icon(LettaIcons.ZoomOut, contentDescription = "Zoom out")
+            if (!fitOnly) {
+                IconButton(onClick = { viewportState.zoomBy(ZOOM_STEP) }) {
+                    Icon(LettaIcons.ZoomIn, contentDescription = "Zoom in")
+                }
+                IconButton(onClick = { viewportState.zoomBy(1f / ZOOM_STEP) }) {
+                    Icon(LettaIcons.ZoomOut, contentDescription = "Zoom out")
+                }
             }
             IconButton(onClick = onFit) {
                 Icon(LettaIcons.FitToView, contentDescription = "Fit graph")

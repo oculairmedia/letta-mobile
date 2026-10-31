@@ -4778,9 +4778,9 @@ public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryBlockDi
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/memory/ComposableSingletons$MemoryGraphOverlaysKt;
 	public fun <init> ()V
-	public final fun getLambda$-166897746$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1397351094$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$496283159$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-2056150377$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-774473774$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$284266688$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/memory/ComposableSingletons$MemoryNodeCardKt {
@@ -4844,7 +4844,6 @@ public final class com/letta/mobile/ui/memory/MemoryGraphViewportState {
 	public final fun getLimits ()Lcom/letta/mobile/data/memory/graph/MemoryGraphZoomLimits;
 	public final fun getSize ()Lcom/letta/mobile/data/memory/graph/MemoryGraphSize;
 	public final fun getViewport ()Lcom/letta/mobile/data/memory/graph/MemoryGraphViewport;
-	public final fun reveal (Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun sync (Lcom/letta/mobile/data/memory/graph/MemoryGraphLayout;Lcom/letta/mobile/data/memory/graph/MemoryGraphSize;)V
 	public final fun transform-Wko1d7g (JJF)V
 	public final fun zoomBy (F)V
@@ -11241,6 +11240,7 @@ public final class com/letta/mobile/ui/theme/graph/GraphDimens {
 	public final fun getEdge-D9Ej5fM ()F
 	public final fun getEdgeFocused-D9Ej5fM ()F
 	public final fun getFitPadding-D9Ej5fM ()F
+	public final fun getFitPaddingCompact-D9Ej5fM ()F
 	public final fun getHalo-D9Ej5fM ()F
 	public final fun getLabelChipPadX-D9Ej5fM ()F
 	public final fun getLabelChipPadY-D9Ej5fM ()F

@@ -47,7 +47,10 @@ internal class GraphFrame(
 
     fun radiusOf(nodeId: String): Float = (scene.looks[nodeId]?.radius ?: MemoryNodeLooks.SMALL_RADIUS) * viewport.scale
 
-    fun alphaOf(nodeId: String): Float = if (focusId == null || nodeId in focusSet) 1f else GraphDimens.DIMMED_ALPHA
+    fun alphaOf(nodeId: String): Float = if (isLit(nodeId)) 1f else GraphDimens.DIMMED_ALPHA
+
+    /** Nothing has focus, or this node is the focus or one of its neighbours. */
+    fun isLit(nodeId: String): Boolean = focusId == null || nodeId in focusSet
 
     fun edgeLit(fromId: String, toId: String): Boolean = focusId != null && (fromId == focusId || toId == focusId)
 
@@ -154,24 +157,28 @@ private fun DrawScope.drawLabel(frame: GraphFrame, node: MemoryGraphNode) {
     val text = if (node.id == frame.focusId) label.full else label.short
     val pad = Offset(GraphDimens.labelChipPadX.toPx(), GraphDimens.labelChipPadY.toPx())
     val chipSize = Size(text.size.width + pad.x * 2f, text.size.height + pad.y * 2f)
-    val chip = labelChipTopLeft(frame, node, centre, chipSize)
+    val chip = labelChipTopLeft(frame, node, centre, chipSize) ?: return
     val alpha = frame.alphaOf(node.id)
     drawRoundRect(frame.scene.palette.labelChip, chip, chipSize, CornerRadius(chipSize.height / 2f), alpha = alpha)
     drawText(text, topLeft = chip + pad, alpha = alpha)
 }
 
-/** The chip hung off the node toward its emptiest side, slid back inside the canvas if it would run off. */
-private fun DrawScope.labelChipTopLeft(frame: GraphFrame, node: MemoryGraphNode, centre: Offset, chip: Size): Offset {
+/**
+ * The chip hung off the node toward its emptiest side, slid back inside the canvas if it would run
+ * off. A dimmed node's label that would run off is dropped instead, so it never crowds the focus.
+ */
+private fun DrawScope.labelChipTopLeft(frame: GraphFrame, node: MemoryGraphNode, centre: Offset, chip: Size): Offset? {
     val neighbours = frame.scene.neighbours[node.id].orEmpty().mapNotNull(frame::screen)
     val direction = MemoryLabelPlacement.direction(centre, neighbours)
     val arcGap = if (frame.scene.looks[node.id]?.usage != null) GraphDimens.usageGap.toPx() else 0f
     val reach = frame.radiusOf(node.id) + GraphDimens.labelGap.toPx() + arcGap
     val placed = MemoryLabelPlacement.topLeft(centre, reach, direction, chip)
     val inset = GraphDimens.labelGap.toPx()
-    return Offset(
+    val clamped = Offset(
         placed.x.coerceIn(inset, (size.width - chip.width - inset).coerceAtLeast(inset)),
         placed.y.coerceIn(inset, (size.height - chip.height - inset).coerceAtLeast(inset)),
     )
+    return clamped.takeIf { it == placed || frame.isLit(node.id) }
 }
 
 /** Undirected adjacency, built once per view: label placement and focus both read it. */

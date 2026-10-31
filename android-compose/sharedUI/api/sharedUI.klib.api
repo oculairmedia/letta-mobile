@@ -4166,7 +4166,6 @@ final class com.letta.mobile.ui.memory/MemoryGraphViewportState { // com.letta.m
     final fun sync(com.letta.mobile.data.memory.graph/MemoryGraphLayout, com.letta.mobile.data.memory.graph/MemoryGraphSize) // com.letta.mobile.ui.memory/MemoryGraphViewportState.sync|sync(com.letta.mobile.data.memory.graph.MemoryGraphLayout;com.letta.mobile.data.memory.graph.MemoryGraphSize){}[0]
     final fun transform(androidx.compose.ui.geometry/Offset, androidx.compose.ui.geometry/Offset, kotlin/Float) // com.letta.mobile.ui.memory/MemoryGraphViewportState.transform|transform(androidx.compose.ui.geometry.Offset;androidx.compose.ui.geometry.Offset;kotlin.Float){}[0]
     final fun zoomBy(kotlin/Float) // com.letta.mobile.ui.memory/MemoryGraphViewportState.zoomBy|zoomBy(kotlin.Float){}[0]
-    final suspend fun reveal(com.letta.mobile.data.memory.graph/MemoryGraphPoint, com.letta.mobile.data.memory.graph/MemoryGraphPoint, kotlin/Boolean) // com.letta.mobile.ui.memory/MemoryGraphViewportState.reveal|reveal(com.letta.mobile.data.memory.graph.MemoryGraphPoint;com.letta.mobile.data.memory.graph.MemoryGraphPoint;kotlin.Boolean){}[0]
 }
 
 final class com.letta.mobile.ui.memory/MemoryPageOptions { // com.letta.mobile.ui.memory/MemoryPageOptions|null[0]
@@ -10553,6 +10552,8 @@ final object com.letta.mobile.ui.theme.graph/GraphDimens { // com.letta.mobile.u
         final fun <get-edgeFocused>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.graph/GraphDimens.edgeFocused.<get-edgeFocused>|<get-edgeFocused>(){}[0]
     final val fitPadding // com.letta.mobile.ui.theme.graph/GraphDimens.fitPadding|{}fitPadding[0]
         final fun <get-fitPadding>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.graph/GraphDimens.fitPadding.<get-fitPadding>|<get-fitPadding>(){}[0]
+    final val fitPaddingCompact // com.letta.mobile.ui.theme.graph/GraphDimens.fitPaddingCompact|{}fitPaddingCompact[0]
+        final fun <get-fitPaddingCompact>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.graph/GraphDimens.fitPaddingCompact.<get-fitPaddingCompact>|<get-fitPaddingCompact>(){}[0]
     final val halo // com.letta.mobile.ui.theme.graph/GraphDimens.halo|{}halo[0]
         final fun <get-halo>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme.graph/GraphDimens.halo.<get-halo>|<get-halo>(){}[0]
     final val labelChipPadX // com.letta.mobile.ui.theme.graph/GraphDimens.labelChipPadX|{}labelChipPadX[0]

@@ -205,10 +205,10 @@ class MemoryGraphRenderTest {
         const val AGENT = "agent:agent-1"
         const val HUMAN_BLOCK = "memory:block-human"
         const val BLOOM_SETTLE_MILLIS = 8_000L
-        val HUMAN_VALUE = """
-            Name: Emmanuel. Builds letta-mobile, a Kotlin Multiplatform client for Letta agents.
-            Prefers small, green PRs; reviews renders before merging; dark theme on desktop.
-            Working style: plans in beads, not docs. Wants the memory page to feel alive.
-        """.trimIndent().repeat(14)
+        // Distinct paragraphs, so a render that drops or joins text would show it.
+        val HUMAN_VALUE = (1..12).joinToString("\n\n") { n ->
+            "Note $n. Emmanuel builds letta-mobile, a Kotlin Multiplatform client for Letta agents. " +
+                "Prefers small, green PRs and reviews renders before merging; plans live in beads."
+        }
     }
 }
