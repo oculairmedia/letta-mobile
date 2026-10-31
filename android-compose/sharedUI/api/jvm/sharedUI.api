@@ -8028,15 +8028,6 @@ public final class com/letta/mobile/ui/shell/pages/conversations/ConversationsPa
 	public final fun filter (Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;)Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeCompactDashboardKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeCompactDashboardKt;
-	public fun <init> ()V
-	public final fun getLambda$-2127339018$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-949174326$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1828441617$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$747698600$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeConnectionPanelKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeConnectionPanelKt;
 	public fun <init> ()V
@@ -8053,9 +8044,7 @@ public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$Hom
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePagePartsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePagePartsKt;
 	public fun <init> ()V
-	public final fun getLambda$-304278067$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-419973574$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-641396568$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-858596876$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1028033273$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$122529946$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
@@ -8069,12 +8058,26 @@ public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$Hom
 	public final fun getLambda$-2053074142$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeRecentsKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeRecentsKt;
+	public fun <init> ()V
+	public final fun getLambda$-770086364$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeSearchResultsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeSearchResultsKt;
 	public fun <init> ()V
 	public final fun getLambda$-224626277$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-761605148$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$785112649$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeSectionsKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomeSectionsKt;
+	public fun <init> ()V
+	public final fun getLambda$-1593592053$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-772144012$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1304579417$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/shell/pages/home/HomeConnectionPanelKt {
@@ -8202,7 +8205,6 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageTags {
 	public static final field SEARCH_RESULTS Ljava/lang/String;
 	public static final field SEND Ljava/lang/String;
 	public static final field SHORTCUT_ROW Ljava/lang/String;
-	public static final field STATS Ljava/lang/String;
 	public static final field STATS_EXPAND Ljava/lang/String;
 	public static final field STATS_MENU Ljava/lang/String;
 	public static final field STATS_STRIP Ljava/lang/String;
@@ -8214,6 +8216,7 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageTags {
 	public final fun pin (Lcom/letta/mobile/data/home/HomePinnedItem;)Ljava/lang/String;
 	public final fun pinAgent (Lcom/letta/mobile/data/home/FleetAgentStat;)Ljava/lang/String;
 	public final fun recent (Lcom/letta/mobile/data/home/FleetRecentConversation;)Ljava/lang/String;
+	public final fun recentDay (Ljava/lang/String;)Ljava/lang/String;
 	public final fun searchHit (Ljava/lang/String;)Ljava/lang/String;
 	public final fun seeAll (Lcom/letta/mobile/data/home/HomeShortcut;)Ljava/lang/String;
 	public final fun sort (Lcom/letta/mobile/data/home/FleetSortKey;)Ljava/lang/String;

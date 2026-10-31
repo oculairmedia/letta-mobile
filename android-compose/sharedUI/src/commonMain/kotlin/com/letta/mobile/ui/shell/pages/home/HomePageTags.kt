@@ -17,13 +17,12 @@ object HomePageTags {
     const val PINNED_GRID = "home_pinned_grid"
     const val EDIT_PINS = "home_edit_pins"
     const val ADD_PIN = "home_add_pin"
-    const val STATS = "home_stats"
     const val ERROR = "home_error"
 
     /** The header's refresh, on pointer hosts only (touch pulls the page instead). */
     const val REFRESH = "home_refresh"
 
-    /** Compact Home (phone): the one-line "running now" strip, recents, the agent avatar row and the stats strip. */
+    /** Home's sections: the one-line "running now" strip, recents, the agent avatar row and the stats strip. */
     const val NOW_STRIP = "home_now_strip"
     const val RECENTS = "home_recents"
     const val AGENT_ROW = "home_agent_row"
@@ -49,6 +48,9 @@ object HomePageTags {
     fun addShortcut(shortcut: HomeShortcut): String = "home_add_${shortcut.name}"
 
     fun recent(conversation: FleetRecentConversation): String = "home_recent_${conversation.conversationId}"
+
+    /** A recents day label; [day] is the bucket's name (TODAY, YESTERDAY, WEEK, EARLIER). */
+    fun recentDay(day: String): String = "home_recent_day_$day"
 
     fun agentRow(agent: FleetAgentStat): String = "home_agent_${agent.agentId}"
 
