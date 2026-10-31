@@ -47,9 +47,9 @@ internal fun ChatRenderItem.livePresentationFor(
 ): LiveRowPresentation? {
     val names = events.flatMapTo(mutableSetOf()) { it.namesKnownTo(aliases) }
     if (names.isEmpty()) return null
-    val named = live.filter { item -> item.rows().any { it.isNamedBy(names) } }
+    val named = live.filter { item -> item.messagesInOrder().any { it.isNamedBy(names) } }
     val match = named.firstOrNull(::sharesShapeWith) ?: named.firstOrNull { isRunItem && !it.isRunItem } ?: return null
-    return LiveRowPresentation(match.key, match.runIdentity(), match.rows().firstNotNullOfOrNull { it.latencyMs })
+    return LiveRowPresentation(match.key, match.runIdentity(), match.messagesInOrder().firstNotNullOfOrNull { it.latencyMs })
 }
 
 /** [this] as the live row showed it; every other field is the settled row's own. */
@@ -68,7 +68,7 @@ internal fun ChatRenderItem.adopt(live: LiveRowPresentation): ChatRenderItem = w
 
 private fun ChatRenderItem.sharesShapeWith(other: ChatRenderItem): Boolean = when {
     isRunItem || other.isRunItem -> isRunItem && other.isRunItem
-    else -> rows().single().sameKindAs(other.rows().single())
+    else -> messagesInOrder().single().sameKindAs(other.messagesInOrder().single())
 }
 
 private fun UiMessage.sameKindAs(other: UiMessage): Boolean =
@@ -85,11 +85,6 @@ private fun UiMessage.withLatencyOf(live: LiveRowPresentation): UiMessage =
 
 private fun TimelineResidentEvent.namesKnownTo(aliases: Map<String, TimelineMessageId>): List<String> =
     (listOf(serverId, identity.value, otid) + aliases.filterValues { it == identity }.keys).filter(String::isNotBlank)
-
-private fun ChatRenderItem.rows(): List<UiMessage> = when (this) {
-    is ChatRenderItem.RunBlock -> messages.map { it.first }
-    is ChatRenderItem.Single -> listOf(message)
-}
 
 /** Reasoning rows are keyed `<serverId>:REASONING` so they cannot collide with their reply. */
 private fun UiMessage.isNamedBy(names: Set<String>): Boolean =

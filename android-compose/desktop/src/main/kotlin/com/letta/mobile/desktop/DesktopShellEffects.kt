@@ -5,7 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.dreaming.DreamNotifyPrefs
+import com.letta.mobile.data.chat.projection.chronologicalMessages
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.ui.shell.SyncShellWorkspace
 import com.letta.mobile.ui.shell.workspace.openSearchHit
@@ -69,11 +71,7 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             controller = context.core.nucleusController,
             // Read through the controller's live state: the toast fires from a
             // coroutine after composition-captured chatState may be stale.
-            replyPreviewFor = { conversationId ->
-                notificationReplyPreview(
-                    chatController.state.value.messagesByConversationId[conversationId],
-                )
-            },
+            replyPreviewFor = { conversationId -> notificationReplyPreview(chatController.replyMessages(conversationId)) },
             onOpenConversation = { context.router.openConversation(ConversationId(it)) },
             onReplyToConversation = chatController::replyFromNotification,
             attention = rememberShellAttentionBindings(context),
@@ -186,3 +184,7 @@ private fun workingAgentName(params: WorkingAgentNameParams): String {
     }
     return byConversation ?: params.fallback
 }
+
+/** [conversationId]'s messages, oldest first: the hydrated map's, else the canonical route's live overlay. */
+private fun DesktopChatController.replyMessages(conversationId: String) = state.value.messagesByConversationId[conversationId]
+    ?: liveReply?.takeIf { it.first == conversationId }?.let { chronologicalMessages(it.second) }
