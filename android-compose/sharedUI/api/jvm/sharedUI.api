@@ -3506,7 +3506,12 @@ public final class com/letta/mobile/ui/host/ComposableSingletons$PointerHost_jvm
 	public fun <init> ()V
 	public final fun getLambda$-189359938$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$1471434836$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
-	public final fun getLambda$2057665449$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+}
+
+public final class com/letta/mobile/ui/host/ComposableSingletons$PointerHoverKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/host/ComposableSingletons$PointerHoverKt;
+	public fun <init> ()V
+	public final fun getLambda$-1393220772$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/host/InspectorDefaults {
@@ -4026,10 +4031,13 @@ public final class com/letta/mobile/ui/host/PaneWindowClassKt {
 }
 
 public final class com/letta/mobile/ui/host/PointerHost_jvmKt {
+	public static final fun desktopPointer (Lcom/letta/mobile/ui/host/LettaHost$Companion;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/host/LettaHost;
+}
+
+public final class com/letta/mobile/ui/host/PointerTooltipKt {
 	public static final fun PointerTooltip (Ljava/lang/String;Landroidx/compose/ui/Modifier;ILcom/letta/mobile/ui/host/PointerTooltipPosition;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun PointerTooltipArea (Lkotlin/jvm/functions/Function2;Landroidx/compose/ui/Modifier;ILcom/letta/mobile/ui/host/PointerTooltipPosition;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun PointerTooltipSurface (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
-	public static final fun desktopPointer (Lcom/letta/mobile/ui/host/LettaHost$Companion;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/host/LettaHost;
 }
 
 public final class com/letta/mobile/ui/host/PointerTooltipPosition : java/lang/Enum {

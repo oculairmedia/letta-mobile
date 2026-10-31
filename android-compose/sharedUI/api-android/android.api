@@ -3501,6 +3501,12 @@ public final class com/letta/mobile/ui/host/ComposableSingletons$OverlayLayerKt 
 	public final fun getLambda$-1967646420$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/host/ComposableSingletons$PointerHoverKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/host/ComposableSingletons$PointerHoverKt;
+	public fun <init> ()V
+	public final fun getLambda$-1393220772$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+}
+
 public final class com/letta/mobile/ui/host/InspectorDefaults {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/host/InspectorDefaults;
@@ -4015,6 +4021,20 @@ public final class com/letta/mobile/ui/host/PaneWindowClass$Companion {
 public final class com/letta/mobile/ui/host/PaneWindowClassKt {
 	public static final fun currentPaneWindowClass (Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/host/PaneWindowClass;
 	public static final fun getLocalPaneWindowClass ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/host/PointerTooltipKt {
+	public static final fun PointerTooltip (Ljava/lang/String;Landroidx/compose/ui/Modifier;ILcom/letta/mobile/ui/host/PointerTooltipPosition;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun PointerTooltipArea (Lkotlin/jvm/functions/Function2;Landroidx/compose/ui/Modifier;ILcom/letta/mobile/ui/host/PointerTooltipPosition;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun PointerTooltipSurface (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/host/PointerTooltipPosition : java/lang/Enum {
+	public static final field BelowAnchor Lcom/letta/mobile/ui/host/PointerTooltipPosition;
+	public static final field Cursor Lcom/letta/mobile/ui/host/PointerTooltipPosition;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/host/PointerTooltipPosition;
+	public static fun values ()[Lcom/letta/mobile/ui/host/PointerTooltipPosition;
 }
 
 public final class com/letta/mobile/ui/host/RowDragTracker {
