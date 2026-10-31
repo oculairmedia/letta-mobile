@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.avatar.core.HeadlessAvatarRuntime
 import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.avatar.core.model.MascotShape
+import kotlin.random.Random
 
 /** A renderer that can draw every agent and paints a tagged empty box: no scene, no frame loop. */
 internal object FakeMascotHost : FakeMascotRenderer(observesPointer = false) {
@@ -30,7 +31,8 @@ internal open class FakeMascotRenderer(private val observesPointer: Boolean) : M
     override val available: Boolean = true
 
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry =
-        object : MascotEntry(HeadlessAvatarRuntime(), identity, applyState = {}) {
+        // Each scene owns its random sequence: gaze/fidgets are repeatable across runs and test order.
+        object : MascotEntry(HeadlessAvatarRuntime(), identity, applyState = {}, random = Random(0)) {
             override suspend fun load() = Unit
             override fun writeIdentity(identity: MascotIdentity) = Unit
             override fun dispose() = Unit
