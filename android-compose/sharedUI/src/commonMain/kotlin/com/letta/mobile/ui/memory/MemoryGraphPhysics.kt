@@ -41,7 +41,7 @@ internal class MemoryGraphPhysics private constructor(
     fun pin(id: String, point: MemoryGraphPoint) {
         val index = indexById[id] ?: return
         pinned = index
-        field.place(index, point, stop = true)
+        field.hold(index, point)
         heat()
     }
 
@@ -84,7 +84,7 @@ internal class MemoryGraphPhysics private constructor(
         ): MemoryGraphPhysics {
             val ids = view.nodes.map { it.id }
             val radii = FloatArray(ids.size) { radiusOf(ids[it]) }
-            val field = MemoryGraphForceField(ids.size, MemoryGraphForceField.springsOf(view, ids), radii = radii)
+            val field = MemoryGraphForceField(ids.size, MemoryGraphForceField.springsOf(view), radii = radii)
             val motion = start.motion && ids.size <= LIVE_NODE_LIMIT
             val physics = MemoryGraphPhysics(ids, field, motion)
             val moved = physics.seed(target, start)

@@ -85,7 +85,7 @@ internal class MemoryGraphForceSimulation(
     private val config: MemoryGraphLayoutConfig,
 ) {
     private val ids = view.nodes.map { it.id }
-    private val field = MemoryGraphForceField(ids.size, MemoryGraphForceField.springsOf(view, ids), config)
+    private val field = MemoryGraphForceField(ids.size, MemoryGraphForceField.springsOf(view), config)
 
     fun relax(seed: Map<String, MemoryGraphPoint>): Map<String, MemoryGraphPoint> {
         ids.forEachIndexed { index, id -> field.place(index, seed.getValue(id)) }
@@ -130,14 +130,17 @@ class MemoryGraphForceField(
     /** Node [index]'s position. */
     fun point(index: Int): MemoryGraphPoint = MemoryGraphPoint(x[index], y[index])
 
-    /** Put node [index] at [point]; with [stop], also drop its velocity (a drag holds it there). */
-    fun place(index: Int, point: MemoryGraphPoint, stop: Boolean = false) {
+    /** Put node [index] at [point]. */
+    fun place(index: Int, point: MemoryGraphPoint) {
         x[index] = point.x
         y[index] = point.y
-        if (stop) {
-            vx[index] = 0f
-            vy[index] = 0f
-        }
+    }
+
+    /** Put node [index] at [point] and stop it there (a drag holding it). */
+    fun hold(index: Int, point: MemoryGraphPoint) {
+        place(index, point)
+        vx[index] = 0f
+        vy[index] = 0f
     }
 
     /** One step. Node [pinned] (or none, [FREE]) stays where it is. Returns the fastest free node's speed. */
@@ -161,17 +164,17 @@ class MemoryGraphForceField(
                 }
                 val distanceSq = max(dx * dx + dy * dy, MIN_DISTANCE_SQ)
                 val distance = sqrt(distanceSq)
-                val force = config.repulsion / distanceSq + overlap(i, j, distance)
-                addPair(i, j, dx / distance * force, dy / distance * force)
+                // Drawn circles that overlap push apart harder; point masses have no radii.
+                val overlap = radii?.let { r -> max(0f, r[i] + r[j] + COLLISION_PADDING - distance) * COLLISION_STRENGTH } ?: 0f
+                val force = config.repulsion / distanceSq + overlap
+                val px = dx / distance * force
+                val py = dy / distance * force
+                fx[i] += px
+                fy[i] += py
+                fx[j] -= px
+                fy[j] -= py
             }
         }
-    }
-
-    /** How hard two drawn circles push apart where they overlap; 0 for point masses. */
-    private fun overlap(i: Int, j: Int, distance: Float): Float {
-        val r = radii ?: return 0f
-        val clearance = r[i] + r[j] + COLLISION_PADDING
-        return if (distance < clearance) (clearance - distance) * COLLISION_STRENGTH else 0f
     }
 
     private fun applySprings() {
@@ -183,16 +186,14 @@ class MemoryGraphForceField(
             val dy = y[b] - y[a]
             val distance = max(sqrt(dx * dx + dy * dy), MIN_DISTANCE)
             val force = config.attraction * (distance - config.idealEdgeLength)
-            addPair(a, b, dx / distance * force, dy / distance * force)
+            val px = dx / distance * force
+            val py = dy / distance * force
+            fx[a] += px
+            fy[a] += py
+            fx[b] -= px
+            fy[b] -= py
             s += 2
         }
-    }
-
-    private fun addPair(a: Int, b: Int, px: Float, py: Float) {
-        fx[a] += px
-        fy[a] += py
-        fx[b] -= px
-        fy[b] -= py
     }
 
     /** Damped step with a per-step cap; returns the fastest free node's speed. */
@@ -215,17 +216,13 @@ class MemoryGraphForceField(
         /** No node is pinned. */
         const val FREE = -1
 
-        /** [view]'s edges as index pairs over [ids], skipping self-loops and edges to nodes not in [ids]. */
-        fun springsOf(view: MemoryGraphView, ids: List<String>): IntArray {
-            val indexById = ids.withIndex().associate { (index, id) -> id to index }
+        /** [view]'s edges as index pairs over its nodes, skipping self-loops and edges to nodes not in it. */
+        fun springsOf(view: MemoryGraphView): IntArray {
+            val indexById = view.nodes.withIndex().associate { (index, node) -> node.id to index }
             val pairs = ArrayList<Int>(view.edges.size * 2)
             view.edges.forEach { edge ->
-                val from = indexById[edge.fromId]
-                val to = indexById[edge.toId]
-                if (from != null && to != null && from != to) {
-                    pairs += from
-                    pairs += to
-                }
+                val ends = listOfNotNull(indexById[edge.fromId], indexById[edge.toId]).distinct()
+                if (ends.size == 2) pairs += ends
             }
             return pairs.toIntArray()
         }

@@ -19582,15 +19582,15 @@ public final class com/letta/mobile/data/memory/graph/MemoryGraphForceField {
 	public fun <init> (I[ILcom/letta/mobile/data/memory/graph/MemoryGraphLayoutConfig;[F)V
 	public synthetic fun <init> (I[ILcom/letta/mobile/data/memory/graph/MemoryGraphLayoutConfig;[FILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getSize ()I
-	public final fun place (ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;Z)V
-	public static synthetic fun place$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphForceField;ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;ZILjava/lang/Object;)V
+	public final fun hold (ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;)V
+	public final fun place (ILcom/letta/mobile/data/memory/graph/MemoryGraphPoint;)V
 	public final fun point (I)Lcom/letta/mobile/data/memory/graph/MemoryGraphPoint;
 	public final fun step (I)F
 	public static synthetic fun step$default (Lcom/letta/mobile/data/memory/graph/MemoryGraphForceField;IILjava/lang/Object;)F
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphForceField$Companion {
-	public final fun springsOf (Lcom/letta/mobile/data/memory/graph/MemoryGraphView;Ljava/util/List;)[I
+	public final fun springsOf (Lcom/letta/mobile/data/memory/graph/MemoryGraphView;)[I
 }
 
 public final class com/letta/mobile/data/memory/graph/MemoryGraphHitTarget {

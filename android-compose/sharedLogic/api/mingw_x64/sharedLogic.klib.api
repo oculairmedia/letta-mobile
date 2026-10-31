@@ -34730,7 +34730,8 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphForceField { // com.le
     final val size // com.letta.mobile.data.memory.graph/MemoryGraphForceField.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphForceField.size.<get-size>|<get-size>(){}[0]
 
-    final fun place(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphPoint, kotlin/Boolean = ...) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.place|place(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphPoint;kotlin.Boolean){}[0]
+    final fun hold(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphPoint) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.hold|hold(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphPoint){}[0]
+    final fun place(kotlin/Int, com.letta.mobile.data.memory.graph/MemoryGraphPoint) // com.letta.mobile.data.memory.graph/MemoryGraphForceField.place|place(kotlin.Int;com.letta.mobile.data.memory.graph.MemoryGraphPoint){}[0]
     final fun point(kotlin/Int): com.letta.mobile.data.memory.graph/MemoryGraphPoint // com.letta.mobile.data.memory.graph/MemoryGraphForceField.point|point(kotlin.Int){}[0]
     final fun step(kotlin/Int = ...): kotlin/Float // com.letta.mobile.data.memory.graph/MemoryGraphForceField.step|step(kotlin.Int){}[0]
 
@@ -34738,7 +34739,7 @@ final class com.letta.mobile.data.memory.graph/MemoryGraphForceField { // com.le
         final const val FREE // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.FREE|{}FREE[0]
             final fun <get-FREE>(): kotlin/Int // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.FREE.<get-FREE>|<get-FREE>(){}[0]
 
-        final fun springsOf(com.letta.mobile.data.memory.graph/MemoryGraphView, kotlin.collections/List<kotlin/String>): kotlin/IntArray // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.springsOf|springsOf(com.letta.mobile.data.memory.graph.MemoryGraphView;kotlin.collections.List<kotlin.String>){}[0]
+        final fun springsOf(com.letta.mobile.data.memory.graph/MemoryGraphView): kotlin/IntArray // com.letta.mobile.data.memory.graph/MemoryGraphForceField.Companion.springsOf|springsOf(com.letta.mobile.data.memory.graph.MemoryGraphView){}[0]
     }
 }
 
