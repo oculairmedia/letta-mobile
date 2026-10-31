@@ -47,9 +47,7 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 @Immutable
@@ -180,12 +178,12 @@ fun subagentTodoSheetStateFrom(result: Result<List<SubagentTodo>>): SubagentTodo
 internal val TODOS_DEADLINE: Duration = 8.seconds
 
 /**
- * [load]'s result, or a failure once [deadline] passes. The load runs detached and only the wait is
- * timed: a round trip that does not answer cancellation (a transport blocked under it) still cannot
- * hold the sheet on its spinner.
+ * [load]'s result, or a failure once [deadline] passes. The load runs in [owner] (the sheet's own
+ * effect scope) and only the wait is timed: a round trip that does not answer cancellation (a
+ * transport blocked under it) still cannot hold the sheet on its spinner.
  */
-internal suspend fun <T> loadWithin(deadline: Duration, load: suspend () -> Result<T>): Result<T> {
-    val pending = CoroutineScope(currentCoroutineContext().minusKey(Job)).async { load() }
+internal suspend fun <T> loadWithin(owner: CoroutineScope, deadline: Duration, load: suspend () -> Result<T>): Result<T> {
+    val pending = owner.async { load() }
     return withTimeoutOrNull(deadline) { pending.await() } ?: run {
         pending.cancel()
         Result.failure(IllegalStateException("No answer from this subagent's todo list"))
@@ -211,7 +209,7 @@ fun SubagentTodoSheetHost(
 ) {
     var state by remember(target.toolCallId) { mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading) }
     LaunchedEffect(loader, target.toolCallId) {
-        state = subagentTodoSheetStateFrom(loadWithin(TODOS_DEADLINE) { loader.todos(target) })
+        state = subagentTodoSheetStateFrom(loadWithin(this, TODOS_DEADLINE) { loader.todos(target) })
     }
     SubagentTodoSheet(
         description = target.description,

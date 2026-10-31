@@ -27,7 +27,7 @@ class SubagentTodoSheetTest {
     @Test
     fun `a load that never answers fails at the deadline`() = runBlocking<Unit> {
         val never = CompletableDeferred<Result<List<SubagentTodo>>>()
-        val result = loadWithin(50.milliseconds) { withContext(NonCancellable) { never.await() } }
+        val result = loadWithin(this, 50.milliseconds) { withContext(NonCancellable) { never.await() } }
         assertTrue(result.isFailure)
         assertTrue(subagentTodoSheetStateFrom(result) is SubagentTodoSheetState.Error)
         never.complete(Result.success(emptyList()))
@@ -35,7 +35,7 @@ class SubagentTodoSheetTest {
 
     @Test
     fun `a load that answers in time is passed through`() = runBlocking<Unit> {
-        val result = loadWithin(1000.milliseconds) { Result.success(emptyList<SubagentTodo>()) }
+        val result = loadWithin(this, 1000.milliseconds) { Result.success(emptyList<SubagentTodo>()) }
         assertEquals(SubagentTodoSheetState.Empty, subagentTodoSheetStateFrom(result))
     }
 }
