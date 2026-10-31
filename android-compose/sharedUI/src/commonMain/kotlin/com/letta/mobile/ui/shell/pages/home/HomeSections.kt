@@ -82,7 +82,11 @@ private fun LazyListScope.homeNowStrip(page: HomePageScope) {
 @Composable
 private fun NowStrip(running: List<FleetAgentStat>, page: HomePageScope) {
     val onClick = {
-        if (page.offers(HomeShortcut.RUNS)) page.navigation.onOpenShortcut(HomeShortcut.RUNS) else page.navigation.onOpenAgent(running.first().agentId)
+        if (page.offers(HomeShortcut.RUNS)) {
+            page.navigation.onOpenShortcut(HomeShortcut.RUNS)
+        } else {
+            page.navigation.onOpenAgent(running.first().agentId)
+        }
     }
     Surface(
         onClick = onClick,
@@ -276,7 +280,9 @@ private fun LazyListScope.homePinnedShortcutRow(page: HomePageScope) {
                 AssistChip(
                     onClick = { page.navigation.onOpenShortcut(item.shortcut) },
                     label = { Text(item.shortcut.label) },
-                    leadingIcon = { Icon(item.shortcut.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm)) },
+                    leadingIcon = {
+                        Icon(item.shortcut.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
+                    },
                     modifier = Modifier.testTag(HomePageTags.pin(item)),
                 )
             }
