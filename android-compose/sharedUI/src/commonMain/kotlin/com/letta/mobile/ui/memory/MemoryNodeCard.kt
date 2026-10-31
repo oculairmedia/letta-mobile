@@ -132,26 +132,30 @@ private fun kindOverline(kind: MemoryGraphNodeKind): String = when (kind) {
 @Composable
 private fun ColumnScope.MemoryNodeBody(card: MemoryNodeCardState, actions: MemoryPageActions) {
     val selection = card.selection
-    val text = when (card.item) {
-        is MemoryParityItem.Schedule, is MemoryParityItem.Channel -> null
-        else -> selection.displayText
-    }
     when (val content = selection.content) {
         MemoryNodeContent.Loading -> MemoryNodeLoading()
         is MemoryNodeContent.Failed -> MemoryNodeLoadFailed(content.message, actions::retryContent)
-        else -> text?.let {
-            if (card.item is MemoryParityItem.MemoryBlock) LettaSectionLabel("Value")
-            MemoryNodeText(it, monospace = content is MemoryNodeContent.Loaded)
-        }
+        else -> MemoryNodeValue(card, monospace = content is MemoryNodeContent.Loaded)
     }
-    if (selection.canEdit || selection.canDelete) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            if (selection.canDelete) {
-                MemoryCardAction(LettaIcons.Delete, "Delete", actions::requestDelete, MaterialTheme.colorScheme.error)
-            }
-            if (selection.canEdit) {
-                MemoryCardAction(LettaIcons.Edit, "Edit", actions::beginEdit)
-            }
+    if (selection.canEdit || selection.canDelete) MemoryNodeActions(card, actions)
+}
+
+/** The node's text, under a "Value" heading for a block; schedules and channels say it all in their facts. */
+@Composable
+private fun ColumnScope.MemoryNodeValue(card: MemoryNodeCardState, monospace: Boolean) {
+    if (card.item is MemoryParityItem.Schedule || card.item is MemoryParityItem.Channel) return
+    if (card.item is MemoryParityItem.MemoryBlock) LettaSectionLabel("Value")
+    MemoryNodeText(card.selection.displayText, monospace = monospace)
+}
+
+@Composable
+private fun MemoryNodeActions(card: MemoryNodeCardState, actions: MemoryPageActions) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        if (card.selection.canDelete) {
+            MemoryCardAction(LettaIcons.Delete, "Delete", actions::requestDelete, MaterialTheme.colorScheme.error)
+        }
+        if (card.selection.canEdit) {
+            MemoryCardAction(LettaIcons.Edit, "Edit", actions::beginEdit)
         }
     }
 }

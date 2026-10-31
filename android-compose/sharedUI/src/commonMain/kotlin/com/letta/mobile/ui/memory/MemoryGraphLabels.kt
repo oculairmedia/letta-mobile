@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
@@ -45,20 +46,23 @@ internal fun rememberMemoryNodeLabels(view: MemoryGraphView, palette: MemoryGrap
                 typography.labelMedium.copy(color = palette.label)
             }
             node.id to MemoryNodeLabel(
-                short = measure(measurer, MemoryLabelText.shorten(node.title, maxChars), style, shortWidth, maxLines = 1),
-                full = measure(measurer, node.title, style, fullWidth, maxLines = FULL_LABEL_LINES),
+                short = measurer.label(MemoryLabelText.shorten(node.title, maxChars), style, LabelBox(shortWidth, 1)),
+                full = measurer.label(node.title, style, LabelBox(fullWidth, FULL_LABEL_LINES)),
             )
         }
     }
 }
 
-private fun measure(measurer: TextMeasurer, text: String, style: TextStyle, maxWidthPx: Int, maxLines: Int): TextLayoutResult =
-    measurer.measure(
+/** A label's box: its width cap in px and how many lines it may wrap to. */
+private class LabelBox(val maxWidthPx: Int, val maxLines: Int)
+
+private fun TextMeasurer.label(text: String, style: TextStyle, box: LabelBox): TextLayoutResult =
+    measure(
         text = text,
         style = style,
         overflow = TextOverflow.Ellipsis,
-        maxLines = maxLines,
-        constraints = Constraints(maxWidth = maxWidthPx),
+        maxLines = box.maxLines,
+        constraints = Constraints(maxWidth = box.maxWidthPx),
     )
 
 /** Truncation that keeps the part of a title that tells nodes apart. */
@@ -115,17 +119,15 @@ internal object MemoryLabelPlacement {
     }
 
     /**
-     * Top-left of a [width] x [height] label hung off a node of [radius] toward [direction]: the
-     * box's near corner (or edge midpoint) touches the anchor point, so the box never covers the
-     * node.
+     * Top-left of a [chip]-sized label hung [reach] from [centre] toward [direction]: the box's
+     * near corner (or edge midpoint) touches that anchor point, so the box never covers the node.
      */
-    fun topLeft(centre: Offset, radius: Float, gap: Float, direction: Offset, width: Float, height: Float): Offset {
-        val reach = radius + gap
+    fun topLeft(centre: Offset, reach: Float, direction: Offset, chip: Size): Offset {
         val anchor = Offset(centre.x + direction.x * reach, centre.y + direction.y * reach)
         val square = max(abs(direction.x), abs(direction.y)).coerceAtLeast(MIN_COMPONENT)
         val sx = direction.x / square
         val sy = direction.y / square
-        return Offset(anchor.x - width / 2f + sx * width / 2f, anchor.y - height / 2f + sy * height / 2f)
+        return Offset(anchor.x - chip.width / 2f + sx * chip.width / 2f, anchor.y - chip.height / 2f + sy * chip.height / 2f)
     }
 
     private const val TWO_PI = (2 * kotlin.math.PI).toFloat()

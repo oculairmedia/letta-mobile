@@ -42,7 +42,7 @@ internal fun MemoryContextMeter(summary: MemoryParitySummary, modifier: Modifier
         else -> "Unavailable"
     }
     val fraction = used?.let { lettaFraction(it, limit) }
-    LettaMeter("Context", text, fraction, MaterialTheme.colorScheme.primary, modifier)
+    LettaMeter("Context" to text, fraction, MaterialTheme.colorScheme.primary, modifier)
 }
 
 /** The agent: its context window, then its blocks (tap one to open it) and what else it links to. */
@@ -72,8 +72,7 @@ internal fun MemoryAgentFacts(card: MemoryNodeCardState, palette: MemoryGraphPal
 private fun MemoryRelatedBlockRow(block: MemoryRelatedNode, colour: androidx.compose.ui.graphics.Color, onOpen: (String) -> Unit) {
     val length = block.length ?: 0
     LettaMeter(
-        label = block.title,
-        value = lettaUsage(length, block.limit, "chars"),
+        caption = block.title to lettaUsage(length, block.limit, "chars"),
         fraction = lettaFraction(length, block.limit),
         colour = colour,
         modifier = Modifier
@@ -91,7 +90,7 @@ internal fun MemoryBlockFacts(card: MemoryNodeCardState) {
     val length = card.blockLength ?: 0
     val limit = block?.limit ?: card.selection.detail.limit
     val text = lettaUsage(length, limit, "chars") + (limit?.let { " · " + lettaPercent(length, it) } ?: "")
-    LettaMeter("Size", text, lettaFraction(length, limit), card.accent, Modifier.fillMaxWidth())
+    LettaMeter("Size" to text, lettaFraction(length, limit), card.accent, Modifier.fillMaxWidth())
     if (card.selection.detail.readOnly) LettaFactRow("Access", "Read-only")
 }
 

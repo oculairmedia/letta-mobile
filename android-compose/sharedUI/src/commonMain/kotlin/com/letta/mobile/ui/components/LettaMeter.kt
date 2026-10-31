@@ -27,12 +27,13 @@ import com.letta.mobile.ui.text.LettaSelectionContainer
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * A labelled single-value bar: [label], then [value] ("801 / 1,000,000 tokens"), over a track
- * [fraction] full in [colour]. An unknown fraction draws the empty track; a sliver still shows a
- * dot's worth. The track takes the context bar's radius and surface.
+ * A labelled single-value bar: [caption] is label to value ("Context" to "801 / 1,000,000
+ * tokens"), over a track [fraction] full in [colour]. An unknown fraction draws the empty track; a
+ * sliver still shows a dot's worth. The track takes the context bar's radius and surface.
  */
 @Composable
-internal fun LettaMeter(label: String, value: String, fraction: Float?, colour: Color, modifier: Modifier = Modifier) {
+internal fun LettaMeter(caption: Pair<String, String>, fraction: Float?, colour: Color, modifier: Modifier = Modifier) {
+    val (label, value) = caption
     Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             Text(

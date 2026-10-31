@@ -54,12 +54,12 @@ class MemoryGraphRenderTest {
     @Test
     fun rendersTheAgentAndABlockAtEveryWidth() {
         shots.forEach { shot ->
-            render(shot, "agent", AGENT)
-            render(shot, "block", "memory:block-human")
+            render(shot, AGENT)
+            render(shot, HUMAN_BLOCK)
         }
     }
 
-    private fun render(shot: Shot, name: String, nodeId: String) =
+    private fun render(shot: Shot, nodeId: String) =
         runDesktopComposeUiTest(width = shot.widthDp * shot.scale, height = shot.heightDp * shot.scale) {
             val state = pageState(nodeId)
             setContent {
@@ -76,7 +76,7 @@ class MemoryGraphRenderTest {
             mainClock.advanceTimeBy(BLOOM_SETTLE_MILLIS)
             waitForIdle()
             val image = onRoot().captureToImage().toAwtImage()
-            val out = File("build/memory-graph-render").apply { mkdirs() }.resolve("memory-${shot.widthDp}dp-$name.png")
+            val out = File("build/memory-graph-render").apply { mkdirs() }.resolve("memory-${shot.widthDp}dp-${if (nodeId == AGENT) "agent" else "block"}.png")
             ImageIO.write(image, "png", out)
             assertTrue(out.length() > 0)
         }
@@ -100,13 +100,13 @@ class MemoryGraphRenderTest {
 
     private fun memory(): MemoryParityState {
         val blocks = listOf(
-            block("block-persona", "persona", 1_840),
-            block("block-human", "human", HUMAN_VALUE.length),
-            block("block-project", "project_letta_mobile", 4_210),
+            block("persona", 1_840),
+            block("human", HUMAN_VALUE.length),
+            block("project_letta_mobile", 4_210),
         )
         val schedules = listOf(
-            schedule("sched-1", "Emmanuel authorized check-ins on the release train every weekday", "Recurring: 0 9 * * 1-5"),
-            schedule("sched-2", "Summarise yesterday's merged PRs", "One-time: 2026-10-31T08:00:00Z"),
+            schedule("Emmanuel authorized check-ins on the release train every weekday", recurring = true),
+            schedule("Summarise yesterday's merged PRs", recurring = false),
         )
         val channel = MemoryParityItem.Channel(
             id = "channel-1",
@@ -162,8 +162,8 @@ class MemoryGraphRenderTest {
     private fun section(kind: MemoryParitySectionKind, items: List<MemoryParityItem>) =
         MemoryParitySection(kind = kind, title = kind.name, subtitle = "", emptyMessage = "", items = items)
 
-    private fun block(id: String, label: String, length: Int) = MemoryParityItem.MemoryBlock(
-        id = id,
+    private fun block(label: String, length: Int) = MemoryParityItem.MemoryBlock(
+        id = "block-$label",
         title = label,
         subtitle = "Limit 5000 chars",
         detailText = "",
@@ -176,16 +176,19 @@ class MemoryGraphRenderTest {
         length = length,
     )
 
-    private fun schedule(id: String, message: String, subtitle: String) = MemoryParityItem.Schedule(
-        id = id,
-        title = message,
-        subtitle = subtitle,
-        detailText = subtitle,
-        metadataLabels = emptyList(),
-        links = emptyList(),
-        scheduleType = if (subtitle.startsWith("Recurring")) "recurring" else "one-time",
-        nextRunLabel = "2026-10-31T09:00:00Z",
-    )
+    private fun schedule(message: String, recurring: Boolean): MemoryParityItem.Schedule {
+        val subtitle = if (recurring) "Recurring: 0 9 * * 1-5" else "One-time: 2026-10-31T08:00:00Z"
+        return MemoryParityItem.Schedule(
+            id = "sched-${message.length}",
+            title = message,
+            subtitle = subtitle,
+            detailText = subtitle,
+            metadataLabels = emptyList(),
+            links = emptyList(),
+            scheduleType = if (recurring) "recurring" else "one-time",
+            nextRunLabel = "2026-10-31T09:00:00Z",
+        )
+    }
 
     private fun actions(): MemoryPageActions =
         Proxy.newProxyInstance(MemoryPageActions::class.java.classLoader, arrayOf(MemoryPageActions::class.java)) { proxy, method, args ->
@@ -199,6 +202,7 @@ class MemoryGraphRenderTest {
 
     private companion object {
         const val AGENT = "agent:agent-1"
+        const val HUMAN_BLOCK = "memory:block-human"
         const val BLOOM_SETTLE_MILLIS = 8_000L
         val HUMAN_VALUE = """
             Name: Emmanuel. Builds letta-mobile, a Kotlin Multiplatform client for Letta agents.

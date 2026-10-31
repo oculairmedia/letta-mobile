@@ -156,11 +156,7 @@ internal class MemoryGraphPhysics private constructor(
         ): MemoryGraphPhysics {
             val ids = view.nodes.map { it.id }
             val index = ids.withIndex().associate { (i, id) -> id to i }
-            val springs = view.edges.flatMap { edge ->
-                val from = index[edge.fromId]
-                val to = index[edge.toId]
-                if (from != null && to != null && from != to) listOf(from, to) else emptyList()
-            }.toIntArray()
+            val springs = view.edges.flatMap { edge -> springOf(index[edge.fromId], index[edge.toId]) }.toIntArray()
             val motion = start.motion && ids.size <= LIVE_NODE_LIMIT
             val physics = MemoryGraphPhysics(ids, FloatArray(ids.size) { radiusOf(ids[it]) }, springs, motion)
             val moved = physics.seed(target, start)
@@ -168,6 +164,9 @@ internal class MemoryGraphPhysics private constructor(
             return physics
         }
     }
+
+    /** An edge's two node indices, or nothing for a self-loop or an edge to a node not in the view. */
+    private fun springOf(from: Int?, to: Int?): List<Int> = if (from == null || to == null || from == to) emptyList() else listOf(from, to)
 
     /** Place every node; returns whether anything starts away from the target (so should move). */
     private fun seed(target: MemoryGraphLayout, start: MemoryGraphPhysicsStart): Boolean {
