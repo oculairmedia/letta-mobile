@@ -3,7 +3,6 @@ package com.letta.mobile.data.home
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -356,9 +355,3 @@ private fun resolveAgentName(agentId: String, roster: Agent?, conversations: Lis
         conversation.agentName.takeIf { it.isNotBlank() && it != agentId }
     } ?: agentId
 }
-
-/** Compact age label ("now", "5m", "3h", "2d", "1w", "2mo"): [TimeLabels.age], kept for Home's callers. */
-fun relativeAge(at: Instant, now: Instant = Clock.System.now()): String = TimeLabels.age(at, now)
-
-/** [relativeAge] for a raw label; a label that is not an ISO instant is returned unchanged ([TimeLabels.ageLabel]). */
-fun relativeAgeLabel(label: String, now: Instant = Clock.System.now()): String = TimeLabels.ageLabel(label, now)
