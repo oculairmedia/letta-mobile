@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:DeviceGateLogScan.kt$DeviceGateLogScan$fun parse( lines: List&lt;String>, conversationId: String, socketSamples: List&lt;Int> = emptyList(), httpPort: Int = 0, ): DeviceGateMetrics</ID>
+    <ID>CyclomaticComplexMethod:IrohProbeMetrics.kt$IrohProbeAssertions$fun summarize(turns: List&lt;IrohProbeTurnMetrics>): IrohProbeSummary</ID>
+    <ID>CyclomaticComplexMethod:ProbeStubStore.kt$ProbeStubAdminServer$private fun handle(exchange: HttpExchange)</ID>
+    <ID>CyclomaticComplexMethod:TimelineCommands.kt$ReplayCommand$override fun run()</ID>
+    <ID>CyclomaticComplexMethod:TimelineCommands.kt$private fun TimelineAssertionOptions.hasAssertions(): Boolean</ID>
+    <ID>LongMethod:AppServerIrohProbeCommandTest.kt$AppServerIrohProbeCommandTest$@Test fun `accumulator tracks event seq typing terminal and tool pairing`()</ID>
+    <ID>LongMethod:AppServerIrohTwoClientProbeCommand.kt$AppServerIrohTwoClientProbeCommand$override fun run()</ID>
+    <ID>LongMethod:DeviceGateLogScan.kt$DeviceGateLogScan$fun parse( lines: List&lt;String>, conversationId: String, socketSamples: List&lt;Int> = emptyList(), httpPort: Int = 0, ): DeviceGateMetrics</ID>
+    <ID>LongMethod:ProbeStubController.kt$ProbeStubController$override fun runTurn(command: TurnCommand): Flow&lt;RuntimeEventDraft></ID>
+    <ID>LongMethod:TimelineCommands.kt$ReplayCommand$override fun run()</ID>
+    <ID>LoopWithTooManyJumpStatements:AppServerIrohProbeHydrateScenario.kt$HydrateHeavyProbeScenario$while</ID>
+    <ID>LoopWithTooManyJumpStatements:ReplayInteractiveShell.kt$ReplayInteractiveShell$while</ID>
+    <ID>MatchingDeclarationName:AppServerIrohProbeAccumulator.kt$ProbeAccumulator</ID>
+    <ID>MatchingDeclarationName:AppServerIrohProbeCancelScenario.kt$CancelMidstreamProbeScenario</ID>
+    <ID>MatchingDeclarationName:AppServerIrohProbeDuplicateScenario.kt$DuplicateSendProbeScenario</ID>
+    <ID>MatchingDeclarationName:AppServerIrohProbeHydrateScenario.kt$HydrateHeavyProbeScenario</ID>
+    <ID>MatchingDeclarationName:SwarmExitCodes.kt$SwarmExit</ID>
+    <ID>MatchingDeclarationName:SwarmOutput.kt$OutputLine</ID>
+    <ID>MatchingDeclarationName:TwoClientProbeSupport.kt$TwoClientEndpoint</ID>
+    <ID>MaxLineLength:AppServerIrohTwoClientProbeCommand.kt$AppServerIrohTwoClientProbeCommand$help = "Probe mode. 'live-sync' (default) asserts two-way sync + redial auto-resubscribe. 'kyqdt-busy' asserts a second send is busy-rejected while a first turn is still active (matches the live kyqdt gate)."</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.120 1234 1270 I Telemetry/TimelineSync: uiProjection.snapshot conversationId=$conv eventsTotal=10 messageCount=4 isStreaming=false isReconciling=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.320 1234 1260 I Telemetry/IrohGate: gate3.coordinatorMessageDelta resolvedConversationId=$conv messageId=m1 messageType=assistant_message isReplay=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.330 1234 1260 I Telemetry/IrohGate: gate4.repositoryIngest agentId=a1 conversationId=$conv messageId=m1 messageType=assistant_message"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.340 1234 1270 I Telemetry/TimelineSync: uiProjection.snapshot (2ms) conversationId=$conv eventsTotal=10 messageCount=4 isStreaming=true isReconciling=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.340 1234 1270 I Telemetry/TimelineSync: uiProjection.snapshot conversationId=$conv eventsTotal=12 messageCount=5 isStreaming=true isReconciling=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.380 1234 1270 I Telemetry/TimelineSync: uiProjection.snapshot (1ms) conversationId=$conv eventsTotal=12 messageCount=5 isStreaming=true isReconciling=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.500 1234 1250 I Telemetry/AdminChatVM: ws.turnComplete status=completed turnId=t1 runId=r1 stopReason=end_turn lossy=false reason=turnDone"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.520 1234 1270 I Telemetry/TimelineSync: uiProjection.snapshot (1ms) conversationId=$conv eventsTotal=13 messageCount=5 isStreaming=false isReconciling=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$"06-30 12:00:00.520 1234 1270 I Telemetry/TimelineSync: uiProjection.snapshot conversationId=$conv eventsTotal=13 messageCount=5 isStreaming=false isReconciling=false"</ID>
+    <ID>MaxLineLength:DeviceGateLogScanTest.kt$DeviceGateLogScanTest$val log = greenLog() + "06-30 12:00:00.900 1234 1250 I Telemetry/AdminChatVM: ws.turnComplete status=completed turnId=t2 runId=r2 stopReason=end_turn lossy=false reason=subscribeDone"</ID>
+    <ID>MaxLineLength:MessageCommands.kt$MessageSendCommand$if (inline.length > SwarmLimits.MAX_MESSAGE_CHARS) throw UsageError("--text is longer than ${SwarmLimits.MAX_MESSAGE_CHARS} characters")</ID>
+    <ID>MaxLineLength:NoHttpSocketScanTest.kt$NoHttpSocketScanTest$" 0: 0100007F:A3F2 0100007F:2063 01 00000000:00000000 00:00000000 00000000 1000 0 111111 1 0000000000000000 20 4 30 10 -1"</ID>
+    <ID>MaxLineLength:NoHttpSocketScanTest.kt$NoHttpSocketScanTest$" 1: 0100007F:B411 0100007F:2063 01 00000000:00000000 00:00000000 00000000 1000 0 222222 1 0000000000000000 20 4 30 10 -1"</ID>
+    <ID>MaxLineLength:NoHttpSocketScanTest.kt$NoHttpSocketScanTest$" 2: 0100007F:C522 0100007F:270F 01 00000000:00000000 00:00000000 00000000 1000 0 333333 1 0000000000000000 20 4 30 10 -1"</ID>
+    <ID>MaxLineLength:ReplayInteractiveShell.kt$ReplayInteractiveShell$currentTimelineJson = step.snapshot?.timeline?.let { prettyJson.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), it) }</ID>
+    <ID>MaxLineLength:SwarmCommandsTest.kt$SwarmCommandsTest$assertEquals(Path.of("C:\\Users\\me\\AppData\\Roaming", "Meridian", "cli"), defaultSwarmProfileDirectory(mapOf("APPDATA" to "C:\\Users\\me\\AppData\\Roaming"), "C:\\Users\\me"))</ID>
+    <ID>MaxLineLength:SwarmCommandsTest.kt$SwarmCommandsTest$assertEquals(SwarmExit.NeedsApproval, sendExit(DeliveryReceipt.Processed(TurnTerminal.NeedsApproval(emptyList()), SwarmReply.Empty)))</ID>
+    <ID>MaxLineLength:SwarmCommandsTest.kt$SwarmCommandsTest$send.test(listOf("--agent", "PM-letta-mobile", "--text", "hi", "--from", "orch\nestrator", "--wait", "accepted", "--client-message-id", "swarm-7"))</ID>
+    <ID>MaxLineLength:SwarmCommandsTest.kt$SwarmCommandsTest.ScriptedSession$if ((params["offset"] as? JsonPrimitive)?.contentOrNull == "0") JsonArray(listOf(agentJson)) else JsonArray(emptyList())</ID>
+    <ID>MaxLineLength:SwarmOutput.kt$is DeliveryFailure.TimedOut -> "timed out after ${reached?.name?.lowercase() ?: "no confirmed stage"}; the turn keeps running on the host"</ID>
+    <ID>MemberNameEqualsClassName:Main.kt$Main$@JvmStatic fun main(args: Array&lt;String>)</ID>
+    <ID>NestedBlockDepth:DeviceGateLogScan.kt$DeviceGateLogScan$fun parse( lines: List&lt;String>, conversationId: String, socketSamples: List&lt;Int> = emptyList(), httpPort: Int = 0, ): DeviceGateMetrics</ID>
+    <ID>NestedBlockDepth:NoHttpSocketScanTest.kt$NoHttpSocketScanTest$@Test fun `attributes a real child process connection to that child`()</ID>
+    <ID>NewLineAtEndOfFile:SwarmOutput.kt$com.letta.mobile.cli.swarm.SwarmOutput.kt</ID>
+    <ID>SwallowedException:AppServerServeCommand.kt$AppServerServeCommand$error: AppServerServeSpecException</ID>
+    <ID>ThrowsCount:AppServerIrohProbeCommand.kt$AppServerIrohProbeCommand$private fun validateOptions()</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohProbeCancelScenario.kt$CancelMidstreamProbeScenario$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohProbeDuplicateScenario.kt$DuplicateSendProbeScenario$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohProbeHydrateScenario.kt$HydrateHeavyProbeScenario$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohProbeHydrateScenario.kt$HydrateHeavyProbeScenario$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohProbeScenarios.kt$LegacyProbeScenarios$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohProbeSupport.kt$ProbeSessionFixture$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppServerIrohTwoClientProbeCommand.kt$AppServerIrohTwoClientProbeCommand$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppServerServeIrohStubCommand.kt$AppServerServeIrohStubCommand$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ProbeStubStore.kt$ProbeStubAdminServer$error: Exception</ID>
+    <ID>TooManyFunctions:AppServerIrohProbeSupport.kt$ProbeSessionFixture</ID>
+    <ID>TooManyFunctions:IrohProbeMetrics.kt$IrohProbeAssertions</ID>
+    <ID>TooManyFunctions:ReplayInteractiveShell.kt$ReplayInteractiveShell</ID>
+    <ID>UnusedParameter:TwoClientProbeSupport.kt$TwoClientEndpoint$conversationId: String</ID>
+    <ID>UnusedPrivateProperty:ProbeStubControllerTest.kt$ProbeStubControllerTest$attempt</ID>
+    <ID>UseCheckOrError:CliRuntime.kt$CliRestClient$throw IllegalStateException("fetch messages failed: HTTP ${response.status.value}: ${response.bodyAsText()}")</ID>
+    <ID>UseCheckOrError:TimelineCommands.kt$ReplayCommand$throw IllegalStateException("replay assertions failed")</ID>
+  </CurrentIssues>
+</SmellBaseline>

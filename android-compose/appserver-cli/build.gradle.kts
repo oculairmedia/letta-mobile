@@ -3,9 +3,15 @@ import org.gradle.api.tasks.AbstractCopyTask
 import org.gradle.jvm.application.tasks.CreateStartScripts
 
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.serialization")
     application
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 kotlin {

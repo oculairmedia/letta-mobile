@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:DuplicateCodeRatchetTest.kt$DuplicateCodeRatchetTest$val drift = CountRatchetBaseline.drift(actual, CountRatchetBaseline.read(baselineFile), BASELINE, CountRatchetBaseline.Shrink.MUST_UPDATE)</ID>
+    <ID>MaxLineLength:DuplicateCodeScan.kt$DuplicateCodeScan$.</ID>
+    <ID>MaxLineLength:DuplicateCodeScan.kt$DuplicateCodeScan$Copy(repositoryRoot.relativize(path).invariantSeparatorsPathString, moduleOf(repositoryRoot, path), location.endLine - location.startLine + 1)</ID>
+    <ID>UnusedPrivateProperty:CycleOne.kt$CycleOne$private val other: CycleTwo</ID>
+    <ID>UnusedPrivateProperty:CycleTwo.kt$CycleTwo$private val other: CycleOne</ID>
+  </CurrentIssues>
+</SmellBaseline>

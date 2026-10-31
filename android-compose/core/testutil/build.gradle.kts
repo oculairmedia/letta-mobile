@@ -1,5 +1,11 @@
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("com.letta.mobile.android.library")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 android {

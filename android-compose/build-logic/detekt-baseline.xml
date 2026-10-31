@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>DestructuringDeclarationWithTooManyEntries:ArchitectureBoundaryGate.kt$ArchitectureBoundaryBaseline$val (rule, from, _, to, bead) = tokens</ID>
+    <ID>LongMethod:ApiDocumentationPluginTest.kt$ApiDocumentationPluginTest$@Test fun `aggregates module and package overviews with KDoc and revision links`()</ID>
+    <ID>MaxLineLength:ApiDocumentationPlugin.kt$ApiDocumentationPlugin$matchingRegex.set("com\\.letta\\.mobile\\.(data\\.(controller\\.extras|timeline|transport\\.(api|appserver))|ui\\.chat\\.session)(\\..*)?")</ID>
+    <ID>MaxLineLength:ArchitectureBoundaryGateTest.kt$ArchitectureBoundaryGateTest$assertViolations(edge(":sharedUI", ":app", "kapt"), "into-app :sharedUI -&gt; :app", "multiplatform-to-single-platform :sharedUI -&gt; :app")</ID>
+    <ID>MaxLineLength:PrepareEmbeddedLettaCodeAssetsTask.kt$PrepareEmbeddedLettaCodeAssetsTask$listOf(npmCommand(), "install", "--no-audit", "--no-fund", "--ignore-scripts", "--prefix", npmStageDir.absolutePath, "npm@${deviceNpmVersion.get()}")</ID>
+    <ID>MaxLineLength:PrepareEmbeddedLettaCodeAssetsTask.kt$PrepareEmbeddedLettaCodeAssetsTask$run(npmWorkDir, patch.failure, listOf("node") + patch.nodeArgs + listOf(npmWorkDir.resolve(patch.file).absolutePath, lettaJs.absolutePath))</ID>
+    <ID>NestedBlockDepth:PrepareEmbeddedLettaCodeLibnodeTask.kt$PrepareEmbeddedLettaCodeLibnodeTask$private fun extract(archive: File, outputDir: File)</ID>
+    <ID>ThrowsCount:ArchitectureBoundaryGate.kt$ArchitectureBoundaryBaseline$private fun parseEntry(line: String, source: String): BaselineEntry</ID>
+    <ID>TooGenericExceptionCaught:VerifyJniLibSanityTask.kt$VerifyJniLibSanityTask$e: Exception</ID>
+  </CurrentIssues>
+</SmellBaseline>

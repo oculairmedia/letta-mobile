@@ -1,5 +1,11 @@
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlin.jvm")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 java {

@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:AppServerRestartReplayEvidence.kt$AppServerRestartReplayEvidence$check(!identityScopes.clientMessageId.serverDeduplicated, "client_message_id must be observed as NOT server-deduplicated (blind replay duplicates)")</ID>
+    <ID>MaxLineLength:LettaCodeVersionPinsTest.kt$LettaCodeVersionPinsTest$assertEquals(emptyList&lt;String>(), QUOTED_PIN.findAll(workflow).map { it.value }.toList(), "CI must not hard-code a letta-code version")</ID>
+    <ID>MemberNameEqualsClassName:Main.kt$Main$@JvmStatic fun main(args: Array&lt;String>)</ID>
+    <ID>NestedBlockDepth:AppServerRestartReplayProbe.kt$AppServerRestartReplayProbe$private fun countCommittedMessages(predicate: (role: String?, otid: String?) -> Boolean): Int</ID>
+    <ID>ReturnCount:BackendOwnerInfo.kt$BackendOwnerInfo.Companion$fun fromJson(json: String): BackendOwnerInfo?</ID>
+    <ID>ReturnCount:BackendOwnershipPreflight.kt$BackendOwnershipPreflight$fun evaluate(backendDir: Path): Decision</ID>
+    <ID>SwallowedException:AppServerServeCommand.kt$AppServerServeCommand$e: LocalAppServerStartException</ID>
+    <ID>ThrowsCount:LocalBackendLock.kt$LocalBackendLock.Companion$fun acquire(backendDir: Path): LocalBackendLock</ID>
+  </CurrentIssues>
+</SmellBaseline>

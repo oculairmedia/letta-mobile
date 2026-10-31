@@ -1,4 +1,5 @@
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     // letta-mobile-by4vm.57: plain Kotlin/JVM. The module uses no Android APIs, and being an
     // Android library forced `:cli:run` to borrow the debug unit-test classpath (Android stubs)
     // and to drag kotlinx-coroutines-android. It now consumes :sharedLogic's `jvm` target.
@@ -7,6 +8,11 @@ plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.serialization")
     application
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 kotlin {

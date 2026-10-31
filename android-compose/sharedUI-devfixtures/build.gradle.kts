@@ -10,11 +10,17 @@
  * platform needs the fixtures. The sources are JVM (AWT for the sample image, a reflective proxy).
  */
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlin.multiplatform")
     // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
     id("com.letta.mobile.kmp.library")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.compose")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 kotlin {

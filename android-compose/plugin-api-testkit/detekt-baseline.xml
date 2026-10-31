@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:AllowlistHttpClient.kt$AllowlistHttpClient$PluginHostException(PluginHostException.CAPABILITY_DENIED, "the network needs the ${ConformanceCapability.NET_CONNECT} capability")</ID>
+    <ID>MaxLineLength:AllowlistHttpClient.kt$AllowlistHttpClient$PluginHostException(PluginHostException.ORIGIN_DENIED, "${origin ?: request.url} is not one of the manifest's net.connect origins")</ID>
+    <ID>MaxLineLength:ConformanceRun.kt$ConformanceRun$val origin = ActionOrigin.Agent(agentId = "conformance-agent", conversationId = "conformance-conversation", toolCallId = "call-$calls")</ID>
+    <ID>MaxLineLength:FakePluginHost.kt$FakePluginHost$refuse(ConformanceRule.CAPABILITY, PluginHostException(PluginHostException.CAPABILITY_DENIED, "$call needs the $capability capability"))</ID>
+    <ID>MaxLineLength:JsonSchemaSubset.kt$JsonSchemaSubset$SchemaType.OBJECT -> JsonObject(node.properties.filterKeys { it in node.required }.mapValues { (name, child) -> sampleOf(node.child(name, child)) })</ID>
+    <ID>MaxLineLength:JsonSchemaSubset.kt$JsonSchemaSubset$val nested = items?.let { itemSchema -> value.flatMapIndexed { index, item -> problems(SchemaNode(itemSchema, item, node.at.child(index))) } }</ID>
+    <ID>MaxLineLength:JsonSchemaSubset.kt$JsonSchemaSubset$val nested = value.keys.filter { it in node.properties }.flatMap { name -> problems(node.child(name, node.properties.getValue(name))) }</ID>
+    <ID>MaxLineLength:JsonSchemaSubset.kt$JsonSchemaSubset$val tooMany = node.bound(SchemaBound.MAX_ITEMS)?.let { max -> node.problem("more than ${max.toInt()} items").takeIf { value.size > max } }</ID>
+    <ID>MaxLineLength:JsonSchemaSubset.kt$JsonSchemaSubset$val unknown = if (node.closed) value.keys.filter { it !in node.properties }.map { "${node.at.child(it)}: is not a declared field" } else emptyList()</ID>
+    <ID>MaxLineLength:SamplePlugin.kt$SamplePlugin$val card = Card(label = call.input.getValue("label").jsonPrimitive.content, snapshotRef = host.putAsset("image/png", byteArrayOf(1, 2, 3)))</ID>
+    <ID>TooGenericExceptionCaught:DeadlineCaller.kt$DeadlineCaller$error: Throwable</ID>
+    <ID>TooManyFunctions:ConformanceRun.kt$ConformanceRun</ID>
+    <ID>UnusedParameter:EmitRules.kt$EmitRules$image: PlaceImage</ID>
+  </CurrentIssues>
+</SmellBaseline>

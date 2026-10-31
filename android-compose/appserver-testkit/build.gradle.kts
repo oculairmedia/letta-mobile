@@ -1,7 +1,13 @@
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlin.multiplatform")
     id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 kotlin {

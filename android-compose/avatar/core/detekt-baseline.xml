@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:GazeAttentionTest.kt$GazeAttentionTest$GazeDirector(Random(2)).run(20f, AvatarState.SPEAKING, rim) { assertTrue(GazeContainment.fits(it.lookX, it.lookY), "reading look $it") }</ID>
+    <ID>MaxLineLength:GazeAttentionTest.kt$GazeAttentionTest$GazeDirector(Random(2)).run(3f, AvatarState.IDLE, corner) { assertTrue(GazeContainment.fits(it.lookX, it.lookY), "corner look $it") }</ID>
+    <ID>MaxLineLength:GazeAttentionTest.kt$GazeAttentionTest$val director = MascotDirector(runtime, Random(7), avatarConfig = AvatarDirector.Config(blinkMinInterval = 1_000f, blinkMaxInterval = 1_000f))</ID>
+    <ID>MaxLineLength:MascotDirectorInteractionTest.kt$MascotDirectorInteractionTest$return MascotDirector(runtime, Random(7), avatarConfig = AvatarDirector.Config(blinkMinInterval = 1_000f, blinkMaxInterval = 1_000f))</ID>
+    <ID>MaxLineLength:MascotIdentityTest.kt$MascotIdentityTest$listOf(MascotPalette.BROWN, MascotPalette.RED, MascotPalette.ORANGE, MascotPalette.AMBER, MascotPalette.GREEN, MascotPalette.TEAL, MascotPalette.BLUE, MascotPalette.PURPLE, MascotPalette.PINK)</ID>
+    <ID>ReturnCount:AvatarDirector.kt$AvatarDirector$private fun behaviorState(): AvatarState</ID>
+    <ID>ReturnCount:GazeDirector.kt$GazeDirector$private fun cursorDemandsLook(state: AvatarState, world: GazeWorld): Boolean</ID>
+    <ID>ReturnCount:GazeDirector.kt$GazeDirector$private fun noteStateFlip(state: AvatarState): AvatarState</ID>
+    <ID>ReturnCount:MascotIdentity.kt$MascotIdentity.Companion$fun decode(value: String?): MascotIdentity?</ID>
+    <ID>TooGenericExceptionCaught:HeadlessAvatarRuntime.kt$HeadlessAvatarRuntime$t: Throwable</ID>
+    <ID>TooManyFunctions:AvatarDirector.kt$AvatarDirector</ID>
+    <ID>TooManyFunctions:AvatarRuntime.kt$AvatarRuntime</ID>
+    <ID>TooManyFunctions:GazeDirector.kt$GazeDirector</ID>
+    <ID>TooManyFunctions:HeadlessAvatarRuntime.kt$HeadlessAvatarRuntime : AvatarRuntimeAvatarHeadTurn</ID>
+    <ID>TooManyFunctions:MascotDirector.kt$MascotDirector</ID>
+    <ID>TooManyFunctions:MascotGestures.kt$MascotGestureClassifier</ID>
+    <ID>UnusedImports:GazeAttentionTest.kt$import kotlin.math.abs</ID>
+    <ID>UnusedImports:MascotSignals.kt$import com.letta.mobile.avatar.core.model.Hover</ID>
+    <ID>UnusedImports:MascotSignals.kt$import com.letta.mobile.avatar.core.model.Petting</ID>
+    <ID>UnusedParameter:AvatarDirector.kt$AvatarDirector$leaving: AvatarState</ID>
+  </CurrentIssues>
+</SmellBaseline>

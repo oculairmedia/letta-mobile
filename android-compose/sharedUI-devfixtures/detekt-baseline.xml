@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:PhoneFixtures.kt$PhoneFixtures$UiMessage(id = "u1", role = "user", content = "Plan a shopping list for a taco night for six.", timestamp = "2026-10-01T10:19:00Z")</ID>
+    <ID>MaxLineLength:PhoneFixtures.kt$PhoneFixtures$UiToolCall(name = "canvas_add_element", arguments = "{\"kind\":\"checklist\"}", result = "ok", status = "success", toolCallId = "t1")</ID>
+    <ID>MaxLineLength:PhoneFixtures.kt$PhoneFixtures$id = "a1"</ID>
+    <ID>MaxLineLength:PhoneFixtures.kt$PhoneFixtures$id = "a2"</ID>
+    <ID>MaxLineLength:PhoneFixtures.kt$PhoneFixtures$id = "a3"</ID>
+    <ID>MaxLineLength:PhoneFixtures.kt$PhoneFixtures$name = "canvas_compose"</ID>
+    <ID>MaxLineLength:PhoneScenes.kt$PhoneScenes$val canvasReplyPopupLight = canvasReplyPopup.copy(id = "phone-canvas-reply-popup-light", label = "Canvas - reply popup (light)", dark = false)</ID>
+  </CurrentIssues>
+</SmellBaseline>

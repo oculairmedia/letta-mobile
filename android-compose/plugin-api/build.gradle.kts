@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 // :sharedLogic depends on it (KMP -> KMP) and carries the same targets.
 
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("com.letta.mobile.api-documentation")
     id("org.jetbrains.kotlin.multiplatform")
     // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
@@ -14,6 +15,11 @@ plugins {
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     `maven-publish`
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 // The SPI version; its major is the manifest's `contract.version` (PluginApi.CONTRACT_VERSION).

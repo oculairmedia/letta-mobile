@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: kotlinx.serialization.json.JsonElement?): List&lt;String></ID>
+    <ID>LongParameterList:TestData.kt$TestData$( id: String = "msg-1", messageType: MessageType = MessageType.USER, content: String = "Hello", isPending: Boolean = false, localId: String? = null, toolName: String? = null, toolCallId: String? = null, date: Instant = Instant.parse("2024-03-15T10:00:00Z"), )</ID>
+    <ID>MatchingDeclarationName:TestSettingsStorage.kt$InMemorySecureSettingsStore : SecureSettingsStore</ID>
+    <ID>MaxLineLength:FakeMcpServerApi.kt$FakeMcpServerApi$authToken = config?.get("auth_token")?.toString()?.trim('"') ?: config?.get("token")?.toString()?.trim('"') ?: current.authToken</ID>
+    <ID>MaxLineLength:FakeMcpServerApi.kt$FakeMcpServerApi$customHeaders = config?.get("custom_headers")?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content } ?: current.customHeaders</ID>
+    <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$override suspend</ID>
+    <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$val updated = providers[index].copy(apiKey = params.apiKey, baseUrl = params.baseUrl, accessKey = params.accessKey, region = params.region)</ID>
+    <ID>NestedBlockDepth:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: kotlinx.serialization.json.JsonElement?): List&lt;String></ID>
+    <ID>TooManyFunctions:FakeAgentRepository.kt$FakeAgentRepository : IAgentRepository</ID>
+    <ID>TooManyFunctions:FakeConversationRepository.kt$FakeConversationRepository : IConversationRepository</ID>
+    <ID>TooManyFunctions:FakeSettingsRepository.kt$FakeSettingsRepository : ISettingsRepository</ID>
+    <ID>TooManyFunctions:FakeTimelineExternalTransportWriter.kt$FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -2,11 +2,17 @@
 // PluginConformance.run, which a plugin author calls from their own tests. Kept out of :plugin-api
 // so the API jar carries only the contract. jvm only: plugins are jars.
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlin.multiplatform")
     // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
     id("com.letta.mobile.kmp.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     `maven-publish`
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 group = "com.letta.mobile"

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:RiveAvatarRuntimeTest.kt$RiveAvatarRuntimeTest$assertEquals(RiveAvatarContract.TRIGGER_BLINK, sink.fired[AvatarReaction.APPROVAL_ASK.ordinal], "an ask blinks; waitingInput says the rest")</ID>
+    <ID>TooGenericExceptionCaught:RiveMascotSurface.kt$AndroidMascotSurfaceScene.Companion$t: Throwable</ID>
+    <ID>TooManyFunctions:RiveAvatarRuntime.kt$RiveAvatarRuntime : AvatarRuntimeAvatarHeadTurn</ID>
+  </CurrentIssues>
+</SmellBaseline>

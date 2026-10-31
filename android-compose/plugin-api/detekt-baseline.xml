@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MaxLineLength:PluginWireShapesTest.kt$PluginWireShapesTest$"""{"action":"start","input":{"label":"Render"},"context":{"origin":{"type":"agent","agentId":"agent-1","toolCallId":"call-9"},"canvasId":"c1"}}"""</ID>
+  </CurrentIssues>
+</SmellBaseline>

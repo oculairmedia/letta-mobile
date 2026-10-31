@@ -128,12 +128,22 @@ subprojects {
     }
 }
 
+// Included builds are not selected by the root build's aggregate task selector.
+tasks.register("detekt") {
+    group = "verification"
+    description = "Run detekt for all modules and the included build logic."
+    dependsOn(gradle.includedBuild("build-logic").task(":detekt"))
+}
+
 val advisoryDetekt = tasks.register("advisoryDetekt") {
     description = "Run configured Detekt checks and emit SARIF/XML/HTML reports without blocking by default."
     group = "verification"
 }
 
 gradle.projectsEvaluated {
+    tasks.named("detekt") {
+        dependsOn(subprojects.filter { it.plugins.hasPlugin("io.gitlab.arturbosch.detekt") }.map { it.tasks.named("detekt") })
+    }
     advisoryDetekt.configure {
         dependsOn(subprojects.flatMap { project -> project.tasks.withType<Detekt>().toList() })
     }

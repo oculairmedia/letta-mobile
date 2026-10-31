@@ -1,6 +1,12 @@
 plugins {
+    id("io.gitlab.arturbosch.detekt")
     id("com.android.test")
     id("androidx.baselineprofile")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
 }
 
 android {
