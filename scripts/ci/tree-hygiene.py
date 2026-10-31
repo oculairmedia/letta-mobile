@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from git_ref import resolve_commit
+
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "scripts/ci/tree-hygiene-baseline.txt"
 ALWAYS_DOT_DIRS = {".github", ".githooks", ".beads"}
@@ -31,50 +33,110 @@ def entries(text: str) -> set[str]:
 
 def is_reference_source(path: str) -> bool:
     name = posixpath.basename(path)
-    return (path.startswith(".github/workflows/") and name.endswith((".yml", ".yaml"))) or name in {"Makefile", "makefile", "GNUmakefile"} or name.endswith((".gradle", ".gradle.kts", *SCRIPT_SUFFIXES))
+    workflow = path.startswith(".github/workflows/") and name.endswith((".yml", ".yaml"))
+    makefile = name in {"Makefile", "makefile", "GNUmakefile"}
+    build_or_script = name.endswith((".gradle", ".gradle.kts", *SCRIPT_SUFFIXES))
+    return workflow or makefile or build_or_script
+
+
+def contains_reference(candidate: str, content: str) -> bool:
+    # Avoid a basename hit embedded in a different path or a larger filename.
+    pattern = r"(?<![\w./-])" + re.escape(candidate) + r"(?![\w./-])"
+    return bool(re.search(pattern, content))
+
+
+def source_references(path: str, source: str, content: str) -> bool:
+    if source == path:
+        return False
+    relative = posixpath.relpath(path, posixpath.dirname(source) or ".")
+    candidates = (path, relative, "./" + relative)
+    explicit = any(contains_reference(candidate, content) for candidate in candidates)
+    rooted = re.search(ROOT_VARIABLE + re.escape(path) + r"(?![\w./-])", content)
+    return explicit or bool(rooted)
 
 
 def referenced(path: str, sources: dict[str, str]) -> bool:
     """Accept an explicit repo-relative path or a path relative to the referencing file."""
-    for source, content in sources.items():
-        if source == path:
-            continue
-        relative = posixpath.relpath(path, posixpath.dirname(source) or ".")
-        for candidate in {path, relative, "./" + relative}:
-            # Avoid a basename hit embedded in a different path or a larger filename.
-            pattern = r"(?<![\w./-])" + re.escape(candidate) + r"(?![\w./-])"
-            if re.search(pattern, content):
-                return True
-            if candidate == path and re.search(ROOT_VARIABLE + re.escape(path) + r"(?![\w./-])", content):
-                return True
-    return False
+    return any(source_references(path, source, content) for source, content in sources.items())
+
+
+def is_new_dot_dir(path: str, current: set[str]) -> bool:
+    parts = path.split("/")
+    if len(parts) <= 1:
+        return False
+    directory = parts[0]
+    if not directory.startswith("."):
+        return False
+    if directory in ALWAYS_DOT_DIRS:
+        return False
+    return f"dot {directory}" not in current
+
+
+def is_misplaced_markdown(path: str, current: set[str]) -> bool:
+    if not path.endswith(".md"):
+        return False
+    if path.startswith("docs/"):
+        return False
+    if path in ROOT_MARKDOWN:
+        return False
+    if path.startswith("android-compose/"):
+        if path.split("/")[-1] in MODULE_MARKDOWN:
+            return False
+    return f"md {path}" not in current
+
+
+def is_unreferenced_script(path: str, current: set[str], sources: dict[str, str]) -> bool:
+    if not path.endswith(SCRIPT_SUFFIXES):
+        return False
+    if path.startswith(("scripts/", "tools/")):
+        return False
+    if f"script {path}" in current:
+        return False
+    return not referenced(path, sources)
+
+
+def baseline_problems(root: Path, sha: str, current: set[str]) -> list[str]:
+    old = subprocess.run(["git", "-C", str(root), "show", f"{sha}:{BASELINE}"], capture_output=True)
+    if old.returncode:
+        return []
+    return [f"baseline entry added: {entry}" for entry in sorted(current - entries(old.stdout.decode()))]
+
+
+def reference_sources(root: Path) -> dict[str, str]:
+    paths = set(git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z").decode().split("\0"))
+    return {
+        path: (root / path).read_text(encoding="utf-8", errors="replace")
+        for path in paths if is_readable_source(root, path)
+    }
+
+
+def is_readable_source(root: Path, path: str) -> bool:
+    if not path:
+        return False
+    if not is_reference_source(path):
+        return False
+    return (root / path).is_file()
+
+
+def path_problems(path: str, current: set[str], sources: dict[str, str]) -> list[str]:
+    rules = (
+        (is_new_dot_dir(path, current), "new top-level dot-directory"),
+        (is_misplaced_markdown(path, current), "misplaced Markdown"),
+        (is_unreferenced_script(path, current, sources), "unreferenced script outside scripts/ and tools/"),
+    )
+    return [f"{message}: {path}" for matches, message in rules if matches]
 
 
 def check(root: Path, base: str) -> list[str]:
-    sha = git(root, "rev-parse", "--verify", "--end-of-options", base + "^{commit}").decode().strip()
+    sha = resolve_commit(root, base)
     current = entries((root / BASELINE).read_text(encoding="utf-8"))
-    old = subprocess.run(["git", "-C", str(root), "show", f"{sha}:{BASELINE}"], capture_output=True)
-    problems = []
-    if old.returncode == 0:
-        problems.extend(f"baseline entry added: {entry}" for entry in sorted(current - entries(old.stdout.decode())))
+    problems = baseline_problems(root, sha, current)
     added = set(git(root, "diff", "--no-renames", "--diff-filter=A", "--name-only", "-z", sha, "--").decode().split("\0"))
     added.update(git(root, "ls-files", "--others", "--exclude-standard", "-z").decode().split("\0"))
-    paths = set(git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z").decode().split("\0"))
-    sources = {}
-    for path in paths:
-        if path and is_reference_source(path) and (root / path).is_file():
-            sources[path] = (root / path).read_text(encoding="utf-8", errors="replace")
+    sources = reference_sources(root)
     for path in sorted(added - {""}):
-        if not (root / path).is_file():
-            continue
-        parts = path.split("/")
-        if len(parts) > 1 and parts[0].startswith(".") and parts[0] not in ALWAYS_DOT_DIRS and f"dot {parts[0]}" not in current:
-            problems.append(f"new top-level dot-directory: {path}")
-        markdown_allowed = path.startswith("docs/") or path in ROOT_MARKDOWN or (path.startswith("android-compose/") and parts[-1] in MODULE_MARKDOWN)
-        if path.endswith(".md") and not markdown_allowed and f"md {path}" not in current:
-            problems.append(f"misplaced Markdown: {path}")
-        if path.endswith(SCRIPT_SUFFIXES) and not path.startswith(("scripts/", "tools/")) and f"script {path}" not in current and not referenced(path, sources):
-            problems.append(f"unreferenced script outside scripts/ and tools/: {path}")
+        if (root / path).is_file():
+            problems.extend(path_problems(path, current, sources))
     return problems
 
 

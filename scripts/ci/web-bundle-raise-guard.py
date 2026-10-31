@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from git_ref import resolve_commit
+
 ROOT = Path(__file__).resolve().parents[2]
 BUDGET = "android-compose/web/bundle-budget.json"
 APPROVAL = "Budget raise approved-by: oculairmedia"
@@ -38,7 +40,7 @@ def pr_body() -> str:
 
 
 def check(root: Path, ref: str, body: str) -> list[str]:
-    resolved = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "--end-of-options", ref + "^{commit}"], capture_output=True, text=True, check=True).stdout.strip()
+    resolved = resolve_commit(root, ref)
     old = subprocess.run(["git", "-C", str(root), "show", f"{resolved}:{BUDGET}"], capture_output=True, text=True, check=True).stdout
     before = ceilings(json.loads(old))
     after = ceilings(json.loads((root / BUDGET).read_text(encoding="utf-8")))

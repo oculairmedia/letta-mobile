@@ -124,6 +124,18 @@ class GateFixtures(unittest.TestCase):
         result = subprocess.run(["python3", str(BUDGET_GATE), "--root", str(self.root), "--diff-base", "missing"], capture_output=True)
         self.assertEqual(result.returncode, 2)
 
+    def test_invalid_refs_are_rejected_cleanly_by_both_gates(self):
+        for gate in (TREE_GATE, BUDGET_GATE):
+            for ref, message in (("--help", "invalid diff base"), ("missing-ref", "does not resolve to a commit")):
+                with self.subTest(gate=gate.name, ref=ref):
+                    result = subprocess.run(
+                        ["python3", str(gate), "--root", str(self.root), f"--diff-base={ref}"],
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn(message, result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
