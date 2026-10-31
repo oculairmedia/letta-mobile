@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import com.letta.mobile.ui.components.LettaSwatch
+import com.letta.mobile.ui.components.lettaHorizontalFadingEdges
 import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -39,8 +40,18 @@ internal fun MemoryKindFilterBar(
 ) {
     val palette = rememberMemoryGraphPalette()
     // One row above the canvas (never over it), scrolling sideways when a phone is too narrow.
+    val scroll = rememberScrollState()
     Row(
-        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.lg),
+        modifier = modifier
+            .fillMaxWidth()
+            // Fade whichever edge has more chips beyond it (the rail's shared fade, sideways).
+            .lettaHorizontalFadingEdges(
+                startFadeAlpha = if (scroll.canScrollBackward) 1f else 0f,
+                endFadeAlpha = if (scroll.canScrollForward) 1f else 0f,
+                fadeLength = LettaDimens.Space.xxl,
+            )
+            .horizontalScroll(scroll)
+            .padding(horizontal = LettaDimens.Space.lg),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         view.kindsPresent.forEach { kind ->
