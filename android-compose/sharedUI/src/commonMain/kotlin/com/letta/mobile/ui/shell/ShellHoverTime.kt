@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.shell
 
-import com.letta.mobile.ui.shell.sidebar.ShellRelativeTime
+import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
@@ -16,7 +16,7 @@ import kotlinx.datetime.toLocalDateTime
 internal fun shellHoverTimeLabel(raw: String, now: Instant = Clock.System.now(), zone: TimeZone = TimeZone.currentSystemDefault()): String {
     val instant = runCatching { Instant.parse(raw) }.getOrNull() ?: return raw
     val local = instant.toLocalDateTime(zone)
-    return if (local.date == now.toLocalDateTime(zone).date) local.format(HoverClock) else ShellRelativeTime.compact(instant, now)
+    return if (local.date == now.toLocalDateTime(zone).date) local.format(HoverClock) else TimeLabels.age(instant, now)
 }
 
 private val HoverClock = LocalDateTime.Format {
