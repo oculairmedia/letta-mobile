@@ -41,36 +41,31 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.home.FleetAgentStat
-import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.FleetSort
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStatTile
-import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.components.LettaListRowSpec
-import com.letta.mobile.ui.components.list.RosterListRow
-import com.letta.mobile.ui.components.list.RosterRowSlots
-import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Home below [LettaDimens.Pane.wideBreakpoint]: what is happening and where
- * the user left off come first, the counters shrink to one strip. In order: a one-line "running
- * now" strip (only while something runs), the recent conversations, the agents as a row of avatars
- * (pinned first), then the stats strip whose overflow opens the pinned-tile editor. The full fleet
- * table stays on the wide layout and the Agents page.
+ * Home's sections, the same order at every width: what needs the user first, then where they
+ * left off, then everything else small. A one-line "running now" strip (only while something
+ * runs), the recent conversations ([homeRecents]), the agents as a row of avatars (pinned first),
+ * the stats strip whose overflow opens the pinned-tile editor, and the pinned shortcuts the strip
+ * does not already open. A wide window adds the fleet table below; the composer sits above these
+ * there and docks below them on a phone.
  */
-internal fun LazyListScope.homeCompactDashboard(page: HomePageScope) {
+internal fun LazyListScope.homeSections(page: HomePageScope) {
     homeNowStrip(page)
-    homeCompactRecents(page)
+    homeRecents(page)
     homeAgentAvatarRow(page)
     item(key = "stats-strip") { HomeStatsStrip(page) }
     if (page.editingPins) homePinnedSection(page) else homePinnedShortcutRow(page)
@@ -87,7 +82,11 @@ private fun LazyListScope.homeNowStrip(page: HomePageScope) {
 @Composable
 private fun NowStrip(running: List<FleetAgentStat>, page: HomePageScope) {
     val onClick = {
-        if (page.offers(HomeShortcut.RUNS)) page.navigation.onOpenShortcut(HomeShortcut.RUNS) else page.navigation.onOpenAgent(running.first().agentId)
+        if (page.offers(HomeShortcut.RUNS)) {
+            page.navigation.onOpenShortcut(HomeShortcut.RUNS)
+        } else {
+            page.navigation.onOpenAgent(running.first().agentId)
+        }
     }
     Surface(
         onClick = onClick,
@@ -117,34 +116,6 @@ private fun NowStrip(running: List<FleetAgentStat>, page: HomePageScope) {
 /** "2 running · Scout, Planner". */
 internal fun nowLine(running: List<FleetAgentStat>): String =
     "${running.size} running · ${running.joinToString(", ") { it.name }}"
-
-// endregion
-
-// region Recents
-
-private fun LazyListScope.homeCompactRecents(page: HomePageScope) {
-    item(key = "recents-header") { SeeAllHeader(RECENT_LABEL, HomeShortcut.CONVERSATIONS, page, Modifier.testTag(HomePageTags.RECENTS)) }
-    val recent = page.state.fleet.recent.take(COMPACT_RECENT_LIMIT)
-    if (recent.isEmpty()) item(key = "recents-empty") { HomeEmptyLine(NO_CONVERSATIONS) }
-    items(items = recent, key = { "recent-${it.conversationId}" }) { conversation ->
-        CompactRecentRow(conversation, page)
-    }
-}
-
-@Composable
-private fun CompactRecentRow(conversation: FleetRecentConversation, page: HomePageScope) {
-    val subtitle = listOf(conversation.agentName, conversation.preview).filter { it.isNotBlank() }.joinToString(" · ")
-    RosterListRow(
-        spec = LettaListRowSpec(
-            title = conversation.title,
-            trailing = relativeAgeLabel(conversation.updatedAtLabel),
-            subtitle = subtitle.ifBlank { null },
-        ),
-        row = RosterRowState(onClick = { page.navigation.onOpenConversation(conversation) }),
-        slots = RosterRowSlots(leading = { AgentAvatar(conversation.agentId, conversation.agentName, LettaDimens.Orb.md) }),
-        modifier = Modifier.testTag(HomePageTags.recent(conversation)),
-    )
-}
 
 // endregion
 
@@ -309,7 +280,9 @@ private fun LazyListScope.homePinnedShortcutRow(page: HomePageScope) {
                 AssistChip(
                     onClick = { page.navigation.onOpenShortcut(item.shortcut) },
                     label = { Text(item.shortcut.label) },
-                    leadingIcon = { Icon(item.shortcut.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm)) },
+                    leadingIcon = {
+                        Icon(item.shortcut.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
+                    },
                     modifier = Modifier.testTag(HomePageTags.pin(item)),
                 )
             }
@@ -320,7 +293,7 @@ private fun LazyListScope.homePinnedShortcutRow(page: HomePageScope) {
 // endregion
 
 @Composable
-private fun SeeAllHeader(label: String, target: HomeShortcut, page: HomePageScope, modifier: Modifier = Modifier) {
+internal fun SeeAllHeader(label: String, target: HomeShortcut, page: HomePageScope, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         HomeSectionLabel(label, Modifier.weight(1f))
         if (page.offers(target)) {
@@ -331,7 +304,6 @@ private fun SeeAllHeader(label: String, target: HomeShortcut, page: HomePageScop
     }
 }
 
-private const val COMPACT_RECENT_LIMIT = 6
 private const val AGENT_ROW_LIMIT = 12
 private const val AGENTS_LABEL = "Agents"
 private const val SEE_ALL = "See all"
