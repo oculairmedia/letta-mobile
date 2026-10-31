@@ -33,8 +33,8 @@ import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
-import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSectionLabel
 import kotlinx.datetime.toLocalDateTime
 
 /**
