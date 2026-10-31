@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -67,6 +66,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -266,11 +266,7 @@ private fun CanvasArtifactStatusLine(receipt: CanvasArtifactReceipt, status: Str
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (receipt.status == CanvasArtifactStatus.Pending && !LocalReducedMotion.current) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(LettaDimens.Control.iconSm),
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = LettaDimens.Stroke.hairline,
-            )
+            LettaSpinner(size = LettaDimens.Control.spinnerSm)
         }
         Text(
             text = status,

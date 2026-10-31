@@ -17,7 +17,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -87,7 +86,9 @@ import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaTonalPill
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.pill.LettaPillColors
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -384,23 +385,15 @@ private fun ApprovalToolCallCard(toolCall: UiApprovalToolCall) {
 /** Android's ToolApprovalChip in its RequestingInput state. */
 @Composable
 private fun RequestingInputChip() {
-    Surface(
+    LettaTonalPill(
+        text = stringResource(Res.string.rows_requesting_input),
+        colors = LettaPillColors(
+            container = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = LettaDimens.Alpha.muted),
+            content = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
         modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT),
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = REQUESTING_INPUT_CHIP_ALPHA),
-    ) {
-        Text(
-            text = stringResource(Res.string.rows_requesting_input),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-        )
-    }
+    )
 }
-
-/** Android's chip container alpha (ChatToolCallCards.ToolApprovalChip). */
-private const val REQUESTING_INPUT_CHIP_ALPHA = 0.72f
 
 /** The always-allow rules the server offers, then [ApprovalDecisionButtons] for every call of [approval]. */
 @Composable

@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,7 +15,7 @@ import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMascotDimens
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpinner
 
 /** Test tags for the agent's mascot in the timeline. */
 internal object TimelineMascotTags {
@@ -43,7 +42,7 @@ internal fun TimelineLoading(agentId: String?, modifier: Modifier = Modifier) {
 @Composable
 internal fun TimelineOlderHistoryLoading(agentId: String?) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        MascotLoading(agentId) { CircularProgressIndicator(Modifier.size(LettaDimens.Control.icon)) }
+        MascotLoading(agentId) { LettaSpinner() }
     }
 }
 

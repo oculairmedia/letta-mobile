@@ -43,7 +43,7 @@ import com.letta.mobile.data.skills.SkillSourceLabels
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaInfoBox
-import com.letta.mobile.ui.components.LettaPill
+import com.letta.mobile.ui.theme.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
