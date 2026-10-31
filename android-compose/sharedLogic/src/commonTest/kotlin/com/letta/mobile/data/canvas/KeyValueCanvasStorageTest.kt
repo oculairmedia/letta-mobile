@@ -46,6 +46,35 @@ class KeyValueCanvasStorageTest {
     }
 
     @Test
+    fun aFailedOpLogWriteRefusesTheDraftEvenWhenTheBoardSaved() = runTest {
+        var failOps = false
+        val backing = object : KeyValueStore by store {
+            override suspend fun put(key: String, value: String) {
+                if (failOps && key.startsWith(KeyValueCanvasStorage.OPS_PREFIX)) error("op log disk full")
+                store.put(key, value)
+            }
+        }
+        val storage = KeyValueCanvasStorage(backing, clock = { 1 })
+        val health = storage.documents as CanvasStorageHealth
+        val session = CanvasSession.create(storage.documents, CanvasCreateOptions(opLog = storage.opLog))
+        val baseline = session.sceneJsonOrEmpty()
+        val draft = """{"bgColor":"#f7f3eaff","elements":[{"id":"draft","type":"rect"}]}"""
+        failOps = true
+        // The board write succeeds but its ops are missing from the persisted log: never acknowledge.
+        val refused = assertFailsWith<IllegalStateException> { session.applyLocalScene(draft, baseJson = baseline) }
+        val draftOps = storage.opLog.getOps(session.canvasId, Long.MIN_VALUE).map { it.canvasOpId }
+        assertTrue(draftOps.isNotEmpty(), "the refused draft's ops are kept in memory for the retry: ${refused.message}")
+        assertFalse(health.awaitDurableSave(session.canvasId), "an op-log write failure fails the barrier")
+        failOps = false
+        session.applyLocalScene(draft)
+        assertTrue(health.awaitDurableSave(session.canvasId), "a completed op-log retry repairs the barrier")
+        // The invariant CodeRabbit named: after the acknowledged retry, every op is in the PERSISTED log,
+        // so a restart can still deliver it.
+        val persisted = KeyValueCanvasStorage(store).opLog.getOps(session.canvasId, Long.MIN_VALUE).map { it.canvasOpId }
+        assertTrue(persisted.containsAll(draftOps), "persisted op log is missing $draftOps")
+    }
+
+    @Test
     fun identicalSaveFailuresRemainUnsettledUntilAnActualDurableRetry() = runTest {
         var fail = false
         var writes = 0

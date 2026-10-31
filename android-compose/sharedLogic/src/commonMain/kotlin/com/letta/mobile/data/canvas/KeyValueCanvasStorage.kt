@@ -86,6 +86,23 @@ private data class StoredEntry(val key: String, val canvasId: CanvasId? = null) 
 
 /** [KeyValueStore] calls that report a failure as a storage fault instead of throwing. */
 private class StorageIo(val store: KeyValueStore, val faults: CanvasStorageFaults, val clock: () -> Long) {
+    /** Keys whose most recent write failed, so a board's durability covers its document AND its op log. */
+    private val failedKeys = MutableStateFlow<Set<String>>(emptySet())
+
+    /** True when every key of [canvasId] (board, ops) last wrote successfully. */
+    fun lastWritesSucceeded(canvasId: CanvasId): Boolean =
+        failedKeys.value.none { key -> key == StoredEntry.board(canvasId).key || key == StoredEntry.ops(canvasId).key }
+
+    /** Writes [entry] and records whether it reached the store; a swallowed failure stays visible. */
+    suspend fun write(entry: StoredEntry, value: String): Boolean {
+        val saved = guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, false) {
+            store.put(entry.key, value)
+            true
+        }
+        failedKeys.update { if (saved) it - entry.key else it + entry.key }
+        return saved
+    }
+
     suspend fun <T> guarded(kind: CanvasStorageFault.Kind, entry: StoredEntry, fallback: T, action: suspend () -> T): T =
         attempt(action).getOrElse { error ->
             faults.record(fault(kind, entry, describe(kind, error)), error)
@@ -104,9 +121,7 @@ private class StorageIo(val store: KeyValueStore, val faults: CanvasStorageFault
 
 /** The boards, one JSON value per board under [KeyValueCanvasStorage.BOARD_PREFIX]. */
 private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument>, CanvasStorageHealth {
-    private val failedWrites = MutableStateFlow<Set<CanvasId>>(emptySet())
-
-    override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = canvasId !in failedWrites.value
+    override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = io.lastWritesSucceeded(canvasId)
 
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = io.faults.faults
 
@@ -123,12 +138,7 @@ private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument
     }
 
     override suspend fun write(doc: CanvasDocument) {
-        val entry = StoredEntry.board(doc.id)
-        val saved = io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, false) {
-            io.store.put(entry.key, LettaJson.persisted.encodeToString(CanvasDocument.serializer(), doc))
-            true
-        }
-        failedWrites.update { if (saved) it - doc.id else it + doc.id }
+        io.write(StoredEntry.board(doc.id), LettaJson.persisted.encodeToString(CanvasDocument.serializer(), doc))
     }
 }
 
@@ -214,10 +224,7 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
         val pending = memory.unsettled(canvasId).mapTo(mutableSetOf()) { it.opId }
         val ops = compact(canvasId, memory.getOps(canvasId, Long.MIN_VALUE), pending)
         val record = StoredCanvasOps(ops, ops.map { it.opId }.filterNot { it in pending }, droppedHistory = canvasId in dropped)
-        val entry = StoredEntry.ops(canvasId)
-        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, Unit) {
-            io.store.put(entry.key, LettaJson.persisted.encodeToString(StoredCanvasOps.serializer(), record))
-        }
+        io.write(StoredEntry.ops(canvasId), LettaJson.persisted.encodeToString(StoredCanvasOps.serializer(), record))
     }
 
     /** [ops] within the budget: past it, the oldest settled ones go, down to the warning share. */
