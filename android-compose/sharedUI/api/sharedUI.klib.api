@@ -10792,6 +10792,8 @@ final object com.letta.mobile.ui.theme/ChatRowDimens { // com.letta.mobile.ui.th
         final fun <get-imageGridHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.imageGridHeight.<get-imageGridHeight>|<get-imageGridHeight>(){}[0]
     final val imageSingleHeight // com.letta.mobile.ui.theme/ChatRowDimens.imageSingleHeight|{}imageSingleHeight[0]
         final fun <get-imageSingleHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.imageSingleHeight.<get-imageSingleHeight>|<get-imageSingleHeight>(){}[0]
+    final val imageSingleMaxHeight // com.letta.mobile.ui.theme/ChatRowDimens.imageSingleMaxHeight|{}imageSingleMaxHeight[0]
+        final fun <get-imageSingleMaxHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.imageSingleMaxHeight.<get-imageSingleMaxHeight>|<get-imageSingleMaxHeight>(){}[0]
     final val promptExpandedMaxHeight // com.letta.mobile.ui.theme/ChatRowDimens.promptExpandedMaxHeight|{}promptExpandedMaxHeight[0]
         final fun <get-promptExpandedMaxHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.promptExpandedMaxHeight.<get-promptExpandedMaxHeight>|<get-promptExpandedMaxHeight>(){}[0]
     final val promptGridCellHeight // com.letta.mobile.ui.theme/ChatRowDimens.promptGridCellHeight|{}promptGridCellHeight[0]
