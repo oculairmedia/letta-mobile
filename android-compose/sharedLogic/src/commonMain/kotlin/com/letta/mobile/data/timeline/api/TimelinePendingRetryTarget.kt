@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 /** No-runtime hosts delegate metadata handling here; actual writes still fail loudly. */
+@Suppress("NoAnyType") // A reflective proxy's result: each member returns its own declared type.
 fun unboundTimelineWriterResult(member: String): Any? =
     when (member.substringBefore('-')) {
     "queuedRetries" -> emptyFlow<List<Pair<ConversationId, CanonicalPendingLocalStore.Record>>>()
