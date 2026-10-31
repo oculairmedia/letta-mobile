@@ -3,27 +3,28 @@ package com.letta.mobile.data.timeline.api
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.update
 
-/** Retains sender bindings across lazy conversation resolution in a captured writer. */
+/** Gathers queued retries across a captured writer's lazily resolved conversations. */
 class TimelinePendingRetryBinding {
-    private val lock = SynchronizedObject()
-    private val senders = mutableMapOf<AgentId, suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit>()
-    private val writers = mutableSetOf<TimelineExternalTransportWriter>()
+    private val writers = MutableStateFlow<Set<TimelineExternalTransportWriter>>(emptySet())
 
-    /** Forwards to existing conversations and remembers the sender for later ones. */
-    fun bind(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) {
-        synchronized(lock) {
-            senders[agent] = sender
-            writers.forEach { it.bindPendingRetry(agent, sender) }
+    /** Every conversation writer resolved so far, including ones resolved after subscription. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun queuedRetries(agent: AgentId): Flow<List<Pair<ConversationId, CanonicalPendingLocalStore.Record>>> =
+        writers.flatMapLatest { resolved ->
+            if (resolved.isEmpty()) flowOf(emptyList())
+            else combine(resolved.map { it.queuedRetries(agent) }) { lists -> lists.flatMap { it } }
         }
-    }
 
-    /** Applies every retained binding before a newly resolved writer is used. */
+    /** Adds a newly resolved writer to [queuedRetries]. */
     fun resolved(writer: TimelineExternalTransportWriter) {
-        synchronized(lock) {
-            if (writers.add(writer)) senders.forEach { (agent, sender) -> writer.bindPendingRetry(agent, sender) }
-        }
+        writers.update { it + writer }
     }
 }

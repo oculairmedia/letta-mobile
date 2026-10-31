@@ -6,6 +6,12 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.sync.withLock
 
 /** Conversation ownership is independent of screen selection; hosts explicitly retire idle owners. */
@@ -16,17 +22,33 @@ class CanonicalTimelineCoordinator(
     internal val pendingStorage: TimelineBoundedStore get() = store
     private val mutex = kotlinx.coroutines.sync.Mutex()
     private val owners = mutableMapOf<TimelineScope, Owner>()
+    // Mirrors [owners] for [queuedRetries]; written only under [mutex] alongside it.
+    private val ownerState = kotlinx.coroutines.flow.MutableStateFlow<Map<TimelineScope, Owner>>(emptyMap())
     private var revoked = false
-    private val retryLock = kotlinx.atomicfu.locks.SynchronizedObject()
-    private val retrySenders = mutableMapOf<AgentId, suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit>()
 
-    internal fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) {
-        kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] = sender }
-    }
+    /**
+     * The agent's queued retries in every conversation this coordinator owns. A Retry queues its
+     * prompt in the outbox, and the agent's send coordinator dispatches whatever is queued here, so
+     * a retry made before any sender subscribed still goes out once one does.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    internal fun queuedRetries(agent: AgentId): Flow<List<Pair<ConversationId, CanonicalPendingLocalStore.Record>>> =
+        ownerState.flatMapLatest { current ->
+            val mine = current.values.filter { it.selection.scope.agentId == agent.value }
+            if (mine.isEmpty()) flowOf(emptyList())
+            else combine(mine.map { owner ->
+                val scope = owner.selection.scope
+                val conversation = ConversationId(scope.conversationId)
+                // The pending view changes whenever a retry is queued, fails or settles.
+                owner.session.pending.mapLatest {
+                    CanonicalPendingLocalStore(store).queuedRetries(scope).map { conversation to it }
+                }
+            }) { lists -> lists.flatMap { it } }
+        }.distinctUntilChanged()
 
-    // A failed prompt is never abandoned, and its retry is stamped as this process's own attempt.
+    // A failed prompt is never abandoned; its retry waits in the outbox as this process's own attempt.
     internal suspend fun retryPending(owner: Owner, identity: MessageId): Boolean =
-        echoArrivedBeforeRetry(owner, identity) || dispatchRetry(owner, identity)
+        echoArrivedBeforeRetry(owner, identity) || queueRetry(owner, identity)
 
     /**
      * A failed prompt may have reached the host before contact was lost, and the App Server does
@@ -42,29 +64,9 @@ class CanonicalTimelineCoordinator(
         return owner.session.pending.value.none { it.otid == identity.value }
     }
 
-    private suspend fun dispatchRetry(owner: Owner, identity: MessageId): Boolean {
-        val (record, sender) = mutex.withLock {
-            check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
-            val record = owner.session.pending.value.singleOrNull {
-                it.otid == identity.value && it.delivery == CanonicalPendingLocalStore.Delivery.Failed
-            } ?: return false
-            val sender = owner.selection.scope.agentId?.let(::AgentId)?.let { agent ->
-                kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] }
-            } ?: return false
-            val retry = owner.session.retryPending(record.otid) ?: return false
-            retry to sender
-        }
-        val result = runCatching {
-            // Never hold the canonical mutex while dispatch calls back into appendPending.
-            sender(ConversationId(owner.selection.scope.conversationId), record)
-        }
-        result.exceptionOrNull()?.let { failure ->
-            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                owner.session.markPending(record.otid, CanonicalPendingLocalStore.Delivery.Failed, record.attempt)
-            }
-            if (failure is kotlinx.coroutines.CancellationException) throw failure
-        }
-        return result.isSuccess
+    private suspend fun queueRetry(owner: Owner, identity: MessageId): Boolean = mutex.withLock {
+        check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+        owner.session.retryPending(identity.value) != null
     }
 
     internal suspend fun dismissPending(owner: Owner, identity: MessageId): Boolean = mutex.withLock {
@@ -77,6 +79,7 @@ class CanonicalTimelineCoordinator(
         revoked = true
         owners.values.forEach { it.session.close(it.selection) }
         owners.clear()
+        ownerState.value = emptyMap()
     }
 
     class Owner internal constructor(
@@ -126,7 +129,10 @@ class CanonicalTimelineCoordinator(
         owners[scope]?.let { return@withLock it }
         val session = CanonicalTimelineSession(store, transport, scope, enabled = true)
         val opened = session.open() as TimelineEngineOpen.Opened
-        Owner(session, opened.selection).also { owners[scope] = it }
+        Owner(session, opened.selection).also {
+            owners[scope] = it
+            ownerState.value = owners.toMap()
+        }
     }
 
     suspend fun current(scope: TimelineScope): Owner? = mutex.withLock { owners[scope] }
@@ -292,6 +298,7 @@ class CanonicalTimelineCoordinator(
         if (owner.presentations.isNotEmpty()) return@withLock false
         owner.session.close(owner.selection)
         owners.remove(owner.selection.scope)
+        ownerState.value = owners.toMap()
         true
     }
 }
