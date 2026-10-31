@@ -1,5 +1,8 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.chat.projection.chronologicalMessages
 import com.letta.mobile.data.model.UiMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,6 +38,21 @@ class DesktopNotificationPreviewTest {
         assertEquals("Real reply", notificationReplyPreview(messages))
         assertNull(notificationReplyPreview(listOf(message("user", "hi"))))
         assertNull(notificationReplyPreview(null))
+    }
+
+    // The canonical route keeps no message map; the toast reads its live overlay, which is newest first.
+    @Test
+    fun readsTheNewestReplyFromANewestFirstRenderOverlay() {
+        val overlay = buildChatRenderModel(
+            messages = listOf(
+                message("assistant", "Old reply").copy(id = "a0", runId = "run-0"),
+                message("user", "hello").copy(id = "u1"),
+                message("assistant", "Earlier step").copy(id = "a1", runId = "run-1"),
+                message("assistant", "Final answer").copy(id = "a2", runId = "run-1"),
+            ),
+            mode = ChatDisplayMode.Interactive,
+        ).renderItems
+        assertEquals("Final answer", notificationReplyPreview(chronologicalMessages(overlay)))
     }
 
     @Test
