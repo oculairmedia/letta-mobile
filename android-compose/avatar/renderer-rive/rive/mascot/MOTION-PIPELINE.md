@@ -159,10 +159,12 @@ run exists for the scenario, else from the authored keys; both are shown when th
 
 ### Seams and the blend policy (`rig/seams.py`)
 
-For every transition in every layer: the outgoing animation's last value and the incoming one's
-first value on each (object, property) both key, the delta, and the blend duration. A hard cut
-across a delta is a seam. `Layer.rml()` refuses one unless the state is marked `cut=True` with a
-reason; the beat entry/exit blends (160 / 320 ms) live in one policy table instead of being retyped
+For every transition in every layer: every value the outgoing animation can be left at (any
+frame of a loop or of a one-shot a request interrupts; the last key only for an exit-time
+transition) against the incoming one's first, on each (object, property) both key, and the blend
+duration. A pose that moves in under `MIN_TRANSITION_MS` (100 ms) is refused by `Layer.rml()`
+outright - no signature excuses it; only a discrete swap (a glyph) may cut, signed `cut=True` with a
+reason, and no blend may sweep the glyph index; the beat entry/exit blends (160 / 320 ms) live in one policy table instead of being retyped
 per state. The ledger is also a tool: `python -m rig.seams` lists every seam worst first, and the
 X-sheet marks them. Telemetry closes the gap the authored keys cannot see: cross-layer seams,
 where a one-shot hands a shared node back to a lower layer.
