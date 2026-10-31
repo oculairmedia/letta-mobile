@@ -9,6 +9,7 @@ import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlin.random.Random
 
 /**
  * One live mascot for one agent, kept for the life of the process: the renderer's scene (owned
@@ -22,12 +23,20 @@ import kotlinx.coroutines.sync.withPermit
  * world ([setGazeWorld]); it drives the runtime, and writes each sustained state through
  * [applyState]. Nothing here is platform policy; the platform supplies [load] and [dispose].
  */
-abstract class MascotEntry(
+abstract class MascotEntry internal constructor(
     val runtime: AvatarRuntime,
     identity: MascotIdentity,
     /** The renderer's write for an arbitrated state (Rive: the state machine's inputs). */
     applyState: (AvatarState) -> Unit,
+    random: Random,
 ) {
+    /** Creates a platform entry with the director's ambient random source. */
+    constructor(
+        runtime: AvatarRuntime,
+        identity: MascotIdentity,
+        applyState: (AvatarState) -> Unit,
+    ) : this(runtime, identity, applyState, Random.Default)
+
     /** The identity this mascot is (or is becoming - see [retarget]). */
     var identity: MascotIdentity = identity
         private set
@@ -40,7 +49,7 @@ abstract class MascotEntry(
     private var morph: Morph? = null
 
     /** The shared director: state, gaze and reactions for this agent, on every platform. */
-    val director = MascotDirector(runtime).also { d ->
+    val director = MascotDirector(runtime, random).also { d ->
         d.addStateListener { _, enter -> applyState(enter) }
     }
     val lastGaze: GazePose get() = director.frame.gaze
