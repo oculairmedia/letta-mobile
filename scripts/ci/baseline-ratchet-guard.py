@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shrink-only ratchet for the parity guardrail baselines (letta-mobile-ewtaq).
+"""Shrink-only ratchet for the guardrail baselines (letta-mobile-ewtaq, letta-mobile-ojnvp).
 
 The gates (parity_gates.py, platform-ui-gate.sh, the duplicate-code scan) compare the tree with a
 committed baseline. This guard compares each baseline with the PR's base so a baseline can only
@@ -9,8 +9,11 @@ scripts/ci/ratchet-baselines.txt lists the baselines, one `<kind> <path>` per li
   set        `<key> [| reason]` lines; a key may be removed, never added.
   count      `<key> <n> ...` lines; a key may be removed or its n lowered, never added or raised.
   grow-only  lines may be added, never removed or changed (the list of things that must be bound).
-A baseline listed for the first time in this change is seeded by it (nothing to compare against);
-a baseline listed at the base may not be dropped from the list.
+  detekt     XML <ID> values in both issue sections; IDs may be removed, never added.
+A non-detekt baseline listed for the first time is seeded by this change. Detekt baselines are
+always compared with the base, even when first listed; a new file must contain no IDs, including
+in a newly added module. Every android-compose/**/detekt-baseline.xml must be listed as detekt.
+A baseline listed at the base may not be dropped from the list.
 
 Usage: baseline-ratchet-guard.py --diff-base REF [--root DIR] [--config FILE]
 Exit status: 0 clean, 1 a baseline moved the wrong way, 2 usage or git error.
@@ -23,12 +26,16 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Callable
+from xml.etree import ElementTree
 
 DEFAULT_CONFIG = "scripts/ci/ratchet-baselines.txt"
+DETEKT_KIND = "detekt"
+DETEKT_BASELINE_GLOB = "android-compose/**/detekt-baseline.xml"
 FIX = {
     "set": "Fix the code instead (bind the slot, implement the shared type, move it to sharedLogic/sharedUI); never add a line.",
     "count": "Fix the code instead (move the logic to sharedLogic/sharedUI, delete the duplicate); never add or raise a line.",
     "grow-only": "Restore the line: these must stay enforced. Retire one only by deleting the thing it names from shared code.",
+    DETEKT_KIND: "Fix the detekt finding instead; never add a baseline ID (new baseline files must contain no IDs, even in new modules).",
 }
 
 
@@ -77,10 +84,25 @@ def _compare_grow_only(name: str, base: list[str], head: list[str]) -> list[str]
     return [f"{name}: line removed or changed: {line.strip()}" for line in base if " ".join(line.split()) not in kept]
 
 
+def _detekt_ids(name: str, lines: list[str]) -> set[str]:
+    try:
+        baseline = ElementTree.fromstring("\n".join(lines))
+    except ElementTree.ParseError as error:
+        raise ValueError(f"{name}: malformed detekt baseline XML: {error}") from None
+    return {(element.text or "").strip() for element in baseline.iter("ID")}
+
+
+def _compare_detekt(name: str, base: list[str], head: list[str]) -> list[str]:
+    before = _detekt_ids(name, base) if base else set()
+    added = _detekt_ids(name, head) - before
+    return [f"{name}: detekt ID added: {key}" for key in sorted(added)]
+
+
 COMPARE: dict[str, Callable[[str, list[str], list[str]], list[str]]] = {
     "set": _compare_set,
     "count": _compare_count,
     "grow-only": _compare_grow_only,
+    DETEKT_KIND: _compare_detekt,
 }
 
 
@@ -135,10 +157,10 @@ def baseline_drift(root: Path, ref: str, path: str, kind: str) -> list[str]:
     if not current.is_file():
         return [f"{path}: listed in the ratchet config but missing - restore it"]
     base_text = git_show(root, ref, path)
-    if base_text is None:
+    if base_text is None and kind != DETEKT_KIND:
         print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")
         return []
-    found = compare(kind, path, entries(base_text), entries(current.read_text(encoding="utf-8")))
+    found = compare(kind, path, entries(base_text or ""), entries(current.read_text(encoding="utf-8")))
     return [f"{p}\n      -> {FIX[kind]}" for p in found]
 
 
@@ -146,8 +168,12 @@ def problems_for(root: Path, ref: str, config_name: str) -> tuple[list[str], int
     config = parse_config((root / config_name).read_text(encoding="utf-8"))
     base_config = parse_config(git_show(root, ref, config_name) or "")
     problems = dropped_ratchets(config_name, base_config, config)
+    for current in sorted(root.glob(DETEKT_BASELINE_GLOB)):
+        path = current.relative_to(root).as_posix()
+        if config.get(path) != DETEKT_KIND:
+            problems.append(f"{path}: detekt baseline must be listed as '{DETEKT_KIND} {path}' in {config_name}")
     for path, kind in sorted(config.items()):
-        if path in base_config:
+        if path in base_config or kind == DETEKT_KIND:
             problems += baseline_drift(root, ref, path, kind)
         else:
             print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")

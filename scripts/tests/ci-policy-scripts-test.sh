@@ -211,6 +211,7 @@ assert_contains "$test_job" 'bash scripts/ci/platform-ui-gate.sh --enforce'
 assert_contains "$test_job" 'python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"'
 assert_contains "$test_job" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
 assert_contains "$test_job" 'test_parity_gates.py'
+assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v"
 assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'
 assert_not_contains "$test_job" 'continue-on-error'
 # letta-mobile-l8lcn: every push to main runs the full additive test set.

@@ -273,7 +273,11 @@ jobs:
           git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null \
             || git fetch --no-tags origin "${BASE_REF}"
 
-      - name: Reject raised parity baselines
+      - name: Self-test baseline ratchet guard
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v
+
+      - name: Reject raised parity and detekt baselines
         if: github.event_name == 'pull_request'
         working-directory: ${{ github.workspace }}
         env:
