@@ -746,13 +746,11 @@ class CanvasSession(
     ): List<CanvasOp> = applyLocalSceneChecked(newJson, baseJson, actorId)
 
     private suspend fun applyLocalSceneChecked(newJson: String, baseJson: String?, actorId: CanvasActorId): List<CanvasOp> {
-        val health = store as? CanvasStorageHealth
-        val before = health?.saveFailureGeneration(canvasId)
         val refused = storageFaults.value.affecting(canvasId).firstOrNull { it.kind == CanvasStorageFault.Kind.READ_ONLY }
         check(refused == null) { requireNotNull(refused).message }
         return locked(durable = true) {
             applyLocalSceneLocked(newJson, baseJson ?: sceneJsonOrEmpty(), actorId).also {
-                check(documentDurable && before == health?.saveFailureGeneration(canvasId)) {
+                check(documentDurable) {
                     "Canvas save did not reach durable storage"
                 }
             }

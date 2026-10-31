@@ -69,7 +69,7 @@ class NotebookCanvasDocumentStoreTest {
             hold.set(true)
             val saving = async(Dispatchers.Default) { session.applyLocalScene("""{"elements":[{"id":"gated"}]}""") }
             try {
-                entered.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                entered.get(STORAGE_WAIT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
                 assertEquals(null, kotlinx.coroutines.withTimeoutOrNull(1.seconds) { saving.await() },
                     "an accepted CRDT transaction is not a durable save")
                 assertEquals(baseline, session.sceneJsonOrEmpty())
@@ -85,35 +85,37 @@ class NotebookCanvasDocumentStoreTest {
 
     @Test
     fun failedDrawingSavesRetryToDiskBeforeAcknowledgment() = runBlocking {
+        verifyDrawingSaveRetry()
+    }
+
+    @Test
+    fun delayedBackgroundFailureDoesNotRejectADurableRetry() = runBlocking {
+        verifyDrawingSaveRetry(deferBackgroundFailure = true)
+    }
+
+    private suspend fun verifyDrawingSaveRetry(deferBackgroundFailure: Boolean = false) {
         val path = Files.createTempDirectory("canvas-durable-retry-")
-        val failing = java.util.concurrent.atomic.AtomicBoolean(false)
-        val puts = java.util.concurrent.atomic.AtomicInteger()
+        lateinit var retryStorage: RetryStorage
         val wrap = { delegate: org.automerge.repo.Storage ->
-            object : org.automerge.repo.Storage by delegate {
-                override fun put(key: org.automerge.repo.StorageKey, value: ByteArray): java.util.concurrent.CompletableFuture<Void> {
-                    puts.incrementAndGet()
-                    if (failing.get()) return java.util.concurrent.CompletableFuture.failedFuture(java.io.IOException("same disk failure"))
-                    return delegate.put(key, value)
-                }
-            }
+            RetryStorage(delegate, deferBackgroundFailure).also { retryStorage = it }
         }
         NotebookLocalStore(path, "retry-peer", storage = wrap).use { notebooks ->
             val store = NotebookCanvasDocumentStore(notebooks)
             val session = CanvasSession.create(store, CanvasCreateOptions())
             val baseline = session.sceneJsonOrEmpty()
             val draft = """{"bgColor":"#f7f3eaff","elements":[{"id":"draft"}]}"""
-            failing.set(true)
+            retryStorage.failWrites()
             repeat(2) {
-                val before = puts.get()
+                val before = retryStorage.attempts
                 assertFailsWith<IllegalStateException> { session.applyLocalScene(draft, baseJson = baseline) }
-                assertTrue(puts.get() > before)
+                assertTrue(retryStorage.attempts > before)
                 assertTrue(session.opLog.unsettled(session.canvasId).isNotEmpty())
             }
             val firstFailureTime = store.storageFaults.value.first { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }.atEpochMs
-            failing.set(false)
-            val before = puts.get()
+            retryStorage.recoverWrites()
+            val before = retryStorage.attempts
             assertTrue(session.applyLocalScene(draft).isEmpty(), "retry persists even when recovery leaves no new drawing ops")
-            assertTrue(puts.get() > before)
+            assertTrue(retryStorage.attempts > before)
             assertTrue(session.opLog.unsettled(session.canvasId).isEmpty())
             assertEquals(firstFailureTime, store.storageFaults.value.first { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }.atEpochMs)
             // Reopen before closing the original repository: shutdown must not rescue an early acknowledgment.
@@ -236,5 +238,52 @@ class NotebookCanvasDocumentStoreTest {
             assertEquals(listOf(a.id), store.listForAgent(AgentId("agent")).map { it.id })
             assertEquals(a.id, store.getForConversation(ConversationId("chat"))?.id)
         }
+    }
+
+    private class RetryStorage(
+        private val delegate: org.automerge.repo.Storage,
+        private val deferBackgroundFailure: Boolean,
+    ) : org.automerge.repo.Storage by delegate {
+        private val failing = java.util.concurrent.atomic.AtomicBoolean(false)
+        private val puts = java.util.concurrent.atomic.AtomicInteger()
+        private val backgroundEntered = java.util.concurrent.CompletableFuture<Unit>()
+        private val delayedFailures = java.util.concurrent.ConcurrentLinkedQueue<java.util.concurrent.CompletableFuture<Void>>()
+        val attempts: Int get() = puts.get()
+
+        fun failWrites() { failing.set(true) }
+
+        fun recoverWrites() {
+            if (deferBackgroundFailure) backgroundEntered.get(STORAGE_WAIT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+            failing.set(false)
+        }
+
+        override fun put(key: org.automerge.repo.StorageKey, value: ByteArray): java.util.concurrent.CompletableFuture<Void> {
+            puts.incrementAndGet()
+            return when {
+                !failing.get() -> delegate.put(key, value).also { if (!onRepositoryThread()) failDelayedWrites() }
+                deferBackgroundFailure && onRepositoryThread() -> deferredFailure()
+                else -> java.util.concurrent.CompletableFuture.failedFuture(java.io.IOException(DISK_FAILURE))
+            }
+        }
+
+        private fun onRepositoryThread() = Thread.currentThread().name == REPOSITORY_IO_THREAD
+
+        /** A background repository put that fails only later, after a retry has already succeeded. */
+        private fun deferredFailure() = java.util.concurrent.CompletableFuture<Void>().also {
+            delayedFailures.add(it)
+            backgroundEntered.complete(Unit)
+        }
+
+        /** Complete older repository puts as failed inside the successful retry's barrier. */
+        private fun failDelayedWrites() {
+            generateSequence { delayedFailures.poll() }
+                .forEach { it.completeExceptionally(java.io.IOException(DISK_FAILURE)) }
+        }
+    }
+
+    private companion object {
+        const val REPOSITORY_IO_THREAD = "automerge-io"
+        const val STORAGE_WAIT_SECONDS = 10L
+        const val DISK_FAILURE = "same disk failure"
     }
 }

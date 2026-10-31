@@ -73,8 +73,9 @@ interface CanvasStorageHealth : DocumentStorageHealth<CanvasStorageFault> {
 
     /**
      * Waits for the board's last upsert to reach storage; false retains the draft and journal.
-     * Synchronous backings finish in upsert. Asynchronous stores must override this barrier and
-     * retry missing writes even when their in-memory document already contains the changes.
+     * This result decides durability; diagnostic generations may include older background writes.
+     * Backings that swallow write failures must return their last write's outcome. Asynchronous
+     * stores await completion and retry even when memory already contains the changes.
      */
     suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = true
 }

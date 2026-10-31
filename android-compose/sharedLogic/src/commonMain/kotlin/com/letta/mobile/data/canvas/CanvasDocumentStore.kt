@@ -41,9 +41,8 @@ interface CanvasDocumentStore : DocumentStore<CanvasId, CanvasDocument> {
 internal suspend fun CanvasDocumentStore.upsertDurably(doc: CanvasDocument): Boolean {
     val health = this as? CanvasStorageHealth
     if (health?.storageFaults?.value?.affecting(doc.id)?.any { it.kind == CanvasStorageFault.Kind.READ_ONLY } == true) return false
-    val before = health?.saveFailureGeneration(doc.id)
     upsert(doc)
     val durable = health?.awaitDurableSave(doc.id) ?: true
-    return durable && before == health?.saveFailureGeneration(doc.id) &&
+    return durable &&
         health?.storageFaults?.value?.affecting(doc.id)?.none { it.kind == CanvasStorageFault.Kind.READ_ONLY } != false
 }
