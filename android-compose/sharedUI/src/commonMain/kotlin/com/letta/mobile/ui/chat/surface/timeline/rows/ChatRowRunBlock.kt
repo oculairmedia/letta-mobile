@@ -14,16 +14,14 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
-import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.offset
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.model.UiMessage
@@ -32,7 +30,6 @@ import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
-import com.letta.mobile.ui.theme.LettaSizingTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -68,12 +65,12 @@ internal fun RunBlockRow(
 ) {
     val messages = remember(runMessages) { runMessages.toImmutableList() }
     val plan = rememberRunBlockPlan(messages, context) ?: return
-    val compactWidth = remember { mutableStateOf(false) }
-    val row = RunRowScope(context.copy(compactRunWidth = compactWidth), callbacks)
+    val runWidthPx = remember { mutableIntStateOf(0) }
+    val row = RunRowScope(context.copy(runWidthPx = runWidthPx), callbacks)
     Column(
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK).layout { measurable, constraints ->
             // Only measurement reads this state: children get the right inset on their first measure.
-            compactWidth.value = constraints.maxWidth.toDp() < LettaSizingTokens.COMPACT_WIDTH_BREAKPOINT.dp
+            runWidthPx.intValue = constraints.maxWidth
             val placeable = measurable.measure(constraints.copy(minHeight = 0))
             layout(placeable.width, constraints.constrainHeight(placeable.height)) { placeable.place(0, 0) }
         },
@@ -88,18 +85,6 @@ internal fun RunBlockRow(
         }
     }
 }
-
-/** Applies a run's indentation during measurement, after its available width is known. */
-internal fun Modifier.runWidthPadding(indent: Dp, compactWidth: State<Boolean>?, top: Dp = 0.dp): Modifier =
-    layout { measurable, constraints ->
-        val startPx = if (compactWidth?.value == true) 0 else indent.roundToPx()
-        val topPx = top.roundToPx()
-        val placeable = measurable.measure(constraints.offset(horizontal = -startPx, vertical = -topPx))
-        layout(
-            constraints.constrainWidth(placeable.width + startPx),
-            constraints.constrainHeight(placeable.height + topPx),
-        ) { placeable.placeRelative(startPx, topPx) }
-    }
 
 /**
  * One message under its header keeps its own row's beat, and lifts it (and the header's floor) away
@@ -359,7 +344,7 @@ private fun RunStep.hasImages(): Boolean =
 private fun RunStepImages(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
     if (!positioned.step.hasImages()) return
     val step = positioned.step as RunStep.ToolCalls
-    Column(modifier = positioned.workPadding(body, row.context.compactRunWidth)) {
+    Column(modifier = positioned.workPadding(body, row.context.runWidthPx)) {
         step.calls.toolCalls.forEach { call -> ToolGeneratedImages(call, row.callbacks) }
     }
 }
@@ -377,7 +362,7 @@ private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: 
         RunStepRow(
             positioned,
             row,
-            Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.compactRunWidth)),
+            Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).then(positioned.workPadding(body, row.context.runWidthPx)),
         )
     }
 }
@@ -402,12 +387,12 @@ internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
 /** A run step and its place among the run's visible steps (the legacy row's group position). */
 @Immutable
 private class PositionedRunStep(val step: RunStep, val position: GroupPosition) {
-    fun workPadding(body: RunBodyState, compactWidth: State<Boolean>?): Modifier {
+    fun workPadding(body: RunBodyState, runWidthPx: State<Int>?): Modifier {
         val indent = if (body.lifted) ChatRowSpacing.runStepIndent else 0.dp
         val calls = (step as? RunStep.ToolCalls)?.calls
         // Keep an approval's column width: widening it can unwrap its command and move its actions.
         val approval = calls != null && calls.approvals.any { it.isWaitingOn(calls.toolCalls) }
-        return Modifier.runWidthPadding(indent, compactWidth.takeUnless { approval }, top = top())
+        return Modifier.runWidthPadding(indent, runWidthPx, top = top(), preserveIndent = approval)
     }
 
     /** The legacy row beat above it: a tool summary always takes the grouped beat. */

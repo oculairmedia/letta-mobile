@@ -37,8 +37,8 @@ internal data class ChatRowContext(
     val newestMessageId: String? = null,
     /** Rows these options hide draw nothing (reasoning, compactions, usage). */
     val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
-    /** The enclosing run's width, read only by indentation modifiers during measurement. */
-    val compactRunWidth: State<Boolean>? = null,
+    /** The enclosing run's measured width before step indents, read only during measurement. */
+    val runWidthPx: State<Int>? = null,
 ) {
     /** True on the row holding the conversation's newest message. */
     val isNewest: Boolean get() = newestMessageId != null
