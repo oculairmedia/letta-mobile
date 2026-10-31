@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.shell.rail
+package com.letta.mobile.ui.chat
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -26,7 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import com.letta.mobile.ui.chat.agentOrbBrush
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.ui.mascot.LocalMascotHost
 import com.letta.mobile.ui.mascot.MASCOT_TILE_OVERSCALE
 import com.letta.mobile.ui.theme.LettaDimens
@@ -38,8 +38,9 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
  * Each mascot glows in its shape, and nothing is drawn over its face. Reduced motion holds the glow.
  */
 @Composable
-fun ShellThinkingAura(
-    entry: ShellRailEntry,
+fun AgentThinkingAura(
+    identity: MascotIdentity?,
+    orbStyle: Int,
     size: Dp,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = LettaDimens.Radius.sm,
@@ -54,7 +55,6 @@ fun ShellThinkingAura(
             alpha = lerp(ALPHA_REST, ALPHA_PEAK, breath.value)
         }
         .blur(BLUR, BlurredEdgeTreatment.Unbounded)
-    val identity = entry.identity
     val still = identity?.let { LocalMascotHost.current.stills?.get(it) }
     if (identity != null && still != null) {
         Image(
@@ -69,7 +69,7 @@ fun ShellThinkingAura(
         // The orb's own gradient; a mascot whose still has not landed yet glows in its colour.
         val shape = RoundedCornerShape(cornerRadius)
         val fill = if (identity == null) {
-            Modifier.background(agentOrbBrush(entry.orbStyle), shape)
+            Modifier.background(agentOrbBrush(orbStyle), shape)
         } else {
             Modifier.background(Color(identity.argb), shape)
         }

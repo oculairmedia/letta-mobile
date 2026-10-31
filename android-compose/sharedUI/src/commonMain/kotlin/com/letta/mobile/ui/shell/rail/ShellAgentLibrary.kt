@@ -27,6 +27,7 @@ import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.search.TextMatch
+import com.letta.mobile.ui.chat.AgentThinkingAura
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterActions
@@ -160,7 +161,7 @@ private fun SpaceHeaderEnd(count: Int, working: Boolean) {
 @Composable
 private fun LibraryAgentTile(entry: ShellRailEntry) {
     Box(contentAlignment = Alignment.Center) {
-        if (entry.thinking) ShellThinkingAura(entry, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
+        if (entry.thinking) AgentThinkingAura(entry.identity, entry.orbStyle, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
         ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
     }
 }

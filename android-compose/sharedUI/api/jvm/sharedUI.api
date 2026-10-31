@@ -1116,6 +1116,10 @@ public final class com/letta/mobile/ui/chat/AgentOrbKt {
 	public static final fun agentOrbBrush (I)Landroidx/compose/ui/graphics/Brush;
 }
 
+public final class com/letta/mobile/ui/chat/AgentThinkingAuraKt {
+	public static final fun AgentThinkingAura-hkzxCQw (Lcom/letta/mobile/avatar/core/model/MascotIdentity;IFLandroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/chat/ChatLayoutKt {
 	public static final fun getChatColumnMaxWidth ()F
 }
@@ -9410,10 +9414,6 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailMapping {
 	public final fun entry (Lcom/letta/mobile/data/agents/AgentRailGroup;ILcom/letta/mobile/ui/shell/rail/ShellRailFocus;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
 	public final fun groups (Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
 	public final fun recency (Ljava/lang/String;)Lkotlin/time/Instant;
-}
-
-public final class com/letta/mobile/ui/shell/rail/ShellThinkingAuraKt {
-	public static final fun ShellThinkingAura-icBs0wY (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;FLandroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/shell/scaffold/LettaPageScaffoldDefaults {
