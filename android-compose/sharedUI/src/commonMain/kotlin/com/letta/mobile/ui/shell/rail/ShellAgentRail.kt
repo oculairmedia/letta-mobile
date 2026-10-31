@@ -41,7 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.AgentOrb
-import com.letta.mobile.ui.chat.AgentThinkingAura
 import com.letta.mobile.ui.components.lettaFadingEdges
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LettaHoverCard
@@ -175,12 +174,7 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
                 if (entry.selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
                 // Rail mascots stay on their cached still; thinking glows behind the character.
                 if (entry.thinking) {
-                    AgentThinkingAura(
-                        identity = entry.identity,
-                        orbStyle = entry.orbStyle,
-                        size = LettaDimens.Orb.lg,
-                        modifier = Modifier.testTag("shell-thinking-aura-${entry.key}"),
-                    )
+                    ShellThinkingAura(entry, size = LettaDimens.Orb.lg, modifier = Modifier.testTag("shell-thinking-aura-${entry.key}"))
                 }
                 ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
             }
