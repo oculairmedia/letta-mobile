@@ -259,29 +259,31 @@ class NotebookCanvasDocumentStoreTest {
 
         override fun put(key: org.automerge.repo.StorageKey, value: ByteArray): java.util.concurrent.CompletableFuture<Void> {
             puts.incrementAndGet()
-            if (failing.get()) {
-                if (deferBackgroundFailure && Thread.currentThread().name == REPOSITORY_IO_THREAD) {
-                    return java.util.concurrent.CompletableFuture<Void>().also {
-                        delayedFailures.add(it)
-                        backgroundEntered.complete(Unit)
-                    }
-                }
-                return java.util.concurrent.CompletableFuture.failedFuture(java.io.IOException("same disk failure"))
+            return when {
+                !failing.get() -> delegate.put(key, value).also { if (!onRepositoryThread()) failDelayedWrites() }
+                deferBackgroundFailure && onRepositoryThread() -> deferredFailure()
+                else -> java.util.concurrent.CompletableFuture.failedFuture(java.io.IOException(DISK_FAILURE))
             }
-            return delegate.put(key, value).also {
-                if (Thread.currentThread().name != REPOSITORY_IO_THREAD) {
-                    // Complete an older repository put inside the successful retry's barrier.
-                    while (true) {
-                        val failure = delayedFailures.poll() ?: break
-                        failure.completeExceptionally(java.io.IOException("same disk failure"))
-                    }
-                }
-            }
+        }
+
+        private fun onRepositoryThread() = Thread.currentThread().name == REPOSITORY_IO_THREAD
+
+        /** A background repository put that fails only later, after a retry has already succeeded. */
+        private fun deferredFailure() = java.util.concurrent.CompletableFuture<Void>().also {
+            delayedFailures.add(it)
+            backgroundEntered.complete(Unit)
+        }
+
+        /** Complete older repository puts as failed inside the successful retry's barrier. */
+        private fun failDelayedWrites() {
+            generateSequence { delayedFailures.poll() }
+                .forEach { it.completeExceptionally(java.io.IOException(DISK_FAILURE)) }
         }
     }
 
     private companion object {
         const val REPOSITORY_IO_THREAD = "automerge-io"
         const val STORAGE_WAIT_SECONDS = 10L
+        const val DISK_FAILURE = "same disk failure"
     }
 }
