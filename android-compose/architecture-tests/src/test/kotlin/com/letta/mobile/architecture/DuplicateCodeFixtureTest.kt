@@ -6,7 +6,7 @@ import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 
-/** Self-test: the ratchet fails on a crafted cross-module clone and ignores one inside a module. */
+/** Fixture checks for the cross-module and same-module scans and their ratchets. */
 class DuplicateCodeFixtureTest {
     @Test
     fun `a block copied into another module is reported and one inside a module is not`(@TempDir root: Path) {
@@ -17,7 +17,7 @@ class DuplicateCodeFixtureTest {
         web.resolve("C.kt").writeText(cloneSource("Web"))
 
         val sources = DuplicateCodeScan.productionSources(root)
-        val pairs = DuplicateCodeScan.crossModuleDuplicates(root, sources, minimumTokens = 50)
+        val pairs = DuplicateCodeScan.crossModuleDuplicates(root, sources, minimumTokens = FIXTURE_MINIMUM_TOKENS)
 
         val desktopA = "android-compose/desktop/src/main/kotlin/A.kt"
         val desktopB = "android-compose/desktop/src/main/kotlin/B.kt"
@@ -32,11 +32,48 @@ class DuplicateCodeFixtureTest {
         check(healed.size == 2 && healed.all { it.startsWith("STALE:") }) { "a removed clone must lower the baseline: $healed" }
     }
 
+    @Test
+    fun `same module clones are ratcheted including clones in one file`(@TempDir root: Path) {
+        val first = module(root, "first")
+        val second = module(root, "second")
+        first.resolve("A.kt").writeText(cloneSource("First") + cloneSource("Again").substringAfter("package example\n"))
+        first.resolve("B.kt").writeText(cloneSource("Twin"))
+        second.resolve("C.kt").writeText(cloneSource("Other"))
+        val sources = DuplicateCodeScan.productionSources(root)
+        val pairs = DuplicateCodeScan.sameModuleDuplicates(root, sources, minimumTokens = FIXTURE_MINIMUM_TOKENS)
+        val a = "android-compose/first/src/main/kotlin/A.kt"
+        val b = "android-compose/first/src/main/kotlin/B.kt"
+        check(pairs.keys == setOf("$a|$a", "$a|$b")) { "unexpected same-module pairs: $pairs" }
+        val baseline = pairs.toList()
+        check(CountRatchetBaseline.drift(pairs, emptyList(), "fixture", CountRatchetBaseline.Shrink.MUST_UPDATE).all { it.startsWith("NEW:") })
+        check(CountRatchetBaseline.drift(pairs, baseline, "fixture", CountRatchetBaseline.Shrink.MUST_UPDATE).isEmpty())
+        val stale = CountRatchetBaseline.drift(emptyMap(), baseline, "fixture", CountRatchetBaseline.Shrink.MUST_UPDATE)
+        check(stale.size == baseline.size && stale.all { it.startsWith("STALE:") }) { "removed clones must fail: $stale" }
+    }
+
+    @Test
+    fun `same module matches below the token threshold are ignored`(@TempDir root: Path) {
+        val sourcesDir = module(root, "small")
+        val source = "package example\nfun number() = 42\n"
+        sourcesDir.resolve("A.kt").writeText(source)
+        sourcesDir.resolve("B.kt").writeText(source)
+        val sources = DuplicateCodeScan.productionSources(root)
+        val detectable = DuplicateCodeScan.sameModuleDuplicates(root, sources, minimumTokens = TINY_FIXTURE_MINIMUM_TOKENS)
+        check(detectable.isNotEmpty()) { "the tiny fixture must contain a detectable match" }
+        val pairs = DuplicateCodeScan.sameModuleDuplicates(root, sources)
+        check(pairs.isEmpty()) { "a tiny match should be below the threshold: $pairs" }
+    }
+
     private fun module(root: Path, name: String): Path {
         val dir = root.resolve("android-compose/$name")
         dir.createDirectories()
         dir.resolve("build.gradle.kts").writeText("")
         return dir.resolve("src/main/kotlin").createDirectories()
+    }
+
+    private companion object {
+        const val FIXTURE_MINIMUM_TOKENS = 50
+        const val TINY_FIXTURE_MINIMUM_TOKENS = 5
     }
 
     private fun cloneSource(prefix: String) = buildString {

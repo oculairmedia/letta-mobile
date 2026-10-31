@@ -65,6 +65,8 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     // DuplicateCodeRatchetTest (letta-mobile-ewtaq) reads its cross-module duplicate baseline.
     inputs.file("duplicate-code-baseline.txt")
         .withPropertyName("duplicateCodeBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("same-module-duplicate-code-baseline.txt")
+        .withPropertyName("sameModuleDuplicateCodeBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
 }

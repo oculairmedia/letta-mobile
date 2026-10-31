@@ -29,8 +29,29 @@ class DuplicateCodeRatchetTest {
         check(drift.isEmpty()) { failureMessage(drift) }
     }
 
+    @Test
+    fun `no new code is duplicated within modules`() {
+        val sources = DuplicateCodeScan.productionSources(projectRoot)
+        check(sources.size > 500) { "Scanned ${sources.size} files; the scan is not seeing the source tree" }
+        val actual = DuplicateCodeScan.sameModuleDuplicates(projectRoot, sources)
+        val report = projectRoot.resolve("android-compose/architecture-tests/build/reports/duplicate-code/same-module-actual.txt")
+        report.parent.createDirectories()
+        report.writeText(CountRatchetBaseline.render(actual))
+        val baseline = projectRoot.resolve("android-compose/architecture-tests/$SAME_MODULE_BASELINE")
+        val drift = CountRatchetBaseline.drift(actual, CountRatchetBaseline.read(baseline), SAME_MODULE_BASELINE, CountRatchetBaseline.Shrink.MUST_UPDATE)
+        check(drift.isEmpty()) {
+            buildString {
+                appendLine("Same-module duplicate code (PMD CPD, ${DuplicateCodeScan.SAME_MODULE_MINIMUM_TOKENS}+ tokens) moved against $SAME_MODULE_BASELINE:")
+                drift.forEach { appendLine("  $it") }
+                appendLine("NEW: consolidate the duplicate implementation; do not add or raise a baseline line.")
+                appendLine("STALE: lower or delete the baseline line. Current pairs: $report")
+            }
+        }
+    }
+
     internal companion object {
         const val BASELINE = "duplicate-code-baseline.txt"
+        const val SAME_MODULE_BASELINE = "same-module-duplicate-code-baseline.txt"
 
         fun failureMessage(drift: List<String>): String = buildString {
             appendLine("Cross-module duplicate code (PMD CPD, ${DuplicateCodeScan.MINIMUM_TOKENS}+ tokens) moved against $BASELINE:")
