@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_placeholder
+import com.letta.mobile.sharedui.resources.composer_attach_failed
+import com.letta.mobile.sharedui.resources.composer_clipboard_unreadable_image
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
@@ -145,9 +147,11 @@ internal fun ComposerTextField(
     }
     // The mascot being typed to listens to the cadence (letta-mobile-te3n1.1); only the primary field counts.
     val mascots = LocalMascotRegistry.current
+    val pasteError = unreadableClipboardMessage()
     BasicTextField(
         value = fieldValue,
-        onValueChange = { next ->
+        onValueChange = onValueChange@{ next ->
+            if (isUnreadableComposerText(fieldValue, next.text)) return@onValueChange model.actions.reportComposerError(pasteError)
             fieldValue = next
             if (next.text != text) {
                 model.actions.updateComposerText(next.text)
@@ -181,6 +185,12 @@ internal fun ComposerTextField(
         },
     )
 }
+
+@Composable
+private fun unreadableClipboardMessage(): String = stringResource(
+    Res.string.composer_attach_failed,
+    stringResource(Res.string.composer_clipboard_unreadable_image),
+)
 
 /** One key at the prompt: Shift+Tab cycles the permission mode, Enter sends. */
 private fun composerKeyHandled(event: KeyEvent, model: ComposerModel, sendFromKeyboard: () -> Boolean): Boolean {
