@@ -4515,11 +4515,15 @@ abstract interface com.letta.mobile.data.document/StorageFault { // com.letta.mo
 }
 
 abstract interface com.letta.mobile.data.dreaming/DreamingActions { // com.letta.mobile.data.dreaming/DreamingActions|null[0]
+    open val models // com.letta.mobile.data.dreaming/DreamingActions.models|{}models[0]
+        open fun <get-models>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.dreaming/DreamingActions.models.<get-models>|<get-models>(){}[0]
+
     abstract fun closeRun() // com.letta.mobile.data.dreaming/DreamingActions.closeRun|closeRun(){}[0]
     abstract fun openRun(com.letta.mobile.data.dreaming/DreamRun) // com.letta.mobile.data.dreaming/DreamingActions.openRun|openRun(com.letta.mobile.data.dreaming.DreamRun){}[0]
     abstract fun refresh() // com.letta.mobile.data.dreaming/DreamingActions.refresh|refresh(){}[0]
     abstract fun runNow(kotlin/String? = ...) // com.letta.mobile.data.dreaming/DreamingActions.runNow|runNow(kotlin.String?){}[0]
     abstract fun save(com.letta.mobile.data.dreaming/DreamSettingsChange) // com.letta.mobile.data.dreaming/DreamingActions.save|save(com.letta.mobile.data.dreaming.DreamSettingsChange){}[0]
+    open suspend fun reloadModels() // com.letta.mobile.data.dreaming/DreamingActions.reloadModels|reloadModels(){}[0]
 }
 
 abstract interface com.letta.mobile.data.dreaming/DreamingRepository { // com.letta.mobile.data.dreaming/DreamingRepository|null[0]
@@ -34082,8 +34086,10 @@ final class com.letta.mobile.data.dreaming/DreamTarget { // com.letta.mobile.dat
 }
 
 final class com.letta.mobile.data.dreaming/DreamingController : com.letta.mobile.data.dreaming/DreamingActions, kotlin/AutoCloseable { // com.letta.mobile.data.dreaming/DreamingController|null[0]
-    constructor <init>(com.letta.mobile.data.dreaming/DreamingRepository, com.letta.mobile.data.dreaming/DreamHistorySource?, kotlinx.coroutines/CoroutineScope, kotlin/Function1<com.letta.mobile.data.model/AgentId, kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>>> = ...) // com.letta.mobile.data.dreaming/DreamingController.<init>|<init>(com.letta.mobile.data.dreaming.DreamingRepository;com.letta.mobile.data.dreaming.DreamHistorySource?;kotlinx.coroutines.CoroutineScope;kotlin.Function1<com.letta.mobile.data.model.AgentId,kotlinx.coroutines.flow.Flow<kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>>>){}[0]
+    constructor <init>(com.letta.mobile.data.dreaming/DreamingRepository, com.letta.mobile.data.dreaming/DreamHistorySource?, kotlinx.coroutines/CoroutineScope, kotlin/Function1<com.letta.mobile.data.model/AgentId, kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>>> = ..., kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> = ..., kotlin.coroutines/SuspendFunction0<kotlin/Unit> = ...) // com.letta.mobile.data.dreaming/DreamingController.<init>|<init>(com.letta.mobile.data.dreaming.DreamingRepository;com.letta.mobile.data.dreaming.DreamHistorySource?;kotlinx.coroutines.CoroutineScope;kotlin.Function1<com.letta.mobile.data.model.AgentId,kotlinx.coroutines.flow.Flow<kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>>>;kotlinx.coroutines.flow.StateFlow<kotlin.collections.List<com.letta.mobile.data.model.LlmModel>>;kotlin.coroutines.SuspendFunction0<kotlin.Unit>){}[0]
 
+    final val models // com.letta.mobile.data.dreaming/DreamingController.models|{}models[0]
+        final fun <get-models>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.dreaming/DreamingController.models.<get-models>|<get-models>(){}[0]
     final val state // com.letta.mobile.data.dreaming/DreamingController.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.dreaming/DreamingState> // com.letta.mobile.data.dreaming/DreamingController.state.<get-state>|<get-state>(){}[0]
 
@@ -34094,6 +34100,7 @@ final class com.letta.mobile.data.dreaming/DreamingController : com.letta.mobile
     final fun refresh() // com.letta.mobile.data.dreaming/DreamingController.refresh|refresh(){}[0]
     final fun runNow(kotlin/String?) // com.letta.mobile.data.dreaming/DreamingController.runNow|runNow(kotlin.String?){}[0]
     final fun save(com.letta.mobile.data.dreaming/DreamSettingsChange) // com.letta.mobile.data.dreaming/DreamingController.save|save(com.letta.mobile.data.dreaming.DreamSettingsChange){}[0]
+    final suspend fun reloadModels() // com.letta.mobile.data.dreaming/DreamingController.reloadModels|reloadModels(){}[0]
 }
 
 final class com.letta.mobile.data.dreaming/DreamingState { // com.letta.mobile.data.dreaming/DreamingState|null[0]

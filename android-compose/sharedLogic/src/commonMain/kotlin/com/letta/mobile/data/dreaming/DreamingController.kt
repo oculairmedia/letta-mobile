@@ -1,6 +1,7 @@
 package com.letta.mobile.data.dreaming
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,8 @@ class DreamingController(
     private val history: DreamHistorySource?,
     private val scope: CoroutineScope,
     private val activity: (AgentId) -> Flow<List<SubagentEntry>> = { emptyFlow() },
+    override val models: StateFlow<List<LlmModel>> = MutableStateFlow(emptyList()),
+    private val reloadModelsAction: suspend () -> Unit = {},
 ) : DreamingActions, AutoCloseable {
     private val stateFlow = MutableStateFlow(DreamingState())
     val state: StateFlow<DreamingState> = stateFlow.asStateFlow()
@@ -50,6 +53,8 @@ class DreamingController(
         refresh()
         follow(target)
     }
+
+    override suspend fun reloadModels() = reloadModelsAction()
 
     /** Re-reads the settings and the dream log of the focused agent. */
     override fun refresh() {
