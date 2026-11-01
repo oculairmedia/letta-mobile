@@ -103,7 +103,7 @@ cd android-compose
 
 # detekt — JDK 21. Same as the CI `detekt` job: findings already in a module's
 # detekt-baseline.xml are ignored, anything new fails. Do not lower thresholds.
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parchitecture.strict=true
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt
 ```
 
 **CI at a glance** (full table: "CI map" in `AGENTS.md`):
