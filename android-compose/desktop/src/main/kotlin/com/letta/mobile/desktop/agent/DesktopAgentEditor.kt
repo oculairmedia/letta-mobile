@@ -8,10 +8,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.letta.mobile.data.agenteditor.AgentCreator
-import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.secrets.AgentSecretsFeature
 import com.letta.mobile.data.secrets.AgentVaultController
-import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.DesktopShellContext
 import com.letta.mobile.desktop.workspace.DesktopDreamingDeps
 import com.letta.mobile.desktop.workspace.DesktopDreamingPane
@@ -31,25 +29,23 @@ import com.letta.mobile.ui.shell.pages.vault.AgentVaultPageOptions
  */
 internal fun DesktopShellContext.agentEditorHost(): ShellAgentEditorHost {
     val chat = core.chatController
-    val panels = DesktopEditorPanelDeps(core.bootstrap.secureSettingsStore, this.panels.subagents.repository)
+    val dreaming = DesktopDreamingDeps(
+        core.bootstrap.secureSettingsStore,
+        this.panels.subagents.repository,
+        chat.models,
+    )
     return ShellAgentEditorHost(
         creator = AgentCreator { params -> chat.createAgentAndOpen(params) },
         modelCatalog = chat.models.available,
-        panels = { agent -> desktopPanels(agent.value, panels) },
+        panels = { agent -> desktopPanels(agent.value, dreaming) },
         onIdentityChange = { agent, identity -> avatarOverrides.value += agent.value to identity },
         onRosterChanged = chat::retryConnection,
     )
 }
 
-/** What the desktop's editor panels work over: the device store and the background-task registry. */
-private class DesktopEditorPanelDeps(
-    val settings: SecureSettingsStore,
-    val subagents: ISubagentRepository?,
-)
-
 /** The agent's Dreaming view and, where the vault is on, its secrets (letta-mobile-iczm7, bzvro.25). */
-private fun desktopPanels(agentId: String, deps: DesktopEditorPanelDeps) = AgentEditorPanels(
-    dreaming = { DesktopDreamingPane(agentId, rememberCoroutineScope(), DesktopDreamingDeps(deps.settings, deps.subagents)) },
+private fun desktopPanels(agentId: String, dreaming: DesktopDreamingDeps) = AgentEditorPanels(
+    dreaming = { DesktopDreamingPane(agentId, rememberCoroutineScope(), dreaming) },
     secrets = if (AgentSecretsFeature.Desktop.enabled) {
         { DesktopAgentVault(agentId) }
     } else {
