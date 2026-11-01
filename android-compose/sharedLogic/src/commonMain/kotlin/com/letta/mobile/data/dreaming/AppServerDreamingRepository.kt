@@ -35,7 +35,7 @@ class AppServerDreamingRepository(
             AppServerCommand.SetReflectionSettings(
                 requestId = requestId(OP_SET),
                 runtime = target.runtime(),
-                settings = change.settings.toWire(),
+                settings = change.toWire(),
                 scope = change.scope?.wire,
             ),
         )

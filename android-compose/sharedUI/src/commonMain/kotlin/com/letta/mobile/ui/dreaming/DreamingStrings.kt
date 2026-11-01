@@ -7,6 +7,8 @@ import com.letta.mobile.data.dreaming.DreamStartStatus
 import com.letta.mobile.data.dreaming.DreamTrigger
 import com.letta.mobile.data.dreaming.DreamUnsupportedReason
 import com.letta.mobile.data.model.SubagentKind
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcome
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcomeStatus
 
 /** The Dreaming surface's text. Our own words over letta-code's behaviour. */
 object DreamingStrings {
@@ -22,7 +24,10 @@ object DreamingStrings {
     const val REVIEW_INSTRUCTIONS = "Review instructions (optional)"
     const val SAVE = "Save"
     const val SAVED_FOR = "Applies to"
-    const val MODEL = "Dreams use the agent's own model."
+    const val MODEL_LABEL = "Reflection model"
+    const val MODEL_INHERIT = "Inherit agent model"
+    const val MODEL_CHOOSE = "Choose model"
+    const val FOCUS_INSTRUCTIONS = "Focus instructions"
     const val STEPS_LABEL = "Steps between dreams"
 
     const val RUN_NOW = "Dream now"
@@ -94,4 +99,19 @@ object DreamingStrings {
     fun lastDream(summary: String, whenText: String): String = "Last dream $whenText: $summary"
 
     fun stats(added: Int, removed: Int): String = "+$added −$removed"
+}
+
+/** A status line that includes skipped and failed runs, which memory history cannot show. */
+internal fun reflectionOutcomeText(outcome: ReflectionLastOutcome?, whenText: String?): String {
+    outcome ?: return "No reflection outcome yet."
+    val lead = when (outcome.status) {
+        ReflectionLastOutcomeStatus.Launched -> "Last reflection launched"
+        ReflectionLastOutcomeStatus.Skipped -> "Last reflection skipped"
+        ReflectionLastOutcomeStatus.Failed -> "Last reflection failed"
+        ReflectionLastOutcomeStatus.Completed -> "Last reflection completed"
+        ReflectionLastOutcomeStatus.Unknown -> "Last reflection outcome"
+    }
+    val time = whenText?.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+    val reason = outcome.reason?.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
+    return lead + time + reason
 }

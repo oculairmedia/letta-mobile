@@ -1702,6 +1702,26 @@ final enum class com.letta.mobile.data.messaging/AgentMessageKind : kotlin/Enum<
     final fun values(): kotlin/Array<com.letta.mobile.data.messaging/AgentMessageKind> // com.letta.mobile.data.messaging/AgentMessageKind.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus : kotlin/Enum<com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus> { // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus|null[0]
+    enum entry Completed // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Completed|null[0]
+    enum entry Failed // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Failed|null[0]
+    enum entry Launched // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Launched|null[0]
+    enum entry Skipped // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Skipped|null[0]
+    enum entry Unknown // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Unknown|null[0]
+
+    final val entries // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus> // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val wire // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus> // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Companion|null[0]
+        final fun fromWire(kotlin/String?): com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus // com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus.Companion.fromWire|fromWire(kotlin.String?){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.model/AppTheme : kotlin/Enum<com.letta.mobile.data.model/AppTheme> { // com.letta.mobile.data.model/AppTheme|null[0]
     enum entry DARK // com.letta.mobile.data.model/AppTheme.DARK|null[0]
     enum entry LIGHT // com.letta.mobile.data.model/AppTheme.LIGHT|null[0]
@@ -11208,6 +11228,33 @@ sealed interface com.letta.mobile.data.model.provider/VisibilityPolicy { // com.
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.provider/VisibilityPolicy.Visible.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.provider/VisibilityPolicy.Visible.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.model.provider/VisibilityPolicy.Visible.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.model.reflection/ReflectionModelChoice { // com.letta.mobile.data.model.reflection/ReflectionModelChoice|null[0]
+    final class Handle : com.letta.mobile.data.model.reflection/ReflectionModelChoice { // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.<init>|<init>(kotlin.String){}[0]
+
+        final val value // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.value|{}value[0]
+            final fun <get-value>(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Handle.toString|toString(){}[0]
+    }
+
+    final object Inherit : com.letta.mobile.data.model.reflection/ReflectionModelChoice { // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Inherit|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Inherit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Inherit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Inherit.toString|toString(){}[0]
+    }
+
+    final object Unsupported : com.letta.mobile.data.model.reflection/ReflectionModelChoice { // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Unsupported|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Unsupported.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Unsupported.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionModelChoice.Unsupported.toString|toString(){}[0]
     }
 }
 
@@ -33982,14 +34029,20 @@ final class com.letta.mobile.data.dreaming/DreamRunStart { // com.letta.mobile.d
 }
 
 final class com.letta.mobile.data.dreaming/DreamSettings { // com.letta.mobile.data.dreaming/DreamSettings|null[0]
-    constructor <init>(com.letta.mobile.data.dreaming/DreamTrigger = ..., kotlin/Int = ..., com.letta.mobile.data.dreaming/DreamMerge = ..., kotlin/String = ...) // com.letta.mobile.data.dreaming/DreamSettings.<init>|<init>(com.letta.mobile.data.dreaming.DreamTrigger;kotlin.Int;com.letta.mobile.data.dreaming.DreamMerge;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.data.dreaming/DreamTrigger = ..., kotlin/Int = ..., com.letta.mobile.data.dreaming/DreamMerge = ..., kotlin/String = ..., com.letta.mobile.data.model.reflection/ReflectionModelChoice = ..., kotlin/String? = ..., com.letta.mobile.data.model.reflection/ReflectionLastOutcome? = ...) // com.letta.mobile.data.dreaming/DreamSettings.<init>|<init>(com.letta.mobile.data.dreaming.DreamTrigger;kotlin.Int;com.letta.mobile.data.dreaming.DreamMerge;kotlin.String;com.letta.mobile.data.model.reflection.ReflectionModelChoice;kotlin.String?;com.letta.mobile.data.model.reflection.ReflectionLastOutcome?){}[0]
 
     final val automatic // com.letta.mobile.data.dreaming/DreamSettings.automatic|{}automatic[0]
         final fun <get-automatic>(): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettings.automatic.<get-automatic>|<get-automatic>(){}[0]
+    final val focusInstructions // com.letta.mobile.data.dreaming/DreamSettings.focusInstructions|{}focusInstructions[0]
+        final fun <get-focusInstructions>(): kotlin/String? // com.letta.mobile.data.dreaming/DreamSettings.focusInstructions.<get-focusInstructions>|<get-focusInstructions>(){}[0]
+    final val lastOutcome // com.letta.mobile.data.dreaming/DreamSettings.lastOutcome|{}lastOutcome[0]
+        final fun <get-lastOutcome>(): com.letta.mobile.data.model.reflection/ReflectionLastOutcome? // com.letta.mobile.data.dreaming/DreamSettings.lastOutcome.<get-lastOutcome>|<get-lastOutcome>(){}[0]
     final val merge // com.letta.mobile.data.dreaming/DreamSettings.merge|{}merge[0]
         final fun <get-merge>(): com.letta.mobile.data.dreaming/DreamMerge // com.letta.mobile.data.dreaming/DreamSettings.merge.<get-merge>|<get-merge>(){}[0]
     final val mergeInstructions // com.letta.mobile.data.dreaming/DreamSettings.mergeInstructions|{}mergeInstructions[0]
         final fun <get-mergeInstructions>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.mergeInstructions.<get-mergeInstructions>|<get-mergeInstructions>(){}[0]
+    final val model // com.letta.mobile.data.dreaming/DreamSettings.model|{}model[0]
+        final fun <get-model>(): com.letta.mobile.data.model.reflection/ReflectionModelChoice // com.letta.mobile.data.dreaming/DreamSettings.model.<get-model>|<get-model>(){}[0]
     final val stepCount // com.letta.mobile.data.dreaming/DreamSettings.stepCount|{}stepCount[0]
         final fun <get-stepCount>(): kotlin/Int // com.letta.mobile.data.dreaming/DreamSettings.stepCount.<get-stepCount>|<get-stepCount>(){}[0]
     final val trigger // com.letta.mobile.data.dreaming/DreamSettings.trigger|{}trigger[0]
@@ -33999,7 +34052,10 @@ final class com.letta.mobile.data.dreaming/DreamSettings { // com.letta.mobile.d
     final fun component2(): kotlin/Int // com.letta.mobile.data.dreaming/DreamSettings.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.dreaming/DreamMerge // com.letta.mobile.data.dreaming/DreamSettings.component3|component3(){}[0]
     final fun component4(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.component4|component4(){}[0]
-    final fun copy(com.letta.mobile.data.dreaming/DreamTrigger = ..., kotlin/Int = ..., com.letta.mobile.data.dreaming/DreamMerge = ..., kotlin/String = ...): com.letta.mobile.data.dreaming/DreamSettings // com.letta.mobile.data.dreaming/DreamSettings.copy|copy(com.letta.mobile.data.dreaming.DreamTrigger;kotlin.Int;com.letta.mobile.data.dreaming.DreamMerge;kotlin.String){}[0]
+    final fun component5(): com.letta.mobile.data.model.reflection/ReflectionModelChoice // com.letta.mobile.data.dreaming/DreamSettings.component5|component5(){}[0]
+    final fun component6(): kotlin/String? // com.letta.mobile.data.dreaming/DreamSettings.component6|component6(){}[0]
+    final fun component7(): com.letta.mobile.data.model.reflection/ReflectionLastOutcome? // com.letta.mobile.data.dreaming/DreamSettings.component7|component7(){}[0]
+    final fun copy(com.letta.mobile.data.dreaming/DreamTrigger = ..., kotlin/Int = ..., com.letta.mobile.data.dreaming/DreamMerge = ..., kotlin/String = ..., com.letta.mobile.data.model.reflection/ReflectionModelChoice = ..., kotlin/String? = ..., com.letta.mobile.data.model.reflection/ReflectionLastOutcome? = ...): com.letta.mobile.data.dreaming/DreamSettings // com.letta.mobile.data.dreaming/DreamSettings.copy|copy(com.letta.mobile.data.dreaming.DreamTrigger;kotlin.Int;com.letta.mobile.data.dreaming.DreamMerge;kotlin.String;com.letta.mobile.data.model.reflection.ReflectionModelChoice;kotlin.String?;com.letta.mobile.data.model.reflection.ReflectionLastOutcome?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettings.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.dreaming/DreamSettings.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.toString|toString(){}[0]
@@ -34008,12 +34064,26 @@ final class com.letta.mobile.data.dreaming/DreamSettings { // com.letta.mobile.d
     final object Companion { // com.letta.mobile.data.dreaming/DreamSettings.Companion|null[0]
         final const val DEFAULT_STEP_COUNT // com.letta.mobile.data.dreaming/DreamSettings.Companion.DEFAULT_STEP_COUNT|{}DEFAULT_STEP_COUNT[0]
             final fun <get-DEFAULT_STEP_COUNT>(): kotlin/Int // com.letta.mobile.data.dreaming/DreamSettings.Companion.DEFAULT_STEP_COUNT.<get-DEFAULT_STEP_COUNT>|<get-DEFAULT_STEP_COUNT>(){}[0]
+        final const val FOCUS_INSTRUCTIONS // com.letta.mobile.data.dreaming/DreamSettings.Companion.FOCUS_INSTRUCTIONS|{}FOCUS_INSTRUCTIONS[0]
+            final fun <get-FOCUS_INSTRUCTIONS>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.FOCUS_INSTRUCTIONS.<get-FOCUS_INSTRUCTIONS>|<get-FOCUS_INSTRUCTIONS>(){}[0]
+        final const val LAST_OUTCOME // com.letta.mobile.data.dreaming/DreamSettings.Companion.LAST_OUTCOME|{}LAST_OUTCOME[0]
+            final fun <get-LAST_OUTCOME>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.LAST_OUTCOME.<get-LAST_OUTCOME>|<get-LAST_OUTCOME>(){}[0]
         final const val MERGE // com.letta.mobile.data.dreaming/DreamSettings.Companion.MERGE|{}MERGE[0]
             final fun <get-MERGE>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.MERGE.<get-MERGE>|<get-MERGE>(){}[0]
         final const val MERGE_INSTRUCTIONS // com.letta.mobile.data.dreaming/DreamSettings.Companion.MERGE_INSTRUCTIONS|{}MERGE_INSTRUCTIONS[0]
             final fun <get-MERGE_INSTRUCTIONS>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.MERGE_INSTRUCTIONS.<get-MERGE_INSTRUCTIONS>|<get-MERGE_INSTRUCTIONS>(){}[0]
         final const val MIN_STEP_COUNT // com.letta.mobile.data.dreaming/DreamSettings.Companion.MIN_STEP_COUNT|{}MIN_STEP_COUNT[0]
             final fun <get-MIN_STEP_COUNT>(): kotlin/Int // com.letta.mobile.data.dreaming/DreamSettings.Companion.MIN_STEP_COUNT.<get-MIN_STEP_COUNT>|<get-MIN_STEP_COUNT>(){}[0]
+        final const val MODEL // com.letta.mobile.data.dreaming/DreamSettings.Companion.MODEL|{}MODEL[0]
+            final fun <get-MODEL>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.MODEL.<get-MODEL>|<get-MODEL>(){}[0]
+        final const val OUTCOME_AT // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_AT|{}OUTCOME_AT[0]
+            final fun <get-OUTCOME_AT>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_AT.<get-OUTCOME_AT>|<get-OUTCOME_AT>(){}[0]
+        final const val OUTCOME_REASON // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_REASON|{}OUTCOME_REASON[0]
+            final fun <get-OUTCOME_REASON>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_REASON.<get-OUTCOME_REASON>|<get-OUTCOME_REASON>(){}[0]
+        final const val OUTCOME_STATUS // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_STATUS|{}OUTCOME_STATUS[0]
+            final fun <get-OUTCOME_STATUS>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_STATUS.<get-OUTCOME_STATUS>|<get-OUTCOME_STATUS>(){}[0]
+        final const val OUTCOME_TRIGGER_SOURCE // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_TRIGGER_SOURCE|{}OUTCOME_TRIGGER_SOURCE[0]
+            final fun <get-OUTCOME_TRIGGER_SOURCE>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.OUTCOME_TRIGGER_SOURCE.<get-OUTCOME_TRIGGER_SOURCE>|<get-OUTCOME_TRIGGER_SOURCE>(){}[0]
         final const val STEP_COUNT // com.letta.mobile.data.dreaming/DreamSettings.Companion.STEP_COUNT|{}STEP_COUNT[0]
             final fun <get-STEP_COUNT>(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettings.Companion.STEP_COUNT.<get-STEP_COUNT>|<get-STEP_COUNT>(){}[0]
         final const val TRIGGER // com.letta.mobile.data.dreaming/DreamSettings.Companion.TRIGGER|{}TRIGGER[0]
@@ -34027,8 +34097,12 @@ final class com.letta.mobile.data.dreaming/DreamSettings { // com.letta.mobile.d
 }
 
 final class com.letta.mobile.data.dreaming/DreamSettingsChange { // com.letta.mobile.data.dreaming/DreamSettingsChange|null[0]
-    constructor <init>(com.letta.mobile.data.dreaming/DreamSettings, com.letta.mobile.data.dreaming/DreamSettingsScope? = ...) // com.letta.mobile.data.dreaming/DreamSettingsChange.<init>|<init>(com.letta.mobile.data.dreaming.DreamSettings;com.letta.mobile.data.dreaming.DreamSettingsScope?){}[0]
+    constructor <init>(com.letta.mobile.data.dreaming/DreamSettings, com.letta.mobile.data.dreaming/DreamSettingsScope? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.dreaming/DreamSettingsChange.<init>|<init>(com.letta.mobile.data.dreaming.DreamSettings;com.letta.mobile.data.dreaming.DreamSettingsScope?;kotlin.Boolean;kotlin.Boolean){}[0]
 
+    final val focusInstructionsChanged // com.letta.mobile.data.dreaming/DreamSettingsChange.focusInstructionsChanged|{}focusInstructionsChanged[0]
+        final fun <get-focusInstructionsChanged>(): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettingsChange.focusInstructionsChanged.<get-focusInstructionsChanged>|<get-focusInstructionsChanged>(){}[0]
+    final val modelChanged // com.letta.mobile.data.dreaming/DreamSettingsChange.modelChanged|{}modelChanged[0]
+        final fun <get-modelChanged>(): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettingsChange.modelChanged.<get-modelChanged>|<get-modelChanged>(){}[0]
     final val scope // com.letta.mobile.data.dreaming/DreamSettingsChange.scope|{}scope[0]
         final fun <get-scope>(): com.letta.mobile.data.dreaming/DreamSettingsScope? // com.letta.mobile.data.dreaming/DreamSettingsChange.scope.<get-scope>|<get-scope>(){}[0]
     final val settings // com.letta.mobile.data.dreaming/DreamSettingsChange.settings|{}settings[0]
@@ -34036,7 +34110,9 @@ final class com.letta.mobile.data.dreaming/DreamSettingsChange { // com.letta.mo
 
     final fun component1(): com.letta.mobile.data.dreaming/DreamSettings // com.letta.mobile.data.dreaming/DreamSettingsChange.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.dreaming/DreamSettingsScope? // com.letta.mobile.data.dreaming/DreamSettingsChange.component2|component2(){}[0]
-    final fun copy(com.letta.mobile.data.dreaming/DreamSettings = ..., com.letta.mobile.data.dreaming/DreamSettingsScope? = ...): com.letta.mobile.data.dreaming/DreamSettingsChange // com.letta.mobile.data.dreaming/DreamSettingsChange.copy|copy(com.letta.mobile.data.dreaming.DreamSettings;com.letta.mobile.data.dreaming.DreamSettingsScope?){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettingsChange.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettingsChange.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.dreaming/DreamSettings = ..., com.letta.mobile.data.dreaming/DreamSettingsScope? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.dreaming/DreamSettingsChange // com.letta.mobile.data.dreaming/DreamSettingsChange.copy|copy(com.letta.mobile.data.dreaming.DreamSettings;com.letta.mobile.data.dreaming.DreamSettingsScope?;kotlin.Boolean;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.dreaming/DreamSettingsChange.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.dreaming/DreamSettingsChange.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.dreaming/DreamSettingsChange.toString|toString(){}[0]
@@ -37705,6 +37781,31 @@ final class com.letta.mobile.data.model.provider/RedactedProviderInstance { // c
 
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model.provider/RedactedProviderInstance> // com.letta.mobile.data.model.provider/RedactedProviderInstance.Companion.serializer|serializer(){}[0]
     }
+}
+
+final class com.letta.mobile.data.model.reflection/ReflectionLastOutcome { // com.letta.mobile.data.model.reflection/ReflectionLastOutcome|null[0]
+    constructor <init>(com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String) // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.<init>|<init>(com.letta.mobile.data.model.reflection.ReflectionLastOutcomeStatus;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String){}[0]
+
+    final val at // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.at|{}at[0]
+        final fun <get-at>(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.at.<get-at>|<get-at>(){}[0]
+    final val model // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.model|{}model[0]
+        final fun <get-model>(): kotlin/String? // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.model.<get-model>|<get-model>(){}[0]
+    final val reason // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String? // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.reason.<get-reason>|<get-reason>(){}[0]
+    final val status // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.status|{}status[0]
+        final fun <get-status>(): com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.status.<get-status>|<get-status>(){}[0]
+    final val triggerSource // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.triggerSource|{}triggerSource[0]
+        final fun <get-triggerSource>(): kotlin/String? // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.triggerSource.<get-triggerSource>|<get-triggerSource>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.component4|component4(){}[0]
+    final fun component5(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.model.reflection/ReflectionLastOutcomeStatus = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String = ...): com.letta.mobile.data.model.reflection/ReflectionLastOutcome // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.copy|copy(com.letta.mobile.data.model.reflection.ReflectionLastOutcomeStatus;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model.reflection/ReflectionLastOutcome.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.model/Agent { // com.letta.mobile.data.model/Agent|null[0]
