@@ -38,6 +38,7 @@ import com.letta.mobile.data.dreaming.DreamingActions
 import com.letta.mobile.data.dreaming.DreamingController
 import com.letta.mobile.data.dreaming.DreamingState
 import com.letta.mobile.data.dreaming.DreamTrigger
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import com.letta.mobile.ui.shell.pages.memfs.MemfsFileDiffView
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
@@ -51,6 +52,11 @@ object DreamingTags {
     const val AUTOMATIC = "dreaming_automatic"
     const val REVIEW = "dreaming_review"
     const val INSTRUCTIONS = "dreaming_review_instructions"
+    const val MODEL = "dreaming_model"
+    const val MODEL_INHERIT = "dreaming_model_inherit"
+    const val FOCUS_INSTRUCTIONS = "dreaming_focus_instructions"
+    const val FOCUS_SAVE = "dreaming_focus_save"
+    const val LAST_OUTCOME = "dreaming_last_outcome"
     const val STEPS = "dreaming_steps"
     const val STEPS_UP = "dreaming_steps_up"
     const val STEPS_DOWN = "dreaming_steps_down"
@@ -123,7 +129,7 @@ private fun DreamingOverview(state: DreamingState, actions: DreamingActions, not
     Hint(DreamingStrings.INTRO)
     DreamStatus(state, notes)
     HorizontalDivider()
-    DreamingSettingsSection(state.settings, actions::save)
+    DreamingSettingsSection(state.settings, actions)
     val notify = notes.notifyOnFinish
     val onNotify = notes.onNotifyChange
     if (notify != null && onNotify != null) SwitchRow(DreamingStrings.NOTIFY, notify, DreamingTags.NOTIFY, onNotify)
@@ -143,7 +149,17 @@ private fun DreamStatus(state: DreamingState, notes: DreamingHostNotes) {
             if (live != null) LettaBusyBar(Modifier.testTag(DreamingTags.PROGRESS))
         }
         state.lastRun?.let { Hint(DreamingStrings.lastDream(it.summary, ageText(it.timestamp))) }
-        state.settings.settings?.let { Hint(DreamingStrings.triggerSentence(it.trigger, it.stepCount)) }
+        state.settings.settings?.let { settings ->
+            Hint(DreamingStrings.triggerSentence(settings.trigger, settings.stepCount))
+            if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
+                Text(
+                    reflectionOutcomeText(settings.lastOutcome, settings.lastOutcome?.at?.let(::ageText)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(DreamingTags.LAST_OUTCOME),
+                )
+            }
+        }
         if (notes.windowsAutoBlocked && state.settings.settings?.automatic == true) WindowsNotice(notes)
     }
 }

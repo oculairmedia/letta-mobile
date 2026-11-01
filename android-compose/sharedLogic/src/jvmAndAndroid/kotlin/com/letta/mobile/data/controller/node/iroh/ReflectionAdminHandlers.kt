@@ -22,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -78,8 +79,8 @@ internal object ReflectionAdminHandlers {
     }
 
     /**
-     * The `settings` letta-code validates. merge and merge_instructions go only when the client
-     * sent them, so an older client's trigger change never resets a merge choice made elsewhere.
+     * The `settings` letta-code validates. Optional fields go only when the client sent them, so
+     * an older client's trigger change never resets choices made elsewhere.
      */
     internal fun settings(params: JsonObject?): JsonObject {
         val rawTrigger = params.requireParam(AdminParamKey(DreamSettings.TRIGGER))
@@ -90,12 +91,33 @@ internal object ReflectionAdminHandlers {
             DreamMerge.fromWire(raw) ?: adminError("invalid_merge: $raw (auto or explicit)")
         }
         val instructions = param(params, AdminParamKey(DreamSettings.MERGE_INSTRUCTIONS))
+        val model = model(params)
+        val focus = focusInstructions(params)
         return buildJsonObject {
             put(DreamSettings.TRIGGER, trigger.wire)
             put(DreamSettings.STEP_COUNT, stepCount)
             merge?.let { put(DreamSettings.MERGE, it.wire) }
             instructions?.let { put(DreamSettings.MERGE_INSTRUCTIONS, it) }
+            model?.let { put(DreamSettings.MODEL, it) }
+            focus?.let { put(DreamSettings.FOCUS_INSTRUCTIONS, it) }
         }
+    }
+
+    /** Absent is unchanged, JSON null is inherit, and a nonblank string is a concrete handle. */
+    private fun model(params: JsonObject?): JsonElement? {
+        val raw = params?.get(DreamSettings.MODEL) ?: return null
+        return when {
+            raw == JsonNull -> raw
+            raw is JsonPrimitive && raw.isString && raw.content.isNotBlank() -> raw
+            else -> adminError("invalid_model: expected a nonblank string or null")
+        }
+    }
+
+    /** Absent is unchanged; unlike model, focus instructions must be a JSON string. */
+    private fun focusInstructions(params: JsonObject?): String? {
+        val raw = params?.get(DreamSettings.FOCUS_INSTRUCTIONS) ?: return null
+        if (raw !is JsonPrimitive || !raw.isString) adminError("focus_instructions must be a string")
+        return raw.content
     }
 
     internal suspend fun run(client: AppServerClient, params: JsonObject?): JsonElement {

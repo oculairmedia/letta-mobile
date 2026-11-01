@@ -10,6 +10,8 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -17,6 +19,20 @@ class ReflectionAdminHandlersTest {
     private class FakeReflectionClient : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
         val calls = mutableListOf<String>()
+        var storedSettings = buildJsonObject {
+            put("trigger", "step_count")
+            put("step_count", 5)
+            put("model", "anthropic/sonnet")
+            put("focus_instructions", "durable facts")
+            put(
+                "last_outcome",
+                buildJsonObject {
+                    put("status", "skipped")
+                    put("reason", "nothing new")
+                    put("at", "2026-10-31T18:00:00Z")
+                },
+            )
+        }
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
         override suspend fun input(command: AppServerCommand.Input) = error("unused")
@@ -30,7 +46,7 @@ class ReflectionAdminHandlersTest {
             return AppServerInboundFrame.GetReflectionSettingsResponse(
                 requestId = command.requestId,
                 success = true,
-                reflectionSettings = buildJsonObject { put("trigger", "step_count"); put("step_count", 5) },
+                reflectionSettings = storedSettings,
             )
         }
 
@@ -45,10 +61,14 @@ class ReflectionAdminHandlersTest {
 
         override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse {
             calls += "set:${command.settings}"
+            storedSettings = buildJsonObject {
+                storedSettings.forEach { (key, value) -> put(key, value) }
+                command.settings.forEach { (key, value) -> put(key, value) }
+            }
             return AppServerInboundFrame.SetReflectionSettingsResponse(
                 requestId = command.requestId,
                 success = true,
-                reflectionSettings = command.settings,
+                reflectionSettings = storedSettings,
                 scope = command.scope ?: "conversation",
             )
         }
@@ -61,14 +81,23 @@ class ReflectionAdminHandlersTest {
     }
 
     private suspend fun dispatch(r: AdminRpcRouter, method: String, params: Map<String, String>): String =
+        dispatch(r, method, buildJsonObject { params.forEach { (key, value) -> put(key, value) } })
+
+    private suspend fun dispatch(r: AdminRpcRouter, method: String, params: JsonObject): String =
         r.dispatch(
             AdminRpcInvocation(
                 requestId = "t",
                 method = method,
-                params = buildJsonObject { params.forEach { (k, v) -> put(k, v) } },
+                params = params,
                 context = AdminRpcRequestContext.Authenticated,
             ),
         )
+
+    /** String params plus explicit JSON nulls, which a string-only map cannot represent. */
+    private fun paramsWithNull(strings: Map<String, String>, vararg nullKeys: String): JsonObject = buildJsonObject {
+        strings.forEach { (key, value) -> put(key, value) }
+        nullKeys.forEach { put(it, JsonNull) }
+    }
 
     @Test
     fun getAndSetRouteNativelyWithRuntimeScope() = runTest {
@@ -76,12 +105,25 @@ class ReflectionAdminHandlersTest {
         val r = router(client)
 
         val get = dispatch(r, "reflection.get", mapOf("agent_id" to "a-1", "conversation_id" to "c-1"))
-        assertTrue(get.contains("\"success\":true") && get.contains("step_count"))
+        assertTrue(get.contains("\"success\":true") && get.contains("focus_instructions") && get.contains("last_outcome"), get)
         assertTrue("get:a-1/c-1" in client.calls)
 
         val set = dispatch(r, "reflection.set", mapOf("agent_id" to "a-1", "conversation_id" to "c-1", "trigger" to "step_count", "step_count" to "7"))
         assertTrue(set.contains("\"success\":true"))
         assertTrue(client.calls.any { it.startsWith("set:") && it.contains("\"step_count\":7") })
+    }
+
+    @Test
+    fun oldClientSetPreservesReflectionV2Settings() = runTest {
+        val client = FakeReflectionClient()
+        val response = dispatch(
+            router(client),
+            "reflection.set",
+            mapOf("agent_id" to "a", "trigger" to "off", "step_count" to "7"),
+        )
+        assertEquals("anthropic/sonnet", client.storedSettings.getValue("model").toString().trim('"'))
+        assertEquals("durable facts", client.storedSettings.getValue("focus_instructions").toString().trim('"'))
+        assertTrue(response.contains("last_outcome") && response.contains("nothing new"), response)
     }
 
     @Test
@@ -125,6 +167,39 @@ class ReflectionAdminHandlersTest {
         assertTrue(badTrigger.contains("invalid_trigger"), badTrigger)
         val badScope = dispatch(r, "reflection.set", mapOf("agent_id" to "a", "trigger" to "off", "step_count" to "1", "scope" to "machine"))
         assertTrue(badScope.contains("invalid_scope"), badScope)
+    }
+
+    @Test
+    fun setPassesAndValidatesOptionalReflectionModelAndFocus() = runTest {
+        val client = FakeReflectionClient()
+        val r = router(client)
+        val strings = mapOf(
+            "agent_id" to "a",
+            "trigger" to "step-count",
+            "step_count" to "9",
+            "model" to "openai/gpt-5",
+            "focus_instructions" to "project decisions",
+        )
+        dispatch(r, "reflection.set", strings)
+        assertEquals("\"openai/gpt-5\"", client.storedSettings.getValue("model").toString())
+        assertEquals("\"project decisions\"", client.storedSettings.getValue("focus_instructions").toString())
+
+        dispatch(r, "reflection.set", paramsWithNull(strings - "model", "model"))
+        assertEquals(JsonNull, client.storedSettings["model"])
+
+        val blankModel = dispatch(r, "reflection.set", strings + ("model" to " "))
+        assertTrue(blankModel.contains("invalid_model"), blankModel)
+        val nullFocus = dispatch(r, "reflection.set", paramsWithNull(strings - "focus_instructions", "focus_instructions"))
+        assertTrue(nullFocus.contains("focus_instructions"), nullFocus)
+        val booleanModel = dispatch(
+            r,
+            "reflection.set",
+            buildJsonObject {
+                strings.forEach { (key, value) -> put(key, value) }
+                put("model", true)
+            },
+        )
+        assertTrue(booleanModel.contains("invalid_model"), booleanModel)
     }
 
     @Test

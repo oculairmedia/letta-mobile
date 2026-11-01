@@ -3368,8 +3368,12 @@ public final class com/letta/mobile/ui/dreaming/ComposableSingletons$DreamingSet
 	public fun <init> ()V
 	public final fun getLambda$-1139020610$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-1379494098$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1563885608$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-2026969553$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-2111527001$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-38164556$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$2001419733$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$625086509$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/dreaming/DreamingHostNotes {
@@ -3405,13 +3409,16 @@ public final class com/letta/mobile/ui/dreaming/DreamingStrings {
 	public static final field BACK Ljava/lang/String;
 	public static final field DETAIL_LOADING Ljava/lang/String;
 	public static final field FOCUS Ljava/lang/String;
+	public static final field FOCUS_INSTRUCTIONS Ljava/lang/String;
 	public static final field HISTORY Ljava/lang/String;
 	public static final field HISTORY_EMPTY Ljava/lang/String;
 	public static final field HISTORY_LOADING Ljava/lang/String;
 	public static final field HISTORY_UNAVAILABLE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/dreaming/DreamingStrings;
 	public static final field INTRO Ljava/lang/String;
-	public static final field MODEL Ljava/lang/String;
+	public static final field MODEL_CHOOSE Ljava/lang/String;
+	public static final field MODEL_INHERIT Ljava/lang/String;
+	public static final field MODEL_LABEL Ljava/lang/String;
 	public static final field NOTIFY Ljava/lang/String;
 	public static final field NOW_IDLE Ljava/lang/String;
 	public static final field NO_FILES Ljava/lang/String;
@@ -3444,9 +3451,14 @@ public final class com/letta/mobile/ui/dreaming/DreamingTags {
 	public static final field $stable I
 	public static final field AUTOMATIC Ljava/lang/String;
 	public static final field DETAIL Ljava/lang/String;
+	public static final field FOCUS_INSTRUCTIONS Ljava/lang/String;
+	public static final field FOCUS_SAVE Ljava/lang/String;
 	public static final field HISTORY Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/dreaming/DreamingTags;
 	public static final field INSTRUCTIONS Ljava/lang/String;
+	public static final field LAST_OUTCOME Ljava/lang/String;
+	public static final field MODEL Ljava/lang/String;
+	public static final field MODEL_INHERIT Ljava/lang/String;
 	public static final field NOTIFY Ljava/lang/String;
 	public static final field PANEL Ljava/lang/String;
 	public static final field PROGRESS Ljava/lang/String;

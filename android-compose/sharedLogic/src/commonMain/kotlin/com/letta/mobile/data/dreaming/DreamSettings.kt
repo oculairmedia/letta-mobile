@@ -1,6 +1,10 @@
 package com.letta.mobile.data.dreaming
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcome
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcomeStatus
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -66,8 +70,8 @@ enum class DreamSettingsScope(val wire: String) {
 
 /**
  * One agent's dreaming settings as letta-code stores them
- * (`reflection_settings` {trigger, step_count, merge, merge_instructions}). letta-code has no
- * dream model setting: a local-backend dream uses the agent's own model.
+ * (`reflection_settings`). [model], [focusInstructions], and [lastOutcome] are present only with a
+ * reflection-settings-v2 host; their unsupported values keep the legacy surface unchanged.
  */
 @Immutable
 data class DreamSettings(
@@ -75,11 +79,14 @@ data class DreamSettings(
     val stepCount: Int = DEFAULT_STEP_COUNT,
     val merge: DreamMerge = DreamMerge.Auto,
     val mergeInstructions: String = "",
+    val model: ReflectionModelChoice = ReflectionModelChoice.Unsupported,
+    val focusInstructions: String? = null,
+    val lastOutcome: ReflectionLastOutcome? = null,
 ) {
     /** Dreams start on their own. */
     val automatic: Boolean get() = trigger != DreamTrigger.Off
 
-    /** The `settings` object of `set_reflection_settings`; letta-code requires `step_count` even when off. */
+    /** The legacy fields every `set_reflection_settings` accepts; v2 changes are added separately. */
     fun toWire(): JsonObject = buildJsonObject {
         put(TRIGGER, trigger.wire)
         put(STEP_COUNT, stepCount.coerceAtLeast(MIN_STEP_COUNT))
@@ -96,6 +103,13 @@ data class DreamSettings(
         const val STEP_COUNT: String = "step_count"
         const val MERGE: String = "merge"
         const val MERGE_INSTRUCTIONS: String = "merge_instructions"
+        const val MODEL: String = "model"
+        const val FOCUS_INSTRUCTIONS: String = "focus_instructions"
+        const val LAST_OUTCOME: String = "last_outcome"
+        const val OUTCOME_STATUS: String = "status"
+        const val OUTCOME_REASON: String = "reason"
+        const val OUTCOME_TRIGGER_SOURCE: String = "trigger_source"
+        const val OUTCOME_AT: String = "at"
 
         val DEFAULT: DreamSettings = DreamSettings()
 
@@ -111,6 +125,35 @@ data class DreamSettings(
                 stepCount = settings.int(STEP_COUNT)?.takeIf { it >= MIN_STEP_COUNT } ?: DEFAULT_STEP_COUNT,
                 merge = DreamMerge.fromWire(settings.text(MERGE)) ?: DreamMerge.Auto,
                 mergeInstructions = settings.text(MERGE_INSTRUCTIONS).orEmpty(),
+                model = settings.modelChoice(),
+                focusInstructions = settings.focusInstructions(),
+                lastOutcome = settings.lastOutcome(),
+            )
+        }
+
+        private fun JsonObject.modelChoice(): ReflectionModelChoice {
+            if (MODEL !in this) return ReflectionModelChoice.Unsupported
+            return when (val raw = getValue(MODEL)) {
+                JsonNull -> ReflectionModelChoice.Inherit
+                is JsonPrimitive -> raw.contentOrNull
+                    ?.takeIf { raw.isString && it.isNotBlank() }
+                    ?.let(ReflectionModelChoice::Handle)
+                    ?: ReflectionModelChoice.Unsupported
+                else -> ReflectionModelChoice.Unsupported
+            }
+        }
+
+        private fun JsonObject.focusInstructions(): String? =
+            (this[FOCUS_INSTRUCTIONS] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+
+        private fun JsonObject.lastOutcome(): ReflectionLastOutcome? {
+            val raw = this[LAST_OUTCOME] as? JsonObject ?: return null
+            return ReflectionLastOutcome(
+                status = ReflectionLastOutcomeStatus.fromWire(raw.text(OUTCOME_STATUS)),
+                reason = raw.text(OUTCOME_REASON),
+                triggerSource = raw.text(OUTCOME_TRIGGER_SOURCE),
+                model = raw.text(MODEL),
+                at = raw.text(OUTCOME_AT).orEmpty(),
             )
         }
 
