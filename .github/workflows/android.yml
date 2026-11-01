@@ -15,6 +15,8 @@ on:
       - "*.md"
       - "scripts/bootstrap-branch-protection.sh"
   pull_request:
+    # edited: a PR-body change (approval lines, test-change reasons) must re-run the body checks.
+    types: [opened, synchronize, reopened, edited]
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
     # on stacked letta/**, feat/**, cursor/** and codex/** PRs as well as main.
     # pull_request.branches filters the PR *base*, not the head — Cloud Agent

@@ -95,10 +95,19 @@ def is_unreferenced_script(path: str, current: set[str], sources: dict[str, str]
     return not referenced(path, sources)
 
 
+def exists_at_base(entry: str, base_paths: set[str]) -> bool:
+    """A seeded exception must describe something already on the base, never a path this PR adds."""
+    kind, _, path = entry.partition(" ")
+    if kind == "dot":
+        return any(p.startswith(path + "/") for p in base_paths)
+    return path in base_paths
+
+
 def baseline_problems(root: Path, sha: str, current: set[str]) -> list[str]:
     old = subprocess.run(["git", "-C", str(root), "show", f"{sha}:{BASELINE}"], capture_output=True)
     if old.returncode:
-        return []
+        base_paths = set(git(root, "ls-tree", "-r", "-z", "--name-only", sha).decode().split("\0"))
+        return [f"baseline entry names no path at base: {e}" for e in sorted(current) if not exists_at_base(e, base_paths)]
     return [f"baseline entry added: {entry}" for entry in sorted(current - entries(old.stdout.decode()))]
 
 
@@ -135,7 +144,8 @@ def check(root: Path, base: str) -> list[str]:
     added.update(git(root, "ls-files", "--others", "--exclude-standard", "-z").decode().split("\0"))
     sources = reference_sources(root)
     for path in sorted(added - {""}):
-        if (root / path).is_file():
+        # A symlink (dangling or to a directory) is still a new tree entry the rules must see.
+        if (root / path).is_file() or (root / path).is_symlink():
             problems.extend(path_problems(path, current, sources))
     return problems
 

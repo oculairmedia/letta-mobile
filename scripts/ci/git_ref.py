@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 # Branch names, tags, remote refs, SHAs and ~/^ suffixes only: nothing that git could read as an option.
-_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/~^-]{0,199}")
+_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/~^+-]{0,199}")
 _SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 

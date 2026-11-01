@@ -88,6 +88,20 @@ class GateFixtures(unittest.TestCase):
         (self.root / BASELINE).unlink()
         self.assertEqual(self.run_gate(TREE_GATE).returncode, 2)
 
+    def test_a_newly_seeded_baseline_cannot_name_paths_the_pr_adds(self):
+        self.git("rm", "-q", BASELINE)
+        self.git("commit", "-qm", "no baseline yet")
+        self.write(BASELINE, "dot .legacy\ndot .new\n")
+        self.write(".new/file.txt", "x")
+        result = self.run_gate(TREE_GATE)
+        self.assertIn("baseline entry names no path at base: dot .new", result.stderr)
+        self.assertNotIn("dot .legacy", result.stderr)
+
+    def test_symlinks_are_checked_like_files(self):
+        (self.root / ".sneaky").mkdir()
+        os.symlink("does-not-exist", self.root / ".sneaky" / "link")
+        self.assertIn("new top-level dot-directory: .sneaky/link", self.run_gate(TREE_GATE).stderr)
+
     def test_renames_are_checked_as_additions(self):
         self.git("mv", "plan/old.md", "plan/new.md")
         self.assertIn("misplaced Markdown: plan/new.md", self.run_gate(TREE_GATE).stderr)
