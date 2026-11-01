@@ -97,9 +97,7 @@ project.update
 provider.connect
 provider.disconnect
 provider.list
-reflection.get
 reflection.run
-reflection.set
 run.get
 run.list
 schedule.create
