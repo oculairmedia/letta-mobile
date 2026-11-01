@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTestApi::class)
+@file:OptIn(ExperimentalTestApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 
 package com.letta.mobile.ui.chat.surface.composer
 
@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
@@ -25,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
@@ -61,6 +66,7 @@ import com.letta.mobile.ui.modelcontrol.RecordedPicks
 import com.letta.mobile.ui.modelcontrol.pickerModel
 import com.letta.mobile.ui.modelcontrol.testModelPicker
 import kotlinx.collections.immutable.persistentListOf
+import java.awt.datatransfer.StringSelection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -85,6 +91,87 @@ class ChatComposerPanelUiTest {
         canSend = true,
         model = ChatModelUiState(currentHandle = null, currentLabel = "Model"),
     )
+
+    @Test
+    fun binaryTextIsRejectedAtTheComposerField() = runComposeUiTest {
+        var text by mutableStateOf("draft")
+        val actions = RecordingChatActions(onText = { text = it })
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        val rawHeader = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        ).decodeToString()
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        listOf("PNG\n\u001a", rawHeader).forEachIndexed { index, binary ->
+            input.performTextInput(binary)
+            runOnIdle {
+                assertEquals("draft", text)
+                assertEquals(index + 1, actions.composerErrors.size)
+                assertEquals(
+                    "Could not attach that image: the clipboard did not contain an image the app could read",
+                    actions.composerErrors.last(),
+                )
+            }
+            input.assertTextEquals("draft")
+        }
+    }
+
+    @Test
+    fun ordinaryMultilingualTextRemainsEditable() = runComposeUiTest {
+        var text by mutableStateOf("")
+        val actions = RecordingChatActions(onText = { text = it })
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        val legitimate = listOf("PNG", "\nsecond line", "\ttab", "\r\nCRLF", " 🙂 世界")
+        legitimate.forEach { input.performTextInput(it) }
+        runOnIdle {
+            assertEquals(legitimate.joinToString(""), text)
+            assertEquals(0, actions.count("reportComposerError"))
+        }
+    }
+
+    @Test
+    fun imageSignaturesAndForbiddenControlsAreRejected() = runComposeUiTest {
+        var text by mutableStateOf("draft")
+        val actions = RecordingChatActions(onText = { text = it })
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        val signatures = listOf("\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a", "GIF89a", "RIFF1234WEBP", "BM")
+        val controls = (0..31).filterNot { it == 9 || it == 10 || it == 13 }.map { it.toChar().toString() } + "\u007f"
+        (signatures + controls).forEachIndexed { index, value ->
+            input.performTextInput(value)
+            runOnIdle {
+                assertEquals("draft", text, "accepted $value")
+                assertEquals(index + 1, actions.composerErrors.size, "no error for $value")
+            }
+        }
+        input.assertTextEquals("draft")
+    }
+
+    @Test
+    fun keyboardPasteRejectsUnreadableClipboardText() = runComposeUiTest {
+        var text by mutableStateOf("draft")
+        val actions = RecordingChatActions(onText = { text = it })
+        val clipboard = object : Clipboard {
+            override suspend fun getClipEntry(): ClipEntry = ClipEntry(StringSelection("PNG\n\u001a"))
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) = Unit
+        }
+        setPointerContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                Panel(ComposerInputs(composer = ready(text), actions = actions))
+            }
+        }
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performKeyInput {
+            keyDown(Key.CtrlLeft)
+            pressKey(Key.V)
+            keyUp(Key.CtrlLeft)
+        }
+        runOnIdle {
+            assertEquals("draft", text)
+            assertEquals(1, actions.composerErrors.size)
+        }
+        onNodeWithTag(ComposerTestTags.INPUT).assertTextEquals("draft")
+    }
 
     @Test
     fun externalComposerResetMovesCaretToEnd() = runComposeUiTest {

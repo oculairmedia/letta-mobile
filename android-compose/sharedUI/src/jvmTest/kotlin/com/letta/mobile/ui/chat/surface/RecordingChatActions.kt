@@ -27,6 +27,7 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     // Composer
     val texts = mutableListOf<String>()
+    val composerErrors = mutableListOf<String>()
     val sent = mutableListOf<String>()
     val commandsRun = mutableListOf<ChatComposerCommand>()
     val uninstalled = mutableListOf<ChatComposerCommand>()
@@ -81,7 +82,10 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     override fun removeAttachment(index: Int) = record("removeAttachment:$index")
 
-    override fun reportComposerError(message: String) = record("reportComposerError")
+    override fun reportComposerError(message: String) {
+        record("reportComposerError")
+        composerErrors += message
+    }
 
     override fun clearComposerError() = record("clearComposerError")
 
