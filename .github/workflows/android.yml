@@ -15,6 +15,8 @@ on:
       - "*.md"
       - "scripts/bootstrap-branch-protection.sh"
   pull_request:
+    # edited: a PR-body change (approval lines, test-change reasons) must re-run the body checks.
+    types: [opened, synchronize, reopened, edited]
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
     # on stacked letta/**, feat/**, cursor/** and codex/** PRs as well as main.
     # pull_request.branches filters the PR *base*, not the head — Cloud Agent
@@ -26,39 +28,7 @@ on:
       - "feat/**"
       - "cursor/**"
       - "codex/**"
-    paths:
-      # Broadened to all workflow files so a PR that only edits CI config still
-      # triggers the required checks (test/build-apk-pass/shared-multiplatform).
-      # Without this, a workflow-only PR skips these jobs, the required contexts
-      # never report, and branch protection leaves it BLOCKED forever.
-      # Same for tooling-smoke / architecture-stack scripts: those PRs must still
-      # report the required Android contexts or they stay BLOCKED forever.
-      # scripts/deploy/** is listed for the same reason (letta-mobile-lgns8.24):
-      # host unit templates and the cron sensing check land as scripts+docs PRs
-      # that would otherwise never report test/build-apk-pass/
-      # shared-multiplatform. android-perf.yml needs no entry: its perf-gate
-      # macrobenchmark is nightly + main only, not a required PR check.
-      # *.md and scripts/bootstrap-branch-protection.sh feed the docs-freshness
-      # check in `test`, so a README-only PR must run it rather than skip it.
-      # docs/** is here for the same reason: a docs-only PR would otherwise
-      # report none of the required contexts, so branch protection blocks it
-      # with nothing to fix and no check to re-run. letta-mobile-je4k7 tracks replacing this allowlist,
-      # which has now grown an entry per discovery, with heavy jobs that always
-      # report and short-circuit when nothing they gate has changed.
-      - ".github/workflows/**"
-      - "docs/**"
-      - "*.md"
-      - "scripts/bootstrap-branch-protection.sh"
-      - "android-compose/**"
-      - "third_party/overmorrow/**"
-      - "scripts/ci/**"
-      - "scripts/tests/**"
-      - "scripts/docs/**"
-      - "scripts/appserver/**"
-      - "scripts/deploy/**"
-      - "scripts/mcp/**"
-      - "scripts/scip/**"
-      - "tools/**"
+    # Tree hygiene must inspect every PR, including changes in previously unlisted paths.
   workflow_dispatch:
 
 concurrency:
@@ -283,6 +253,30 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"
+
+      - name: Test tree hygiene and bundle raise guards
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts/ci -p 'test_gate_hygiene.py' -v
+
+      - name: Enforce tree hygiene
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/ci/tree-hygiene.py --diff-base "$BASE_SHA"
+
+      - name: Guard web bundle ceiling raises
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
+          export PR_BODY
+          python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"
 
       # Reads the description live (not the event payload), so editing it and re-running the
       # job is enough. Only a dependabot[bot] PR, whose body is generated, is exempt.

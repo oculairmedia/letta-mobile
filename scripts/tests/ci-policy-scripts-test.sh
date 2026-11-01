@@ -123,11 +123,12 @@ assert_contains "$android_workflow_text" '- "cursor/**"'
 assert_contains "$android_workflow_text" '- "codex/**"'
 push_triggers="$(awk '/^  push:$/ { active=1; next } active && /^  [[:alnum:]_]+:$/ { exit } active { print }' "$android_workflow")"
 pr_triggers="$(awk '/^  pull_request:$/ { active=1; next } active && /^  [[:alnum:]_]+:$/ { exit } active { print }' "$android_workflow")"
-for triggers in "$push_triggers" "$pr_triggers"; do
-  assert_contains "$triggers" '- "docs/**"'
-  assert_contains "$triggers" '- "scripts/docs/**"'
-  assert_contains "$triggers" '- "scripts/appserver/**"'
-done
+assert_contains "$push_triggers" '- "docs/**"'
+assert_contains "$push_triggers" '- "scripts/docs/**"'
+assert_contains "$push_triggers" '- "scripts/appserver/**"'
+# Tree hygiene must run for additions in any directory, including unknown ones.
+assert_not_contains "$pr_triggers" '    paths:'
+assert_not_contains "$pr_triggers" '    paths-ignore:'
 build_apk_job="$(
   awk '
     /^  build-apk:$/ { in_job = 1; next }
@@ -209,6 +210,9 @@ done
 assert_contains "$test_job" 'python3 scripts/ci/parity_gates.py'
 assert_contains "$test_job" 'bash scripts/ci/platform-ui-gate.sh --enforce'
 assert_contains "$test_job" 'python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$test_job" 'python3 scripts/ci/tree-hygiene.py --diff-base "$BASE_SHA"'
+assert_contains "$test_job" 'python3 scripts/ci/web-bundle-raise-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$test_job" 'test_gate_hygiene.py'
 assert_contains "$test_job" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
 assert_contains "$test_job" 'test_parity_gates.py'
 assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v"
