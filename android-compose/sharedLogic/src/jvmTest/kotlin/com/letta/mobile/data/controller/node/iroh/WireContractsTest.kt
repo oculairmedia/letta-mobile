@@ -17,6 +17,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -53,7 +54,7 @@ class WireContractsTest {
                 val name = case.getValue("name").jsonPrimitive.content
                 val host = case.getValue("host_state").jsonObject
                 // New fixture families must supply a real host-state adapter, never be skipped.
-                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index")
+                val known = setOf("controller_state", "conversations", "hidden_agent_ids", "visibility_index", "reflection_settings")
                 require(host.keys.all { it in known }) { "Unsupported host_state for ${fixture.method}/$name: ${host.keys}" }
                 require("controller_state" in host)
                 val state = when (host.getValue("controller_state").jsonPrimitive.content) {
@@ -161,6 +162,36 @@ class WireContractsTest {
         )
     } as AppServerClient
 
+    private fun reflectionNative(host: JsonObject): AppServerClient = Proxy.newProxyInstance(
+        AppServerClient::class.java.classLoader, arrayOf(AppServerClient::class.java),
+    ) { _, method, args ->
+        val stored = host.getValue("reflection_settings").jsonObject
+        when (method.name) {
+            "getReflectionSettings" -> {
+                val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.GetReflectionSettings
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.GetReflectionSettingsResponse(
+                    requestId = command.requestId, success = true, reflectionSettings = stored,
+                )
+            }
+            "setReflectionSettings" -> {
+                val command = args[0] as com.letta.mobile.data.transport.appserver.AppServerCommand.SetReflectionSettings
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.SetReflectionSettingsResponse(
+                    requestId = command.requestId,
+                    success = true,
+                    reflectionSettings = JsonObject(stored + command.settings),
+                    scope = command.scope,
+                )
+            }
+            else -> error("Unexpected native call: ${method.name}")
+        }
+    } as AppServerClient
+
+    private fun fixtureNative(host: JsonObject?): AppServerClient = when {
+        host?.containsKey("conversations") == true -> conversationNative(host)
+        host?.containsKey("reflection_settings") == true -> reflectionNative(host)
+        else -> rejectCalls("native")
+    }
+
     private suspend fun withRouter(
         state: AppServerControllerState,
         host: kotlinx.serialization.json.JsonObject? = null,
@@ -172,7 +203,7 @@ class WireContractsTest {
         val runtime = plugins.runtime()
         // Health must not query native data. Any accidental native call fails rather than
         // returning a permissive fake response for an id the App Server cannot resolve.
-        val native = if (host?.containsKey("conversations") == true) conversationNative(host) else rejectCalls("native")
+        val native = fixtureNative(host)
         val backend = File(dir, "backend")
         if (host?.get("visibility_index")?.jsonPrimitive?.boolean == true) {
             LocalBackendFixtureStore.create(backend)

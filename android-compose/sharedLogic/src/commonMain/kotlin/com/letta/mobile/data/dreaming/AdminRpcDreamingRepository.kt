@@ -28,7 +28,7 @@ class AdminRpcDreamingRepository(
 
     override suspend fun save(target: DreamTarget, change: DreamSettingsChange): DreamOutcome<DreamSettings> =
         call(DreamingRpc.SET, target) {
-            change.settings.toWire().forEach { (key, value) -> put(key, value) }
+            change.toWire().forEach { (key, value) -> put(key, value) }
             change.scope?.let { put(DreamingRpc.SCOPE, it.wire) }
         }.thenSettings()
 

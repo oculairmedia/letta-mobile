@@ -1,8 +1,11 @@
 package com.letta.mobile.data.dreaming
 
 import com.letta.mobile.data.memory.memfs.MemfsCommit
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcomeStatus
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentKind
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
@@ -25,8 +28,69 @@ class DreamModelsTest {
     fun missingFieldsTakeLettaCodesDefaultsAndAnUnknownTriggerIsNoSettings() {
         val sparse = DreamSettings.fromWire(buildJsonObject { put("trigger", "compaction-event") })
         assertEquals(DreamSettings.DEFAULT, sparse)
+        assertEquals(ReflectionModelChoice.Unsupported, sparse?.model)
+        assertNull(sparse?.focusInstructions)
+        assertNull(sparse?.lastOutcome)
         assertNull(DreamSettings.fromWire(buildJsonObject { put("trigger", "on-idle") }))
         assertNull(DreamSettings.fromWire(null))
+    }
+
+    @Test
+    fun reflectionV2FieldsDistinguishInheritHandleAndUnknownOutcomes() {
+        val inherit = DreamSettings.fromWire(
+            buildJsonObject {
+                put("trigger", "compaction-event")
+                put("model", JsonNull)
+                put("focus_instructions", "Prefer durable project facts")
+                put(
+                    "last_outcome",
+                    buildJsonObject {
+                        put("status", "skipped")
+                        put("reason", "no new transcript content")
+                        put("trigger_source", "compaction-event")
+                        put("model", "anthropic/sonnet")
+                        put("at", "2026-10-31T18:00:00Z")
+                    },
+                )
+            },
+        )
+        assertEquals(ReflectionModelChoice.Inherit, inherit?.model)
+        assertEquals("Prefer durable project facts", inherit?.focusInstructions)
+        assertEquals(ReflectionLastOutcomeStatus.Skipped, inherit?.lastOutcome?.status)
+        assertEquals("no new transcript content", inherit?.lastOutcome?.reason)
+        assertEquals("compaction-event", inherit?.lastOutcome?.triggerSource)
+        assertEquals("anthropic/sonnet", inherit?.lastOutcome?.model)
+        assertEquals("2026-10-31T18:00:00Z", inherit?.lastOutcome?.at)
+
+        val handle = DreamSettings.fromWire(
+            buildJsonObject {
+                put("trigger", "off")
+                put("model", "openai/gpt-5")
+                put("focus_instructions", "")
+                put("last_outcome", buildJsonObject { put("status", "future-status"); put("at", "2026-10-31T19:00:00Z") })
+            },
+        )
+        assertEquals(ReflectionModelChoice.Handle("openai/gpt-5"), handle?.model)
+        assertEquals(ReflectionLastOutcomeStatus.Unknown, handle?.lastOutcome?.status)
+    }
+
+    @Test
+    fun settingsChangesSendReflectionV2FieldsOnlyWhenTheUserChangedThem() {
+        val settings = DreamSettings(
+            model = ReflectionModelChoice.Inherit,
+            focusInstructions = "Focus on tools",
+        )
+        val unchanged = DreamSettingsChange(settings).toWire()
+        assertFalse(DreamSettings.MODEL in unchanged)
+        assertFalse(DreamSettings.FOCUS_INSTRUCTIONS in unchanged)
+
+        val changed = DreamSettingsChange(
+            settings,
+            modelChanged = true,
+            focusInstructionsChanged = true,
+        ).toWire()
+        assertEquals(JsonNull, changed[DreamSettings.MODEL])
+        assertEquals("Focus on tools", changed.getValue(DreamSettings.FOCUS_INSTRUCTIONS).jsonPrimitive.content)
     }
 
     @Test

@@ -3,6 +3,10 @@ package com.letta.mobile.data.dreaming
 import com.letta.mobile.data.compaction.wireConversationIdOf
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Whose dreaming a request is about. letta-code keys the settings by agent but
@@ -13,8 +17,34 @@ data class DreamTarget(val agentId: AgentId, val conversationId: ConversationId?
     val wireConversationId: String get() = wireConversationIdOf(agentId, conversationId)
 }
 
-/** A settings change and where letta-code should save it (null leaves letta-code's default, both files). */
-data class DreamSettingsChange(val settings: DreamSettings, val scope: DreamSettingsScope? = null)
+/**
+ * A settings change and where letta-code should save it (null leaves letta-code's default, both
+ * files). V2 fields are written only when their corresponding changed flag is true.
+ */
+data class DreamSettingsChange(
+    val settings: DreamSettings,
+    val scope: DreamSettingsScope? = null,
+    val modelChanged: Boolean = false,
+    val focusInstructionsChanged: Boolean = false,
+)
+
+/** The set payload, retaining omission as "unchanged" for reflection-settings-v2 fields. */
+internal fun DreamSettingsChange.toWire(): JsonObject = buildJsonObject {
+    settings.toWire().forEach { (key, value) -> put(key, value) }
+    if (modelChanged) {
+        when (val choice = settings.model) {
+            ReflectionModelChoice.Unsupported -> error("An unsupported reflection model cannot be changed")
+            ReflectionModelChoice.Inherit -> put(DreamSettings.MODEL, kotlinx.serialization.json.JsonNull)
+            is ReflectionModelChoice.Handle -> put(DreamSettings.MODEL, choice.value)
+        }
+    }
+    if (focusInstructionsChanged) {
+        put(
+            DreamSettings.FOCUS_INSTRUCTIONS,
+            requireNotNull(settings.focusInstructions) { "Unsupported focus instructions cannot be changed" },
+        )
+    }
+}
 
 /** Why a backend cannot do dreaming, so the surface can say it once instead of failing each time. */
 enum class DreamUnsupportedReason {

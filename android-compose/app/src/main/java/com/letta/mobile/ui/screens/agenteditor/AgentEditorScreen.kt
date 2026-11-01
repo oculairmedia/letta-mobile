@@ -49,6 +49,7 @@ private fun AndroidDreamingPanel(drawer: SharedNavDrawerViewModel, agent: AgentI
             activity = { id ->
                 graph.subagentRepository.activeSubagentsFlow(SubagentParentScope(id.value, ConversationCompactRpc.DEFAULT_CONVERSATION))
             },
+            models = graph.modelRepository.llmModels, reloadModelsAction = graph.modelRepository::refreshLlmModels,
         )
     }
     DisposableEffect(controller) { onDispose { controller.close() } }

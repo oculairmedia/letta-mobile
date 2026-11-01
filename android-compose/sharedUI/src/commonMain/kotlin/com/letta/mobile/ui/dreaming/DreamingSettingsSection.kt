@@ -17,6 +17,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,18 +32,30 @@ import com.letta.mobile.data.dreaming.DreamSettingsChange
 import com.letta.mobile.data.dreaming.DreamSettingsScope
 import com.letta.mobile.data.dreaming.DreamSettingsState
 import com.letta.mobile.data.dreaming.DreamTrigger
+import com.letta.mobile.data.dreaming.DreamingActions
+import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
+import com.letta.mobile.ui.chat.surface.composer.ModelListPicker
+import com.letta.mobile.ui.chat.surface.composer.rememberModelListPicker
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.flow.StateFlow
 
 /** The automatic triggers a user picks between; [DreamTrigger.Off] is the switch. */
 private val AutomaticTriggers = listOf(DreamTrigger.CompactionEvent, DreamTrigger.StepCount)
 
 /** The stored settings as controls. Every change saves through letta-code at once. */
 @Composable
-internal fun DreamingSettingsSection(state: DreamSettingsState, onSave: (DreamSettingsChange) -> Unit) {
+internal fun DreamingSettingsSection(state: DreamSettingsState, actions: DreamingActions) {
     val settings = state.settings ?: return
     var scope by remember { mutableStateOf(DreamSettingsScope.Both) }
-    val save: (DreamSettings) -> Unit = { onSave(DreamSettingsChange(it, scope)) }
+    var pickingModel by remember { mutableStateOf(false) }
+    if (pickingModel) {
+        ReflectionModelPicker(settings, scope, actions) { pickingModel = false }
+        return
+    }
+    val save: (DreamSettings) -> Unit = { actions.save(DreamSettingsChange(it, scope)) }
     Column(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -56,12 +69,94 @@ internal fun DreamingSettingsSection(state: DreamSettingsState, onSave: (DreamSe
         }
         Hint(DreamingStrings.REVIEW_HINT)
         if (settings.merge == DreamMerge.Explicit) ReviewInstructions(settings, save)
+        if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
+            ReflectionModelControl(settings, actions.models, onPick = { pickingModel = true }) { choice ->
+                actions.save(DreamSettingsChange(settings.copy(model = choice), scope, modelChanged = true))
+            }
+            FocusInstructions(settings) { focus ->
+                actions.save(
+                    DreamSettingsChange(
+                        settings.copy(focusInstructions = focus),
+                        scope,
+                        focusInstructionsChanged = true,
+                    ),
+                )
+            }
+        }
         ScopeChoice(scope) { picked ->
             scope = picked
-            onSave(DreamSettingsChange(settings, picked))
+            actions.save(DreamSettingsChange(settings, picked))
         }
-        Hint(DreamingStrings.MODEL)
         state.error?.let { Text(DreamingStrings.failure(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+    }
+}
+
+@Composable
+private fun ReflectionModelControl(
+    settings: DreamSettings,
+    models: StateFlow<List<LlmModel>>,
+    onPick: () -> Unit,
+    onChoice: (ReflectionModelChoice) -> Unit,
+) {
+    val available by models.collectAsState()
+    val label = when (val choice = settings.model) {
+        ReflectionModelChoice.Unsupported -> return
+        ReflectionModelChoice.Inherit -> DreamingStrings.MODEL_INHERIT
+        is ReflectionModelChoice.Handle ->
+            ModelCatalog.selectedModel(available, choice.value)?.displayName ?: choice.value
+    }
+    Text(DreamingStrings.MODEL_LABEL, style = MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        TextButton(onClick = onPick, modifier = Modifier.testTag(DreamingTags.MODEL)) { Text(DreamingStrings.MODEL_CHOOSE) }
+    }
+    if (settings.model != ReflectionModelChoice.Inherit) {
+        TextButton(onClick = { onChoice(ReflectionModelChoice.Inherit) }, modifier = Modifier.testTag(DreamingTags.MODEL_INHERIT)) {
+            Text(DreamingStrings.MODEL_INHERIT)
+        }
+    }
+}
+
+@Composable
+private fun ReflectionModelPicker(
+    settings: DreamSettings,
+    scope: DreamSettingsScope,
+    actions: DreamingActions,
+    onDismiss: () -> Unit,
+) {
+    val available by actions.models.collectAsState()
+    val picker = rememberModelListPicker(actions.models, actions::reloadModels) { value ->
+        val handle = ModelCatalog.transportValue(available, value) ?: value
+        actions.save(
+            DreamSettingsChange(
+                settings.copy(model = ReflectionModelChoice.Handle(handle)),
+                scope,
+                modelChanged = true,
+            ),
+        )
+    }
+    val selected = (settings.model as? ReflectionModelChoice.Handle)?.value
+    ModelListPicker(picker, selectedValue = selected, onDismiss = onDismiss)
+}
+
+@Composable
+private fun FocusInstructions(settings: DreamSettings, onSave: (String) -> Unit) {
+    val stored = settings.focusInstructions ?: return
+    var draft by remember(stored) { mutableStateOf(stored) }
+    val trimmed = draft.trim()
+    OutlinedTextField(
+        value = draft,
+        onValueChange = { draft = it },
+        label = { Text(DreamingStrings.FOCUS_INSTRUCTIONS) },
+        modifier = Modifier.fillMaxWidth().testTag(DreamingTags.FOCUS_INSTRUCTIONS),
+        minLines = 2,
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        TextButton(
+            onClick = { onSave(trimmed) },
+            enabled = trimmed != stored,
+            modifier = Modifier.testTag(DreamingTags.FOCUS_SAVE),
+        ) { Text(DreamingStrings.SAVE) }
     }
 }
 

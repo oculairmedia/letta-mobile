@@ -17767,24 +17767,37 @@ public final class com/letta/mobile/data/dreaming/DreamRunStart$Companion {
 public final class com/letta/mobile/data/dreaming/DreamSettings {
 	public static final field Companion Lcom/letta/mobile/data/dreaming/DreamSettings$Companion;
 	public static final field DEFAULT_STEP_COUNT I
+	public static final field FOCUS_INSTRUCTIONS Ljava/lang/String;
+	public static final field LAST_OUTCOME Ljava/lang/String;
 	public static final field MERGE Ljava/lang/String;
 	public static final field MERGE_INSTRUCTIONS Ljava/lang/String;
 	public static final field MIN_STEP_COUNT I
+	public static final field MODEL Ljava/lang/String;
+	public static final field OUTCOME_AT Ljava/lang/String;
+	public static final field OUTCOME_REASON Ljava/lang/String;
+	public static final field OUTCOME_STATUS Ljava/lang/String;
+	public static final field OUTCOME_TRIGGER_SOURCE Ljava/lang/String;
 	public static final field STEP_COUNT Ljava/lang/String;
 	public static final field TRIGGER Ljava/lang/String;
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/dreaming/DreamTrigger;
 	public final fun component2 ()I
 	public final fun component3 ()Lcom/letta/mobile/data/dreaming/DreamMerge;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;)Lcom/letta/mobile/data/dreaming/DreamSettings;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/dreaming/DreamSettings;
+	public final fun component5 ()Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;
+	public final fun copy (Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;)Lcom/letta/mobile/data/dreaming/DreamSettings;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamTrigger;ILcom/letta/mobile/data/dreaming/DreamMerge;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice;Ljava/lang/String;Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;ILjava/lang/Object;)Lcom/letta/mobile/data/dreaming/DreamSettings;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAutomatic ()Z
+	public final fun getFocusInstructions ()Ljava/lang/String;
+	public final fun getLastOutcome ()Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;
 	public final fun getMerge ()Lcom/letta/mobile/data/dreaming/DreamMerge;
 	public final fun getMergeInstructions ()Ljava/lang/String;
+	public final fun getModel ()Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice;
 	public final fun getStepCount ()I
 	public final fun getTrigger ()Lcom/letta/mobile/data/dreaming/DreamTrigger;
 	public fun hashCode ()I
@@ -17798,13 +17811,17 @@ public final class com/letta/mobile/data/dreaming/DreamSettings$Companion {
 }
 
 public final class com/letta/mobile/data/dreaming/DreamSettingsChange {
-	public fun <init> (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;ZZ)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/dreaming/DreamSettings;
 	public final fun component2 ()Lcom/letta/mobile/data/dreaming/DreamSettingsScope;
-	public final fun copy (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;)Lcom/letta/mobile/data/dreaming/DreamSettingsChange;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/dreaming/DreamSettingsChange;Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;ILjava/lang/Object;)Lcom/letta/mobile/data/dreaming/DreamSettingsChange;
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;ZZ)Lcom/letta/mobile/data/dreaming/DreamSettingsChange;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/dreaming/DreamSettingsChange;Lcom/letta/mobile/data/dreaming/DreamSettings;Lcom/letta/mobile/data/dreaming/DreamSettingsScope;ZZILjava/lang/Object;)Lcom/letta/mobile/data/dreaming/DreamSettingsChange;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFocusInstructionsChanged ()Z
+	public final fun getModelChanged ()Z
 	public final fun getScope ()Lcom/letta/mobile/data/dreaming/DreamSettingsScope;
 	public final fun getSettings ()Lcom/letta/mobile/data/dreaming/DreamSettings;
 	public fun hashCode ()I
@@ -17900,26 +17917,32 @@ public final class com/letta/mobile/data/dreaming/DreamUnsupportedReason : java/
 
 public abstract interface class com/letta/mobile/data/dreaming/DreamingActions {
 	public abstract fun closeRun ()V
+	public fun getModels ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun openRun (Lcom/letta/mobile/data/dreaming/DreamRun;)V
 	public abstract fun refresh ()V
+	public fun reloadModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun runNow (Ljava/lang/String;)V
 	public static synthetic fun runNow$default (Lcom/letta/mobile/data/dreaming/DreamingActions;Ljava/lang/String;ILjava/lang/Object;)V
 	public abstract fun save (Lcom/letta/mobile/data/dreaming/DreamSettingsChange;)V
 }
 
 public final class com/letta/mobile/data/dreaming/DreamingActions$DefaultImpls {
+	public static fun getModels (Lcom/letta/mobile/data/dreaming/DreamingActions;)Lkotlinx/coroutines/flow/StateFlow;
+	public static fun reloadModels (Lcom/letta/mobile/data/dreaming/DreamingActions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun runNow$default (Lcom/letta/mobile/data/dreaming/DreamingActions;Ljava/lang/String;ILjava/lang/Object;)V
 }
 
 public final class com/letta/mobile/data/dreaming/DreamingController : com/letta/mobile/data/dreaming/DreamingActions, java/lang/AutoCloseable {
-	public fun <init> (Lcom/letta/mobile/data/dreaming/DreamingRepository;Lcom/letta/mobile/data/dreaming/DreamHistorySource;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/dreaming/DreamingRepository;Lcom/letta/mobile/data/dreaming/DreamHistorySource;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/dreaming/DreamingRepository;Lcom/letta/mobile/data/dreaming/DreamHistorySource;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/dreaming/DreamingRepository;Lcom/letta/mobile/data/dreaming/DreamHistorySource;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public fun closeRun ()V
 	public final fun focus (Lcom/letta/mobile/data/dreaming/DreamTarget;)V
+	public fun getModels ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun openRun (Lcom/letta/mobile/data/dreaming/DreamRun;)V
 	public fun refresh ()V
+	public fun reloadModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun runNow (Ljava/lang/String;)V
 	public fun save (Lcom/letta/mobile/data/dreaming/DreamSettingsChange;)V
 }
@@ -32011,6 +32034,71 @@ public final synthetic class com/letta/mobile/data/model/provider/wire/UpdatePro
 
 public final class com/letta/mobile/data/model/provider/wire/UpdateProviderInstanceCommandDto$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/model/reflection/ReflectionLastOutcome {
+	public fun <init> (Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcome;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAt ()Ljava/lang/String;
+	public final fun getModel ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public final fun getTriggerSource ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus$Companion;
+	public static final field Completed Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public static final field Failed Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public static final field Launched Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public static final field Skipped Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public static final field Unknown Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+	public static fun values ()[Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+}
+
+public final class com/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/data/model/reflection/ReflectionLastOutcomeStatus;
+}
+
+public abstract interface class com/letta/mobile/data/model/reflection/ReflectionModelChoice {
+}
+
+public final class com/letta/mobile/data/model/reflection/ReflectionModelChoice$Handle : com/letta/mobile/data/model/reflection/ReflectionModelChoice {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice$Handle;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice$Handle;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice$Handle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/model/reflection/ReflectionModelChoice$Inherit : com/letta/mobile/data/model/reflection/ReflectionModelChoice {
+	public static final field INSTANCE Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice$Inherit;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/model/reflection/ReflectionModelChoice$Unsupported : com/letta/mobile/data/model/reflection/ReflectionModelChoice {
+	public static final field INSTANCE Lcom/letta/mobile/data/model/reflection/ReflectionModelChoice$Unsupported;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/modelvalidation/ModelHandleValidator {

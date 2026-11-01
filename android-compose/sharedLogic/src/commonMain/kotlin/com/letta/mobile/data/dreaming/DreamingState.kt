@@ -1,9 +1,14 @@
 package com.letta.mobile.data.dreaming
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentKind
 import com.letta.mobile.data.model.SubagentStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+private val EmptyDreamingModels: StateFlow<List<LlmModel>> = MutableStateFlow(emptyList())
 
 /** A background memory run in flight for the agent, from the subagent registry. */
 @Immutable
@@ -95,6 +100,13 @@ data class DreamingState(
 
 /** What the Dreaming surface can ask for; [DreamingController] implements it, previews fake it. */
 interface DreamingActions {
+    /** The active session's models, for reflection-model selection where the backend supports it. */
+    val models: StateFlow<List<LlmModel>>
+        get() = EmptyDreamingModels
+
+    /** Re-reads [models] from the active session. */
+    suspend fun reloadModels() = Unit
+
     fun refresh()
 
     fun save(change: DreamSettingsChange)

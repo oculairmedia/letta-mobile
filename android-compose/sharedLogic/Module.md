@@ -305,6 +305,10 @@ Shared models for agents, conversations, messages, models, tools and related res
 
 Provider-management domain models and model-route availability. Canonical route identity is shared by catalog composition, selection and management workflows. Keep credential access and network execution outside provider descriptions; adapters construct [ProviderDefinition](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model.provider/-provider-definition/index.html) and [CanonicalModelRoute](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model.provider/-canonical-model-route/index.html) values under [VisibilityPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model.provider/-visibility-policy/index.html).
 
+# Package com.letta.mobile.data.model.reflection
+
+Reflection-settings-v2 values shared by dreaming repositories and UI. Model choice preserves the wire distinction between an omitted legacy field, inherited agent model and explicit catalog handle; last outcomes retain skipped and failed runs that do not appear in memory history.
+
 # Package com.letta.mobile.data.model.provider.composer
 
 Pure projection of provider/catalog inputs into a canonical catalog. Cache and selection state enter explicitly rather than hiding inside platform picker code. Keep fetching and hidden caching outside catalog composition; supply [CatalogScope](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model.provider.composer/-catalog-scope/index.html) inputs to [CanonicalCatalogComposer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model.provider.composer/-canonical-catalog-composer/index.html) and consume [SelectionResolution](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model.provider.composer/-selection-resolution/index.html) results.
