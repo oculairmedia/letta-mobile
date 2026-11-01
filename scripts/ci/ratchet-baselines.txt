@@ -14,6 +14,7 @@ detekt android-compose/sharedLogic/detekt-baseline.xml
 detekt android-compose/sharedUI/detekt-baseline.xml
 detekt android-compose/web/detekt-baseline.xml
 count android-compose/architecture-tests/duplicate-code-baseline.txt
+count android-compose/architecture-tests/same-module-duplicate-code-baseline.txt
 count scripts/ci/parity/platform-code-baseline.txt
 count scripts/ci/platform-ui-allowlist.txt
 grow-only scripts/ci/parity/parity-contracts.txt
