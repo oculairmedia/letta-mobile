@@ -97,7 +97,9 @@ object ConversationAdminHandlers {
     ) {
         val hiddenAgents = tiers.localBackendStore?.let { store -> HiddenAgentIndex(load = store::hiddenAgentIds) }
         val discovery = tiers.localBackendStore?.let {
-            ConversationDiscovery(it.conversationsDirectory, heldList, LocalBackendLayout::decodeConversationId)
+            ConversationDiscovery(it.conversationsDirectory, heldList, LocalBackendLayout::decodeConversationId,
+                onPrimed = { id, agentId -> tiers.conversationChanges?.notify(id, agentId, ConversationChangeKind.Created) },
+            )
         }
         registerConversationListRoute(router, nativeClient, hiddenAgents, discovery)
         registerConversationAgentListRoute(router, tiers)

@@ -17,6 +17,7 @@ internal class ConversationDiscovery(
     private val directory: File,
     val heldList: HeldListCache?,
     private val decodeId: (String) -> String?,
+    private val onPrimed: suspend (String, String?) -> Unit = { _, _ -> },
     private val clock: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
 ) {
     private val scanning = Mutex()
@@ -78,9 +79,10 @@ internal class ConversationDiscovery(
         return loaded
     }
 
-    private fun recordPrimed(id: String) {
+    private suspend fun recordPrimed(id: String) {
         synchronized(known) { known.add(id) }
         heldList?.invalidate()
+        onPrimed(id, null)
     }
 
     private fun refreshPending(now: Long, warn: (String, Int, Boolean) -> Unit) {
