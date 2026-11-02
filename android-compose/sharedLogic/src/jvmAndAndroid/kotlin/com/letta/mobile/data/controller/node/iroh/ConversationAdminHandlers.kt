@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.node.iroh.discovery.ConversationDiscovery
 import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
@@ -95,7 +96,12 @@ object ConversationAdminHandlers {
         heldList: HeldListCache?,
     ) {
         val hiddenAgents = tiers.localBackendStore?.let { store -> HiddenAgentIndex(load = store::hiddenAgentIds) }
-        registerConversationListRoute(router, nativeClient, hiddenAgents, heldList)
+        val discovery = tiers.localBackendStore?.let {
+            ConversationDiscovery(it.conversationsDirectory, heldList, LocalBackendLayout::decodeConversationId,
+                onPrimed = { id, agentId -> tiers.conversationChanges?.notify(id, agentId, ConversationChangeKind.Created) },
+            )
+        }
+        registerConversationListRoute(router, nativeClient, hiddenAgents, discovery)
         registerConversationAgentListRoute(router, tiers)
         registerConversationGetRoute(router, nativeClient)
     }
@@ -110,15 +116,21 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
         hiddenAgents: HiddenAgentIndex?,
-        heldList: HeldListCache?,
+        discovery: ConversationDiscovery?,
     ) {
+        val heldList = discovery?.heldList
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
+            if (nativeClient != null) {
+                discovery?.prime(context.authenticated, ::reportDiscoveryWarning) { id, remaining ->
+                    NativeAdmin.retrieveForDiscovery(nativeClient, ConversationId(id), remaining.milliseconds)
+                }
+            }
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
                 if (wantsVisibleConversationPage(params)) {
-                    return@require hiddenAgents.visibleRecents(c, params, context, heldList)
+                    return@require hiddenAgents.visibleRecents(c, params, context, discovery)
                 }
-                val own = suspend { listConversations(c, params) }
+                val own = suspend { listConversations(c, params)?.also { discovery?.remember(it) } }
                 // One agent's page (no summary search) is cut from the held full list: the App Server
                 // re-reads every conversation record per list call, so per-agent calls cost the same as
                 // a full one and a client listing agent by agent paid that once per agent.
@@ -127,7 +139,7 @@ object ConversationAdminHandlers {
                     param(params, AdminParamKey("summary_search")) == null
                 val held = heldList?.takeIf { sliceable }
                 if (held == null) own() else held.serve(
-                    fetchAll = { listAgentConversations(c) },
+                    fetchAll = { listAgentConversations(c)?.also { discovery.remember(it) } },
                     fromFull = { full ->
                         agentConversationPage(
                             full,
@@ -155,8 +167,9 @@ object ConversationAdminHandlers {
         client: AppServerClient,
         params: JsonObject?,
         context: AdminRpcRequestContext,
-        heldList: HeldListCache?,
+        discovery: ConversationDiscovery?,
     ): JsonArray? {
+        val heldList = discovery?.heldList
         val visibility = this ?: adminError("capability_unavailable: visible_only requires local agent visibility")
         val request = param(params, AdminParamKey("after"))?.let(::ConversationId) to param(params, AdminParamKey("limit"))
         val page: (JsonArray) -> JsonArray = { full ->
@@ -168,13 +181,22 @@ object ConversationAdminHandlers {
         // App Server frame limit and close the shared session. A longer list fails explicitly.
         val ownVisible = suspend {
             listAgentConversations(client)?.also { full ->
+                discovery?.remember(full)
                 if (full.size > MAX_HELD_CONVERSATIONS) {
                     adminError("capability_unavailable: visible_only supports at most $MAX_HELD_CONVERSATIONS conversations")
                 }
             }?.let(page)
         }
         if (heldList == null) return ownVisible()
-        return heldList.serve(fetchAll = { listAgentConversations(client) }, fromFull = page, fetchOwn = ownVisible)
+        return heldList.serve(
+            fetchAll = { listAgentConversations(client)?.also { discovery.remember(it) } },
+            fromFull = page,
+            fetchOwn = ownVisible,
+        )
+    }
+
+    private fun reportDiscoveryWarning(event: String, count: Int, timedOut: Boolean) {
+        Telemetry.event("IrohNode", event, "count" attr count, "timedOut" attr timedOut, level = Telemetry.Level.WARN)
     }
 
     /** The conversation list exactly as the client asked for it, from the App Server. */

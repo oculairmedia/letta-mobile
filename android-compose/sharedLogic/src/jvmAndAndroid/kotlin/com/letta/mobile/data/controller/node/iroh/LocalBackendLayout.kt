@@ -34,6 +34,13 @@ object LocalBackendLayout {
     fun b64UrlDecode(value: String): String =
         String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
 
+    internal fun decodeConversationId(name: String): String? {
+        val key = b64UrlDecode(name)
+        require(b64UrlEncode(key) == name)
+        if (!key.startsWith("conversation:")) return null
+        return key.removePrefix("conversation:").takeIf { it.isNotEmpty() && it != DEFAULT_CONVERSATION_ID }
+    }
+
     fun conversationKey(conversationId: ConversationId, agentId: AgentId): String =
         if (conversationId.value == DEFAULT_CONVERSATION_ID) {
             "$DEFAULT_CONVERSATION_ID:${agentId.value}"

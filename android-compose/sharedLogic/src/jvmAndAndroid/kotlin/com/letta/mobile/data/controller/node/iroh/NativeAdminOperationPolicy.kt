@@ -29,6 +29,7 @@ enum class NativeAdminOp(
     AgentDelete("agent.delete", NativeAdminOperationPolicy.MutationAmbiguous),
 
     ConversationList("conversation.list", NativeAdminOperationPolicy.ReadScan),
+    ConversationDiscovery("conversation.discovery", NativeAdminOperationPolicy.Read),
     ConversationGet("conversation.get", NativeAdminOperationPolicy.Read),
     ConversationCreate("conversation.create", NativeAdminOperationPolicy.MutationAmbiguous),
     ConversationUpdate("conversation.update", NativeAdminOperationPolicy.MutationAmbiguous),
