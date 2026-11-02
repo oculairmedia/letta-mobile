@@ -17952,8 +17952,11 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyTranspor
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcHostServices {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBeadsBaseUrl ()Ljava/lang/String;
+	public final fun getBeadsRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public final fun getBeadsTokenFile ()Ljava/lang/String;
 	public final fun getController ()Lcom/letta/mobile/data/controller/AppServerController;
 	public final fun getPluginRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getSubagentRegistrySource ()Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;
@@ -18696,6 +18699,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohPairingService
 
 public final class com/letta/mobile/data/controller/node/iroh/IrohPeerCapabilities {
 	public static final field ADMIN_FULL Ljava/lang/String;
+	public static final field BEADS_READ Ljava/lang/String;
+	public static final field BEADS_WRITE Ljava/lang/String;
 	public static final field CHAT_READ Ljava/lang/String;
 	public static final field CHAT_SEND Ljava/lang/String;
 	public static final field CONVERSATION_MANAGE Ljava/lang/String;
@@ -19495,6 +19500,17 @@ public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolic
 	public final fun getPolicy ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/beads/BeadsRouteClient {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun execute (Lcom/letta/mobile/data/beads/BeadsOperation;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes;
+	public final fun getReads ()Ljava/util/Map;
+	public final fun getWrites ()Ljava/util/Map;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/records/FileWrapperRecordStore : com/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore {

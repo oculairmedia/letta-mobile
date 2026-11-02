@@ -2,13 +2,13 @@
   "meta": {
     "issue": "letta-mobile-lgns8.13",
     "decided_at": "2026-07-22",
-    "review_status": "phase5-complete; zero admin_rest_service operations — every former admin REST method has an explicit non-shim owner or a fail-closed denial (letta-mobile-lgns8.9)",
+    "review_status": "phase5-complete; zero admin_rest_service operations \u2014 every former admin REST method has an explicit non-shim owner or a fail-closed denial (letta-mobile-lgns8.9)",
     "sources": [
       "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.29.12, lgns8.21.1)",
       "app-server-v2-contract-matrix.json (lgns8.1)",
       "AdminRpcRegistry.buildRouter registered methods (enumerated by IrohAdminOwnershipMatrixTest)",
       "docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md (shim-only surfaces disposition, lgns8.25)",
-      "admin-shim server.ts / lib/{runs,store,crons}.ts route inventory read on the 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim) — the per-method evidence for owner-vs-deny (lgns8.9)"
+      "admin-shim server.ts / lib/{runs,store,crons}.ts route inventory read on the 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim) \u2014 the per-method evidence for owner-vs-deny (lgns8.9)"
     ],
     "rules": [
       "The presence of a native v2 command does not by itself transfer ownership; each app_server_v2 row is an explicit adoption decision scoped to a migration slice.",
@@ -25,7 +25,7 @@
     "phase3_synced_at": "2026-07-27",
     "phase4_synced_at": "2026-07-27",
     "shim_only_surfaces_dispositioned_at": "2026-07-31",
-    "shim_only_surfaces_evidence_window": "2026-07-23T14:40Z..2026-07-31T05:48Z lettashim access log (/tmp/admin-shim.log, 70569 logged requests; every request is logged — the 60s healthcheck accounts for the 10925 GET / rows)",
+    "shim_only_surfaces_evidence_window": "2026-07-23T14:40Z..2026-07-31T05:48Z lettashim access log (/tmp/admin-shim.log, 70569 logged requests; every request is logged \u2014 the 60s healthcheck accounts for the 10925 GET / rows)",
     "phase5_synced_at": "2026-07-31"
   },
   "enums": {
@@ -37,7 +37,8 @@
       "capability_gated_unsupported",
       "obsolete",
       "local_backend_store",
-      "plugin_host"
+      "plugin_host",
+      "beads_service"
     ],
     "authorization_classes": [
       "admin_read",
@@ -50,7 +51,8 @@
       "vibesync_registry",
       "controller_memory",
       "controller_state_file",
-      "plugin_registry_file"
+      "plugin_registry_file",
+      "beads_backend"
     ],
     "fallbacks": [
       "shim_until_cutover",
@@ -72,7 +74,8 @@
       "vibesync_http",
       "controller_native",
       "capability_unavailable",
-      "plugin_host"
+      "plugin_host",
+      "beads_http"
     ],
     "post_shim_fallbacks": [
       "none",
@@ -109,7 +112,7 @@
     {
       "method": "agent.list",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_list",
       "native_contract": [
@@ -143,7 +146,7 @@
     {
       "method": "agent.get",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_retrieve",
       "native_contract": [
@@ -161,7 +164,7 @@
     {
       "method": "agent.create",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_create",
       "native_contract": [
@@ -179,7 +182,7 @@
     {
       "method": "agent.update",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_update",
       "native_contract": [
@@ -198,7 +201,7 @@
     {
       "method": "agent.delete",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_delete",
       "native_contract": [
@@ -232,7 +235,7 @@
     {
       "method": "conversation.list",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_list",
       "native_contract": [
@@ -265,7 +268,7 @@
     {
       "method": "conversation.get",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_retrieve",
       "native_contract": [
@@ -283,7 +286,7 @@
     {
       "method": "conversation.create",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_create",
       "native_contract": [
@@ -302,7 +305,7 @@
     {
       "method": "conversation.update",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_update",
       "native_contract": [
@@ -320,7 +323,7 @@
     {
       "method": "conversation.archive",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_update",
       "native_contract": [
@@ -417,7 +420,7 @@
     {
       "method": "conversation.restore",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_update",
       "native_contract": [
@@ -450,7 +453,7 @@
     {
       "method": "message.list",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_messages_list",
       "native_contract": [
@@ -844,7 +847,7 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.9",
-      "notes": "lgns8.9: admin-shim returns one hard-coded text-embedding-3-small descriptor. The pinned native list_models still has no embedding-catalog split, but the shim never had a source either — the constant moves into the controller. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim).",
+      "notes": "lgns8.9: admin-shim returns one hard-coded text-embedding-3-small descriptor. The pinned native list_models still has no embedding-catalog split, but the shim never had a source either \u2014 the constant moves into the controller. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim).",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none",
@@ -1078,7 +1081,7 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.9",
-      "notes": "lgns8.9: admin-shim's GET /v1/tools returns a hard-coded 14-entry list of letta-code's client-side tools — no datastore, no upstream call — so the catalog is controller-owned verbatim. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim).",
+      "notes": "lgns8.9: admin-shim's GET /v1/tools returns a hard-coded 14-entry list of letta-code's client-side tools \u2014 no datastore, no upstream call \u2014 so the catalog is controller-owned verbatim. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim).",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none",
@@ -1114,7 +1117,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records — admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records \u2014 admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "tool.update",
@@ -1130,7 +1133,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records — admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records \u2014 admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "tool.delete",
@@ -1146,7 +1149,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records — admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records \u2014 admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "tool.attach",
@@ -1162,7 +1165,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records — admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records \u2014 admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "tool.detach",
@@ -1178,7 +1181,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records — admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: letta-code tools are code-defined, not user-authored records \u2014 admin-shim registers only GET /v1/tools and GET /v1/tools/{id}, so every CRUD/attach path 404s today. The pinned inventory's update_toolset is the RUNTIME toolset of a live session, not admin CRUD, and adopting it would silently reshape turn behaviour. UPSTREAM ASK: a native tool-library command. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "block.list",
@@ -1209,7 +1212,7 @@
       "production_first_route": "local_backend_store",
       "post_shim_owner": "local_backend_store",
       "post_shim_fallback": "deny_fail_closed",
-      "notes": "kzqkr.7: agent-scoped block read over the same memfs store as block.get/block.list. Required agent_id; missing/blank agent_id fails before any store read. Returns only the requested agent's projected blocks with stable synthesised ids — no client-side filtering of the global union. admin-shim's handleBlocksList(path=v1/agents/{agentId}/core-memory/blocks) serves readBlocksForAgent for the same path.",
+      "notes": "kzqkr.7: agent-scoped block read over the same memfs store as block.get/block.list. Required agent_id; missing/blank agent_id fails before any store read. Returns only the requested agent's projected blocks with stable synthesised ids \u2014 no client-side filtering of the global union. admin-shim's handleBlocksList(path=v1/agents/{agentId}/core-memory/blocks) serves readBlocksForAgent for the same path.",
       "phase3_decision": "bounded_service"
     },
     {
@@ -1242,7 +1245,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity — blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity \u2014 blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "block.update",
@@ -1258,7 +1261,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity — blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity \u2014 blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "block.delete",
@@ -1274,7 +1277,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity — blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity \u2014 blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "block.attach",
@@ -1290,7 +1293,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity — blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity \u2014 blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "block.detach",
@@ -1306,7 +1309,7 @@
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed",
       "phase3_decision": "deny_fail_closed",
-      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity — blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
+      "notes": "lgns8.9 DENIAL: the local backend has no globally addressable block entity \u2014 blocks are per-agent memfs files, and the global block id is synthesised by admin-shim (sha256(agentId:label)) with no native equivalent. Global creation and agent attach/detach have no meaning in a per-agent memory filesystem, and admin-shim registers none of these routes (all 404 today). The agent-scoped write IS supported natively: block.update_agent -> write_memory_file. UPSTREAM ASK: a native block command that addresses a block by a stable global id. Evidence: admin-shim server.ts @letta-ai/letta-code 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim)."
     },
     {
       "method": "block.update_agent",
@@ -1322,7 +1325,7 @@
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none",
       "phase3_decision": "adopt_v2",
-      "notes": "lgns8.9 WRITE with a native owner: a core-memory block IS the memfs file memory/system/<label>.md, and block.update_agent already carries agent_id + label, so it maps 1:1 onto the pinned write_memory_file command. The App Server — the backend root's single writer — commits it; the controller never writes the store. admin-shim has no PATCH route here at all, so this is a strict improvement.",
+      "notes": "lgns8.9 WRITE with a native owner: a core-memory block IS the memfs file memory/system/<label>.md, and block.update_agent already carries agent_id + label, so it maps 1:1 onto the pinned write_memory_file command. The App Server \u2014 the backend root's single writer \u2014 commits it; the controller never writes the store. admin-shim has no PATCH route here at all, so this is a strict improvement.",
       "native_contract": [
         "write_memory_file",
         "write_memory_file_response"
@@ -2343,6 +2346,321 @@
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
+    },
+    {
+      "method": "beads.ready",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 LIST_READY_WORK",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.ready.count",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 COUNT_READY_WORK",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.get",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 GET_ISSUE",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.list",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 LIST_ISSUES",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.dependencies.tree",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 GET_DEPENDENCY_TREE",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.dependencies.cycles",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 LIST_DEPENDENCY_CYCLES",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.events.list",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 LIST_EVENTS",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.stats",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 GET_STATS",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.context",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 GET_CONTEXT",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.config.get",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 GET_SETTING",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.memories.list",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 LIST_MEMORIES",
+      "authorization_class": "admin_read",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.create",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 CREATE_ISSUE",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.update",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 UPDATE_ISSUE",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.close",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 CLOSE_ISSUE",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.claim",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 CLAIM_ISSUE",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.release",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 RELEASE_ISSUE",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.issues.claimNext",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 CLAIM_NEXT_ISSUE",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.dependencies.add",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 ADD_DEPENDENCIES",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.dependencies.remove",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 REMOVE_DEPENDENCY",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.config.set",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 SET_SETTING",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "beads.memories.write",
+      "handler": "BeadsRoutes.kt",
+      "current_backend": "bd serve HTTP, optional wrapper binding",
+      "owner": "beads_service",
+      "public_contract": "bd 1.3.2 REMEMBER_MEMORY",
+      "authorization_class": "admin_write",
+      "data_store": "beads_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "Wrapper-only bearer; agent-scoped peers denied; method omitted when not configured.",
+      "production_first_route": "beads_http",
+      "post_shim_owner": "beads_service",
+      "post_shim_fallback": "deny_fail_closed"
     }
   ],
   "unsupported_native_operations": [
@@ -2387,7 +2705,7 @@
     {
       "domain": "search",
       "current_state": "raw HTTP POST /v1/messages/search only; no admin_rpc method and no Iroh admin surface. admin-shim implements it over its own lib/search.ts index, which the controller does not own.",
-      "decision": "DECIDED (lgns8.9): PERMANENT DENIAL over Iroh. The pinned @letta-ai/letta-code 0.29.12 inventory has no message-search command — grep_in_files / search_files are workspace FILE search, not transcript search — and no admin_rpc method exists to register, so there is nothing to route and nothing to fail closed. message.search must never be added as an ad hoc proxy. UPSTREAM ASK: a native conversation/message search command; until then clients search locally over message.list pages.",
+      "decision": "DECIDED (lgns8.9): PERMANENT DENIAL over Iroh. The pinned @letta-ai/letta-code 0.29.12 inventory has no message-search command \u2014 grep_in_files / search_files are workspace FILE search, not transcript search \u2014 and no admin_rpc method exists to register, so there is nothing to route and nothing to fail closed. message.search must never be added as an ad hoc proxy. UPSTREAM ASK: a native conversation/message search command; until then clients search locally over message.list pages.",
       "disposition_scope": "message.search"
     },
     {
@@ -2400,8 +2718,8 @@
       ],
       "current_state": "The iroh-wrapper controller is the channels host (lgns8.23 cutover 2026-08-01; lettashim retired). Upstream letta-code accepts channel_* over the app-server WS under --listen with no handshake, but initializeChannels() is unreachable at boot there, so enabled accounts are never auto-restored without the controller.",
       "disposition": "alive_keep_on_shim_until_successor",
-      "decision": "CONTROLLER-NATIVE (lgns8.23). ChannelRestoreCoordinator (sharedLogic) closes the boot-restore gap client-side: channels_list -> channel_accounts_list -> channel_start for every enabled account, re-issued on EVERY generation-ready because channel_start also re-wires ingress to the issuing socket. Unconditional since by4vm.111 (the --channels-host flag is gone): never point two wrappers at one App Server — the second re-wires ingress to its own socket. This is NOT an admin_rpc exposure: channel_* frames are controller-initiated and controller-internal, never fanned out to viewers, because channel_accounts_list returns plugin config (Matrix accessToken/syncAccessToken) in CLEARTEXT. Any future VIEWER-facing channel surface still requires the explicit per-command sensitive-capability policy of lgns8.12.",
-      "evidence": "EMPIRICAL, letta-mobile-lgns8.23.1 probe 2026-07-31 against letta-code 0.29.12 on a throwaway HOME: (1) channel_* accepted on a bare socket with no handshake; (2) our matrix plugin discovered via channel.json and started to running=true with a live sync; (3) boot-restore absent after appserver restart (enabled=true, running=false) until a client-issued channel_start restored it; (4) a repeated channel_start is a clean stop+start, exactly one sync loop, no leak; (5) a FAILED channel_start persists enabled:false into accounts.json — hence the enabled re-assertion in the coordinator; (6) channel_accounts_list returns accessToken/syncAccessToken in cleartext.",
+      "decision": "CONTROLLER-NATIVE (lgns8.23). ChannelRestoreCoordinator (sharedLogic) closes the boot-restore gap client-side: channels_list -> channel_accounts_list -> channel_start for every enabled account, re-issued on EVERY generation-ready because channel_start also re-wires ingress to the issuing socket. Unconditional since by4vm.111 (the --channels-host flag is gone): never point two wrappers at one App Server \u2014 the second re-wires ingress to its own socket. This is NOT an admin_rpc exposure: channel_* frames are controller-initiated and controller-internal, never fanned out to viewers, because channel_accounts_list returns plugin config (Matrix accessToken/syncAccessToken) in CLEARTEXT. Any future VIEWER-facing channel surface still requires the explicit per-command sensitive-capability policy of lgns8.12.",
+      "evidence": "EMPIRICAL, letta-mobile-lgns8.23.1 probe 2026-07-31 against letta-code 0.29.12 on a throwaway HOME: (1) channel_* accepted on a bare socket with no handshake; (2) our matrix plugin discovered via channel.json and started to running=true with a live sync; (3) boot-restore absent after appserver restart (enabled=true, running=false) until a client-issued channel_start restored it; (4) a repeated channel_start is a clean stop+start, exactly one sync loop, no leak; (5) a FAILED channel_start persists enabled:false into accounts.json \u2014 hence the enabled re-assertion in the coordinator; (6) channel_accounts_list returns accessToken/syncAccessToken in cleartext.",
       "successor": "controller_native (ChannelRestoreCoordinator, unconditional in the iroh-wrapper)",
       "native_contract": [
         "channels_list",
@@ -2433,7 +2751,7 @@
       ],
       "current_state": "shim-only external work ingest (lcp-zncq): writes third-party step lifecycle into the shim subagent registry under the ext-<source>-<external_id> namespace. No repo reference; the mobile READ side is already native (admin_rpc subagent.list / subagent.todos), so only the write side is unrouted.",
       "disposition": "alive_keep_on_shim_until_successor",
-      "decision": "ALIVE — a configured live caller exists outside this repo; do not deny yet. Keep the ingest on the shim until a controller-native bounded ingest exists and the caller repoints (letta-mobile-lgns8.25.1). Never expose ingest as a generic admin_rpc write: it must be an explicitly authorized admin_write method with a source allow-list.",
+      "decision": "ALIVE \u2014 a configured live caller exists outside this repo; do not deny yet. Keep the ingest on the shim until a controller-native bounded ingest exists and the caller repoints (letta-mobile-lgns8.25.1). Never expose ingest as a generic admin_rpc write: it must be an explicitly authorized admin_write method with a source allow-list.",
       "evidence": "vibesync.service (running, MainPID 53871, cwd /opt/stacks/vibesync/.letta/worktrees/bound-project-list) boots WorkActivityReporter (src/orchestration/boot.ts:193-207) whenever VIBESYNC_LETTA_CODE_SHIM_URL is set and VIBESYNC_WORK_ACTIVITY_REPORT != 0; the running process environment has VIBESYNC_LETTA_CODE_SHIM_URL=http://127.0.0.1:8291 and no disable flag. Dormant, not dead: 0 POSTs in the 2026-07-23..2026-07-31 shim access log (70569 logged requests) because no dispatcher/step.* molecule events fired in that window. The 7 logged hits on this path are GET reads from curl.",
       "successor": "controller-native bounded external-work ingest (proposed subagent.ingest_external), tracked by letta-mobile-lgns8.25.1"
     },
@@ -2444,9 +2762,9 @@
       ],
       "current_state": "shim-internal child-process lifecycle supervision: the shim's own letta-cli-sdk-wrapper.mjs posts {event:\"child_exit\", taskId, code, signal} on spawn exit so the shim can finalize a stranded running registry entry. Loopback-only, and gated on LETTA_TASK_ID being present in the child environment.",
       "disposition": "dead_deny_fail_closed",
-      "decision": "DEAD for this repo — deny fail-closed; never becomes an admin_rpc method. Process-exit supervision is an internal concern of whichever component owns the spawn; the Kotlin controller supervises its own App Server sessions and does not need an inbound HTTP lifecycle webhook. This route retires with the shim's runtime role.",
+      "decision": "DEAD for this repo \u2014 deny fail-closed; never becomes an admin_rpc method. Process-exit supervision is an internal concern of whichever component owns the spawn; the Kotlin controller supervises its own App Server sessions and does not need an inbound HTTP lifecycle webhook. This route retires with the shim's runtime role.",
       "evidence": "Sole poster is /opt/stacks/letta-code-parallel/admin-shim/scripts/letta-cli-sdk-wrapper.mjs:107, inside the shim itself; the post is skipped unless LETTA_TASK_ID is set, which prod does not set. 0 requests in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo; no other /opt/stacks service references the path.",
-      "successor": "none — controller-owned session supervision already covers the sensing need"
+      "successor": "none \u2014 controller-owned session supervision already covers the sensing need"
     },
     {
       "domain": "usage_summary",
@@ -2455,9 +2773,9 @@
       ],
       "current_state": "shim extension (not vanilla Letta) that aggregates the shim's own local run records by agent/conversation/model/day. Not wired to the LiteLLM gateway (:4000), which is the actual accounting source of truth.",
       "disposition": "dead_deny_fail_closed",
-      "decision": "DEAD — deny fail-closed; do not port and do not proxy. Mobile usage analytics are computed client-side from step records (DashboardUsageCalculator), so nothing regresses. If product ever needs authoritative usage it must come from the LiteLLM gateway through a bounded adapter with its own ownership row, never from a shim aggregate.",
+      "decision": "DEAD \u2014 deny fail-closed; do not port and do not proxy. Mobile usage analytics are computed client-side from step records (DashboardUsageCalculator), so nothing regresses. If product ever needs authoritative usage it must come from the LiteLLM gateway through a bounded adapter with its own ownership row, never from a shim aggregate.",
       "evidence": "0 requests in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo to the path; the only usageSummary symbols are the Dashboard's local calculation (DashboardViewModel.kt:511,555 calling DashboardUsageCalculator.calculate(steps)). No other /opt/stacks service references the path.",
-      "successor": "none — LiteLLM gateway is the accounting authority if this need returns"
+      "successor": "none \u2014 LiteLLM gateway is the accounting authority if this need returns"
     },
     {
       "domain": "permissions_preview",
@@ -2468,7 +2786,7 @@
       ],
       "current_state": "shim-side permission config + dry-run evaluator (lcp-indw). The evaluator still runs in-process for shim-served turns (SHIM_SERVER_PERMISSIONS=1), but the HTTP config/preview surface has no external consumer and overlaps the letta-code 0.29.12 mod permissions.register capability.",
       "disposition": "dead_deny_fail_closed",
-      "decision": "DEAD as an external surface — deny fail-closed. The Kotlin fail-closed policy layer (lgns8.12) is the sole policy authority after cutover; a second, shim-resident policy store that clients can PUT would be a fail-open bypass of it. Any future preview/dry-run affordance must be a method on the Kotlin policy layer, not a proxy to this route.",
+      "decision": "DEAD as an external surface \u2014 deny fail-closed. The Kotlin fail-closed policy layer (lgns8.12) is the sole policy authority after cutover; a second, shim-resident policy store that clients can PUT would be a fail-open bypass of it. Any future preview/dry-run affordance must be a method on the Kotlin policy layer, not a proxy to this route.",
       "evidence": "0 requests to /shim/v1/permissions/global or /shim/v1/permissions/preview in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo. No other /opt/stacks service references the paths.",
       "successor": "lgns8.12 Kotlin fail-closed policy layer (already owns evaluation); no new admin_rpc method required"
     },
@@ -2479,9 +2797,9 @@
       ],
       "current_state": "shim-only diagnostic window into pooled letta-code worker sessions: size, max, idle_evict_sec, queued, in_flight_spawns, per-worker {key, conversation_id, agent_id, ...}, plus perf {event-loop delay percentiles, frame-append counters, rss_bytes}. It is the only window into pooled session state; controller-native introspection currently reports only health.check {status, controller_state, native}.",
       "disposition": "dead_route_successor_required",
-      "decision": "DEAD as a route (deny fail-closed; never proxied over admin_rpc) but its SENSING value must be replaced before the shim's runtime role retires — losing the only view of pooled session state would be a sensing regression. Proposal: extend controller-native introspection with a read-only admin_read diagnostics method (proposed health.diagnostics) reporting controller session/lease occupancy, queued/in-flight session starts, reconnect state, and a coarse process snapshot. Specified and tracked by letta-mobile-lgns8.25.2; not implemented in this bead.",
+      "decision": "DEAD as a route (deny fail-closed; never proxied over admin_rpc) but its SENSING value must be replaced before the shim's runtime role retires \u2014 losing the only view of pooled session state would be a sensing regression. Proposal: extend controller-native introspection with a read-only admin_read diagnostics method (proposed health.diagnostics) reporting controller session/lease occupancy, queued/in-flight session starts, reconnect state, and a coarse process snapshot. Specified and tracked by letta-mobile-lgns8.25.2; not implemented in this bead.",
       "evidence": "0 requests in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo. The only referencing consumer anywhere on the host is the shim's own manual maintenance script admin-shim/scripts/prune-transient-agents.mjs (SHIM_POOL_URL default http://127.0.0.1:8291/shim/pool), which is offline-only and is not scheduled by cron or any systemd timer.",
-      "successor": "controller-native health.diagnostics (admin_read, controller_memory) — proposed row spec in letta-mobile-lgns8.25.2"
+      "successor": "controller-native health.diagnostics (admin_read, controller_memory) \u2014 proposed row spec in letta-mobile-lgns8.25.2"
     }
   ]
 }

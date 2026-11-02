@@ -113,6 +113,7 @@ object AdminRpcRegistry {
         SubagentAdminHandlers.register(router, services.subagentRegistrySource)
         ConversationAdminHandlers.register(router, tiers, controller = services.controller)
         ProjectAdminHandlers.register(router, services.vibesyncBaseUrl?.trimEnd('/'))
+        registerBeads(router, services)
         RunAdminHandlers.register(router, localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
@@ -164,6 +165,13 @@ object AdminRpcRegistry {
     }
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
+
+    private fun registerBeads(router: AdminRpcRouter, services: AdminRpcHostServices) {
+        if (!services.beadsBaseUrl.isNullOrBlank()) {
+            services.beadsRoutes?.register(router)
+            router.featureCapabilities += router.registeredMethods.filter { it.startsWith("beads.") }
+        }
+    }
 
     private fun modelExposureStore(path: String?): ModelExposureStore =
         path?.takeIf { it.isNotBlank() }
