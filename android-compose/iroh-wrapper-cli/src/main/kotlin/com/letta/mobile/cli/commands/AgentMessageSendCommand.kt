@@ -20,9 +20,6 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.system.exitProcess
 
 /**
@@ -172,24 +169,3 @@ internal fun agentSendResultJson(result: AgentSendResult, id: String): String {
             """{"ok":false,"accepted":false,"applicationDelivered":false,"msgId":${q(id)},"error":"failed","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
     }
 }
-
-internal fun parseCorrelation(entries: List<String>, json: String?): Map<String, String>? {
-    if (json != null) {
-        if (entries.isNotEmpty()) throw UsageError("Use only one of --correlation or --correlation-json")
-        return parseCorrelationJson(json)
-    }
-    if (entries.isEmpty()) return null
-    return entries.associate { entry ->
-        val separator = entry.indexOf('=')
-        if (separator <= 0) throw UsageError("--correlation requires key=value")
-        entry.substring(0, separator) to entry.substring(separator + 1)
-    }
-}
-
-private fun parseCorrelationJson(json: String): Map<String, String> = runCatching {
-    val obj = Json.parseToJsonElement(json) as JsonObject
-    obj.mapValues { (_, value) ->
-        require(value is JsonPrimitive && value.isString)
-        value.content
-    }
-}.getOrElse { throw UsageError("--correlation-json requires an object of strings") }

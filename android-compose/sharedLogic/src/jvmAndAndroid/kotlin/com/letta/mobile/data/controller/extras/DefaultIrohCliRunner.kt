@@ -1,12 +1,10 @@
 package com.letta.mobile.data.controller.extras
 
-import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
 
 import java.io.File
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -228,21 +226,6 @@ class DefaultIrohCliRunner(
         }
         if (paths.addressStore != null) {
             add("--address-store"); add(paths.addressStore)
-        }
-    }
-
-    private fun MutableList<String>.addMessageOptions(options: IrohMessageOptions) {
-        options.conversationId?.let { add("--conversation-id"); add(it) }
-        if (options.conversationId == null) options.lane?.let { add("--lane"); add(it) }
-        options.correlation?.let(::addCorrelation)
-    }
-
-    private fun MutableList<String>.addCorrelation(correlation: Map<String, String>) {
-        if (correlation.isEmpty() || correlation.keys.any { it.isEmpty() || '=' in it }) {
-            add("--correlation-json")
-            add(JsonObject(correlation.mapValues { JsonPrimitive(it.value) }).toString())
-        } else {
-            correlation.forEach { (key, value) -> add("--correlation"); add("$key=$value") }
         }
     }
 
