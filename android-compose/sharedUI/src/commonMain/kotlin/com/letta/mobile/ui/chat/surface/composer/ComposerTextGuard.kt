@@ -37,5 +37,4 @@ private fun hasImageSignature(inserted: String): Boolean =
         inserted.startsWith("\u00ff\u00d8\u00ff") ||
         inserted.startsWith("\ufffd\ufffd\ufffd") ||
         inserted.startsWith("GIF87a") || inserted.startsWith("GIF89a") ||
-        (inserted.startsWith("RIFF") && inserted.length >= 12 && inserted.substring(8, 12) == "WEBP") ||
-        inserted.startsWith("BM")
+        (inserted.startsWith("RIFF") && inserted.length >= 12 && inserted.substring(8, 12) == "WEBP")

@@ -122,7 +122,7 @@ class ChatComposerPanelUiTest {
         val actions = RecordingChatActions(onText = { text = it })
         setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
         val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
-        val legitimate = listOf("PNG", "\nsecond line", "\ttab", "\r\nCRLF", " 🙂 世界")
+        val legitimate = listOf("PNG", "BMW and BM25", "\nsecond line", "\ttab", "\r\nCRLF", " 🙂 世界")
         legitimate.forEach { input.performTextInput(it) }
         runOnIdle {
             assertEquals(legitimate.joinToString(""), text)
@@ -136,7 +136,7 @@ class ChatComposerPanelUiTest {
         val actions = RecordingChatActions(onText = { text = it })
         setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
         val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
-        val signatures = listOf("\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a", "GIF89a", "RIFF1234WEBP", "BM")
+        val signatures = listOf("\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a", "GIF89a", "RIFF1234WEBP")
         val controls = (0..31).filterNot { it == 9 || it == 10 || it == 13 }.map { it.toChar().toString() } + "\u007f"
         (signatures + controls).forEachIndexed { index, value ->
             input.performTextInput(value)
