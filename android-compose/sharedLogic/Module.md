@@ -645,6 +645,10 @@ Wrapper-owned producer run records and leases, independent of upstream cron stor
 
 Bounded Beads admin RPC adapter for the wrapper, with upstream credentials held on the host.
 
+# Package com.letta.mobile.data.schedules.leases
+
+Read-only lease records and their per-day calendar spans. Lease producers and transport remain outside this model.
+
 # Package com.letta.mobile.data.schedules.runs
 
 Maps merged wrapper cron-run pages into shared schedule history records. The mapper tolerates older rows and rejects malformed entries.

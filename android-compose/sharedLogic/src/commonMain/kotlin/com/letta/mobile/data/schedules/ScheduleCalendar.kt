@@ -1,6 +1,9 @@
 package com.letta.mobile.data.schedules
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.schedules.leases.Lease
+import com.letta.mobile.data.schedules.leases.LeaseSpan
+import com.letta.mobile.data.schedules.leases.leaseSpan
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.atStartOfDayIn
@@ -50,6 +53,11 @@ sealed interface CalendarEntry {
         override val minuteOfDay: Int get() = event.minuteOfDay
     }
 
+    /** A portion of a lease on this day. */
+    data class LeaseEntry(val span: LeaseSpan) : CalendarEntry {
+        override val minuteOfDay: Int get() = span.startMinute.toInt()
+    }
+
     data class Band(val band: CalendarBand) : CalendarEntry {
         override val minuteOfDay: Int get() = band.firstMinute
     }
@@ -61,6 +69,8 @@ data class CalendarDay(
     val date: LocalDate,
     val events: List<CalendarEvent>,
     val bands: List<CalendarBand>,
+    /** Lease portions visible on this date. */
+    val leases: List<LeaseSpan> = emptyList(),
 ) {
     /** Every run that day, collapsed ones included. */
     val runCount: Int get() = events.size + bands.sumOf { it.count }
@@ -70,7 +80,7 @@ data class CalendarDay(
 
     /** Every entry in time order, a band at its first run. */
     val entries: List<CalendarEntry>
-        get() = (events.map { CalendarEntry.Event(it) } + bands.map { CalendarEntry.Band(it) }).sortedBy { it.minuteOfDay }
+        get() = (events.map { CalendarEntry.Event(it) } + bands.map { CalendarEntry.Band(it) } + leases.map { CalendarEntry.LeaseEntry(it) }).sortedBy { it.minuteOfDay }
 
     /** The agents with runs that day, first-run first; null for a schedule with no agent. */
     val agentIds: List<String?> get() = entries.map { entryAgent(it) }.distinct()
@@ -78,6 +88,7 @@ data class CalendarDay(
     private fun entryAgent(entry: CalendarEntry): String? = when (entry) {
         is CalendarEntry.Event -> entry.event.run.agentId
         is CalendarEntry.Band -> entry.band.agentId
+        is CalendarEntry.LeaseEntry -> entry.span.lease.owner
     }
 }
 
@@ -89,6 +100,8 @@ data class CalendarQuery(
     val includePaused: Boolean = true,
     /** Include recorded non-cron wakes in the agenda without placing them on calendar grids. */
     val includeUnscheduled: Boolean = false,
+    /** Read-only leases to project into each day. */
+    val leases: List<Lease> = emptyList(),
 )
 
 /**
@@ -123,7 +136,9 @@ object ScheduleCalendar {
         }
         val unscheduled = unscheduled(defs, query, start, end)
         val byDate = (placed + unscheduled).groupBy { it.at.first }
-        return dates.map { date -> day(date, byDate[date].orEmpty()) }
+        return dates.map { date ->
+            day(date, byDate[date].orEmpty()).copy(leases = query.leases.mapNotNull { leaseSpan(it, date, zone) })
+        }
     }
 
     private fun unscheduled(

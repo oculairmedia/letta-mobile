@@ -16,6 +16,9 @@ import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.InMemoryAgentRepository
+import com.letta.mobile.data.schedules.runs.LeaseHistory
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +32,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -96,6 +100,24 @@ class ScheduleLibraryControllerTest {
         advanceUntilIdle()
         assertEquals("a2" to listOf("s2"), calls.last())
         assertEquals(setOf("s2"), controller.state.value.runHistory.keys)
+    }
+
+    @Test
+    fun oldWrapperWithoutLeaseMethodDoesNotProduceAnError() = runTest {
+        val transport = object : NoOpChannelTransport() {
+            override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
+                error("lease.list must not be called on an older wrapper")
+        }
+        val controller = ScheduleLibraryController(
+            agentRepository = FakeAgentRepository(),
+            scheduleRepository = FakeScheduleRepository(),
+            scope = this,
+            leaseSource = LeaseHistory(transport)::load,
+        )
+        controller.start()
+        advanceUntilIdle()
+        assertNull(controller.state.value.errorMessage)
+        assertTrue(controller.state.value.leases.isEmpty())
     }
 
     @Test
