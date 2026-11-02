@@ -9,17 +9,45 @@ class ComposerTextGuardTest {
     @Test
     fun gifHeaderIsRejectedButReadableSignatureIsAccepted() {
         val previous = TextFieldValue("")
-        // Byte-valued logical screen descriptor, including permitted whitespace bytes.
-        val descriptor = "\t\n\r \t\n\r"
+        // Byte-valued logical screen descriptor, including whitespace and a control byte.
+        val descriptor = "\t\n\r \t\n\u001a"
+        val whitespaceDescriptor = "\t\n\r \t\n\r"
         listOf("GIF87a", "GIF89a").forEach { signature ->
             assertTrue(hasGifHeader(signature + descriptor))
             assertTrue(isUnreadableComposerText(previous, signature + descriptor))
+            assertFalse(hasGifHeader(signature + whitespaceDescriptor))
+            assertFalse(isUnreadableComposerText(previous, signature + whitespaceDescriptor))
         }
         assertFalse(hasGifHeader("GIF89a"))
         assertFalse(hasGifHeader("GIF89a" + descriptor.withByte(0, 256)))
         assertFalse(hasGifHeader("GIF89a" + descriptor.withByte(0, 0).withByte(1, 0)))
         assertFalse(hasGifHeader("GIF89a" + descriptor.withByte(2, 0).withByte(3, 0)))
         assertFalse(isUnreadableComposerText(previous, "GIF89a is the GIF file signature"))
+    }
+
+    @Test
+    fun gifDescriptorDistinguishesReadableLatin1FromBinaryEvidence() {
+        val previous = TextFieldValue("")
+        listOf(
+            "GIF89a café is the GIF signature",
+            "GIF87a naïve résumé of a format",
+            "GIF89a ¡olé! is readable text",
+            "GIF89a ÿþáé is readable text",
+        ).forEach { text ->
+            assertFalse(hasGifHeader(text), text)
+            assertFalse(isUnreadableComposerText(previous, text), text)
+        }
+        val descriptor = "\u0001\u0000\u0001\u0000   "
+        listOf('\u0000', '\u001a', '\u007f', '\u0080', '\u009f', '\ufffd').forEach { evidence ->
+            val header = "GIF89a" + descriptor.replaceRange(4, 5, evidence.toString())
+            assertTrue(hasGifHeader(header), "evidence U+${evidence.code.toString(16)}")
+            assertTrue(isUnreadableComposerText(previous, header), "evidence U+${evidence.code.toString(16)}")
+        }
+        // Nonzero dimensions and otherwise printable bytes isolate the evidence predicate.
+        listOf('\u0000', '\u0001', '\u001a', '\u007f', '\u0080', '\u009f', '\ufffd').forEach { evidence ->
+            assertTrue(hasGifHeader("GIF89aabcd" + evidence + "ef"), "evidence U+${evidence.code.toString(16)}")
+        }
+        assertFalse(hasBmpHeader("BM café résumé with readable Latin-1 text"))
     }
 
     @Test
