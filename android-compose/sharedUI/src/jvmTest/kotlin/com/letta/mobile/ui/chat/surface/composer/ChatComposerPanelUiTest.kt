@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,6 +18,7 @@ import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
@@ -94,6 +96,19 @@ class ChatComposerPanelUiTest {
         model = ChatModelUiState(currentHandle = null, currentLabel = "Model"),
     )
 
+    private fun ComposeUiTest.showEditableDraft(initial: String): MutableState<TimelineComposerDraft> {
+        val draft = mutableStateOf(TimelineComposerDraft().withText(initial))
+        val actions = object : ChatActions by RecordingChatActions() {
+            override fun updateComposerText(text: String) { draft.value = draft.value.withText(text) }
+            override fun reportComposerError(message: String) { draft.value = draft.value.copy(hostError = message) }
+            override fun clearComposerError() { draft.value = draft.value.cleared() }
+        }
+        setPointerContent {
+            Panel(ComposerInputs(composer = ready(draft.value.state.text).copy(error = draft.value.hostError), actions = actions))
+        }
+        return draft
+    }
+
     @Test
     fun typedControlReportsNeutralValidationError() = runComposeUiTest {
         val actions = RecordingChatActions()
@@ -106,15 +121,7 @@ class ChatComposerPanelUiTest {
 
     @Test
     fun validEditClearsRejectedPasteError() = runComposeUiTest {
-        var draft by mutableStateOf(TimelineComposerDraft().withText("draft"))
-        val actions = object : ChatActions by RecordingChatActions() {
-            override fun updateComposerText(text: String) { draft = draft.withText(text) }
-            override fun reportComposerError(message: String) { draft = draft.copy(hostError = message) }
-            override fun clearComposerError() { draft = draft.cleared() }
-        }
-        setPointerContent {
-            Panel(ComposerInputs(composer = ready(draft.state.text).copy(error = draft.hostError), actions = actions))
-        }
+        val draft by showEditableDraft("draft")
         val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
         input.performTextInput("PNG\n\u001a")
         runOnIdle {
@@ -132,15 +139,7 @@ class ChatComposerPanelUiTest {
 
     @Test
     fun existingControlDoesNotBlockUnrelatedEdit() = runComposeUiTest {
-        var draft by mutableStateOf(TimelineComposerDraft().withText("old\u001a"))
-        val actions = object : ChatActions by RecordingChatActions() {
-            override fun updateComposerText(text: String) { draft = draft.withText(text) }
-            override fun reportComposerError(message: String) { draft = draft.copy(hostError = message) }
-            override fun clearComposerError() { draft = draft.cleared() }
-        }
-        setPointerContent {
-            Panel(ComposerInputs(composer = ready(draft.state.text).copy(error = draft.hostError), actions = actions))
-        }
+        val draft by showEditableDraft("old\u001a")
         onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("!")
         runOnIdle {
             assertEquals("old\u001a!", draft.state.text)
@@ -150,15 +149,7 @@ class ChatComposerPanelUiTest {
 
     @Test
     fun bm25TextUpdatesDraft() = runComposeUiTest {
-        var draft by mutableStateOf(TimelineComposerDraft())
-        val actions = object : ChatActions by RecordingChatActions() {
-            override fun updateComposerText(text: String) { draft = draft.withText(text) }
-            override fun reportComposerError(message: String) { draft = draft.copy(hostError = message) }
-            override fun clearComposerError() { draft = draft.cleared() }
-        }
-        setPointerContent {
-            Panel(ComposerInputs(composer = ready(draft.state.text).copy(error = draft.hostError), actions = actions))
-        }
+        val draft by showEditableDraft("")
         onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("BM25 results")
         runOnIdle {
             assertEquals("BM25 results", draft.state.text)

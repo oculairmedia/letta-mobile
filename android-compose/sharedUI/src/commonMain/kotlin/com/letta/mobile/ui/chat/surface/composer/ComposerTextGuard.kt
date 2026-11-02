@@ -43,23 +43,34 @@ private fun hasImageSignature(inserted: String): Boolean =
         hasBmpHeader(inserted)
 
 // BITMAPFILEHEADER and a supported DIB header, represented as byte-valued characters.
-internal fun hasBmpHeader(text: String): Boolean {
-    if (!text.startsWith("BM") || text.length < 26 || text.take(26).any { it.code > 255 } ||
-        (6..9).any { text[it] != '\u0000' }
-    ) return false
-    val fileSize = littleEndian(text, 2, 4)
-    val pixelOffset = littleEndian(text, 10, 4)
-    val dibSize = littleEndian(text, 14, 4)
-    if (dibSize !in listOf(12L, 40L, 52L, 56L, 108L, 124L) ||
-        pixelOffset < 14 + dibSize || fileSize < pixelOffset
-    ) return false
-    val planesOffset = if (dibSize == 12L) 22 else 26
-    if (text.length < planesOffset + 2 || text.substring(planesOffset, planesOffset + 2).any { it.code > 255 }) return false
-    return littleEndian(text, planesOffset, 2) == 1L
+private val supportedDibSizes = setOf(12L, 40L, 52L, 56L, 108L, 124L)
+
+internal fun hasBmpHeader(text: String): Boolean =
+    text.hasBmpFileHeader() && text.hasSupportedDibHeader() && text.hasOneBmpPlane()
+
+private fun String.hasBmpFileHeader(): Boolean =
+    startsWith("BM") && hasByteValuedBmpHeader() && hasClearBmpReservedBytes()
+
+private fun String.hasByteValuedBmpHeader(): Boolean = length >= 26 && take(26).all { it.code <= 255 }
+
+private fun String.hasClearBmpReservedBytes(): Boolean = (6..9).all { this[it] == '\u0000' }
+
+private fun String.hasSupportedDibHeader(): Boolean {
+    val fileSize = littleEndian(2, 4)
+    val pixelOffset = littleEndian(10, 4)
+    val dibSize = littleEndian(14, 4)
+    return dibSize in supportedDibSizes && pixelOffset >= 14 + dibSize && fileSize >= pixelOffset
 }
 
-private fun littleEndian(text: String, offset: Int, count: Int): Long {
+private fun String.hasOneBmpPlane(): Boolean {
+    val planesOffset = if (littleEndian(14, 4) == 12L) 22 else 26
+    return length >= planesOffset + 2 &&
+        substring(planesOffset, planesOffset + 2).all { it.code <= 255 } &&
+        littleEndian(planesOffset, 2) == 1L
+}
+
+private fun String.littleEndian(offset: Int, count: Int): Long {
     var value = 0L
-    for (index in 0 until count) value += text[offset + index].code.toLong() shl (index * 8)
+    for (index in 0 until count) value += this[offset + index].code.toLong() shl (index * 8)
     return value
 }
