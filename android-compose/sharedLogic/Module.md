@@ -5,6 +5,14 @@ Start with repository/session contracts for resources, App Server clients and ru
 for turns, and timeline packages for durable history and live projections. UI-facing chat
 ports and render models are portable contracts; composable painting belongs to `:sharedUI`.
 
+The vendored `src/commonMain/resources/beads/openapi.v0-bd-1.3.2.yaml` is
+`internal/httpapi/spec/openapi.v0.yaml` from steveyegge/beads tag `v1.3.2`,
+commit `9b65b9e198acbcc98e7fd3a87a5d55baa065a572` (matching the installed
+`bd version 1.3.2 (9b65b9e19)`). Its SHA-256 is
+`9a33a349e5266bdba916246594a4fc457c63e39d7affb5acec9bd5b75acde4dd`.
+The spec's `info.version` is its document revision, `0.1.0`, not the bd release.
+Update this pin only for a deliberate bd contract upgrade.
+
 Read each declaration's platform/source-set tags. `commonMain` holds shared contracts,
 `jvmAndAndroid` adds JVM/Android integrations, and `jvmMain` provides JVM process/filesystem
 facilities. Android, host-native and wasmJs actuals implement their declared seams; a package
@@ -34,6 +42,24 @@ Portable API failures and project request payloads retained by repository contra
 # Package com.letta.mobile.data.attachment
 
 Shared image-ingress policy and attachment budgets. Platform decoders supply image data; these policies constrain turn attachment counts, dimensions and payload size. Keep decoding behind platform adapters and attachment rendering in `sharedUI`; apply [ImageIngressPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.attachment/-image-ingress-policy/index.html) and [AttachmentLimits](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.attachment/-attachment-limits/index.html) before admitting image results.
+
+# Package com.letta.mobile.data.beads
+
+Portable bd serve HTTP client, capability handshake, event stream and typed failures. Supply a Ktor engine and credentials at connection time; the client has no wrapper route or host integration.
+
+Issue projections and related mutation requests share wire models. Their operation-specific fields remain optional, while dependency entries retain JSON because detail and edge responses use different shapes. For nullable patch members, a Kotlin null omits the member and `JsonNull` explicitly clears it.
+
+# Package com.letta.mobile.data.beads.wire.core
+
+Serializable wire models for the pinned bd serve contract, including issue and journal records.
+
+# Package com.letta.mobile.data.beads.wire.payloads
+
+Serializable wire models for pinned bd serve operations and their shared payloads.
+
+# Package com.letta.mobile.data.beads.wire.mutations
+
+Serializable wire models for pinned bd serve mutation operations and their request and response payloads.
 
 # Package com.letta.mobile.data.backend
 
