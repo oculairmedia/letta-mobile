@@ -6,6 +6,29 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ComposerTextGuardTest {
+    @Test
+    fun gifHeaderIsRejectedButReadableSignatureIsAccepted() {
+        val previous = TextFieldValue("")
+        // Byte-valued logical screen descriptor, including permitted whitespace bytes.
+        val descriptor = "\t\n\r \t\n\r"
+        listOf("GIF87a", "GIF89a").forEach { signature ->
+            assertTrue(hasGifHeader(signature + descriptor))
+            assertTrue(isUnreadableComposerText(previous, signature + descriptor))
+        }
+        assertFalse(hasGifHeader("GIF89a"))
+        assertFalse(hasGifHeader("GIF89a" + descriptor.withByte(0, 256)))
+        assertFalse(hasGifHeader("GIF89a" + descriptor.withByte(0, 0).withByte(1, 0)))
+        assertFalse(hasGifHeader("GIF89a" + descriptor.withByte(2, 0).withByte(3, 0)))
+        assertFalse(isUnreadableComposerText(previous, "GIF89a is the GIF file signature"))
+    }
+
+    @Test
+    fun readableDescriptionsOfOtherFormatsAreAccepted() {
+        val previous = TextFieldValue("")
+        listOf("PNG is an image format", "JPEG is an image format", "WEBP is an image format", "RIFF is a container format")
+            .forEach { assertFalse(isUnreadableComposerText(previous, it), it) }
+    }
+
     // BITMAPFILEHEADER + BITMAPINFOHEADER; 54-byte header and one plane.
     private val bmp = "BM" + "\u003a\u0000\u0000\u0000" + "\u0000\u0000\u0000\u0000" +
         "\u0036\u0000\u0000\u0000" + "\u0028\u0000\u0000\u0000" +

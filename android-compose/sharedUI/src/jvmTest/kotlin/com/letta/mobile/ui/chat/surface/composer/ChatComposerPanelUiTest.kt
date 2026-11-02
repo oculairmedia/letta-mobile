@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
@@ -63,6 +65,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
+import com.letta.mobile.ui.chat.session.message
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
@@ -96,15 +99,17 @@ class ChatComposerPanelUiTest {
         model = ChatModelUiState(currentHandle = null, currentLabel = "Model"),
     )
 
-    private fun ComposeUiTest.showEditableDraft(initial: String): MutableState<TimelineComposerDraft> {
-        val draft = mutableStateOf(TimelineComposerDraft().withText(initial))
+    private fun ComposeUiTest.showEditableDraft(initial: String, error: ChatComposerError? = null): MutableState<TimelineComposerDraft> {
+        val initialDraft = TimelineComposerDraft().withText(initial)
+        val draft = mutableStateOf(initialDraft.copy(state = initialDraft.state.copy(error = error)))
         val actions = object : ChatActions by RecordingChatActions() {
             override fun updateComposerText(text: String) { draft.value = draft.value.withText(text) }
             override fun reportComposerError(message: String) { draft.value = draft.value.copy(hostError = message) }
             override fun clearComposerError() { draft.value = draft.value.cleared() }
         }
         setPointerContent {
-            Panel(ComposerInputs(composer = ready(draft.value.state.text).copy(error = draft.value.hostError), actions = actions))
+            val errorMessage = draft.value.hostError ?: draft.value.state.error?.message(AttachmentLimits.Default)
+            Panel(ComposerInputs(composer = ready(draft.value.state.text).copy(error = errorMessage), actions = actions))
         }
         return draft
     }
@@ -133,6 +138,30 @@ class ChatComposerPanelUiTest {
         input.performTextInput("!")
         runOnIdle {
             assertEquals("draft!", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun validEditPreservesAttachmentLimitError() = runComposeUiTest {
+        val draft by showEditableDraft("draft", ChatComposerError.MaxAttachmentCountExceeded)
+        val message = ChatComposerError.MaxAttachmentCountExceeded.message(AttachmentLimits.Default)
+        onNodeWithText(message).assertExists()
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("!")
+        runOnIdle {
+            assertEquals("draft!", draft.state.text)
+            assertEquals(ChatComposerError.MaxAttachmentCountExceeded, draft.state.error)
+        }
+        onNodeWithText(message).assertExists()
+    }
+
+    @Test
+    fun readableGifSignatureSentenceUpdatesDraft() = runComposeUiTest {
+        val draft by showEditableDraft("")
+        val sentence = "GIF89a is the GIF file signature"
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput(sentence)
+        runOnIdle {
+            assertEquals(sentence, draft.state.text)
             assertEquals(null, draft.hostError)
         }
     }
@@ -201,7 +230,9 @@ class ChatComposerPanelUiTest {
         val actions = RecordingChatActions(onText = { text = it })
         setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
         val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
-        val signatures = listOf("\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a", "GIF89a", "RIFF1234WEBP")
+        val signatures = listOf(
+            "\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a\t\n\r \t\n\r", "GIF89a\t\n\r \t\n\r", "RIFF1234WEBP",
+        )
         val controls = (0..31).filterNot { it == 9 || it == 10 || it == 13 }.map { it.toChar().toString() } + "\u007f"
         (signatures + controls).forEachIndexed { index, value ->
             input.performTextInput(value)

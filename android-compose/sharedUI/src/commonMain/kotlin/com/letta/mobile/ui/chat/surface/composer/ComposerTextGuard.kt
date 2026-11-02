@@ -42,9 +42,17 @@ private fun hasImageSignature(inserted: String): Boolean =
         inserted.startsWith("\ufffdPNG") ||
         inserted.startsWith("\u00ff\u00d8\u00ff") ||
         inserted.startsWith("\ufffd\ufffd\ufffd") ||
-        inserted.startsWith("GIF87a") || inserted.startsWith("GIF89a") ||
+        hasGifHeader(inserted) ||
         (inserted.startsWith("RIFF") && inserted.length >= 12 && inserted.substring(8, 12) == "WEBP") ||
         hasBmpHeader(inserted)
+
+// A logical screen descriptor has seven byte-valued characters after the signature.
+internal fun hasGifHeader(text: String): Boolean {
+    if (!text.startsWith("GIF87a") && !text.startsWith("GIF89a")) return false
+    if (text.length < 13 || !text.substring(6, 13).all { it.code <= 255 }) return false
+    if (text.littleEndian(6, 2) == 0L || text.littleEndian(8, 2) == 0L) return false
+    return text.substring(6, 13).any { it.code < 32 || it.code >= 127 }
+}
 
 // BITMAPFILEHEADER and a supported DIB header, represented as byte-valued characters.
 private val supportedDibSizes = setOf(12L, 40L, 52L, 56L, 108L, 124L)

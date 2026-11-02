@@ -151,7 +151,9 @@ internal fun ComposerTextField(
             fieldValue = next
             if (next.text != text) {
                 model.actions.updateComposerText(next.text)
-                if (model.composer.error != null) model.actions.clearComposerError()
+                if (model.composer.error == pasteError || model.composer.error == textError) {
+                    model.actions.clearComposerError()
+                }
                 if (primary) mascots.noteComposerKeystroke()
             }
         },
