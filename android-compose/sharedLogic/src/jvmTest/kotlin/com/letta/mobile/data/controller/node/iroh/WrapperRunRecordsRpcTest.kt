@@ -354,15 +354,17 @@ class WrapperRunRecordsRpcTest {
                 """{"action":"finished","jobId":"other","ts":1793491200000}""",
                 """{"action":"finished","jobId":"","ts":1793491200000}""",
                 """{"action":"finished","jobId":"task-A","ts":"bad"}""",
-                """{"action":"finished","jobId":"task-A","ts":1793491200000,"status":"ok",
-                    "agentId":"agent-A","runId":"upstream-1","reason":"scheduler reason"}""",
+                "\uFEFF" + """{"action":"finished","jobId":"task-A","ts":1793491200000,"status":"ok",""" +
+                    """"agentId":"agent-A","runId":"upstream-1","reason":"scheduler reason"}""",
+                """{"action":"finished","jobId":"task-A","ts":1793491200000,
+                    "agentId":"agent-A","runId":"invalid-multiline-jsonl"}""",
                 "partial-json",
             ) + (0 until extraRows).map { index ->
                 """{"action":"finished","jobId":"task-A","ts":${1793491200000L - index - 1},"agentId":"agent-A","runId":"older-$index"}"""
             }
             // These lines belong only to task-A's file; unknown safe ids have no file.
-            val fileRows = raw.takeIf { safe == "task-A" }.orEmpty()
-            val rows = fileRows.mapNotNull { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
+            val fileRows = raw.takeIf { safe == "task-A" }.orEmpty().flatMap { it.split('\n') }
+            val rows = fileRows.mapNotNull { runCatching { Json.parseToJsonElement(it.trimJs()) as? JsonObject }.getOrNull() }
                 .filter { it["action"] == JsonPrimitive("finished") }
                 .filter { row -> (row["jobId"] as? JsonPrimitive)?.let { it.isString && it.content.trimJs().isNotEmpty() } == true }
                 .filter { (it["ts"] as? JsonPrimitive)?.let { ts -> !ts.isString && ts.doubleOrNull?.isFinite() == true } == true }
