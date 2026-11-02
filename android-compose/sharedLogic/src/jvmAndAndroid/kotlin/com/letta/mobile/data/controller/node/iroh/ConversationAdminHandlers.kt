@@ -30,8 +30,12 @@ object ConversationAdminHandlers {
     // in this wrapper process and take this mutex across the check and write.
     private val laneWriteMutex = Mutex()
     /** Atomically reuses or creates the recipient inbox against wrapper lane writes. */
-    suspend fun createInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String = laneWriteMutex.withLock {
-        laneOwner(client, store, setOf("lane:inbox"), agent to null)?.let { return@withLock it }
+    suspend fun createInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String {
+        return laneWriteMutex.withLock { reuseOrCreateInbox(client, agent, store) }
+    }
+
+    private suspend fun reuseOrCreateInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String {
+        laneOwner(client, store, setOf("lane:inbox"), agent to null)?.let { return it }
         val response = client.conversationCreate(AppServerCommand.ConversationCreate(
             requestId = NativeAdmin.requestId(),
             body = kotlinx.serialization.json.buildJsonObject {
@@ -41,7 +45,7 @@ object ConversationAdminHandlers {
             },
         ))
         if (!response.success) adminError(response.error ?: "conversation_create_failure")
-        (response.conversation?.get("id") as? JsonPrimitive)?.contentOrNull ?: adminError("conversation_create_failure")
+        return (response.conversation?.get("id") as? JsonPrimitive)?.contentOrNull ?: adminError("conversation_create_failure")
     }
 
     /**
