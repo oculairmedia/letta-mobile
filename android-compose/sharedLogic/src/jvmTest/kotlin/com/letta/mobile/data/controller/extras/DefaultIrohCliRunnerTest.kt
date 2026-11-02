@@ -67,7 +67,10 @@ class DefaultIrohCliRunnerTest {
         val index = words.indexOf("--correlation-json")
         assertTrue(index >= 0)
         val json = kotlinx.serialization.json.Json.parseToJsonElement(words[index + 1])
-        assertEquals(kotlinx.serialization.json.JsonObject(correlation.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }), json)
+        assertEquals(
+            kotlinx.serialization.json.JsonObject(correlation.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }),
+            json,
+        )
     }
 
     @BeforeTest
