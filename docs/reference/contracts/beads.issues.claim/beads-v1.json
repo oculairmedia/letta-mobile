@@ -1,0 +1,25 @@
+{
+  "method": "beads.issues.claim",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes.kt",
+  "cases": [
+    {
+      "name": "invalid-query",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected"
+      },
+      "params": {
+        "query": "invalid"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "validation.invalid_params: query"
+      }
+    }
+  ]
+}

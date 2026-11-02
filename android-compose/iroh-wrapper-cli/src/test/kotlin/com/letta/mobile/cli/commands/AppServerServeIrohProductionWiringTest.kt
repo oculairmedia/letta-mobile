@@ -140,6 +140,16 @@ class AppServerServeIrohProductionWiringTest {
         assertTrue(explicit.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
     }
 
+    @Test
+    fun `beads routes are registered only when configured`() {
+        val controller = DefaultAppServerController(EmptyClient)
+        val absent = buildProductionAdminRouter(controller = controller)
+        val configured = buildProductionAdminRouter(controller = controller, beadsBaseUrl = "http://127.0.0.1:9")
+        val expected = com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes.let { it.reads.keys + it.writes.keys }
+        assertTrue(absent.registeredMethods.none { it.startsWith("beads.") })
+        assertEquals(expected, configured.registeredMethods.filter { it.startsWith("beads.") }.toSet())
+    }
+
     private object EmptySource : SubagentRegistrySource {
         override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> = emptyList()
         override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? = null

@@ -18,6 +18,9 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcNativeSources
 import com.letta.mobile.data.controller.node.iroh.AdminRpcNotifications
 import com.letta.mobile.data.controller.node.iroh.AdminRpcPairing
 import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
+import com.letta.mobile.data.controller.node.iroh.beads.BeadsRouteClient
+import com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 
 fun buildProductionAdminRouter(
     controller: DefaultAppServerController,
@@ -32,6 +35,8 @@ fun buildProductionAdminRouter(
     pairingService: IrohPairingService? = null,
     nativeClient: AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
+    beadsBaseUrl: String? = null,
+    beadsTokenFile: String? = null,
     /**
      * lgns8.9: the letta-code on-disk backend root. Admin READS the App Server
      * exposes no command for (run/step history, agent context, memory blocks)
@@ -118,6 +123,16 @@ fun buildProductionAdminRouter(
             controller = controller,
             subagentRegistrySource = subagentSource,
             vibesyncBaseUrl = vibesyncBaseUrl,
+            beadsBaseUrl = beadsBaseUrl,
+            beadsTokenFile = beadsTokenFile,
+            beadsRoutes = beadsBaseUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                val client = BeadsRouteClient(url, beadsTokenFile)
+                AdminRpcRoutes { router ->
+                    (BeadsRoutes.reads + BeadsRoutes.writes).forEach { (method, operation) ->
+                        router.register(method) { params -> client.execute(operation, params) }
+                    }
+                }
+            },
             pluginRoutes = pluginRoutes,
         ),
         pairing = AdminRpcPairing(

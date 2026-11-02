@@ -204,6 +204,90 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 
+### reference/contracts/beads.config.get
+
+- [beads.config.get v1](reference/contracts/beads.config.get/beads-v1.md)
+
+### reference/contracts/beads.config.set
+
+- [beads.config.set v1](reference/contracts/beads.config.set/beads-v1.md)
+
+### reference/contracts/beads.context
+
+- [beads.context v1](reference/contracts/beads.context/beads-v1.md)
+
+### reference/contracts/beads.dependencies.add
+
+- [beads.dependencies.add v1](reference/contracts/beads.dependencies.add/beads-v1.md)
+
+### reference/contracts/beads.dependencies.cycles
+
+- [beads.dependencies.cycles v1](reference/contracts/beads.dependencies.cycles/beads-v1.md)
+
+### reference/contracts/beads.dependencies.remove
+
+- [beads.dependencies.remove v1](reference/contracts/beads.dependencies.remove/beads-v1.md)
+
+### reference/contracts/beads.dependencies.tree
+
+- [beads.dependencies.tree v1](reference/contracts/beads.dependencies.tree/beads-v1.md)
+
+### reference/contracts/beads.events.list
+
+- [beads.events.list v1](reference/contracts/beads.events.list/beads-v1.md)
+
+### reference/contracts/beads.issues.claim
+
+- [beads.issues.claim v1](reference/contracts/beads.issues.claim/beads-v1.md)
+
+### reference/contracts/beads.issues.claimNext
+
+- [beads.issues.claimNext v1](reference/contracts/beads.issues.claimNext/beads-v1.md)
+
+### reference/contracts/beads.issues.close
+
+- [beads.issues.close v1](reference/contracts/beads.issues.close/beads-v1.md)
+
+### reference/contracts/beads.issues.create
+
+- [beads.issues.create v1](reference/contracts/beads.issues.create/beads-v1.md)
+
+### reference/contracts/beads.issues.get
+
+- [beads.issues.get v1](reference/contracts/beads.issues.get/beads-v1.md)
+
+### reference/contracts/beads.issues.list
+
+- [beads.issues.list v1](reference/contracts/beads.issues.list/beads-v1.md)
+
+### reference/contracts/beads.issues.release
+
+- [beads.issues.release v1](reference/contracts/beads.issues.release/beads-v1.md)
+
+### reference/contracts/beads.issues.update
+
+- [beads.issues.update v1](reference/contracts/beads.issues.update/beads-v1.md)
+
+### reference/contracts/beads.memories.list
+
+- [beads.memories.list v1](reference/contracts/beads.memories.list/beads-v1.md)
+
+### reference/contracts/beads.memories.write
+
+- [beads.memories.write v1](reference/contracts/beads.memories.write/beads-v1.md)
+
+### reference/contracts/beads.ready
+
+- [beads.ready v1](reference/contracts/beads.ready/beads-v1.md)
+
+### reference/contracts/beads.ready.count
+
+- [beads.ready.count v1](reference/contracts/beads.ready.count/beads-v1.md)
+
+### reference/contracts/beads.stats
+
+- [beads.stats v1](reference/contracts/beads.stats/beads-v1.md)
+
 ### reference/contracts/conversation.list
 
 - [conversation.list: Visible Recents v1](reference/contracts/conversation.list/visible-recents-v1.md)

@@ -640,3 +640,7 @@ Shared document composition over the existing NotebookDocumentId, NotebookNoteSe
 # Package com.letta.mobile.data.controller.node.iroh.records
 
 Wrapper-owned producer run records and leases, independent of upstream cron storage. `WrapperRecordStore` is the injectable persistence boundary; `FileWrapperRecordStore` serializes append/upsert transactions, enforces clock-based retention and capacity, and quarantines corrupt state. Enum values cross the JSON boundary with an UNKNOWN fallback and persist by name. Record filters and pagination state also live here; authenticated Iroh handlers supply agent scope checks. This package has no dependency on connection lifecycle or product UI.
+
+# Package com.letta.mobile.data.controller.node.iroh.beads
+
+Bounded Beads admin RPC adapter for the wrapper, with upstream credentials held on the host.

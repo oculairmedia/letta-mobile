@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | ba81c9774cdc12d5f473653e9e5ff1e18371dc4da2b74096983dd0324230b5a4 | 08ed60e770725cedea0c4553c8be30d2a2e5d3fb |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 9bc400f7e9905478218ecf3fe222303c6167c6e45090fb3ed83f4d925a6a04d3 | 35d5934f754bde7912b7bf674df3c1b6876e899c |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 059a8074d8822474115bf90fd79307e82cd9956647e5159ab5366c058049b23f | 53ce84ba4956811e08566fa7e9fc3dfa32e88f29 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 84e62d502a28e0fb64e50a6d4c444bf48bd2a78bca62f17c38ae083f5d22de6d | 4a7bc7339087238113f9e9ee2f79f5ad334aa72a |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -287,13 +287,14 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (133 methods)
+## Admin ownership (154 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
 | Owner | Method count |
 | --- | --- |
 | app&#95;server&#95;v2 | 57 |
+| beads&#95;service | 21 |
 | capability&#95;gated&#95;unsupported | 17 |
 | controller&#95;native | 31 |
 | local&#95;backend&#95;store | 9 |
@@ -302,7 +303,7 @@ These are declared ownership decisions, not newly observed production execution.
 
 | Fallback | Method count |
 | --- | --- |
-| deny&#95;fail&#95;closed | 25 |
+| deny&#95;fail&#95;closed | 46 |
 | none | 108 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
@@ -316,6 +317,27 @@ These are declared ownership decisions, not newly observed production execution.
 | agent.update | app&#95;server&#95;v2 | none | admin&#95;write | AgentAdminHandlers.kt | agent&#95;update |
 | approval.submit | app&#95;server&#95;v2 | none | runtime&#95;write | ApprovalAdminHandlers.kt | control&#95;request approval response via live control session |
 | archive.list | controller&#95;native | none | admin&#95;read | ArchiveAdminHandlers.kt | controller-owned empty list for an entity the local backend does not model |
+| beads.config.get | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 GET&#95;SETTING |
+| beads.config.set | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 SET&#95;SETTING |
+| beads.context | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 GET&#95;CONTEXT |
+| beads.dependencies.add | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 ADD&#95;DEPENDENCIES |
+| beads.dependencies.cycles | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 LIST&#95;DEPENDENCY&#95;CYCLES |
+| beads.dependencies.remove | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 REMOVE&#95;DEPENDENCY |
+| beads.dependencies.tree | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 GET&#95;DEPENDENCY&#95;TREE |
+| beads.events.list | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 LIST&#95;EVENTS |
+| beads.issues.claim | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 CLAIM&#95;ISSUE |
+| beads.issues.claimNext | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 CLAIM&#95;NEXT&#95;ISSUE |
+| beads.issues.close | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 CLOSE&#95;ISSUE |
+| beads.issues.create | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 CREATE&#95;ISSUE |
+| beads.issues.get | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 GET&#95;ISSUE |
+| beads.issues.list | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 LIST&#95;ISSUES |
+| beads.issues.release | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 RELEASE&#95;ISSUE |
+| beads.issues.update | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 UPDATE&#95;ISSUE |
+| beads.memories.list | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 LIST&#95;MEMORIES |
+| beads.memories.write | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;write | BeadsRoutes.kt | bd 1.3.2 REMEMBER&#95;MEMORY |
+| beads.ready | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 LIST&#95;READY&#95;WORK |
+| beads.ready.count | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 COUNT&#95;READY&#95;WORK |
+| beads.stats | beads&#95;service | deny&#95;fail&#95;closed | admin&#95;read | BeadsRoutes.kt | bd 1.3.2 GET&#95;STATS |
 | block.attach | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native global-block command |
 | block.create | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native global-block command |
 | block.create&#95;agent | app&#95;server&#95;v2 | none | admin&#95;write | AgentBlockWriteHandlers.kt | write&#95;memory&#95;file |

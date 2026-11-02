@@ -121,7 +121,9 @@ class WireContractsTest {
             "Update full wire-contract host wiring for new router inputs; never leave a tier disabled",
         )
         val inputs = mapOf(
-            AdminRpcHostServices::class.java to setOf("controller", "subagentRegistrySource", "vibesyncBaseUrl", "pluginRoutes"),
+            AdminRpcHostServices::class.java to setOf(
+                "controller", "subagentRegistrySource", "vibesyncBaseUrl", "beadsBaseUrl", "beadsTokenFile", "beadsRoutes", "pluginRoutes",
+            ),
             AdminRpcNativeSources::class.java to setOf(
                 "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile", "wrapperRecords",
             ),
@@ -193,17 +195,15 @@ class WireContractsTest {
             }
         }
         val identityStore = rejectCalls<TurnIdentityStore>("identity-store")
-        val subagents = object : SubagentRegistrySource {
-            override suspend fun list(conversationId: String, includeTerminal: Boolean) = error("Unexpected subagent read")
-            override suspend fun todos(conversationId: String, toolCallId: String) = error("Unexpected subagent read")
-        }
         try {
             runtime.start()
             val router = AdminRpcRegistry.buildRouter(
                 services = AdminRpcHostServices(
                     controller = controller(state),
-                    subagentRegistrySource = subagents,
+                    subagentRegistrySource = rejectSubagentCalls(),
                     vibesyncBaseUrl = "http://127.0.0.1:9",
+                    beadsBaseUrl = "http://127.0.0.1:9",
+                    beadsRoutes = beadsRoutes(),
                     pluginRoutes = PluginAdminHandlers(runtime, InMemoryAssetStore()),
                 ),
                 pairing = AdminRpcPairing(
@@ -236,6 +236,21 @@ class WireContractsTest {
             runtime.close()
             plugins.close()
             dir.deleteRecursively()
+        }
+    }
+
+    private fun rejectSubagentCalls(): SubagentRegistrySource = object : SubagentRegistrySource {
+        override suspend fun list(conversationId: String, includeTerminal: Boolean) = error("Unexpected subagent read")
+        override suspend fun todos(conversationId: String, toolCallId: String) = error("Unexpected subagent read")
+    }
+
+    private fun beadsRoutes(): AdminRpcRoutes {
+        val client = com.letta.mobile.data.controller.node.iroh.beads.BeadsRouteClient("http://127.0.0.1:9", null)
+        val routes = com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes
+        return AdminRpcRoutes { router ->
+            (routes.reads + routes.writes).forEach { (method, operation) ->
+                router.register(method) { params -> client.execute(operation, params) }
+            }
         }
     }
 }

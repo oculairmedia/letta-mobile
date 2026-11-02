@@ -121,12 +121,17 @@ class AdminRpcRouter(
             Telemetry.event("AdminRpc", "method.not_found", "method" attr invocation.method)
             return encodeFailure(invocation.requestId, AdminRpcErrors.unknownMethod(invocation.method))
         }
-        val agentScope = invocation.context.authorizedAgentIds
-        if (!AgentScopeGuard.allowsParams(agentScope, invocation.params)) {
+        if (isAgentScopeDenied(invocation)) {
             Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" attr invocation.method)
             return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
         }
         return null
+    }
+
+    private fun isAgentScopeDenied(invocation: AdminRpcInvocation): Boolean {
+        val scope = invocation.context.authorizedAgentIds
+        val scopedBeads = invocation.method.startsWith("beads.") && !scope.isNullOrEmpty()
+        return scopedBeads || !AgentScopeGuard.allowsParams(scope, invocation.params)
     }
 
     /**

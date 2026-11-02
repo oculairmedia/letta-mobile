@@ -22,6 +22,8 @@ object IrohPeerCapabilities {
     const val TOOLS_MANAGE = "tools.manage"
     const val PROJECTS_MANAGE = "projects.manage"
     const val ADMIN_FULL = "admin.full"
+    const val BEADS_READ = "beads.read"
+    const val BEADS_WRITE = "beads.write"
     // letta-mobile-qjncd: new capabilities gating the Vibesync cross-project consumer.
     // Both are CLIENT-side authorization constructs (not letta-code RPC verbs): the gate
     // here authorizes the canonical admin_rpc methods (agent.create / conversation.create
@@ -34,7 +36,7 @@ object IrohPeerCapabilities {
     val ALL: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE, ADMIN_FULL,
-        SUBAGENT_SPAWN, WORKACTIVITY_REPORT,
+        SUBAGENT_SPAWN, WORKACTIVITY_REPORT, BEADS_READ, BEADS_WRITE,
     )
 
     /**
@@ -63,7 +65,7 @@ object IrohPeerCapabilities {
             "chat" to CHAT_ROLE,
             "desktop" to DEFAULT_DESKTOP_ROLE,
             "vibesync" to VIBESYNC_ROLE,
-            "admin" to setOf(ADMIN_FULL),
+            "admin" to setOf(ADMIN_FULL, BEADS_READ, BEADS_WRITE),
         )
     }
 
@@ -99,6 +101,8 @@ object IrohPeerCapabilities {
      * classified here (and in the ownership matrix).
      */
     fun forAdminMethod(method: String): String = when {
+        method in BEADS_READ_METHODS -> BEADS_READ
+        method in BEADS_WRITE_METHODS -> BEADS_WRITE
         method in WRAPPER_RECORD_READ_METHODS -> CHAT_READ
         method in WRAPPER_RECORD_WRITE_METHODS -> WORKACTIVITY_REPORT
         method in CHAT_READ_METHODS -> CHAT_READ
@@ -209,6 +213,16 @@ object IrohPeerCapabilities {
 
     // Reporting uses the existing opt-in producer grant; reading does not grant schedule mutation.
     private val WRAPPER_RECORD_WRITE_METHODS = setOf("run.record", "lease.upsert")
+    private val BEADS_READ_METHODS = setOf(
+        "beads.ready", "beads.ready.count", "beads.issues.get", "beads.issues.list",
+        "beads.dependencies.tree", "beads.dependencies.cycles", "beads.events.list", "beads.stats",
+        "beads.context", "beads.config.get", "beads.memories.list",
+    )
+    private val BEADS_WRITE_METHODS = setOf(
+        "beads.issues.create", "beads.issues.update", "beads.issues.close", "beads.issues.claim",
+        "beads.issues.release", "beads.issues.claimNext", "beads.dependencies.add", "beads.dependencies.remove",
+        "beads.config.set", "beads.memories.write",
+    )
     private val WRAPPER_RECORD_READ_METHODS = setOf("cron.runs", "lease.list")
 
     private val CHAT_READ_METHODS = setOf(

@@ -136,6 +136,18 @@ class AppServerServeIrohCommand : CliktCommand(
             "DIRECTLY (lgns8.9). Server-side localhost only.",
     ).default("http://127.0.0.1:3099")
 
+    private val beadsBaseUrl by option(
+        "--beads-base-url",
+        envvar = "LETTA_IROH_BEADS_BASE_URL",
+        help = "Optional bd serve base URL for beads.* admin RPC methods.",
+    )
+
+    private val beadsTokenFile by option(
+        "--beads-token-file",
+        envvar = "LETTA_IROH_BEADS_TOKEN_FILE",
+        help = "File containing the wrapper's bd serve bearer token.",
+    )
+
     private val canvasOpsDir by option(
         "--canvas-ops-dir",
         envvar = "LETTA_CANVAS_OPS_DIR",
@@ -536,6 +548,8 @@ class AppServerServeIrohCommand : CliktCommand(
             pairingService = admin.pairingService,
             nativeClient = admin.nativeClient,
             vibesyncBaseUrl = vibesyncBaseUrl,
+            beadsBaseUrl = beadsBaseUrl,
+            beadsTokenFile = beadsTokenFile,
             subagentRegistryFile = subagentRegistryFile,
             skillsDir = skillsDir,
             localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),

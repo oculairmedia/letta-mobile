@@ -10,6 +10,12 @@ class AdminRpcHostServices(
     val subagentRegistrySource: SubagentRegistrySource? = null,
     /** Product service for project methods; null keeps those methods capability-unavailable. */
     val vibesyncBaseUrl: String? = null,
+    /** Optional bd serve endpoint. Unset omits all beads methods. */
+    val beadsBaseUrl: String? = null,
+    /** Wrapper-only bearer token file for bd serve. */
+    val beadsTokenFile: String? = null,
+    /** Wrapper binding for the optional Beads routes. */
+    val beadsRoutes: AdminRpcRoutes? = null,
     /** Host-specific plugin routes; null registers capability-unavailable responses for plugin methods. */
     val pluginRoutes: AdminRpcRoutes? = null,
 )
