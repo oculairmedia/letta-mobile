@@ -65,7 +65,7 @@ class FileWrapperRecordStore(
         input.validate(now)
         val retained = prune(state, now)
         val prior = retained.leases.firstOrNull { it.input.id == input.id }
-        if (prior != null && (prior.input.owner != input.owner || prior.input.startedAtMs != input.startedAtMs)) {
+        if (prior != null && prior.hasDifferentIdentity(input)) {
             conflict("lease ownership/start")
         }
         val others = retained.leases.filterNot { it.input.id == input.id }
@@ -76,6 +76,9 @@ class FileWrapperRecordStore(
         commit(retained.copy(leases = others + row))
         return row
     }
+
+    private fun StoredLeaseRecord.hasDifferentIdentity(input: RecordedLeaseInput): Boolean =
+        this.input.owner != input.owner || this.input.startedAtMs != input.startedAtMs
 
     @Synchronized
     override fun snapshot(): WrapperRecordSnapshot = state
@@ -117,14 +120,14 @@ class FileWrapperRecordStore(
             check(loaded.leases.map { it.input.id }.distinct().size == loaded.leases.size)
             loaded.runs.forEach {
                 it.input.validate(clock())
-                saneInstant(it.createdAtMs, clock(), "createdAt")
+                InstantCheck(it.createdAtMs, clock(), "createdAt").validate()
                 check(it.id == runId(it.input))
                 checkRecordSize(json.encodeToString(it))
             }
             loaded.leases.forEach {
                 it.input.validate(clock())
-                saneInstant(it.createdAtMs, clock(), "createdAt")
-                saneInstant(it.updatedAtMs, clock(), "updatedAt")
+                InstantCheck(it.createdAtMs, clock(), "createdAt").validate()
+                InstantCheck(it.updatedAtMs, clock(), "updatedAt").validate()
                 checkRecordSize(json.encodeToString(it))
             }
             loaded

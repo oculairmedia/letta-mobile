@@ -232,7 +232,7 @@ class ShimOffParityGateTest {
         // but path separators/NUL/blank ids are rejected; pagination is always complete.
         override suspend fun cronRuns(command: AppServerCommand.CronRuns): AppServerInboundFrame.CronRunsResponse {
             val safe = command.taskId.trim()
-            if (safe.isEmpty() || safe.any { it == '/' || it == '\\' || it == '\u0000' }) {
+            if (safe.isEmpty() || safe.any(::isUnsafeCronCharacter)) {
                 return AppServerInboundFrame.CronRunsResponse(command.requestId, false, error = "invalid cron run log job id")
             }
             return AppServerInboundFrame.CronRunsResponse(command.requestId, true, buildJsonObject {
@@ -244,6 +244,8 @@ class ShimOffParityGateTest {
                 put("nextOffset", kotlinx.serialization.json.JsonNull)
             })
         }
+
+        private fun isUnsafeCronCharacter(char: Char): Boolean = char in "/\\\u0000"
 
         override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) =
             AppServerInboundFrame.CronTriggerResponse(command.requestId, true)

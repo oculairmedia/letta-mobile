@@ -22,16 +22,20 @@ internal fun invalid(field: String): Nothing = throw IllegalArgumentException("v
 internal fun conflict(field: String): Nothing = throw IllegalArgumentException("validation.conflict: $field")
 internal fun capacity(field: String): Nothing = error("storage.capacity: $field")
 
-internal fun bounded(value: String, field: String, max: Int): String {
-    if (value.isBlank() || value.length > max) invalid(field)
-    return value
+internal data class TextField(val name: String, val maxLength: Int, val optional: Boolean = false) {
+    fun bounded(value: String): String {
+        if (value.isBlank() || value.length > maxLength) invalid(name)
+        return value
+    }
 }
 
-internal fun JsonObject?.text(field: String, max: Int, optional: Boolean = false): String? {
-    val raw = this?.get(field)
-    if ((raw == null || raw == JsonNull) && optional) return null
-    val value = (raw as? JsonPrimitive)?.takeIf { it.isString }?.content ?: invalid(field)
-    return bounded(value, field, max)
+private fun isMissing(raw: kotlinx.serialization.json.JsonElement?): Boolean = raw == null || raw == JsonNull
+
+internal fun JsonObject?.text(field: TextField): String? {
+    val raw = this?.get(field.name)
+    if (field.optional && isMissing(raw)) return null
+    val value = (raw as? JsonPrimitive)?.takeIf { it.isString }?.content ?: invalid(field.name)
+    return field.bounded(value)
 }
 
 internal fun JsonObject?.integer(field: String, default: Int, max: Int = Int.MAX_VALUE, min: Int = 0): Int {
@@ -41,74 +45,82 @@ internal fun JsonObject?.integer(field: String, default: Int, max: Int = Int.MAX
     return number
 }
 
-internal fun JsonObject?.instant(field: String, optional: Boolean = false): Long? {
-    val value = text(field, MAX_ID_LENGTH, optional) ?: return null
-    val parsed = runCatching { Instant.parse(value).toEpochMilli() }.getOrElse { invalid(field) }
-    if (parsed !in earliestInstant..latestQueryInstant) invalid(field)
+internal data class InstantField(val name: String, val optional: Boolean = false)
+
+internal fun JsonObject?.instant(field: InstantField): Long? {
+    val value = text(TextField(field.name, MAX_ID_LENGTH, field.optional)) ?: return null
+    val parsed = runCatching { Instant.parse(value).toEpochMilli() }.getOrElse { invalid(field.name) }
+    if (parsed !in earliestInstant..latestQueryInstant) invalid(field.name)
     return parsed
 }
 
-internal fun saneInstant(value: Long, now: Long, field: String) {
-    if (value < earliestInstant || value > now + FUTURE_DAYS * DAY_MS) invalid(field)
+internal data class InstantCheck(val value: Long, val now: Long, val field: String) {
+    fun validate() {
+        if (value < earliestInstant || value > now + FUTURE_DAYS * DAY_MS) invalid(field)
+    }
 }
 
 // The native cron run-log reader uses ECMAScript String.trim before validating its file key.
 private const val CRON_TRIM_CHARS = "\t\n\u000b\u000c\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004" +
     "\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
-internal fun safeCronReference(value: String, field: String) {
-    bounded(value, field, MAX_ID_LENGTH)
-    val safe = value.trim { it in CRON_TRIM_CHARS }
-    if (safe.isEmpty() || safe.any { it == '/' || it == '\\' || it == '\u0000' }) invalid(field)
+internal data class CronReference(val value: String, val field: String) {
+    fun validate() {
+        TextField(field, MAX_ID_LENGTH).bounded(value)
+        val safe = value.trim { it in CRON_TRIM_CHARS }
+        if (safe.isEmpty() || safe.any(::isUnsafeCronCharacter)) invalid(field)
+    }
 }
 
+private fun isUnsafeCronCharacter(char: Char): Boolean = char in "/\\\u0000"
+
 internal fun RecordedRunInput.validate(now: Long) {
-    bounded(agentId, "agentId", MAX_ID_LENGTH)
-    scheduleId?.let { safeCronReference(it, "scheduleId") }
-    bounded(scheduleName, "scheduleName", MAX_LABEL_LENGTH)
-    bounded(reason, "reason", MAX_REASON_LENGTH)
-    detail?.let { bounded(it, "detail", MAX_DETAIL_LENGTH) }
-    saneInstant(instantMs, now, "instant")
+    TextField("agentId", MAX_ID_LENGTH).bounded(agentId)
+    scheduleId?.let { CronReference(it, "scheduleId").validate() }
+    TextField("scheduleName", MAX_LABEL_LENGTH).bounded(scheduleName)
+    TextField("reason", MAX_REASON_LENGTH).bounded(reason)
+    detail?.let { TextField("detail", MAX_DETAIL_LENGTH).bounded(it) }
+    InstantCheck(instantMs, now, "instant").validate()
 }
 
 internal fun RecordedLeaseInput.validate(now: Long) {
-    bounded(id, "id", MAX_ID_LENGTH)
-    bounded(owner, "owner", MAX_ID_LENGTH)
-    bounded(label, "label", MAX_LABEL_LENGTH)
-    runId?.let { bounded(it, "runId", MAX_ID_LENGTH) }
-    detail?.let { bounded(it, "detail", MAX_DETAIL_LENGTH) }
-    saneInstant(startedAtMs, now, "startedAt")
-    saneInstant(dueAtMs, now, "dueAt")
+    TextField("id", MAX_ID_LENGTH).bounded(id)
+    TextField("owner", MAX_ID_LENGTH).bounded(owner)
+    TextField("label", MAX_LABEL_LENGTH).bounded(label)
+    runId?.let { TextField("runId", MAX_ID_LENGTH).bounded(it) }
+    detail?.let { TextField("detail", MAX_DETAIL_LENGTH).bounded(it) }
+    InstantCheck(startedAtMs, now, "startedAt").validate()
+    InstantCheck(dueAtMs, now, "dueAt").validate()
     if (dueAtMs < startedAtMs) invalid("dueAt")
 }
 
 internal fun parseRun(params: JsonObject?) = RecordedRunInput(
-    agentId = params.text("agentId", MAX_ID_LENGTH)!!,
-    scheduleId = params.text("scheduleId", MAX_ID_LENGTH, optional = true),
-    scheduleName = params.text("scheduleName", MAX_LABEL_LENGTH)!!,
-    instantMs = params.instant("instant")!!,
-    status = runStatus(params.text("status", MAX_ID_LENGTH)!!),
-    reason = params.text("reason", MAX_REASON_LENGTH)!!,
-    source = runSource(params.text("source", MAX_ID_LENGTH)!!),
-    detail = params.text("detail", MAX_DETAIL_LENGTH, optional = true),
+    agentId = params.text(TextField("agentId", MAX_ID_LENGTH))!!,
+    scheduleId = params.text(TextField("scheduleId", MAX_ID_LENGTH, optional = true)),
+    scheduleName = params.text(TextField("scheduleName", MAX_LABEL_LENGTH))!!,
+    instantMs = params.instant(InstantField("instant"))!!,
+    status = params.text(TextField("status", MAX_ID_LENGTH))!!.runStatus(),
+    reason = params.text(TextField("reason", MAX_REASON_LENGTH))!!,
+    source = params.text(TextField("source", MAX_ID_LENGTH))!!.runSource(),
+    detail = params.text(TextField("detail", MAX_DETAIL_LENGTH, optional = true)),
 )
 
 internal fun parseLease(params: JsonObject?) = RecordedLeaseInput(
-    id = params.text("id", MAX_ID_LENGTH)!!,
-    owner = params.text("owner", MAX_ID_LENGTH)!!,
-    label = params.text("label", MAX_LABEL_LENGTH)!!,
-    startedAtMs = params.instant("startedAt")!!,
-    dueAtMs = params.instant("dueAt")!!,
-    state = leaseState(params.text("state", MAX_ID_LENGTH)!!),
-    runId = params.text("runId", MAX_ID_LENGTH, optional = true),
-    detail = params.text("detail", MAX_DETAIL_LENGTH, optional = true),
+    id = params.text(TextField("id", MAX_ID_LENGTH))!!,
+    owner = params.text(TextField("owner", MAX_ID_LENGTH))!!,
+    label = params.text(TextField("label", MAX_LABEL_LENGTH))!!,
+    startedAtMs = params.instant(InstantField("startedAt"))!!,
+    dueAtMs = params.instant(InstantField("dueAt"))!!,
+    state = leaseState(params.text(TextField("state", MAX_ID_LENGTH))!!),
+    runId = params.text(TextField("runId", MAX_ID_LENGTH, optional = true)),
+    detail = params.text(TextField("detail", MAX_DETAIL_LENGTH, optional = true)),
 )
 
-private fun runStatus(value: String): RecordedRunStatus =
-    RecordedRunStatus.entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: RecordedRunStatus.UNKNOWN
+private fun String.runStatus(): RecordedRunStatus =
+    RecordedRunStatus.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: RecordedRunStatus.UNKNOWN
 
-private fun runSource(value: String): RecordedRunSource =
-    RecordedRunSource.entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: RecordedRunSource.UNKNOWN
+private fun String.runSource(): RecordedRunSource =
+    RecordedRunSource.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: RecordedRunSource.UNKNOWN
 
 internal fun leaseState(value: String): RecordedLeaseState =
     RecordedLeaseState.entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: RecordedLeaseState.UNKNOWN
