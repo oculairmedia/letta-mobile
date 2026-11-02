@@ -60,34 +60,49 @@ internal fun DreamingSettingsSection(state: DreamSettingsState, actions: Dreamin
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        SwitchRow(DreamingStrings.AUTOMATIC, settings.automatic, DreamingTags.AUTOMATIC) { on ->
-            save(settings.copy(trigger = if (on) DreamTrigger.CompactionEvent else DreamTrigger.Off))
-        }
-        if (settings.automatic) TriggerControls(settings, save)
-        SwitchRow(DreamingStrings.REVIEW, settings.merge == DreamMerge.Explicit, DreamingTags.REVIEW) { on ->
-            save(settings.copy(merge = if (on) DreamMerge.Explicit else DreamMerge.Auto))
-        }
-        Hint(DreamingStrings.REVIEW_HINT)
-        if (settings.merge == DreamMerge.Explicit) ReviewInstructions(settings, save)
-        if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
-            ReflectionModelControl(settings, actions.models, onPick = { pickingModel = true }) { choice ->
-                actions.save(DreamSettingsChange(settings.copy(model = choice), scope, modelChanged = true))
-            }
-            FocusInstructions(settings) { focus ->
-                actions.save(
-                    DreamSettingsChange(
-                        settings.copy(focusInstructions = focus),
-                        scope,
-                        focusInstructionsChanged = true,
-                    ),
-                )
-            }
-        }
+        AutomaticAndReviewControls(settings, save)
+        ReflectionSettingsControls(settings, scope, actions) { pickingModel = true }
         ScopeChoice(scope) { picked ->
             scope = picked
             actions.save(DreamSettingsChange(settings, picked))
         }
         state.error?.let { Text(DreamingStrings.failure(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+    }
+}
+
+@Composable
+private fun AutomaticAndReviewControls(settings: DreamSettings, save: (DreamSettings) -> Unit) {
+    SwitchRow(DreamingStrings.AUTOMATIC, settings.automatic, DreamingTags.AUTOMATIC) { on ->
+        save(settings.copy(trigger = if (on) DreamTrigger.CompactionEvent else DreamTrigger.Off))
+    }
+    if (settings.automatic) TriggerControls(settings, save)
+    SwitchRow(DreamingStrings.REVIEW, settings.merge == DreamMerge.Explicit, DreamingTags.REVIEW) { on ->
+        save(settings.copy(merge = if (on) DreamMerge.Explicit else DreamMerge.Auto))
+    }
+    Hint(DreamingStrings.REVIEW_HINT)
+    if (settings.merge == DreamMerge.Explicit) ReviewInstructions(settings, save)
+}
+
+@Composable
+private fun ReflectionSettingsControls(
+    settings: DreamSettings,
+    scope: DreamSettingsScope,
+    actions: DreamingActions,
+    onPickModel: () -> Unit,
+) {
+    if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
+        ReflectionModelControl(settings, actions.models, onPick = onPickModel) { choice ->
+            actions.save(DreamSettingsChange(settings.copy(model = choice), scope, modelChanged = true))
+        }
+        FocusInstructions(settings) { focus ->
+            actions.save(
+                DreamSettingsChange(
+                    settings.copy(focusInstructions = focus),
+                    scope,
+                    focusInstructionsChanged = true,
+                ),
+            )
+        }
     }
 }
 
