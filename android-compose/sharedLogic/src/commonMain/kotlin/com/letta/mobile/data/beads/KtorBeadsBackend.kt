@@ -4,6 +4,7 @@ import com.letta.mobile.data.beads.wire.core.ContextResponse
 import com.letta.mobile.data.stream.SseParser
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareRequest
 import io.ktor.client.request.setBody
@@ -45,7 +46,8 @@ class KtorBeadsBackend private constructor(
             val isolated = HttpClient(engine) { expectSuccess = false; followRedirects = false }
             var connected = false
             try {
-                val response = request(isolated, baseUrl, token, BeadsOperation.GET_CONTEXT, emptyMap(), emptyMap(), null)
+                val spec = RequestSpec(BeadsOperation.GET_CONTEXT, emptyMap(), emptyMap(), null)
+                val response = request(isolated, baseUrl, token, spec)
                 val context: ContextResponse = decodeBeads(response)
                 val backend = KtorBeadsBackend(isolated, baseUrl, token, context)
                 connected = true
@@ -63,12 +65,12 @@ class KtorBeadsBackend private constructor(
         body: JsonElement?,
     ): JsonElement {
         guard(operation)
-        return request(client, baseUrl, token, operation, pathParameters, query, body)
+        return request(client, baseUrl, token, RequestSpec(operation, pathParameters, query, body))
     }
 
     override fun watchEvents(since: Long, lastEventId: Long?): Flow<BeadsEvent> = flow {
         guard(BeadsOperation.WATCH_EVENTS)
-        try {
+        withBeadsFailures {
             client.prepareRequest(baseUrl.trimEnd('/') + BeadsOperation.WATCH_EVENTS.path) {
                 method = HttpMethod.Get
                 url.parameters.append("since", since.toString())
@@ -79,26 +81,12 @@ class KtorBeadsBackend private constructor(
                 val channel = response.bodyAsChannel()
                 try {
                     SseParser.parseRawEvents(channel).collect { frame ->
-                        if (frame.event != null && frame.event != "message") throw BeadsProtocolException()
-                        val value = try {
-                            wireJson.parseToJsonElement(frame.data)
-                        } catch (_: Exception) {
-                            throw BeadsProtocolException()
-                        }
-                        emit(decodeBeads(value))
+                        emit(decodeEvent(frame.event, frame.data))
                     }
                 } finally {
                     channel.cancel(null)
                 }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: BeadsHttpException) {
-            throw e
-        } catch (e: BeadsProtocolException) {
-            throw e
-        } catch (_: Exception) {
-            throw BeadsTransportException()
         }
     }
 
@@ -113,35 +101,59 @@ class KtorBeadsBackend private constructor(
     }
 }
 
-private suspend fun request(
-    client: HttpClient,
-    baseUrl: String,
-    token: String?,
-    operation: BeadsOperation,
-    pathParameters: Map<String, String>,
-    query: Map<String, List<String>>,
-    body: JsonElement?,
-): JsonElement = try {
-    var path = operation.path
-    pathParameters.forEach { (name, value) -> path = path.replace("{$name}", value.encodeURLPathPart()) }
-    client.prepareRequest(baseUrl.trimEnd('/') + path) {
-        method = HttpMethod.parse(operation.method)
-        query.forEach { (name, values) -> values.forEach { url.parameters.append(name, it) } }
-        token?.let { header(HttpHeaders.Authorization, "Bearer $it") }
-        body?.let {
-            contentType(ContentType.Application.Json)
-            setBody(it.toString())
-        }
-    }.execute { response ->
-        checkStatus(response)
-        try {
-            wireJson.parseToJsonElement(response.bodyAsText())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            throw BeadsProtocolException()
+private class RequestSpec(
+    val operation: BeadsOperation,
+    val pathParameters: Map<String, String>,
+    val query: Map<String, List<String>>,
+    val body: JsonElement?,
+)
+
+private suspend fun request(client: HttpClient, baseUrl: String, token: String?, spec: RequestSpec): JsonElement =
+    withBeadsFailures {
+        client.prepareRequest(requestUrl(baseUrl, spec)) {
+            configureRequest(spec, token)
+        }.execute { response ->
+            checkStatus(response)
+            decodeResponse(response)
         }
     }
+
+private fun requestUrl(baseUrl: String, spec: RequestSpec): String {
+    var path = spec.operation.path
+    spec.pathParameters.forEach { (name, value) -> path = path.replace("{$name}", value.encodeURLPathPart()) }
+    return baseUrl.trimEnd('/') + path
+}
+
+private fun HttpRequestBuilder.configureRequest(spec: RequestSpec, token: String?) {
+    method = HttpMethod.parse(spec.operation.method)
+    spec.query.forEach { (name, values) -> values.forEach { url.parameters.append(name, it) } }
+    token?.let { header(HttpHeaders.Authorization, "Bearer $it") }
+    spec.body?.let {
+        contentType(ContentType.Application.Json)
+        setBody(it.toString())
+    }
+}
+
+private suspend fun decodeResponse(response: HttpResponse): JsonElement = try {
+    wireJson.parseToJsonElement(response.bodyAsText())
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    throw BeadsProtocolException()
+}
+
+private fun decodeEvent(event: String?, data: String): BeadsEvent {
+    if (event != null && event != "message") throw BeadsProtocolException()
+    val value = try {
+        wireJson.parseToJsonElement(data)
+    } catch (_: Exception) {
+        throw BeadsProtocolException()
+    }
+    return decodeBeads(value)
+}
+
+private suspend inline fun <T> withBeadsFailures(block: () -> T): T = try {
+    block()
 } catch (e: CancellationException) {
     throw e
 } catch (e: BeadsHttpException) {
