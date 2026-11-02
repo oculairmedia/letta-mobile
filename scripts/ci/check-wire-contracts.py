@@ -56,7 +56,9 @@ def previous_baseline(root, diff_base):
 
 
 def contracts(root):
-    specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md") if p != root / INDEX}
+    # Only <method>/<name>-vN.md files are RPC specs; prose contracts (for example
+    # conversation-lanes-v1.md) and the generated README.md sit directly in SPECS.
+    specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md") if p.parent != root / SPECS}
     fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")}
     require_pairs(specs, fixtures)
     return [contract_row(root, key, path, specs[key]) for key, path in sorted(fixtures.items())]

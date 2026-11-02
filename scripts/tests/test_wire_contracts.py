@@ -39,6 +39,11 @@ class WireContractsTest(unittest.TestCase):
         (self.root / "handler.kt").write_text("// handler\n")
         return spec, fixture
 
+    def test_prose_contract_beside_the_index_is_not_an_orphan_spec(self):
+        self.pair()
+        (self.root / self.module.SPECS / "conversation-lanes-v1.md").write_text("# prose contract\n")
+        self.assertEqual(1, len(self.module.contracts(self.root)))
+
     def test_orphans_fail(self):
         spec, fixture = self.pair()
         spec.unlink()
