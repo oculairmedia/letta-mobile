@@ -66,11 +66,7 @@ class IrohAgentMessageRouter(
                 0 -> RoutingDecision.CreateAndDeliver
                 1 -> {
                     val inbox = matches.single()
-                    if (candidates.first { it.conversation.id == inbox.id }.busy) {
-                        RoutingDecision.Queue(inbox.id.value)
-                    } else {
-                        RoutingDecision.Deliver(inbox.id.value)
-                    }
+                    routeExplicitTarget(inbox.id.value, candidates)
                 }
                 else -> RoutingDecision.Dropped("duplicate_lane_tags")
             }

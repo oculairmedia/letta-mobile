@@ -26,6 +26,8 @@ import kotlin.time.Duration.Companion.milliseconds
 private typealias ConversationWriteNotice = suspend (JsonElement?, String?, ConversationChangeKind, String?) -> Unit
 
 object ConversationAdminHandlers {
+    // Both the Iroh peer's conversation.create/update routes and createInbox run
+    // in this wrapper process and take this mutex across the check and write.
     private val laneWriteMutex = Mutex()
     /** Atomically reuses or creates the recipient inbox against wrapper lane writes. */
     suspend fun createInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String = laneWriteMutex.withLock {
