@@ -15693,6 +15693,7 @@ public final class com/letta/mobile/data/controller/node/iroh/NativeAdminOp : ja
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp$Companion;
 	public static final field ConversationArchive Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp;
 	public static final field ConversationCreate Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp;
+	public static final field ConversationDiscovery Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp;
 	public static final field ConversationFork Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp;
 	public static final field ConversationGet Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp;
 	public static final field ConversationList Lcom/letta/mobile/data/controller/node/iroh/NativeAdminOp;

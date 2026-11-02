@@ -46,6 +46,7 @@ open class LocalBackendAdminStore(
     lmstudioBaseUrl: String =
         System.getenv("LMSTUDIO_BASE_URL")?.takeIf { it.isNotBlank() } ?: DEFAULT_MODEL_ENDPOINT,
 ) {
+    internal val conversationsDirectory: File = File(baseDir, LocalBackendLayout.CONVERSATIONS_DIR)
     private val support = LocalBackendStoreSupport(baseDir, lmstudioBaseUrl)
     internal val blockReader = LocalBackendBlockReader(support)
     private val agentReader = LocalBackendAgentReader(support, blockReader)
