@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.UsageError
+import com.github.ajalt.clikt.core.parse
 import com.letta.mobile.data.transport.iroh.AgentSendResult
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import java.io.ByteArrayInputStream
