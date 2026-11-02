@@ -117,24 +117,27 @@ private fun validateUpstreamPage(page: JsonObject, entries: JsonArray, offset: I
     val total = (page["total"] as? JsonPrimitive)?.intOrNull ?: adminError("cron_runs invalid page")
     val hasMore = (page["hasMore"] as? JsonPrimitive)?.booleanOrNull ?: adminError("cron_runs invalid page")
     val next = offset + entries.size
-    if (invalidPageSize(total, next, entries)) adminError("cron_runs invalid page")
+    val position = UpstreamPagePosition(total, next)
+    if (invalidPageSize(position, entries)) adminError("cron_runs invalid page")
     if (invalidPageBounds(page, offset)) adminError("cron_runs invalid page")
-    if (invalidContinuation(page, entries, total, next, hasMore)) adminError("cron_runs invalid page")
+    if (invalidContinuation(page, entries, position, hasMore)) adminError("cron_runs invalid page")
     return hasMore
 }
 
-private fun invalidPageSize(total: Int, next: Int, entries: JsonArray): Boolean =
-    total !in 0..UPSTREAM_RUN_CAP || invalidPageExtent(next, total, entries)
+private data class UpstreamPagePosition(val total: Int, val next: Int)
 
-private fun invalidPageExtent(next: Int, total: Int, entries: JsonArray): Boolean =
-    next > total || entries.size > UPSTREAM_PAGE_SIZE
+private fun invalidPageSize(position: UpstreamPagePosition, entries: JsonArray): Boolean =
+    position.total !in 0..UPSTREAM_RUN_CAP || invalidPageExtent(position, entries)
+
+private fun invalidPageExtent(position: UpstreamPagePosition, entries: JsonArray): Boolean =
+    position.next > position.total || entries.size > UPSTREAM_PAGE_SIZE
 
 private fun invalidPageBounds(page: JsonObject, offset: Int): Boolean =
     page["offset"] != JsonPrimitive(offset) || page["limit"] != JsonPrimitive(UPSTREAM_PAGE_SIZE)
 
-private fun invalidContinuation(page: JsonObject, entries: JsonArray, total: Int, next: Int, hasMore: Boolean): Boolean {
-    val expectedNext = if (hasMore) JsonPrimitive(next) else JsonNull
-    return hasMore != (next < total) || invalidNextOffset(page, expectedNext, hasMore, entries)
+private fun invalidContinuation(page: JsonObject, entries: JsonArray, position: UpstreamPagePosition, hasMore: Boolean): Boolean {
+    val expectedNext = if (hasMore) JsonPrimitive(position.next) else JsonNull
+    return hasMore != (position.next < position.total) || invalidNextOffset(page, expectedNext, hasMore, entries)
 }
 
 private fun invalidNextOffset(

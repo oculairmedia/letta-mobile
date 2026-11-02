@@ -43,16 +43,16 @@ class FileWrapperRecordStore(
     @Synchronized
     override fun record(input: RecordedRunInput): StoredRunRecord {
         val now = clock()
-        input.validate(now)
+        input.validate(ValidationClock(now))
         val retained = prune(state, now)
         val id = runId(input)
         val prior = retained.runs.firstOrNull { it.id == id }
-        if (prior != null && prior.input != input) conflict("run identity")
+        if (prior != null && prior.input != input) "run identity".conflict()
         if (prior != null) {
             commit(retained)
             return prior
         }
-        if (retained.runs.size >= MAX_RUNS) capacity("runs")
+        if (retained.runs.size >= MAX_RUNS) "runs".capacity()
         val row = StoredRunRecord(input, id, now)
         checkRecordSize(json.encodeToString(row))
         commit(prune(retained.copy(runs = retained.runs + row), now))
@@ -62,15 +62,15 @@ class FileWrapperRecordStore(
     @Synchronized
     override fun upsert(input: RecordedLeaseInput): StoredLeaseRecord {
         val now = clock()
-        input.validate(now)
+        input.validate(ValidationClock(now))
         val retained = prune(state, now)
         val prior = retained.leases.firstOrNull { it.input.id == input.id }
         if (prior != null && prior.hasDifferentIdentity(input)) {
-            conflict("lease ownership/start")
+            "lease ownership/start".conflict()
         }
         val others = retained.leases.filterNot { it.input.id == input.id }
-        if (others.size >= MAX_LEASES) capacity("leases")
-        if (!input.state.closed && others.count { !it.input.state.closed } >= MAX_ACTIVE_LEASES) capacity("active leases")
+        if (others.size >= MAX_LEASES) "leases".capacity()
+        if (!input.state.closed && others.count { !it.input.state.closed } >= MAX_ACTIVE_LEASES) "active leases".capacity()
         val row = StoredLeaseRecord(input, prior?.createdAtMs ?: now, now)
         checkRecordSize(json.encodeToString(row))
         commit(retained.copy(leases = others + row))
@@ -98,7 +98,7 @@ class FileWrapperRecordStore(
     }
 
     private fun checkRecordSize(text: String) {
-        if (text.toByteArray(Charsets.UTF_8).size > MAX_RECORD_BYTES) invalid("record size")
+        if (text.toByteArray(Charsets.UTF_8).size > MAX_RECORD_BYTES) "record size".invalid()
     }
 
     private fun load(): WrapperRecordSnapshot {
@@ -119,13 +119,13 @@ class FileWrapperRecordStore(
             check(loaded.runs.map { it.id }.distinct().size == loaded.runs.size)
             check(loaded.leases.map { it.input.id }.distinct().size == loaded.leases.size)
             loaded.runs.forEach {
-                it.input.validate(clock())
+                it.input.validate(ValidationClock(clock()))
                 InstantCheck(it.createdAtMs, clock(), "createdAt").validate()
                 check(it.id == runId(it.input))
                 checkRecordSize(json.encodeToString(it))
             }
             loaded.leases.forEach {
-                it.input.validate(clock())
+                it.input.validate(ValidationClock(clock()))
                 InstantCheck(it.createdAtMs, clock(), "createdAt").validate()
                 InstantCheck(it.updatedAtMs, clock(), "updatedAt").validate()
                 checkRecordSize(json.encodeToString(it))
@@ -149,7 +149,7 @@ class FileWrapperRecordStore(
     }
 
     private fun persist(file: Path, bytes: ByteArray) {
-        if (bytes.size > MAX_FILE_BYTES) capacity("file")
+        if (bytes.size > MAX_FILE_BYTES) "file".capacity()
         val absolute = file.toAbsolutePath()
         Files.createDirectories(absolute.parent)
         val temporary = absolute.resolveSibling(".${absolute.fileName}.tmp-${UUID.randomUUID()}")

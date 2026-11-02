@@ -38,10 +38,10 @@ internal fun registerRunRecordHandlers(router: AdminRpcRouter, store: WrapperRec
         requireRecordAuthentication(context)
         val agent = params.text(TextField("agentId", MAX_ID_LENGTH, optional = true))
         agent?.let { requireRecordAgentScope(context, AgentId(it)) }
-        val state = params.text(TextField("state", MAX_ID_LENGTH, optional = true))?.let(::leaseState)
+        val state = params.text(TextField("state", MAX_ID_LENGTH, optional = true))?.leaseState()
         val from = params.instant(InstantField("from", optional = true))
         val to = params.instant(InstantField("to", optional = true))
-        if (invalidRange(from, to)) invalid("from/to")
+        if (invalidRange(from, to)) "from/to".invalid()
         val filter = LeaseFilter(context, agent, state, from, to)
         val rows = store.snapshot().leases.filter(filter::includes)
             .sortedWith(compareByDescending<StoredLeaseRecord> { it.input.startedAtMs }
