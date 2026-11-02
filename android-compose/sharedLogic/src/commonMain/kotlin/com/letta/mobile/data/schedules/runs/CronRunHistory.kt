@@ -29,15 +29,19 @@ class CronRunHistory(private val transport: IChannelTransport) {
             val response = transport.adminRpc("cron.runs", "/v1/crons/$task/runs", body.toString())
             check(response.success) { response.error ?: "cron.runs failed" }
             val page = (response.result as? JsonObject)?.get("page") as? JsonObject ?: error("cron.runs missing page")
-            val entries = page["entries"] as? JsonArray ?: error("cron.runs invalid entries")
             records += cronRunRecords(page).filter { it.scheduleId == task }
-            val more = (page["hasMore"] as? JsonPrimitive)?.booleanOrNull ?: error("cron.runs invalid page")
-            val next = (page["nextOffset"] as? JsonPrimitive)?.intOrNull
-            if (!more) return records
-            check(next != null && entries.isNotEmpty() && next == offset + entries.size && next <= 15000) {
-                "cron.runs invalid continuation"
-            }
-            offset = next
+            offset = nextOffset(page, offset) ?: return records
         } while (true)
+    }
+
+    private fun nextOffset(page: JsonObject, offset: Int): Int? {
+        val entries = page["entries"] as? JsonArray ?: error("cron.runs invalid entries")
+        val more = (page["hasMore"] as? JsonPrimitive)?.booleanOrNull ?: error("cron.runs invalid page")
+        if (!more) return null
+        val next = (page["nextOffset"] as? JsonPrimitive)?.intOrNull
+        check(next != null && entries.isNotEmpty() && next == offset + entries.size && next <= 15000) {
+            "cron.runs invalid continuation"
+        }
+        return next
     }
 }

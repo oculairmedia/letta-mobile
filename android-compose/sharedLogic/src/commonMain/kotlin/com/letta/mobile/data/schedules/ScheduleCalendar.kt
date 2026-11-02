@@ -121,18 +121,25 @@ object ScheduleCalendar {
                 Placed(run, instant.toLocalDateTime(zone).let { it.date to it.hour * MINUTES_PER_HOUR + it.minute })
             }
         }
-        val unscheduled = if (query.includeUnscheduled) defs.filter { query.includePaused || it.active }.flatMap { def ->
+        val unscheduled = unscheduled(defs, query, start, end)
+        val byDate = (placed + unscheduled).groupBy { it.at.first }
+        return dates.map { date -> day(date, byDate[date].orEmpty()) }
+    }
+
+    private fun unscheduled(
+        defs: List<ScheduleDef>, query: CalendarQuery, start: Instant, end: Instant,
+    ): List<Placed> {
+        if (!query.includeUnscheduled) return emptyList()
+        return defs.filter { query.includePaused || it.active }.flatMap { def ->
             query.history[def.id].orEmpty().filter {
-                it.source != null && it.source != "cron" && it.instant in start..<end && it.instant <= now
+                it.source != null && it.source != "cron" && it.instant in start..<end && it.instant <= query.clock.now
             }.map { record ->
-                val local = record.instant.toLocalDateTime(zone)
+                val local = record.instant.toLocalDateTime(query.clock.zone)
                 val run = ScheduleRun(def.id, record.scheduleName ?: def.name, record.instant, record.status, record.durationMillis,
                     record.exitCode, record.error, def.agentId, record.reason, record.source, record.recordId)
                 Placed(run, local.date to local.hour * MINUTES_PER_HOUR + local.minute)
             }
-        } else emptyList()
-        val byDate = (placed + unscheduled).groupBy { it.at.first }
-        return dates.map { date -> day(date, byDate[date].orEmpty()) }
+        }
     }
 
     /** True when runs at these minutes of one day should collapse into a band. */
