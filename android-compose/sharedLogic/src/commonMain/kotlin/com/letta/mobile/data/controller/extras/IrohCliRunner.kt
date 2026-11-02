@@ -47,8 +47,7 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
  * already implements (do not duplicate the send path; reuse the existing CLI).
  */
 /**
- * The pair of optional Iroh
- * filesystem paths a CLI invocation may override.
+ * Optional Iroh filesystem paths and message options for a CLI invocation.
  *
  * Grouped into a single value class so the runner's `send` signature stays
  * under CodeScene's "≤4 function arguments" threshold and so callers that
@@ -60,6 +59,7 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
 data class IrohCliPaths(
     val identityDir: String? = null,
     val addressStore: String? = null,
+    val message: IrohMessageOptions = IrohMessageOptions(),
 ) {
     companion object {
         /** The path triple that means "no overrides — let the CLI default." */
@@ -86,7 +86,6 @@ interface IrohCliRunner {
      * @param paths Optional overrides for the Iroh filesystem layout
      *   (identity dir + address-book kv). Pass [IrohCliPaths.DEFAULTS] for
      *   "no overrides — let the CLI default."
-     * @param options Optional conversation, lane and task correlation.
      * @return Typed outcome — never throws to the caller (the dispatcher
      *   contract is "always answer"; throwing would surface as a tool error
      *   and break the turn's answer guarantee).
@@ -97,7 +96,6 @@ interface IrohCliRunner {
         toAgentId: String,
         body: String,
         paths: IrohCliPaths = IrohCliPaths.DEFAULTS,
-        options: IrohMessageOptions = IrohMessageOptions(),
     ): IrohCliSendResult
 }
 

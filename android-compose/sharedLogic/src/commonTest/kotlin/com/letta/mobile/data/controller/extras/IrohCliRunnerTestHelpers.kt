@@ -1,7 +1,5 @@
 package com.letta.mobile.data.controller.extras
 
-import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
-
 /**
  * letta-mobile-bn008-phase2-custom-tool (1vuec): shared test doubles for
  * the [IrohCliRunner] interface, used by [CustomIrohMessagingToolTest],
@@ -18,7 +16,6 @@ internal class CapturingRunner : IrohCliRunner {
         val toAgentId: String,
         val body: String,
         val paths: IrohCliPaths,
-        val options: IrohMessageOptions,
     )
     val calls: MutableList<Call> = mutableListOf()
     override suspend fun send(
@@ -27,9 +24,8 @@ internal class CapturingRunner : IrohCliRunner {
         toAgentId: String,
         body: String,
         paths: IrohCliPaths,
-        options: IrohMessageOptions,
     ): IrohCliSendResult {
-        calls += Call(binary, fromAgentId, toAgentId, body, paths, options)
+        calls += Call(binary, fromAgentId, toAgentId, body, paths)
         return IrohCliSendResult.Delivered("captured-${calls.size}")
     }
 }
@@ -42,6 +38,5 @@ internal class FixedRunner(private val result: IrohCliSendResult) : IrohCliRunne
         toAgentId: String,
         body: String,
         paths: IrohCliPaths,
-        options: IrohMessageOptions,
     ): IrohCliSendResult = result
 }

@@ -36,8 +36,9 @@ class DefaultIrohCliRunnerTest {
             printf '{"accepted":true,"applicationDelivered":true,"msgId":"m"}'
         """.trimIndent())
         val result = DefaultIrohCliRunner().send(
-            script.absolutePath, "from", "to", "body", IrohCliPaths(),
-            IrohMessageOptions(conversationId = "conv", lane = "home", correlation = mapOf("bead" to "x=y", "run" to "42")),
+            script.absolutePath, "from", "to", "body", IrohCliPaths(
+                message = IrohMessageOptions(conversationId = "conv", lane = "home", correlation = mapOf("bead" to "x=y", "run" to "42")),
+            ),
         )
         assertTrue(result is IrohCliSendResult.Delivered)
         val words = args.readLines()

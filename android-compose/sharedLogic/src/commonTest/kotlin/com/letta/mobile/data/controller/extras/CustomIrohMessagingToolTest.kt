@@ -39,7 +39,7 @@ class CustomIrohMessagingToolTest {
             put("correlation", buildJsonObject { put("bead", "x=y"); put("run", "42") })
         }
         assertIs<ExternalToolResult.Success>(tool.invoke(input, "sender"))
-        val options = captured.calls.single().options
+        val options = captured.calls.single().paths.message
         assertEquals("conv-1", options.conversationId)
         assertEquals(null, options.lane)
         assertEquals(mapOf("bead" to "x=y", "run" to "42"), options.correlation)
@@ -55,9 +55,9 @@ class CustomIrohMessagingToolTest {
             put("correlation", buildJsonObject { put("bead", "ywa2y") })
         }
         assertIs<ExternalToolResult.Success>(toolWithRunner(captured).invoke(input, "sender"))
-        assertEquals("home", captured.calls.single().options.lane)
-        assertEquals(null, captured.calls.single().options.conversationId)
-        assertEquals(mapOf("bead" to "ywa2y"), captured.calls.single().options.correlation)
+        assertEquals("home", captured.calls.single().paths.message.lane)
+        assertEquals(null, captured.calls.single().paths.message.conversationId)
+        assertEquals(mapOf("bead" to "ywa2y"), captured.calls.single().paths.message.correlation)
     }
 
     @Test

@@ -208,8 +208,7 @@ class CustomIrohMessagingTool(
             fromAgentId = fromAgentId,
             toAgentId = toAgentId,
             body = body,
-            paths = IrohCliPaths(identityDir = identityDir, addressStore = addressStore),
-            options = options,
+            paths = IrohCliPaths(identityDir = identityDir, addressStore = addressStore, message = options),
         )
         return when (result) {
             is IrohCliSendResult.Delivered -> ExternalToolResult.Success(
