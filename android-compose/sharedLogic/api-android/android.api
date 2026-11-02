@@ -1542,33 +1542,33 @@ public abstract class com/letta/mobile/data/backend/UnservedStandIn : com/letta/
 }
 
 public abstract interface class com/letta/mobile/data/beads/BeadsBackend {
-	public fun addComment (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/core/AddCommentRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun addComment-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/core/AddCommentRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun addDependencies (Lcom/letta/mobile/data/beads/wire/payloads/AddDependenciesRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun applyBatch (Lcom/letta/mobile/data/beads/wire/payloads/ApplyBatchRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun batchCloseIssues (Lcom/letta/mobile/data/beads/wire/mutations/BatchCloseRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun batchCreateIssues (Lcom/letta/mobile/data/beads/wire/payloads/BatchCreateRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun claimIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ClaimRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun claimIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ClaimRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun claimNextIssue (Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextRequest;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun claimNextIssue$default (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextRequest;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun closeIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CloseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun compareAndSetMetadata (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CompareAndSetMetadataRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun countDependencyEdges (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun countDependencyEdges$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun closeIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CloseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun compareAndSetMetadata-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CompareAndSetMetadataRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun countDependencyEdges-x6FDWQ0 (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun countDependencyEdges-x6FDWQ0$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun countIssues (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun countIssues$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun countReadyWork (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun countReadyWork$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun createIssue (Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun createIssue (Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteIssues (Lcom/letta/mobile/data/beads/wire/core/DeleteIssuesRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun execute (Lcom/letta/mobile/data/beads/BeadsOperation;Ljava/util/Map;Ljava/util/Map;Lkotlinx/serialization/json/JsonElement;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun execute$default (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/BeadsOperation;Ljava/util/Map;Ljava/util/Map;Lkotlinx/serialization/json/JsonElement;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun fetchContext (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun forgetMemory (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getContext ()Lcom/letta/mobile/data/beads/wire/core/ContextResponse;
-	public fun getDependencyTree (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun getDependencyTree$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun getIssue (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun getIssue$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun getDependencyTree-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getDependencyTree-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun getIssue-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getIssue-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun getMemory (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun getMemory$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun getSetting (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -1576,10 +1576,10 @@ public abstract interface class com/letta/mobile/data/beads/BeadsBackend {
 	public fun getStats (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun getStats$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun health (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun listBlockingAnnotations (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listBlockingAnnotations$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun listDependencies (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listDependencies$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun listBlockingAnnotations-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listBlockingAnnotations-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun listDependencies-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listDependencies-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun listDependencyCycles (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listDependencyCycles$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun listEvents (JLjava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -1590,50 +1590,50 @@ public abstract interface class com/letta/mobile/data/beads/BeadsBackend {
 	public static synthetic fun listMemories$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun listReadyWork (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listReadyWork$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun listRelatedIssues (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listRelatedIssues$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun listRelatedIssues-x6FDWQ0 (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listRelatedIssues-x6FDWQ0$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun listSettings (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listSettings$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun queryIssues (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun queryIssues$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun releaseIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReleaseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun releaseIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReleaseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun rememberMemory (Lcom/letta/mobile/data/beads/wire/payloads/RememberRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeDependency (Lcom/letta/mobile/data/beads/wire/payloads/RemoveDependencyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun reopenIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReopenIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun reopenIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReopenIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setSetting (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/SetSettingRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun sweepIssues (Lcom/letta/mobile/data/beads/wire/core/SweepRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun unsetSetting (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun updateIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun watchEvents (JLjava/lang/Long;)Lkotlinx/coroutines/flow/Flow;
 	public static synthetic fun watchEvents$default (Lcom/letta/mobile/data/beads/BeadsBackend;JLjava/lang/Long;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 }
 
 public final class com/letta/mobile/data/beads/BeadsBackend$DefaultImpls {
-	public static fun addComment (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/core/AddCommentRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun addComment-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/core/AddCommentRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun addDependencies (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/payloads/AddDependenciesRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun applyBatch (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/payloads/ApplyBatchRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun batchCloseIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/mutations/BatchCloseRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun batchCreateIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/payloads/BatchCreateRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun claimIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ClaimRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun claimIssue-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ClaimRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun claimNextIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextRequest;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun claimNextIssue$default (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextRequest;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun closeIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CloseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun compareAndSetMetadata (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CompareAndSetMetadataRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun countDependencyEdges (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun countDependencyEdges$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun closeIssue-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CloseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun compareAndSetMetadata-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CompareAndSetMetadataRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun countDependencyEdges-x6FDWQ0 (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun countDependencyEdges-x6FDWQ0$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun countIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun countIssues$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun countReadyWork (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun countReadyWork$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun createIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun createIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun deleteIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/core/DeleteIssuesRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun execute$default (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/BeadsOperation;Ljava/util/Map;Ljava/util/Map;Lkotlinx/serialization/json/JsonElement;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun fetchContext (Lcom/letta/mobile/data/beads/BeadsBackend;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun forgetMemory (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getDependencyTree (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun getDependencyTree$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun getIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun getIssue$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun getDependencyTree-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getDependencyTree-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun getIssue-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getIssue-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun getMemory (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun getMemory$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun getSetting (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -1641,10 +1641,10 @@ public final class com/letta/mobile/data/beads/BeadsBackend$DefaultImpls {
 	public static fun getStats (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun getStats$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun health (Lcom/letta/mobile/data/beads/BeadsBackend;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun listBlockingAnnotations (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listBlockingAnnotations$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun listDependencies (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listDependencies$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun listBlockingAnnotations-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listBlockingAnnotations-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun listDependencies-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listDependencies-DCWkLcw$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun listDependencyCycles (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listDependencyCycles$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun listEvents (Lcom/letta/mobile/data/beads/BeadsBackend;JLjava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -1655,20 +1655,20 @@ public final class com/letta/mobile/data/beads/BeadsBackend$DefaultImpls {
 	public static synthetic fun listMemories$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun listReadyWork (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listReadyWork$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun listRelatedIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun listRelatedIssues$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun listRelatedIssues-x6FDWQ0 (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun listRelatedIssues-x6FDWQ0$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun listSettings (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listSettings$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun queryIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun queryIssues$default (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public static fun releaseIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReleaseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun releaseIssue-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReleaseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun rememberMemory (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/payloads/RememberRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun removeDependency (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/payloads/RemoveDependencyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun reopenIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReopenIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun reopenIssue-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReopenIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun setSetting (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/SetSettingRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun sweepIssues (Lcom/letta/mobile/data/beads/BeadsBackend;Lcom/letta/mobile/data/beads/wire/core/SweepRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun unsetSetting (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun updateIssue (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun updateIssue-DCWkLcw (Lcom/letta/mobile/data/beads/BeadsBackend;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun watchEvents$default (Lcom/letta/mobile/data/beads/BeadsBackend;JLjava/lang/Long;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 }
 
@@ -1694,6 +1694,20 @@ public final class com/letta/mobile/data/beads/BeadsEventKind$Companion {
 public final class com/letta/mobile/data/beads/BeadsHttpException : java/lang/Exception {
 	public fun <init> (I)V
 	public final fun getStatus ()I
+}
+
+public final class com/letta/mobile/data/beads/BeadsIssueId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/beads/BeadsIssueId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/beads/BeadsIssueStatus : java/lang/Enum {
@@ -1776,49 +1790,49 @@ public final class com/letta/mobile/data/beads/BeadsUnsupportedOperation : java/
 
 public final class com/letta/mobile/data/beads/KtorBeadsBackend : com/letta/mobile/data/beads/BeadsBackend {
 	public static final field Companion Lcom/letta/mobile/data/beads/KtorBeadsBackend$Companion;
-	public fun addComment (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/core/AddCommentRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun addComment-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/core/AddCommentRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun addDependencies (Lcom/letta/mobile/data/beads/wire/payloads/AddDependenciesRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun applyBatch (Lcom/letta/mobile/data/beads/wire/payloads/ApplyBatchRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun batchCloseIssues (Lcom/letta/mobile/data/beads/wire/mutations/BatchCloseRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun batchCreateIssues (Lcom/letta/mobile/data/beads/wire/payloads/BatchCreateRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun claimIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ClaimRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun claimIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ClaimRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun claimNextIssue (Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextRequest;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun close ()V
-	public fun closeIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CloseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun compareAndSetMetadata (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CompareAndSetMetadataRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun countDependencyEdges (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun closeIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CloseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun compareAndSetMetadata-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/CompareAndSetMetadataRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun countDependencyEdges-x6FDWQ0 (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun countIssues (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun countReadyWork (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun createIssue (Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun createIssue (Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteIssues (Lcom/letta/mobile/data/beads/wire/core/DeleteIssuesRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun execute (Lcom/letta/mobile/data/beads/BeadsOperation;Ljava/util/Map;Ljava/util/Map;Lkotlinx/serialization/json/JsonElement;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun fetchContext (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun forgetMemory (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContext ()Lcom/letta/mobile/data/beads/wire/core/ContextResponse;
-	public fun getDependencyTree (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getIssue (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDependencyTree-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getIssue-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getMemory (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getSetting (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getStats (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun health (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun listBlockingAnnotations (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun listDependencies (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listBlockingAnnotations-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listDependencies-DCWkLcw (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listDependencyCycles (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listEvents (JLjava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listIssues (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listMemories (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listReadyWork (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun listRelatedIssues (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listRelatedIssues-x6FDWQ0 (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listSettings (Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun queryIssues (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun releaseIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReleaseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun releaseIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReleaseIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun rememberMemory (Lcom/letta/mobile/data/beads/wire/payloads/RememberRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeDependency (Lcom/letta/mobile/data/beads/wire/payloads/RemoveDependencyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun reopenIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReopenIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun reopenIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/ReopenIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setSetting (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/SetSettingRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun sweepIssues (Lcom/letta/mobile/data/beads/wire/core/SweepRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun unsetSetting (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun updateIssue (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun updateIssue-DCWkLcw (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun watchEvents (JLjava/lang/Long;)Lkotlinx/coroutines/flow/Flow;
 }
 
@@ -2306,8 +2320,8 @@ public final class com/letta/mobile/data/beads/wire/core/Health$Companion {
 
 public final class com/letta/mobile/data/beads/wire/core/Issue {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/core/Issue$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component11 ()Ljava/lang/Boolean;
@@ -2360,12 +2374,27 @@ public final class com/letta/mobile/data/beads/wire/core/Issue {
 	public final fun component54 ()Ljava/lang/String;
 	public final fun component55 ()Ljava/lang/String;
 	public final fun component56 ()Ljava/lang/String;
+	public final fun component57 ()Ljava/lang/Long;
+	public final fun component58 ()Ljava/lang/Long;
+	public final fun component59 ()Ljava/lang/Long;
 	public final fun component6 ()Ljava/lang/String;
+	public final fun component60 ()Ljava/lang/String;
+	public final fun component61 ()Ljava/util/List;
+	public final fun component62 ()Ljava/lang/Boolean;
+	public final fun component63 ()Ljava/lang/Integer;
+	public final fun component64 ()Ljava/lang/Integer;
+	public final fun component65 ()Ljava/lang/Boolean;
+	public final fun component66 ()Ljava/lang/String;
+	public final fun component67 ()Ljava/lang/String;
+	public final fun component68 ()Ljava/lang/Integer;
+	public final fun component69 ()Ljava/lang/String;
 	public final fun component7 ()Ljava/lang/String;
+	public final fun component70 ()Ljava/lang/String;
+	public final fun component71 ()Ljava/lang/Boolean;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()I
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/beads/wire/core/Issue;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/core/Issue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/core/Issue;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;)Lcom/letta/mobile/data/beads/wire/core/Issue;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/core/Issue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;IIILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/core/Issue;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptanceCriteria ()Ljava/lang/String;
 	public final fun getActor ()Ljava/lang/String;
@@ -2376,7 +2405,9 @@ public final class com/letta/mobile/data/beads/wire/core/Issue {
 	public final fun getCloseReason ()Ljava/lang/String;
 	public final fun getClosedAt ()Ljava/lang/String;
 	public final fun getClosedBySession ()Ljava/lang/String;
+	public final fun getCommentCount ()Ljava/lang/Long;
 	public final fun getComments ()Ljava/util/List;
+	public final fun getCommentsOmitted ()Ljava/lang/Boolean;
 	public final fun getCompactedAt ()Ljava/lang/String;
 	public final fun getCompactedAtCommit ()Ljava/lang/String;
 	public final fun getCompactionLevel ()Ljava/lang/Integer;
@@ -2384,10 +2415,19 @@ public final class com/letta/mobile/data/beads/wire/core/Issue {
 	public final fun getCreatedBy ()Ljava/lang/String;
 	public final fun getDeferUntil ()Ljava/lang/String;
 	public final fun getDependencies ()Ljava/util/List;
+	public final fun getDependencyCount ()Ljava/lang/Long;
+	public final fun getDependencyType ()Ljava/lang/String;
+	public final fun getDependentCount ()Ljava/lang/Long;
+	public final fun getDependents ()Ljava/util/List;
+	public final fun getDepth ()Ljava/lang/Integer;
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getDesign ()Ljava/lang/String;
 	public final fun getDueAt ()Ljava/lang/String;
+	public final fun getEdgeFromParent ()Ljava/lang/String;
 	public final fun getEphemeral ()Ljava/lang/Boolean;
+	public final fun getEpicCloseable ()Ljava/lang/Boolean;
+	public final fun getEpicClosedChildren ()Ljava/lang/Integer;
+	public final fun getEpicTotalChildren ()Ljava/lang/Integer;
 	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
 	public final fun getEventKind ()Ljava/lang/String;
 	public final fun getExternalRef ()Ljava/lang/String;
@@ -2403,9 +2443,12 @@ public final class com/letta/mobile/data/beads/wire/core/Issue {
 	public final fun getNotes ()Ljava/lang/String;
 	public final fun getOriginalSize ()Ljava/lang/Integer;
 	public final fun getOwner ()Ljava/lang/String;
+	public final fun getParent ()Ljava/lang/String;
+	public final fun getParentId ()Ljava/lang/String;
 	public final fun getPayload ()Ljava/lang/String;
 	public final fun getPinned ()Ljava/lang/Boolean;
 	public final fun getPriority ()I
+	public final fun getRevision ()Ljava/lang/String;
 	public final fun getSender ()Ljava/lang/String;
 	public final fun getSourceFormula ()Ljava/lang/String;
 	public final fun getSourceLocation ()Ljava/lang/String;
@@ -2417,6 +2460,7 @@ public final class com/letta/mobile/data/beads/wire/core/Issue {
 	public final fun getTarget ()Ljava/lang/String;
 	public final fun getTimeout ()Ljava/lang/Long;
 	public final fun getTitle ()Ljava/lang/String;
+	public final fun getTruncated ()Ljava/lang/Boolean;
 	public final fun getUpdatedAt ()Ljava/lang/String;
 	public final fun getWaiters ()Ljava/util/List;
 	public final fun getWispType ()Ljava/lang/String;
@@ -2503,450 +2547,6 @@ public final synthetic class com/letta/mobile/data/beads/wire/core/IssueCount$$s
 }
 
 public final class com/letta/mobile/data/beads/wire/core/IssueCount$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/IssueDetails {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/core/IssueDetails$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/Boolean;
-	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ljava/lang/String;
-	public final fun component14 ()Ljava/lang/Integer;
-	public final fun component15 ()Ljava/lang/String;
-	public final fun component16 ()Ljava/lang/String;
-	public final fun component17 ()Ljava/lang/String;
-	public final fun component18 ()Ljava/lang/String;
-	public final fun component19 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component20 ()Ljava/lang/String;
-	public final fun component21 ()Ljava/lang/String;
-	public final fun component22 ()Ljava/lang/String;
-	public final fun component23 ()Ljava/lang/String;
-	public final fun component24 ()Ljava/lang/String;
-	public final fun component25 ()Ljava/lang/String;
-	public final fun component26 ()Ljava/lang/String;
-	public final fun component27 ()Ljava/lang/String;
-	public final fun component28 ()Ljava/lang/String;
-	public final fun component29 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component30 ()Ljava/lang/Integer;
-	public final fun component31 ()Ljava/lang/String;
-	public final fun component32 ()Ljava/lang/String;
-	public final fun component33 ()Ljava/lang/Integer;
-	public final fun component34 ()Ljava/lang/String;
-	public final fun component35 ()Ljava/lang/Boolean;
-	public final fun component36 ()Ljava/lang/Boolean;
-	public final fun component37 ()Ljava/lang/String;
-	public final fun component38 ()Ljava/lang/String;
-	public final fun component39 ()Ljava/lang/Boolean;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component40 ()Ljava/lang/Boolean;
-	public final fun component41 ()Ljava/util/List;
-	public final fun component42 ()Ljava/lang/String;
-	public final fun component43 ()Ljava/lang/String;
-	public final fun component44 ()Ljava/lang/Long;
-	public final fun component45 ()Ljava/util/List;
-	public final fun component46 ()Ljava/lang/String;
-	public final fun component47 ()Ljava/lang/String;
-	public final fun component48 ()Ljava/lang/String;
-	public final fun component49 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component50 ()Ljava/lang/String;
-	public final fun component51 ()Ljava/lang/String;
-	public final fun component52 ()Ljava/lang/String;
-	public final fun component53 ()Ljava/lang/String;
-	public final fun component54 ()Ljava/util/List;
-	public final fun component55 ()Ljava/util/List;
-	public final fun component56 ()Ljava/util/List;
-	public final fun component57 ()Ljava/util/List;
-	public final fun component58 ()Ljava/lang/String;
-	public final fun component59 ()Ljava/lang/Long;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component60 ()Ljava/lang/Long;
-	public final fun component61 ()Ljava/lang/Long;
-	public final fun component62 ()Ljava/lang/Boolean;
-	public final fun component63 ()Ljava/lang/Integer;
-	public final fun component64 ()Ljava/lang/Integer;
-	public final fun component65 ()Ljava/lang/Boolean;
-	public final fun component66 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()I
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;)Lcom/letta/mobile/data/beads/wire/core/IssueDetails;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/core/IssueDetails;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/String;IIILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/core/IssueDetails;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptanceCriteria ()Ljava/lang/String;
-	public final fun getActor ()Ljava/lang/String;
-	public final fun getAssignee ()Ljava/lang/String;
-	public final fun getAwaitId ()Ljava/lang/String;
-	public final fun getAwaitType ()Ljava/lang/String;
-	public final fun getBondedFrom ()Ljava/util/List;
-	public final fun getCloseReason ()Ljava/lang/String;
-	public final fun getClosedAt ()Ljava/lang/String;
-	public final fun getClosedBySession ()Ljava/lang/String;
-	public final fun getCommentCount ()Ljava/lang/Long;
-	public final fun getComments ()Ljava/util/List;
-	public final fun getCommentsOmitted ()Ljava/lang/Boolean;
-	public final fun getCompactedAt ()Ljava/lang/String;
-	public final fun getCompactedAtCommit ()Ljava/lang/String;
-	public final fun getCompactionLevel ()Ljava/lang/Integer;
-	public final fun getCreatedAt ()Ljava/lang/String;
-	public final fun getCreatedBy ()Ljava/lang/String;
-	public final fun getDeferUntil ()Ljava/lang/String;
-	public final fun getDependencies ()Ljava/util/List;
-	public final fun getDependencyCount ()Ljava/lang/Long;
-	public final fun getDependentCount ()Ljava/lang/Long;
-	public final fun getDependents ()Ljava/util/List;
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getDesign ()Ljava/lang/String;
-	public final fun getDueAt ()Ljava/lang/String;
-	public final fun getEphemeral ()Ljava/lang/Boolean;
-	public final fun getEpicCloseable ()Ljava/lang/Boolean;
-	public final fun getEpicClosedChildren ()Ljava/lang/Integer;
-	public final fun getEpicTotalChildren ()Ljava/lang/Integer;
-	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
-	public final fun getEventKind ()Ljava/lang/String;
-	public final fun getExternalRef ()Ljava/lang/String;
-	public final fun getHeartbeatAt ()Ljava/lang/String;
-	public final fun getId ()Ljava/lang/String;
-	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Ljava/util/List;
-	public final fun getLeaseExpiresAt ()Ljava/lang/String;
-	public final fun getLeaseGrantedNode ()Ljava/lang/String;
-	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getMolType ()Ljava/lang/String;
-	public final fun getNoHistory ()Ljava/lang/Boolean;
-	public final fun getNotes ()Ljava/lang/String;
-	public final fun getOriginalSize ()Ljava/lang/Integer;
-	public final fun getOwner ()Ljava/lang/String;
-	public final fun getParent ()Ljava/lang/String;
-	public final fun getPayload ()Ljava/lang/String;
-	public final fun getPinned ()Ljava/lang/Boolean;
-	public final fun getPriority ()I
-	public final fun getRevision ()Ljava/lang/String;
-	public final fun getSender ()Ljava/lang/String;
-	public final fun getSourceFormula ()Ljava/lang/String;
-	public final fun getSourceLocation ()Ljava/lang/String;
-	public final fun getSourceSystem ()Ljava/lang/String;
-	public final fun getSpecId ()Ljava/lang/String;
-	public final fun getStartedAt ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getStorageClass ()Ljava/lang/String;
-	public final fun getTarget ()Ljava/lang/String;
-	public final fun getTimeout ()Ljava/lang/Long;
-	public final fun getTitle ()Ljava/lang/String;
-	public final fun getUpdatedAt ()Ljava/lang/String;
-	public final fun getWaiters ()Ljava/util/List;
-	public final fun getWispType ()Ljava/lang/String;
-	public final fun getWorkType ()Ljava/lang/String;
-	public fun hashCode ()I
-	public final fun isBlocked ()Ljava/lang/Boolean;
-	public final fun isTemplate ()Ljava/lang/Boolean;
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/core/IssueDetails$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/core/IssueDetails$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/core/IssueDetails;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/core/IssueDetails;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/IssueDetails$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/IssueWithCounts {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILjava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILjava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/Boolean;
-	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ljava/lang/String;
-	public final fun component14 ()Ljava/lang/Integer;
-	public final fun component15 ()Ljava/lang/String;
-	public final fun component16 ()Ljava/lang/String;
-	public final fun component17 ()Ljava/lang/String;
-	public final fun component18 ()Ljava/lang/String;
-	public final fun component19 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component20 ()Ljava/lang/String;
-	public final fun component21 ()Ljava/lang/String;
-	public final fun component22 ()Ljava/lang/String;
-	public final fun component23 ()Ljava/lang/String;
-	public final fun component24 ()Ljava/lang/String;
-	public final fun component25 ()Ljava/lang/String;
-	public final fun component26 ()Ljava/lang/String;
-	public final fun component27 ()Ljava/lang/String;
-	public final fun component28 ()Ljava/lang/String;
-	public final fun component29 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component30 ()Ljava/lang/Integer;
-	public final fun component31 ()Ljava/lang/String;
-	public final fun component32 ()Ljava/lang/String;
-	public final fun component33 ()Ljava/lang/Integer;
-	public final fun component34 ()Ljava/util/List;
-	public final fun component35 ()Ljava/util/List;
-	public final fun component36 ()Ljava/util/List;
-	public final fun component37 ()Ljava/lang/String;
-	public final fun component38 ()Ljava/lang/Boolean;
-	public final fun component39 ()Ljava/lang/Boolean;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component40 ()Ljava/lang/String;
-	public final fun component41 ()Ljava/lang/String;
-	public final fun component42 ()Ljava/lang/Boolean;
-	public final fun component43 ()Ljava/lang/Boolean;
-	public final fun component44 ()Ljava/util/List;
-	public final fun component45 ()Ljava/lang/String;
-	public final fun component46 ()Ljava/lang/String;
-	public final fun component47 ()Ljava/lang/Long;
-	public final fun component48 ()Ljava/util/List;
-	public final fun component49 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component50 ()Ljava/lang/String;
-	public final fun component51 ()Ljava/lang/String;
-	public final fun component52 ()Ljava/lang/String;
-	public final fun component53 ()Ljava/lang/String;
-	public final fun component54 ()Ljava/lang/String;
-	public final fun component55 ()Ljava/lang/String;
-	public final fun component56 ()Ljava/lang/String;
-	public final fun component57 ()I
-	public final fun component58 ()I
-	public final fun component59 ()I
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component60 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()I
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILjava/lang/String;)Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIILjava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptanceCriteria ()Ljava/lang/String;
-	public final fun getActor ()Ljava/lang/String;
-	public final fun getAssignee ()Ljava/lang/String;
-	public final fun getAwaitId ()Ljava/lang/String;
-	public final fun getAwaitType ()Ljava/lang/String;
-	public final fun getBondedFrom ()Ljava/util/List;
-	public final fun getCloseReason ()Ljava/lang/String;
-	public final fun getClosedAt ()Ljava/lang/String;
-	public final fun getClosedBySession ()Ljava/lang/String;
-	public final fun getCommentCount ()I
-	public final fun getComments ()Ljava/util/List;
-	public final fun getCompactedAt ()Ljava/lang/String;
-	public final fun getCompactedAtCommit ()Ljava/lang/String;
-	public final fun getCompactionLevel ()Ljava/lang/Integer;
-	public final fun getCreatedAt ()Ljava/lang/String;
-	public final fun getCreatedBy ()Ljava/lang/String;
-	public final fun getDeferUntil ()Ljava/lang/String;
-	public final fun getDependencies ()Ljava/util/List;
-	public final fun getDependencyCount ()I
-	public final fun getDependentCount ()I
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getDesign ()Ljava/lang/String;
-	public final fun getDueAt ()Ljava/lang/String;
-	public final fun getEphemeral ()Ljava/lang/Boolean;
-	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
-	public final fun getEventKind ()Ljava/lang/String;
-	public final fun getExternalRef ()Ljava/lang/String;
-	public final fun getHeartbeatAt ()Ljava/lang/String;
-	public final fun getId ()Ljava/lang/String;
-	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Ljava/util/List;
-	public final fun getLeaseExpiresAt ()Ljava/lang/String;
-	public final fun getLeaseGrantedNode ()Ljava/lang/String;
-	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getMolType ()Ljava/lang/String;
-	public final fun getNoHistory ()Ljava/lang/Boolean;
-	public final fun getNotes ()Ljava/lang/String;
-	public final fun getOriginalSize ()Ljava/lang/Integer;
-	public final fun getOwner ()Ljava/lang/String;
-	public final fun getParent ()Ljava/lang/String;
-	public final fun getPayload ()Ljava/lang/String;
-	public final fun getPinned ()Ljava/lang/Boolean;
-	public final fun getPriority ()I
-	public final fun getSender ()Ljava/lang/String;
-	public final fun getSourceFormula ()Ljava/lang/String;
-	public final fun getSourceLocation ()Ljava/lang/String;
-	public final fun getSourceSystem ()Ljava/lang/String;
-	public final fun getSpecId ()Ljava/lang/String;
-	public final fun getStartedAt ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getStorageClass ()Ljava/lang/String;
-	public final fun getTarget ()Ljava/lang/String;
-	public final fun getTimeout ()Ljava/lang/Long;
-	public final fun getTitle ()Ljava/lang/String;
-	public final fun getUpdatedAt ()Ljava/lang/String;
-	public final fun getWaiters ()Ljava/util/List;
-	public final fun getWispType ()Ljava/lang/String;
-	public final fun getWorkType ()Ljava/lang/String;
-	public fun hashCode ()I
-	public final fun isBlocked ()Ljava/lang/Boolean;
-	public final fun isTemplate ()Ljava/lang/Boolean;
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/core/IssueWithCounts$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/IssueWithCounts$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/Boolean;
-	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ljava/lang/String;
-	public final fun component14 ()Ljava/lang/Integer;
-	public final fun component15 ()Ljava/lang/String;
-	public final fun component16 ()Ljava/lang/String;
-	public final fun component17 ()Ljava/lang/String;
-	public final fun component18 ()Ljava/lang/String;
-	public final fun component19 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component20 ()Ljava/lang/String;
-	public final fun component21 ()Ljava/lang/String;
-	public final fun component22 ()Ljava/lang/String;
-	public final fun component23 ()Ljava/lang/String;
-	public final fun component24 ()Ljava/lang/String;
-	public final fun component25 ()Ljava/lang/String;
-	public final fun component26 ()Ljava/lang/String;
-	public final fun component27 ()Ljava/lang/String;
-	public final fun component28 ()Ljava/lang/String;
-	public final fun component29 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component30 ()Ljava/lang/Integer;
-	public final fun component31 ()Ljava/lang/String;
-	public final fun component32 ()Ljava/lang/String;
-	public final fun component33 ()Ljava/lang/Integer;
-	public final fun component34 ()Ljava/util/List;
-	public final fun component35 ()Ljava/util/List;
-	public final fun component36 ()Ljava/util/List;
-	public final fun component37 ()Ljava/lang/String;
-	public final fun component38 ()Ljava/lang/Boolean;
-	public final fun component39 ()Ljava/lang/Boolean;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component40 ()Ljava/lang/String;
-	public final fun component41 ()Ljava/lang/String;
-	public final fun component42 ()Ljava/lang/Boolean;
-	public final fun component43 ()Ljava/lang/Boolean;
-	public final fun component44 ()Ljava/util/List;
-	public final fun component45 ()Ljava/lang/String;
-	public final fun component46 ()Ljava/lang/String;
-	public final fun component47 ()Ljava/lang/Long;
-	public final fun component48 ()Ljava/util/List;
-	public final fun component49 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component50 ()Ljava/lang/String;
-	public final fun component51 ()Ljava/lang/String;
-	public final fun component52 ()Ljava/lang/String;
-	public final fun component53 ()Ljava/lang/String;
-	public final fun component54 ()Ljava/lang/String;
-	public final fun component55 ()Ljava/lang/String;
-	public final fun component56 ()Ljava/lang/String;
-	public final fun component57 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()I
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptanceCriteria ()Ljava/lang/String;
-	public final fun getActor ()Ljava/lang/String;
-	public final fun getAssignee ()Ljava/lang/String;
-	public final fun getAwaitId ()Ljava/lang/String;
-	public final fun getAwaitType ()Ljava/lang/String;
-	public final fun getBondedFrom ()Ljava/util/List;
-	public final fun getCloseReason ()Ljava/lang/String;
-	public final fun getClosedAt ()Ljava/lang/String;
-	public final fun getClosedBySession ()Ljava/lang/String;
-	public final fun getComments ()Ljava/util/List;
-	public final fun getCompactedAt ()Ljava/lang/String;
-	public final fun getCompactedAtCommit ()Ljava/lang/String;
-	public final fun getCompactionLevel ()Ljava/lang/Integer;
-	public final fun getCreatedAt ()Ljava/lang/String;
-	public final fun getCreatedBy ()Ljava/lang/String;
-	public final fun getDeferUntil ()Ljava/lang/String;
-	public final fun getDependencies ()Ljava/util/List;
-	public final fun getDependencyType ()Ljava/lang/String;
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getDesign ()Ljava/lang/String;
-	public final fun getDueAt ()Ljava/lang/String;
-	public final fun getEphemeral ()Ljava/lang/Boolean;
-	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
-	public final fun getEventKind ()Ljava/lang/String;
-	public final fun getExternalRef ()Ljava/lang/String;
-	public final fun getHeartbeatAt ()Ljava/lang/String;
-	public final fun getId ()Ljava/lang/String;
-	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Ljava/util/List;
-	public final fun getLeaseExpiresAt ()Ljava/lang/String;
-	public final fun getLeaseGrantedNode ()Ljava/lang/String;
-	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getMolType ()Ljava/lang/String;
-	public final fun getNoHistory ()Ljava/lang/Boolean;
-	public final fun getNotes ()Ljava/lang/String;
-	public final fun getOriginalSize ()Ljava/lang/Integer;
-	public final fun getOwner ()Ljava/lang/String;
-	public final fun getPayload ()Ljava/lang/String;
-	public final fun getPinned ()Ljava/lang/Boolean;
-	public final fun getPriority ()I
-	public final fun getSender ()Ljava/lang/String;
-	public final fun getSourceFormula ()Ljava/lang/String;
-	public final fun getSourceLocation ()Ljava/lang/String;
-	public final fun getSourceSystem ()Ljava/lang/String;
-	public final fun getSpecId ()Ljava/lang/String;
-	public final fun getStartedAt ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getStorageClass ()Ljava/lang/String;
-	public final fun getTarget ()Ljava/lang/String;
-	public final fun getTimeout ()Ljava/lang/Long;
-	public final fun getTitle ()Ljava/lang/String;
-	public final fun getUpdatedAt ()Ljava/lang/String;
-	public final fun getWaiters ()Ljava/util/List;
-	public final fun getWispType ()Ljava/lang/String;
-	public final fun getWorkType ()Ljava/lang/String;
-	public fun hashCode ()I
-	public final fun isBlocked ()Ljava/lang/Boolean;
-	public final fun isTemplate ()Ljava/lang/Boolean;
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/IssueWithDependencyMetadata$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -3321,152 +2921,6 @@ public final class com/letta/mobile/data/beads/wire/core/SweepSkips$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public final class com/letta/mobile/data/beads/wire/core/TreeNode {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/core/TreeNode$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Z)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/Boolean;
-	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ljava/lang/String;
-	public final fun component14 ()Ljava/lang/Integer;
-	public final fun component15 ()Ljava/lang/String;
-	public final fun component16 ()Ljava/lang/String;
-	public final fun component17 ()Ljava/lang/String;
-	public final fun component18 ()Ljava/lang/String;
-	public final fun component19 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component20 ()Ljava/lang/String;
-	public final fun component21 ()Ljava/lang/String;
-	public final fun component22 ()Ljava/lang/String;
-	public final fun component23 ()Ljava/lang/String;
-	public final fun component24 ()Ljava/lang/String;
-	public final fun component25 ()Ljava/lang/String;
-	public final fun component26 ()Ljava/lang/String;
-	public final fun component27 ()Ljava/lang/String;
-	public final fun component28 ()Ljava/lang/String;
-	public final fun component29 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component30 ()Ljava/lang/Integer;
-	public final fun component31 ()Ljava/lang/String;
-	public final fun component32 ()Ljava/lang/String;
-	public final fun component33 ()Ljava/lang/Integer;
-	public final fun component34 ()Ljava/util/List;
-	public final fun component35 ()Ljava/util/List;
-	public final fun component36 ()Ljava/util/List;
-	public final fun component37 ()Ljava/lang/String;
-	public final fun component38 ()Ljava/lang/Boolean;
-	public final fun component39 ()Ljava/lang/Boolean;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component40 ()Ljava/lang/String;
-	public final fun component41 ()Ljava/lang/String;
-	public final fun component42 ()Ljava/lang/Boolean;
-	public final fun component43 ()Ljava/lang/Boolean;
-	public final fun component44 ()Ljava/util/List;
-	public final fun component45 ()Ljava/lang/String;
-	public final fun component46 ()Ljava/lang/String;
-	public final fun component47 ()Ljava/lang/Long;
-	public final fun component48 ()Ljava/util/List;
-	public final fun component49 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component50 ()Ljava/lang/String;
-	public final fun component51 ()Ljava/lang/String;
-	public final fun component52 ()Ljava/lang/String;
-	public final fun component53 ()Ljava/lang/String;
-	public final fun component54 ()Ljava/lang/String;
-	public final fun component55 ()Ljava/lang/String;
-	public final fun component56 ()Ljava/lang/String;
-	public final fun component57 ()I
-	public final fun component58 ()Ljava/lang/String;
-	public final fun component59 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component60 ()Z
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()I
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/data/beads/wire/core/TreeNode;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/core/TreeNode;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ZIILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/core/TreeNode;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptanceCriteria ()Ljava/lang/String;
-	public final fun getActor ()Ljava/lang/String;
-	public final fun getAssignee ()Ljava/lang/String;
-	public final fun getAwaitId ()Ljava/lang/String;
-	public final fun getAwaitType ()Ljava/lang/String;
-	public final fun getBondedFrom ()Ljava/util/List;
-	public final fun getCloseReason ()Ljava/lang/String;
-	public final fun getClosedAt ()Ljava/lang/String;
-	public final fun getClosedBySession ()Ljava/lang/String;
-	public final fun getComments ()Ljava/util/List;
-	public final fun getCompactedAt ()Ljava/lang/String;
-	public final fun getCompactedAtCommit ()Ljava/lang/String;
-	public final fun getCompactionLevel ()Ljava/lang/Integer;
-	public final fun getCreatedAt ()Ljava/lang/String;
-	public final fun getCreatedBy ()Ljava/lang/String;
-	public final fun getDeferUntil ()Ljava/lang/String;
-	public final fun getDependencies ()Ljava/util/List;
-	public final fun getDepth ()I
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getDesign ()Ljava/lang/String;
-	public final fun getDueAt ()Ljava/lang/String;
-	public final fun getEdgeFromParent ()Ljava/lang/String;
-	public final fun getEphemeral ()Ljava/lang/Boolean;
-	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
-	public final fun getEventKind ()Ljava/lang/String;
-	public final fun getExternalRef ()Ljava/lang/String;
-	public final fun getHeartbeatAt ()Ljava/lang/String;
-	public final fun getId ()Ljava/lang/String;
-	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Ljava/util/List;
-	public final fun getLeaseExpiresAt ()Ljava/lang/String;
-	public final fun getLeaseGrantedNode ()Ljava/lang/String;
-	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getMolType ()Ljava/lang/String;
-	public final fun getNoHistory ()Ljava/lang/Boolean;
-	public final fun getNotes ()Ljava/lang/String;
-	public final fun getOriginalSize ()Ljava/lang/Integer;
-	public final fun getOwner ()Ljava/lang/String;
-	public final fun getParentId ()Ljava/lang/String;
-	public final fun getPayload ()Ljava/lang/String;
-	public final fun getPinned ()Ljava/lang/Boolean;
-	public final fun getPriority ()I
-	public final fun getSender ()Ljava/lang/String;
-	public final fun getSourceFormula ()Ljava/lang/String;
-	public final fun getSourceLocation ()Ljava/lang/String;
-	public final fun getSourceSystem ()Ljava/lang/String;
-	public final fun getSpecId ()Ljava/lang/String;
-	public final fun getStartedAt ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getStorageClass ()Ljava/lang/String;
-	public final fun getTarget ()Ljava/lang/String;
-	public final fun getTimeout ()Ljava/lang/Long;
-	public final fun getTitle ()Ljava/lang/String;
-	public final fun getTruncated ()Z
-	public final fun getUpdatedAt ()Ljava/lang/String;
-	public final fun getWaiters ()Ljava/util/List;
-	public final fun getWispType ()Ljava/lang/String;
-	public final fun getWorkType ()Ljava/lang/String;
-	public fun hashCode ()I
-	public final fun isBlocked ()Ljava/lang/Boolean;
-	public final fun isTemplate ()Ljava/lang/Boolean;
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/core/TreeNode$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/core/TreeNode$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/core/TreeNode;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/core/TreeNode;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/core/TreeNode$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
 public final class com/letta/mobile/data/beads/wire/mutations/BatchCloseItem {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/BatchCloseItem$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
@@ -3588,13 +3042,13 @@ public final class com/letta/mobile/data/beads/wire/mutations/ClaimNextRequest$C
 public final class com/letta/mobile/data/beads/wire/mutations/ClaimNextResponse {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse$Companion;
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;
-	public final fun copy (Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;)Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse;Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse;
+	public fun <init> (Lcom/letta/mobile/data/beads/wire/core/Issue;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/beads/wire/core/Issue;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/beads/wire/core/Issue;
+	public final fun copy (Lcom/letta/mobile/data/beads/wire/core/Issue;)Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse;Lcom/letta/mobile/data/beads/wire/core/Issue;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/ClaimNextResponse;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getClaimed ()Lcom/letta/mobile/data/beads/wire/core/IssueWithCounts;
+	public final fun getClaimed ()Lcom/letta/mobile/data/beads/wire/core/Issue;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -3830,213 +3284,6 @@ public final class com/letta/mobile/data/beads/wire/mutations/CompareAndSetMetad
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public final class com/letta/mobile/data/beads/wire/mutations/CreateIssueDependency {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/Boolean;
-	public final fun component4 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getReverse ()Ljava/lang/Boolean;
-	public final fun getTargetId ()Ljava/lang/String;
-	public final fun getType ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/mutations/CreateIssueDependency$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueDependency;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/CreateIssueDependency$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/CreateIssueRequest {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/Integer;
-	public final fun component11 ()Ljava/lang/String;
-	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ljava/util/List;
-	public final fun component14 ()Ljava/lang/Integer;
-	public final fun component15 ()Ljava/lang/String;
-	public final fun component16 ()Ljava/lang/String;
-	public final fun component17 ()Ljava/lang/String;
-	public final fun component18 ()Ljava/lang/String;
-	public final fun component19 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component20 ()Ljava/lang/Boolean;
-	public final fun component21 ()Ljava/lang/Boolean;
-	public final fun component22 ()Ljava/lang/String;
-	public final fun component23 ()Ljava/lang/Boolean;
-	public final fun component24 ()Ljava/util/List;
-	public final fun component25 ()Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;
-	public final fun component26 ()Ljava/lang/Boolean;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;Ljava/lang/Boolean;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptanceCriteria ()Ljava/lang/String;
-	public final fun getActor ()Ljava/lang/String;
-	public final fun getAssignee ()Ljava/lang/String;
-	public final fun getDeferUntil ()Ljava/lang/String;
-	public final fun getDependencies ()Ljava/util/List;
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getDesign ()Ljava/lang/String;
-	public final fun getDueAt ()Ljava/lang/String;
-	public final fun getEphemeral ()Ljava/lang/Boolean;
-	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
-	public final fun getExternalRef ()Ljava/lang/String;
-	public final fun getForceIdPrefix ()Ljava/lang/Boolean;
-	public final fun getId ()Ljava/lang/String;
-	public final fun getInheritLabelsFromParent ()Ljava/lang/Boolean;
-	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Ljava/util/List;
-	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getNoHistory ()Ljava/lang/Boolean;
-	public final fun getNotes ()Ljava/lang/String;
-	public final fun getOwner ()Ljava/lang/String;
-	public final fun getParentId ()Ljava/lang/String;
-	public final fun getPriority ()Ljava/lang/Integer;
-	public final fun getSender ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getTitle ()Ljava/lang/String;
-	public final fun getWaitsFor ()Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/mutations/CreateIssueRequest$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueRequest;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/CreateIssueRequest$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getGate ()Ljava/lang/String;
-	public final fun getSpawnerId ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/CreateIssueWaitsFor$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/IssuePatchBody {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody$Companion;
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/String;
-	public final fun component12 ()Ljava/util/List;
-	public final fun component13 ()Ljava/util/List;
-	public final fun component14 ()Ljava/util/List;
-	public final fun component15 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component16 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component17 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component18 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component19 ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/Integer;
-	public final fun component8 ()Ljava/lang/String;
-	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;)Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptanceCriteria ()Ljava/lang/String;
-	public final fun getAddLabels ()Ljava/util/List;
-	public final fun getAppendNotes ()Ljava/lang/String;
-	public final fun getAssignee ()Ljava/lang/String;
-	public final fun getDeferUntil ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getDescription ()Ljava/lang/String;
-	public final fun getDesign ()Ljava/lang/String;
-	public final fun getDueAt ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getEstimatedMinutes ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getExternalRef ()Lkotlinx/serialization/json/JsonElement;
-	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Ljava/util/List;
-	public final fun getMetadata ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;
-	public final fun getNotes ()Ljava/lang/String;
-	public final fun getParentId ()Ljava/lang/String;
-	public final fun getPriority ()Ljava/lang/Integer;
-	public final fun getRemoveLabels ()Ljava/util/List;
-	public final fun getStatus ()Ljava/lang/String;
-	public final fun getTitle ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/mutations/IssuePatchBody$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/IssuePatchBody$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
 public final class com/letta/mobile/data/beads/wire/mutations/Problem {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/Problem$Companion;
 	public fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/String;)V
@@ -4248,46 +3495,6 @@ public final synthetic class com/letta/mobile/data/beads/wire/mutations/ReopenIs
 }
 
 public final class com/letta/mobile/data/beads/wire/mutations/ReopenIssueResponse$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest {
-	public static final field Companion Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest$Companion;
-	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/Boolean;
-	public final fun component7 ()Ljava/lang/Boolean;
-	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getActor ()Ljava/lang/String;
-	public final fun getExpectedAssignee ()Ljava/lang/String;
-	public final fun getExpectedStatus ()Ljava/lang/String;
-	public final fun getExpectedVersion ()Ljava/lang/String;
-	public final fun getForceAssigneeTransfer ()Ljava/lang/Boolean;
-	public final fun getForceClosePolicy ()Ljava/lang/Boolean;
-	public final fun getPatch ()Lcom/letta/mobile/data/beads/wire/mutations/IssuePatchBody;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/beads/wire/mutations/UpdateIssueRequest$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -4512,23 +3719,29 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyCloseItem$Comp
 
 public final class com/letta/mobile/data/beads/wire/payloads/ApplyCreateItem {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/Integer;
-	public final fun component11 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/Integer;
 	public final fun component12 ()Ljava/lang/String;
-	public final fun component13 ()Ljava/util/List;
-	public final fun component14 ()Ljava/lang/Integer;
-	public final fun component15 ()Ljava/lang/String;
+	public final fun component13 ()Ljava/lang/String;
+	public final fun component14 ()Ljava/util/List;
+	public final fun component15 ()Ljava/lang/Integer;
 	public final fun component16 ()Ljava/lang/String;
 	public final fun component17 ()Ljava/lang/String;
 	public final fun component18 ()Ljava/lang/String;
-	public final fun component19 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component19 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun component20 ()Ljava/lang/Boolean;
+	public final fun component20 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component21 ()Ljava/lang/Boolean;
-	public final fun component22 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component22 ()Ljava/lang/Boolean;
+	public final fun component23 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component24 ()Ljava/lang/String;
+	public final fun component25 ()Ljava/lang/Boolean;
+	public final fun component26 ()Ljava/util/List;
+	public final fun component27 ()Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;
+	public final fun component28 ()Ljava/lang/Boolean;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Ljava/lang/String;
@@ -4536,19 +3749,23 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyCreateItem {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;Ljava/lang/Boolean;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Ljava/lang/Boolean;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;Ljava/lang/String;Ljava/lang/Boolean;Ljava/util/List;Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyCreateItem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptanceCriteria ()Ljava/lang/String;
+	public final fun getActor ()Ljava/lang/String;
 	public final fun getAssignee ()Ljava/lang/String;
 	public final fun getDeferUntil ()Ljava/lang/String;
+	public final fun getDependencies ()Ljava/util/List;
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getDesign ()Ljava/lang/String;
 	public final fun getDueAt ()Ljava/lang/String;
 	public final fun getEphemeral ()Ljava/lang/Boolean;
 	public final fun getEstimatedMinutes ()Ljava/lang/Integer;
 	public final fun getExternalRef ()Ljava/lang/String;
+	public final fun getForceIdPrefix ()Ljava/lang/Boolean;
 	public final fun getId ()Ljava/lang/String;
+	public final fun getInheritLabelsFromParent ()Ljava/lang/Boolean;
 	public final fun getIssueType ()Ljava/lang/String;
 	public final fun getKey ()Ljava/lang/String;
 	public final fun getLabels ()Ljava/util/List;
@@ -4557,10 +3774,12 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyCreateItem {
 	public final fun getNoHistory ()Ljava/lang/Boolean;
 	public final fun getNotes ()Ljava/lang/String;
 	public final fun getOwner ()Ljava/lang/String;
+	public final fun getParentId ()Ljava/lang/String;
 	public final fun getPriority ()Ljava/lang/Integer;
 	public final fun getSender ()Ljava/lang/String;
 	public final fun getStatus ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
+	public final fun getWaitsFor ()Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -4757,18 +3976,21 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch$
 public final class com/letta/mobile/data/beads/wire/payloads/ApplyPatchBody {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyLabelPatch;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyLabelPatch;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component11 ()Ljava/lang/String;
-	public final fun component12 ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyLabelPatch;
-	public final fun component13 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component14 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Ljava/util/List;
+	public final fun component14 ()Ljava/util/List;
 	public final fun component15 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component16 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun component17 ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;
+	public final fun component17 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component18 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component19 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component2 ()Ljava/lang/String;
+	public final fun component20 ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Ljava/lang/String;
@@ -4776,10 +3998,11 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyPatchBody {
 	public final fun component7 ()Ljava/lang/Integer;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyLabelPatch;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/ApplyLabelPatch;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptanceCriteria ()Ljava/lang/String;
+	public final fun getAddLabels ()Ljava/util/List;
 	public final fun getAppendNotes ()Ljava/lang/String;
 	public final fun getAssignee ()Ljava/lang/String;
 	public final fun getDeferUntil ()Lkotlinx/serialization/json/JsonElement;
@@ -4789,11 +4012,13 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyPatchBody {
 	public final fun getEstimatedMinutes ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getExternalRef ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getIssueType ()Ljava/lang/String;
-	public final fun getLabels ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyLabelPatch;
+	public final fun getLabels ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getMetadata ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyMetadataPatch;
 	public final fun getNotes ()Ljava/lang/String;
 	public final fun getOwner ()Ljava/lang/String;
+	public final fun getParentId ()Ljava/lang/String;
 	public final fun getPriority ()Ljava/lang/Integer;
+	public final fun getRemoveLabels ()Ljava/util/List;
 	public final fun getStatus ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
 	public fun hashCode ()I
@@ -4817,18 +4042,20 @@ public final class com/letta/mobile/data/beads/wire/payloads/ApplyPatchBody$Comp
 
 public final class com/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem {
 	public static final field Companion Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem$Companion;
-	public fun <init> (Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/letta/mobile/data/beads/wire/payloads/Ref;
-	public final fun component2 ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;
-	public final fun component3 ()Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/beads/wire/payloads/Ref;
+	public final fun component3 ()Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/Boolean;
+	public final fun component6 ()Ljava/lang/String;
 	public final fun component7 ()Ljava/lang/Boolean;
-	public final fun copy (Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;
+	public final fun component8 ()Ljava/lang/Boolean;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;Ljava/lang/String;Lcom/letta/mobile/data/beads/wire/payloads/Ref;Lcom/letta/mobile/data/beads/wire/payloads/ApplyPatchBody;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/ApplyUpdateItem;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActor ()Ljava/lang/String;
 	public final fun getExpectedAssignee ()Ljava/lang/String;
 	public final fun getExpectedStatus ()Ljava/lang/String;
 	public final fun getExpectedVersion ()Ljava/lang/String;
@@ -5008,6 +4235,70 @@ public final synthetic class com/letta/mobile/data/beads/wire/payloads/BlockingA
 }
 
 public final class com/letta/mobile/data/beads/wire/payloads/BlockingAnnotations$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/beads/wire/payloads/CreateIssueDependency {
+	public static final field Companion Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Boolean;
+	public final fun component4 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMetadata ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getReverse ()Ljava/lang/Boolean;
+	public final fun getTargetId ()Ljava/lang/String;
+	public final fun getType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/beads/wire/payloads/CreateIssueDependency$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueDependency;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/beads/wire/payloads/CreateIssueDependency$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor {
+	public static final field Companion Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getGate ()Ljava/lang/String;
+	public final fun getSpawnerId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/beads/wire/payloads/CreateIssueWaitsFor$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
