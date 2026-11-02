@@ -231,7 +231,7 @@ class ChatComposerPanelUiTest {
         setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
         val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
         val signatures = listOf(
-            "\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a\t\n\r \t\n\r", "GIF89a\t\n\r \t\n\r", "RIFF1234WEBP",
+            "\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a\t\n\r \t\n\u0080", "GIF89a\t\n\r \t\n\u0080", "RIFF1234WEBP",
         )
         val controls = (0..31).filterNot { it == 9 || it == 10 || it == 13 }.map { it.toChar().toString() } + "\u007f"
         (signatures + controls).forEachIndexed { index, value ->

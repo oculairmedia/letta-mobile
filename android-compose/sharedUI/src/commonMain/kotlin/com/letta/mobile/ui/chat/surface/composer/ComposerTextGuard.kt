@@ -5,12 +5,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 /** Rejects control characters and recognizable image headers introduced by a text-field edit. */
 internal fun isUnreadableComposerText(previous: TextFieldValue, next: String): Boolean {
     if (next == previous.text) return false
-    val inserted = composerInsertedText(previous, next)
-    return inserted.any(::isForbiddenControl) || hasImageSignature(inserted)
+    val inserted = ComposerTextEdit(previous, next).insertedText()
+    return inserted.any(::isForbiddenControl) || ComposerImageSignature(inserted).matches()
 }
-
-internal fun composerInsertedText(previous: TextFieldValue, next: String): String =
-    ComposerTextEdit(previous, next).insertedText()
 
 private fun isForbiddenControl(char: Char): Boolean = char == '\u007f' || (char < ' ' && char !in "\t\n\r")
 
@@ -37,14 +34,16 @@ private class ComposerTextEdit(private val previous: TextFieldValue, private val
     }
 }
 
-private fun hasImageSignature(inserted: String): Boolean =
-    inserted.startsWith("\u0089PNG\r\n\u001a\n") ||
-        inserted.startsWith("\ufffdPNG") ||
-        inserted.startsWith("\u00ff\u00d8\u00ff") ||
-        inserted.startsWith("\ufffd\ufffd\ufffd") ||
-        hasGifHeader(inserted) ||
-        (inserted.startsWith("RIFF") && inserted.length >= 12 && inserted.substring(8, 12) == "WEBP") ||
-        hasBmpHeader(inserted)
+private class ComposerImageSignature(private val inserted: String) {
+    fun matches(): Boolean =
+        inserted.startsWith("\u0089PNG\r\n\u001a\n") ||
+            inserted.startsWith("\ufffdPNG") ||
+            inserted.startsWith("\u00ff\u00d8\u00ff") ||
+            inserted.startsWith("\ufffd\ufffd\ufffd") ||
+            hasGifHeader(inserted) ||
+            (inserted.startsWith("RIFF") && inserted.length >= 12 && inserted.substring(8, 12) == "WEBP") ||
+            hasBmpHeader(inserted)
+}
 
 // A logical screen descriptor has seven decoded byte characters after the signature.
 internal fun hasGifHeader(text: String): Boolean {
