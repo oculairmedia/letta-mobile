@@ -14801,13 +14801,14 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminRpcInvocation
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcNativeSources {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Ljava/lang/String;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getLocalBackendDir ()Ljava/lang/String;
 	public final fun getModelExposureFile ()Ljava/lang/String;
 	public final fun getNativeClient ()Lcom/letta/mobile/data/transport/appserver/AppServerClient;
 	public final fun getSkillsListing ()Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;
 	public final fun getSlashCommands ()Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;
+	public final fun getWrapperRecords ()Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcNotifications {
@@ -16310,6 +16311,247 @@ public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolic
 	public final fun getPolicy ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/FileWrapperRecordStore : com/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore {
+	public fun <init> ()V
+	public fun <init> (Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Ljava/nio/file/Path;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun record (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;
+	public fun snapshot ()Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;
+	public fun upsert (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJLcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJLcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJLcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJLcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getDueAtMs ()J
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getOwner ()Ljava/lang/String;
+	public final fun getRunId ()Ljava/lang/String;
+	public final fun getStartedAtMs ()J
+	public final fun getState ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState : java/lang/Enum {
+	public static final field ACTIVE Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState$Companion;
+	public static final field DONE Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public static final field EXPIRED Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public static final field RECOVERED Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public static final field UNKNOWN Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public final fun getClosed ()Z
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+	public static fun values ()[Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedLeaseState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedRunInput {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()J
+	public final fun component5 ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getInstantMs ()J
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getScheduleId ()Ljava/lang/String;
+	public final fun getScheduleName ()Ljava/lang/String;
+	public final fun getSource ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public final fun getStatus ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/controller/node/iroh/records/RecordedRunInput$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedRunInput$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedRunSource : java/lang/Enum {
+	public static final field AGENT Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public static final field CRON Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource$Companion;
+	public static final field HUMAN Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public static final field JULES Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public static final field UNKNOWN Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+	public static fun values ()[Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunSource;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedRunSource$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus$Companion;
+	public static final field DONE Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public static final field FAILED Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public static final field RUNNING Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public static final field SKIPPED Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public static final field UNKNOWN Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+	public static fun values ()[Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/RecordedRunStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord$Companion;
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;JJ)V
+	public final fun component1 ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun copy (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;JJ)Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;JJILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCreatedAtMs ()J
+	public final fun getInput ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;
+	public final fun getUpdatedAtMs ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/StoredRunRecord {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord$Companion;
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;Ljava/lang/String;J)V
+	public final fun component1 ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun copy (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;Ljava/lang/String;J)Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;Ljava/lang/String;JILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCreatedAtMs ()J
+	public final fun getId ()Ljava/lang/String;
+	public final fun getInput ()Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/controller/node/iroh/records/StoredRunRecord$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/StoredRunRecord$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeases ()Ljava/util/List;
+	public final fun getRuns ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore {
+	public abstract fun record (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedRunInput;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredRunRecord;
+	public abstract fun snapshot ()Lcom/letta/mobile/data/controller/node/iroh/records/WrapperRecordSnapshot;
+	public abstract fun upsert (Lcom/letta/mobile/data/controller/node/iroh/records/RecordedLeaseInput;)Lcom/letta/mobile/data/controller/node/iroh/records/StoredLeaseRecord;
 }
 
 public final class com/letta/mobile/data/controller/reconnect/AppServerClientGeneration {
