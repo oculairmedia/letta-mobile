@@ -87,6 +87,8 @@ data class CalendarQuery(
     val clock: ScheduleClock,
     val history: Map<String, List<RunRecord>> = emptyMap(),
     val includePaused: Boolean = true,
+    /** Include recorded non-cron wakes in the agenda without placing them on calendar grids. */
+    val includeUnscheduled: Boolean = false,
 )
 
 /**
@@ -119,7 +121,17 @@ object ScheduleCalendar {
                 Placed(run, instant.toLocalDateTime(zone).let { it.date to it.hour * MINUTES_PER_HOUR + it.minute })
             }
         }
-        val byDate = placed.groupBy { it.at.first }
+        val unscheduled = if (query.includeUnscheduled) defs.filter { query.includePaused || it.active }.flatMap { def ->
+            query.history[def.id].orEmpty().filter {
+                it.source != null && it.source != "cron" && it.instant in start..<end && it.instant <= now
+            }.map { record ->
+                val local = record.instant.toLocalDateTime(zone)
+                val run = ScheduleRun(def.id, record.scheduleName ?: def.name, record.instant, record.status, record.durationMillis,
+                    record.exitCode, record.error, def.agentId, record.reason, record.source, record.recordId)
+                Placed(run, local.date to local.hour * MINUTES_PER_HOUR + local.minute)
+            }
+        } else emptyList()
+        val byDate = (placed + unscheduled).groupBy { it.at.first }
         return dates.map { date -> day(date, byDate[date].orEmpty()) }
     }
 
@@ -174,7 +186,8 @@ object ScheduleCalendar {
     }
 
     private fun day(date: LocalDate, placed: List<Placed>): CalendarDay {
-        val bySchedule = placed.groupBy { it.run.scheduleId }.values
+        val (wakes, scheduled) = placed.partition { it.run.source != null && it.run.source != "cron" }
+        val bySchedule = scheduled.groupBy { it.run.scheduleId }.values
         val (collapsed, timed) = bySchedule.partition { runs -> collapses(runs.map { it.minute }) }
         val bands = collapsed.map { runs ->
             val sorted = runs.sortedBy { it.minute }
@@ -188,7 +201,7 @@ object ScheduleCalendar {
                 lastMinute = sorted.last().minute,
             )
         }.sortedBy { it.firstMinute }
-        val events = layoutLanes(timed.flatten().map { CalendarEvent(it.run, it.minute) })
+        val events = layoutLanes((timed.flatten() + wakes).map { CalendarEvent(it.run, it.minute) })
         return CalendarDay(date, events, bands)
     }
 

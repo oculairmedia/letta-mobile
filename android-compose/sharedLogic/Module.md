@@ -644,3 +644,7 @@ Wrapper-owned producer run records and leases, independent of upstream cron stor
 # Package com.letta.mobile.data.controller.node.iroh.beads
 
 Bounded Beads admin RPC adapter for the wrapper, with upstream credentials held on the host.
+
+# Package com.letta.mobile.data.schedules.runs
+
+Maps merged wrapper cron-run pages into shared schedule history records. The mapper tolerates older rows and rejects malformed entries.

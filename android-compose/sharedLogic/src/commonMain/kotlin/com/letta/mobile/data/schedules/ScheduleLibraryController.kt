@@ -1,6 +1,7 @@
 package com.letta.mobile.data.schedules
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
@@ -44,6 +45,8 @@ data class ScheduleLibraryState(
      * mode is a real "0 schedules", NOT a signal that admin is unavailable.
      */
     val cronMode: Boolean = false,
+    /** Recorded runs keyed by their cron task ID. */
+    val runHistory: Map<String, List<RunRecord>> = emptyMap(),
 ) {
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
     val cronsForSelectedAgent: List<CronTask>
@@ -124,6 +127,8 @@ class ScheduleLibraryController(
      * "admin unavailable" state straight away.
      */
     nativeScheduleRoute: Boolean = true,
+    /** Optional shared transport for a selected agent’s run history. */
+    private val runHistorySource: (suspend (AgentId, List<String>) -> List<RunRecord>)? = null,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
@@ -184,6 +189,7 @@ class ScheduleLibraryController(
                 }
                 val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
                 stateFlow.value = target.withSchedules(schedules)
+                loadRunHistory()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -216,7 +222,8 @@ class ScheduleLibraryController(
                 return@launch
             }
             try {
-                stateFlow.value = target.withSchedules(loadSchedulesForAgent(agentId))
+                stateFlow.value = target.withSchedules(loadSchedulesForAgent(agentId)).copy(runHistory = emptyMap())
+                loadRunHistory()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -240,7 +247,8 @@ class ScheduleLibraryController(
             try {
                 scheduleRepository.createSchedule(agentId, params)
                 val schedules = scheduleRepository.getSchedules(agentId).first()
-                stateFlow.value = current.copy(selectedAgentId = agentId).withSchedules(schedules)
+                stateFlow.value = current.copy(selectedAgentId = agentId, runHistory = emptyMap()).withSchedules(schedules)
+                loadRunHistory()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -272,7 +280,8 @@ class ScheduleLibraryController(
             val agentId = current.selectedAgentId ?: return@launch
             try {
                 scheduleRepository.deleteSchedule(agentId, scheduledMessageId)
-                stateFlow.value = current.withSchedules(scheduleRepository.getSchedules(agentId).first())
+                stateFlow.value = current.withSchedules(scheduleRepository.getSchedules(agentId).first()).copy(runHistory = emptyMap())
+                loadRunHistory()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -322,12 +331,30 @@ class ScheduleLibraryController(
     private suspend fun publishCronFallbackOrUnavailable(target: ScheduleLibraryState) {
         val crons = cronSource?.let { source -> runCatching { source.listCrons(target.selectedAgentId) }.getOrNull() }
         stateFlow.value = if (crons != null) {
-            target.withSchedules(emptyList()).copy(crons = crons, cronMode = true)
+            target.withSchedules(emptyList()).copy(crons = crons, cronMode = true, runHistory = emptyMap())
         } else {
             ScheduleLibraryState(
                 agents = target.agents,
                 selectedAgentId = target.agents.resolveSelection(target.selectedAgentId),
             ).adminUnavailable()
+        }
+        loadRunHistory()
+    }
+
+    private suspend fun loadRunHistory() {
+        val source = runHistorySource ?: return
+        val state = stateFlow.value
+        val agent = state.selectedAgentId ?: return
+        val ids = (state.schedules.map { it.id } + state.crons.map { it.id }).distinct()
+        try {
+            val records = source(AgentId(agent), ids)
+            stateFlow.update {
+                if (it.selectedAgentId == agent) it.copy(runHistory = records.groupBy { record -> record.scheduleId }) else it
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            stateFlow.update { it.copy(errorMessage = errorMessageMapper(t, "Failed to load run history")) }
         }
     }
 

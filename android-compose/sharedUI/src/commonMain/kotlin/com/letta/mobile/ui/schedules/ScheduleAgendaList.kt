@@ -76,10 +76,14 @@ private fun AgendaLine(item: AgendaItem, params: ScheduleCalendarParams) {
 @Composable
 private fun RunRow(entry: CalendarEntry.Event, params: ScheduleCalendarParams) {
     val run = entry.event.run
+    val cadence = params.cadenceById[run.scheduleId]
+    val subtitle = run.reason?.takeIf { it.isNotBlank() }?.let { reason ->
+        listOfNotNull(cadence, "woke: $reason").joinToString(" · ")
+    } ?: cadence
     LettaListRow(
         spec = LettaListRowSpec(
             title = run.scheduleName,
-            subtitle = params.cadenceById[run.scheduleId],
+            subtitle = subtitle,
             trailing = ScheduleRunText.trailing(run, params.clock.now),
             emphasized = run.status == RunStatus.Next,
             quiet = run.status.isPast || run.status == RunStatus.Paused,

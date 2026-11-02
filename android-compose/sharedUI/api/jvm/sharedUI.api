@@ -6097,8 +6097,8 @@ public final class com/letta/mobile/ui/schedules/CalendarTone : java/lang/Enum {
 public final class com/letta/mobile/ui/schedules/ComposableSingletons$ScheduleHistoryViewKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/schedules/ComposableSingletons$ScheduleHistoryViewKt;
 	public fun <init> ()V
-	public final fun getLambda$-1204552788$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$2025850832$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1207821133$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$814956457$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/schedules/ComposableSingletons$ScheduleMonthCalendarKt {
@@ -6141,7 +6141,7 @@ public final class com/letta/mobile/ui/schedules/ScheduleCalendarParams {
 }
 
 public final class com/letta/mobile/ui/schedules/ScheduleHistoryViewKt {
-	public static final fun HistoryView (Lcom/letta/mobile/data/schedules/HistorySummary;Landroidx/compose/runtime/Composer;I)V
+	public static final fun HistoryView (Lcom/letta/mobile/data/schedules/HistorySummary;Lkotlinx/datetime/TimeZone;Landroidx/compose/runtime/Composer;II)V
 	public static final fun ReliabilityStrip (Ljava/util/List;ILandroidx/compose/runtime/Composer;II)V
 	public static final fun StatCell-FNF3uiM (Ljava/lang/String;Ljava/lang/String;JLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
 	public static final fun StatsCard (Lcom/letta/mobile/data/schedules/HistorySummary;Landroidx/compose/runtime/Composer;I)V
