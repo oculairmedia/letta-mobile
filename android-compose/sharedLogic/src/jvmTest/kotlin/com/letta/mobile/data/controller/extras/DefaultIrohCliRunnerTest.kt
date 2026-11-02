@@ -49,6 +49,27 @@ class DefaultIrohCliRunnerTest {
     }
 
 
+    @Test
+    fun preservesJsonCorrelationWithKeysThatCannotUseEqualsFlags() = runBlocking {
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-json").toFile()
+        val args = File(tmp, "args")
+        val script = writeCaptureScript(tmp, "capture.sh", args, """
+            #!/bin/sh
+            printf '%s\n' "$@" > "@STDOUT_PATH@"
+            cat > /dev/null
+            printf '{"accepted":true,"applicationDelivered":true,"msgId":"m"}'
+        """.trimIndent())
+        val correlation = mapOf("a=b" to "value", "" to "empty")
+        DefaultIrohCliRunner().send(
+            script.absolutePath, "from", "to", "body", IrohCliPaths(message = IrohMessageOptions(correlation = correlation)),
+        )
+        val words = args.readLines()
+        val index = words.indexOf("--correlation-json")
+        assertTrue(index >= 0)
+        val json = kotlinx.serialization.json.Json.parseToJsonElement(words[index + 1])
+        assertEquals(kotlinx.serialization.json.JsonObject(correlation.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }), json)
+    }
+
     @BeforeTest
     fun setUp() {
         org.junit.Assume.assumeFalse(System.getProperty("os.name").lowercase().contains("windows"))
