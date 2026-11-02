@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.cli.meridian.MeridianToolsEndpoint
 import com.letta.mobile.cli.meridian.MeridianToolsOptions
 import com.letta.mobile.cli.meridian.servesCli
+import com.letta.mobile.cli.commands.records.WrapperStoreOptions
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
@@ -163,12 +164,7 @@ class AppServerServeIrohCommand : CliktCommand(
             "'off' is the global kill switch (no plugin runs, no plugin tool is advertised).",
     ).choice(PluginHostFlags.ON, PluginHostFlags.OFF).default(PluginHostFlags.ON)
 
-    private val modelExposureFile by option(
-        "--model-exposure-file",
-        envvar = "LETTA_MODEL_EXPOSURE_FILE",
-        help = "JSON file holding which App Server models are exposed to app model pickers " +
-            "(model.exposure.*; default: model-exposure.json next to host-canvases.json).",
-    )
+    private val wrapperStores by WrapperStoreOptions()
 
     private val agentToolsMode by option(
         "--agent-tools-mode",
@@ -547,6 +543,7 @@ class AppServerServeIrohCommand : CliktCommand(
             agentChanges = agentChanges,
             conversationChanges = conversationChanges,
             modelExposureFile = resolvedModelExposureFile(),
+            runRecordsFile = wrapperStores.runRecordsFile,
             turnIdentity = admin.turnIdentity,
             pairingQr = pairingQr,
             subagentPublisher = { source ->
@@ -791,7 +788,7 @@ class AppServerServeIrohCommand : CliktCommand(
     }
 
     private fun resolvedModelExposureFile(): String =
-        com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(modelExposureFile, canvasOpsDir)
+        com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(wrapperStores.modelExposureFile, canvasOpsDir)
 
     /** The canvas side plugins place through, set by [startCanvasRelay]. */
     private lateinit var pluginCanvas: PluginHostCanvas

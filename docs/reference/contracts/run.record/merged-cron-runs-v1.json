@@ -1,0 +1,50 @@
+{
+  "name": "merged-cron-runs",
+  "request": {
+    "type": "admin_rpc",
+    "request_id": "test",
+    "method": "cron.runs",
+    "params": {
+      "task_id": "task-A"
+    }
+  },
+  "response": {
+    "type": "admin_rpc_response",
+    "request_id": "test",
+    "success": true,
+    "result": {
+      "page": {
+        "entries": [
+          {
+            "ts": 1793577600000,
+            "jobId": "task-A",
+            "action": "finished",
+            "status": "done",
+            "agentId": "agent-A",
+            "runId": "aae34202cbd1d5c209264d6ef8c74356a3cd9f8328fec691974a19ea9e01b02e",
+            "scheduleName": "daily",
+            "instant": "2026-11-02T00:00:00Z",
+            "reason": "requested by operator",
+            "source": "human",
+            "detail": null
+          },
+          {
+            "ts": 1793491200000,
+            "jobId": "task-A",
+            "action": "finished",
+            "status": "ok",
+            "agentId": "agent-A",
+            "runId": "upstream-1",
+            "reason": null,
+            "source": null
+          }
+        ],
+        "total": 2,
+        "offset": 0,
+        "limit": 50,
+        "hasMore": false,
+        "nextOffset": null
+      }
+    }
+  }
+}

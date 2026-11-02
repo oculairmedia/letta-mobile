@@ -1,0 +1,23 @@
+{
+  "method": "lease.upsert",
+  "version": 1,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/RunRecordAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "invalid-params",
+      "context": {
+        "authenticated": true
+      },
+      "host_state": {
+        "controller_state": "connected"
+      },
+      "params": {},
+      "expected_response": {
+        "type": "admin_rpc_response",
+        "request_id": "contract",
+        "success": false,
+        "error": "validation.invalid_params: id"
+      }
+    }
+  ]
+}

@@ -212,6 +212,18 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [health.check: Controller Status v1](reference/contracts/health.check/status-v1.md)
 
+### reference/contracts/lease.list
+
+- [lease.list v1](reference/contracts/lease.list/wrapper-records-v1.md)
+
+### reference/contracts/lease.upsert
+
+- [lease.upsert v1](reference/contracts/lease.upsert/wrapper-records-v1.md)
+
+### reference/contracts/run.record
+
+- [Wrapper run records and leases v1](reference/contracts/run.record/wrapper-records-v1.md)
+
 ### testing
 
 - [5s9lq.1 Chat Hydration Trace Baseline](testing/5s9lq-1-chat-hydration-trace.md)

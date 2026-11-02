@@ -15,12 +15,26 @@ import kotlinx.serialization.json.put
  * instead of pretending.
  */
 internal object CronAdminHandlers {
-    fun register(router: AdminRpcRouter, nativeClient: AppServerClient?) {
-        fun requireClient(): AppServerClient =
-            nativeClient ?: adminError("cron operations require the native App Server client")
+    fun register(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient?,
+        records: com.letta.mobile.data.controller.node.iroh.records.WrapperRecordStore,
+    ) {
+        registerReads(router, nativeClient, records)
+        registerCreate(router, nativeClient)
+        registerMutations(router, nativeClient)
+    }
 
+    private fun AppServerClient?.requireCronClient(): AppServerClient =
+        this ?: adminError("cron operations require the native App Server client")
+
+    private fun registerReads(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient?,
+        records: com.letta.mobile.data.controller.node.iroh.records.WrapperRecordStore,
+    ) {
         router.register("cron.list") { params ->
-            val response = requireClient().cronList(
+            val response = nativeClient.requireCronClient().cronList(
                 AppServerCommand.CronList(
                     requestId = NativeAdmin.requestId(),
                     agentId = param(params, AdminParamKey("agent_id")),
@@ -30,8 +44,27 @@ internal object CronAdminHandlers {
             if (!response.success) adminError(response.error ?: "cron_list failed")
             buildJsonObject { put("tasks", response.tasks ?: JsonArray(emptyList())) }
         }
+        router.register("cron.get") { params ->
+            val response = nativeClient.requireCronClient().cronGet(
+                AppServerCommand.CronGet(
+                    requestId = NativeAdmin.requestId(),
+                    taskId = params.requireParam(AdminParamKey("task_id")),
+                ),
+            )
+            if (!response.success) adminError(response.error ?: "cron_get failed")
+            buildJsonObject {
+                put("found", response.found)
+                put("task", response.task ?: JsonNull)
+            }
+        }
+        router.registerScoped("cron.runs") { params, context ->
+            mergedCronRuns(nativeClient.requireCronClient(), records, params, context)
+        }
+    }
+
+    private fun registerCreate(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.register("cron.add") { params ->
-            val response = requireClient().cronAdd(
+            val response = nativeClient.requireCronClient().cronAdd(
                 AppServerCommand.CronAdd(
                     requestId = NativeAdmin.requestId(),
                     agentId = params.requireParam(AdminParamKey("agent_id")),
@@ -51,33 +84,16 @@ internal object CronAdminHandlers {
                 response.warning?.let { put("warning", it) }
             }
         }
-        router.register("cron.get") { params ->
-            val response = requireClient().cronGet(
-                AppServerCommand.CronGet(
-                    requestId = NativeAdmin.requestId(),
-                    taskId = params.requireParam(AdminParamKey("task_id")),
-                ),
-            )
-            if (!response.success) adminError(response.error ?: "cron_get failed")
-            buildJsonObject {
-                put("found", response.found)
-                put("task", response.task ?: JsonNull)
-            }
-        }
-        router.register("cron.runs") { params ->
-            val response = requireClient().cronRuns(
-                AppServerCommand.CronRuns(
-                    requestId = NativeAdmin.requestId(),
-                    taskId = params.requireParam(AdminParamKey("task_id")),
-                    limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
-                    offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
-                ),
-            )
-            if (!response.success) adminError(response.error ?: "cron_runs failed")
-            buildJsonObject { put("page", response.page ?: JsonNull) }
-        }
+    }
+
+    private fun registerMutations(router: AdminRpcRouter, nativeClient: AppServerClient?) {
+        registerTriggerAndUpdate(router, nativeClient)
+        registerDeletes(router, nativeClient)
+    }
+
+    private fun registerTriggerAndUpdate(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.register("cron.trigger") { params ->
-            val response = requireClient().cronTrigger(
+            val response = nativeClient.requireCronClient().cronTrigger(
                 AppServerCommand.CronTrigger(
                     requestId = NativeAdmin.requestId(),
                     taskId = params.requireParam(AdminParamKey("task_id")),
@@ -90,7 +106,7 @@ internal object CronAdminHandlers {
             }
         }
         router.register("cron.update") { params ->
-            val response = requireClient().cronUpdate(
+            val response = nativeClient.requireCronClient().cronUpdate(
                 AppServerCommand.CronUpdate(
                     requestId = NativeAdmin.requestId(),
                     taskId = params.requireParam(AdminParamKey("task_id")),
@@ -107,8 +123,11 @@ internal object CronAdminHandlers {
             if (!response.success) adminError(response.error ?: "cron_update failed")
             buildJsonObject { put("task", response.task ?: JsonNull) }
         }
+    }
+
+    private fun registerDeletes(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.register("cron.delete") { params ->
-            val response = requireClient().cronDelete(
+            val response = nativeClient.requireCronClient().cronDelete(
                 AppServerCommand.CronDelete(
                     requestId = NativeAdmin.requestId(),
                     taskId = params.requireParam(AdminParamKey("task_id")),
@@ -118,7 +137,7 @@ internal object CronAdminHandlers {
             buildJsonObject { put("found", response.found) }
         }
         router.register("cron.delete_all") { params ->
-            val response = requireClient().cronDeleteAll(
+            val response = nativeClient.requireCronClient().cronDeleteAll(
                 AppServerCommand.CronDeleteAll(
                     requestId = NativeAdmin.requestId(),
                     agentId = params.requireParam(AdminParamKey("agent_id")),

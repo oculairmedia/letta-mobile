@@ -40,6 +40,49 @@ class IrohPeerCapabilitiesTest {
     }
 
     @Test
+    fun registeredMethodsCannotAccidentallyFallThroughToAdminFull() {
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(subagentRegistrySource = EmptySubagentSource),
+            pairing = AdminRpcPairing(pairingService = IrohPairingService(InMemoryPairedPeerStore())),
+        )
+        val intentionalAdmin = setOf(
+            "agent.delete", "conversation.list_agent", "goal.command", "model.exposure.set",
+            "provider.connect", "provider.disconnect", "secret.list", "secret.apply",
+            "workspace.read_file", "workspace.search_files",
+            "pair.invite.create", "pair.invite.list", "pair.invite.revoke",
+            "pair.peer.list", "pair.peer.get", "pair.peer.rename",
+            "pair.peer.set_capabilities", "pair.peer.set_agents", "pair.peer.revoke",
+            "plugins.list", "plugins.inspect", "plugins.install", "plugins.consent",
+            "plugins.enable", "plugins.disable", "plugins.remove", "plugins.disableAll",
+        )
+        assertEquals(
+            intentionalAdmin,
+            router.registeredMethods.filter { IrohPeerCapabilities.forAdminMethod(it) == IrohPeerCapabilities.ADMIN_FULL }.toSet(),
+            "Every new method needs an intentional tier; the default admin.full fallback must fail this assertion",
+        )
+        println("VO3OO_REGISTERED_METHODS=" + router.registeredMethods.sorted().joinToString(","))
+    }
+
+    @Test
+    fun wrapperRecordMethodsAreExplicitlyTieredRegisteredAndAdvertised() {
+        val expected = mapOf(
+            "run.record" to "workactivity.report",
+            "lease.upsert" to "workactivity.report",
+            "lease.list" to "chat.read",
+            "cron.runs" to "chat.read",
+        )
+        val router = AdminRpcRegistry.buildRouter()
+        expected.forEach { (method, tier) ->
+            assertEquals(tier, IrohPeerCapabilities.forAdminMethod(method))
+            assertTrue(method in router.registeredMethods)
+            assertTrue(IrohPeerCapabilities.isAllowed(vibesyncRole, tier))
+        }
+        val advertised = IrohNodeConnection.advertisedCapabilities(router)
+        assertTrue(setOf("run.record", "lease.upsert", "lease.list").all { it in advertised })
+        assertFalse(IrohPeerCapabilities.ADMIN_FULL in vibesyncRole)
+    }
+
+    @Test
     fun unknownMethodsRequireAdminFullByDefault() {
         assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("brand.new.method"))
         assertFalse(

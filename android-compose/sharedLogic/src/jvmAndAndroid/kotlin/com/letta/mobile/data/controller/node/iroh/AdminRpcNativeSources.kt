@@ -33,4 +33,6 @@ class AdminRpcNativeSources(
      * for the router's lifetime (tests, stub CLI).
      */
     val modelExposureFile: String? = null,
+    /** Wrapper-owned run/lease persistence; null creates an isolated in-memory store. */
+    val wrapperRecords: com.letta.mobile.data.controller.node.iroh.records.WrapperRecordStore? = null,
 )

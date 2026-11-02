@@ -1,0 +1,202 @@
+{
+  "clock": "2026-11-02T00:00:00Z",
+  "lease_recovery_clock": "2026-11-02T01:00:00Z",
+  "cases": [
+    {
+      "name": "run-record",
+      "request": {
+        "type": "admin_rpc",
+        "request_id": "test",
+        "method": "run.record",
+        "params": {
+          "agentId": "agent-A",
+          "scheduleId": "task-A",
+          "scheduleName": "daily",
+          "instant": "2026-11-02T00:00:00Z",
+          "status": "done",
+          "reason": "requested by operator",
+          "source": "human"
+        }
+      },
+      "response": {
+        "type": "admin_rpc_response",
+        "request_id": "test",
+        "success": true,
+        "result": {
+          "record": {
+            "id": "aae34202cbd1d5c209264d6ef8c74356a3cd9f8328fec691974a19ea9e01b02e",
+            "agentId": "agent-A",
+            "scheduleId": "task-A",
+            "scheduleName": "daily",
+            "instant": "2026-11-02T00:00:00Z",
+            "status": "done",
+            "reason": "requested by operator",
+            "source": "human",
+            "detail": null,
+            "createdAt": "2026-11-02T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "lease-active",
+      "request": {
+        "type": "admin_rpc",
+        "request_id": "test",
+        "method": "lease.upsert",
+        "params": {
+          "id": "lease-1",
+          "owner": "agent-A",
+          "label": "work",
+          "startedAt": "2026-11-01T00:00:00Z",
+          "dueAt": "2026-11-03T00:00:00Z",
+          "state": "active"
+        }
+      },
+      "response": {
+        "type": "admin_rpc_response",
+        "request_id": "test",
+        "success": true,
+        "result": {
+          "lease": {
+            "id": "lease-1",
+            "owner": "agent-A",
+            "label": "work",
+            "startedAt": "2026-11-01T00:00:00Z",
+            "dueAt": "2026-11-03T00:00:00Z",
+            "state": "active",
+            "runId": null,
+            "detail": null,
+            "createdAt": "2026-11-02T00:00:00Z",
+            "updatedAt": "2026-11-02T00:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "lease-recovered",
+      "request": {
+        "type": "admin_rpc",
+        "request_id": "test",
+        "method": "lease.upsert",
+        "params": {
+          "id": "lease-1",
+          "owner": "agent-A",
+          "label": "work",
+          "startedAt": "2026-11-01T00:00:00Z",
+          "dueAt": "2026-11-03T00:00:00Z",
+          "state": "recovered"
+        }
+      },
+      "response": {
+        "type": "admin_rpc_response",
+        "request_id": "test",
+        "success": true,
+        "result": {
+          "lease": {
+            "id": "lease-1",
+            "owner": "agent-A",
+            "label": "work",
+            "startedAt": "2026-11-01T00:00:00Z",
+            "dueAt": "2026-11-03T00:00:00Z",
+            "state": "recovered",
+            "runId": null,
+            "detail": null,
+            "createdAt": "2026-11-02T00:00:00Z",
+            "updatedAt": "2026-11-02T01:00:00Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "lease-list",
+      "request": {
+        "type": "admin_rpc",
+        "request_id": "test",
+        "method": "lease.list",
+        "params": {
+          "agentId": "agent-A",
+          "state": "recovered",
+          "limit": 50,
+          "offset": 0
+        }
+      },
+      "response": {
+        "type": "admin_rpc_response",
+        "request_id": "test",
+        "success": true,
+        "result": {
+          "leases": [
+            {
+              "id": "lease-1",
+              "owner": "agent-A",
+              "label": "work",
+              "startedAt": "2026-11-01T00:00:00Z",
+              "dueAt": "2026-11-03T00:00:00Z",
+              "state": "recovered",
+              "runId": null,
+              "detail": null,
+              "createdAt": "2026-11-02T00:00:00Z",
+              "updatedAt": "2026-11-02T01:00:00Z"
+            }
+          ],
+          "total": 1,
+          "offset": 0,
+          "limit": 50,
+          "hasMore": false,
+          "nextOffset": null
+        }
+      }
+    },
+    {
+      "name": "merged-cron-runs",
+      "request": {
+        "type": "admin_rpc",
+        "request_id": "test",
+        "method": "cron.runs",
+        "params": {
+          "task_id": "task-A"
+        }
+      },
+      "response": {
+        "type": "admin_rpc_response",
+        "request_id": "test",
+        "success": true,
+        "result": {
+          "page": {
+            "entries": [
+              {
+                "ts": 1793577600000,
+                "jobId": "task-A",
+                "action": "finished",
+                "status": "done",
+                "agentId": "agent-A",
+                "runId": "aae34202cbd1d5c209264d6ef8c74356a3cd9f8328fec691974a19ea9e01b02e",
+                "scheduleName": "daily",
+                "instant": "2026-11-02T00:00:00Z",
+                "reason": "requested by operator",
+                "source": "human",
+                "detail": null
+              },
+              {
+                "ts": 1793491200000,
+                "jobId": "task-A",
+                "action": "finished",
+                "status": "ok",
+                "agentId": "agent-A",
+                "runId": "upstream-1",
+                "reason": null,
+                "source": null
+              }
+            ],
+            "total": 2,
+            "offset": 0,
+            "limit": 50,
+            "hasMore": false,
+            "nextOffset": null
+          }
+        }
+      }
+    }
+  ]
+}

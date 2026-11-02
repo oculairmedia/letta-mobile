@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | ba81c9774cdc12d5f473653e9e5ff1e18371dc4da2b74096983dd0324230b5a4 | 08ed60e770725cedea0c4553c8be30d2a2e5d3fb |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 17cf06b6306b06ed0173fc4687ec38bbd412888ff011ebdbf981aa9c113ca6af | b7a9730df13ad7ad6bed5747ec1cc1689cea4e45 |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 9bc400f7e9905478218ecf3fe222303c6167c6e45090fb3ed83f4d925a6a04d3 | 35d5934f754bde7912b7bf674df3c1b6876e899c |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 84e62d502a28e0fb64e50a6d4c444bf48bd2a78bca62f17c38ae083f5d22de6d | 4a7bc7339087238113f9e9ee2f79f5ad334aa72a |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -287,7 +287,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (130 methods)
+## Admin ownership (133 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
@@ -295,7 +295,7 @@ These are declared ownership decisions, not newly observed production execution.
 | --- | --- |
 | app&#95;server&#95;v2 | 57 |
 | capability&#95;gated&#95;unsupported | 17 |
-| controller&#95;native | 28 |
+| controller&#95;native | 31 |
 | local&#95;backend&#95;store | 9 |
 | plugin&#95;host | 10 |
 | vibesync&#95;service | 9 |
@@ -303,7 +303,7 @@ These are declared ownership decisions, not newly observed production execution.
 | Fallback | Method count |
 | --- | --- |
 | deny&#95;fail&#95;closed | 25 |
-| none | 105 |
+| none | 108 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
 | --- | --- | --- | --- | --- | --- |
@@ -356,6 +356,8 @@ These are declared ownership decisions, not newly observed production execution.
 | identity.list | controller&#95;native | none | admin&#95;read | IdentityAdminHandlers.kt | controller-owned empty list for an entity the local backend does not model |
 | job.get | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;read | ScheduleAdminHandlers.kt | explicit capability denial pending a native job command |
 | job.list | controller&#95;native | none | admin&#95;read | ScheduleAdminHandlers.kt | controller-owned empty list for an entity the local backend does not model |
+| lease.list | controller&#95;native | none | admin&#95;read | RunRecordAdminHandlers.kt | docs/reference/contracts/run.record/wrapper-records-v1.md |
+| lease.upsert | controller&#95;native | none | admin&#95;write | RunRecordAdminHandlers.kt | docs/reference/contracts/run.record/wrapper-records-v1.md |
 | mcp.list | controller&#95;native | none | admin&#95;read | McpAdminHandlers.kt | controller-owned empty MCP server list |
 | memfs.commit&#95;diff | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | memory&#95;commit&#95;diff |
 | memfs.enable | app&#95;server&#95;v2 | none | admin&#95;write | WorkspaceAdminHandlers.kt | enable&#95;memfs |
@@ -412,6 +414,7 @@ These are declared ownership decisions, not newly observed production execution.
 | reflection.set | app&#95;server&#95;v2 | none | admin&#95;write | ReflectionAdminHandlers.kt | set&#95;reflection&#95;settings |
 | run.get | local&#95;backend&#95;store | deny&#95;fail&#95;closed | admin&#95;read | RunAdminHandlers.kt | controller-owned run lookup over the letta-code on-disk backend |
 | run.list | local&#95;backend&#95;store | deny&#95;fail&#95;closed | admin&#95;read | RunAdminHandlers.kt | controller-owned run history over the letta-code on-disk backend |
+| run.record | controller&#95;native | none | admin&#95;write | RunRecordAdminHandlers.kt | docs/reference/contracts/run.record/wrapper-records-v1.md |
 | schedule.create | app&#95;server&#95;v2 | none | admin&#95;write | ScheduleAdminHandlers.kt | cron&#95;add |
 | schedule.delete | app&#95;server&#95;v2 | none | admin&#95;write | ScheduleAdminHandlers.kt | cron&#95;delete |
 | schedule.get | app&#95;server&#95;v2 | none | admin&#95;read | ScheduleAdminHandlers.kt | cron&#95;get |

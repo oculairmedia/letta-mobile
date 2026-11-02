@@ -99,6 +99,8 @@ object IrohPeerCapabilities {
      * classified here (and in the ownership matrix).
      */
     fun forAdminMethod(method: String): String = when {
+        method in WRAPPER_RECORD_READ_METHODS -> CHAT_READ
+        method in WRAPPER_RECORD_WRITE_METHODS -> WORKACTIVITY_REPORT
         method in CHAT_READ_METHODS -> CHAT_READ
         // letta-mobile-bzvro.37: the workspace relay's explicit allowlist.
         method in WorkspaceRelayMethod.methods -> forWorkspaceMethod(requireNotNull(WorkspaceRelayMethod.forMethod(method)))
@@ -204,6 +206,10 @@ object IrohPeerCapabilities {
 
     private fun String.isReadMethod(): Boolean =
         endsWith(".list") || endsWith(".get") || endsWith(".list_agent")
+
+    // Reporting uses the existing opt-in producer grant; reading does not grant schedule mutation.
+    private val WRAPPER_RECORD_WRITE_METHODS = setOf("run.record", "lease.upsert")
+    private val WRAPPER_RECORD_READ_METHODS = setOf("cron.runs", "lease.list")
 
     private val CHAT_READ_METHODS = setOf(
         "conversation.list", "conversation.get",
