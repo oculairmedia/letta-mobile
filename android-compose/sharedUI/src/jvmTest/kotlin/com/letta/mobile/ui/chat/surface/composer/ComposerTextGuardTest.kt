@@ -53,14 +53,14 @@ class ComposerTextGuardTest {
     @Test
     fun webpNeedsBinaryEvidenceInItsSizeField() {
         val previous = TextFieldValue("")
-        assertFalse(hasWebpHeader("RIFFtestWEBP is a format"))
+        assertFalse("RIFFtestWEBP is a format".hasWebpHeader())
         assertFalse(isUnreadableComposerText(previous, "RIFFtestWEBP is a format"))
         listOf('\u0000', '\u0001', '\u001a', '\u007f', '\u0080', '\u009f', '\ufffd').forEach { evidence ->
             val header = "RIFF" + evidence + "abc" + "WEBP"
-            assertTrue(hasWebpHeader(header), "evidence U+${evidence.code.toString(16)}")
+            assertTrue(header.hasWebpHeader(), "evidence U+${evidence.code.toString(16)}")
             assertTrue(isUnreadableComposerText(previous, header), "evidence U+${evidence.code.toString(16)}")
         }
-        assertFalse(hasWebpHeader("RIFF\u0000\u0000\u0001\u0000WEBX"))
+        assertFalse("RIFF\u0000\u0000\u0001\u0000WEBX".hasWebpHeader())
     }
 
     @Test

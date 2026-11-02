@@ -45,14 +45,13 @@ private class ComposerImageSignature(private val inserted: String) {
             inserted.startsWith("\u00ff\u00d8\u00ff") ||
             inserted.startsWith("\ufffd\ufffd\ufffd") ||
             hasGifHeader(inserted) ||
-            hasWebpHeader(inserted) ||
+            inserted.hasWebpHeader() ||
             hasBmpHeader(inserted)
 }
 
 // RIFF size field (four decoded bytes) followed by WEBP; readable text needs binary evidence in the size field.
-internal fun hasWebpHeader(text: String): Boolean =
-    text.length >= 12 && text.startsWith("RIFF") && text.substring(8, 12) == "WEBP" &&
-        text.substring(4, 8).any(::isBinaryEvidence)
+internal fun String.hasWebpHeader(): Boolean =
+    length >= 12 && startsWith("RIFF") && substring(8, 12) == "WEBP" && substring(4, 8).any(::isBinaryEvidence)
 
 // A logical screen descriptor has seven decoded byte characters after the signature.
 internal fun hasGifHeader(text: String): Boolean {
