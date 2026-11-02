@@ -49,12 +49,9 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
 /**
  * Optional Iroh filesystem paths and message options for a CLI invocation.
  *
- * Grouped into a single value class so the runner's `send` signature stays
- * under CodeScene's "≤4 function arguments" threshold and so callers that
- * override both directories do so via named fields rather than positional
- * nulls. `identityDir` and `addressStore` are independent overrides — null
- * means "use the CLI's default" (`~/.letta/iroh/identities` and
- * `~/.letta/iroh/agent-addresses.kv` respectively).
+ * The directory overrides are independent: null uses the CLI's default
+ * (`~/.letta/iroh/identities` and `~/.letta/iroh/agent-addresses.kv`).
+ * [message] carries optional recipient addressing and task correlation.
  */
 data class IrohCliPaths(
     val identityDir: String? = null,
@@ -62,7 +59,7 @@ data class IrohCliPaths(
     val message: IrohMessageOptions = IrohMessageOptions(),
 ) {
     companion object {
-        /** The path triple that means "no overrides — let the CLI default." */
+        /** No overrides; use CLI defaults. */
         val DEFAULTS: IrohCliPaths = IrohCliPaths()
     }
 }
@@ -83,9 +80,8 @@ interface IrohCliRunner {
      *   this is the regression pinned by the
      *   `multiLineBodyRoundTripsViaStdin` unit test. Empty body is allowed
      *   (the CLI treats it as a ping).
-     * @param paths Optional overrides for the Iroh filesystem layout
-     *   (identity dir + address-book kv). Pass [IrohCliPaths.DEFAULTS] for
-     *   "no overrides — let the CLI default."
+     * @param paths Optional filesystem overrides and message addressing. Pass
+     *   [IrohCliPaths.DEFAULTS] to use the CLI defaults.
      * @return Typed outcome — never throws to the caller (the dispatcher
      *   contract is "always answer"; throwing would surface as a tool error
      *   and break the turn's answer guarantee).
