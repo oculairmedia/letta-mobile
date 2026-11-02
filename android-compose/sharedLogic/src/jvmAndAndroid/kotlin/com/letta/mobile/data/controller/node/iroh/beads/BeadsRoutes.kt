@@ -55,24 +55,35 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
         val query = readQuery(params)
         val path = readPath(operation, params)
         val body = params?.get("body")
-        val result = try {
-            val connected = connect()
-            connected.execute(operation, path, query, body)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: BeadsUnsupportedOperation) {
-            error("capability_unavailable: beads operation unsupported")
-        } catch (failure: BeadsHttpException) {
-            error(if (failure.status == 401 || failure.status == 403) "beads.unauthorized" else "beads.upstream_error")
-        } catch (_: BeadsProtocolException) {
-            error("beads.invalid_response")
-        } catch (_: BeadsTransportException) {
-            error("beads.unavailable")
-        } catch (_: Exception) {
-            error("beads.unavailable")
-        }
+        val result = request(operation, path, query, body)
         if (token?.let { containsSecret(result, it) } == true) error("beads.invalid_response")
         return result
+    }
+
+    private suspend fun request(
+        operation: BeadsOperation,
+        path: Map<String, String>,
+        query: Map<String, List<String>>,
+        body: JsonElement?,
+    ): JsonElement = try {
+        connect().execute(operation, path, query, body)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: BeadsUnsupportedOperation) {
+        error("capability_unavailable: beads operation unsupported")
+    } catch (failure: BeadsHttpException) {
+        error(httpError(failure.status))
+    } catch (_: BeadsProtocolException) {
+        error("beads.invalid_response")
+    } catch (_: BeadsTransportException) {
+        error("beads.unavailable")
+    } catch (_: Exception) {
+        error("beads.unavailable")
+    }
+
+    private fun httpError(status: Int): String = when (status) {
+        401, 403 -> "beads.unauthorized"
+        else -> "beads.upstream_error"
     }
 
     private suspend fun connect(): KtorBeadsBackend = mutex.withLock {
@@ -112,8 +123,8 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
             BeadsOperation.GET_SETTING, BeadsOperation.SET_SETTING -> "key"
             else -> return emptyMap()
         }
-        val value = params?.get(key) as? JsonPrimitive
-        if (value == null || !value.isString || value.content.isBlank()) error("validation.invalid_params: $key")
+        val value = (params?.get(key) as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotBlank() }
+            ?: error("validation.invalid_params: $key")
         return mapOf(key to value.content)
     }
 
