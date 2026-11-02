@@ -202,6 +202,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 ### reference/contracts
 
+- [Conversation lanes v1](reference/contracts/conversation-lanes-v1.md)
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
 
 ### reference/contracts/beads.config.get
