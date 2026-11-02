@@ -83,6 +83,12 @@ private fun WideCell(day: CalendarDay, params: ScheduleCalendarParams) {
         val spec = when (entry) {
             is CalendarEntry.Event -> runEventSpec(entry.event.run, params.clock.zone, params.clock.now)
             is CalendarEntry.Band -> bandEventSpec(entry.band, params.cadenceById[entry.band.scheduleId])
+            is CalendarEntry.LeaseEntry -> CalendarEventSpec(
+                title = entry.span.lease.label,
+                accent = leaseStateAccent(entry.span.lease.state),
+                trailing = entry.span.lease.state.badgeLabel,
+                description = "${entry.span.lease.label}, ${entry.span.lease.state.badgeLabel} lease",
+            )
         }
         CalendarEventBlock(
             spec = spec,
@@ -90,6 +96,7 @@ private fun WideCell(day: CalendarDay, params: ScheduleCalendarParams) {
                 when (entry) {
                     is CalendarEntry.Event -> params.actions.onRunClick(entry.event.run)
                     is CalendarEntry.Band -> params.actions.onScheduleClick(entry.band.scheduleId)
+                    is CalendarEntry.LeaseEntry -> params.actions.onLeaseClick(entry.span.lease)
                 }
             },
             modifier = Modifier.fillMaxWidth().height(CalendarDimens.eventHeight),

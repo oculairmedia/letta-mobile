@@ -17,6 +17,7 @@ import com.letta.mobile.data.schedules.CalendarLabels
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.ScheduleRun
+import com.letta.mobile.data.schedules.leases.Lease
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
@@ -32,6 +33,8 @@ class ScheduleCalendarActions(
     val onOpenDay: (LocalDate) -> Unit,
     /** An empty hour was tapped: start a schedule there. Null when the page cannot create one. */
     val onEmptySlot: ((LocalDate, Int) -> Unit)?,
+    /** Opens a linked run when one is available. */
+    val onLeaseClick: (Lease) -> Unit = {},
 )
 
 /** A calendar view's input: the projected [days], the day in focus and the recurrence of each schedule. */
@@ -43,6 +46,8 @@ class ScheduleCalendarParams(
     val clock: ScheduleClock,
     val cadenceById: Map<String, String>,
     val actions: ScheduleCalendarActions,
+    /** Run selected by a linked lease, when present. */
+    val highlightedRunId: String? = null,
 )
 
 /**
@@ -89,6 +94,13 @@ private fun WeekGrid(params: ScheduleCalendarParams, days: List<CalendarDay>, sh
         }
         if (days.any { it.bands.isNotEmpty() }) FrequentLane(days, params)
         CalendarTimeGrid(gridSpec(params, columns), Modifier.weight(1f)) { index ->
+            days[index].leases.forEach { span ->
+                LeaseCalendarBlock(
+                    lease = span.lease,
+                    onClick = { params.actions.onLeaseClick(span.lease) },
+                    modifier = Modifier.calendarSlot(CalendarSlot(span.startMinute.toInt(), durationMinutes = span.durationMinutes, exactMinuteOfDay = span.startMinute)),
+                )
+            }
             days[index].events.forEach { event ->
                 CalendarEventBlock(
                     spec = runEventSpec(event.run, params.clock.zone, params.clock.now, showTime = event.lanes == 1),
@@ -124,7 +136,7 @@ private fun gridSpec(params: ScheduleCalendarParams, columns: List<CalendarColum
     val now = params.clock.now.toLocalDateTime(params.clock.zone)
     val nowMinute = now.hour * MINUTES + now.minute
     val showsToday = columns.any { it.isToday }
-    val firstEvent = params.days.flatMap { it.events }.minOfOrNull { it.minuteOfDay }
+    val firstEvent = params.days.flatMap { day -> day.events.map { it.minuteOfDay } + day.leases.map { it.startMinute.toInt() } }.minOrNull()
     val initial = when {
         showsToday -> nowMinute - LEAD_MINUTES
         firstEvent != null -> firstEvent - LEAD_MINUTES

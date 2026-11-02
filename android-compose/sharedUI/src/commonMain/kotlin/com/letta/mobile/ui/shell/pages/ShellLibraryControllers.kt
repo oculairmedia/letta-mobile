@@ -18,6 +18,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohSkillsApi
 import com.letta.mobile.data.schedules.ScheduleLibraryController
+import com.letta.mobile.data.schedules.runs.LeaseHistory
 import com.letta.mobile.data.schedules.runs.CronRunHistory
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.session.SessionRepositoryGraph
@@ -72,6 +73,7 @@ object ShellLibraryFactory {
             scheduleAdminUnavailableMatcher = ShellPageErrors::isNotServed,
             nativeScheduleRoute = graph.capabilities.supports(SessionRoute.SCHEDULES),
             runHistorySource = CronRunHistory(graph.channelTransport)::load,
+            leaseSource = LeaseHistory(graph.channelTransport)::load,
         )
 
     fun channels(provider: ShellGraphProvider, scope: CoroutineScope): ChannelsPageController =
