@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.schedules.leases.Lease
+import com.letta.mobile.data.schedules.runs.ScheduleRecordSources
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.coroutines.CancellationException
@@ -130,10 +131,8 @@ class ScheduleLibraryController(
      * "admin unavailable" state straight away.
      */
     nativeScheduleRoute: Boolean = true,
-    /** Optional shared transport for a selected agent’s run history. */
-    private val runHistorySource: (suspend (AgentId, List<String>) -> List<RunRecord>)? = null,
-    /** Optional wrapper lease reader. */
-    private val leaseSource: (suspend (AgentId) -> List<Lease>)? = null,
+    /** Optional shared wrapper readers for run history and read-only leases. */
+    private val recordSources: ScheduleRecordSources? = null,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
@@ -254,7 +253,11 @@ class ScheduleLibraryController(
             try {
                 scheduleRepository.createSchedule(agentId, params)
                 val schedules = scheduleRepository.getSchedules(agentId).first()
-                stateFlow.value = current.copy(selectedAgentId = agentId, runHistory = emptyMap(), leases = emptyList()).withSchedules(schedules)
+                stateFlow.value = current.copy(
+                    selectedAgentId = agentId,
+                    runHistory = emptyMap(),
+                    leases = emptyList(),
+                ).withSchedules(schedules)
                 loadRunHistory()
                 loadLeases()
             } catch (cancelled: CancellationException) {
@@ -288,7 +291,12 @@ class ScheduleLibraryController(
             val agentId = current.selectedAgentId ?: return@launch
             try {
                 scheduleRepository.deleteSchedule(agentId, scheduledMessageId)
-                stateFlow.value = current.withSchedules(scheduleRepository.getSchedules(agentId).first()).copy(runHistory = emptyMap(), leases = emptyList())
+                stateFlow.value = current.withSchedules(
+                    scheduleRepository.getSchedules(agentId).first(),
+                ).copy(
+                    runHistory = emptyMap(),
+                    leases = emptyList(),
+                )
                 loadRunHistory()
                 loadLeases()
             } catch (cancelled: CancellationException) {
@@ -352,7 +360,7 @@ class ScheduleLibraryController(
     }
 
     private suspend fun loadRunHistory() {
-        val source = runHistorySource ?: return
+        val source = recordSources?.runHistory ?: return
         val state = stateFlow.value
         val agent = state.selectedAgentId ?: return
         val ids = (state.schedules.map { it.id } + state.crons.map { it.id }).distinct()
@@ -369,7 +377,7 @@ class ScheduleLibraryController(
     }
 
     private suspend fun loadLeases() {
-        val source = leaseSource ?: return
+        val source = recordSources?.leases ?: return
         val agent = stateFlow.value.selectedAgentId ?: return
         try {
             val leases = source(AgentId(agent))
@@ -377,7 +385,13 @@ class ScheduleLibraryController(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            stateFlow.update { if (it.selectedAgentId == agent) it.copy(errorMessage = errorMessageMapper(t, "Failed to load leases")) else it }
+            stateFlow.update {
+                if (it.selectedAgentId == agent) {
+                    it.copy(errorMessage = errorMessageMapper(t, "Failed to load leases"))
+                } else {
+                    it
+                }
+            }
         }
     }
 

@@ -52,7 +52,9 @@ class LeaseTest {
             "future" to LeaseState.UNKNOWN,
         ).forEach { (rawState, expectedState) ->
             val modifiedRow = kotlinx.serialization.json.JsonObject(row + ("state" to JsonPrimitive(rawState)))
-            val modified = kotlinx.serialization.json.JsonObject(result + ("leases" to kotlinx.serialization.json.JsonArray(listOf(modifiedRow))))
+            val modified = kotlinx.serialization.json.JsonObject(
+                result + ("leases" to kotlinx.serialization.json.JsonArray(listOf(modifiedRow))),
+            )
             assertEquals(expectedState, leaseRecords(response.copy(result = modified)).single().state)
         }
     }
@@ -116,6 +118,13 @@ class LeaseTest {
         assertEquals(75f, second.durationMinutes)
         val clamped = lease.copy(dueAt = lease.startedAt)
         assertEquals(1f, leaseSpan(clamped, LocalDate(2026, 11, 2), TimeZone.UTC)!!.durationMinutes)
-        assertEquals(1f, leaseSpan(clamped.copy(dueAt = Instant.parse("2026-11-01T00:00:00Z")), LocalDate(2026, 11, 2), TimeZone.UTC)!!.durationMinutes)
+        assertEquals(
+            1f,
+            leaseSpan(
+                clamped.copy(dueAt = Instant.parse("2026-11-01T00:00:00Z")),
+                LocalDate(2026, 11, 2),
+                TimeZone.UTC,
+            )!!.durationMinutes,
+        )
     }
 }

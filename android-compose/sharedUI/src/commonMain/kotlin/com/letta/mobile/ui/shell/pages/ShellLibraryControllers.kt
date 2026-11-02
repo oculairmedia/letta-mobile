@@ -20,6 +20,7 @@ import com.letta.mobile.data.repository.iroh.IrohSkillsApi
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.runs.LeaseHistory
 import com.letta.mobile.data.schedules.runs.CronRunHistory
+import com.letta.mobile.data.schedules.runs.ScheduleRecordSources
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.ifSupported
@@ -72,8 +73,10 @@ object ShellLibraryFactory {
             errorMessageMapper = ShellPageErrors::message,
             scheduleAdminUnavailableMatcher = ShellPageErrors::isNotServed,
             nativeScheduleRoute = graph.capabilities.supports(SessionRoute.SCHEDULES),
-            runHistorySource = CronRunHistory(graph.channelTransport)::load,
-            leaseSource = LeaseHistory(graph.channelTransport)::load,
+            recordSources = ScheduleRecordSources(
+                runHistory = CronRunHistory(graph.channelTransport)::load,
+                leases = LeaseHistory(graph.channelTransport)::load,
+            ),
         )
 
     fun channels(provider: ShellGraphProvider, scope: CoroutineScope): ChannelsPageController =

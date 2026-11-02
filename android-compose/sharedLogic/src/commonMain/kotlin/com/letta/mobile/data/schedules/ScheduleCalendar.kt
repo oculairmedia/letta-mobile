@@ -80,7 +80,11 @@ data class CalendarDay(
 
     /** Every entry in time order, a band at its first run. */
     val entries: List<CalendarEntry>
-        get() = (events.map { CalendarEntry.Event(it) } + bands.map { CalendarEntry.Band(it) } + leases.map { CalendarEntry.LeaseEntry(it) }).sortedBy { it.minuteOfDay }
+        get() = (
+            events.map { CalendarEntry.Event(it) } +
+                bands.map { CalendarEntry.Band(it) } +
+                leases.map { CalendarEntry.LeaseEntry(it) }
+            ).sortedBy { it.minuteOfDay }
 
     /** The agents with runs that day, first-run first; null for a schedule with no agent. */
     val agentIds: List<String?> get() = entries.map { entryAgent(it) }.distinct()

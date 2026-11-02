@@ -98,7 +98,13 @@ private fun WeekGrid(params: ScheduleCalendarParams, days: List<CalendarDay>, sh
                 LeaseCalendarBlock(
                     lease = span.lease,
                     onClick = { params.actions.onLeaseClick(span.lease) },
-                    modifier = Modifier.calendarSlot(CalendarSlot(span.startMinute.toInt(), durationMinutes = span.durationMinutes, exactMinuteOfDay = span.startMinute)),
+                    modifier = Modifier.calendarSlot(
+                        CalendarSlot(
+                            minuteOfDay = span.startMinute.toInt(),
+                            durationMinutes = span.durationMinutes,
+                            exactMinuteOfDay = span.startMinute,
+                        ),
+                    ),
                 )
             }
             days[index].events.forEach { event ->
@@ -136,7 +142,9 @@ private fun gridSpec(params: ScheduleCalendarParams, columns: List<CalendarColum
     val now = params.clock.now.toLocalDateTime(params.clock.zone)
     val nowMinute = now.hour * MINUTES + now.minute
     val showsToday = columns.any { it.isToday }
-    val firstEvent = params.days.flatMap { day -> day.events.map { it.minuteOfDay } + day.leases.map { it.startMinute.toInt() } }.minOrNull()
+    val firstEvent = params.days.flatMap { day ->
+        day.events.map { it.minuteOfDay } + day.leases.map { it.startMinute.toInt() }
+    }.minOrNull()
     val initial = when {
         showsToday -> nowMinute - LEAD_MINUTES
         firstEvent != null -> firstEvent - LEAD_MINUTES

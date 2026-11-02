@@ -164,9 +164,13 @@ private fun SlotLayout(content: @Composable () -> Unit) {
         val placed = measurables.map { measurable ->
             val slot = measurable.layoutId as? CalendarSlot ?: CalendarSlot(0)
             val laneWidth = (width - gapPx) / slot.lanes.coerceAtLeast(1)
-            val height = slot.durationMinutes?.let { (hourPx * it.coerceAtLeast(0f) / MINUTES_PER_HOUR).roundToInt() } ?: eventPx
+            val height = slot.durationMinutes?.let {
+                (hourPx * it.coerceAtLeast(0f) / MINUTES_PER_HOUR).roundToInt()
+            } ?: eventPx
             val placeable = measurable.measure(Constraints.fixed((laneWidth - gapPx).coerceAtLeast(0), height))
-            Triple(placeable, gapPx + slot.lane * laneWidth, (hourPx * (slot.exactMinuteOfDay ?: slot.minuteOfDay.toFloat()) / MINUTES_PER_HOUR).roundToInt())
+            val minute = slot.exactMinuteOfDay ?: slot.minuteOfDay.toFloat()
+            val y = (hourPx * minute / MINUTES_PER_HOUR).roundToInt()
+            Triple(placeable, gapPx + slot.lane * laneWidth, y)
         }
         layout(width, constraints.maxHeight) {
             placed.forEach { (placeable, x, y) -> placeable.place(x, y) }

@@ -78,7 +78,9 @@ private fun AgendaLine(item: AgendaItem, params: ScheduleCalendarParams) {
         is AgendaItem.Entry -> when (val entry = item.entry) {
             is CalendarEntry.Event -> RunRow(entry, params)
             is CalendarEntry.Band -> BandRow(entry.band, params)
-            is CalendarEntry.LeaseEntry -> LeaseAgendaRow(entry.span.lease, params.clock.zone) { params.actions.onLeaseClick(entry.span.lease) }
+            is CalendarEntry.LeaseEntry -> LeaseAgendaRow(entry.span.lease, params.clock.zone) {
+                params.actions.onLeaseClick(entry.span.lease)
+            }
         }
     }
 }
@@ -87,6 +89,7 @@ private fun AgendaLine(item: AgendaItem, params: ScheduleCalendarParams) {
 private fun RunRow(entry: CalendarEntry.Event, params: ScheduleCalendarParams) {
     val run = entry.event.run
     val cadence = params.cadenceById[run.scheduleId]
+    val isLinked = run.recordId != null && run.recordId == params.highlightedRunId
     val subtitle = run.reason?.takeIf { it.isNotBlank() }?.let { reason ->
         listOfNotNull(cadence, "woke: $reason").joinToString(" · ")
     } ?: cadence
@@ -95,12 +98,12 @@ private fun RunRow(entry: CalendarEntry.Event, params: ScheduleCalendarParams) {
             title = run.scheduleName,
             subtitle = subtitle,
             trailing = ScheduleRunText.trailing(run, params.clock.now),
-            emphasized = run.status == RunStatus.Next || (run.recordId != null && run.recordId == params.highlightedRunId),
+            emphasized = run.status == RunStatus.Next || isLinked,
             quiet = run.status.isPast || run.status == RunStatus.Paused,
         ),
         onClick = { params.actions.onRunClick(run) },
         modifier = Modifier.heightIn(min = LettaDimens.Control.minTouchTarget)
-            .then(if (run.recordId != null && run.recordId == params.highlightedRunId) Modifier.testTag("linked-run-${run.recordId}") else Modifier),
+            .then(if (isLinked) Modifier.testTag("linked-run-${run.recordId}") else Modifier),
         leading = { AgendaLeading(ScheduleFormat.timeOfDay(run.instant, params.clock.zone), scheduleAccentOfRaw(run.agentId)) },
         end = outcomeBadge(run.status)?.let { badge -> { BadgeIcon(badge) } },
     )

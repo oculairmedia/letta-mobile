@@ -98,7 +98,9 @@ internal fun rememberSchedulesData(state: SchedulesPageState, clock: ScheduleClo
     val cadence = remember(defs, clock.zone) { defs.associate { it.id to ScheduleRailText.cadence(it, clock.zone) } }
     val agentNames = remember(state.library.agents) { state.library.agents.associate { it.id.value to it.name } }
     val history = remember(historyDefs, clock, runHistory) { ScheduleProjection.history(historyDefs, clock.now, clock.zone, runHistory) }
-    val leases = state.library.leases.takeIf { state.focusedAgentId == null || state.focusedAgentId == state.library.selectedAgentId }.orEmpty()
+    val leases = state.library.leases.takeIf {
+        state.focusedAgentId == null || state.focusedAgentId == state.library.selectedAgentId
+    }.orEmpty()
     return SchedulesData(defs, historyDefs, defsById, clock, history, runHistory, cadence, agentNames, leases)
 }
 

@@ -55,8 +55,19 @@ internal fun LeaseCalendarBlock(lease: Lease, onClick: () -> Unit, modifier: Mod
         modifier.testTag("lease-${lease.state.badgeLabel.lowercase()}-${lease.id}")
             .background(color, MaterialTheme.shapes.small).clickable(onClick = onClick).padding(LettaDimens.Space.xs),
     ) {
-        Text(lease.label, color = contentColor, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(lease.state.badgeLabel, color = contentColor, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(
+            lease.label,
+            color = contentColor,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            lease.state.badgeLabel,
+            color = contentColor,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
     }
 }
 

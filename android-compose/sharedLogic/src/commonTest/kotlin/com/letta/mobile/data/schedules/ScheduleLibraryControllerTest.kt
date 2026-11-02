@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.schedules.runs.LeaseHistory
+import com.letta.mobile.data.schedules.runs.ScheduleRecordSources
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -87,10 +88,12 @@ class ScheduleLibraryControllerTest {
             agentRepository = FakeAgentRepository(),
             scheduleRepository = FakeScheduleRepository(),
             scope = this,
-            runHistorySource = { agent, ids ->
-                calls += agent.value to ids
-                listOf(RunRecord(ids.single(), Instant.parse("2026-11-02T00:00:00Z"), true, reason = "review", source = "human"))
-            },
+            recordSources = ScheduleRecordSources(
+                runHistory = { agent, ids ->
+                    calls += agent.value to ids
+                    listOf(RunRecord(ids.single(), Instant.parse("2026-11-02T00:00:00Z"), true, reason = "review", source = "human"))
+                },
+            ),
         )
         controller.start()
         advanceUntilIdle()
@@ -112,7 +115,7 @@ class ScheduleLibraryControllerTest {
             agentRepository = FakeAgentRepository(),
             scheduleRepository = FakeScheduleRepository(),
             scope = this,
-            leaseSource = LeaseHistory(transport)::load,
+            recordSources = ScheduleRecordSources(leases = LeaseHistory(transport)::load),
         )
         controller.start()
         advanceUntilIdle()
