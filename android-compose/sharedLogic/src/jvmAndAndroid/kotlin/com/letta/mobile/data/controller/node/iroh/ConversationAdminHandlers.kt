@@ -12,10 +12,8 @@ import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -29,62 +27,9 @@ private typealias ConversationWriteNotice = suspend (JsonElement?, String?, Conv
 
 object ConversationAdminHandlers {
     private val laneWriteMutex = Mutex()
-    private val uniqueLaneTags = setOf("lane:inbox", "lane:home")
-    private const val LANE_PAGE_SIZE = 500
-
-    private fun laneTags(body: JsonObject): Set<String> {
-        val value = body["tags"]?.takeUnless { it is kotlinx.serialization.json.JsonNull } ?: return emptySet()
-        val tags = value as? JsonArray ?: adminError("invalid_tags: expected an array of strings")
-        return tags.map { (it as? JsonPrimitive)?.takeIf { item -> item.isString }?.content
-            ?: adminError("invalid_tags: expected an array of strings") }.toSet().intersect(uniqueLaneTags)
-    }
-
-    private fun laneOwnerInRows(rows: JsonArray, agent: String, tags: Set<String>, exceptId: String?): String? {
-        for (element in rows) {
-            val row = element as? JsonObject ?: adminError("lane_check_invalid_row")
-            val id = (row["id"] as? JsonPrimitive)?.contentOrNull ?: adminError("lane_check_invalid_row")
-            val owner = (row["agent_id"] as? JsonPrimitive)?.contentOrNull ?: adminError("lane_check_invalid_row")
-            val sameDefault = id == "conv-default-$agent" && exceptId == "default"
-            if (owner == agent && id != exceptId && !sameDefault && laneTags(row).any { it in tags }) return id
-        }
-        return null
-    }
-
-    private suspend fun laneOwner(
-        client: AppServerClient,
-        store: LocalBackendAdminStore?,
-        agent: String,
-        tags: Set<String>,
-        exceptId: String?,
-    ): String? {
-        if (tags.isEmpty()) return null
-        val localStore = store ?: adminError("lane_check_unavailable: local backend required")
-        val local = withContext(Dispatchers.IO) { localStore.listConversationsProjected(agent, "all", null, null) }
-            ?: adminError("lane_check_unavailable")
-        laneOwnerInRows(local, agent, tags, exceptId)?.let { return it }
-        var after: String? = null
-        val seen = mutableSetOf<String>()
-        while (true) {
-            val query = kotlinx.serialization.json.buildJsonObject {
-                put("agent_id", JsonPrimitive(agent))
-                put("limit", JsonPrimitive(LANE_PAGE_SIZE))
-                put("include_hidden", JsonPrimitive(true))
-                after?.let { put("after", JsonPrimitive(it)) }
-            }
-            val response = client.conversationList(AppServerCommand.ConversationList(NativeAdmin.requestId(), query))
-            if (!response.success || response.conversations == null) adminError("lane_check_unavailable")
-            val rows = response.conversations
-            laneOwnerInRows(rows, agent, tags, exceptId)?.let { return it }
-            if (rows.size < LANE_PAGE_SIZE) return null
-            val last = (rows.last() as? JsonObject)?.get("id") as? JsonPrimitive
-            after = last?.contentOrNull ?: adminError("lane_check_invalid_row")
-            if (!seen.add(after)) adminError("lane_check_pagination_failed")
-        }
-    }
-
     /** Atomically reuses or creates the recipient inbox against wrapper lane writes. */
     suspend fun createInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String = laneWriteMutex.withLock {
-        laneOwner(client, store, agent, setOf("lane:inbox"), null)?.let { return@withLock it }
+        laneOwner(client, store, setOf("lane:inbox"), agent to null)?.let { return@withLock it }
         val response = client.conversationCreate(AppServerCommand.ConversationCreate(
             requestId = NativeAdmin.requestId(),
             body = kotlinx.serialization.json.buildJsonObject {
@@ -411,7 +356,7 @@ object ConversationAdminHandlers {
             laneWriteMutex.withLock {
                 val tags = laneTags(createBody)
                 NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
-                    if (laneOwner(c, store, agentId, tags, null) != null) adminError("lane_already_assigned")
+                    if (laneOwner(c, store, tags, agentId to null) != null) adminError("lane_already_assigned")
                     val response = c.conversationCreate(
                         AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
                     )
@@ -442,7 +387,7 @@ object ConversationAdminHandlers {
                         val current = c.conversationRetrieve(AppServerCommand.ConversationRetrieve(NativeAdmin.requestId(), id))
                         val agent = (current.conversation?.get("agent_id") as? JsonPrimitive)?.contentOrNull
                         if (!current.success || agent == null) adminError("lane_check_unavailable")
-                        if (laneOwner(c, store, agent, tags, id) != null) adminError("lane_already_assigned")
+                        if (laneOwner(c, store, tags, agent to id) != null) adminError("lane_already_assigned")
                     }
                     val response = c.conversationUpdate(
                         AppServerCommand.ConversationUpdate(

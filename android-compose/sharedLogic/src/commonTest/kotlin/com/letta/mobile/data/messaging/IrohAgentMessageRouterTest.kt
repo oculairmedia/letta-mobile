@@ -55,10 +55,10 @@ class IrohAgentMessageRouterTest {
         val router = IrohAgentMessageRouter("target")
         val states = listOf(state("home", "lane:home"), state("inbox", "lane:inbox"))
         assertEquals("home_lane_forbidden", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
-            router.route("other", "one", states, lane = "home"),
+            router.route("other", "one", states, IrohAgentMessageRouter.InboundAddress(lane = "home")),
         ).reason)
         assertEquals("inbox", assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(
-            router.route("other", "two", states, lane = "inbox"),
+            router.route("other", "two", states, IrohAgentMessageRouter.InboundAddress(lane = "inbox")),
         ).conversationId)
     }
 
@@ -75,7 +75,7 @@ class IrohAgentMessageRouterTest {
         val states = listOf(state("work", "lane:work"), state("inbox", "lane:inbox"))
         for (lane in listOf("work", "other")) {
             assertEquals("unsupported_lane", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
-                router.route("sender", lane, states, lane = lane),
+                router.route("sender", lane, states, IrohAgentMessageRouter.InboundAddress(lane = lane)),
             ).reason)
         }
     }
@@ -94,10 +94,10 @@ class IrohAgentMessageRouterTest {
         val states = listOf(state("work", "lane:work"), state("inbox", "lane:inbox"), state("plain"))
         // conversation_id wins over lane: lane:"home" is ignored when an id is present.
         assertEquals("plain", assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(
-            router.route("sender", "one", states, targetConversationId = "plain", lane = "home"),
+            router.route("sender", "one", states, IrohAgentMessageRouter.InboundAddress(targetConversationId = "plain", lane = "home")),
         ).conversationId)
         assertEquals("target_conversation_not_found", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
-            router.route("sender", "two", states, targetConversationId = "missing"),
+            router.route("sender", "two", states, IrohAgentMessageRouter.InboundAddress(targetConversationId = "missing")),
         ).reason)
     }
 
@@ -105,7 +105,7 @@ class IrohAgentMessageRouterTest {
     fun explicitBusyTargetQueuesEvenWhenInboxIsIdle() {
         val result = IrohAgentMessageRouter("target").route(
             "sender", "m", listOf(state("plain", busy = true), state("inbox", "lane:inbox")),
-            targetConversationId = "plain",
+            IrohAgentMessageRouter.InboundAddress(targetConversationId = "plain"),
         )
         assertEquals("plain", assertIs<IrohAgentMessageRouter.RoutingDecision.Queue>(result).conversationId)
     }
@@ -118,11 +118,11 @@ class IrohAgentMessageRouterTest {
         )
         for ((n, id) in listOf("work", "busyWork").withIndex()) {
             assertEquals("target_is_work_lane", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
-                router.route("sender", "w$n", states, targetConversationId = id),
+                router.route("sender", "w$n", states, IrohAgentMessageRouter.InboundAddress(targetConversationId = id)),
             ).reason)
         }
         assertEquals("home_lane_forbidden", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
-            router.route("sender", "h", states, targetConversationId = "home"),
+            router.route("sender", "h", states, IrohAgentMessageRouter.InboundAddress(targetConversationId = "home")),
         ).reason)
     }
 

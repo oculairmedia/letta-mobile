@@ -120,8 +120,7 @@ class IrohAgentMessageReceiver(
                 message.fromAgentId,
                 message.msgId,
                 candidates,
-                targetConversationId = message.conversationId,
-                lane = message.lane,
+                IrohAgentMessageRouter.InboundAddress(message.conversationId, message.lane),
             )
         }
         return runCatching {

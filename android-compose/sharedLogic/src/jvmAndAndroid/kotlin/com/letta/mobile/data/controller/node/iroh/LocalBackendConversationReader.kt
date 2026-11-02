@@ -166,6 +166,8 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
 
     private fun String?.orJsonNull(): JsonElement = this?.let(::JsonPrimitive) ?: JsonNull
 
+    private fun conversationTags(c: ConvRecord): JsonArray = c.raw["tags"] as? JsonArray ?: JsonArray(emptyList())
+
     private fun conversationToLetta(c: ConvRecord): JsonObject = buildJsonObject {
         put("id", if (c.id == "default") "conv-default-${c.agentId}" else c.id)
         put("agent_id", c.agentId)
@@ -178,7 +180,7 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
         put("archived", c.archived?.let(::JsonPrimitive) ?: JsonNull)
         put("archived_at", c.archivedAt.orJsonNull())
         // letta-mobile-fxoew.6: carry the store's hidden flag; it used to be dropped here.
-        put("tags", c.raw["tags"] as? JsonArray ?: JsonArray(emptyList()))
+        put("tags", conversationTags(c))
         put("conversation_class", (c.raw["conversation_class"] as? JsonPrimitive)?.takeIf { it.isString } ?: JsonNull)
         put("hidden", parseBooleanFlag(c.raw["hidden"])?.let(::JsonPrimitive) ?: JsonNull)
         put("in_context_message_ids", c.inContextMessageIds)

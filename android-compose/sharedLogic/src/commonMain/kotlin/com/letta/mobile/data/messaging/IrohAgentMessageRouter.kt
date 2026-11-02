@@ -18,6 +18,9 @@ class IrohAgentMessageRouter(
     /** A conversation with a "busy" flag (an active run in flight). */
     data class ConversationState(val conversation: Conversation, val busy: Boolean)
 
+    /** Optional explicit conversation and lane for an inbound message. */
+    data class InboundAddress(val targetConversationId: String? = null, val lane: String? = null)
+
     sealed interface RoutingDecision {
         /** Deliver to an existing conversation + trigger a turn now. */
         data class Deliver(val conversationId: String) : RoutingDecision
@@ -31,19 +34,18 @@ class IrohAgentMessageRouter(
 
     /**
      * Decide where an inbound message goes. [candidates] are the target agent's
-     * conversations with busy state (any order). [targetConversationId] takes
-     * precedence; otherwise [lane] defaults to inbox.
+     * conversations with busy state (any order). The explicit conversation in
+     * [address] takes precedence; otherwise its lane defaults to inbox.
      */
     fun route(
         fromAgentId: String,
         msgId: String,
         candidates: List<ConversationState>,
-        targetConversationId: String? = null,
-        lane: String? = null,
+        address: InboundAddress = InboundAddress(),
     ): RoutingDecision {
         guard(fromAgentId, msgId)?.let { return it }
-        if (targetConversationId != null) return routeExplicitTarget(targetConversationId, candidates)
-        return routeLane(lane ?: "inbox", candidates)
+        if (address.targetConversationId != null) return routeExplicitTarget(address.targetConversationId, candidates)
+        return routeLane(address.lane ?: "inbox", candidates)
     }
 
     private fun guard(fromAgentId: String, msgId: String): RoutingDecision.Dropped? {
