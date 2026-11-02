@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.iroh.records.CronRunFilter
+import com.letta.mobile.data.controller.node.iroh.records.UpstreamPagePosition
 import com.letta.mobile.data.controller.node.iroh.records.MAX_ID_LENGTH
 import com.letta.mobile.data.controller.node.iroh.records.TextField
 import com.letta.mobile.data.controller.node.iroh.records.WrapperRecordStore
@@ -18,7 +20,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.put
@@ -39,7 +40,10 @@ internal suspend fun mergedCronRuns(
         ?: params.text(TextField("agent_id", MAX_ID_LENGTH, optional = true))
     agent?.let { requireRecordAgentScope(context, AgentId(it)) }
     val request = AppServerCommand.CronRuns(NativeAdmin.requestId(), taskId, UPSTREAM_PAGE_SIZE, 0)
-    val filter = CronRunFilter(taskId, agent, context)
+    val filter = CronRunFilter(
+        taskId, agent, context.authorizedAgentIds,
+        { wrapperTaskId(AgentId(it)) }, IrohPeerCapabilities::isAgentInScope,
+    )
     val upstream = readUpstreamRuns(nativeClient, request).filter(filter::includesUpstream)
         .map { JsonObject(it + mapOf("reason" to JsonNull, "source" to JsonNull)) }
     val own = store.snapshot().runs.filter(filter::includesStored).sortedBy { it.id }.map { it.cronRow() }
@@ -63,23 +67,6 @@ private suspend fun readUpstreamRuns(client: AppServerClient, request: AppServer
         if (hasMore) command = command.copy(requestId = NativeAdmin.requestId(), offset = next)
     } while (hasMore)
     return rows
-}
-
-private class CronRunFilter(
-    private val taskId: String,
-    private val agent: String?,
-    private val context: AdminRpcRequestContext,
-) {
-    fun includesUpstream(row: JsonObject): Boolean {
-        val owner = (row["agentId"] as? JsonPrimitive)?.contentOrNull
-        return (context.authorizedAgentIds == null || owner in context.authorizedAgentIds) && matchesAgent(owner)
-    }
-
-    fun includesStored(row: StoredRunRecord): Boolean =
-        (row.input.scheduleId ?: wrapperTaskId(AgentId(row.input.agentId))) == taskId &&
-            IrohPeerCapabilities.isAgentInScope(context.authorizedAgentIds, row.input.agentId) && matchesAgent(row.input.agentId)
-
-    private fun matchesAgent(owner: String?): Boolean = agent == null || owner == agent
 }
 
 private suspend fun upstreamPage(client: AppServerClient, command: AppServerCommand.CronRuns): Pair<JsonObject, JsonArray> {
@@ -123,8 +110,6 @@ private fun validateUpstreamPage(page: JsonObject, entries: JsonArray, offset: I
     if (invalidContinuation(page, entries, position, hasMore)) adminError("cron_runs invalid page")
     return hasMore
 }
-
-private data class UpstreamPagePosition(val total: Int, val next: Int)
 
 private fun invalidPageSize(position: UpstreamPagePosition, entries: JsonArray): Boolean =
     position.total !in 0..UPSTREAM_RUN_CAP || invalidPageExtent(position, entries)

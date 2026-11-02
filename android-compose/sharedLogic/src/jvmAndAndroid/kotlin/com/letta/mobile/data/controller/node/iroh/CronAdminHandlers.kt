@@ -87,6 +87,11 @@ internal object CronAdminHandlers {
     }
 
     private fun registerMutations(router: AdminRpcRouter, nativeClient: AppServerClient?) {
+        registerTriggerAndUpdate(router, nativeClient)
+        registerDeletes(router, nativeClient)
+    }
+
+    private fun registerTriggerAndUpdate(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.register("cron.trigger") { params ->
             val response = nativeClient.requireCronClient().cronTrigger(
                 AppServerCommand.CronTrigger(
@@ -118,6 +123,9 @@ internal object CronAdminHandlers {
             if (!response.success) adminError(response.error ?: "cron_update failed")
             buildJsonObject { put("task", response.task ?: JsonNull) }
         }
+    }
+
+    private fun registerDeletes(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.register("cron.delete") { params ->
             val response = nativeClient.requireCronClient().cronDelete(
                 AppServerCommand.CronDelete(
