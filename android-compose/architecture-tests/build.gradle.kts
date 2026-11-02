@@ -40,6 +40,8 @@ tasks.test {
 val architectureTest = tasks.register<Test>("architectureTest") {
     description = "Run Kotlin source and JVM bytecode architecture checks (hard fail)."
     group = "verification"
+    // Full production source scans exceed Gradle's default test-worker heap as the shared tree grows.
+    maxHeapSize = "2g"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
