@@ -4,7 +4,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/** Wire representation of the bd serve Issue schema. */
+/** Issue fields shared by the server's issue, detail, counted and tree projections.
+ *
+ * Dependencies are retained as JSON because detail responses carry issue projections while
+ * other issue responses carry dependency edges.
+ */
 @Serializable
 @Suppress("LongParameterList") // Mirrors the pinned wire schema.
 data class Issue(
@@ -65,7 +69,7 @@ data class Issue(
     @SerialName("original_size")
     val originalSize: Int? = null,
     val labels: List<String>? = null,
-    val dependencies: List<Dependency>? = null,
+    val dependencies: List<JsonElement>? = null,
     val comments: List<Comment>? = null,
     val sender: String? = null,
     val ephemeral: Boolean? = null,
@@ -99,4 +103,29 @@ data class Issue(
     val actor: String? = null,
     val target: String? = null,
     val payload: String? = null,
+    @SerialName("dependency_count")
+    val dependencyCount: Long? = null,
+    @SerialName("dependent_count")
+    val dependentCount: Long? = null,
+    @SerialName("comment_count")
+    val commentCount: Long? = null,
+    val parent: String? = null,
+    val dependents: List<Issue>? = null,
+    @SerialName("comments_omitted")
+    val commentsOmitted: Boolean? = null,
+    @SerialName("epic_total_children")
+    val epicTotalChildren: Int? = null,
+    @SerialName("epic_closed_children")
+    val epicClosedChildren: Int? = null,
+    @SerialName("epic_closeable")
+    val epicCloseable: Boolean? = null,
+    val revision: String? = null,
+    @SerialName("dependency_type")
+    val dependencyType: String? = null,
+    val depth: Int? = null,
+    @SerialName("parent_id")
+    val parentId: String? = null,
+    @SerialName("edge_from_parent")
+    val edgeFromParent: String? = null,
+    val truncated: Boolean? = null,
 )

@@ -47,6 +47,8 @@ Shared image-ingress policy and attachment budgets. Platform decoders supply ima
 
 Portable bd serve HTTP client, capability handshake, event stream and typed failures. Supply a Ktor engine and credentials at connection time; the client has no wrapper route or host integration.
 
+Issue projections and related mutation requests share wire models. Their operation-specific fields remain optional, while dependency entries retain JSON because detail and edge responses use different shapes. For nullable patch members, a Kotlin null omits the member and `JsonNull` explicitly clears it.
+
 # Package com.letta.mobile.data.beads.wire.core
 
 Serializable wire models for the pinned bd serve contract, including issue and journal records.

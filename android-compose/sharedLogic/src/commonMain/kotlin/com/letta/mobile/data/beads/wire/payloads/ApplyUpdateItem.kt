@@ -3,10 +3,11 @@ package com.letta.mobile.data.beads.wire.payloads
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Wire representation of the bd serve ApplyUpdateItem schema. */
+/** Update fields shared by single and batch operations; each operation validates its own members. */
 @Serializable
 data class ApplyUpdateItem(
-    val target: Ref,
+    val actor: String? = null,
+    val target: Ref? = null,
     val patch: ApplyPatchBody,
     @SerialName("expected_version")
     val expectedVersion: String? = null,

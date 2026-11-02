@@ -3,6 +3,7 @@ package com.letta.mobile.data.beads
 import com.letta.mobile.data.beads.wire.mutations.CompareAndSetMetadataResponse
 import com.letta.mobile.data.beads.wire.mutations.CreateIssueRequest
 import com.letta.mobile.data.beads.wire.mutations.IssuePatchBody
+import com.letta.mobile.data.beads.wire.payloads.ApplyCreateItem
 import com.letta.mobile.data.beads.wire.payloads.ApplyPatchBody
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -44,12 +45,43 @@ class BeadsBackendTest {
                 else -> error("Unexpected path $path")
             }
         }
-        assertEquals("First", backend.listIssues().items.single().title)
-        val edges = backend.listDependencies("bd-1")
+        val listed = backend.listIssues().items.single()
+        assertEquals("First", listed.title)
+        assertEquals(0L, listed.dependencyCount)
+        val edges = backend.listDependencies(BeadsIssueId("bd-1"))
         assertEquals(listOf("bd-missing"), edges.missing)
         assertEquals("bd-2", edges.items.single().dependsOnId)
         assertEquals("bd-1", backend.listReadyWork().items.single().id)
-        assertEquals(1L, backend.listEvents(0).records.single().seq)
+        val eventRecord = backend.listEvents(0).records.single()
+        assertEquals(1L, eventRecord.seq)
+        assertEquals(JsonNull, eventRecord.issue)
+    }
+
+    @Test
+    fun detailRetainsIssueShapedDependenciesAndRequiredEventNull() = runTest {
+        val dependency = issue.dropLast(1) + ",\"dependency_type\":\"blocks\"}"
+        val detail = issue.dropLast(1) + ",\"revision\":\"r1\",\"dependencies\":[$dependency]}"
+        val backend = connect { path ->
+            when (path) {
+                "/v0/beads/issues/bd-1" -> detail
+                "/v0/beads/events" -> """{"records":[${event.replace(",\"issue\":null", "")}],"head":1}"""
+                else -> error("Unexpected path $path")
+            }
+        }
+        val decoded = backend.getIssue(BeadsIssueId("bd-1"))
+        assertEquals("r1", decoded.revision)
+        assertEquals("bd-1", decoded.dependencies!!.single().jsonObject.getValue("id").jsonPrimitive.content)
+        assertFailsWith<BeadsProtocolException> { backend.listEvents(0) }
+    }
+
+    @Test
+    fun sharedCreateFieldsPreserveSingleAndBatchShapes() {
+        val single = wireJson.encodeToJsonElement(CreateIssueRequest(actor = "alice", title = "One")).jsonObject
+        val batch = wireJson.encodeToJsonElement(ApplyCreateItem(key = "first", title = "Two")).jsonObject
+        assertEquals("alice", single.getValue("actor").jsonPrimitive.content)
+        assertFalse("key" in single)
+        assertEquals("first", batch.getValue("key").jsonPrimitive.content)
+        assertFalse("actor" in batch)
     }
 
     @Test

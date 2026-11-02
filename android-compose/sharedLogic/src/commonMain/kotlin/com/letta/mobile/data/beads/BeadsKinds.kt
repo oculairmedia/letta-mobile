@@ -19,3 +19,7 @@ enum class BeadsIssueStatus {
         fun fromWire(value: String): BeadsIssueStatus = entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: UNKNOWN
     }
 }
+
+/** Identifier of an issue in the connected Beads workspace. */
+@kotlin.jvm.JvmInline
+value class BeadsIssueId(val value: String)

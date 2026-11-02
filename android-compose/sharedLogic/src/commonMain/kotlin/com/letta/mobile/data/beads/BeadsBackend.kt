@@ -59,7 +59,7 @@ import com.letta.mobile.data.beads.wire.mutations.UpdateIssueRequest
 import com.letta.mobile.data.beads.wire.mutations.UpdateIssueResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 
@@ -101,8 +101,8 @@ interface BeadsBackend {
         decodeBeads(execute(BeadsOperation.LIST_DEPENDENCY_CYCLES, emptyMap(), query, null))
 
     /** Calls the getDependencyTree operation. */
-    suspend fun getDependencyTree(rootId: String, query: Map<String, List<String>> = emptyMap()): DependencyTreePage =
-        decodeBeads(execute(BeadsOperation.GET_DEPENDENCY_TREE, emptyMap(), query + mapOf("root_id" to listOf(rootId)), null))
+    suspend fun getDependencyTree(rootId: BeadsIssueId, query: Map<String, List<String>> = emptyMap()): DependencyTreePage =
+        decodeBeads(execute(BeadsOperation.GET_DEPENDENCY_TREE, emptyMap(), query + mapOf("root_id" to listOf(rootId.value)), null))
 
     /** Calls the countReadyWork operation. */
     suspend fun countReadyWork(query: Map<String, List<String>> = emptyMap()): ReadyCount =
@@ -125,40 +125,54 @@ interface BeadsBackend {
         decodeBeads(execute(BeadsOperation.COUNT_ISSUES, emptyMap(), query, null))
 
     /** Calls the getIssue operation. */
-    suspend fun getIssue(id: String, query: Map<String, List<String>> = emptyMap()): IssueDetails =
-        decodeBeads(execute(BeadsOperation.GET_ISSUE, mapOf("id" to id), query, null))
+    suspend fun getIssue(id: BeadsIssueId, query: Map<String, List<String>> = emptyMap()): IssueDetails =
+        decodeBeads(execute(BeadsOperation.GET_ISSUE, mapOf("id" to id.value), query, null))
 
     /** Calls the updateIssue operation. */
-    suspend fun updateIssue(id: String, body: UpdateIssueRequest): UpdateIssueResponse =
-        decodeBeads(execute(BeadsOperation.UPDATE_ISSUE, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun updateIssue(id: BeadsIssueId, body: UpdateIssueRequest): UpdateIssueResponse =
+        decodeBeads(execute(BeadsOperation.UPDATE_ISSUE, mapOf("id" to id.value), emptyMap(), wireJson.encodeToJsonElement(body)))
 
     /** Calls the listRelatedIssues operation. */
-    suspend fun listRelatedIssues(id: String, direction: String, query: Map<String, List<String>> = emptyMap()): RelatedIssues =
-        decodeBeads(execute(BeadsOperation.LIST_RELATED_ISSUES, mapOf("id" to id), query + mapOf("direction" to listOf(direction)), null))
+    suspend fun listRelatedIssues(id: BeadsIssueId, direction: String, query: Map<String, List<String>> = emptyMap()): RelatedIssues =
+        decodeBeads(
+            execute(
+                BeadsOperation.LIST_RELATED_ISSUES,
+                mapOf("id" to id.value),
+                query + mapOf("direction" to listOf(direction)),
+                null,
+            ),
+        )
 
     /** Calls the addComment operation. */
-    suspend fun addComment(id: String, body: AddCommentRequest): Comment =
-        decodeBeads(execute(BeadsOperation.ADD_COMMENT, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun addComment(id: BeadsIssueId, body: AddCommentRequest): Comment =
+        decodeBeads(execute(BeadsOperation.ADD_COMMENT, mapOf("id" to id.value), emptyMap(), wireJson.encodeToJsonElement(body)))
 
     /** Calls the claimIssue operation. */
-    suspend fun claimIssue(id: String, body: ClaimRequest): ClaimResponse =
-        decodeBeads(execute(BeadsOperation.CLAIM_ISSUE, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun claimIssue(id: BeadsIssueId, body: ClaimRequest): ClaimResponse =
+        decodeBeads(execute(BeadsOperation.CLAIM_ISSUE, mapOf("id" to id.value), emptyMap(), wireJson.encodeToJsonElement(body)))
 
     /** Calls the releaseIssue operation. */
-    suspend fun releaseIssue(id: String, body: ReleaseIssueRequest): ReleaseIssueResponse =
-        decodeBeads(execute(BeadsOperation.RELEASE_ISSUE, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun releaseIssue(id: BeadsIssueId, body: ReleaseIssueRequest): ReleaseIssueResponse =
+        decodeBeads(execute(BeadsOperation.RELEASE_ISSUE, mapOf("id" to id.value), emptyMap(), wireJson.encodeToJsonElement(body)))
 
     /** Calls the closeIssue operation. */
-    suspend fun closeIssue(id: String, body: CloseIssueRequest): CloseIssueResponse =
-        decodeBeads(execute(BeadsOperation.CLOSE_ISSUE, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun closeIssue(id: BeadsIssueId, body: CloseIssueRequest): CloseIssueResponse =
+        decodeBeads(execute(BeadsOperation.CLOSE_ISSUE, mapOf("id" to id.value), emptyMap(), wireJson.encodeToJsonElement(body)))
 
     /** Calls the reopenIssue operation. */
-    suspend fun reopenIssue(id: String, body: ReopenIssueRequest): ReopenIssueResponse =
-        decodeBeads(execute(BeadsOperation.REOPEN_ISSUE, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun reopenIssue(id: BeadsIssueId, body: ReopenIssueRequest): ReopenIssueResponse =
+        decodeBeads(execute(BeadsOperation.REOPEN_ISSUE, mapOf("id" to id.value), emptyMap(), wireJson.encodeToJsonElement(body)))
 
     /** Calls the compareAndSetMetadata operation. */
-    suspend fun compareAndSetMetadata(id: String, body: CompareAndSetMetadataRequest): CompareAndSetMetadataResponse =
-        decodeBeads(execute(BeadsOperation.COMPARE_AND_SET_METADATA, mapOf("id" to id), emptyMap(), wireJson.encodeToJsonElement(body)))
+    suspend fun compareAndSetMetadata(id: BeadsIssueId, body: CompareAndSetMetadataRequest): CompareAndSetMetadataResponse =
+        decodeBeads(
+            execute(
+                BeadsOperation.COMPARE_AND_SET_METADATA,
+                mapOf("id" to id.value),
+                emptyMap(),
+                wireJson.encodeToJsonElement(body),
+            ),
+        )
 
     /** Calls the sweepIssues operation. */
     suspend fun sweepIssues(body: SweepRequest): SweepResult =
@@ -201,23 +215,23 @@ interface BeadsBackend {
         decodeBeads(execute(BeadsOperation.UNSET_SETTING, mapOf("key" to key), emptyMap(), null))
 
     /** Calls the listDependencies operation. */
-    suspend fun listDependencies(issueId: String, query: Map<String, List<String>> = emptyMap()): DependencyEdges =
-        decodeBeads(execute(BeadsOperation.LIST_DEPENDENCIES, emptyMap(), query + mapOf("issue_id" to listOf(issueId)), null))
+    suspend fun listDependencies(issueId: BeadsIssueId, query: Map<String, List<String>> = emptyMap()): DependencyEdges =
+        decodeBeads(execute(BeadsOperation.LIST_DEPENDENCIES, emptyMap(), query + mapOf("issue_id" to listOf(issueId.value)), null))
 
     /** Calls the countDependencyEdges operation. */
-    suspend fun countDependencyEdges(issueId: String, direction: String, query: Map<String, List<String>> = emptyMap()): EdgeCounts =
+    suspend fun countDependencyEdges(issueId: BeadsIssueId, direction: String, query: Map<String, List<String>> = emptyMap()): EdgeCounts =
         decodeBeads(
             execute(
                 BeadsOperation.COUNT_DEPENDENCY_EDGES,
                 emptyMap(),
-                query + mapOf("issue_id" to listOf(issueId), "direction" to listOf(direction)),
+                query + mapOf("issue_id" to listOf(issueId.value), "direction" to listOf(direction)),
                 null,
             ),
         )
 
     /** Calls the listBlockingAnnotations operation. */
-    suspend fun listBlockingAnnotations(issueId: String, query: Map<String, List<String>> = emptyMap()): BlockingAnnotations =
-        decodeBeads(execute(BeadsOperation.LIST_BLOCKING_ANNOTATIONS, emptyMap(), query + mapOf("issue_id" to listOf(issueId)), null))
+    suspend fun listBlockingAnnotations(issueId: BeadsIssueId, query: Map<String, List<String>> = emptyMap()): BlockingAnnotations =
+        decodeBeads(execute(BeadsOperation.LIST_BLOCKING_ANNOTATIONS, emptyMap(), query + mapOf("issue_id" to listOf(issueId.value)), null))
 
     /** Calls the addDependencies operation. */
     suspend fun addDependencies(body: AddDependenciesRequest): AddDependenciesResponse =
@@ -252,7 +266,7 @@ interface BeadsBackend {
 
 }
 
-internal val wireJson = Json { ignoreUnknownKeys = true }
+internal val wireJson = LettaJson.wire
 
 internal inline fun <reified T> decodeBeads(value: JsonElement): T = try {
     wireJson.decodeFromJsonElement(value)

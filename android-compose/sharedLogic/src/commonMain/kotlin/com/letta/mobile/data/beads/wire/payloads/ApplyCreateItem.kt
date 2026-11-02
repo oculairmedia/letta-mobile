@@ -4,10 +4,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/** Wire representation of the bd serve ApplyCreateItem schema. */
+/** Create fields shared by single and batch operations; each operation validates its own members. */
 @Serializable
 @Suppress("LongParameterList") // Mirrors the pinned wire schema.
 data class ApplyCreateItem(
+    val actor: String? = null,
     val key: String? = null,
     val id: String? = null,
     val title: String,
@@ -38,4 +39,13 @@ data class ApplyCreateItem(
     val noHistory: Boolean? = null,
     @SerialName("metadata_refs")
     val metadataRefs: JsonElement? = null,
+    @SerialName("parent_id")
+    val parentId: String? = null,
+    @SerialName("inherit_labels_from_parent")
+    val inheritLabelsFromParent: Boolean? = null,
+    val dependencies: List<CreateIssueDependency>? = null,
+    @SerialName("waits_for")
+    val waitsFor: CreateIssueWaitsFor? = null,
+    @SerialName("force_id_prefix")
+    val forceIdPrefix: Boolean? = null,
 )

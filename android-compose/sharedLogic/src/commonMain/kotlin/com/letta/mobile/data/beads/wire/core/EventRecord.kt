@@ -13,7 +13,7 @@ data class EventRecord(
     @SerialName("issue_id")
     val issueId: String,
     val actor: String? = null,
-    val issue: JsonElement?,
+    val issue: JsonElement,
     val dep: JsonElement? = null,
     val comment: JsonElement? = null,
 )

@@ -4,7 +4,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/** Wire representation of the bd serve ApplyPatchBody schema. For nullable patch fields, null omits and JsonNull clears. */
+/**
+ * Shared patch fields. Null omits a field; JsonNull clears nullable members.
+ * Labels retain each operation's JSON shape.
+ */
 @Serializable
 @Suppress("LongParameterList") // Mirrors the pinned wire schema.
 data class ApplyPatchBody(
@@ -22,7 +25,13 @@ data class ApplyPatchBody(
     val status: String? = null,
     val assignee: String? = null,
     val owner: String? = null,
-    val labels: ApplyLabelPatch? = null,
+    @SerialName("parent_id")
+    val parentId: String? = null,
+    @SerialName("add_labels")
+    val addLabels: List<String>? = null,
+    @SerialName("remove_labels")
+    val removeLabels: List<String>? = null,
+    val labels: JsonElement? = null,
     @SerialName("estimated_minutes")
     val estimatedMinutes: JsonElement? = null,
     @SerialName("external_ref")
