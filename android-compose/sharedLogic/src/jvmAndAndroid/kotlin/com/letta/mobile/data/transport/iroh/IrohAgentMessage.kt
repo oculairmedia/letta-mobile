@@ -18,6 +18,10 @@ data class IrohAgentMessage(
     val ts: Long,
     /** Optional explicit target conversation on the recipient. */
     val conversationId: String? = null,
+    /** Optional destination lane. */
+    val lane: String? = null,
+    /** Task correlation carried with the message. */
+    val correlation: Map<String, String>? = null,
 ) {
     fun encode(): String = wireJson.encodeToString(serializer(), this)
 

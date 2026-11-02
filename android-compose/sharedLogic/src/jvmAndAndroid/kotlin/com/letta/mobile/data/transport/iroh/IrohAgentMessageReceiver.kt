@@ -7,6 +7,8 @@ import com.letta.mobile.util.Telemetry
 import computer.iroh.Connection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -15,7 +17,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * Serves the a2a ALPN as a protocol of the host's own endpoint: read the [IrohAgentMessage]
  * envelope from an accepted connection, apply the [IrohAgentMessageRouter] policy, hand the
- * delivery decision to [onDeliver] (which lands the message in the chosen interactive
+ * delivery decision to [onDeliver] (which lands the message in the chosen
  * conversation and triggers a turn), then ack the outcome. A dropped/duplicate/ping-pong
  * message is still acked (delivery is at-most-once on OUR side) but not delivered. NO HTTP
  * fallback.
@@ -51,6 +53,8 @@ class IrohAgentMessageReceiver(
      */
     override fun authorize(peer: String): Boolean = true
 
+    private val routingMutex = Mutex()
+
     private val failures = IrohFailureLog("A2aHost", "a2a.recv_failed")
 
     override suspend fun accept(connection: Connection, peer: String) {
@@ -74,6 +78,8 @@ class IrohAgentMessageReceiver(
                 "fromAgentId" attr message.fromAgentId,
                 "toAgentId" attr message.toAgentId,
                 "msgId" attr message.msgId,
+                "lane" attr (message.lane ?: "inbox"),
+                "correlation" attr (message.correlation?.toString() ?: ""),
             )
             Telemetry.event("A2aHost", "a2a.transport_accepted", "msgId" attr message.msgId)
             // Route + deliver and return the application outcome through the
@@ -109,12 +115,15 @@ class IrohAgentMessageReceiver(
 
     private suspend fun deliver(message: IrohAgentMessage): DeliveryOutcome {
         val candidates = conversationsFor(message.toAgentId)
-        val decision = router.route(
-            message.fromAgentId,
-            message.msgId,
-            candidates,
-            targetConversationId = message.conversationId,
-        )
+        val decision = routingMutex.withLock {
+            router.route(
+                message.fromAgentId,
+                message.msgId,
+                candidates,
+                targetConversationId = message.conversationId,
+                lane = message.lane,
+            )
+        }
         return runCatching {
             withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) {
                 onDeliver(message, decision)

@@ -83,7 +83,8 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
      */
     private fun readConversations(agentId: String?): List<ConvRecord> {
         val root = File(support.baseDir, "conversations")
-        val dirs = root.listFiles { f -> f.isDirectory } ?: return emptyList()
+        if (!root.exists()) return emptyList()
+        val dirs = root.listFiles { f -> f.isDirectory } ?: error("conversation directory is unreadable")
         return dirs.mapNotNull { parseConversationRecord(it, agentId) }
     }
 
@@ -177,6 +178,8 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
         put("archived", c.archived?.let(::JsonPrimitive) ?: JsonNull)
         put("archived_at", c.archivedAt.orJsonNull())
         // letta-mobile-fxoew.6: carry the store's hidden flag; it used to be dropped here.
+        put("tags", c.raw["tags"] as? JsonArray ?: JsonArray(emptyList()))
+        put("conversation_class", (c.raw["conversation_class"] as? JsonPrimitive)?.takeIf { it.isString } ?: JsonNull)
         put("hidden", parseBooleanFlag(c.raw["hidden"])?.let(::JsonPrimitive) ?: JsonNull)
         put("in_context_message_ids", c.inContextMessageIds)
         put("isolated_block_ids", JsonArray(emptyList()))

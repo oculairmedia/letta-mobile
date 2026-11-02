@@ -8,8 +8,12 @@ import kotlin.time.Duration.Companion.milliseconds
 sealed interface AgentSendResult {
     /** The peer acked receipt of [msgId]. */
     data class Delivered(val msgId: String) : AgentSendResult
-    /** Transport was accepted, but receiver application delivery is not confirmed. */
-    data class Accepted(val msgId: String, val toAgentId: String) : AgentSendResult
+    /**
+     * Transport was accepted, but receiver application delivery is not confirmed.
+     * [reason] is the receiver's drop reason (for example `target_is_work_lane`), so a
+     * misaddressed send fails loudly where the sender can see it.
+     */
+    data class Accepted(val msgId: String, val toAgentId: String, val reason: String? = null) : AgentSendResult
     /** The target could not be resolved to a dialable address. */
     data class Unaddressable(val toAgentId: String, val reason: String) : AgentSendResult
     /** Dial/stream/ack failed. */
@@ -65,7 +69,7 @@ class IrohAgentMessageSender(
         }
     }
 
-    private fun classifyAck(
+    internal fun classifyAck(
         message: IrohAgentMessage,
         ack: IrohAgentMessageAck,
     ): AgentSendResult = when {
@@ -74,6 +78,6 @@ class IrohAgentMessageSender(
         ack.accepted && ack.applicationDelivered ->
             AgentSendResult.Delivered(message.msgId)
         else ->
-            AgentSendResult.Accepted(message.msgId, message.toAgentId)
+            AgentSendResult.Accepted(message.msgId, message.toAgentId, ack.reason)
     }
 }

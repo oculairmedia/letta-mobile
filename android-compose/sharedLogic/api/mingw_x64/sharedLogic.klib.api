@@ -39676,7 +39676,7 @@ final class com.letta.mobile.data.messaging/AgentMessageProvenance { // com.lett
 final class com.letta.mobile.data.messaging/IrohAgentMessageRouter { // com.letta.mobile.data.messaging/IrohAgentMessageRouter|null[0]
     constructor <init>(kotlin/String, kotlin.collections/Set<kotlin/String> = ..., kotlin/Int = ...) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.<init>|<init>(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.Int){}[0]
 
-    final fun route(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState>, kotlin/String? = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision // com.letta.mobile.data.messaging/IrohAgentMessageRouter.route|route(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.messaging.IrohAgentMessageRouter.ConversationState>;kotlin.String?){}[0]
+    final fun route(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState>, kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision // com.letta.mobile.data.messaging/IrohAgentMessageRouter.route|route(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.messaging.IrohAgentMessageRouter.ConversationState>;kotlin.String?;kotlin.String?){}[0]
 
     sealed interface RoutingDecision { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision|null[0]
         final class Deliver : com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision.Deliver|null[0]
@@ -39742,8 +39742,7 @@ final class com.letta.mobile.data.messaging/IrohAgentMessageRouter { // com.lett
     }
 
     final object Companion { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Companion|null[0]
-        final fun pickMostRecentInteractive(kotlin.collections/List<com.letta.mobile.data.model/Conversation>): com.letta.mobile.data.model/Conversation? // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Companion.pickMostRecentInteractive|pickMostRecentInteractive(kotlin.collections.List<com.letta.mobile.data.model.Conversation>){}[0]
-        final fun recencyKey(com.letta.mobile.data.model/Conversation): kotlin/String // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Companion.recencyKey|recencyKey(com.letta.mobile.data.model.Conversation){}[0]
+        final fun pickLane(kotlin.collections/List<com.letta.mobile.data.model/Conversation>, kotlin/String): com.letta.mobile.data.model/Conversation? // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Companion.pickLane|pickLane(kotlin.collections.List<com.letta.mobile.data.model.Conversation>;kotlin.String){}[0]
     }
 }
 
@@ -43164,7 +43163,7 @@ final class com.letta.mobile.data.model/ContextWindowOverview { // com.letta.mob
 }
 
 final class com.letta.mobile.data.model/Conversation { // com.letta.mobile.data.model/Conversation|null[0]
-    constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.model/ConversationClass? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., com.letta.mobile.data.model/ConversationModelSettings? = ..., kotlin/Int? = ...) // com.letta.mobile.data.model/Conversation.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.model.ConversationClass?;kotlin.Boolean?;kotlin.String?;com.letta.mobile.data.model.ConversationModelSettings?;kotlin.Int?){}[0]
+    constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.model/ConversationClass? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.model/ConversationModelSettings? = ..., kotlin/Int? = ...) // com.letta.mobile.data.model/Conversation.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.model.ConversationClass?;kotlin.Boolean?;kotlin.String?;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.model.ConversationModelSettings?;kotlin.Int?){}[0]
 
     final val agentId // com.letta.mobile.data.model/Conversation.agentId|{}agentId[0]
         final fun <get-agentId>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.model/Conversation.agentId.<get-agentId>|<get-agentId>(){}[0]
@@ -43200,6 +43199,8 @@ final class com.letta.mobile.data.model/Conversation { // com.letta.mobile.data.
         final fun <get-modelSettings>(): com.letta.mobile.data.model/ConversationModelSettings? // com.letta.mobile.data.model/Conversation.modelSettings.<get-modelSettings>|<get-modelSettings>(){}[0]
     final val summary // com.letta.mobile.data.model/Conversation.summary|{}summary[0]
         final fun <get-summary>(): kotlin/String? // com.letta.mobile.data.model/Conversation.summary.<get-summary>|<get-summary>(){}[0]
+    final val tags // com.letta.mobile.data.model/Conversation.tags|{}tags[0]
+        final fun <get-tags>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.model/Conversation.tags.<get-tags>|<get-tags>(){}[0]
     final val updatedAt // com.letta.mobile.data.model/Conversation.updatedAt|{}updatedAt[0]
         final fun <get-updatedAt>(): kotlin/String? // com.letta.mobile.data.model/Conversation.updatedAt.<get-updatedAt>|<get-updatedAt>(){}[0]
 
@@ -43209,8 +43210,9 @@ final class com.letta.mobile.data.model/Conversation { // com.letta.mobile.data.
     final fun component12(): com.letta.mobile.data.model/ConversationClass? // com.letta.mobile.data.model/Conversation.component12|component12(){}[0]
     final fun component13(): kotlin/Boolean? // com.letta.mobile.data.model/Conversation.component13|component13(){}[0]
     final fun component14(): kotlin/String? // com.letta.mobile.data.model/Conversation.component14|component14(){}[0]
-    final fun component15(): com.letta.mobile.data.model/ConversationModelSettings? // com.letta.mobile.data.model/Conversation.component15|component15(){}[0]
-    final fun component16(): kotlin/Int? // com.letta.mobile.data.model/Conversation.component16|component16(){}[0]
+    final fun component15(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.model/Conversation.component15|component15(){}[0]
+    final fun component16(): com.letta.mobile.data.model/ConversationModelSettings? // com.letta.mobile.data.model/Conversation.component16|component16(){}[0]
+    final fun component17(): kotlin/Int? // com.letta.mobile.data.model/Conversation.component17|component17(){}[0]
     final fun component2(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.model/Conversation.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.model/Conversation.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.letta.mobile.data.model/Conversation.component4|component4(){}[0]
@@ -43219,7 +43221,7 @@ final class com.letta.mobile.data.model/Conversation { // com.letta.mobile.data.
     final fun component7(): kotlin/String? // com.letta.mobile.data.model/Conversation.component7|component7(){}[0]
     final fun component8(): kotlin/Boolean? // com.letta.mobile.data.model/Conversation.component8|component8(){}[0]
     final fun component9(): kotlin/String? // com.letta.mobile.data.model/Conversation.component9|component9(){}[0]
-    final fun copy(com.letta.mobile.data.model/ConversationId = ..., com.letta.mobile.data.model/AgentId = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.model/ConversationClass? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., com.letta.mobile.data.model/ConversationModelSettings? = ..., kotlin/Int? = ...): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.model/Conversation.copy|copy(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.model.ConversationClass?;kotlin.Boolean?;kotlin.String?;com.letta.mobile.data.model.ConversationModelSettings?;kotlin.Int?){}[0]
+    final fun copy(com.letta.mobile.data.model/ConversationId = ..., com.letta.mobile.data.model/AgentId = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.model/ConversationClass? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., com.letta.mobile.data.model/ConversationModelSettings? = ..., kotlin/Int? = ...): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.model/Conversation.copy|copy(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.model.ConversationClass?;kotlin.Boolean?;kotlin.String?;kotlin.collections.List<kotlin.String>;com.letta.mobile.data.model.ConversationModelSettings?;kotlin.Int?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/Conversation.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/Conversation.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/Conversation.toString|toString(){}[0]

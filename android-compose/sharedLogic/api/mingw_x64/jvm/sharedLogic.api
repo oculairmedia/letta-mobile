@@ -18234,6 +18234,7 @@ public final class com/letta/mobile/data/controller/node/iroh/ControllerSubagent
 
 public final class com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers {
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers;
+	public final fun createInbox (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeReadTiers;Lcom/letta/mobile/data/controller/AppServerController;)V
 	public static synthetic fun register$default (Lcom/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeReadTiers;Lcom/letta/mobile/data/controller/AppServerController;ILjava/lang/Object;)V
 }
@@ -24509,13 +24510,12 @@ public final class com/letta/mobile/data/messaging/IrohAgentMessageRouter {
 	public static final field Companion Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/util/Set;I)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun route (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter$RoutingDecision;
-	public static synthetic fun route$default (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter$RoutingDecision;
+	public final fun route (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter$RoutingDecision;
+	public static synthetic fun route$default (Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/messaging/IrohAgentMessageRouter$RoutingDecision;
 }
 
 public final class com/letta/mobile/data/messaging/IrohAgentMessageRouter$Companion {
-	public final fun pickMostRecentInteractive (Ljava/util/List;)Lcom/letta/mobile/data/model/Conversation;
-	public final fun recencyKey (Lcom/letta/mobile/data/model/Conversation;)Ljava/lang/String;
+	public final fun pickLane (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/model/Conversation;
 }
 
 public final class com/letta/mobile/data/messaging/IrohAgentMessageRouter$ConversationState {
@@ -26748,16 +26748,17 @@ public final class com/letta/mobile/data/model/ContextWindowOverview$Companion {
 
 public final class com/letta/mobile/data/model/Conversation {
 	public static final field Companion Lcom/letta/mobile/data/model/Conversation$Companion;
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-nFOXY6g ()Ljava/lang/String;
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Ljava/util/List;
 	public final fun component12 ()Lcom/letta/mobile/data/model/ConversationClass;
 	public final fun component13 ()Ljava/lang/Boolean;
 	public final fun component14 ()Ljava/lang/String;
-	public final fun component15 ()Lcom/letta/mobile/data/model/ConversationModelSettings;
-	public final fun component16 ()Ljava/lang/Integer;
+	public final fun component15 ()Ljava/util/List;
+	public final fun component16 ()Lcom/letta/mobile/data/model/ConversationModelSettings;
+	public final fun component17 ()Ljava/lang/Integer;
 	public final fun component2-zqmzO_A ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -26766,8 +26767,8 @@ public final class com/letta/mobile/data/model/Conversation {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/Boolean;
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy-G6NAFrQ (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;)Lcom/letta/mobile/data/model/Conversation;
-	public static synthetic fun copy-G6NAFrQ$default (Lcom/letta/mobile/data/model/Conversation;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/model/Conversation;
+	public final fun copy-kAyYU1s (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;)Lcom/letta/mobile/data/model/Conversation;
+	public static synthetic fun copy-kAyYU1s$default (Lcom/letta/mobile/data/model/Conversation;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationClass;Ljava/lang/Boolean;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/model/ConversationModelSettings;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/model/Conversation;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
 	public final fun getAgentName ()Ljava/lang/String;
@@ -26786,6 +26787,7 @@ public final class com/letta/mobile/data/model/Conversation {
 	public final fun getModel ()Ljava/lang/String;
 	public final fun getModelSettings ()Lcom/letta/mobile/data/model/ConversationModelSettings;
 	public final fun getSummary ()Ljava/lang/String;
+	public final fun getTags ()Ljava/util/List;
 	public final fun getUpdatedAt ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -66004,21 +66006,25 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentIdentityKt {
 
 public final class com/letta/mobile/data/transport/iroh/IrohAgentMessage {
 	public static final field Companion Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()J
 	public final fun component6 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;
 	public final fun encode ()Ljava/lang/String;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBody ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getCorrelation ()Ljava/util/Map;
 	public final fun getFromAgentId ()Ljava/lang/String;
+	public final fun getLane ()Ljava/lang/String;
 	public final fun getMsgId ()Ljava/lang/String;
 	public final fun getToAgentId ()Ljava/lang/String;
 	public final fun getTs ()J

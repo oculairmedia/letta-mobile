@@ -2,217 +2,150 @@ package com.letta.mobile.data.messaging
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationClass
 import com.letta.mobile.data.model.ConversationId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-/**
- * letta-mobile-bn008.3: inbound routing policy — a direct message lands in the
- * most-recent INTERACTIVE conversation and NEVER in an autonomous/heartbeat one,
- * with ping-pong + loop-safety guards.
- */
 class IrohAgentMessageRouterTest {
-
-    private fun conv(
-        id: String,
-        cls: ConversationClass?,
-        lastMessageAt: String,
-        busy: Boolean = false,
-    ) = IrohAgentMessageRouter.ConversationState(
-        conversation = Conversation(
-            id = ConversationId(id),
-            agentId = AgentId("agent-target"),
-            conversationClass = cls,
-            lastMessageAt = lastMessageAt,
-        ),
-        busy = busy,
-    )
-
-    private fun router() = IrohAgentMessageRouter(ownAgentId = "agent-target")
-
-    @Test
-    fun landsInMostRecentInteractiveConversation() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(
-                conv("older", ConversationClass.INTERACTIVE, "2026-07-17T10:00:00Z"),
-                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
-            ),
+    private fun state(id: String, tag: String? = null, busy: Boolean = false) =
+        IrohAgentMessageRouter.ConversationState(
+            Conversation(ConversationId(id), AgentId("target"), tags = listOfNotNull(tag)), busy,
         )
-        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
-        assertEquals("newest", deliver.conversationId)
+
+    @Test
+    fun firstMessageCreatesInboxAndSecondUsesSameInbox() {
+        val router = IrohAgentMessageRouter("target")
+        val states = mutableListOf(state("home", "lane:home"))
+        val deliveries = mutableMapOf<String, MutableList<String>>()
+        var creations = 0
+        fun send(id: String) {
+            val decision = router.route("sender", id, states)
+            val destination = when (decision) {
+                IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver -> {
+                    creations++
+                    states += state("created-inbox", "lane:inbox")
+                    "created-inbox"
+                }
+                is IrohAgentMessageRouter.RoutingDecision.Deliver -> decision.conversationId
+                else -> error("unexpected $decision")
+            }
+            deliveries.getOrPut(destination) { mutableListOf() }.add(id)
+        }
+        send("first")
+        send("second")
+        assertEquals(1, creations)
+        assertEquals(listOf("first", "second"), deliveries["created-inbox"]?.toList())
+        assertEquals(null, deliveries["home"])
     }
 
     @Test
-    fun neverLandsInAutonomousHeartbeatConversationEvenIfMoreRecent() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(
-                // The heartbeat conversation is the MOST recent, but AUTONOMOUS —
-                // must be skipped in favor of the older interactive one.
-                conv("heartbeat", ConversationClass.AUTONOMOUS, "2026-07-17T12:00:00Z"),
-                conv("interactive", ConversationClass.INTERACTIVE, "2026-07-17T10:00:00Z"),
-            ),
+    fun busyHomeIsUntouchedAndInboxReceives() {
+        val states = listOf(state("home", "lane:home", busy = true), state("inbox", "lane:inbox"))
+        val delivery = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(
+            IrohAgentMessageRouter("target").route("sender", "m", states),
         )
-        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
-        assertEquals("interactive", deliver.conversationId)
+        val received = mutableMapOf(delivery.conversationId to listOf("m"))
+        assertEquals(listOf("m"), received["inbox"])
+        assertEquals(null, received["home"])
     }
 
     @Test
-    fun createsWhenNoInteractiveConversationExists() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(conv("only-heartbeat", ConversationClass.AUTONOMOUS, "2026-07-17T12:00:00Z")),
+    fun nonOwnerCannotSendToHomeButCanSendToInbox() {
+        val router = IrohAgentMessageRouter("target")
+        val states = listOf(state("home", "lane:home"), state("inbox", "lane:inbox"))
+        assertEquals("home_lane_forbidden", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+            router.route("other", "one", states, lane = "home"),
+        ).reason)
+        assertEquals("inbox", assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(
+            router.route("other", "two", states, lane = "inbox"),
+        ).conversationId)
+    }
+
+    @Test
+    fun duplicateLaneTagsAreRejectedInsteadOfChoosingByListOrder() {
+        val states = listOf(state("newest", "lane:inbox"), state("older", "lane:inbox"))
+        val result = IrohAgentMessageRouter("target").route("sender", "m", states)
+        assertEquals("duplicate_lane_tags", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(result).reason)
+    }
+
+    @Test
+    fun workAndUnknownLanesAreNotInboundTargets() {
+        val router = IrohAgentMessageRouter("target")
+        val states = listOf(state("work", "lane:work"), state("inbox", "lane:inbox"))
+        for (lane in listOf("work", "other")) {
+            assertEquals("unsupported_lane", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+                router.route("sender", lane, states, lane = lane),
+            ).reason)
+        }
+    }
+
+    @Test
+    fun busyInboxQueuesWithoutRerouting() {
+        val result = IrohAgentMessageRouter("target").route("sender", "m", listOf(
+            state("inbox", "lane:inbox", busy = true), state("home", "lane:home"),
+        ))
+        assertEquals("inbox", assertIs<IrohAgentMessageRouter.RoutingDecision.Queue>(result).conversationId)
+    }
+
+    @Test
+    fun explicitIdWinsAndMissingIdDrops() {
+        val router = IrohAgentMessageRouter("target")
+        val states = listOf(state("work", "lane:work"), state("inbox", "lane:inbox"), state("plain"))
+        // conversation_id wins over lane: lane:"home" is ignored when an id is present.
+        assertEquals("plain", assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(
+            router.route("sender", "one", states, targetConversationId = "plain", lane = "home"),
+        ).conversationId)
+        assertEquals("target_conversation_not_found", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+            router.route("sender", "two", states, targetConversationId = "missing"),
+        ).reason)
+    }
+
+    @Test
+    fun explicitBusyTargetQueuesEvenWhenInboxIsIdle() {
+        val result = IrohAgentMessageRouter("target").route(
+            "sender", "m", listOf(state("plain", busy = true), state("inbox", "lane:inbox")),
+            targetConversationId = "plain",
         )
-        assertIs<IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver>(decision)
+        assertEquals("plain", assertIs<IrohAgentMessageRouter.RoutingDecision.Queue>(result).conversationId)
     }
 
     @Test
-    fun untaggedConversationRoutesAsInteractive() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(conv("legacy", cls = null, "2026-07-17T12:00:00Z")),
+    fun explicitIdCannotBeABackDoorIntoWorkOrHome() {
+        val router = IrohAgentMessageRouter("target")
+        val states = listOf(
+            state("work", "lane:work"), state("busyWork", "lane:work", busy = true), state("home", "lane:home"),
         )
-        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
-        assertEquals("legacy", deliver.conversationId)
+        for ((n, id) in listOf("work", "busyWork").withIndex()) {
+            assertEquals("target_is_work_lane", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+                router.route("sender", "w$n", states, targetConversationId = id),
+            ).reason)
+        }
+        assertEquals("home_lane_forbidden", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+            router.route("sender", "h", states, targetConversationId = "home"),
+        ).reason)
     }
 
     @Test
-    fun queuesWhenChosenInteractiveConversationIsBusy_neverReroutes() {
-        val busyInteractive = IrohAgentMessageRouter.ConversationState(
-            conversation = Conversation(
-                id = ConversationId("busy-newest"),
-                agentId = AgentId("agent-target"),
-                conversationClass = ConversationClass.INTERACTIVE,
-                lastMessageAt = "2026-07-17T12:00:00Z",
-            ),
-            busy = true,
+    fun guardPoliciesRemainInForce() {
+        val router = IrohAgentMessageRouter("target", setOf("sibling"), maxPerSender = 1)
+        val states = listOf(state("inbox", "lane:inbox"))
+        assertEquals(
+            "ping_pong_own_or_sibling",
+            assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(router.route("target", "a", states)).reason,
         )
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(
-                busyInteractive,
-                conv("idle-older", ConversationClass.INTERACTIVE, "2026-07-17T10:00:00Z"),
-            ),
+        assertEquals(
+            "ping_pong_own_or_sibling",
+            assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(router.route("sibling", "b", states)).reason,
         )
-        // Must QUEUE on the busy most-recent one — NOT reroute to the idle older one.
-        val queue = assertIs<IrohAgentMessageRouter.RoutingDecision.Queue>(decision)
-        assertEquals("busy-newest", queue.conversationId)
-    }
-
-    @Test
-    fun dropsOwnIdentityMessage_pingPongGuard() {
-        val decision = IrohAgentMessageRouter(ownAgentId = "agent-target").route(
-            fromAgentId = "agent-target", // our own id
-            msgId = "m-1",
-            candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z")),
+        assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(router.route("other", "c", states))
+        assertEquals(
+            "duplicate_msg_id",
+            assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(router.route("other", "c", states)).reason,
         )
-        val dropped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(decision)
-        assertEquals("ping_pong_own_or_sibling", dropped.reason)
-    }
-
-    @Test
-    fun dropsSiblingIdentityMessage() {
-        val r = IrohAgentMessageRouter(ownAgentId = "agent-target", siblingAgentIds = setOf("agent-sibling"))
-        val decision = r.route("agent-sibling", "m-1", listOf(conv("c", ConversationClass.INTERACTIVE, "t")))
-        assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(decision)
-    }
-
-    @Test
-    fun dropsDuplicateMsgId_atMostOncePerInbound() {
-        val r = router()
-        val candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"))
-        assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(r.route("agent-sender", "dup", candidates))
-        // Redelivery of the same msgId is dropped exactly-once.
-        val second = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(r.route("agent-sender", "dup", candidates))
-        assertEquals("duplicate_msg_id", second.reason)
-    }
-
-    @Test
-    fun perSenderCapDropsAfterLimit() {
-        val r = IrohAgentMessageRouter(ownAgentId = "agent-target", maxPerSender = 2)
-        val candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"))
-        assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(r.route("s", "m-1", candidates))
-        assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(r.route("s", "m-2", candidates))
-        val capped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(r.route("s", "m-3", candidates))
-        assertEquals("per_sender_cap_exceeded", capped.reason)
-    }
-
-    // letta-mobile-5m1qy: explicit target conversation routing.
-
-    @Test
-    fun explicitTargetPresentAndIdleDeliversToThatConversationNotMostRecent() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(
-                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
-                conv("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = false),
-            ),
-            targetConversationId = "target-conv",
+        assertEquals(
+            "per_sender_cap_exceeded",
+            assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(router.route("other", "d", states)).reason,
         )
-        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
-        assertEquals("target-conv", deliver.conversationId)
-    }
-
-    @Test
-    fun explicitTargetPresentAndBusyQueuesOnThatConversation() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(
-                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
-                conv("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = true),
-            ),
-            targetConversationId = "target-conv",
-        )
-        val queue = assertIs<IrohAgentMessageRouter.RoutingDecision.Queue>(decision)
-        assertEquals("target-conv", queue.conversationId)
-    }
-
-    @Test
-    fun explicitTargetAbsentDropsWithDistinctReasonNeverCreates() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z")),
-            targetConversationId = "missing-conv",
-        )
-        val dropped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(decision)
-        assertEquals("target_conversation_not_found", dropped.reason)
-    }
-
-    @Test
-    fun pingPongGuardFiresBeforeExplicitTarget() {
-        val decision = router().route(
-            fromAgentId = "agent-target", // own id — ping-pong guard must win over explicit target
-            msgId = "m-1",
-            candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z")),
-            targetConversationId = "c",
-        )
-        val dropped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(decision)
-        assertEquals("ping_pong_own_or_sibling", dropped.reason)
-    }
-
-    @Test
-    fun nullExplicitTargetKeepsMostRecentInteractiveBehavior() {
-        val decision = router().route(
-            fromAgentId = "agent-sender",
-            msgId = "m-1",
-            candidates = listOf(
-                conv("older", ConversationClass.INTERACTIVE, "2026-07-17T10:00:00Z"),
-                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
-            ),
-            targetConversationId = null,
-        )
-        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
-        assertEquals("newest", deliver.conversationId)
     }
 }

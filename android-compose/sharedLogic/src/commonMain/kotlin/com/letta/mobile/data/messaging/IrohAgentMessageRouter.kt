@@ -1,28 +1,8 @@
 package com.letta.mobile.data.messaging
 
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationClass
 
-/**
- * Routing decision for an inbound direct agent-to-agent
- * message. Pure + deterministic so it is fully headless-testable; the QUIC
- * listener and turn-trigger wire around it.
- *
- * Policy (from the 2026-07 inter-agent routing discussion):
- *  - Ping-pong guard: drop a message from our own (or a sibling) identity so an
- *    agent never loops on its own output.
- *  - Loop-safety: at-most-once per inbound (dedupe by msgId), and a per-sender cap.
- *  - Route to the target agent's MOST-RECENT-INTERACTIVE conversation; NEVER an
- *    AUTONOMOUS (heartbeat/goal/dispatch) conversation.
- *  - Create-if-none: no interactive conversation -> create one and deliver.
- *  - Queue-if-busy: the chosen interactive conversation is busy -> queue on it;
- *    NEVER reroute to a different conversation on busy.
- *  - Never hard-fail on a missing conversation.
- *  - an explicit targetConversationId overrides the
- *    most-recent pick (Deliver/Queue per busy state); a target that does not
- *    exist is dropped with the distinct reason "target_conversation_not_found"
- *    (never created). All safety guards still run before explicit targeting.
- */
+/** Routes inbound messages by conversation lane, after loop-safety checks. */
 class IrohAgentMessageRouter(
     /** This receiver's own agentId — messages from it are our own echo. */
     private val ownAgentId: String,
@@ -39,90 +19,70 @@ class IrohAgentMessageRouter(
     data class ConversationState(val conversation: Conversation, val busy: Boolean)
 
     sealed interface RoutingDecision {
-        /** Deliver to an existing interactive conversation + trigger a turn now. */
+        /** Deliver to an existing conversation + trigger a turn now. */
         data class Deliver(val conversationId: String) : RoutingDecision
-        /** No interactive conversation exists — create one, then deliver. */
+        /** No inbox exists — create one, then deliver. */
         data object CreateAndDeliver : RoutingDecision
-        /** The chosen interactive conversation is busy — queue on it (do not reroute). */
+        /** The chosen conversation is busy — queue on it (do not reroute). */
         data class Queue(val conversationId: String) : RoutingDecision
-        /** Dropped for a policy reason (ping-pong / duplicate / cap). */
+        /** Dropped for a policy reason, including loop-safety or an invalid lane. */
         data class Dropped(val reason: String) : RoutingDecision
     }
 
     /**
      * Decide where an inbound message goes. [candidates] are the target agent's
-     * conversations with busy state (any order); most-recent is picked by
-     * lastMessageAt/updatedAt among the INTERACTIVE ones. When
-     * [targetConversationId] is non-null, the message routes to that
-     * exact conversation instead of the most-recent-interactive pick.
+     * conversations with busy state (any order). [targetConversationId] takes
+     * precedence; otherwise [lane] defaults to inbox.
      */
     fun route(
         fromAgentId: String,
         msgId: String,
         candidates: List<ConversationState>,
         targetConversationId: String? = null,
+        lane: String? = null,
     ): RoutingDecision {
-        // Ping-pong guard: never process our own / a sibling's message.
+        guard(fromAgentId, msgId)?.let { return it }
+        if (targetConversationId != null) return routeExplicitTarget(targetConversationId, candidates)
+        return routeLane(lane ?: "inbox", candidates)
+    }
+
+    private fun guard(fromAgentId: String, msgId: String): RoutingDecision.Dropped? {
         if (fromAgentId == ownAgentId || fromAgentId in siblingAgentIds) {
             return RoutingDecision.Dropped("ping_pong_own_or_sibling")
         }
-        // At-most-once per inbound (dedupe by msgId).
-        if (!seenMsgIds.add(msgId)) {
-            return RoutingDecision.Dropped("duplicate_msg_id")
-        }
-        // Per-sender loop-safety cap.
+        if (!seenMsgIds.add(msgId)) return RoutingDecision.Dropped("duplicate_msg_id")
         val count = (perSenderCount[fromAgentId] ?: 0) + 1
         perSenderCount[fromAgentId] = count
-        if (count > maxPerSender) {
-            return RoutingDecision.Dropped("per_sender_cap_exceeded")
-        }
+        return if (count > maxPerSender) RoutingDecision.Dropped("per_sender_cap_exceeded") else null
+    }
 
-        // letta-mobile-5m1qy: an explicit target conversation from the sender
-        // overrides the most-recent-interactive pick — but only AFTER the safety
-        // guards above, and it must NEVER fall through to CreateAndDeliver
-        // (a missing target is dropped with a distinct reason, not created).
-        if (targetConversationId != null) {
-            return routeExplicitTarget(targetConversationId, candidates)
+    private fun routeLane(lane: String, candidates: List<ConversationState>): RoutingDecision = when (lane) {
+        "home" -> RoutingDecision.Dropped("home_lane_forbidden")
+        "inbox" -> {
+            val matches = laneMatches(candidates.map { it.conversation }, lane)
+            when (matches.size) {
+                0 -> RoutingDecision.CreateAndDeliver
+                1 -> {
+                    val inbox = matches.single()
+                    if (candidates.first { it.conversation.id == inbox.id }.busy) {
+                        RoutingDecision.Queue(inbox.id.value)
+                    } else {
+                        RoutingDecision.Deliver(inbox.id.value)
+                    }
+                }
+                else -> RoutingDecision.Dropped("duplicate_lane_tags")
+            }
         }
-
-        // Most-recent INTERACTIVE conversation (never AUTONOMOUS/heartbeat).
-        // The "which conversation" half is shared with the client-side
-        // picker (letta-mobile-i9h61.3) via [pickMostRecentInteractive] so
-        // the two can never disagree; busy state only decides Deliver-vs-
-        // Queue, not which.
-        val interactive = pickMostRecentInteractive(candidates.map { it.conversation })
-            ?: return RoutingDecision.CreateAndDeliver
-
-        val state = candidates.first { it.conversation.id == interactive.id }
-        return if (state.busy) {
-            RoutingDecision.Queue(interactive.id.value)
-        } else {
-            RoutingDecision.Deliver(interactive.id.value)
-        }
+        else -> RoutingDecision.Dropped("unsupported_lane")
     }
 
     companion object {
-        /**
-         * The exact recency key the router uses to order candidates.
-         * Shared with the client-side picker so both compute the same
-         * "most recent" conversation.
-         */
-        fun recencyKey(c: Conversation): String =
-            c.lastMessageAt ?: c.updatedAt ?: c.createdAt ?: ""
+        /** Select the conversation carrying the exact lane tag. */
+        fun pickLane(conversations: List<Conversation>, lane: String): Conversation? =
+            laneMatches(conversations, lane).singleOrNull()
 
-        /**
-         * Pure most-recent-INTERACTIVE pick (never AUTONOMOUS/heartbeat).
-         * This is the "which conversation" half of [route]; the busy flag
-         * only decides Deliver-vs-Queue, not which. Exposed so the
-         * client-side tap-to-navigate picker can
-         * run the identical deterministic policy against the target
-         * agent's conversation list and land on the same conversation the
-         * router chose at receive time.
-         */
-        fun pickMostRecentInteractive(conversations: List<Conversation>): Conversation? =
-            conversations
-                .filter { it.effectiveClass == ConversationClass.INTERACTIVE }
-                .maxByOrNull { recencyKey(it) }
+        private fun laneMatches(conversations: List<Conversation>, lane: String): List<Conversation> =
+            conversations.filter { "lane:$lane" in it.tags }
     }
 
     /**
@@ -136,6 +96,10 @@ class IrohAgentMessageRouter(
     ): RoutingDecision {
         val target = candidates.find { it.conversation.id.value == targetConversationId }
             ?: return RoutingDecision.Dropped("target_conversation_not_found")
+        // Lanes v1: an explicit id is not a back door around the lane rules. Work
+        // conversations are records, never inbound targets, and home is owner-only.
+        if ("lane:work" in target.conversation.tags) return RoutingDecision.Dropped("target_is_work_lane")
+        if ("lane:home" in target.conversation.tags) return RoutingDecision.Dropped("home_lane_forbidden")
         return if (target.busy) {
             RoutingDecision.Queue(targetConversationId)
         } else {

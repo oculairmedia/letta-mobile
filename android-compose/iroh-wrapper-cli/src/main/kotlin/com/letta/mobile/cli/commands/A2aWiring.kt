@@ -3,6 +3,7 @@ package com.letta.mobile.cli.commands
 import com.letta.mobile.util.telemetryAttributes
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.node.iroh.ConversationAdminHandlers
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.AgentMessageClientId
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
@@ -27,16 +28,16 @@ import com.letta.mobile.data.transport.iroh.IrohFailureLog
 import com.letta.mobile.data.transport.iroh.isFromIdentityIn
 import com.letta.mobile.util.Telemetry
 import computer.iroh.EndpointAddr
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
-import java.util.UUID
 
 /**
  * letta-mobile-bn008.6: production wiring for the a2a (direct agent-to-agent)
@@ -93,7 +94,7 @@ internal const val A2A_SENDER_AUTH_OBSERVE = "observe"
  * endpoint, so it is read late — the endpoint accepts nothing before then).
  *
  * **CreateAndDeliver** — the router returns CreateAndDeliver when the target
- * agent has NO interactive conversation; the wrapper creates one through the
+ * agent has no inbox; the wrapper creates one through the
  * client, or drops with `no_conversation_create_path` when it cannot.
  */
 fun buildA2aWiring(
@@ -134,7 +135,7 @@ fun buildA2aWiring(
     val receiver = IrohAgentMessageReceiver(
         router = router,
         conversationsFor = conversationsFor,
-        onDeliver = { message, decision -> handleDecision(client(), message, decision) },
+        onDeliver = { message, decision -> handleDecision(client(), message, decision, backendStore) },
         authenticate = { message, peer -> authenticateSender(config, message, peer) },
     )
     return A2aWiring(
@@ -238,7 +239,7 @@ private const val HOST_ONLY_AGENT_ID = "host"
 
 
 /**
- * Resolve a list of interactive conversations for the target agent. The
+ * Resolve the target agent's conversations. The
  * `busy` flag is computed from the local `runs/` store: a conversation is
  * busy iff there's at least one run with status="running" referencing it.
  *
@@ -273,8 +274,8 @@ internal suspend fun listConversationsForAgent(
     runCatching {
         val convsArray = store.listConversationsProjected(
             agentId = agentId,
-            archiveStatus = "active",
-            limit = 200,
+            archiveStatus = "all",
+            limit = null,
             offset = 0,
         ) ?: return@runCatching emptyList<IrohAgentMessageRouter.ConversationState>()
         val activeConvs = store.activeConversationIds(agentId)
@@ -283,7 +284,7 @@ internal suspend fun listConversationsForAgent(
             val obj = el as? JsonObject ?: return@mapNotNull null
             val conv = decodeConversation(obj, agentId) ?: return@mapNotNull null
             IrohAgentMessageRouter.ConversationState(conv, conv.id.value in activeConvs)
-        }.sortedByDescending { it.conversation.lastMessageAt ?: it.conversation.updatedAt ?: it.conversation.createdAt ?: "" }
+        }
     }.getOrElse { emptyList() }
 }
 
@@ -295,8 +296,8 @@ internal fun JsonElement?.stringOrNullSafe(): String? = (this as? JsonPrimitive)
  * Shape: {"envelope":"a2a","from_agent_id":...,"to_agent_id":...,"ts":...,"msg_id":...,"content":...}
  *
  * letta-mobile-8kbqd: this is NOT what gets written into the recipient's
- * conversation. Delivery uses [message.body] plain text so humans / chat UIs
- * see the sender's words, not a nested JSON blob. Wire identity for
+ * conversation. Delivery keeps [message.body] readable and adds only explicitly
+ * supplied lane and correlation metadata for the receiving turn. Wire identity for
  * at-most-once dedup stays on [IrohAgentMessage.msgId] → clientMessageId.
  */
 internal fun wrapA2aEnvelope(message: IrohAgentMessage): String = buildJsonObject {
@@ -306,6 +307,10 @@ internal fun wrapA2aEnvelope(message: IrohAgentMessage): String = buildJsonObjec
     put("ts", message.ts)
     put("msg_id", message.msgId)
     put("content", message.body)
+    message.lane?.let { put("lane", it) }
+    message.correlation?.let { values ->
+        put("correlation", buildJsonObject { values.forEach { (key, value) -> put(key, value) } })
+    }
 }.toString()
 
 /**
@@ -328,6 +333,7 @@ internal fun decodeConversation(obj: JsonObject, fallbackAgentId: String): Conve
         updatedAt = obj["updated_at"]?.stringOrNullSafe(),
         lastMessageAt = obj["last_message_at"]?.stringOrNullSafe(),
         conversationClass = convClass,
+        tags = (obj["tags"] as? JsonArray)?.mapNotNull { it.stringOrNullSafe() }.orEmpty(),
     )
 }.getOrNull()
 
@@ -344,6 +350,7 @@ internal suspend fun handleDecision(
     client: AppServerClient?,
     message: IrohAgentMessage,
     decision: IrohAgentMessageRouter.RoutingDecision,
+    store: LocalBackendAdminStore? = null,
 ): DeliveryOutcome {
     val normMessage = message.copy(
         fromAgentId = AgentIdNamespace.normalizeToBareId(message.fromAgentId),
@@ -377,7 +384,7 @@ internal suspend fun handleDecision(
             return inputOnConversation(client, normMessage, decision.conversationId)
         }
         is IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver -> {
-            return handleCreateAndDeliver(client, normMessage)
+            return handleCreateAndDeliver(client, normMessage, store)
         }
         is IrohAgentMessageRouter.RoutingDecision.Dropped -> {
             Telemetry.event(
@@ -395,6 +402,7 @@ internal suspend fun handleDecision(
 internal suspend fun handleCreateAndDeliver(
     client: AppServerClient?,
     message: IrohAgentMessage,
+    store: LocalBackendAdminStore? = null,
 ): DeliveryOutcome {
     if (client == null) {
         Telemetry.event(
@@ -409,19 +417,9 @@ internal suspend fun handleCreateAndDeliver(
     }
     var appServerError: String? = null
     val createdId = runCatching {
-        val response = client.conversationCreate(
-            AppServerCommand.ConversationCreate(
-                requestId = "conv-create-${UUID.randomUUID()}",
-                body = buildJsonObject { put("agent_id", message.toAgentId) },
-            ),
-        )
-        if (response.success) {
-            response.conversation?.get("id")?.stringOrNullSafe()
-        } else {
-            appServerError = response.error
-            null
-        }
+        ConversationAdminHandlers.createInbox(client, message.toAgentId, store)
     }.onFailure { t ->
+        if (t is CancellationException) throw t
         appServerError = t.message ?: t::class.simpleName
     }.getOrNull()
 
@@ -453,6 +451,17 @@ internal suspend fun handleCreateAndDeliver(
     return DeliveryOutcome(false, "conversation_create_failure")
 }
 
+private fun deliveredBody(message: IrohAgentMessage): String {
+    if (message.lane == null && message.correlation == null) return message.body
+    val metadata = buildJsonObject {
+        message.lane?.let { put("lane", it) }
+        message.correlation?.let { values ->
+            put("correlation", buildJsonObject { values.forEach { (key, value) -> put(key, value) } })
+        }
+    }
+    return "${message.body}\n\n[a2a metadata] $metadata"
+}
+
 private suspend fun inputOnConversation(
     client: AppServerClient?,
     message: IrohAgentMessage,
@@ -478,11 +487,9 @@ private suspend fun inputOnConversation(
                 ),
                 payload = AppServerInputPayload.CreateMessage(
                     messages = listOf(
-                        // letta-mobile-8kbqd: persist/render the plain body.
-                        // Envelope metadata (from/to/ts/msg_id) stays on the
-                        // wire + telemetry; the body text itself NEVER carries
-                        // wrapA2aEnvelope(...) JSON — it must stay readable to
-                        // both the human and the receiving agent's own turn.
+                        // Keep the body readable. Explicit lane/correlation metadata is
+                        // appended so the receiving turn can use it; sender identity
+                        // stays in the client message id below.
                         //
                         // letta-mobile-slqfp: structural (non-heuristic)
                         // provenance instead rides the clientMessageId field,
@@ -493,7 +500,7 @@ private suspend fun inputOnConversation(
                         // of this id — never by parsing the body above.
                         AppServerInputMessage(
                             role = "user",
-                            content = JsonPrimitive(message.body),
+                            content = JsonPrimitive(deliveredBody(message)),
                             clientMessageId = AgentMessageClientId.encode(
                                 msgId = message.msgId,
                                 fromAgentId = message.fromAgentId,
