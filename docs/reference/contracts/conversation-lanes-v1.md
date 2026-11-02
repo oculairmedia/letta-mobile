@@ -68,3 +68,8 @@ No per-lane permissions beyond owner-only `home`. No lane other than the three. 
 - Host check: letta-code 0.34.14 `updateLocalConversationRecord` stores `tags` verbatim when it is a string array (replace, not merge), and `conversation.update` is classified `conversation.manage` in `IrohPeerCapabilities`. A tag update replaces the whole tag list, so writers must send the full list.
 - Not yet verified (tracked in letta-mobile-ooykc): that `tags` survive the `conversation.list` projection the router's candidate loader reads, and the one-`lane:inbox` / one-`lane:home` write invariant.
 - Beads: contract `letta-mobile-0s3m6`, router `letta-mobile-ooykc`, sender `letta-mobile-ywa2y`, UI `letta-mobile-x60fz`.
+
+## Clarifications (letta-mobile, 2026-11-02; resolves PR #2350 review)
+
+- Both `lane` and `conversation_id` present: the request is accepted, `lane` is ignored and `conversation_id` is used (no error). Senders that want strictness simply send one.
+- Explicit `conversation_id` that resolves to a `lane:work` conversation: dropped with reason `target_is_work_lane`, never delivered, matching "work is never an inbound target". (Proposed by PM-letta-mobile; Meridian to confirm. Explicit ids to `home` still require an owner sender; explicit ids to `inbox` or untagged conversations are honoured as today.)
