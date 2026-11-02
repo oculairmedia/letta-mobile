@@ -128,6 +128,7 @@ class AdminRpcContractTest {
             "reflection.run",
             "run.get",
             "run.list",
+            "run.record", "lease.upsert", "lease.list",
             "cron.add",
             "cron.delete",
             "cron.delete_all",

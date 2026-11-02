@@ -228,8 +228,22 @@ class ShimOffParityGateTest {
         override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile) =
             AppServerInboundFrame.DeleteMemoryFileResponse(command.requestId, true, command.agentId, command.path, committed = true)
 
-        override suspend fun cronRuns(command: AppServerCommand.CronRuns) =
-            AppServerInboundFrame.CronRunsResponse(command.requestId, true)
+        // letta.js 0.34.14:193781-193926: safe unknown ids read empty logs,
+        // but path separators/NUL/blank ids are rejected; pagination is always complete.
+        override suspend fun cronRuns(command: AppServerCommand.CronRuns): AppServerInboundFrame.CronRunsResponse {
+            val safe = command.taskId.trim()
+            if (safe.isEmpty() || safe.any { it == '/' || it == '\\' || it == '\u0000' }) {
+                return AppServerInboundFrame.CronRunsResponse(command.requestId, false, error = "invalid cron run log job id")
+            }
+            return AppServerInboundFrame.CronRunsResponse(command.requestId, true, buildJsonObject {
+                put("entries", JsonArray(emptyList()))
+                put("total", 0)
+                put("offset", (command.offset ?: 0).coerceAtLeast(0))
+                put("limit", (command.limit ?: 50).coerceIn(1, 200))
+                put("hasMore", false)
+                put("nextOffset", kotlinx.serialization.json.JsonNull)
+            })
+        }
 
         override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) =
             AppServerInboundFrame.CronTriggerResponse(command.requestId, true)
@@ -364,6 +378,7 @@ class ShimOffParityGateTest {
         put("name", "demo")
         put("cron", "0 0 * * *")
         put("prompt", "hi")
+        wrapperRecordParams(method)
         // pairing rows address a peer by node id; reflection.set carries settings
         put("node_id", PEER_NODE_ID)
         put("capabilities", "chat.read")
@@ -419,6 +434,25 @@ class ShimOffParityGateTest {
                     )
                 },
             )
+        }
+    }
+
+    private fun kotlinx.serialization.json.JsonObjectBuilder.wrapperRecordParams(method: String) {
+        if (method == "run.record") {
+            put("agentId", "agent-1")
+            put("scheduleId", "t-1")
+            put("scheduleName", "gate")
+            put("instant", "2026-11-02T00:00:00Z")
+            put("status", "done")
+            put("reason", "parity gate")
+            put("source", "agent")
+        }
+        if (method == "lease.upsert") {
+            put("id", "gate-lease")
+            put("owner", "agent-1")
+            put("startedAt", "2026-11-01T00:00:00Z")
+            put("dueAt", "2026-11-03T00:00:00Z")
+            put("state", "active")
         }
     }
 

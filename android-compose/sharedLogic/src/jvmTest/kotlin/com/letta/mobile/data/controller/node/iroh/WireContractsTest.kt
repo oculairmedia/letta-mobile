@@ -82,6 +82,16 @@ class WireContractsTest {
     }
 
     @Test
+    fun producerContractCopiesMatchSharedClientFixtures() {
+        for (method in listOf("run.record", "lease.upsert", "lease.list")) {
+            val relative = "$method/wrapper-records-v1.json"
+            val shared = Json.parseToJsonElement(File(fixtureRoot, relative).readText())
+            val producer = Json.parseToJsonElement(File(root, "docs/reference/contracts/$relative").readText())
+            assertEquals(shared, producer, "$method producer/client fixture drift")
+        }
+    }
+
+    @Test
     fun registryRatchetRejectsEveryKindOfMembershipDrift() {
         assertTrue(coverageErrors(setOf("new.method"), emptySet(), emptySet()).single().contains("New uncovered methods: new.method"))
         assertTrue(coverageErrors(setOf("a.method"), setOf("a.method"), setOf("a.method")).single().contains("Stale baseline entries"))
@@ -113,7 +123,7 @@ class WireContractsTest {
         val inputs = mapOf(
             AdminRpcHostServices::class.java to setOf("controller", "subagentRegistrySource", "vibesyncBaseUrl", "pluginRoutes"),
             AdminRpcNativeSources::class.java to setOf(
-                "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile",
+                "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile", "wrapperRecords",
             ),
             AdminRpcPairing::class.java to setOf("pairingService", "pairingQr"),
             AdminRpcNotifications::class.java to setOf("agentChanges", "conversationChanges", "turnIdentity", "permissionModes"),
@@ -208,6 +218,9 @@ class WireContractsTest {
                     ).asListingSource(),
                     slashCommands = NativeSlashCommandCatalog(),
                     modelExposureFile = File(dir, "model-exposure.json").path,
+                    wrapperRecords = com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore(
+                        File(dir, "wrapper-records.json").toPath(),
+                    ),
                 ),
                 notifications = AdminRpcNotifications(
                     agentChanges = AgentChangeNotifier(plugins.scope),

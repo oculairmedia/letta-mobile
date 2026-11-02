@@ -73,6 +73,7 @@ object AdminRpcRegistry {
         "subagent.list",
         "subagent.todos",
         "health.check",
+        "run.record", "lease.upsert", "lease.list",
         "approval.submit",
         "project.list",
         "project.get",
@@ -132,7 +133,10 @@ object AdminRpcRegistry {
         // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
         PermissionModeAdminHandlers.register(router, services.controller, notifications.permissionModes)
         PairingAdminHandlers.register(router, pairing.pairingService, pairing.pairingQr)
-        CronAdminHandlers.register(router, native.nativeClient)
+        val wrapperRecords = native.wrapperRecords
+            ?: com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore()
+        registerRunRecordHandlers(router, wrapperRecords)
+        CronAdminHandlers.register(router, native.nativeClient, wrapperRecords)
         ReflectionAdminHandlers.register(router, native.nativeClient)
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
         WorkspaceAdminHandlers.register(router, native.nativeClient)

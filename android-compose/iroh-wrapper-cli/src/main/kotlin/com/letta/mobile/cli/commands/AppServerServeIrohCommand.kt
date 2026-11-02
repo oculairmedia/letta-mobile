@@ -183,6 +183,12 @@ class AppServerServeIrohCommand : CliktCommand(
         help = "Per-agent agent-tools-mode, as agentId=mode pairs separated by commas; overrides --agent-tools-mode.",
     )
 
+    private val runRecordsFile by option(
+        "--run-records-file",
+        envvar = "LETTA_RUN_RECORDS_STORE",
+        help = "Wrapper-owned run records and leases JSON file (default: run-records.json beside model-exposure.json).",
+    )
+
     private val subagentRegistryFile by option(
         "--subagent-registry-file",
         envvar = "LETTA_SUBAGENT_REGISTRY_STORE",
@@ -547,6 +553,7 @@ class AppServerServeIrohCommand : CliktCommand(
             agentChanges = agentChanges,
             conversationChanges = conversationChanges,
             modelExposureFile = resolvedModelExposureFile(),
+            runRecordsFile = runRecordsFile,
             turnIdentity = admin.turnIdentity,
             pairingQr = pairingQr,
             subagentPublisher = { source ->

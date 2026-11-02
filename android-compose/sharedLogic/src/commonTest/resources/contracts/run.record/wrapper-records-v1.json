@@ -1,7 +1,7 @@
 {
   "method": "run.record",
   "version": 1,
-  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry.kt",
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/RunRecordAdminHandlers.kt",
   "cases": [
     {
       "name": "invalid-params",

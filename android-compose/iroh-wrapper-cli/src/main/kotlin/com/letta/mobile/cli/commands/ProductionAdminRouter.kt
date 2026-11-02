@@ -54,6 +54,8 @@ fun buildProductionAdminRouter(
     conversationChanges: com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier? = null,
     /** letta-mobile-w4q4p: persisted model exposure decisions; null keeps them in memory. */
     modelExposureFile: String? = null,
+    /** Run/lease JSON file; defaults beside configured model exposure state, otherwise memory-only. */
+    runRecordsFile: String? = null,
     /** letta-mobile-r1xkl: serves stream-joined ids on `message.list`; null serves rows as stored. */
     turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
     /**
@@ -128,6 +130,13 @@ fun buildProductionAdminRouter(
             skillsListing = skillsCatalog.asListingSource(),
             slashCommands = slashCommands,
             modelExposureFile = modelExposureFile,
+            wrapperRecords = com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore(
+                runRecordsFile?.let { java.nio.file.Path.of(it) }
+                    ?: modelExposureFile?.let { modelFile ->
+                        java.io.File(java.io.File(modelFile).absoluteFile.parentFile, "run-records.json").toPath()
+                    },
+                warn = { Telemetry.event("WrapperRecords", "store.corrupt", level = Telemetry.Level.WARN) },
+            ),
         ),
         notifications = AdminRpcNotifications(
             agentChanges = agentChanges,

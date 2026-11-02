@@ -1,7 +1,8 @@
 {
+  "name": "merged-cron-runs",
   "request": {
     "type": "admin_rpc",
-    "request_id": "example",
+    "request_id": "test",
     "method": "cron.runs",
     "params": {
       "task_id": "task-A"
@@ -9,7 +10,7 @@
   },
   "response": {
     "type": "admin_rpc_response",
-    "request_id": "example",
+    "request_id": "test",
     "success": true,
     "result": {
       "page": {
@@ -20,7 +21,7 @@
             "action": "finished",
             "status": "done",
             "agentId": "agent-A",
-            "runId": "wrapper-id",
+            "runId": "aae34202cbd1d5c209264d6ef8c74356a3cd9f8328fec691974a19ea9e01b02e",
             "scheduleName": "daily",
             "instant": "2026-11-02T00:00:00Z",
             "reason": "requested by operator",
