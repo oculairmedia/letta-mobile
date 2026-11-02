@@ -35612,6 +35612,25 @@ final class com.letta.mobile.data.controller.channels/InMemoryChannelAccountCach
     final fun record(kotlin.collections/List<com.letta.mobile.data.controller.channels/ChannelAccountRef>) // com.letta.mobile.data.controller.channels/InMemoryChannelAccountCache.record|record(kotlin.collections.List<com.letta.mobile.data.controller.channels.ChannelAccountRef>){}[0]
 }
 
+final class com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions { // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions|null[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ...) // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?){}[0]
+
+    final val conversationId // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val correlation // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.correlation|{}correlation[0]
+        final fun <get-correlation>(): kotlin.collections/Map<kotlin/String, kotlin/String>? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.correlation.<get-correlation>|<get-correlation>(){}[0]
+    final val lane // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.lane|{}lane[0]
+        final fun <get-lane>(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.lane.<get-lane>|<get-lane>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/String>? // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String>? = ...): com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.controller.extras/AgentDiscoveryTool : com.letta.mobile.data.controller.extras/ExternalTool { // com.letta.mobile.data.controller.extras/AgentDiscoveryTool|null[0]
     constructor <init>(com.letta.mobile.data.controller.extras/AgentDiscoverySource) // com.letta.mobile.data.controller.extras/AgentDiscoveryTool.<init>|<init>(com.letta.mobile.data.controller.extras.AgentDiscoverySource){}[0]
 
@@ -35755,16 +35774,19 @@ final class com.letta.mobile.data.controller.extras/ImageHydrationTool : com.let
 }
 
 final class com.letta.mobile.data.controller.extras/IrohCliPaths { // com.letta.mobile.data.controller.extras/IrohCliPaths|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras/IrohCliPaths.<init>|<init>(kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions = ...) // com.letta.mobile.data.controller.extras/IrohCliPaths.<init>|<init>(kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions){}[0]
 
     final val addressStore // com.letta.mobile.data.controller.extras/IrohCliPaths.addressStore|{}addressStore[0]
         final fun <get-addressStore>(): kotlin/String? // com.letta.mobile.data.controller.extras/IrohCliPaths.addressStore.<get-addressStore>|<get-addressStore>(){}[0]
     final val identityDir // com.letta.mobile.data.controller.extras/IrohCliPaths.identityDir|{}identityDir[0]
         final fun <get-identityDir>(): kotlin/String? // com.letta.mobile.data.controller.extras/IrohCliPaths.identityDir.<get-identityDir>|<get-identityDir>(){}[0]
+    final val message // com.letta.mobile.data.controller.extras/IrohCliPaths.message|{}message[0]
+        final fun <get-message>(): com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions // com.letta.mobile.data.controller.extras/IrohCliPaths.message.<get-message>|<get-message>(){}[0]
 
     final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras/IrohCliPaths.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras/IrohCliPaths.component2|component2(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras/IrohCliPaths // com.letta.mobile.data.controller.extras/IrohCliPaths.copy|copy(kotlin.String?;kotlin.String?){}[0]
+    final fun component3(): com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions // com.letta.mobile.data.controller.extras/IrohCliPaths.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions = ...): com.letta.mobile.data.controller.extras/IrohCliPaths // com.letta.mobile.data.controller.extras/IrohCliPaths.copy|copy(kotlin.String?;kotlin.String?;com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras/IrohCliPaths.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras/IrohCliPaths.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras/IrohCliPaths.toString|toString(){}[0]

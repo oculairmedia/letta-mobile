@@ -17106,15 +17106,17 @@ public final class com/letta/mobile/data/controller/extras/ImageHydrationTool : 
 public final class com/letta/mobile/data/controller/extras/IrohCliPaths {
 	public static final field Companion Lcom/letta/mobile/data/controller/extras/IrohCliPaths$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/IrohCliPaths;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/IrohCliPaths;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/IrohCliPaths;
+	public final fun component3 ()Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;)Lcom/letta/mobile/data/controller/extras/IrohCliPaths;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/IrohCliPaths;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/IrohCliPaths;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAddressStore ()Ljava/lang/String;
 	public final fun getIdentityDir ()Ljava/lang/String;
+	public final fun getMessage ()Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -17297,6 +17299,23 @@ public abstract interface class com/letta/mobile/data/controller/extras/ToolSour
 
 public final class com/letta/mobile/data/controller/extras/ToolSource$Companion {
 	public final fun static (Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/controller/extras/ToolSource;
+}
+
+public final class com/letta/mobile/data/controller/extras/messaging/IrohMessageOptions {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/messaging/IrohMessageOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getCorrelation ()Ljava/util/Map;
+	public final fun getLane ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/controller/fanout/AppServerRuntimeEventRouter {
