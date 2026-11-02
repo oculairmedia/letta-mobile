@@ -52,7 +52,9 @@ class IrohPeerCapabilitiesTest {
             "pair.invite.create", "pair.invite.list", "pair.invite.revoke",
             "pair.peer.list", "pair.peer.get", "pair.peer.rename",
             "pair.peer.set_capabilities", "pair.peer.set_agents", "pair.peer.revoke",
-        ) + PluginAdminRpc.MANAGEMENT
+            "plugins.list", "plugins.inspect", "plugins.install", "plugins.consent",
+            "plugins.enable", "plugins.disable", "plugins.remove", "plugins.disableAll",
+        )
         assertEquals(
             intentionalAdmin,
             router.registeredMethods.filter { IrohPeerCapabilities.forAdminMethod(it) == IrohPeerCapabilities.ADMIN_FULL }.toSet(),
@@ -64,10 +66,10 @@ class IrohPeerCapabilitiesTest {
     @Test
     fun wrapperRecordMethodsAreExplicitlyTieredRegisteredAndAdvertised() {
         val expected = mapOf(
-            "run.record" to IrohPeerCapabilities.WORKACTIVITY_REPORT,
-            "lease.upsert" to IrohPeerCapabilities.WORKACTIVITY_REPORT,
-            "lease.list" to IrohPeerCapabilities.CHAT_READ,
-            "cron.runs" to IrohPeerCapabilities.CHAT_READ,
+            "run.record" to "workactivity.report",
+            "lease.upsert" to "workactivity.report",
+            "lease.list" to "chat.read",
+            "cron.runs" to "chat.read",
         )
         val router = AdminRpcRegistry.buildRouter()
         expected.forEach { (method, tier) ->
