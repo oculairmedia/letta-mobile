@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.node.iroh.discovery.ConversationDiscovery
 import com.letta.mobile.data.controller.node.listcache.HeldListCache
 import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
@@ -95,7 +96,9 @@ object ConversationAdminHandlers {
         heldList: HeldListCache?,
     ) {
         val hiddenAgents = tiers.localBackendStore?.let { store -> HiddenAgentIndex(load = store::hiddenAgentIds) }
-        val discovery = tiers.localBackendStore?.let { ConversationDiscovery(it.conversationsDirectory, heldList) }
+        val discovery = tiers.localBackendStore?.let {
+            ConversationDiscovery(it.conversationsDirectory, heldList, LocalBackendLayout::decodeConversationId)
+        }
         registerConversationListRoute(router, nativeClient, hiddenAgents, discovery)
         registerConversationAgentListRoute(router, tiers)
         registerConversationGetRoute(router, nativeClient)
@@ -116,7 +119,11 @@ object ConversationAdminHandlers {
         val heldList = discovery?.heldList
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            if (nativeClient != null) discovery?.prime(nativeClient, context.authenticated)
+            if (nativeClient != null) {
+                discovery?.prime(context.authenticated, ::reportDiscoveryWarning) { id, remaining ->
+                    NativeAdmin.retrieveForDiscovery(nativeClient, ConversationId(id), remaining.milliseconds)
+                }
+            }
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
                 if (wantsVisibleConversationPage(params)) {
                     return@require hiddenAgents.visibleRecents(c, params, context, discovery)
@@ -130,7 +137,7 @@ object ConversationAdminHandlers {
                     param(params, AdminParamKey("summary_search")) == null
                 val held = heldList?.takeIf { sliceable }
                 if (held == null) own() else held.serve(
-                    fetchAll = { listAgentConversations(c)?.also { discovery?.remember(it) } },
+                    fetchAll = { listAgentConversations(c)?.also { discovery.remember(it) } },
                     fromFull = { full ->
                         agentConversationPage(
                             full,
@@ -180,10 +187,14 @@ object ConversationAdminHandlers {
         }
         if (heldList == null) return ownVisible()
         return heldList.serve(
-            fetchAll = { listAgentConversations(client)?.also { discovery?.remember(it) } },
+            fetchAll = { listAgentConversations(client)?.also { discovery.remember(it) } },
             fromFull = page,
             fetchOwn = ownVisible,
         )
+    }
+
+    private fun reportDiscoveryWarning(event: String, count: Int, timedOut: Boolean) {
+        Telemetry.event("IrohNode", event, "count" attr count, "timedOut" attr timedOut, level = Telemetry.Level.WARN)
     }
 
     /** The conversation list exactly as the client asked for it, from the App Server. */

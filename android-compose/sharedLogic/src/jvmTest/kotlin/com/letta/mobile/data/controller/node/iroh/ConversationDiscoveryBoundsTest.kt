@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.iroh.discovery.ConversationDiscovery
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -35,7 +36,7 @@ class ConversationDiscoveryBoundsTest {
             File(root, "bad%name").mkdir()
             val watched = CountingDirectory(root)
             var now = 0L
-            val discovery = ConversationDiscovery(watched, null) { now }
+            val discovery = ConversationDiscovery(watched, null, ::decodeTestKey) { now }
             val server = RecordingClient(root)
             discovery.prime(server, true)
             assertEquals(32, server.ids.size)
@@ -62,7 +63,7 @@ class ConversationDiscoveryBoundsTest {
         try {
             directory(root, "conversation:local-conv-first")
             var now = 0L
-            val discovery = ConversationDiscovery(root, null) { now }
+            val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { now }
             val server = RecordingClient(root)
             discovery.prime(server, true)
             val oldMtime = root.lastModified()
@@ -84,7 +85,7 @@ class ConversationDiscoveryBoundsTest {
         val root = createTempDirectory("discovery-missing").toFile()
         try {
             val server = RecordingClient(root)
-            ConversationDiscovery(File(root, "missing"), null) { 0L }.prime(server, true)
+            ConversationDiscovery(File(root, "missing"), null, ::decodeTestKey) { 0L }.prime(server, true)
             assertEquals(emptyList(), server.ids)
         } finally {
             root.deleteRecursively()
@@ -128,7 +129,7 @@ class ConversationDiscoveryBoundsTest {
         try {
             repeat(40) { directory(root, "conversation:local-conv-$it") }
             var now = 0L
-            val discovery = ConversationDiscovery(root, null) { now }
+            val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { now }
             val server = RecordingClient(root)
             discovery.prime(server, true)
             discovery.remember(JsonArray((0 until 40).map { id ->
@@ -152,7 +153,7 @@ class ConversationDiscoveryBoundsTest {
         try {
             repeat(32) { directory(root, "conversation:local-conv-$it") }
             val server = RecordingClient(root, fail = true, delayMs = 500)
-            val discovery = ConversationDiscovery(root, null) { testScheduler.currentTime }
+            val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { testScheduler.currentTime }
             discovery.prime(server, true)
             assertEquals(1_500L, testScheduler.currentTime)
             assertEquals(3, server.ids.size)
@@ -170,7 +171,7 @@ class ConversationDiscoveryBoundsTest {
             val gate = CompletableDeferred<Unit>()
             val server = RecordingClient(root, gate = gate)
             var now = 0L
-            val discovery = ConversationDiscovery(root, null) { now }
+            val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { now }
             val first = async { discovery.prime(server, true) }
             runCurrent()
             first.cancelAndJoin()
@@ -191,7 +192,7 @@ class ConversationDiscoveryBoundsTest {
             directory(root, "conversation:local-conv-one")
             val gate = CompletableDeferred<Unit>()
             val server = RecordingClient(root, gate = gate)
-            val discovery = ConversationDiscovery(root, null) { 0L }
+            val discovery = ConversationDiscovery(root, null, ::decodeTestKey) { 0L }
             val first = async { discovery.prime(server, true) }
             runCurrent()
             val second = async { discovery.prime(server, true) }
@@ -206,10 +207,24 @@ class ConversationDiscoveryBoundsTest {
         }
     }
 
+    private fun decodeTestKey(name: String): String? {
+        val key = String(Base64.getUrlDecoder().decode(name), Charsets.UTF_8)
+        require(Base64.getUrlEncoder().withoutPadding().encodeToString(key.toByteArray()) == name)
+        if (!key.startsWith("conversation:")) return null
+        return key.removePrefix("conversation:").takeIf { it.isNotEmpty() && it != "default" }
+    }
+
+    private suspend fun ConversationDiscovery.prime(server: RecordingClient, authenticated: Boolean) {
+        prime(authenticated, { _, _, _ -> }) { id, _ ->
+            val response = server.conversationRetrieve(AppServerCommand.ConversationRetrieve("bounds", id))
+            response.success && (response.conversation?.get("id") as? JsonPrimitive)?.contentOrNull == id
+        }
+    }
+
     private suspend fun assertRetriedWithoutRescan(root: File, id: String, server: RecordingClient, repair: () -> Unit) {
         val watched = CountingDirectory(root)
         var now = 0L
-        val discovery = ConversationDiscovery(watched, null) { now }
+        val discovery = ConversationDiscovery(watched, null, ::decodeTestKey) { now }
         discovery.prime(server, true)
         repair()
         now += 5_000

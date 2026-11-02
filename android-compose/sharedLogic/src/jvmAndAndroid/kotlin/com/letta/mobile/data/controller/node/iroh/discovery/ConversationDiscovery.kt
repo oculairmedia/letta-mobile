@@ -1,10 +1,6 @@
-package com.letta.mobile.data.controller.node.iroh
+package com.letta.mobile.data.controller.node.iroh.discovery
 
 import com.letta.mobile.data.controller.node.listcache.HeldListCache
-import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.attr
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -20,6 +16,7 @@ import kotlinx.serialization.json.contentOrNull
 internal class ConversationDiscovery(
     private val directory: File,
     val heldList: HeldListCache?,
+    private val decodeId: (String) -> String?,
     private val clock: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
 ) {
     private val scanning = Mutex()
@@ -36,13 +33,17 @@ internal class ConversationDiscovery(
         synchronized(known) { known.addAll(ids) }
     }
 
-    suspend fun prime(client: AppServerClient, authenticated: Boolean) {
+    suspend fun prime(
+        authenticated: Boolean,
+        warn: (String, Int, Boolean) -> Unit,
+        retrieve: suspend (String, Long) -> Boolean,
+    ) {
         if (!authenticated) return
         scanning.withLock {
             val now = clock()
             if (lastScanAt?.let { now - it < MIN_INTERVAL_MS } == true) return
             lastScanAt = now
-            refreshPending(now)
+            refreshPending(now, warn)
             pending.removeAll { isKnown(it) }
             var failures = 0
             var timedOut = false
@@ -54,20 +55,17 @@ internal class ConversationDiscovery(
                 }
                 val id = pending.removeFirst()
                 if (isKnown(id)) return@repeat
-                if (!primeOne(client, id, remaining)) failures++
+                if (!primeOne(id, remaining, retrieve)) failures++
             }
             if (failures > 0 || timedOut) {
-                Telemetry.event(
-                    "IrohNode", "conversation_discovery.retrieve_failed",
-                    "count" attr failures, "timedOut" attr timedOut, level = Telemetry.Level.WARN,
-                )
+                warn("conversation_discovery.retrieve_failed", failures, timedOut)
             }
         }
     }
 
-    private suspend fun primeOne(client: AppServerClient, id: String, remaining: Long): Boolean {
+    private suspend fun primeOne(id: String, remaining: Long, retrieve: suspend (String, Long) -> Boolean): Boolean {
         val loaded = try {
-            retrieve(client, id, remaining)
+            withTimeoutOrNull((remaining + RETRIEVE_GRACE_MS).milliseconds) { retrieve(id, remaining) } ?: false
         } catch (cancelled: CancellationException) {
             pending.addFirst(id)
             throw cancelled
@@ -85,7 +83,7 @@ internal class ConversationDiscovery(
         heldList?.invalidate()
     }
 
-    private fun refreshPending(now: Long) {
+    private fun refreshPending(now: Long, warn: (String, Int, Boolean) -> Unit) {
         if (!directory.isDirectory) {
             directoryMtime = null
             directoryReadAt = null
@@ -94,7 +92,7 @@ internal class ConversationDiscovery(
         }
         val modified = directory.lastModified()
         if (directoryMtime == modified && directoryReadAt?.let { now - it < FULL_RECHECK_MS } == true) return
-        val ids = readCandidateIds() ?: return
+        val ids = readCandidateIds(warn) ?: return
         pending.retainAll(ids)
         val queued = pending.toSet()
         ids.sorted().filterNot { it in queued || isKnown(it) }.forEach(pending::addLast)
@@ -102,66 +100,34 @@ internal class ConversationDiscovery(
         directoryReadAt = now
     }
 
-    private fun readCandidateIds(): Set<String>? {
+    private fun readCandidateIds(warn: (String, Int, Boolean) -> Unit): Set<String>? {
         val names = directory.list() ?: run {
-            Telemetry.event("IrohNode", "conversation_discovery.directory_unreadable", level = Telemetry.Level.WARN)
+            warn("conversation_discovery.directory_unreadable", 0, false)
             return null
         }
         var malformed = 0
         val ids = names.mapNotNull { conversationId(it) { malformed++ } }.toSet()
         if (malformed > 0) {
-            Telemetry.event(
-                "IrohNode", "conversation_discovery.invalid_names",
-                "count" attr malformed, level = Telemetry.Level.WARN,
-            )
+            warn("conversation_discovery.invalid_names", malformed, false)
         }
         return ids
     }
 
     private fun isKnown(id: String): Boolean = synchronized(known) { id in known }
 
-    private suspend fun retrieve(client: AppServerClient, id: String, remainingMs: Long): Boolean = try {
-        NativeAdmin.require(client, NativeAdminOp.ConversationDiscovery) { c ->
-            withTimeoutOrNull(remainingMs.milliseconds) { sendRetrieve(c, id) } ?: false
-        }
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: Exception) {
-        false
-    }
-
-    private suspend fun sendRetrieve(client: AppServerClient, id: String): Boolean = try {
-        val response = client.conversationRetrieve(
-            AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = id),
-        )
-        response.success && (response.conversation?.get("id") as? JsonPrimitive)?.contentOrNull == id
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: Exception) {
-        false
-    }
-
-    private fun conversationId(name: String, onMalformed: () -> Unit): String? {
-        val key = try {
-            LocalBackendLayout.b64UrlDecode(name)
-        } catch (_: IllegalArgumentException) {
-            onMalformed()
-            return null
-        }
-        if (LocalBackendLayout.b64UrlEncode(key) != name) {
-            onMalformed()
-            return null
-        }
-        if (!key.startsWith(KEY_PREFIX)) return null
-        return key.removePrefix(KEY_PREFIX).takeIf { it.isNotEmpty() && it != LocalBackendLayout.DEFAULT_CONVERSATION_ID }
+    private fun conversationId(name: String, onMalformed: () -> Unit): String? = try {
+        decodeId(name)
+    } catch (_: IllegalArgumentException) {
+        onMalformed()
+        null
     }
 
     companion object {
         internal const val MAX_PER_PASS = 32
         internal const val MIN_INTERVAL_MS = 5_000L
         private const val PASS_BUDGET_MS = 1_500L
+        private const val RETRIEVE_GRACE_MS = 100L
         private const val FULL_RECHECK_MS = 60_000L
         private const val NANOS_PER_MILLI = 1_000_000L
-        private const val KEY_PREFIX = "conversation:"
     }
 }

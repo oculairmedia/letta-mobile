@@ -3,6 +3,9 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryRecorder
+import com.letta.mobile.util.attr
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -22,6 +25,7 @@ import java.util.Base64
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Models the local server's scan-once store and strict retrieve using the actual directory layout. */
@@ -88,7 +92,11 @@ class HeadlessConversationDiscoveryTest {
 
     private suspend fun assertListSurvivesRetrieveFailure(timeout: Boolean) {
         val root = createTempDirectory("headless-failure").toFile()
+        val previousEnabled = Telemetry.enabled.get()
+        val recorder = TelemetryRecorder()
+        val recording = Telemetry.installRecorder(recorder)
         try {
+            Telemetry.enabled.set(true)
             File(root, "conversations").mkdirs()
             val server = ScanOnceClient(root)
             server.conversationList(AppServerCommand.ConversationList("initial"))
@@ -104,7 +112,15 @@ class HeadlessConversationDiscoveryTest {
             assertTrue(server.retrieveCalls > 0)
             assertEquals(emptyList(), ids(dispatch(router, emptyMap())))
             if (timeout) assertEquals(1, server.retrieveCalls)
+            val selected = recorder.snapshot().filter {
+                it.tag == "IrohAdminRoute" && it.name == "selected" &&
+                    it.attrs["method"] == ("method" attr "conversation.discovery").second
+            }
+            assertTrue(selected.any { it.attrs["outcome"] == ("outcome" attr "error").second })
+            assertFalse(selected.any { it.attrs["outcome"] == ("outcome" attr "success").second })
         } finally {
+            recording.close()
+            Telemetry.enabled.set(previousEnabled)
             root.deleteRecursively()
         }
     }

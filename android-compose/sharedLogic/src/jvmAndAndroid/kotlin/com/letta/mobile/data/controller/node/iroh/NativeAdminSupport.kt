@@ -1,11 +1,17 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Native App Server v2 execution for runtime-owned admin operations.
@@ -208,6 +214,29 @@ internal object NativeAdmin {
             markLegacyNull(op, e.message ?: e::class.simpleName ?: "error")
             null
         }
+    }
+
+    suspend fun retrieveForDiscovery(client: AppServerClient, id: ConversationId, remaining: Duration): Boolean = try {
+        NativeAdmin.require(client, NativeAdminOp.ConversationDiscovery) { c ->
+            val loaded = withTimeoutOrNull(remaining) { sendDiscoveryRetrieve(c, id) } ?: false
+            if (!loaded) NativeAdmin.refused(NativeAdminOp.ConversationDiscovery, null)
+            true
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
+    }
+
+    private suspend fun sendDiscoveryRetrieve(client: AppServerClient, id: ConversationId): Boolean = try {
+        val response = client.conversationRetrieve(
+            AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = id.value),
+        )
+        response.success && (response.conversation?.get("id") as? JsonPrimitive)?.contentOrNull == id.value
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
     }
 
     /** Builds a native query object from pagination-style string params. */
