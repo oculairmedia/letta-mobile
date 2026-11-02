@@ -43,6 +43,22 @@ Portable API failures and project request payloads retained by repository contra
 
 Shared image-ingress policy and attachment budgets. Platform decoders supply image data; these policies constrain turn attachment counts, dimensions and payload size. Keep decoding behind platform adapters and attachment rendering in `sharedUI`; apply [ImageIngressPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.attachment/-image-ingress-policy/index.html) and [AttachmentLimits](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.attachment/-attachment-limits/index.html) before admitting image results.
 
+# Package com.letta.mobile.data.beads
+
+Portable bd serve HTTP client, capability handshake, event stream and typed failures. Supply a Ktor engine and credentials at connection time; the client has no wrapper route or host integration.
+
+# Package com.letta.mobile.data.beads.wire.core
+
+Serializable wire models for the pinned bd serve contract, including issue and journal records.
+
+# Package com.letta.mobile.data.beads.wire.payloads
+
+Serializable wire models for pinned bd serve operations and their shared payloads.
+
+# Package com.letta.mobile.data.beads.wire.mutations
+
+Serializable wire models for pinned bd serve mutation operations and their request and response payloads.
+
 # Package com.letta.mobile.data.backend
 
 Session capabilities and explicit route availability. Bound sources and absent routes let repositories report unsupported operations without silently choosing another backend. Keep unsupported routes explicit rather than silently falling back; session factories describe available operations through [SessionCapabilities](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.backend/-session-capabilities/index.html) and [SessionRouteMatrix](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.backend/-session-route-matrix/index.html).
