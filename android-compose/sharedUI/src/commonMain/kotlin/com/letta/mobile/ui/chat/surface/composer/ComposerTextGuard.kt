@@ -10,27 +10,31 @@ internal fun isUnreadableComposerText(previous: TextFieldValue, next: String): B
 }
 
 internal fun composerInsertedText(previous: TextFieldValue, next: String): String =
-    selectionReplacement(previous, next) ?: changedText(previous.text, next)
+    ComposerTextEdit(previous, next).insertedText()
 
 private fun isForbiddenControl(char: Char): Boolean = char == '\u007f' || (char < ' ' && char !in "\t\n\r")
 
-/** Returns the inserted text if the edit replaces the selection; IMEs may edit a different range. */
-private fun selectionReplacement(previous: TextFieldValue, next: String): String? {
-    val beforeSelection = previous.text.substring(0, previous.selection.min)
-    val afterSelection = previous.text.substring(previous.selection.max)
-    if (next.length < beforeSelection.length + afterSelection.length) return null
-    if (!next.startsWith(beforeSelection)) return null
-    if (!next.endsWith(afterSelection)) return null
-    return next.substring(beforeSelection.length, next.length - afterSelection.length)
-}
+private class ComposerTextEdit(private val previous: TextFieldValue, private val next: String) {
+    fun insertedText(): String = selectionReplacement() ?: changedText()
 
-/** Finds the changed text when an IME edit did not replace the current selection. */
-private fun changedText(previous: String, next: String): String {
-    val prefix = previous.commonPrefixWith(next).length
-    val oldRemainder = previous.substring(prefix)
-    val newRemainder = next.substring(prefix)
-    val suffix = oldRemainder.commonSuffixWith(newRemainder).length
-    return newRemainder.dropLast(suffix)
+    /** Returns the inserted text if the edit replaces the selection; IMEs may edit a different range. */
+    private fun selectionReplacement(): String? {
+        val beforeSelection = previous.text.substring(0, previous.selection.min)
+        val afterSelection = previous.text.substring(previous.selection.max)
+        if (next.length < beforeSelection.length + afterSelection.length) return null
+        if (!next.startsWith(beforeSelection)) return null
+        if (!next.endsWith(afterSelection)) return null
+        return next.substring(beforeSelection.length, next.length - afterSelection.length)
+    }
+
+    /** Finds the changed text when an IME edit did not replace the current selection. */
+    private fun changedText(): String {
+        val prefix = previous.text.commonPrefixWith(next).length
+        val oldRemainder = previous.text.substring(prefix)
+        val newRemainder = next.substring(prefix)
+        val suffix = oldRemainder.commonSuffixWith(newRemainder).length
+        return newRemainder.dropLast(suffix)
+    }
 }
 
 private fun hasImageSignature(inserted: String): Boolean =
