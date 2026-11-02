@@ -27,6 +27,51 @@ import kotlin.test.assertFalse
  * hermetic; the runner itself has its own tests in [DefaultIrohCliRunnerTest].
  */
 class CustomIrohMessagingToolTest {
+    @Test
+    fun routesOptionalFieldsAndDropsLaneForExplicitConversation() = runTest {
+        val captured = CapturingRunner()
+        val tool = toolWithRunner(captured)
+        val input = buildJsonObject {
+            put("to", "target")
+            put("body", "hello")
+            put("lane", "home")
+            put("conversation_id", "conv-1")
+            put("correlation", buildJsonObject { put("bead", "x=y"); put("run", "42") })
+        }
+        assertIs<ExternalToolResult.Success>(tool.invoke(input, "sender"))
+        val options = captured.calls.single().options
+        assertEquals("conv-1", options.conversationId)
+        assertEquals(null, options.lane)
+        assertEquals(mapOf("bead" to "x=y", "run" to "42"), options.correlation)
+    }
+
+    @Test
+    fun laneAndCorrelationReachRunner() = runTest {
+        val captured = CapturingRunner()
+        val input = buildJsonObject {
+            put("to", "target")
+            put("body", "hello")
+            put("lane", "home")
+            put("correlation", buildJsonObject { put("bead", "ywa2y") })
+        }
+        assertIs<ExternalToolResult.Success>(toolWithRunner(captured).invoke(input, "sender"))
+        assertEquals("home", captured.calls.single().options.lane)
+        assertEquals(null, captured.calls.single().options.conversationId)
+        assertEquals(mapOf("bead" to "ywa2y"), captured.calls.single().options.correlation)
+    }
+
+    @Test
+    fun rejectsNonStringCorrelationValues() = runTest {
+        val runner = CapturingRunner()
+        val input = buildJsonObject {
+            put("to", "target")
+            put("body", "hello")
+            put("correlation", buildJsonObject { put("bead", 12) })
+        }
+        assertIs<ExternalToolResult.Error>(toolWithRunner(runner).invoke(input, "sender"))
+        assertTrue(runner.calls.isEmpty())
+    }
+
 
     /**
      * The regression test pinned from bn008-phase2-handoff risk #1:

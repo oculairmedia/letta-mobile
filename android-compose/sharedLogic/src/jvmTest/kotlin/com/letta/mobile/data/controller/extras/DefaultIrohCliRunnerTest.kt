@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
@@ -24,6 +25,28 @@ import kotlin.test.assertTrue
  *   - Honor its timeout by destroying the child when it overruns.
  */
 class DefaultIrohCliRunnerTest {
+    @Test
+    fun passesAddressAndCorrelationAsDistinctArguments() = runBlocking {
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-options").toFile()
+        val args = File(tmp, "args")
+        val script = writeCaptureScript(tmp, "capture.sh", args, """
+            #!/bin/sh
+            printf '%s\n' "$@" > "@STDOUT_PATH@"
+            cat > /dev/null
+            printf '{"accepted":true,"applicationDelivered":true,"msgId":"m"}'
+        """.trimIndent())
+        val result = DefaultIrohCliRunner().send(
+            script.absolutePath, "from", "to", "body", IrohCliPaths(),
+            IrohMessageOptions(conversationId = "conv", lane = "home", correlation = mapOf("bead" to "x=y", "run" to "42")),
+        )
+        assertTrue(result is IrohCliSendResult.Delivered)
+        val words = args.readLines()
+        assertTrue(words.windowed(2).contains(listOf("--conversation-id", "conv")))
+        assertTrue("--lane" !in words)
+        assertTrue(words.windowed(2).contains(listOf("--correlation", "bead=x=y")))
+        assertTrue(words.windowed(2).contains(listOf("--correlation", "run=42")))
+    }
+
 
     @BeforeTest
     fun setUp() {

@@ -1,9 +1,12 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
+
 import java.io.File
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -69,6 +72,7 @@ class DefaultIrohCliRunner(
         toAgentId: String,
         body: String,
         paths: IrohCliPaths,
+        options: IrohMessageOptions,
     ): IrohCliSendResult {
         // Generate the idempotency id at the wrapper so the CLI's default
         // `msg-${UUID}` only fires when an upstream caller didn't pin one.
@@ -82,6 +86,7 @@ class DefaultIrohCliRunner(
             toAgentId = toAgentId,
             msgId = msgId,
             paths = paths,
+            options = options,
         )
 
         return try {
@@ -211,6 +216,7 @@ class DefaultIrohCliRunner(
         toAgentId: String,
         msgId: String,
         paths: IrohCliPaths,
+        options: IrohMessageOptions,
     ): List<String> = buildList {
         add(binary)
         add("agent-message")
@@ -219,6 +225,16 @@ class DefaultIrohCliRunner(
         add("--to"); add(toAgentId)
         add("--msg-id"); add(msgId)
         add("--body-file"); add("-")
+        options.conversationId?.let { add("--conversation-id"); add(it) }
+        if (options.conversationId == null) options.lane?.let { add("--lane"); add(it) }
+        options.correlation?.let { correlation ->
+            if (correlation.isEmpty() || correlation.keys.any { it.isEmpty() || '=' in it }) {
+                add("--correlation-json")
+                add(JsonObject(correlation.mapValues { JsonPrimitive(it.value) }).toString())
+            } else {
+                correlation.forEach { (key, value) -> add("--correlation"); add("$key=$value") }
+            }
+        }
         if (paths.identityDir != null) {
             add("--identity-dir"); add(paths.identityDir)
         }

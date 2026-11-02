@@ -2,6 +2,7 @@ package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.UsageError
 import com.letta.mobile.data.transport.iroh.AgentSendResult
+import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import org.junit.jupiter.api.Test
@@ -143,5 +144,43 @@ class AgentMessageSendCommandBodyResolutionTest {
             error.message.orEmpty().contains("--body-file"),
             "error must name the offending flag, got: ${error.message}",
         )
+    }
+}
+
+class AgentMessageSendEnvelopeTest {
+    private fun send(vararg extra: String): IrohAgentMessage {
+        var wire = ""
+        val command = AgentMessageSendCommand().apply { sendOverride = { wire = it.encode() } }
+        command.parse(listOf("--from", "sender", "--to", "recipient", "--body", "hello") + extra)
+        return IrohAgentMessage.decode(wire)
+    }
+
+    @Test
+    fun oldShapeAndHomeHaveDifferentEncodedTargets() {
+        val old = send()
+        val home = send("--lane", "home")
+        assertEquals(null, old.lane)
+        assertEquals("home", home.lane)
+        assertEquals("recipient", old.toAgentId)
+        assertEquals(old.toAgentId, home.toAgentId)
+    }
+
+    @Test
+    fun explicitConversationWinsAndCorrelationRoundTrips() {
+        val decoded = send("--lane", "home", "--conversation-id", "conv-1", "--correlation", "bead=x=y", "--correlation", "run=42")
+        assertEquals("conv-1", decoded.conversationId)
+        assertEquals(null, decoded.lane)
+        assertEquals(mapOf("bead" to "x=y", "run" to "42"), decoded.correlation)
+    }
+
+    @Test
+    fun jsonCorrelationPreservesArbitraryKeysAndEmptyMaps() {
+        assertEquals(mapOf("a=b" to "value", "" to "empty"), send("--correlation-json", """{"a=b":"value","":"empty"}""").correlation)
+        assertEquals(emptyMap<String, String>(), send("--correlation-json", "{}").correlation)
+    }
+
+    @Test
+    fun malformedCorrelationIsRejected() {
+        assertThrows(UsageError::class.java) { send("--correlation", "missing-equals") }
     }
 }

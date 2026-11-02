@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
+
 /**
  * Platform-resolved default
  * [IrohCliRunner] for the agent-message tool. The common tool resolves this
@@ -84,6 +86,7 @@ interface IrohCliRunner {
      * @param paths Optional overrides for the Iroh filesystem layout
      *   (identity dir + address-book kv). Pass [IrohCliPaths.DEFAULTS] for
      *   "no overrides — let the CLI default."
+     * @param options Optional conversation, lane and task correlation.
      * @return Typed outcome — never throws to the caller (the dispatcher
      *   contract is "always answer"; throwing would surface as a tool error
      *   and break the turn's answer guarantee).
@@ -94,6 +97,7 @@ interface IrohCliRunner {
         toAgentId: String,
         body: String,
         paths: IrohCliPaths = IrohCliPaths.DEFAULTS,
+        options: IrohMessageOptions = IrohMessageOptions(),
     ): IrohCliSendResult
 }
 
