@@ -9,6 +9,10 @@ internal fun isUnreadableComposerText(previous: TextFieldValue, next: String): B
     return inserted.any(::isForbiddenControl) || ComposerImageSignature(inserted).matches()
 }
 
+/** The text a field edit inserted or replaced, used to tell a paste from a keystroke. */
+internal fun composerInsertedText(previous: TextFieldValue, next: String): String =
+    ComposerTextEdit(previous, next).insertedText()
+
 private fun isForbiddenControl(char: Char): Boolean = char == '\u007f' || (char < ' ' && char !in "\t\n\r")
 
 private class ComposerTextEdit(private val previous: TextFieldValue, private val next: String) {
