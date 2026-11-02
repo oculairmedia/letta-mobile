@@ -20,6 +20,8 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class LeaseTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
     private fun root(): File =
         generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
             .first { File(it, "docs/reference/contracts/lease.list/wrapper-records-v1.json").isFile }
@@ -29,7 +31,7 @@ class LeaseTest {
         val root = root()
         val cases = Json.parseToJsonElement(File(root, path).readText()).jsonObject.getValue("cases").jsonArray
         val response = cases.first { it.jsonObject["name"] == JsonPrimitive("lease-list") }.jsonObject.getValue("response")
-        return Json { ignoreUnknownKeys = true }.decodeFromJsonElement(AppServerInboundFrame.AdminRpcResponse.serializer(), response)
+        return json.decodeFromJsonElement(AppServerInboundFrame.AdminRpcResponse.serializer(), response)
     }
 
     @Test
@@ -61,10 +63,10 @@ class LeaseTest {
         val clientPath = "android-compose/sharedLogic/src/commonTest/resources/contracts/lease.list/wrapper-records-v1.json"
         val root = root()
         val producer = File(root, producerPath).readText()
-        val fixture = Json.parseToJsonElement(File(root, clientPath).readText()).jsonObject
+        val fixture = json.parseToJsonElement(File(root, clientPath).readText()).jsonObject
         assertEquals(producer, File(root, clientPath).readText(), "lease.list client fixture must remain byte-for-byte equivalent")
         val response = fixture.getValue("cases").jsonArray.single().jsonObject.getValue("expected_response")
-        val frame = Json { ignoreUnknownKeys = true }.decodeFromJsonElement(AppServerInboundFrame.AdminRpcResponse.serializer(), response)
+        val frame = json.decodeFromJsonElement(AppServerInboundFrame.AdminRpcResponse.serializer(), response)
         assertTrue(leaseRecords(frame).isEmpty())
     }
 
