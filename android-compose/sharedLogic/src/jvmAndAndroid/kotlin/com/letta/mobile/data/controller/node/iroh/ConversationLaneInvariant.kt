@@ -83,3 +83,27 @@ private suspend fun lanePage(client: AppServerClient, agent: String, after: Stri
     if (!response.success || response.conversations == null) adminError("lane_check_unavailable")
     return response.conversations
 }
+
+/** Refuses a write that would give [target]'s agent a second owner of a unique lane tag. */
+internal suspend fun requireLaneFree(
+    client: AppServerClient,
+    store: LocalBackendAdminStore?,
+    tags: Set<String>,
+    target: Pair<String, String?>,
+) {
+    if (laneOwner(client, store, tags, target) != null) adminError("lane_already_assigned")
+}
+
+/** The update form: the owning agent is read from the conversation being tagged. */
+internal suspend fun requireLaneFreeForUpdate(
+    client: AppServerClient,
+    store: LocalBackendAdminStore?,
+    conversationId: String,
+    tags: Set<String>,
+) {
+    if (tags.isEmpty()) return
+    val current = client.conversationRetrieve(AppServerCommand.ConversationRetrieve(NativeAdmin.requestId(), conversationId))
+    val agent = (current.conversation?.get("agent_id") as? JsonPrimitive)?.contentOrNull
+    if (!current.success || agent == null) adminError("lane_check_unavailable")
+    requireLaneFree(client, store, tags, agent to conversationId)
+}

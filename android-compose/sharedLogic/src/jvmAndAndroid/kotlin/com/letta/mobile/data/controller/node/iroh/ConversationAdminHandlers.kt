@@ -362,7 +362,7 @@ object ConversationAdminHandlers {
             laneWriteMutex.withLock {
                 val tags = laneTags(createBody)
                 NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
-                    if (laneOwner(c, store, tags, agentId to null) != null) adminError("lane_already_assigned")
+                    requireLaneFree(c, store, tags, agentId to null)
                     val response = c.conversationCreate(
                         AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
                     )
@@ -389,12 +389,7 @@ object ConversationAdminHandlers {
             val result = laneWriteMutex.withLock {
                 val tags = laneTags(body)
                 NativeAdmin.require(nativeClient, NativeAdminOp.ConversationUpdate) { c ->
-                    if (tags.isNotEmpty()) {
-                        val current = c.conversationRetrieve(AppServerCommand.ConversationRetrieve(NativeAdmin.requestId(), id))
-                        val agent = (current.conversation?.get("agent_id") as? JsonPrimitive)?.contentOrNull
-                        if (!current.success || agent == null) adminError("lane_check_unavailable")
-                        if (laneOwner(c, store, tags, agent to id) != null) adminError("lane_already_assigned")
-                    }
+                    requireLaneFreeForUpdate(c, store, id, tags)
                     val response = c.conversationUpdate(
                         AppServerCommand.ConversationUpdate(
                             requestId = NativeAdmin.requestId(),
