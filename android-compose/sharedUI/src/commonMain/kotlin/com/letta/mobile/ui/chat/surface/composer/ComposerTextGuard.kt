@@ -45,21 +45,26 @@ private class ComposerImageSignature(private val inserted: String) {
             inserted.startsWith("\u00ff\u00d8\u00ff") ||
             inserted.startsWith("\ufffd\ufffd\ufffd") ||
             hasGifHeader(inserted) ||
-            (inserted.startsWith("RIFF") && inserted.length >= 12 && inserted.substring(8, 12) == "WEBP") ||
+            hasWebpHeader(inserted) ||
             hasBmpHeader(inserted)
 }
+
+// RIFF size field (four decoded bytes) followed by WEBP; readable text needs binary evidence in the size field.
+internal fun hasWebpHeader(text: String): Boolean =
+    text.length >= 12 && text.startsWith("RIFF") && text.substring(8, 12) == "WEBP" &&
+        text.substring(4, 8).any(::isBinaryEvidence)
 
 // A logical screen descriptor has seven decoded byte characters after the signature.
 internal fun hasGifHeader(text: String): Boolean {
     if (!text.startsWith("GIF87a") && !text.startsWith("GIF89a")) return false
     if (text.length < 13 || !text.substring(6, 13).all(::isGifDescriptorChar)) return false
     if (text.littleEndian(6, 2) == 0L || text.littleEndian(8, 2) == 0L) return false
-    return text.substring(6, 13).any(::isGifBinaryEvidence)
+    return text.substring(6, 13).any(::isBinaryEvidence)
 }
 
 private fun isGifDescriptorChar(char: Char): Boolean = char.code <= 255 || char == '\ufffd'
 
-private fun isGifBinaryEvidence(char: Char): Boolean =
+private fun isBinaryEvidence(char: Char): Boolean =
     isForbiddenControl(char) || char in '\u0080'..'\u009f' || char == '\ufffd'
 
 // BITMAPFILEHEADER and a supported DIB header, represented as byte-valued characters.

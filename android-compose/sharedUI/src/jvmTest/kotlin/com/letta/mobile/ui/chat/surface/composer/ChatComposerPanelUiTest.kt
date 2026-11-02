@@ -85,6 +85,8 @@ import com.letta.mobile.ui.chat.surface.setPointerContent
  * DesktopChatInteractionUiTest; the rest cover what the shared panel adds (modes, the queue,
  * autocomplete routing through ChatActions).
  */
+private const val CLIPBOARD_READ_TIMEOUT_MS = 5_000L
+
 class ChatComposerPanelUiTest {
     @Composable
     private fun Panel(inputs: ComposerInputs) {
@@ -231,7 +233,9 @@ class ChatComposerPanelUiTest {
         setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
         val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
         val signatures = listOf(
-            "\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd", "GIF87a\t\n\r \t\n\u0080", "GIF89a\t\n\r \t\n\u0080", "RIFF1234WEBP",
+            "\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd",
+            "GIF87a\t\n\r \t\n\u0080", "GIF89a\t\n\r \t\n\u0080",
+            "RIFF\u0080\u0080\u0080\u0080WEBP",
         )
         val controls = (0..31).filterNot { it == 9 || it == 10 || it == 13 }.map { it.toChar().toString() } + "\u007f"
         (signatures + controls).forEachIndexed { index, value ->
@@ -262,6 +266,9 @@ class ChatComposerPanelUiTest {
             pressKey(Key.V)
             keyUp(Key.CtrlLeft)
         }
+        // The clipboard is read on a coroutine after the key event, so wait for the rejection itself
+        // (a positive condition with a deadline), not for an idle moment that may precede it.
+        waitUntil(timeoutMillis = CLIPBOARD_READ_TIMEOUT_MS) { actions.composerErrors.size == 1 }
         runOnIdle {
             assertEquals("draft", text)
             assertEquals(1, actions.composerErrors.size)
