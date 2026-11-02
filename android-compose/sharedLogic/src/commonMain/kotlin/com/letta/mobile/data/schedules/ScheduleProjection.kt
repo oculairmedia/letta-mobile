@@ -72,9 +72,19 @@ data class RunRecord(
     val error: String? = null,
     /** The scheduler skipped this run (missed while the host slept, or overlapped). */
     val skipped: Boolean = false,
+    /** Free-text explanation supplied by the wrapper, if any. */
+    val reason: String? = null,
+    /** Wrapper-provided origin, or null for upstream and older wrappers. */
+    val source: String? = null,
+    /** Recorded status for outcomes that cannot be represented by succeeded/skipped. */
+    val recordedStatus: RunStatus? = null,
+    /** Schedule name retained for wrapper records with no schedule definition. */
+    val scheduleName: String? = null,
+    /** Backend run identifier, when present. */
+    val recordId: String? = null,
 ) {
     val status: RunStatus
-        get() = when {
+        get() = recordedStatus ?: when {
             skipped -> RunStatus.Skipped
             succeeded -> RunStatus.Done
             else -> RunStatus.Failed
@@ -91,6 +101,12 @@ data class ScheduleRun(
     val exitCode: Int? = null,
     val error: String? = null,
     val agentId: String? = null,
+    /** Free-text explanation supplied by the wrapper, if any. */
+    val reason: String? = null,
+    /** Wrapper-provided origin, or null for upstream and older wrappers. */
+    val source: String? = null,
+    /** Backend run identifier, when present. */
+    val recordId: String? = null,
 )
 
 /** Agenda: the time-ordered runs of one day. */
@@ -274,7 +290,9 @@ object ScheduleProjection {
         isGlobalNext: Boolean,
         history: Map<String, List<RunRecord>>,
     ): ScheduleRun {
-        val record = history[def.id]?.firstOrNull { sameMinute(it.instant, instant, def.zone) }
+        val record = history[def.id]?.firstOrNull {
+            (it.source == null || it.source == "cron") && sameMinute(it.instant, instant, def.zone)
+        }
         val status = when {
             record != null -> record.status
             instant > now -> futureStatus(def.active, isGlobalNext)
@@ -289,6 +307,9 @@ object ScheduleProjection {
             exitCode = record?.exitCode,
             error = record?.error,
             agentId = def.agentId,
+            reason = record?.reason,
+            source = record?.source,
+            recordId = record?.recordId,
         )
     }
 
@@ -327,8 +348,16 @@ object ScheduleProjection {
             runsBetween(def, start, end).map { instant ->
                 classify(def, instant, now, isGlobalNext = instant == globalNext, history)
             }
-        }.sortedBy { it.instant }
-        return AgendaDay(date, runs)
+        }
+        val wakes = defs.flatMap { def ->
+            history[def.id].orEmpty().filter {
+                it.source != null && it.source != "cron" && it.instant in start..<end && it.instant <= now
+            }.map { record ->
+                ScheduleRun(def.id, record.scheduleName ?: def.name, record.instant, record.status, record.durationMillis,
+                    record.exitCode, record.error, def.agentId, record.reason, record.source, record.recordId)
+            }
+        }
+        return AgendaDay(date, (runs + wakes).sortedBy { it.instant })
     }
 
     /** Week time-grid starting at [weekStart] (a Monday by convention). */
@@ -418,16 +447,20 @@ object ScheduleProjection {
                     total = records.size,
                     succeeded = succeeded,
                     failed = failed,
-                    squares = recent.map { if (it.skipped) null else it.succeeded },
+                    squares = recent.map { when (it.status) { RunStatus.Done -> true; RunStatus.Failed -> false; else -> null } },
                     recentRuns = recent.takeLast(5).reversed().map {
                         ScheduleRun(
                             scheduleId = def.id,
-                            scheduleName = def.name,
+                            scheduleName = it.scheduleName ?: def.name,
                             instant = it.instant,
                             status = it.status,
                             durationMillis = it.durationMillis,
                             exitCode = it.exitCode,
                             error = it.error,
+                            agentId = def.agentId,
+                            reason = it.reason,
+                            source = it.source,
+                            recordId = it.recordId,
                         )
                     },
                 )

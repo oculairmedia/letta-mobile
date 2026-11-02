@@ -30,6 +30,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScheduleLibraryControllerTest {
@@ -73,6 +74,28 @@ class ScheduleLibraryControllerTest {
         assertEquals(emptyList(), controller.state.value.schedules)
         assertEquals(true, controller.state.value.scheduleAdminAvailable)
         assertEquals("No schedules for this agent.", controller.state.value.emptyMessage)
+    }
+
+    @Test
+    fun runHistoryFollowsSelectedAgent() = runTest {
+        val calls = mutableListOf<Pair<String, List<String>>>()
+        val controller = ScheduleLibraryController(
+            agentRepository = FakeAgentRepository(),
+            scheduleRepository = FakeScheduleRepository(),
+            scope = this,
+            runHistorySource = { agent, ids ->
+                calls += agent.value to ids
+                listOf(RunRecord(ids.single(), Instant.parse("2026-11-02T00:00:00Z"), true, reason = "review", source = "human"))
+            },
+        )
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(listOf("a1" to listOf("s1")), calls)
+        assertEquals("review", controller.state.value.runHistory.getValue("s1").single().reason)
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+        assertEquals("a2" to listOf("s2"), calls.last())
+        assertEquals(setOf("s2"), controller.state.value.runHistory.keys)
     }
 
     @Test

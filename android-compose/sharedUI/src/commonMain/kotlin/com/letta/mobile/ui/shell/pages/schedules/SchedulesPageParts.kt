@@ -51,9 +51,11 @@ import com.letta.mobile.ui.theme.customColors
 internal fun SchedulesMainContent(body: SchedulesBody, modifier: Modifier) {
     val library = body.state.library
     val error = library.errorMessage
+    val showsHistory = body.view == SchedulesView.Agenda || body.view == SchedulesView.History
+    val hasContent = body.data.defs.isNotEmpty() || (showsHistory && body.data.runHistory.isNotEmpty())
     LettaRefreshable(refreshing = library.isLoading, onRefresh = body.onRefresh, modifier = modifier) {
         when {
-            body.data.defs.isNotEmpty() -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) {
+            hasContent -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) {
                 ActiveScheduleView(body)
             }
             error != null -> SchedulesError(error, library.isLoading, body.onRefresh)
@@ -70,7 +72,7 @@ private fun ActiveScheduleView(body: SchedulesBody) {
         SchedulesView.Week -> ScheduleWeekCalendar(body.calendar)
         SchedulesView.Month -> ScheduleMonthCalendar(body.calendar)
         SchedulesView.Rules -> SchedulesRulesView(body)
-        SchedulesView.History -> HistoryView(body.data.history)
+        SchedulesView.History -> HistoryView(body.data.history, body.data.clock.zone)
     }
 }
 

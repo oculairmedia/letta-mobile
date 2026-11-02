@@ -25,11 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.HistorySummary
 import com.letta.mobile.data.schedules.ScheduleReliability
+import com.letta.mobile.data.schedules.ScheduleFormat
+import kotlinx.datetime.TimeZone
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.LettaDimens
 
+/** Shows reliability and recorded wake reasons, with run times in [zone]. */
 @Composable
-fun HistoryView(summary: HistorySummary) {
+fun HistoryView(summary: HistorySummary, zone: TimeZone = TimeZone.currentSystemDefault()) {
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xxl),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
@@ -43,7 +46,7 @@ fun HistoryView(summary: HistorySummary) {
             )
         }
         items(items = summary.schedules, key = { it.scheduleId }) { rel ->
-            ReliabilityRow(rel)
+            ReliabilityRow(rel, zone)
         }
         if (summary.totalRuns == 0) {
             item {
@@ -58,7 +61,7 @@ fun HistoryView(summary: HistorySummary) {
 }
 
 @Composable
-private fun ReliabilityRow(rel: ScheduleReliability) {
+private fun ReliabilityRow(rel: ScheduleReliability, zone: TimeZone) {
     val ok = rel.failed == 0
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -77,6 +80,13 @@ private fun ReliabilityRow(rel: ScheduleReliability) {
         }
         Spacer(Modifier.height(LettaDimens.Space.sm))
         ReliabilityStrip(rel.squares)
+        rel.recentRuns.filter { !it.reason.isNullOrBlank() }.forEach { run ->
+            Text(
+                "${ScheduleFormat.timeOfDay(run.instant, zone)} · woke: ${run.reason}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.customColors.onSurfaceMutedColor,
+            )
+        }
     }
 }
 

@@ -19,7 +19,7 @@ internal sealed interface AgendaItem {
     data class Entry(val date: LocalDate, val entry: CalendarEntry) : AgendaItem {
         override val key: String
             get() = when (entry) {
-                is CalendarEntry.Event -> "r:${entry.event.run.scheduleId}:${entry.event.run.instant}"
+                is CalendarEntry.Event -> "r:${entry.event.run.scheduleId}:${entry.event.run.instant}:${entry.event.run.recordId.orEmpty()}"
                 is CalendarEntry.Band -> "b:$date:${entry.band.scheduleId}"
             }
     }

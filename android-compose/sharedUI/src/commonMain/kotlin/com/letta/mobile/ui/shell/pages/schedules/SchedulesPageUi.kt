@@ -58,9 +58,11 @@ internal class SchedulesPageInput(
 /** The schedules projected for this frame: every def, lookups by id, the clock and the run history. */
 internal class SchedulesData(
     val defs: List<ScheduleDef>,
+    val historyDefs: List<ScheduleDef>,
     val defsById: Map<String, ScheduleDef>,
     val clock: ScheduleClock,
     val history: HistorySummary,
+    val runHistory: Map<String, List<com.letta.mobile.data.schedules.RunRecord>>,
     /** Each schedule's recurrence in words ("Every weekday at 9:00 AM"). */
     val cadenceById: Map<String, String>,
     val agentNames: Map<String, String>,
@@ -75,14 +77,24 @@ internal fun rememberSchedulesData(state: SchedulesPageState, clock: ScheduleClo
     val crons = remember(state.crons, state.library.crons) { (state.crons + state.library.crons).distinctBy { it.id } }
     // `now` is intentionally not a key: one-shot crons resolve to a single instant when projected,
     // and re-resolving every tick would jump a just-fired one-shot a year ahead.
+    val runHistory = state.library.runHistory.takeIf {
+        state.focusedAgentId == null || state.focusedAgentId == state.library.selectedAgentId
+    }.orEmpty()
     val defs = remember(crons, state.library.schedules, state.focusedAgentId, clock.zone) {
         SchedulesPageModel.defs(crons, state.library.schedules, state.focusedAgentId, clock)
+    }
+    val historyDefs = remember(defs, runHistory, state.library.selectedAgentId) {
+        val knownIds = defs.map { it.id }.toSet()
+        val additional = runHistory.filterKeys { it !in knownIds }.map { (id, records) ->
+            ScheduleDef(id, records.firstOrNull()?.scheduleName ?: "Wake", null, null, true, agentId = state.library.selectedAgentId)
+        }
+        defs + additional
     }
     val defsById = remember(defs) { defs.associateBy { it.id } }
     val cadence = remember(defs, clock.zone) { defs.associate { it.id to ScheduleRailText.cadence(it, clock.zone) } }
     val agentNames = remember(state.library.agents) { state.library.agents.associate { it.id.value to it.name } }
-    val history = remember(defs, clock) { ScheduleProjection.history(defs, clock.now, clock.zone) }
-    return SchedulesData(defs, defsById, clock, history, cadence, agentNames)
+    val history = remember(historyDefs, clock, runHistory) { ScheduleProjection.history(historyDefs, clock.now, clock.zone, runHistory) }
+    return SchedulesData(defs, historyDefs, defsById, clock, history, runHistory, cadence, agentNames)
 }
 
 /** What the main content draws and reports. */
@@ -162,11 +174,20 @@ internal fun rememberSchedulesPageUi(clock: ScheduleClock, initialView: Schedule
 internal fun rememberCalendarDays(ui: SchedulesPageUi, view: SchedulesView, data: SchedulesData): List<CalendarDay> {
     val anchor = ui.anchor
     val showPaused = ui.showPaused
-    return remember(data.defs, view, anchor, data.clock, showPaused) {
+    return remember(data.defs, data.historyDefs, data.runHistory, view, anchor, data.clock, showPaused) {
         if (!view.hasRange) {
             emptyList()
         } else {
-            ScheduleCalendar.days(data.defs, CalendarRange.dates(view, anchor), CalendarQuery(data.clock, includePaused = showPaused))
+            ScheduleCalendar.days(
+                if (view == SchedulesView.Agenda) data.historyDefs else data.defs,
+                CalendarRange.dates(view, anchor),
+                CalendarQuery(
+                    data.clock,
+                    history = data.runHistory,
+                    includePaused = showPaused,
+                    includeUnscheduled = view == SchedulesView.Agenda,
+                ),
+            )
         }
     }
 }
