@@ -50,6 +50,8 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.QueuedSendsPanelTestTags
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.TimelineComposerDraft
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelOption
@@ -91,6 +93,78 @@ class ChatComposerPanelUiTest {
         canSend = true,
         model = ChatModelUiState(currentHandle = null, currentLabel = "Model"),
     )
+
+    @Test
+    fun typedControlReportsNeutralValidationError() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        setPointerContent { Panel(ComposerInputs(composer = ready("draft"), actions = actions)) }
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("\u001a")
+        runOnIdle {
+            assertEquals(listOf("That text contains unsupported control characters."), actions.composerErrors)
+        }
+    }
+
+    @Test
+    fun validEditClearsRejectedPasteError() = runComposeUiTest {
+        var draft by mutableStateOf(TimelineComposerDraft().withText("draft"))
+        val actions = object : ChatActions by RecordingChatActions() {
+            override fun updateComposerText(text: String) { draft = draft.withText(text) }
+            override fun reportComposerError(message: String) { draft = draft.copy(hostError = message) }
+            override fun clearComposerError() { draft = draft.cleared() }
+        }
+        setPointerContent {
+            Panel(ComposerInputs(composer = ready(draft.state.text).copy(error = draft.hostError), actions = actions))
+        }
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        input.performTextInput("PNG\n\u001a")
+        runOnIdle {
+            assertEquals(
+                "Could not attach that image: the clipboard did not contain an image the app could read",
+                draft.hostError,
+            )
+        }
+        input.performTextInput("!")
+        runOnIdle {
+            assertEquals("draft!", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun existingControlDoesNotBlockUnrelatedEdit() = runComposeUiTest {
+        var draft by mutableStateOf(TimelineComposerDraft().withText("old\u001a"))
+        val actions = object : ChatActions by RecordingChatActions() {
+            override fun updateComposerText(text: String) { draft = draft.withText(text) }
+            override fun reportComposerError(message: String) { draft = draft.copy(hostError = message) }
+            override fun clearComposerError() { draft = draft.cleared() }
+        }
+        setPointerContent {
+            Panel(ComposerInputs(composer = ready(draft.state.text).copy(error = draft.hostError), actions = actions))
+        }
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("!")
+        runOnIdle {
+            assertEquals("old\u001a!", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun bm25TextUpdatesDraft() = runComposeUiTest {
+        var draft by mutableStateOf(TimelineComposerDraft())
+        val actions = object : ChatActions by RecordingChatActions() {
+            override fun updateComposerText(text: String) { draft = draft.withText(text) }
+            override fun reportComposerError(message: String) { draft = draft.copy(hostError = message) }
+            override fun clearComposerError() { draft = draft.cleared() }
+        }
+        setPointerContent {
+            Panel(ComposerInputs(composer = ready(draft.state.text).copy(error = draft.hostError), actions = actions))
+        }
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("BM25 results")
+        runOnIdle {
+            assertEquals("BM25 results", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
 
     @Test
     fun binaryTextIsRejectedAtTheComposerField() = runComposeUiTest {
