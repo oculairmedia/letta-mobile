@@ -13,6 +13,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -62,8 +63,12 @@ fun NotebookReferencePreview(
     key(session) {
         val state by session.state.collectAsState()
         val scope = rememberCoroutineScope()
+        DisposableEffect(session) {
+            onDispose { session.cancel() }
+        }
         LaunchedEffect(session) {
-            if (session.state.value.phase == NotebookReferencePhase.IDLE) session.refresh()
+            // A previous mount's successful read is not authorization for this mount.
+            session.refresh()
         }
         Column(
             modifier.testTag("notebook-reference-preview").verticalScroll(rememberScrollState()),
