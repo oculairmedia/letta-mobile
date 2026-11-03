@@ -12,6 +12,8 @@ import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -24,6 +26,28 @@ import kotlin.time.Duration.Companion.milliseconds
 private typealias ConversationWriteNotice = suspend (JsonElement?, String?, ConversationChangeKind, String?) -> Unit
 
 object ConversationAdminHandlers {
+    // Both the Iroh peer's conversation.create/update routes and createInbox run
+    // in this wrapper process and take this mutex across the check and write.
+    private val laneWriteMutex = Mutex()
+    /** Atomically reuses or creates the recipient inbox against wrapper lane writes. */
+    suspend fun createInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String {
+        return laneWriteMutex.withLock { reuseOrCreateInbox(client, agent, store) }
+    }
+
+    private suspend fun reuseOrCreateInbox(client: AppServerClient, agent: String, store: LocalBackendAdminStore?): String {
+        laneOwner(client, store, setOf("lane:inbox"), agent to null)?.let { return it }
+        val response = client.conversationCreate(AppServerCommand.ConversationCreate(
+            requestId = NativeAdmin.requestId(),
+            body = kotlinx.serialization.json.buildJsonObject {
+                put("agent_id", JsonPrimitive(agent))
+                put("conversation_class", JsonPrimitive("autonomous"))
+                put("tags", JsonArray(listOf(JsonPrimitive("lane:inbox"))))
+            },
+        ))
+        if (!response.success) adminError(response.error ?: "conversation_create_failure")
+        return (response.conversation?.get("id") as? JsonPrimitive)?.contentOrNull ?: adminError("conversation_create_failure")
+    }
+
     /**
      * Newest-window page size for single-message projection.
      *
@@ -85,7 +109,7 @@ object ConversationAdminHandlers {
             tiers.conversationChanges?.notify(id, agent, kind)
         }
         registerConversationReadRoutes(router, nativeClient, tiers, heldList)
-        registerConversationWriteRoutes(router, nativeClient, controller, onChanged)
+        registerConversationWriteRoutes(router, nativeClient, tiers.localBackendStore, controller, onChanged)
         registerMessageRoutes(router, nativeClient, tiers.localBackendStore, tiers.turnIdentity)
     }
 
@@ -294,6 +318,7 @@ object ConversationAdminHandlers {
     private fun registerConversationWriteRoutes(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        store: LocalBackendAdminStore?,
         controller: com.letta.mobile.data.controller.AppServerController?,
         onChanged: suspend (String, String?, ConversationChangeKind) -> Unit,
     ) {
@@ -309,13 +334,13 @@ object ConversationAdminHandlers {
                 onChanged(id, conversation?.get("agent_id")?.jsonPrimitive?.contentOrNull ?: fallbackAgentId, kind)
             }
         }
-        registerConversationCreateRoute(router, nativeClient, notifyChanged)
+        registerConversationCreateRoute(router, nativeClient, store, notifyChanged)
         router.register("conversation.delete") { params ->
             params.requireParam(AdminParamKey("conversation_id"))
             // Phase 2: fail closed unconditionally. Prefer conversation.archive.
             adminError("capability_unavailable: conversation_delete is not in the pinned App Server v2 contract; archive instead")
         }
-        registerConversationUpdateRoute(router, nativeClient, controller, notifyChanged)
+        registerConversationUpdateRoute(router, nativeClient, store, controller, notifyChanged)
         registerConversationArchiveRoutes(router, nativeClient, notifyChanged)
         router.register(IrohConversationForkRpc.METHOD) { params ->
             val sourceId = params.requireParam(AdminParamKey(IrohConversationForkRpc.CONVERSATION_ID))
@@ -328,23 +353,29 @@ object ConversationAdminHandlers {
     private fun registerConversationCreateRoute(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        store: LocalBackendAdminStore?,
         notifyChanged: ConversationWriteNotice,
     ) {
         router.register("conversation.create") { params ->
             val agentId = params.requireParam(AdminParamKey("agent_id"))
             val createBody = checkNotNull(params)
-            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
-                val response = c.conversationCreate(
-                    AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
-                )
-                if (response.success) response.conversation else null
-            }.also { if (it is JsonObject) notifyChanged(it, null, ConversationChangeKind.Created, agentId) }
+            laneWriteMutex.withLock {
+                val tags = laneTags(createBody)
+                NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
+                    requireLaneFree(c, store, tags, agentId to null)
+                    val response = c.conversationCreate(
+                        AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
+                    )
+                    if (response.success) response.conversation else null
+                }.also { notifyChanged(it, null, ConversationChangeKind.Created, agentId) }
+            }
         }
     }
 
     private fun registerConversationUpdateRoute(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        store: LocalBackendAdminStore?,
         controller: com.letta.mobile.data.controller.AppServerController?,
         notifyChanged: ConversationWriteNotice,
     ) {
@@ -355,20 +386,24 @@ object ConversationAdminHandlers {
                     if (key != "conversation_id") put(key, value)
                 }
             }
-            val result = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationUpdate) { c ->
-                val response = c.conversationUpdate(
-                    AppServerCommand.ConversationUpdate(
-                        requestId = NativeAdmin.requestId(),
-                        conversationId = id,
-                        body = body,
-                    ),
-                )
-                if (response.success) response.conversation else null
+            val result = laneWriteMutex.withLock {
+                val tags = laneTags(body)
+                NativeAdmin.require(nativeClient, NativeAdminOp.ConversationUpdate) { c ->
+                    requireLaneFreeForUpdate(c, store, com.letta.mobile.data.model.ConversationId(id), tags)
+                    val response = c.conversationUpdate(
+                        AppServerCommand.ConversationUpdate(
+                            requestId = NativeAdmin.requestId(),
+                            conversationId = id,
+                            body = body,
+                        ),
+                    )
+                    if (response.success) response.conversation else null
+                }
             }
-            if (result is JsonObject) notifyChanged(result, id, ConversationChangeKind.Updated, null)
+            notifyChanged(result, id, ConversationChangeKind.Updated, null)
             if (RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(body)) {
                 val agentId = param(params, AdminParamKey("agent_id"))
-                    ?: (result as? JsonObject)?.get("agent_id")?.jsonPrimitive?.contentOrNull
+                    ?: result["agent_id"]?.jsonPrimitive?.contentOrNull
                 if (agentId != null) {
                     controller?.stopRuntime(com.letta.mobile.data.model.AgentId(agentId))
                 }

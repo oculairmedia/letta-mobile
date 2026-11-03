@@ -51,16 +51,114 @@ import org.junit.jupiter.api.Test
  *    record (no stale per-agent rows can survive migration).
  */
 class A2aWiringTest {
+    @Test
+    fun `first message creates inbox and the second inputs to the same conversation`() {
+        val base = Files.createTempDirectory("lane-first-use").toFile()
+        try {
+            File(base, "agents").mkdirs()
+            File(base, "agents/agent-1.json").writeText("""{"id":"agent-1"}""")
+            writeConversation(base, "conversation:home", """{"id":"home","agent_id":"agent-1","tags":["lane:home"]}""")
+            val store = LocalBackendAdminStore(base)
+            val router = IrohAgentMessageRouter("agent-1")
+            val client = RecordingClient(conversationCreateResult = { command ->
+                val row = JsonObject(command.body + ("id" to JsonPrimitive("inbox")))
+                writeConversation(base, "conversation:inbox", row.toString())
+                AppServerInboundFrame.ConversationCreateResponse(command.requestId, true, row)
+            })
+            runBlocking {
+                for (id in listOf("first", "second")) {
+                    val message = IrohAgentMessage("sender", "agent-1", id, id, 1)
+                    val decision = router.route(message.fromAgentId, id, listConversationsForAgent(store, "agent-1"))
+                    assertTrue(handleDecision(client, message, decision, store).delivered)
+                }
+            }
+            assertEquals(1, client.capturedCreate.size)
+            assertEquals("[\"lane:inbox\"]", client.capturedCreate.single().body["tags"].toString())
+            assertEquals(listOf("inbox", "inbox"), client.captured.map { it.runtime.conversationId })
+        } finally { base.deleteRecursively() }
+    }
+
+    @Test
+    fun `busy home stays untouched while default message is input to inbox`() {
+        val base = Files.createTempDirectory("lane-busy-home").toFile()
+        try {
+            File(base, "agents").mkdirs()
+            File(base, "agents/agent-1.json").writeText("""{"id":"agent-1"}""")
+            writeConversation(base, "conversation:home", """{"id":"home","agent_id":"agent-1","tags":["lane:home"]}""")
+            writeConversation(base, "conversation:inbox", """{"id":"inbox","agent_id":"agent-1","tags":["lane:inbox"]}""")
+            writeRun(base, "active", "agent-1", "home", "running")
+            val store = LocalBackendAdminStore(base)
+            val client = RecordingClient()
+            val message = IrohAgentMessage("sender", "agent-1", "hello", "m", 1)
+            runBlocking {
+                val states = listConversationsForAgent(store, "agent-1")
+                assertTrue(states.single { it.conversation.id.value == "home" }.busy)
+                val decision = IrohAgentMessageRouter("agent-1").route("sender", "m", states)
+                assertTrue(handleDecision(client, message, decision).delivered)
+            }
+            assertEquals(listOf("inbox"), client.captured.map { it.runtime.conversationId })
+            assertTrue(client.captured.none { it.runtime.conversationId == "home" })
+        } finally { base.deleteRecursively() }
+    }
+
+    @Test
+    fun `local conversation list preserves tags and class through router projection`() {
+        val base = Files.createTempDirectory("lane-list").toFile()
+        try {
+            File(base, "agents").mkdirs()
+            File(base, "agents/agent-1.json").writeText("""{"id":"agent-1"}""")
+            writeConversation(base, "conversation:inbox", """{"id":"inbox","agent_id":"agent-1","tags":["lane:inbox","project:x"],"conversation_class":"autonomous"}""")
+            val states = runBlocking { listConversationsForAgent(LocalBackendAdminStore(base), "agent-1") }
+            assertEquals(listOf("lane:inbox", "project:x"), states.single().conversation.tags)
+            assertEquals(ConversationClass.AUTONOMOUS, states.single().conversation.conversationClass)
+        } finally { base.deleteRecursively() }
+    }
+
+    @Test
+    fun `created inbox has lane tag and autonomous class`() {
+        val client = RecordingClient()
+        val message = IrohAgentMessage("sender", "agent-1", "hello", "m", 1)
+        assertTrue(runBlocking { handleCreateAndDeliver(client, message, laneStore()) }.delivered)
+        val body = client.capturedCreate.single().body
+        assertEquals("[\"lane:inbox\"]", body["tags"].toString())
+        assertEquals("autonomous", body["conversation_class"].stringOrNullSafe())
+    }
+
+    @Test
+    fun `older envelopes decode without lane or correlation and ignore unknown fields`() {
+        val decoded = IrohAgentMessage.decode("""{"fromAgentId":"s","toAgentId":"a","body":"hi","msgId":"m","ts":1,"future":true}""")
+        assertEquals(null, decoded.lane)
+        assertEquals(null, decoded.correlation)
+    }
+
+    @Test
+    fun `lane and correlation survive envelope and turn input`() {
+        val message = IrohAgentMessage("sender", "agent-1", "hello", "m", 1, lane = "inbox", correlation = mapOf("bead" to "b-1"))
+        assertEquals(message, IrohAgentMessage.decode(message.encode()))
+        val client = RecordingClient()
+        runBlocking { handleDecision(client, message, IrohAgentMessageRouter.RoutingDecision.Deliver("inbox")) }
+        val input = (client.captured.single().payload as AppServerInputPayload.CreateMessage).messages.single()
+        val content = (input.content as JsonPrimitive).content
+        assertTrue(content.startsWith("hello\n\n"))
+        val metadata = Json.parseToJsonElement(content.substringAfter("[a2a metadata] ")) as JsonObject
+        assertEquals("inbox", metadata["lane"].stringOrNullSafe())
+        assertEquals("b-1", (metadata["correlation"] as JsonObject)["bead"].stringOrNullSafe())
+    }
+
     private var ownedTelemetryHistory: AutoCloseable? = null
+    private lateinit var laneTestRoot: File
+    private fun laneStore() = LocalBackendAdminStore(laneTestRoot)
 
     @org.junit.jupiter.api.BeforeEach
     fun installOwnedTelemetryHistory() {
+        laneTestRoot = Files.createTempDirectory("lane-test-store").toFile()
         ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
     }
 
     @org.junit.jupiter.api.AfterEach
     fun detachOwnedTelemetryHistory() {
         ownedTelemetryHistory?.close()
+        laneTestRoot.deleteRecursively()
     }
 
     private fun config(tmp: File, addressBook: File) = A2aWiringConfig(
@@ -305,7 +403,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-deliver")
 
-        val outcome = runBlocking { handleDecision(client, message, decision) }
+        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
         assertTrue(outcome.delivered)
 
         assertEquals(1, client.captured.size, "expected exactly one client.input call")
@@ -370,7 +468,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-norm")
 
-        runBlocking { handleDecision(client, message, decision) }
+        runBlocking { handleDecision(client, message, decision, laneStore()) }
 
         assertEquals(1, captured.size)
         val cmd = captured.single()
@@ -412,7 +510,7 @@ class A2aWiringTest {
             ts = 1_700_000_000_000L,
         )
 
-        val outcome = runBlocking { handleCreateAndDeliver(client, message) }
+        val outcome = runBlocking { handleCreateAndDeliver(client, message, laneStore()) }
         assertFalse(outcome.delivered)
         assertEquals("conversation_create_failure", outcome.reason)
 
@@ -453,7 +551,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        val outcome = runBlocking { handleDecision(client, message, decision) }
+        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
         assertTrue(outcome.delivered)
 
         assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
@@ -500,7 +598,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        val outcome = runBlocking { handleDecision(client, message, decision) }
+        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
         assertFalse(outcome.delivered)
         assertEquals("conversation_create_failure", outcome.reason)
 
@@ -532,6 +630,8 @@ class A2aWiringTest {
         override suspend fun input(command: AppServerCommand.Input) {
             captured += command
         }
+        override suspend fun conversationList(command: AppServerCommand.ConversationList) =
+            AppServerInboundFrame.ConversationListResponse(command.requestId, true, kotlinx.serialization.json.JsonArray(emptyList()))
         override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): AppServerInboundFrame.ConversationCreateResponse {
             capturedCreate += command
             return conversationCreateResult(command)
@@ -559,6 +659,8 @@ class A2aWiringTest {
             error("unused")
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
             error("unused")
+        override suspend fun conversationList(command: AppServerCommand.ConversationList) =
+            AppServerInboundFrame.ConversationListResponse(command.requestId, true, kotlinx.serialization.json.JsonArray(emptyList()))
         override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationCreateResponse =
             com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationCreateResponse(
                 requestId = command.requestId,

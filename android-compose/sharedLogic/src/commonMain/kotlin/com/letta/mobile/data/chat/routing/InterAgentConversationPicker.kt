@@ -5,47 +5,16 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.IConversationRepository
 
 /**
- * Picks "the conversation where an inter-agent
- * message lives" on the OTHER agent's side.
- *
- * Each agent owns its own conversation id space, and the sender's
- * `agent_message_send` tool result does not carry the recipient-side
- * conversation id (the routing decision is made on the recipient's
- * wrapper at receive time). But the routing policy is deterministic and
- * lives in this repo: [IrohAgentMessageRouter] picks the most-recent
- * INTERACTIVE conversation using
- * `lastMessageAt ?: updatedAt ?: createdAt`. Because that policy is pure
- * AND reads the same data source (the shared local backend store) as
- * the router, we can run the *identical* computation client-side against
- * the target agent's conversation list and land on the same conversation
- * the router chose — no letta-code change, no tool-result change.
- *
- * Reads via [IConversationRepository.listConversationsForAgent],
- * which dispatches to the wrapper's
- * conversation.list_agent admin_rpc. The picker and the router share one
- * implementation (IrohAgentMessageRouter.pickMostRecentInteractive) so
- * they can never disagree about "which conversation."
- *
- * Remaining limitations (honest, not hidden):
- *   - The picker sees the target agent's conversation list as of the
- *     call. If the recipient created a newer INTERACTIVE conversation
- *     between the exchange and the tap, the recency pick differs from
- *     what the router chose at receive time. That is inherent to any
- *     client-side re-derivation and is why an
- *     appserver-side `routingConversationId` would provide a deterministic answer.
- *   - If the target agent has zero INTERACTIVE conversations, returns
- *     null and the caller falls through to appserver-resolved fresh
- *     conversation creation.
- *   - HTTP / appserver gateways without conversation.list_agent return
- *     emptyList and the picker falls through to the null branch.
+ * Finds the default inbox using the same lane lookup as the receiver.
+ * The repository supplies a windowed list, so an inbox outside that window is not seen.
  */
 suspend fun pickOtherAgentConversation(
     repo: IConversationRepository,
     agentId: AgentId,
 ): String? {
     return runCatching {
-        IrohAgentMessageRouter.pickMostRecentInteractive(
-            repo.listConversationsForAgent(agentId),
+        IrohAgentMessageRouter.pickLane(
+            repo.listConversationsForAgent(agentId), "inbox",
         )?.id?.value
     }.getOrNull()
 }

@@ -3,12 +3,7 @@ package com.letta.mobile.data.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Conversation routing class. Direct agent-to-agent inbound
- * messages land ONLY in an INTERACTIVE conversation (human/peer-initiated) and are
- * NEVER routed to an AUTONOMOUS one (heartbeat/goal/dispatch). Tagged at creation;
- * defaults to INTERACTIVE so existing/untagged conversations route correctly.
- */
+/** Conversation class reported by the host. Lane routing is determined by tags. */
 @Serializable
 enum class ConversationClass {
     @SerialName("interactive") INTERACTIVE,
@@ -28,7 +23,7 @@ data class Conversation(
     @SerialName("archived_at") val archivedAt: String? = null,
     @SerialName("in_context_message_ids") val inContextMessageIds: List<String> = emptyList(),
     @SerialName("isolated_block_ids") val isolatedBlockIds: List<String> = emptyList(),
-    // letta-mobile-bn008.3: routing class; null/absent = INTERACTIVE (see effectiveClass).
+    // Host conversation class; null/absent = INTERACTIVE (see effectiveClass).
     @SerialName("conversation_class") val conversationClass: ConversationClass? = null,
     /**
      * The store's `"hidden": true` (subagent / background
@@ -44,6 +39,8 @@ data class Conversation(
      * the conversation runs its agent's model.
      */
     val model: String? = null,
+    /** Tags attached to this conversation by the host. */
+    val tags: List<String> = emptyList(),
     /** The override's settings (window, effort); see [ConversationModelSettings]. */
     @SerialName("model_settings") val modelSettings: ConversationModelSettings? = null,
     /** The conversation's window, set with the model or by `/context-limit`. */

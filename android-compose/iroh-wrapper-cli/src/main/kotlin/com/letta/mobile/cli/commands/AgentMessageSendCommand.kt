@@ -148,7 +148,7 @@ internal fun agentSendResultJson(result: AgentSendResult, id: String): String {
         is AgentSendResult.Delivered ->
             """{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":${q(result.msgId)}}"""
         is AgentSendResult.Accepted ->
-            """{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":${q(result.msgId)},"toAgentId":${q(result.toAgentId)}}"""
+            """{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":${q(result.msgId)},"toAgentId":${q(result.toAgentId)}${result.reason?.let { ""","reason":${q(it)}""" }.orEmpty()}}"""
         is AgentSendResult.Unaddressable ->
             """{"ok":false,"accepted":false,"applicationDelivered":false,"msgId":${q(id)},"error":"unaddressable","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
         is AgentSendResult.Failed ->
