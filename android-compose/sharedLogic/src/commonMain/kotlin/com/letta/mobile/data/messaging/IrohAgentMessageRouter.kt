@@ -1,6 +1,7 @@
 package com.letta.mobile.data.messaging
 
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 
 /** Routes inbound messages by conversation lane, after loop-safety checks. */
 class IrohAgentMessageRouter(
@@ -44,7 +45,7 @@ class IrohAgentMessageRouter(
         address: InboundAddress = InboundAddress(),
     ): RoutingDecision {
         guard(fromAgentId, msgId)?.let { return it }
-        if (address.targetConversationId != null) return routeExplicitTarget(address.targetConversationId, candidates)
+        if (address.targetConversationId != null) return routeExplicitTarget(ConversationId(address.targetConversationId), candidates)
         return routeLane(address.lane ?: "inbox", candidates)
     }
 
@@ -66,7 +67,7 @@ class IrohAgentMessageRouter(
                 0 -> RoutingDecision.CreateAndDeliver
                 1 -> {
                     val inbox = matches.single()
-                    routeExplicitTarget(inbox.id.value, candidates)
+                    routeExplicitTarget(inbox.id, candidates)
                 }
                 else -> RoutingDecision.Dropped("duplicate_lane_tags")
             }
@@ -89,19 +90,19 @@ class IrohAgentMessageRouter(
      * never created — so an explicit send cannot silently open a fresh conv.
      */
     private fun routeExplicitTarget(
-        targetConversationId: String,
+        requested: ConversationId,
         candidates: List<ConversationState>,
     ): RoutingDecision {
-        val target = candidates.find { it.conversation.id.value == targetConversationId }
+        val target = candidates.find { it.conversation.id == requested }
             ?: return RoutingDecision.Dropped("target_conversation_not_found")
         // Lanes v1: an explicit id is not a back door around the lane rules. Work
         // conversations are records, never inbound targets, and home is owner-only.
         if ("lane:work" in target.conversation.tags) return RoutingDecision.Dropped("target_is_work_lane")
         if ("lane:home" in target.conversation.tags) return RoutingDecision.Dropped("home_lane_forbidden")
         return if (target.busy) {
-            RoutingDecision.Queue(targetConversationId)
+            RoutingDecision.Queue(requested.value)
         } else {
-            RoutingDecision.Deliver(targetConversationId)
+            RoutingDecision.Deliver(requested.value)
         }
     }
 

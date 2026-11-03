@@ -389,7 +389,7 @@ object ConversationAdminHandlers {
             val result = laneWriteMutex.withLock {
                 val tags = laneTags(body)
                 NativeAdmin.require(nativeClient, NativeAdminOp.ConversationUpdate) { c ->
-                    requireLaneFreeForUpdate(c, store, id, tags)
+                    requireLaneFreeForUpdate(c, store, com.letta.mobile.data.model.ConversationId(id), tags)
                     val response = c.conversationUpdate(
                         AppServerCommand.ConversationUpdate(
                             requestId = NativeAdmin.requestId(),

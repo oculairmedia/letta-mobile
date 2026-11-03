@@ -39676,7 +39676,7 @@ final class com.letta.mobile.data.messaging/AgentMessageProvenance { // com.lett
 final class com.letta.mobile.data.messaging/IrohAgentMessageRouter { // com.letta.mobile.data.messaging/IrohAgentMessageRouter|null[0]
     constructor <init>(kotlin/String, kotlin.collections/Set<kotlin/String> = ..., kotlin/Int = ...) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.<init>|<init>(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.Int){}[0]
 
-    final fun route(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState>, kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision // com.letta.mobile.data.messaging/IrohAgentMessageRouter.route|route(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.messaging.IrohAgentMessageRouter.ConversationState>;kotlin.String?;kotlin.String?){}[0]
+    final fun route(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState>, com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision // com.letta.mobile.data.messaging/IrohAgentMessageRouter.route|route(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.messaging.IrohAgentMessageRouter.ConversationState>;com.letta.mobile.data.messaging.IrohAgentMessageRouter.InboundAddress){}[0]
 
     sealed interface RoutingDecision { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision|null[0]
         final class Deliver : com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision.Deliver|null[0]
@@ -39739,6 +39739,22 @@ final class com.letta.mobile.data.messaging/IrohAgentMessageRouter { // com.lett
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState.toString|toString(){}[0]
+    }
+
+    final class InboundAddress { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress|null[0]
+        constructor <init>(kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.<init>|<init>(kotlin.String?;kotlin.String?){}[0]
+
+        final val lane // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.lane|{}lane[0]
+            final fun <get-lane>(): kotlin/String? // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.lane.<get-lane>|<get-lane>(){}[0]
+        final val targetConversationId // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.targetConversationId|{}targetConversationId[0]
+            final fun <get-targetConversationId>(): kotlin/String? // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.targetConversationId.<get-targetConversationId>|<get-targetConversationId>(){}[0]
+
+        final fun component1(): kotlin/String? // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.component1|component1(){}[0]
+        final fun component2(): kotlin/String? // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.component2|component2(){}[0]
+        final fun copy(kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.copy|copy(kotlin.String?;kotlin.String?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.toString|toString(){}[0]
     }
 
     final object Companion { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Companion|null[0]

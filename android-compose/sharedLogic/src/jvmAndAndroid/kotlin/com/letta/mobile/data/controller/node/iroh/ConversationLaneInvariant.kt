@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +36,7 @@ private fun laneOwnerInRow(element: kotlinx.serialization.json.JsonElement, tags
     val owner = requiredLaneField(row, "agent_id")
     val (agent, exceptId) = target
     if (owner != agent || id == exceptId) return null
-    if (id == "conv-default-$agent" && exceptId == "default") return null
+    if (id == IdFormats.defaultConversationIdFor(agent) && exceptId == IdFormats.DEFAULT_CONVERSATION_ID) return null
     return if (laneTags(row).any { it in tags }) id else null
 }
 
@@ -98,12 +100,12 @@ internal suspend fun requireLaneFree(
 internal suspend fun requireLaneFreeForUpdate(
     client: AppServerClient,
     store: LocalBackendAdminStore?,
-    conversationId: String,
+    conversation: ConversationId,
     tags: Set<String>,
 ) {
     if (tags.isEmpty()) return
-    val current = client.conversationRetrieve(AppServerCommand.ConversationRetrieve(NativeAdmin.requestId(), conversationId))
+    val current = client.conversationRetrieve(AppServerCommand.ConversationRetrieve(NativeAdmin.requestId(), conversation.value))
     val agent = (current.conversation?.get("agent_id") as? JsonPrimitive)?.contentOrNull
     if (!current.success || agent == null) adminError("lane_check_unavailable")
-    requireLaneFree(client, store, tags, agent to conversationId)
+    requireLaneFree(client, store, tags, agent to conversation.value)
 }
