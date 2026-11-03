@@ -31,6 +31,40 @@ import kotlin.test.assertSame
 @OptIn(ExperimentalTestApi::class)
 class NotebookReferencePreviewTest {
     @Test
+    fun reopeningPreviewReauthorizesAndDoesNotShowPreviouslyGrantedContent() = runComposeUiTest {
+        val root = NotebookDocumentId("root")
+        var access = NotebookReferenceAccess.ALLOWED
+        var reads = 0
+        var authorizations = 0
+        val session = NotebookReferenceSession(root, NotebookReferenceResolver(
+            authorize = { authorizations++; access },
+            readAuthorized = {
+                reads++
+                NotebookReferenceLoad.Found(NotebookDocument(root, "Private document"))
+            },
+        ))
+        val visible = mutableStateOf(true)
+        setContent {
+            MaterialTheme {
+                if (visible.value) NotebookReferencePreview(session, {}, Modifier.size(360.dp, 640.dp))
+            }
+        }
+        onNodeWithText("Private document").assertIsDisplayed()
+        runOnIdle { visible.value = false }
+        onNodeWithTag("notebook-reference-preview").assertDoesNotExist()
+        runOnIdle {
+            access = NotebookReferenceAccess.DENIED
+            visible.value = true
+        }
+        onNodeWithText("Access to this document was denied.").assertIsDisplayed()
+        onNodeWithText("Private document").assertDoesNotExist()
+        runOnIdle {
+            assertEquals(2, authorizations)
+            assertEquals(1, reads, "revoked access must not read storage again")
+        }
+    }
+
+    @Test
     fun compactReadOnlyMarkdownPreviewOpensTheExactTargetIdentityWithoutMountingEditor() = runComposeUiTest {
         val root = NotebookDocumentId("root")
         val target = NotebookDocumentId("00112233445566778899aabbccddeeff")
