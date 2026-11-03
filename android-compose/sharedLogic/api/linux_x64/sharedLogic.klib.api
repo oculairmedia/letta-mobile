@@ -4690,8 +4690,8 @@ abstract interface com.letta.mobile.data.document/StorageFault { // com.letta.mo
 }
 
 abstract interface com.letta.mobile.data.dreaming/DreamingActions { // com.letta.mobile.data.dreaming/DreamingActions|null[0]
-    open val models // com.letta.mobile.data.dreaming/DreamingActions.models|{}models[0]
-        open fun <get-models>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.dreaming/DreamingActions.models.<get-models>|<get-models>(){}[0]
+    abstract val models // com.letta.mobile.data.dreaming/DreamingActions.models|{}models[0]
+        abstract fun <get-models>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.dreaming/DreamingActions.models.<get-models>|<get-models>(){}[0]
 
     abstract fun closeRun() // com.letta.mobile.data.dreaming/DreamingActions.closeRun|closeRun(){}[0]
     abstract fun openRun(com.letta.mobile.data.dreaming/DreamRun) // com.letta.mobile.data.dreaming/DreamingActions.openRun|openRun(com.letta.mobile.data.dreaming.DreamRun){}[0]

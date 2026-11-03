@@ -21317,7 +21317,7 @@ public final class com/letta/mobile/data/dreaming/DreamUnsupportedReason : java/
 
 public abstract interface class com/letta/mobile/data/dreaming/DreamingActions {
 	public abstract fun closeRun ()V
-	public fun getModels ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getModels ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun openRun (Lcom/letta/mobile/data/dreaming/DreamRun;)V
 	public abstract fun refresh ()V
 	public fun reloadModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -21327,7 +21327,6 @@ public abstract interface class com/letta/mobile/data/dreaming/DreamingActions {
 }
 
 public final class com/letta/mobile/data/dreaming/DreamingActions$DefaultImpls {
-	public static fun getModels (Lcom/letta/mobile/data/dreaming/DreamingActions;)Lkotlinx/coroutines/flow/StateFlow;
 	public static fun reloadModels (Lcom/letta/mobile/data/dreaming/DreamingActions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun runNow$default (Lcom/letta/mobile/data/dreaming/DreamingActions;Ljava/lang/String;ILjava/lang/Object;)V
 }
