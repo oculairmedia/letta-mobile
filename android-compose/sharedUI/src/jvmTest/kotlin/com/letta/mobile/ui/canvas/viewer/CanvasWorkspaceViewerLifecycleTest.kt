@@ -100,9 +100,9 @@ class CanvasWorkspaceViewerLifecycleTest {
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 1 }
         runOnIdle { otherVisible.value = true }
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
-        closeMount(originVisible, originTransport)
+        closeMount(originVisible, originTransport) { registry.get(origin.canvasId) === other }
         assertSame(other, registry.get(origin.canvasId))
-        closeMount(otherVisible, otherTransport)
+        closeMount(otherVisible, otherTransport) { registry.get(origin.canvasId) == null }
         assertEquals(null, registry.get(origin.canvasId))
     }
 
@@ -128,14 +128,14 @@ class CanvasWorkspaceViewerLifecycleTest {
         assertEquals(null, isolatedRegistry.get(origin.canvasId))
 
         // Closing the current mount must reveal the still-mounted origin.
-        closeMount(otherVisible, otherTransport)
+        closeMount(otherVisible, otherTransport) { registry.get(origin.canvasId) === origin }
         assertSame(origin, registry.get(origin.canvasId))
 
         runOnIdle { otherVisible.value = true }
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
-        closeMount(originVisible, originTransport)
+        closeMount(originVisible, originTransport) { registry.get(origin.canvasId) === other }
         assertSame(other, registry.get(origin.canvasId))
-        closeMount(otherVisible, otherTransport)
+        closeMount(otherVisible, otherTransport) { registry.get(origin.canvasId) == null }
         assertEquals(null, registry.get(origin.canvasId))
     }
 
@@ -261,9 +261,14 @@ class CanvasWorkspaceViewerLifecycleTest {
         }
     }
 
-    private fun ComposeUiTest.closeMount(visible: MutableState<Boolean>, transport: CountingCanvasSyncTransport) {
+    /** Closes one mount, waiting for both its collector and its registration disposer to settle. */
+    private fun ComposeUiTest.closeMount(
+        visible: MutableState<Boolean>,
+        transport: CountingCanvasSyncTransport,
+        registrySettled: () -> Boolean,
+    ) {
         runOnIdle { visible.value = false }
-        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { transport.activeCollectors.get() == 0 }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { transport.activeCollectors.get() == 0 && registrySettled() }
     }
 
     private fun pluginViewer(id: CanvasDocumentViewerId): CanvasDocumentViewer = CanvasDocumentViewer(
