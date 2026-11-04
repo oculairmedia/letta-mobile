@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.chat.display.OpenChatsOnCanvas
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
@@ -162,6 +163,7 @@ class DesktopPhoneShellTest {
                                 hostInputs = ChatComposerHostInputs(),
                                 errorMessage = null,
                                 canvasStore = InMemoryCanvasDocumentStore(),
+                                canvasSessions = CanvasSessionRegistry(),
                                 canvasOwner = ShellCanvasOwner(conversationId = null, agentId = null, agentName = "Meridian"),
                                 dockGeometry = mutableStateOf(ChatDockGeometry.Default),
                             ),

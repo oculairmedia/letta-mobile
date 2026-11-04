@@ -19,6 +19,7 @@ import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.desktop.chat.showsCanvasSidePane
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.components.LettaSidePane
 
@@ -32,6 +33,8 @@ internal data class DesktopMainContentInputs(
     /** letta-mobile-ckmub.17.5: the shared shell pages (the editor's too), bound to this session. */
     val pages: ShellPageDeps,
     val activeCanvasSession: CanvasSession? = null,
+    /** The window's live boards; the side pane's board registers here so canvas_* tools edit it in place. */
+    val canvasSessions: CanvasSessionRegistry? = null,
     /** The board the shared page has docked; the side pane never shows it a second time. */
     val dockedCanvasId: com.letta.mobile.data.model.CanvasId? = null,
 )
@@ -66,7 +69,8 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) { MainDestination(inputs) }
         when {
             editor != null -> AgentEditorSidePane(editor, inputs, actions)
-            canvas != null && showsCanvasSidePane(canvas.canvasId, inputs.dockedCanvasId) -> CanvasSidePane(canvas, actions)
+            canvas != null && showsCanvasSidePane(canvas.canvasId, inputs.dockedCanvasId) ->
+                CanvasSidePane(canvas, inputs.canvasSessions, actions)
         }
     }
 }
@@ -91,7 +95,11 @@ private fun AgentEditorSidePane(editor: ShellDestination.AgentEditor, inputs: De
 }
 
 @Composable
-private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentActions) {
+private fun CanvasSidePane(
+    session: CanvasSession,
+    sessions: CanvasSessionRegistry?,
+    actions: DesktopMainContentActions,
+) {
     val canvasDocument by session.document.collectAsState()
     LettaSidePane(
         title = canvasDocument?.title ?: "Canvas",
@@ -103,6 +111,7 @@ private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentAc
     ) {
         CanvasWorkspace(
             session = session,
+            sessionRegistry = sessions,
             presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
             assets = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.assets,
             currentPeerId = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.localPeerId,

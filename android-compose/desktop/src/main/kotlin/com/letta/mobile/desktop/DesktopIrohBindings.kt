@@ -206,6 +206,8 @@ internal data class DesktopChatRuntime(
     val chatScope: CoroutineScope,
     val dataBindings: DesktopDataBindings,
     val agentDefaults: com.letta.mobile.data.runtime.AgentDefaultsRepository? = null,
+    /** The window's live boards, which a direct App Server's canvas_* tools edit in place. */
+    val canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry = com.letta.mobile.data.canvas.CanvasSessionRegistry(),
 )
 
 internal data class DesktopChatControllerBindings(
@@ -296,6 +298,7 @@ private fun buildDesktopChatController(
                     appServerGatewayFactory = defaultDesktopAppServerGatewayFactory(
                         runtime.dataBindings.permissionModeSettings,
                         runtime.agentDefaults,
+                        runtime.canvasSessions,
                     ),
                 )
         },

@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatFontScale
 import com.letta.mobile.data.model.CanvasId
@@ -105,6 +106,8 @@ internal data class DesktopSharedChatPageState(
     val errorMessage: String?,
     /** Where the conversation's board lives, and whose it is: the docked canvas. */
     val canvasStore: CanvasDocumentStore,
+    /** The window's live boards, so the board this page mounts is the one canvas_* tools edit. */
+    val canvasSessions: CanvasSessionRegistry,
     val canvasOwner: ShellCanvasOwner,
     /** Routes the shell's canvas opens to this page's dock (one live session per board). */
     val dockedCanvas: DesktopDockedCanvasRouter? = null,
@@ -148,7 +151,7 @@ internal fun DesktopSharedChatPage(
     val router = state.dockedCanvas
     router?.let { LaunchedEffect(it, it.showRequests) { if (it.showRequests > 0) presentation.onIntent(ChatSurfaceIntent.Collapse) } }
     val onBoardShown = remember(router) { router?.let { docked -> { id: CanvasId? -> docked.dockedCanvasId = id } } }
-    val board = remember(state.canvasStore) { desktopChatBoard(state.canvasStore) }
+    val board = remember(state.canvasStore, state.canvasSessions) { desktopChatBoard(state.canvasStore, state.canvasSessions) }
     val frameInputs = PhoneChatPageInputs(presentation.value.mode, port.uiState) { presentation.onIntent(ChatSurfaceIntent.Collapse) }
     DesktopPhoneChatFrame(phone, frameInputs, modifier) { pageModifier, frame ->
         ShellChatDestination(
@@ -170,8 +173,9 @@ internal fun DesktopSharedChatPage(
 }
 
 /** The conversation's board in the desktop's store, synced and with presence over the host relay. */
-private fun desktopChatBoard(store: CanvasDocumentStore) = ShellChatBoard(
+private fun desktopChatBoard(store: CanvasDocumentStore, sessions: CanvasSessionRegistry) = ShellChatBoard(
     store = store,
+    sessions = sessions,
     opLog = DesktopCanvasHostSync.opLog,
     syncTransport = DesktopCanvasHostSync.syncTransport,
     presence = DesktopCanvasHostSync.presenceTransport,

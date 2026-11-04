@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.model.LettaConfig
@@ -84,8 +85,10 @@ internal object DesktopAppServerChatGateways {
     fun defaultFactory(
         permissionModeSettings: PermissionModeSettings? = null,
         agentDefaults: AgentDefaultsRepository? = null,
+        canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
     ): DesktopAppServerChatGatewayFactory =
         DesktopAppServerChatGatewayBuilder(
+            canvasSessions = canvasSessions,
             permissionModeSettings = permissionModeSettings,
             agentDefaults = agentDefaults,
         )
@@ -102,5 +105,6 @@ internal suspend fun createDefaultDesktopChatGateway(
 internal fun defaultDesktopAppServerGatewayFactory(
     permissionModeSettings: PermissionModeSettings? = null,
     agentDefaults: AgentDefaultsRepository? = null,
+    canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ): DesktopAppServerChatGatewayFactory =
-    DesktopAppServerChatGateways.defaultFactory(permissionModeSettings, agentDefaults)
+    DesktopAppServerChatGateways.defaultFactory(permissionModeSettings, agentDefaults, canvasSessions)

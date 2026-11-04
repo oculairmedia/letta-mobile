@@ -154,6 +154,7 @@ private fun desktopMainContentInputs(
         selectedConversationId = frame.chatState.selectedConversationId,
         pages = rememberShellPageDeps(core.sessionGraph.value, context.panels.libraries, desktopPageHost(context, frame, host)),
         activeCanvasSession = core.canvasShell.activeSession,
+        canvasSessions = core.canvasShell.sessions,
         dockedCanvasId = context.sharedChat.dockedCanvas.dockedCanvasId,
     )
 }
@@ -263,6 +264,7 @@ private fun DesktopShellSharedChatPage(
             ),
             errorMessage = frame.chatState.errorMessage,
             canvasStore = context.core.canvasShell.store,
+            canvasSessions = context.core.canvasShell.sessions,
             canvasOwner = frame.conversationCanvasOwner(),
             dockGeometry = context.panels.chatDockGeometry,
             canvasHeaderTrailing = backgroundTasksHeaderToggle(context, frame),
