@@ -3,6 +3,7 @@ package com.letta.mobile.data.messaging
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -12,6 +13,26 @@ class IrohAgentMessageRouterTest {
         IrohAgentMessageRouter.ConversationState(
             Conversation(ConversationId(id), AgentId("target"), tags = listOfNotNull(tag)), busy,
         )
+
+    @Test
+    fun duplicateReasonReflectsEachReservationStateAndSurvivesSnapshotRestore() {
+        for (state in IrohAgentMessageRouter.ReservationState.entries) {
+            val router = IrohAgentMessageRouter("target")
+            assertIs<IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver>(router.route("sender", "m", emptyList()))
+            router.settle(AgentId("sender"), MessageId("m"), state)
+            val expected = if (state == IrohAgentMessageRouter.ReservationState.PERSISTED) "duplicate_persisted" else "duplicate_msg_id"
+            assertEquals(expected, assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+                router.route("sender", "m", emptyList()),
+            ).reason)
+            val restored = IrohAgentMessageRouter("target").apply { restore(router.snapshot()) }
+            assertEquals(expected, assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+                restored.route("sender", "m", emptyList()),
+            ).reason)
+            if (state == IrohAgentMessageRouter.ReservationState.PERSISTED) {
+                assertEquals(state, restored.snapshot().reservations["sender"]?.get("m"))
+            }
+        }
+    }
 
     @Test
     fun senderAliasesKeepReservationsAndOwnSiblingGuards() {
