@@ -113,7 +113,12 @@ sealed interface IrohCliSendResult {
     data class Delivered(val msgId: String) : IrohCliSendResult
 
     /** Transport was accepted, but application delivery is not confirmed. */
-    data class Accepted(val msgId: String, val toAgentId: String, val reason: String? = null) : IrohCliSendResult
+    data class Accepted(
+        val msgId: String,
+        val toAgentId: String,
+        /** Receiver-reported reason delivery was not confirmed, e.g. `home_lane_forbidden`; null when none was given. */
+        val reason: String? = null,
+    ) : IrohCliSendResult
 
     /** The CLI exited non-zero because the target was unaddressable. */
     data class Unaddressable(val toAgentId: String, val reason: String) : IrohCliSendResult
