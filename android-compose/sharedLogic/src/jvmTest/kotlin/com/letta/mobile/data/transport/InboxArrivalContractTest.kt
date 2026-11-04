@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport
 
 import kotlin.test.Test
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
