@@ -76,6 +76,7 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
         nodeCheck(npmWorkDir, lettaJs)
         stageDeviceNpm(npmWorkDir)
         copyNodeModules(npmWorkDir, assetRoot)
+        checkNoStaticCursorImport(npmWorkDir, assetRoot.resolve("node_modules/@letta-ai/letta-code/letta.js"))
         fileSystem.copy {
             from(runtimeDirectory)
             into(assetRoot)
@@ -173,6 +174,21 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
         }
     }
 
+    private fun checkNoStaticCursorImport(npmWorkDir: File, stagedLettaJs: File) {
+        // Babel is installed in the work tree for the patch pipeline and is not shipped.
+        val script = """
+            const fs = require('fs');
+            const parser = require('@babel/parser');
+            const ast = parser.parse(fs.readFileSync(process.argv[1], 'utf8'), { sourceType: 'module' });
+            const forbidden = ast.program.body.some(node =>
+              ['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type) &&
+              node.source && (node.source.value === '@cursor/sdk' || node.source.value.startsWith('@cursor/sdk/'))
+            );
+            if (forbidden) throw new Error('staged letta.js statically imports @cursor/sdk, which is excluded on Android');
+        """.trimIndent()
+        run(npmWorkDir, "staged letta.js Cursor import check failed.", listOf("node", "-e", script, stagedLettaJs.absolutePath))
+    }
+
     private fun writePackageJson(assetRoot: File) {
         assetRoot.resolve("package.json").writeText(
             """
@@ -252,7 +268,14 @@ private val SHARP_PACKAGE_JSON_PATHS = listOf(
  *  - sharp's per-platform binaries: sharp looks up `@img/sharp-android-<arch>`, misses, and falls
  *    back to `@img/sharp-wasm32`, which IS kept (see installSharpWasm). `@janhapke/sharp-electron`
  *    is a linux-x64 Electron build letta-code only loads on Linux desktops.
+ *  - FreeBSD and WebContainers sharp wrappers and their nested wasm copies cannot load on Android.
+ *  - The nested letta-code sharp wasm copy duplicates the version-matched root install.
+ *  - Cursor's SDK is used only by the separate worker, whose native binaries cannot run on Android;
+ *    omit both so Cursor requests fail cleanly when the worker is resolved, while startup stays intact.
  *  - `@vscode/ripgrep-*` binaries: upstream skips ripgrep on android.
+ *  - nested `node_modules/.bin` launchers: the root-level `.bin` exclude misses them, and 0.34.39's
+ *    nested `.bin/rg` resolves to a 1.7 MB macOS (Mach-O) ripgrep from `@cursor/sdk-darwin-arm64`.
+ *    Nothing on android executes a `.bin` shim; the runtime invokes its entrypoints directly.
  *  - the orphan `letta-code/node_modules/@letta-ai/letta-code` tree the 0.34 shrinkwrap leaves
  *    (no package.json, nothing resolves into it).
  *  - TypeScript declaration files and source maps, which the runtime never reads.
@@ -267,8 +290,14 @@ internal val HOST_ONLY_NODE_MODULES: List<String> = listOf(
     "**/@img/sharp-libvips-darwin*/**",
     "**/@img/sharp-darwin*/**",
     "**/@img/sharp-win32*/**",
+    "**/@img/sharp-freebsd-wasm32/**",
+    "**/@img/sharp-webcontainers-wasm32/**",
+    "**/@letta-ai/letta-code/node_modules/@img/sharp-wasm32/**",
+    "**/@letta-ai/letta-code/node_modules/@cursor/**",
+    "**/@letta-ai/letta-code/cursor-worker.js",
     "**/@janhapke/**",
     "**/@vscode/ripgrep-*/**",
+    "**/node_modules/.bin/**",
     "**/@letta-ai/letta-code/node_modules/@letta-ai/letta-code/**",
     "**/*.d.ts",
     "**/*.d.mts",
