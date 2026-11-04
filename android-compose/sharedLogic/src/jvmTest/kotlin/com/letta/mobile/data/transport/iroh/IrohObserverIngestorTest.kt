@@ -46,21 +46,6 @@ internal class IrohObserverIngestorTest : IrohObserverFixture() {
     )
 
     @Test
-    fun inboxActivityIsRepublishedWithoutChangingTheHomeObservation() = testScope.runTest {
-        val emitted = mutableListOf<ServerFrame>()
-        val ingestor = IrohObserverIngestor(
-            scope = testScope, turnRegistry = IrohTurnRegistry(), connectionGeneration = { 1L },
-            emitBoth = { emitted += it }, adminRpc = { _, _, _ -> error("activity cannot issue RPCs") },
-            recordFrameOwnership = { _, _ -> error("activity is not a timeline frame") },
-        )
-        ingestor.recordViewedConversationFrom(ViewedConversationRequest("message.list", "/v1/conversations/home/messages?limit=50"))
-        val wire = checkNotNull(javaClass.getResource("/inbox-arrival/conversation-activity.json")).readText()
-        ingestor.ingestObserverFrame(ObserverFrameRequest(AppServerProtocol.decodeFrame(wire, AppServerChannel.Stream), 1L))
-        assertIs<ServerFrame.ConversationActivity>(emitted.single())
-        assertEquals("home", ingestor.viewedConversationId)
-    }
-
-    @Test
     fun testResubscribeOnlyForCurrentGeneration() = testScope.runTest {
         val fixture = resubscribeFixture(currentGeneration = 1L)
         val path = "/v1/conversations/conv-123/messages?limit=50"
@@ -492,4 +477,18 @@ internal class IrohObserverIngestorTest : IrohObserverFixture() {
         assertTrue(ingestor.subagentCorrelator.snapshot().isEmpty())
     }
 
+    @Test
+    fun inboxActivityIsRepublishedWithoutChangingTheHomeObservation() = testScope.runTest {
+        val emitted = mutableListOf<ServerFrame>()
+        val ingestor = IrohObserverIngestor(
+            scope = testScope, turnRegistry = IrohTurnRegistry(), connectionGeneration = { 1L },
+            emitBoth = { emitted += it }, adminRpc = { _, _, _ -> error("activity cannot issue RPCs") },
+            recordFrameOwnership = { _, _ -> error("activity is not a timeline frame") },
+        )
+        ingestor.recordViewedConversationFrom(ViewedConversationRequest("message.list", "/v1/conversations/home/messages?limit=50"))
+        val wire = checkNotNull(javaClass.getResource("/inbox-arrival/conversation-activity.json")).readText()
+        ingestor.ingestObserverFrame(ObserverFrameRequest(AppServerProtocol.decodeFrame(wire, AppServerChannel.Stream), 1L))
+        assertIs<ServerFrame.ConversationActivity>(emitted.single())
+        assertEquals("home", ingestor.viewedConversationId)
+    }
 }
