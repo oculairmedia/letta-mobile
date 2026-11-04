@@ -25,44 +25,38 @@ import kotlin.test.assertTrue
 class FileNotebookGrantStoreTest {
     @Test
     fun provisionReportsDirectorySyncFailureAfterReplacement() = runBlocking {
-        val file = Files.createTempDirectory("notebook-grant-provision-sync").resolve("grants.json")
-        val id = NotebookDocumentId("document")
         val grant = NotebookPeerGrant("principal", mayRead = true)
-        val injected = AtomicBoolean(false)
-        val store = FileNotebookGrantStore(file) { directory ->
-            assertEquals(file.parent, directory)
-            if (Files.exists(file)) {
-                injected.set(true)
-                throw IOException("injected directory sync failure after provision")
-            }
-            forceDirectory(directory)
-        }
-        val failure = runCatching { store.provision(id, grant) }.exceptionOrNull()
-        assertTrue(injected.get(), "The fault must occur after the real atomic replacement")
-        assertIs<IOException>(failure, "Provisioning must not acknowledge an unconfirmed directory write")
-        // The replacement may already be visible even though its crash durability is unconfirmed.
-        assertEquals(grant, FileNotebookGrantStore(file).withGrant("principal", id) { it })
+        // The replacement may be visible even when its crash durability is unconfirmed.
+        assertEquals(grant, directorySyncFailureAfterReplacement(grant))
     }
 
     @Test
     fun revokeReportsDirectorySyncFailureAfterReplacement() = runBlocking {
-        val file = Files.createTempDirectory("notebook-grant-revoke-sync").resolve("grants.json")
+        assertNull(directorySyncFailureAfterReplacement(null))
+    }
+
+    private suspend fun directorySyncFailureAfterReplacement(expected: NotebookPeerGrant?): NotebookPeerGrant? {
+        val file = Files.createTempDirectory("notebook-grant-directory-sync").resolve("grants.json")
         val id = NotebookDocumentId("document")
-        FileNotebookGrantStore(file).provision(id, NotebookPeerGrant("principal", mayRead = true))
+        if (expected == null) FileNotebookGrantStore(file).provision(id, NotebookPeerGrant("principal", mayRead = true))
         val injected = AtomicBoolean(false)
         val store = FileNotebookGrantStore(file) { directory ->
             assertEquals(file.parent, directory)
-            val current = Json.parseToJsonElement(Files.readString(file)).jsonObject
-            if (current.getValue("grants").jsonArray.isEmpty()) {
+            val replaced = if (expected == null) {
+                Json.parseToJsonElement(Files.readString(file)).jsonObject.getValue("grants").jsonArray.isEmpty()
+            } else Files.exists(file)
+            if (replaced) {
                 injected.set(true)
-                throw IOException("injected directory sync failure after revoke")
+                throw IOException("injected directory sync failure after replacement")
             }
             forceDirectory(directory)
         }
-        val failure = runCatching { store.revoke("principal", id) }.exceptionOrNull()
+        val failure = runCatching {
+            if (expected == null) store.revoke("principal", id) else store.provision(id, expected)
+        }.exceptionOrNull()
         assertTrue(injected.get(), "The fault must occur after the real atomic replacement")
-        assertIs<IOException>(failure, "Revocation must not acknowledge an unconfirmed directory write")
-        assertNull(FileNotebookGrantStore(file).withGrant("principal", id) { it })
+        assertIs<IOException>(failure, "Administration must not acknowledge an unconfirmed directory write")
+        return FileNotebookGrantStore(file).withGrant("principal", id) { it }
     }
 
     @Test

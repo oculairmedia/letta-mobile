@@ -163,15 +163,6 @@ class FileNotebookGrantStore internal constructor(
         return end
     }
 
-    private fun jsonStringEnd(text: String, start: Int): Int {
-        var cursor = start + 1
-        while (cursor < text.length) {
-            if (text[cursor] == '\\') cursor += 2
-            else if (text[cursor++] == '"') break
-        }
-        return cursor
-    }
-
     private class JsonScope(val keys: MutableSet<String>?, var expectKey: Boolean)
 
     private fun write(data: FileData) {
@@ -224,5 +215,14 @@ class FileNotebookGrantStore internal constructor(
         const val MAX_JSON_DEPTH = 8
         const val LOCK_RETRY_MILLIS = 10L
         val locks = ConcurrentHashMap<Path, Mutex>()
+
+        private fun jsonStringEnd(text: String, start: Int): Int {
+            var cursor = start + 1
+            while (cursor < text.length) {
+                if (text[cursor] == '\\') cursor += 2
+                else if (text[cursor++] == '"') break
+            }
+            return cursor
+        }
     }
 }
