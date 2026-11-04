@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
@@ -68,7 +69,9 @@ internal fun CanvasDocumentViewerHost(
         CompositionLocalProvider(
             LocalCanvasDocumentCanvasContent provides { _, canvasModifier -> canvasContent(canvasModifier) },
         ) {
-            selectedViewer.render(context, Modifier.fillMaxSize())
+            key(selectedViewer) {
+                selectedViewer.render(context, Modifier.fillMaxSize())
+            }
         }
         CanvasDocumentViewerToggle(
             viewers = viewers,

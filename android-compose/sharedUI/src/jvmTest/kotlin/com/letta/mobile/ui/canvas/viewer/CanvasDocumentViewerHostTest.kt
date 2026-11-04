@@ -5,6 +5,8 @@ package com.letta.mobile.ui.canvas.viewer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
@@ -94,6 +96,41 @@ class CanvasDocumentViewerHostTest {
         onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertDoesNotExist()
         assertEquals(identity, session.canvasId)
         assertEquals(updatedScene, session.document.value!!.sceneJson)
+    }
+
+    @Test
+    fun replacingAnActiveViewerDisposesItsOldComposition() = runComposeUiTest {
+        val session = session("""{"elements":[]}""")
+        val id = CanvasDocumentViewerId("test.replacement")
+        var active = 0
+        var disposed = 0
+        fun viewer(name: String) = CanvasDocumentViewer(id, label = { "Reader" }, render = { _, modifier ->
+            DisposableEffect(Unit) {
+                active++
+                onDispose { active--; disposed++ }
+            }
+            Text(name, modifier.testTag("replacement-content"))
+        })
+        val registered = mutableStateOf<CanvasDocumentViewer?>(null)
+        setContent {
+            ProvideCanvasDocumentViewers(registrations = {
+                registered.value?.let { register(it) } ?: this
+            }) {
+                CanvasDocumentViewerHost(session) { Text("Board", it) }
+            }
+        }
+        runOnIdle { registered.value = viewer("First") }
+        onNodeWithTag(canvasViewerOptionTag(id)).performClick()
+        onNodeWithTag("replacement-content").assertTextEquals("First")
+        runOnIdle { registered.value = viewer("Second") }
+        onNodeWithTag("replacement-content").assertTextEquals("Second")
+        runOnIdle {
+            assertEquals(1, active)
+            assertEquals(1, disposed)
+            registered.value = null
+        }
+        onNodeWithTag("replacement-content").assertDoesNotExist()
+        runOnIdle { assertEquals(0, active); assertEquals(2, disposed) }
     }
 
     @Test
