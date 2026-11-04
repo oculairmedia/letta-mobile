@@ -20,7 +20,7 @@ The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
 ## Commands
 
 ```powershell
-.\bin\meridian-app-server.bat app-server-serve --backend-dir C:\letta\backend --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.14
+.\bin\meridian-app-server.bat app-server-serve --backend-dir C:\letta\backend --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.39
 ```
 
 The server always listens on an ephemeral loopback port (`--listen ws://127.0.0.1:0`)
@@ -76,7 +76,7 @@ version you are capturing):
 
 ```bash
 NODE=~/.nvm/versions/node/v24.18.0/bin/node
-LETTA_JS=~/letta-code-0.34.14/node_modules/@letta-ai/letta-code/letta.js   # the 0.34.14 contract
+LETTA_JS=~/letta-code-0.34.39/node_modules/@letta-ai/letta-code/letta.js   # the 0.34.39 contract
 "$NODE" --version   # must match the `source.node` you are about to record
 ```
 

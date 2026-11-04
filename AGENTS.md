@@ -613,7 +613,7 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
   `~/.nvm/versions/node/v24.18.0/bin/node`). There is ONE letta-code pin:
-  **`@letta-ai/letta-code@0.34.14`** (`letta-code-runtime/letta-code-runtime.properties`), which
+  **`@letta-ai/letta-code@0.34.39`** (`letta-code-runtime/letta-code-runtime.properties`), which
   is the wire contract (`app-server-v2-contract-matrix.json` `baseline.version`), the desktop's
   bundled runtime, the Android embedded runtime and what the `appserver-contract-baseline` CI job
   installs; `LettaCodeVersionPinsTest` fails if they disagree. The source pin is not evidence of the running Linux host version; verify that host live. The client still must not require a 0.34-only field of an older server: gate
