@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTestApi::class)
+@file:OptIn(ExperimentalTestApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 
 package com.letta.mobile.ui.chat.surface.composer
 
@@ -6,13 +6,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
@@ -25,6 +31,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
@@ -35,6 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
@@ -45,6 +54,8 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.QueuedSendsPanelTestTags
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.TimelineComposerDraft
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelOption
@@ -54,6 +65,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
+import com.letta.mobile.ui.chat.session.message
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
@@ -61,6 +73,7 @@ import com.letta.mobile.ui.modelcontrol.RecordedPicks
 import com.letta.mobile.ui.modelcontrol.pickerModel
 import com.letta.mobile.ui.modelcontrol.testModelPicker
 import kotlinx.collections.immutable.persistentListOf
+import java.awt.datatransfer.StringSelection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -72,6 +85,8 @@ import com.letta.mobile.ui.chat.surface.setPointerContent
  * DesktopChatInteractionUiTest; the rest cover what the shared panel adds (modes, the queue,
  * autocomplete routing through ChatActions).
  */
+private const val CLIPBOARD_READ_TIMEOUT_MS = 5_000L
+
 class ChatComposerPanelUiTest {
     @Composable
     private fun Panel(inputs: ComposerInputs) {
@@ -85,6 +100,181 @@ class ChatComposerPanelUiTest {
         canSend = true,
         model = ChatModelUiState(currentHandle = null, currentLabel = "Model"),
     )
+
+    private fun ComposeUiTest.showEditableDraft(initial: String, error: ChatComposerError? = null): MutableState<TimelineComposerDraft> {
+        val initialDraft = TimelineComposerDraft().withText(initial)
+        val draft = mutableStateOf(initialDraft.copy(state = initialDraft.state.copy(error = error)))
+        val actions = object : ChatActions by RecordingChatActions() {
+            override fun updateComposerText(text: String) { draft.value = draft.value.withText(text) }
+            override fun reportComposerError(message: String) { draft.value = draft.value.copy(hostError = message) }
+            override fun clearComposerError() { draft.value = draft.value.cleared() }
+        }
+        setPointerContent {
+            val errorMessage = draft.value.hostError ?: draft.value.state.error?.message(AttachmentLimits.Default)
+            Panel(ComposerInputs(composer = ready(draft.value.state.text).copy(error = errorMessage), actions = actions))
+        }
+        return draft
+    }
+
+    @Test
+    fun typedControlReportsNeutralValidationError() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        setPointerContent { Panel(ComposerInputs(composer = ready("draft"), actions = actions)) }
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("\u001a")
+        runOnIdle {
+            assertEquals(listOf("That text contains unsupported control characters."), actions.composerErrors)
+        }
+    }
+
+    @Test
+    fun validEditClearsRejectedPasteError() = runComposeUiTest {
+        val draft by showEditableDraft("draft")
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        input.performTextInput("PNG\n\u001a")
+        runOnIdle {
+            assertEquals(
+                "Could not attach that image: the clipboard did not contain an image the app could read",
+                draft.hostError,
+            )
+        }
+        input.performTextInput("!")
+        runOnIdle {
+            assertEquals("draft!", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun validEditPreservesAttachmentLimitError() = runComposeUiTest {
+        val draft by showEditableDraft("draft", ChatComposerError.MaxAttachmentCountExceeded)
+        val message = ChatComposerError.MaxAttachmentCountExceeded.message(AttachmentLimits.Default)
+        onNodeWithText(message).assertExists()
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("!")
+        runOnIdle {
+            assertEquals("draft!", draft.state.text)
+            assertEquals(ChatComposerError.MaxAttachmentCountExceeded, draft.state.error)
+        }
+        onNodeWithText(message).assertExists()
+    }
+
+    @Test
+    fun readableGifSignatureSentenceUpdatesDraft() = runComposeUiTest {
+        val draft by showEditableDraft("")
+        val sentence = "GIF89a is the GIF file signature"
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput(sentence)
+        runOnIdle {
+            assertEquals(sentence, draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun existingControlDoesNotBlockUnrelatedEdit() = runComposeUiTest {
+        val draft by showEditableDraft("old\u001a")
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("!")
+        runOnIdle {
+            assertEquals("old\u001a!", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun bm25TextUpdatesDraft() = runComposeUiTest {
+        val draft by showEditableDraft("")
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performTextInput("BM25 results")
+        runOnIdle {
+            assertEquals("BM25 results", draft.state.text)
+            assertEquals(null, draft.hostError)
+        }
+    }
+
+    @Test
+    fun binaryTextIsRejectedAtTheComposerField() = runComposeUiTest {
+        var text by mutableStateOf("draft")
+        val actions = RecordingChatActions(onText = { text = it })
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        val rawHeader = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        ).decodeToString()
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        listOf("PNG\n\u001a", rawHeader).forEachIndexed { index, binary ->
+            input.performTextInput(binary)
+            runOnIdle {
+                assertEquals("draft", text)
+                assertEquals(index + 1, actions.composerErrors.size)
+                assertEquals(
+                    "Could not attach that image: the clipboard did not contain an image the app could read",
+                    actions.composerErrors.last(),
+                )
+            }
+            input.assertTextEquals("draft")
+        }
+    }
+
+    @Test
+    fun ordinaryMultilingualTextRemainsEditable() = runComposeUiTest {
+        var text by mutableStateOf("")
+        val actions = RecordingChatActions(onText = { text = it })
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        val legitimate = listOf("PNG", "BMW and BM25", "\nsecond line", "\ttab", "\r\nCRLF", " 🙂 世界")
+        legitimate.forEach { input.performTextInput(it) }
+        runOnIdle {
+            assertEquals(legitimate.joinToString(""), text)
+            assertEquals(0, actions.count("reportComposerError"))
+        }
+    }
+
+    @Test
+    fun imageSignaturesAndForbiddenControlsAreRejected() = runComposeUiTest {
+        var text by mutableStateOf("draft")
+        val actions = RecordingChatActions(onText = { text = it })
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        val input = onNodeWithTag(ComposerTestTags.INPUT).requestFocus()
+        val signatures = listOf(
+            "\ufffdPNG", "\u00ff\u00d8\u00ff", "\ufffd\ufffd\ufffd",
+            "GIF87a\t\n\r \t\n\u0080", "GIF89a\t\n\r \t\n\u0080",
+            "RIFF\u0080\u0080\u0080\u0080WEBP",
+        )
+        val controls = (0..31).filterNot { it == 9 || it == 10 || it == 13 }.map { it.toChar().toString() } + "\u007f"
+        (signatures + controls).forEachIndexed { index, value ->
+            input.performTextInput(value)
+            runOnIdle {
+                assertEquals("draft", text, "accepted $value")
+                assertEquals(index + 1, actions.composerErrors.size, "no error for $value")
+            }
+        }
+        input.assertTextEquals("draft")
+    }
+
+    @Test
+    fun keyboardPasteRejectsUnreadableClipboardText() = runComposeUiTest {
+        var text by mutableStateOf("draft")
+        val actions = RecordingChatActions(onText = { text = it })
+        val clipboard = object : Clipboard {
+            override suspend fun getClipEntry(): ClipEntry = ClipEntry(StringSelection("PNG\n\u001a"))
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) = Unit
+        }
+        setPointerContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                Panel(ComposerInputs(composer = ready(text), actions = actions))
+            }
+        }
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performKeyInput {
+            keyDown(Key.CtrlLeft)
+            pressKey(Key.V)
+            keyUp(Key.CtrlLeft)
+        }
+        // The clipboard is read on a coroutine after the key event, so wait for the rejection itself
+        // (a positive condition with a deadline), not for an idle moment that may precede it.
+        waitUntil(timeoutMillis = CLIPBOARD_READ_TIMEOUT_MS) { actions.composerErrors.size == 1 }
+        runOnIdle {
+            assertEquals("draft", text)
+            assertEquals(1, actions.composerErrors.size)
+        }
+        onNodeWithTag(ComposerTestTags.INPUT).assertTextEquals("draft")
+    }
 
     @Test
     fun externalComposerResetMovesCaretToEnd() = runComposeUiTest {

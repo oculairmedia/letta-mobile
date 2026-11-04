@@ -42,6 +42,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_placeholder
+import com.letta.mobile.sharedui.resources.composer_attach_failed
+import com.letta.mobile.sharedui.resources.composer_clipboard_unreadable_image
+import com.letta.mobile.sharedui.resources.composer_invalid_text
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
@@ -135,22 +138,22 @@ internal fun ComposerTextField(
         if (focus.restores()) focusRequester.requestFocus()
     }
     // A keyboard send (IME action, Enter) launches the flight like the bar's button does.
-    val haptics = LocalHaptics.current
-    val sendFromKeyboard = {
-        if (model.decisions.sendEnabled) {
-            haptics.play(LettaHapticCue.SendLaunch)
-            model.actions.send()
-        }
-        true
-    }
+    val sendFromKeyboard = composerKeyboardSend(model)
     // The mascot being typed to listens to the cadence (letta-mobile-te3n1.1); only the primary field counts.
     val mascots = LocalMascotRegistry.current
+    val (pasteError, textError) = composerTextErrors()
     BasicTextField(
         value = fieldValue,
-        onValueChange = { next ->
+        onValueChange = onValueChange@{ next ->
+            rejectedTextMessage(fieldValue, next.text, pasteError, textError)?.let {
+                return@onValueChange model.actions.reportComposerError(it)
+            }
             fieldValue = next
             if (next.text != text) {
                 model.actions.updateComposerText(next.text)
+                if (model.composer.error == pasteError || model.composer.error == textError) {
+                    model.actions.clearComposerError()
+                }
                 if (primary) mascots.noteComposerKeystroke()
             }
         },
@@ -181,6 +184,33 @@ internal fun ComposerTextField(
         },
     )
 }
+
+@Composable
+private fun composerKeyboardSend(model: ComposerModel): () -> Boolean {
+    val haptics = LocalHaptics.current
+    return {
+        if (model.decisions.sendEnabled) {
+            haptics.play(LettaHapticCue.SendLaunch)
+            model.actions.send()
+        }
+        true
+    }
+}
+
+private fun rejectedTextMessage(previous: TextFieldValue, next: String, pasteError: String, textError: String): String? {
+    if (!isUnreadableComposerText(previous, next)) return null
+    return if (composerInsertedText(previous, next).length > 1) pasteError else textError
+}
+
+@Composable
+private fun composerTextErrors(): Pair<String, String> =
+    unreadableClipboardMessage() to stringResource(Res.string.composer_invalid_text)
+
+@Composable
+private fun unreadableClipboardMessage(): String = stringResource(
+    Res.string.composer_attach_failed,
+    stringResource(Res.string.composer_clipboard_unreadable_image),
+)
 
 /** One key at the prompt: Shift+Tab cycles the permission mode, Enter sends. */
 private fun composerKeyHandled(event: KeyEvent, model: ComposerModel, sendFromKeyboard: () -> Boolean): Boolean {
