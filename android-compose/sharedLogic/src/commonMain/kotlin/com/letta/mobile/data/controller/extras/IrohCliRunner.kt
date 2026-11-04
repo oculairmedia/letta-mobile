@@ -56,6 +56,7 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
 data class IrohCliPaths(
     val identityDir: String? = null,
     val addressStore: String? = null,
+    /** Recipient addressing and correlation passed through to `agent-message send`. */
     val message: IrohMessageOptions = IrohMessageOptions(),
 ) {
     companion object {
