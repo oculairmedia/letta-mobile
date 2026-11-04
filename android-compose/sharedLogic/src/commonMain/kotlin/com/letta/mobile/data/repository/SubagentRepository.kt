@@ -225,15 +225,18 @@ open class SubagentRepository(
         val scoped = transport as? SubagentScopeAwareChannelTransport
             ?: throw UnsupportedOperationException("durable subagent dismissal unavailable")
         val changed = scoped.dismissSubagent(scope, toolCallId).getOrThrow()
-        require(changed.isNotEmpty()) { "subagent was not dismissed" }
-        require(changed.all {
-            it.parentAgentId == scope.parentAgentId && it.parentConversationId == scope.parentConversationId &&
-                it.toolCallId == toolCallId && it.status == SubagentStatus.CANCELLED &&
-                it.terminalReason == USER_DISMISSED_REASON
-        }) { "invalid dismissal receipt" }
+        validateDismissalReceipt(changed, scope, toolCallId)
         stateMutex.withLock {
             state.value = mergeSnapshot(changed, kind = SnapshotKind.INCREMENTAL, scope = scope)
         }
+    }
+
+    private fun validateDismissalReceipt(entries: List<SubagentEntry>, scope: SubagentParentScope, toolCallId: String) {
+        require(entries.isNotEmpty()) { "subagent was not dismissed" }
+        val expected = Triple(scope.parentAgentId, scope.parentConversationId, toolCallId)
+        require(entries.all { it.dismissalKey() == expected }) { "invalid dismissal receipt" }
+        require(entries.all { it.status == SubagentStatus.CANCELLED }) { "invalid dismissal receipt" }
+        require(entries.all { it.terminalReason == USER_DISMISSED_REASON }) { "invalid dismissal receipt" }
     }
 
     private fun SubagentEntry.dismissalKey(): Triple<String, String, String>? {
@@ -261,13 +264,7 @@ open class SubagentRepository(
         kind: SnapshotKind,
         scope: SubagentParentScope? = null,
     ): List<SubagentEntry> {
-        val observations = incoming + listOfNotNull(terminal)
-        val acceptedTerminals = observations.filter {
-            it.isInOptionalScope(scope) && it.status in TERMINAL_STATUSES && it.dismissalKey() != null
-        }
-        acceptedTerminals.mapNotNullTo(terminalKeys) { it.dismissalKey() }
-        acceptedTerminals.filter { it.terminalReason == USER_DISMISSED_REASON && it.status == SubagentStatus.CANCELLED }
-            .mapNotNullTo(dismissedKeys) { it.dismissalKey() }
+        val acceptedTerminals = rememberTerminalObservations(incoming + listOfNotNull(terminal), scope)
         val visibleIncoming = incoming.filter { it.isInOptionalScope(scope) }
             .filterNot { it.dismissalKey() in dismissedKeys || it.isRetiredRunning() }
         val now = clock()
@@ -340,11 +337,29 @@ open class SubagentRepository(
         }
     }
 
+    private fun rememberTerminalObservations(
+        observations: List<SubagentEntry>,
+        scope: SubagentParentScope?,
+    ): List<SubagentEntry> {
+        val accepted = observations.filter { it.isInOptionalScope(scope) }
+            .filter { it.status in TERMINAL_STATUSES }
+            .filter { it.dismissalKey() != null }
+        accepted.mapNotNullTo(terminalKeys) { it.dismissalKey() }
+        accepted.filter { it.terminalReason == USER_DISMISSED_REASON }
+            .filter { it.status == SubagentStatus.CANCELLED }
+            .mapNotNullTo(dismissedKeys) { it.dismissalKey() }
+        return accepted
+    }
+
     private fun SubagentEntry.isRetiredRunning(): Boolean =
         status == SubagentStatus.RUNNING && dismissalKey()?.let { it in terminalKeys } == true
 
     private fun SubagentEntry.markSeen(now: Long): SubagentEntry =
-        if (status == SubagentStatus.RUNNING) copy(lastSeenAtMs = now) else this
+        when (status) {
+            SubagentStatus.RUNNING -> copy(lastSeenAtMs = now)
+            in TERMINAL_STATUSES -> copy(terminalAtEpochMs = terminalAtEpochMs ?: now)
+            else -> this
+        }
 
     private fun SubagentEntry.isInOptionalScope(scope: SubagentParentScope?): Boolean =
         scope == null || isInScope(scope)

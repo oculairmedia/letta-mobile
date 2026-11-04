@@ -21,6 +21,7 @@ import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.data.repository.api.dismissAction
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.screen.WorkspaceAgentChat
@@ -120,8 +121,7 @@ internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
     BackgroundTasksSidePane(
         subagents = subagents,
         onClose = { workspace.showBackgroundTasks = false },
-        repository = graph.subagentRepository,
-        parentScope = SubagentParentScope(agent.value, conversation.value),
+        dismissTask = graph.subagentRepository.dismissAction(SubagentParentScope(agent.value, conversation.value)),
     )
 }
 

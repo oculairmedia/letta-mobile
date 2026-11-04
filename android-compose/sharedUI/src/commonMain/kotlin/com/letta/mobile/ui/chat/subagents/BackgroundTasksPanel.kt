@@ -28,8 +28,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.repository.api.ISubagentRepository
-import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
 import com.letta.mobile.ui.host.InspectorPane
@@ -56,23 +54,18 @@ fun BackgroundTasksPanel(
     onOpenConversation: OpenSubagentConversation? = null,
     now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     onDismiss: ((SubagentEntry) -> Unit)? = null,
-    repository: ISubagentRepository? = null,
-    parentScope: SubagentParentScope? = null,
+    dismissTask: (suspend (SubagentEntry) -> Result<Unit>)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var error by remember(repository, parentScope) { mutableStateOf(false) }
-    var pending by remember(repository, parentScope) { mutableStateOf(false) }
-    val dismiss: ((SubagentEntry) -> Unit)? = if (repository != null && parentScope != null && !pending) {
+    var error by remember { mutableStateOf(false) }
+    var pending by remember { mutableStateOf(false) }
+    val dismiss: ((SubagentEntry) -> Unit)? = if (dismissTask != null && !pending) {
         { entry ->
             coroutineScope.launch {
                 pending = true
                 error = false
                 try {
-                    require(
-                        entry.parentAgentId == parentScope.parentAgentId &&
-                            entry.parentConversationId == parentScope.parentConversationId,
-                    )
-                    repository.dismiss(parentScope, entry.toolCallId).getOrThrow()
+                    dismissTask(entry).getOrThrow()
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -123,16 +116,14 @@ fun BackgroundTasksSidePane(
     onClose: () -> Unit,
     onOpenConversation: OpenSubagentConversation? = null,
     onDismiss: ((SubagentEntry) -> Unit)? = null,
-    repository: ISubagentRepository? = null,
-    parentScope: SubagentParentScope? = null,
+    dismissTask: (suspend (SubagentEntry) -> Result<Unit>)? = null,
 ) {
     InspectorPane(title = BACKGROUND_TASKS_TITLE, onClose = onClose, width = SIDE_PANE_WIDTH) {
         BackgroundTasksPanel(
             subagents = subagents,
             onOpenConversation = onOpenConversation,
             onDismiss = onDismiss,
-            repository = repository,
-            parentScope = parentScope,
+            dismissTask = dismissTask,
         )
     }
 }

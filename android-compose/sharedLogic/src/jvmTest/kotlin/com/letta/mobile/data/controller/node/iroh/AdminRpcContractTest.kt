@@ -30,7 +30,21 @@ class AdminRpcContractTest {
             ),
         )
 
-        assertEquals(AdminRpcRegistry.subagentMethods, router.registeredMethods.intersect(AdminRpcRegistry.subagentMethods))
+        assertEquals(setOf("subagent.list", "subagent.todos"), router.registeredMethods.intersect(AdminRpcRegistry.subagentMethods))
+    }
+
+    @Test
+    fun dismissalRequiresDurablePublishingSource() {
+        val directory = java.nio.file.Files.createTempDirectory("subagent-contract")
+        try {
+            val store = com.letta.mobile.data.subagents.FileSubagentRegistryStore(directory.resolve("registry.json"))
+            val source = ControllerSubagentRegistrySource(com.letta.mobile.data.subagents.DurableSubagentRegistry(store = store))
+            source.changeListener = SubagentRegistryChangeListener { }
+            val router = AdminRpcRegistry.buildRouter(services = AdminRpcHostServices(subagentRegistrySource = source))
+            assertEquals(AdminRpcRegistry.subagentMethods, router.registeredMethods.intersect(AdminRpcRegistry.subagentMethods))
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
     }
 
     private object EmptySource : SubagentRegistrySource {

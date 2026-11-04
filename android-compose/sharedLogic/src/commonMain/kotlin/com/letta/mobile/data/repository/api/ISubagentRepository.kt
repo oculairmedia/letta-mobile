@@ -4,6 +4,18 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.coroutines.flow.Flow
 
+/** Bind dismissal to an exact parent without giving the view a repository dependency. */
+fun ISubagentRepository.dismissAction(scope: SubagentParentScope?): (suspend (SubagentEntry) -> Result<Unit>)? =
+    scope?.let { parent ->
+        { entry ->
+            if (entry.parentAgentId != parent.parentAgentId || entry.parentConversationId != parent.parentConversationId) {
+                Result.failure(IllegalArgumentException("subagent parent scope mismatch"))
+            } else {
+                dismiss(parent, entry.toolCallId)
+            }
+        }
+    }
+
 /** Authoritative parent scope for active-subagent projection. */
 data class SubagentParentScope(
     val parentAgentId: String,

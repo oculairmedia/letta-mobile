@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.chat.subagents
 
+import com.letta.mobile.data.repository.api.dismissAction
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -94,7 +96,7 @@ class DurableDismissalPanelTest {
                 val flow = remember { repository.activeSubagentsFlow(scope) }
                 val current by flow.collectAsState(emptyList())
                 MaterialTheme {
-                    BackgroundTasksPanel(subagents = current, repository = repository, parentScope = scope)
+                    BackgroundTasksPanel(subagents = current, dismissTask = repository.dismissAction(scope))
                 }
             }
             assertDismissal(repository, scope, source, entries, path)

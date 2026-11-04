@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.chat.subagents
 
+import com.letta.mobile.data.repository.api.dismissAction
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,7 +81,7 @@ class BackgroundTasksPanelTest {
         }
         setContent {
             MaterialTheme {
-                BackgroundTasksPanel(subagents = current, now = { now }, repository = repository, parentScope = scope)
+                BackgroundTasksPanel(subagents = current, now = { now }, dismissTask = repository.dismissAction(scope))
             }
         }
         onNodeWithText("Dismiss").performClick()
