@@ -63,7 +63,14 @@ internal fun DreamingSettingsSection(state: DreamSettingsState, actions: Dreamin
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         AutomaticAndReviewControls(settings, save)
-        ReflectionSettingsControls(settings, scope, actions, focusDraft) { pickingModel = true }
+        if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
+            ReflectionModelControl(settings, actions.models, onPick = { pickingModel = true }) { choice ->
+                actions.save(DreamSettingsChange(settings.copy(model = choice), scope, modelChanged = true))
+            }
+            FocusInstructions(settings, focusDraft) { focus ->
+                actions.save(DreamSettingsChange(settings.copy(focusInstructions = focus), scope, focusInstructionsChanged = true))
+            }
+        }
         ScopeChoice(scope) { picked ->
             scope = picked
             actions.save(DreamSettingsChange(settings, picked))
@@ -83,30 +90,6 @@ private fun AutomaticAndReviewControls(settings: DreamSettings, save: (DreamSett
     }
     Hint(DreamingStrings.REVIEW_HINT)
     if (settings.merge == DreamMerge.Explicit) ReviewInstructions(settings, save)
-}
-
-@Composable
-private fun ReflectionSettingsControls(
-    settings: DreamSettings,
-    scope: DreamSettingsScope,
-    actions: DreamingActions,
-    focusDraft: MutableState<String>,
-    onPickModel: () -> Unit,
-) {
-    if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
-        ReflectionModelControl(settings, actions.models, onPick = onPickModel) { choice ->
-            actions.save(DreamSettingsChange(settings.copy(model = choice), scope, modelChanged = true))
-        }
-        FocusInstructions(settings, focusDraft) { focus ->
-            actions.save(
-                DreamSettingsChange(
-                    settings.copy(focusInstructions = focus),
-                    scope,
-                    focusInstructionsChanged = true,
-                ),
-            )
-        }
-    }
 }
 
 @Composable

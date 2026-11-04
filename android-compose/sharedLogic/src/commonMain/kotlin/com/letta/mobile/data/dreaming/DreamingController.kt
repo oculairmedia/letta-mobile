@@ -69,22 +69,7 @@ class DreamingController(
         jobs.remove(Slot.Settings)?.cancel()
         updateSettings { it.copy(settings = change.settings, saving = true, loading = false, error = null) }
         launch(Slot.Save, target) {
-            val outcome = if (change.modelChanged || change.focusInstructionsChanged) {
-                when (val fresh = repository.settings(target)) {
-                    is DreamOutcome.Done -> repository.save(target, change.copy(settings = fresh.value.copy(
-                        model = if (change.modelChanged) change.settings.model else fresh.value.model,
-                        focusInstructions = if (change.focusInstructionsChanged) {
-                            change.settings.focusInstructions
-                        } else {
-                            fresh.value.focusInstructions
-                        },
-                    )))
-                    is DreamOutcome.Failed -> fresh
-                    is DreamOutcome.Unsupported -> fresh
-                }
-            } else {
-                repository.save(target, change)
-            }
+            val outcome = repository.saveWithFreshSettings(target, change)
             val cancelledLoad = if (stateFlow.value.target == target) {
                 jobs.remove(Slot.Settings)?.let { it.cancel(); true } == true
             } else {
@@ -93,8 +78,10 @@ class DreamingController(
             applyIfCurrent(target) { state ->
                 state.copy(settings = state.settings.afterSave(outcome, previous).copy(loading = false))
             }
-            if (cancelledLoad && outcome is DreamOutcome.Failed && stateFlow.value.target == target) {
-                loadSettings(target, preserveError = true)
+            if (cancelledLoad) {
+                if (outcome is DreamOutcome.Failed) {
+                    if (stateFlow.value.target == target) loadSettings(target, preserveError = true)
+                }
             }
         }
     }
@@ -186,6 +173,25 @@ class DreamingController(
     private companion object {
         const val HISTORY_FAILED = "Couldn't read the memory history"
         const val DIFF_FAILED = "Couldn't read this dream's changes"
+    }
+}
+
+private suspend fun DreamingRepository.saveWithFreshSettings(
+    target: DreamTarget,
+    change: DreamSettingsChange,
+): DreamOutcome<DreamSettings> {
+    if (!change.modelChanged && !change.focusInstructionsChanged) return save(target, change)
+    return when (val fresh = settings(target)) {
+        is DreamOutcome.Done -> save(target, change.copy(settings = fresh.value.copy(
+            model = if (change.modelChanged) change.settings.model else fresh.value.model,
+            focusInstructions = if (change.focusInstructionsChanged) {
+                change.settings.focusInstructions
+            } else {
+                fresh.value.focusInstructions
+            },
+        )))
+        is DreamOutcome.Failed -> fresh
+        is DreamOutcome.Unsupported -> fresh
     }
 }
 
