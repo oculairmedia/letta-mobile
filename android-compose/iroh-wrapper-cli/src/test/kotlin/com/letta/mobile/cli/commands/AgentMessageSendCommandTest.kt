@@ -1,7 +1,9 @@
 package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.UsageError
+import com.github.ajalt.clikt.core.parse
 import com.letta.mobile.data.transport.iroh.AgentSendResult
+import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import org.junit.jupiter.api.Test
@@ -15,6 +17,15 @@ import org.junit.jupiter.api.Assertions.assertTrue
  * the shape must be stable for delivered / unaddressable / failed.
  */
 class AgentMessageSendCommandTest {
+    @Test
+    fun homeLaneDenialIsIncludedInResultJson() {
+        val json = agentSendResultJson(AgentSendResult.Accepted("home-1", "agent-x", "home_lane_forbidden"), "home-1")
+        assertEquals(
+            """{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":"home-1","toAgentId":"agent-x","reason":"home_lane_forbidden"}""",
+            json,
+        )
+    }
+
 
     @Test
     fun deliveredResultJsonContract() {
@@ -143,5 +154,54 @@ class AgentMessageSendCommandBodyResolutionTest {
             error.message.orEmpty().contains("--body-file"),
             "error must name the offending flag, got: ${error.message}",
         )
+    }
+}
+
+class AgentMessageSendEnvelopeTest {
+    private fun send(vararg extra: String): IrohAgentMessage {
+        var wire = ""
+        val command = AgentMessageSendCommand().apply { sendOverride = { wire = it.encode() } }
+        command.parse(listOf("--from", "sender", "--to", "recipient", "--body", "hello") + extra)
+        return IrohAgentMessage.decode(wire)
+    }
+
+    @Test
+    fun oldShapeAndHomeHaveDifferentEncodedTargets() {
+        val old = send()
+        val home = send("--lane", "home")
+        assertEquals(null, old.lane)
+        assertEquals("home", home.lane)
+        assertEquals("recipient", old.toAgentId)
+        assertEquals(old.toAgentId, home.toAgentId)
+    }
+
+    @Test
+    fun explicitConversationWinsAndCorrelationRoundTrips() {
+        val decoded = send("--lane", "home", "--conversation-id", "conv-1", "--correlation", "bead=x=y", "--correlation", "run=42")
+        assertEquals("conv-1", decoded.conversationId)
+        assertEquals(null, decoded.lane)
+        assertEquals(mapOf("bead" to "x=y", "run" to "42"), decoded.correlation)
+    }
+
+    @Test
+    fun retryPreservesMessageIdAndCorrelationOnWire() {
+        val args = arrayOf("--msg-id", "retry-1", "--lane", "home", "--correlation", "bead=x=y")
+        val first = send(*args)
+        val retry = send(*args)
+        assertEquals("retry-1", first.msgId)
+        assertEquals(first.msgId, retry.msgId)
+        assertEquals(mapOf("bead" to "x=y"), first.correlation)
+        assertEquals(first.correlation, retry.correlation)
+    }
+
+    @Test
+    fun jsonCorrelationPreservesArbitraryKeysAndEmptyMaps() {
+        assertEquals(mapOf("a=b" to "value", "" to "empty"), send("--correlation-json", """{"a=b":"value","":"empty"}""").correlation)
+        assertEquals(emptyMap<String, String>(), send("--correlation-json", "{}").correlation)
+    }
+
+    @Test
+    fun malformedCorrelationIsRejected() {
+        assertThrows(UsageError::class.java) { send("--correlation", "missing-equals") }
     }
 }

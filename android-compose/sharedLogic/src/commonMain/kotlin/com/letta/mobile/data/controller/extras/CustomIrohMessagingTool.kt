@@ -1,7 +1,9 @@
 package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
+import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -100,6 +102,23 @@ class CustomIrohMessagingTool(
                 put("description", "Message body. Multi-line content round-trips exactly " +
                     "(the wrapper pipes this through stdin to avoid shell-quoting collapse).")
             })
+            put("msg_id", buildJsonObject {
+                put("type", "string")
+                put("description", "Idempotency ID; reuse the same ID when retrying the same message.")
+            })
+            put("lane", buildJsonObject {
+                put("type", "string")
+                put("description", "Destination lane; omitted means inbox. Ignored when conversation_id is supplied.")
+            })
+            put("conversation_id", buildJsonObject {
+                put("type", "string")
+                put("description", "Explicit recipient conversation; takes precedence over lane.")
+            })
+            put("correlation", buildJsonObject {
+                put("type", "object")
+                put("description", "Task correlation as a string-to-string map.")
+                put("additionalProperties", buildJsonObject { put("type", "string") })
+            })
         })
         put("required", buildJsonArray { add("to"); add("body") })
     }
@@ -113,7 +132,7 @@ class CustomIrohMessagingTool(
             is Validated.Error -> ExternalToolResult.Error(
                 "agent_message_send: ${v.reason}",
             )
-            is Validated.Ok -> dispatchValidated(v.fromAgentId, v.toAgentId, v.body)
+            is Validated.Ok -> dispatchValidated(v.fromAgentId, v.toAgentId, v.body, v.options)
         }
     }
 
@@ -127,6 +146,7 @@ class CustomIrohMessagingTool(
             val fromAgentId: String,
             val toAgentId: String,
             val body: String,
+            val options: IrohMessageOptions,
         ) : Validated
         data class Error(val reason: String) : Validated
     }
@@ -159,7 +179,10 @@ class CustomIrohMessagingTool(
             // saves a round trip and surfaces a clearer error to the agent.
             return Validated.Error("refusing to send to self (from == to: $fromAgentId)")
         }
-        return Validated.Ok(fromAgentId, toAgentId, body)
+        val options = runCatching { parseMessageOptions(input) }.getOrElse {
+            return Validated.Error(it.message ?: "invalid message options")
+        }
+        return Validated.Ok(fromAgentId, toAgentId, body, options)
     }
 
     /**
@@ -171,6 +194,7 @@ class CustomIrohMessagingTool(
         fromAgentId: String,
         toAgentId: String,
         body: String,
+        options: IrohMessageOptions,
     ): ExternalToolResult {
         // Tests pass an explicit runner; production relies on the
         // platform-specific `DefaultIrohCliRunner` resolved at invoke time.
@@ -188,14 +212,21 @@ class CustomIrohMessagingTool(
             fromAgentId = fromAgentId,
             toAgentId = toAgentId,
             body = body,
-            paths = IrohCliPaths(identityDir = identityDir, addressStore = addressStore),
+            paths = IrohCliPaths(identityDir = identityDir, addressStore = addressStore, message = options),
         )
         return when (result) {
             is IrohCliSendResult.Delivered -> ExternalToolResult.Success(
                 """{"ok":true,"delivered":true,"msgId":"${result.msgId}","to":"$toAgentId"}""",
             )
             is IrohCliSendResult.Accepted -> ExternalToolResult.Success(
-                """{"ok":true,"accepted":true,"delivered":false,"msgId":"${result.msgId}","to":"${result.toAgentId}"}""",
+                buildJsonObject {
+                    put("ok", true)
+                    put("accepted", true)
+                    put("delivered", false)
+                    put("msgId", result.msgId)
+                    put("to", result.toAgentId)
+                    result.reason?.let { put("reason", it) }
+                }.toString(),
             )
             is IrohCliSendResult.Unaddressable -> ExternalToolResult.Error(
                 "agent_message_send: target '$toAgentId' is unaddressable (msgId unavailable at resolution): ${result.reason}",
@@ -228,4 +259,23 @@ class CustomIrohMessagingTool(
          */
         const val TOOL_NAME: String = "agent_message_send"
     }
+}
+
+private fun parseMessageOptions(input: JsonObject): IrohMessageOptions {
+    fun optionalString(name: String): String? = input[name]?.let {
+        require(it is JsonPrimitive && it.isString && it.content.isNotBlank()) { "'$name' must be a non-empty string" }
+        it.content
+    }
+    val conversationId = optionalString("conversation_id")
+    val lane = optionalString("lane")
+    val correlation = input["correlation"]?.let { element ->
+        require(element is JsonObject) { "'correlation' must be an object of strings" }
+        element.mapValues { (_, value) ->
+            require(value is JsonPrimitive && value.isString) {
+                "'correlation' requires string values"
+            }
+            value.content
+        }
+    }
+    return IrohMessageOptions(conversationId, if (conversationId == null) lane else null, correlation, optionalString("msg_id"))
 }

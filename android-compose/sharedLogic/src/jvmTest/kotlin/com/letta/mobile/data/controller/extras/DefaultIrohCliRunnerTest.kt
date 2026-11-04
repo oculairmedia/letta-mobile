@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
@@ -24,6 +25,88 @@ import kotlin.test.assertTrue
  *   - Honor its timeout by destroying the child when it overruns.
  */
 class DefaultIrohCliRunnerTest {
+    @Test
+    fun passesAddressAndCorrelationAsDistinctArguments() = runBlocking {
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-options").toFile()
+        val args = File(tmp, "args")
+        val script = writeCaptureScript(tmp, "capture.sh", args, """
+            #!/bin/sh
+            printf '%s\n' "$@" > "@STDOUT_PATH@"
+            cat > /dev/null
+            printf '{"accepted":true,"applicationDelivered":true,"msgId":"m"}'
+        """.trimIndent())
+        val result = DefaultIrohCliRunner().send(
+            script.absolutePath, "from", "to", "body", IrohCliPaths(
+                message = IrohMessageOptions(conversationId = "conv", lane = "home", correlation = mapOf("bead" to "x=y", "run" to "42")),
+            ),
+        )
+        assertTrue(result is IrohCliSendResult.Delivered)
+        val words = args.readLines()
+        assertTrue(words.windowed(2).contains(listOf("--conversation-id", "conv")))
+        assertTrue("--lane" !in words)
+        assertTrue(words.windowed(2).contains(listOf("--correlation", "bead=x=y")))
+        assertTrue(words.windowed(2).contains(listOf("--correlation", "run=42")))
+    }
+
+
+    @Test
+    fun preservesJsonCorrelationWithKeysThatCannotUseEqualsFlags() = runBlocking {
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-json").toFile()
+        val args = File(tmp, "args")
+        val script = writeCaptureScript(tmp, "capture.sh", args, """
+            #!/bin/sh
+            printf '%s\n' "$@" > "@STDOUT_PATH@"
+            cat > /dev/null
+            printf '{"accepted":true,"applicationDelivered":true,"msgId":"m"}'
+        """.trimIndent())
+        val correlation = mapOf("a=b" to "value", "" to "empty")
+        DefaultIrohCliRunner().send(
+            script.absolutePath, "from", "to", "body", IrohCliPaths(message = IrohMessageOptions(correlation = correlation)),
+        )
+        val words = args.readLines()
+        val index = words.indexOf("--correlation-json")
+        assertTrue(index >= 0)
+        val json = kotlinx.serialization.json.Json.parseToJsonElement(words[index + 1])
+        assertEquals(
+            kotlinx.serialization.json.JsonObject(correlation.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }),
+            json,
+        )
+    }
+
+    @Test
+    fun toolPreservesLaneDropReasonsAndRetryIdentity() = runBlocking {
+        val tmp = kotlin.io.path.createTempDirectory("iroh-tool-retry").toFile()
+        val args = File(tmp, "args")
+        for (reason in listOf("home_lane_forbidden", "target_is_work_lane")) {
+            args.writeText("")
+            val script = writeCaptureScript(tmp, "capture-$reason.sh", args, """
+                #!/bin/sh
+                if [ -s "@STDOUT_PATH@" ]; then result_reason=duplicate_msg_id; else result_reason=$reason; fi
+                printf '%s\n' "$@" >> "@STDOUT_PATH@"
+                cat >/dev/null
+                printf '{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":"retry-1","toAgentId":"to","reason":"%s"}' "${'$'}result_reason"
+                exit 1
+            """.trimIndent())
+            val tool = CustomIrohMessagingTool(binary = script.absolutePath, runner = DefaultIrohCliRunner())
+            val input = kotlinx.serialization.json.buildJsonObject {
+                put("to", kotlinx.serialization.json.JsonPrimitive("to"))
+                put("body", kotlinx.serialization.json.JsonPrimitive("hello"))
+                put("msg_id", kotlinx.serialization.json.JsonPrimitive("retry-1"))
+                put("correlation", kotlinx.serialization.json.buildJsonObject {
+                    put("bead", kotlinx.serialization.json.JsonPrimitive("x=y"))
+                })
+            }
+            repeat(2) { attempt ->
+                val result = tool.invoke(input, "from") as ExternalToolResult.Success
+                val json = kotlinx.serialization.json.Json.parseToJsonElement(result.content) as kotlinx.serialization.json.JsonObject
+                assertEquals(kotlinx.serialization.json.JsonPrimitive(if (attempt == 0) reason else "duplicate_msg_id"), json["reason"])
+                assertEquals(kotlinx.serialization.json.JsonPrimitive("retry-1"), json["msgId"])
+            }
+            val words = args.readLines()
+            assertEquals(2, words.windowed(2).count { it == listOf("--msg-id", "retry-1") })
+            assertEquals(2, words.windowed(2).count { it == listOf("--correlation", "bead=x=y") })
+        }
+    }
 
     @BeforeTest
     fun setUp() {

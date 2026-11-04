@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.required
 import com.letta.mobile.data.transport.iroh.AgentSendResult
 import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
@@ -54,12 +55,16 @@ import kotlin.system.exitProcess
  * the new contract is "ask the host, not the row".
  */
 class AgentMessageSendCommand : CliktCommand(name = "send") {
+    internal var sendOverride: (suspend (IrohAgentMessage) -> Unit)? = null
     private val fromAgentId by option("--from", help = "Sender agentId.").required()
     private val toAgentId by option("--to", help = "Target agentId.").required()
     private val bodyInline by option("--body", help = "Message body (inline; shell-quoting is the caller's responsibility).")
     private val bodyFile by option("--body-file", help = "Path to a file containing the message body, or '-' to read from stdin. Preferred over --body for multi-line / quote-heavy bodies.")
     private val msgId by option("--msg-id", help = "Idempotency id (defaults to a random uuid).").default("")
-    private val conversationId by option("--conversation-id", help = "Target conversation id on the recipient (omit to create/use the most recent interactive conversation).").default("")
+    private val conversationId by option("--conversation-id", help = "Target conversation id on the recipient (takes precedence over --lane).").default("")
+    private val lane by option("--lane", help = "Destination lane (default: inbox).")
+    private val correlation by option("--correlation", help = "Task correlation key=value; repeatable.").multiple()
+    private val correlationJson by option("--correlation-json", help = "Task correlation as a JSON string map.")
     private val identityDir by option("--identity-dir", help = "Per-agent Iroh identity dir.")
         .default(File(System.getProperty("user.home"), ".letta/iroh/identities").path)
     private val addressStore by option("--address-store", help = "Agent address book kv file.")
@@ -68,6 +73,22 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
     override fun run() = runBlocking {
         val id = msgId.ifBlank { "msg-${java.util.UUID.randomUUID()}" }
         val body = resolveBody(bodyInline, bodyFile)
+        val targetId = conversationId.ifBlank { null }
+        val message = IrohAgentMessage(
+            fromAgentId = fromAgentId,
+            toAgentId = toAgentId,
+            body = body,
+            msgId = id,
+            ts = System.currentTimeMillis(),
+            conversationId = targetId,
+            lane = if (targetId == null) lane else null,
+            correlation = parseCorrelation(correlation, correlationJson),
+        )
+        val sendHook = sendOverride
+        if (sendHook != null) {
+            sendHook(message)
+            return@runBlocking
+        }
         val identity = IrohAgentIdentity.loadOrCreate(fromAgentId, File(identityDir))
         val endpoint = Endpoint.bind(
             EndpointOptions(
@@ -87,14 +108,7 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
             val resolver = IrohAgentAddressResolver(HostEndpointAddressStore(File(addressStore)))
             val sender = IrohAgentMessageSender(endpoint, resolver)
             val result = sender.send(
-                IrohAgentMessage(
-                    fromAgentId = fromAgentId,
-                    toAgentId = toAgentId,
-                    body = body,
-                    msgId = id,
-                    ts = System.currentTimeMillis(),
-                    conversationId = conversationId.ifBlank { null },
-                ),
+                message,
             )
             println(resultJson(result, id))
             when (result) {

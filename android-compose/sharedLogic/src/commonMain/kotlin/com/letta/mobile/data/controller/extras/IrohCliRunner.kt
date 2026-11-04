@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.extras
 
+import com.letta.mobile.data.controller.extras.messaging.IrohMessageOptions
+
 /**
  * Platform-resolved default
  * [IrohCliRunner] for the agent-message tool. The common tool resolves this
@@ -45,22 +47,20 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
  * already implements (do not duplicate the send path; reuse the existing CLI).
  */
 /**
- * The pair of optional Iroh
- * filesystem paths a CLI invocation may override.
+ * Optional Iroh filesystem paths and message options for a CLI invocation.
  *
- * Grouped into a single value class so the runner's `send` signature stays
- * under CodeScene's "≤4 function arguments" threshold and so callers that
- * override both directories do so via named fields rather than positional
- * nulls. `identityDir` and `addressStore` are independent overrides — null
- * means "use the CLI's default" (`~/.letta/iroh/identities` and
- * `~/.letta/iroh/agent-addresses.kv` respectively).
+ * The directory overrides are independent: null uses the CLI's default
+ * (`~/.letta/iroh/identities` and `~/.letta/iroh/agent-addresses.kv`).
+ * [message] carries optional recipient addressing and task correlation.
  */
 data class IrohCliPaths(
     val identityDir: String? = null,
     val addressStore: String? = null,
+    /** Recipient addressing and correlation passed through to `agent-message send`. */
+    val message: IrohMessageOptions = IrohMessageOptions(),
 ) {
     companion object {
-        /** The path triple that means "no overrides — let the CLI default." */
+        /** No overrides; use CLI defaults. */
         val DEFAULTS: IrohCliPaths = IrohCliPaths()
     }
 }
@@ -81,9 +81,8 @@ interface IrohCliRunner {
      *   this is the regression pinned by the
      *   `multiLineBodyRoundTripsViaStdin` unit test. Empty body is allowed
      *   (the CLI treats it as a ping).
-     * @param paths Optional overrides for the Iroh filesystem layout
-     *   (identity dir + address-book kv). Pass [IrohCliPaths.DEFAULTS] for
-     *   "no overrides — let the CLI default."
+     * @param paths Optional filesystem overrides and message addressing. Pass
+     *   [IrohCliPaths.DEFAULTS] to use the CLI defaults.
      * @return Typed outcome — never throws to the caller (the dispatcher
      *   contract is "always answer"; throwing would surface as a tool error
      *   and break the turn's answer guarantee).
@@ -114,7 +113,12 @@ sealed interface IrohCliSendResult {
     data class Delivered(val msgId: String) : IrohCliSendResult
 
     /** Transport was accepted, but application delivery is not confirmed. */
-    data class Accepted(val msgId: String, val toAgentId: String) : IrohCliSendResult
+    data class Accepted(
+        val msgId: String,
+        val toAgentId: String,
+        /** Receiver-reported reason delivery was not confirmed, e.g. `home_lane_forbidden`; null when none was given. */
+        val reason: String? = null,
+    ) : IrohCliSendResult
 
     /** The CLI exited non-zero because the target was unaddressable. */
     data class Unaddressable(val toAgentId: String, val reason: String) : IrohCliSendResult

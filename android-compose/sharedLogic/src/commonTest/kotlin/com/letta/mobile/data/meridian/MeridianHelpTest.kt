@@ -92,6 +92,13 @@ class MeridianHelpTest {
     }
 
     @Test
+    fun agentMessageSchemaListsAddressingAndCorrelation() = runTest {
+        val response = run("schema", "agent-message", "send")
+        assertEquals(MeridianExit.OK, response.exitCode)
+        listOf("lane", "conversation_id", "correlation").forEach { assertTrue("\"$it\"" in response.stdout) }
+    }
+
+    @Test
     fun guidesServeTheContractTextAndTheComposeGuideTool() = runTest {
         assertEquals(CanvasSceneSchema.description.trimEnd() + "\n", run("guide", "scene").stdout)
         assertEquals(CanvasToolContract.applyOps.description.trimEnd() + "\n", run("guide", "ops").stdout)

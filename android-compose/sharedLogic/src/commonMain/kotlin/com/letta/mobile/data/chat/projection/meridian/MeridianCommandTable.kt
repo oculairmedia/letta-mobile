@@ -83,7 +83,10 @@ private val CURATED: Map<List<String>, MeridianCommandSpec> = mapOf(
  */
 private val PROPERTY_TYPES: Map<String, Map<String, String>> =
     (CanvasToolContract.withPreview + CanvasToolContract.exportSvg).associate { it.name to it.inputSchema.propertyTypes() } +
-        mapOf(AGENT_DISCOVER to mapOf("limit" to "integer", "offset" to "integer"))
+        mapOf(
+            AGENT_DISCOVER to mapOf("limit" to "integer", "offset" to "integer"),
+            AGENT_MESSAGE_SEND to mapOf("correlation" to "object"),
+        )
 
 private fun JsonObject.propertyTypes(): Map<String, String> =
     (this["properties"] as? JsonObject).orEmpty().mapNotNull { (name, schema) ->

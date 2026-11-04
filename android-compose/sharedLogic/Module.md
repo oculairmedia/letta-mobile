@@ -656,3 +656,7 @@ Read-only lease records and their per-day calendar spans. Lease producers and tr
 # Package com.letta.mobile.data.schedules.runs
 
 Maps merged wrapper cron-run and lease pages into shared schedule history records. The mapper tolerates older rows and rejects malformed entries.
+
+# Package com.letta.mobile.data.controller.extras.messaging
+
+Optional recipient addressing, task correlation, and a caller-supplied retry idempotency ID for agent-message CLI invocations.
