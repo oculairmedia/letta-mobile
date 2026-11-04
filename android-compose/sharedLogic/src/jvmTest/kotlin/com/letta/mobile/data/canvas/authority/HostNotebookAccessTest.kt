@@ -23,6 +23,36 @@ import kotlin.test.assertTrue
 
 class HostNotebookAccessTest {
     @Test
+    fun deniedRefreshDisablesSaveAndReauthorizationRetainsTheDraft() = runBlocking {
+        val root = Files.createTempDirectory("notebook-denied-save")
+        NotebookLocalStore(root.resolve("notebooks"), "host").use { notebooks ->
+            val storageId = notebooks.create("Note")
+            val id = requireNotNull(notebooks.read(storageId)).id
+            val grants = FileNotebookGrantStore(root.resolve("grants.json"))
+            val grant = NotebookPeerGrant("peer", mayRead = true, mayEdit = true)
+            grants.provision(id, grant)
+            val opened = HostNotebookAccess(notebooks, grants, "peer").opener.open(id)
+            val session = assertIs<DocumentWorkspaceOpen.Opened>(opened).sessions.note
+            assertTrue(session.refresh())
+            session.edit("retained draft")
+            assertTrue(session.state.value.canSave)
+            grants.revoke("peer", id)
+            assertFalse(session.refresh())
+            assertTrue(session.state.value.denied)
+            assertFalse(session.state.value.canSave, "Denied editor state must disable Save")
+            assertEquals("retained draft", session.state.value.draft)
+            assertEquals("", notebooks.read(storageId)?.markdown)
+            grants.provision(id, grant)
+            assertTrue(session.refresh())
+            assertFalse(session.state.value.denied)
+            assertTrue(session.state.value.canSave)
+            assertEquals("retained draft", session.state.value.draft)
+            assertTrue(session.save())
+            assertEquals("retained draft", notebooks.read(storageId)?.markdown)
+        }
+    }
+
+    @Test
     fun revocationBetweenOpenAndInitialReadRemainsDenial() = runBlocking {
         val root = Files.createTempDirectory("notebook-open-revocation")
         NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { notebooks ->

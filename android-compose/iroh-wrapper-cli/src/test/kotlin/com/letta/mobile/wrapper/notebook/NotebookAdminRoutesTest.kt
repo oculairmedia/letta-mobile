@@ -37,6 +37,35 @@ import org.junit.jupiter.api.Test
 
 class NotebookAdminRoutesTest {
     @Test
+    fun successfulFlushReturnsTheStoredTitleInsteadOfTheCallerClaim() = runBlocking {
+        val root = Files.createTempDirectory("notebook-flush-title")
+        NotebookLocalStore(root.resolve("notebooks"), "host").use { store ->
+            val storageId = store.create("Stored title")
+            val id = requireNotNull(store.read(storageId)).id
+            val router = AdminRpcRouter()
+            registerNotebookAdminRoutes(router, store, FileNotebookGrantStore(root.resolve("grants.json")))
+            val principal = "a".repeat(64)
+            NotebookGrantCommand().parse(listOf(
+                "--file", root.resolve("grants.json").toString(), "--principal", principal,
+                "--document", id.value, "--read", "--edit",
+            ))
+            val caller = connection(router, principal)
+            val opened = caller.call("notebook.note.open", buildJsonObject { put("document_id", id.value) })
+            assertEquals("found", opened.status())
+            assertEquals("Stored title", opened.getValue("snapshot").jsonObject.getValue("title").jsonPrimitive.content)
+            val flushed = caller.call("notebook.note.flush", buildJsonObject {
+                put("document_id", id.value)
+                put("snapshot", buildJsonObject {
+                    put("document_id", id.value); put("title", "Caller title"); put("markdown", "")
+                })
+            })
+            assertEquals("saved", flushed.status())
+            assertEquals("Stored title", flushed.getValue("snapshot").jsonObject.getValue("title").jsonPrimitive.content)
+            assertEquals("Stored title", store.read(storageId)?.title)
+        }
+    }
+
+    @Test
     fun transportPrincipalCannotBeSelectedByRequestAndRevocationStopsSave() = runBlocking {
         val fixture = requireNotNull(javaClass.getResourceAsStream("/notebook-authority/requests-v1.json"))
             .use { Json.parseToJsonElement(it.readBytes().decodeToString()).jsonObject }

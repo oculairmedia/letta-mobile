@@ -28,8 +28,16 @@ import kotlinx.serialization.json.JsonPrimitive
  * Host-administrated file store. The containing directory must be writable only by the trusted
  * host administrator. All writers must use [provision] and [revoke], including other processes.
  * Transactions hold the OS lock throughout [NotebookGrantStore.withGrant]'s action.
+ * Administration requires directory synchronization. A failure after replacement leaves its
+ * durability unconfirmed and must be reported, even when the new record is already visible.
  */
-class FileNotebookGrantStore(file: Path) : NotebookGrantStore {
+class FileNotebookGrantStore internal constructor(
+    file: Path,
+    private val directorySync: (Path) -> Unit,
+) : NotebookGrantStore {
+    /** Use the host filesystem's directory durability barrier for administration. */
+    constructor(file: Path) : this(file, { directory -> FileChannel.open(directory).use { it.force(true) } })
+
     private val path = file.toAbsolutePath().normalize()
 
     override suspend fun <T> withGrant(
@@ -176,7 +184,7 @@ class FileNotebookGrantStore(file: Path) : NotebookGrantStore {
                 channel.force(true)
             }
             Files.move(temp, path, ATOMIC_MOVE, REPLACE_EXISTING)
-            runCatching { FileChannel.open(path.parent).use { it.force(true) } }
+            runCatching { directorySync(path.parent) }
         } finally {
             Files.deleteIfExists(temp)
         }

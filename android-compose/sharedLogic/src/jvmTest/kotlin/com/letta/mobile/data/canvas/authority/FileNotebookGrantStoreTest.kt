@@ -2,19 +2,88 @@ package com.letta.mobile.data.canvas.authority
 
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookPeerGrant
+import java.io.IOException
+import java.nio.channels.FileChannel
 import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FileNotebookGrantStoreTest {
+    @Test
+    fun provisionReportsDirectorySyncFailureAfterReplacement() = runBlocking {
+        val file = Files.createTempDirectory("notebook-grant-provision-sync").resolve("grants.json")
+        val id = NotebookDocumentId("document")
+        val grant = NotebookPeerGrant("principal", mayRead = true)
+        val injected = AtomicBoolean(false)
+        val store = FileNotebookGrantStore(file) { directory ->
+            assertEquals(file.parent, directory)
+            if (Files.exists(file)) {
+                injected.set(true)
+                throw IOException("injected directory sync failure after provision")
+            }
+            forceDirectory(directory)
+        }
+        val failure = runCatching { store.provision(id, grant) }.exceptionOrNull()
+        assertTrue(injected.get(), "The fault must occur after the real atomic replacement")
+        assertIs<IOException>(failure, "Provisioning must not acknowledge an unconfirmed directory write")
+        // The replacement may already be visible even though its crash durability is unconfirmed.
+        assertEquals(grant, FileNotebookGrantStore(file).withGrant("principal", id) { it })
+    }
+
+    @Test
+    fun revokeReportsDirectorySyncFailureAfterReplacement() = runBlocking {
+        val file = Files.createTempDirectory("notebook-grant-revoke-sync").resolve("grants.json")
+        val id = NotebookDocumentId("document")
+        FileNotebookGrantStore(file).provision(id, NotebookPeerGrant("principal", mayRead = true))
+        val injected = AtomicBoolean(false)
+        val store = FileNotebookGrantStore(file) { directory ->
+            assertEquals(file.parent, directory)
+            val current = Json.parseToJsonElement(Files.readString(file)).jsonObject
+            if (current.getValue("grants").jsonArray.isEmpty()) {
+                injected.set(true)
+                throw IOException("injected directory sync failure after revoke")
+            }
+            forceDirectory(directory)
+        }
+        val failure = runCatching { store.revoke("principal", id) }.exceptionOrNull()
+        assertTrue(injected.get(), "The fault must occur after the real atomic replacement")
+        assertIs<IOException>(failure, "Revocation must not acknowledge an unconfirmed directory write")
+        assertNull(FileNotebookGrantStore(file).withGrant("principal", id) { it })
+    }
+
+    @Test
+    fun unsupportedDirectorySyncRefusesBeforeChangingTheGrantFile() = runBlocking {
+        val file = Files.createTempDirectory("notebook-grant-unsupported-sync").resolve("grants.json")
+        val id = NotebookDocumentId("document")
+        val grant = NotebookPeerGrant("principal", mayRead = true)
+        FileNotebookGrantStore(file).provision(id, grant)
+        val before = Files.readAllBytes(file)
+        val store = FileNotebookGrantStore(file) { directory ->
+            assertEquals(file.parent, directory)
+            throw UnsupportedOperationException("injected unsupported directory syncing")
+        }
+        val failure = runCatching { store.revoke("principal", id) }.exceptionOrNull()
+        assertIs<UnsupportedOperationException>(failure, "Unsupported durability must be explicit")
+        assertTrue(before.contentEquals(Files.readAllBytes(file)), "Unsupported administration must leave grants unchanged")
+        assertEquals(grant, FileNotebookGrantStore(file).withGrant("principal", id) { it })
+    }
+
+    private fun forceDirectory(directory: Path) = FileChannel.open(directory).use { it.force(true) }
+
     @Test
     fun provisionReloadIsolationAndRevoke() = runBlocking {
         val file = Files.createTempDirectory("notebook-grants").resolve("grants.json")
