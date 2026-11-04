@@ -471,6 +471,25 @@ sealed interface ServerFrame {
         val at: String = "",
     ) : ServerFrame
 
+    /** A committed inbox source message, independent of the currently observed conversation. */
+    @Serializable
+    data class ConversationActivity(
+        override val v: Int = 1,
+        val type: String = "conversation_activity",
+        override val id: String,
+        override val ts: String,
+        @SerialName("agent_id") val agentId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val milestone: String,
+        @SerialName("source_message_id") val sourceMessageId: String,
+        @SerialName("client_message_id") val clientMessageId: String,
+        val at: String,
+    ) : ServerFrame {
+        companion object {
+            const val CAPABILITY: String = "conversation_activity_v1"
+        }
+    }
+
     /**
      * Meridian's device-wide push after a conversation write (created, updated,
      * archived, restored) from any client, so conversation lists follow other devices without a
@@ -486,6 +505,7 @@ sealed interface ServerFrame {
         @SerialName("agent_id") val agentId: String? = null,
         val reason: String = "",
         val at: String = "",
+        @SerialName("message_id") val messageId: String? = null,
     ) : ServerFrame
 
     // ─── Subagent server frames (letta-mobile-73o2h.3) ──────────────

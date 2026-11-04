@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -35,6 +37,36 @@ internal fun LocalBackendMessageReader.newestMessageContents(conversationId: Con
         }
     }
 }.getOrNull()
+
+/**
+ * Finds a persisted user identity in one conversation's bounded tail, without roster, run,
+ * attachment or timestamp hydration. Direct transcript otid and legacy sidecars are supported.
+ */
+internal fun LocalBackendMessageReader.committedUserMessageId(
+    conversationId: ConversationId,
+    agentId: AgentId,
+    clientId: MessageId,
+): String? = runCatching {
+    val resolved = resolveConversation(conversationId.value, null) ?: return@runCatching null
+    if (resolved.second != agentId.value) return@runCatching null
+    val dir = File(File(support.baseDir, "conversations"), support.b64UrlEncode(support.conversationKey(resolved.first, agentId.value)))
+    val messages = File(dir, "messages.jsonl").tailLines(ARRIVAL_WINDOW * 2, TAIL_MAX_BYTES)
+        .mapNotNull { line -> runCatching { support.json.parseToJsonElement(line) }.getOrNull() as? JsonObject }
+        .mapNotNull { normalizeMessage(it)?.takeIf(::isLocalMessage) }
+        .takeLast(ARRIVAL_WINDOW)
+        .filter { it["role"]?.stringOrNull() == "user" }
+    val direct = messages.lastOrNull { it["otid"]?.stringOrNull() == clientId.value }?.get("id")?.stringOrNull()
+    if (direct != null) return@runCatching direct
+    val sidecar = File(dir, "_otid-map.json")
+    if (!sidecar.isFile || sidecar.length() > ARRIVAL_SIDECAR_MAX_BYTES) return@runCatching null
+    val identities = support.readStringMap(sidecar)
+    messages.lastOrNull {
+        it["otid"]?.stringOrNull() == null && identities[it["id"]?.stringOrNull()] == clientId.value
+    }?.get("id")?.stringOrNull()
+}.getOrNull()
+
+private const val ARRIVAL_WINDOW = 64
+private const val ARRIVAL_SIDECAR_MAX_BYTES = 4L * 1024 * 1024
 
 /**
  * The last [maxLines] non-blank lines of this file, read backwards from its end so the cost follows

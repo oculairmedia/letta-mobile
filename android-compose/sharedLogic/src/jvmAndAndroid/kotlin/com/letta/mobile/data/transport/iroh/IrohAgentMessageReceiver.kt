@@ -3,6 +3,8 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Connection
 import kotlinx.coroutines.CancellationException
@@ -10,6 +12,12 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
+import java.io.File
+import com.letta.mobile.data.serialization.LettaJson
+import kotlinx.serialization.encodeToString
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -43,6 +51,7 @@ class IrohAgentMessageReceiver(
     private val conversationsFor: suspend (agentId: String) -> List<IrohAgentMessageRouter.ConversationState>,
     private val onDeliver: suspend (message: IrohAgentMessage, decision: IrohAgentMessageRouter.RoutingDecision) -> DeliveryOutcome,
     private val authenticate: (message: IrohAgentMessage, peer: String) -> Boolean,
+    private val journalFile: File? = null,
 ) : IrohNodeProtocolHandler {
     override val alpn: ByteArray get() = IrohAgentMessage.ALPN
 
@@ -53,6 +62,10 @@ class IrohAgentMessageReceiver(
      */
     override fun authorize(peer: String): Boolean = true
 
+    internal var journalDirectorySyncSupported: Boolean = AtomicJsonFile.directorySyncSupported
+    internal var journalDirectorySync: (java.nio.file.Path) -> Unit = AtomicJsonFile::syncDirectory
+
+    private var journalUnavailable = false
     private val routingMutex = Mutex()
 
     private val failures = IrohFailureLog("A2aHost", "a2a.recv_failed")
@@ -82,8 +95,8 @@ class IrohAgentMessageReceiver(
                 "correlation" attr (message.correlation?.toString() ?: ""),
             )
             Telemetry.event("A2aHost", "a2a.transport_accepted", "msgId" attr message.msgId)
-            // Route + deliver and return the application outcome through the
-            // correlated ack only after durable app-server acceptance.
+            // Route + reserve before application dispatch. The ack reports the
+            // observed milestone; input acceptance alone never means persisted delivery.
             val outcome = respond(message, peer)
             val applicationAck = stream.send()
             IrohFrameCodec.write(
@@ -100,7 +113,7 @@ class IrohAgentMessageReceiver(
     }
 
     /** The outcome for [message] from the dialing node [peer]: refused unless it is the claimed sender. */
-    internal suspend fun respond(message: IrohAgentMessage, peer: String): DeliveryOutcome {
+    suspend fun respond(message: IrohAgentMessage, peer: String): DeliveryOutcome {
         if (authenticate(message, peer)) return deliver(message)
         Telemetry.event(
             "A2aHost",
@@ -115,25 +128,106 @@ class IrohAgentMessageReceiver(
 
     private suspend fun deliver(message: IrohAgentMessage): DeliveryOutcome {
         val candidates = conversationsFor(message.toAgentId)
-        val decision = routingMutex.withLock {
-            router.route(
-                message.fromAgentId,
-                message.msgId,
-                candidates,
-                IrohAgentMessageRouter.InboundAddress(message.conversationId, message.lane),
-            )
-        }
-        return runCatching {
-            withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) {
-                onDeliver(message, decision)
+        val decision = runCatching {
+            updateRouting {
+                router.route(message.fromAgentId, message.msgId, candidates,
+                    IrohAgentMessageRouter.InboundAddress(message.conversationId, message.lane))
             }
         }.getOrElse { error ->
-            if (error is CancellationException && error !is TimeoutCancellationException) throw error
-            DeliveryOutcome(false, "delivery_timeout")
+            if (error is CancellationException) throw error
+            failures.record(error, origin = IncomingRemote("journal", "local"))
+            return DeliveryOutcome(false, "reservation_journal_failure")
+        }
+        if (decision is IrohAgentMessageRouter.RoutingDecision.Dropped) {
+            return DeliveryOutcome(false, decision.reason)
+        }
+        val outcome = dispatch(message, decision)
+        return runCatching {
+            updateRouting { router.settle(AgentId(message.fromAgentId), MessageId(message.msgId), outcome.reservationState()) }
+            outcome
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            // The durable RESERVED entry is still suppressive; never claim a released rejection.
+            failures.record(error, origin = IncomingRemote("journal", "local"))
+            DeliveryOutcome(false, "reservation_journal_failure")
         }
     }
 
+    private suspend fun dispatch(
+        message: IrohAgentMessage,
+        decision: IrohAgentMessageRouter.RoutingDecision,
+    ): DeliveryOutcome = runCatching {
+        withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) { onDeliver(message, decision) }
+    }.getOrElse { error ->
+        if (error is CancellationException && error !is TimeoutCancellationException) throw error
+        DeliveryOutcome(false, "delivery_timeout")
+    }
+
+    /** Marks authoritative transcript evidence without permitting another application dispatch. */
+    suspend fun markPersisted(sender: AgentId, msgId: MessageId) {
+        updateRouting { router.settle(sender, msgId, IrohAgentMessageRouter.ReservationState.PERSISTED) }
+    }
+
+    private fun DeliveryOutcome.reservationState(): IrohAgentMessageRouter.ReservationState? = when {
+        delivered -> IrohAgentMessageRouter.ReservationState.PERSISTED
+        reason == "application_input_accepted" -> IrohAgentMessageRouter.ReservationState.ACCEPTED
+        reason in DEFINITE_FAILURES -> null
+        else -> IrohAgentMessageRouter.ReservationState.AMBIGUOUS
+    }
+
+    private suspend fun <T> updateRouting(block: () -> T): T = routingMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val file = journalFile ?: return@withContext block()
+            AtomicJsonFile.withProcessLock(file.toPath()) {
+                check(!journalUnavailable && !pendingJournal(file).exists()) { "A2A receipt journal needs reconciliation" }
+                val previous = if (file.exists()) {
+                    require(file.length() in 1..MAX_JOURNAL_BYTES) { "A2A receipt journal exceeds its bound" }
+                    file.readText().also {
+                        router.restore(LettaJson.persisted.decodeFromString<IrohAgentMessageRouter.Snapshot>(it))
+                    }
+                } else null
+                val result = block()
+                val encoded = LettaJson.persisted.encodeToString(router.snapshot())
+                require(encoded.toByteArray().size <= MAX_JOURNAL_BYTES)
+                writeJournalOrRestore(file, encoded to previous)
+                result
+            }
+        }
+    }
+
+    /** A durable barrier exists before replacement, so failed rollback cannot disappear on restart. */
+    private fun writeJournalOrRestore(file: File, snapshots: Pair<String, String?>) {
+        val (next, previous) = snapshots
+        val pending = pendingJournal(file)
+        writeJournal(pending, "A2A receipt journal needs reconciliation")
+        runCatching {
+            writeJournal(file, next)
+            java.nio.file.Files.delete(pending.toPath())
+        }.getOrElse { failure ->
+            // Only remove the barrier after a fully synced rollback. A failed restore leaves it
+            // durable, and every receiver checks it under the same process lock before admission.
+            runCatching {
+                checkNotNull(previous)
+                writeJournal(file, previous)
+                java.nio.file.Files.delete(pending.toPath())
+            }.onFailure { restoreFailure ->
+                journalUnavailable = true
+                failure.addSuppressed(restoreFailure)
+            }
+            throw failure
+        }
+        // Barrier cleanup need not be durable: resurrection after a crash only denies admission.
+    }
+
+    private fun pendingJournal(file: File): File = File("${file.absolutePath}.pending")
+
+    private fun writeJournal(file: File, encoded: String) =
+        AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true,
+            directorySyncSupported = journalDirectorySyncSupported, syncDirectory = journalDirectorySync)
+
     private companion object {
+        const val MAX_JOURNAL_BYTES = 4L * 1024 * 1024
+        val DEFINITE_FAILURES = setOf("application_enqueue_failure", "conversation_create_failure", "application_input_rejected")
         const val DELIVERY_TIMEOUT_MS = 10_000L
         const val SENDER_NOT_AUTHENTICATED = "sender_not_authenticated"
     }

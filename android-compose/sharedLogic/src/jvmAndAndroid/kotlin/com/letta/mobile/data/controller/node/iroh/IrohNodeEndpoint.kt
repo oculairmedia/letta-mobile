@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
+
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.HostId
@@ -50,6 +52,7 @@ class IrohNodeEndpoint(
     private val protocolHandlers: List<IrohNodeProtocolHandler> = emptyList(),
     /** The host's stream-to-stored identity join, shared by every connection. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
+    private val connectionRegistry: ConnectionRegistry = ConnectionRegistry(),
 ) {
     private val alpn = binding.alpn
     private val relayConfig = binding.relayConfig
@@ -91,7 +94,6 @@ class IrohNodeEndpoint(
      * a turn on one connection to fan its frames out to all connections viewing
      * the same conversation.
      */
-    private val connectionRegistry = ConnectionRegistry()
 
     /**
      * ONE node-owned home for every connection's live turns, a child of
@@ -124,6 +126,14 @@ class IrohNodeEndpoint(
             "recipients" attr result.recipients,
             "delivered" attr result.delivered,
         )
+    }
+
+    /** Broadcasts inbox activity without changing any viewer subscription. Old clients receive nothing. */
+    fun conversationActivityTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
+        val activity = kotlinx.serialization.json.Json.decodeFromString(
+            com.letta.mobile.data.transport.ServerFrame.ConversationActivity.serializer(), frame,
+        )
+        connectionRegistry.broadcast(frame) { it.receivesConversationActivity(AgentId(activity.agentId)) }
     }
 
     /**

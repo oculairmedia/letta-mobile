@@ -53,6 +53,7 @@ object WsFrameMapper {
         is ServerFrame.GoalsUpdated,
         is ServerFrame.AgentUpdated,
         // letta-mobile-lks7m: conversation pushes drive the conversation lists, not the timeline.
+        is ServerFrame.ConversationActivity,
         is ServerFrame.ConversationUpdated,
         // letta-mobile-73o2h: active-subagent registry frames are
         // routing-only — they drive the SubagentRepository state machine

@@ -1,0 +1,1 @@
+{"v":1,"type":"conversation_activity","id":"activity-fixture","ts":"2026-11-04T12:00:00Z","agent_id":"agent-recipient","conversation_id":"conv-inbox","milestone":"persisted","source_message_id":"msg-123","client_message_id":"a2a:v1:stable-wake:sender:agent-recipient","at":"2026-11-04T12:00:00Z"}

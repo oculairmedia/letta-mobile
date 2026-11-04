@@ -1,7 +1,11 @@
 package com.letta.mobile.data.messaging
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentIdNamespace
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
+import kotlinx.serialization.Serializable
 
 /** Routes inbound messages by conversation lane, after loop-safety checks. */
 class IrohAgentMessageRouter(
@@ -11,10 +15,60 @@ class IrohAgentMessageRouter(
     private val siblingAgentIds: Set<String> = emptySet(),
     /** Max inbound messages accepted per sender before capping (loop-safety). */
     private val maxPerSender: Int = 64,
+    private val maxReservations: Int = 4096,
+    private val maxSenders: Int = 1024,
 ) {
-    // Loop-safety state: seen msgIds (at-most-once) + per-sender counts.
-    private val seenMsgIds = LinkedHashSet<String>()
+    /** Retained entries are never evicted: capacity denies new work instead of allowing replay. */
+    @Serializable
+    enum class ReservationState { RESERVED, ACCEPTED, AMBIGUOUS, PERSISTED }
+
+    @Serializable
+    data class Snapshot(
+        val version: Int,
+        val reservations: Map<String, Map<String, ReservationState>>,
+        val senderAttempts: Map<String, Int>,
+    )
+
+    private val loopIdentities = (siblingAgentIds + ownAgentId).map(AgentIdNamespace::normalizeToBareId).toSet()
+    private val reservations = linkedMapOf<Pair<String, String>, ReservationState>()
     private val perSenderCount = mutableMapOf<String, Int>()
+
+    /** Called under the receiver's routing lock, before any application dispatch. */
+    fun snapshot(): Snapshot = Snapshot(
+        version = 2,
+        reservations = reservations.entries.groupBy { it.key.first }.mapValues { (_, entries) ->
+            entries.associate { it.key.second to it.value }
+        },
+        senderAttempts = perSenderCount.toMap(),
+    )
+
+    /** Strict journal recovery; unfinished reservations remain suppressive after a restart. */
+    fun restore(snapshot: Snapshot) {
+        require(snapshot.version == 2) { "Senderless A2A journals require external reconciliation" }
+        require(snapshot.reservations.values.sumOf { it.size.toLong() } <= maxReservations && snapshot.senderAttempts.size <= maxSenders)
+        require(snapshot.reservations.all { (sender, messages) ->
+            validIdentity(sender) && sender in snapshot.senderAttempts && messages.isNotEmpty() && messages.keys.all(::validIdentity)
+        })
+        require(snapshot.senderAttempts.all { (sender, count) -> validIdentity(sender) && count in 0..maxPerSender })
+        reservations.clear()
+        reservations.putAll(snapshot.reservations.flatMap { (sender, messages) ->
+            messages.map { (message, state) ->
+                (sender to message) to if (state == ReservationState.RESERVED) ReservationState.AMBIGUOUS else state
+            }
+        })
+        perSenderCount.clear()
+        perSenderCount.putAll(snapshot.senderAttempts)
+    }
+
+    /** Null releases only a definitely unexecuted attempt; every other state blocks re-execution. */
+    fun settle(sender: AgentId, message: MessageId, state: ReservationState?) {
+        val key = reservationKey(sender, message)
+        if (key !in reservations || reservations[key] == ReservationState.PERSISTED) return
+        if (state == null) reservations.remove(key) else reservations[key] = state
+    }
+
+    private fun reservationKey(sender: AgentId, message: MessageId): Pair<String, String> =
+        AgentIdNamespace.normalizeToBareId(sender.value) to message.value
 
     /** A conversation with a "busy" flag (an active run in flight). */
     data class ConversationState(val conversation: Conversation, val busy: Boolean)
@@ -44,38 +98,57 @@ class IrohAgentMessageRouter(
         candidates: List<ConversationState>,
         address: InboundAddress = InboundAddress(),
     ): RoutingDecision {
-        guard(fromAgentId, msgId)?.let { return it }
-        if (address.targetConversationId != null) return routeExplicitTarget(ConversationId(address.targetConversationId), candidates)
-        return routeLane(address.lane ?: "inbox", candidates)
-    }
-
-    private fun guard(fromAgentId: String, msgId: String): RoutingDecision.Dropped? {
-        if (fromAgentId == ownAgentId || fromAgentId in siblingAgentIds) {
-            return RoutingDecision.Dropped("ping_pong_own_or_sibling")
+        guard(AgentId(fromAgentId), MessageId(msgId))?.let { return it }
+        val decision = when (val target = address.targetConversationId) {
+            null -> routeLane(address, candidates)
+            else -> routeExplicitTarget(ConversationId(target), candidates)
         }
-        if (!seenMsgIds.add(msgId)) return RoutingDecision.Dropped("duplicate_msg_id")
-        val count = (perSenderCount[fromAgentId] ?: 0) + 1
-        perSenderCount[fromAgentId] = count
-        return if (count > maxPerSender) RoutingDecision.Dropped("per_sender_cap_exceeded") else null
+        if (decision is RoutingDecision.Dropped) reservations.remove(reservationKey(AgentId(fromAgentId), MessageId(msgId)))
+        return decision
     }
 
-    private fun routeLane(lane: String, candidates: List<ConversationState>): RoutingDecision = when (lane) {
-        "home" -> RoutingDecision.Dropped("home_lane_forbidden")
-        "inbox" -> {
-            val matches = laneMatches(candidates.map { it.conversation }, lane)
-            when (matches.size) {
-                0 -> RoutingDecision.CreateAndDeliver
-                1 -> {
-                    val inbox = matches.single()
-                    routeExplicitTarget(inbox.id, candidates)
-                }
-                else -> RoutingDecision.Dropped("duplicate_lane_tags")
+    private fun guard(sender: AgentId, message: MessageId): RoutingDecision.Dropped? {
+        val fromAgentId = AgentIdNamespace.normalizeToBareId(sender.value)
+        val msgId = message.value
+        val count = perSenderCount[fromAgentId] ?: 0
+        val atCapacity = reservations.size >= maxReservations ||
+            (fromAgentId !in perSenderCount && perSenderCount.size >= maxSenders)
+        return when {
+            fromAgentId in loopIdentities -> RoutingDecision.Dropped("ping_pong_own_or_sibling")
+            !validIdentity(fromAgentId) || !validIdentity(msgId) -> RoutingDecision.Dropped("invalid_identity")
+            reservationKey(sender, message) in reservations -> RoutingDecision.Dropped("duplicate_msg_id")
+            atCapacity -> RoutingDecision.Dropped("reservation_capacity_exceeded")
+            count >= maxPerSender -> RoutingDecision.Dropped("per_sender_cap_exceeded")
+            else -> {
+                perSenderCount[fromAgentId] = count + 1
+                reservations[reservationKey(sender, message)] = ReservationState.RESERVED
+                null
             }
         }
-        else -> RoutingDecision.Dropped("unsupported_lane")
     }
 
+    private fun validIdentity(value: String): Boolean = value.isNotBlank() && value.length <= MAX_IDENTITY_CHARS
+
+    private fun routeLane(address: InboundAddress, candidates: List<ConversationState>): RoutingDecision =
+        when (val lane = address.lane ?: "inbox") {
+            "home" -> RoutingDecision.Dropped("home_lane_forbidden")
+            "inbox" -> {
+                val matches = laneMatches(candidates.map { it.conversation }, lane)
+                when (matches.size) {
+                    0 -> RoutingDecision.CreateAndDeliver
+                    1 -> {
+                        val inbox = matches.single()
+                        routeExplicitTarget(inbox.id, candidates)
+                    }
+                    else -> RoutingDecision.Dropped("duplicate_lane_tags")
+                }
+            }
+            else -> RoutingDecision.Dropped("unsupported_lane")
+        }
+
     companion object {
+        private const val MAX_IDENTITY_CHARS = 512
+
         /** Select the conversation carrying the exact lane tag. */
         fun pickLane(conversations: List<Conversation>, lane: String): Conversation? =
             laneMatches(conversations, lane).singleOrNull()

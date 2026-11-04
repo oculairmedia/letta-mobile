@@ -323,6 +323,13 @@ Caller-bound Meridian tool service and request/response wire handling. Live-call
 
 Inter-agent delivery routing and structured provenance. Stable sender/recipient relationships and delivery state remain separate from display-only labels used by presentation. Keep display labels out of routing trust decisions; carry identity and provenance through [AgentMessageClientId](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.messaging/-agent-message-client-id/index.html) and [AgentMessageProvenanceProjection](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.messaging/-agent-message-provenance-projection/index.html) when integrating [IrohAgentMessageRouter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.messaging/-iroh-agent-message-router/index.html).
 
+`IrohAgentMessageRouter` reserves identities before delivery and exposes bounded snapshots for the
+JVM receiver's atomic receipt journal. Only definite application refusal releases an identity;
+accepted and ambiguous attempts remain suppressive across restart. Inbox activity uses the separate
+`conversation_activity_v1` capability and committed source/client identities; it is neither a
+conversation-list invalidation nor a timeline message. See the conversation lanes contract for
+capacity, observation-window and reconnect limits.
+
 # Package com.letta.mobile.data.model
 
 Shared dispatch and task-notification wire parsers live here so controller ingestion and chat projection consume the same interpretation without depending on each other.
@@ -570,6 +577,12 @@ Tool-library controller state and operations. Source loading and selection are c
 # Package com.letta.mobile.data.transport
 
 Channel events, server frames and chat bridge mappings. Scope routing and ingest deduplication are transport boundaries; these types do not themselves own a durable timeline. Keep durable timeline storage and product rendering outside frame routing; supply the channel through [IChannelTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.api/-i-channel-transport/index.html) when integrating [WsChatBridge](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport/-ws-chat-bridge/index.html) and `AgentEventRouter`.
+
+# Package com.letta.mobile.data.transport.serialization
+
+Internal deserializers for replay envelopes and unknown transport frames. The public
+`ServerFrameSerializer` selects these inbound-only helpers; they preserve raw payloads and reject
+accidental encoding. Keep frame contracts in `data.transport` and byte framing in the transport binding.
 
 # Package com.letta.mobile.data.transport.api
 

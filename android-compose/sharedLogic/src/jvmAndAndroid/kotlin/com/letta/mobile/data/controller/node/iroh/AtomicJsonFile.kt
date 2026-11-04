@@ -12,28 +12,59 @@ import java.nio.file.StandardOpenOption
 /**
  * Crash-safe replacement of a small JSON state file (paired peers, pending
  * invites): write a temp sibling, fsync it, atomically rename over the target,
- * then best-effort fsync the directory so the rename itself is durable.
+ * then fsync the directory so the rename itself is durable where supported.
  */
 internal object AtomicJsonFile {
-    fun write(path: Path, text: String) {
+    val directorySyncSupported: Boolean
+        get() = !System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
+
+    fun write(
+        path: Path, text: String, requireAtomic: Boolean = false,
+        directorySyncSupported: Boolean = AtomicJsonFile.directorySyncSupported,
+        syncDirectory: (Path) -> Unit = ::syncDirectory,
+    ) {
         path.parent?.let(Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
-        // fsync contents+metadata BEFORE the rename so a power loss can never
-        // expose a partially written or zero-byte file through the durable name.
-        FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).use { channel ->
-            val buffer = ByteBuffer.wrap(text.toByteArray(Charsets.UTF_8))
-            while (buffer.hasRemaining()) channel.write(buffer)
-            channel.force(true)
+        try {
+            // Sync the new contents before making them visible under the durable name.
+            FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).use {
+                channel ->
+                val buffer = ByteBuffer.wrap(text.toByteArray(Charsets.UTF_8))
+                while (buffer.hasRemaining()) channel.write(buffer)
+                channel.force(true)
+            }
+            replace(temp, path, requireAtomic)
+            // Directory channels are unsupported on some platforms, including Windows.
+            path.parent?.takeIf { directorySyncSupported }?.let { parent ->
+                syncDirectoryIfSupported(parent, requireAtomic, syncDirectory)
+            }
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    private fun syncDirectoryIfSupported(path: Path, requireAtomic: Boolean, sync: (Path) -> Unit) {
+        if (!requireAtomic) {
+            runCatching { sync(path) }
+            return
         }
         try {
-            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: Exception) {
-            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
+            sync(path)
+        } catch (_: UnsupportedOperationException) {
+            // Directory channels are not supported on every platform.
         }
-        // Directory fsync is unsupported on some platforms (Windows throws when
-        // opening a directory channel); the file fsync + rename still hold.
-        path.parent?.let { parent ->
-            runCatching { FileChannel.open(parent, StandardOpenOption.READ).use { it.force(true) } }
+    }
+
+    fun syncDirectory(path: Path) {
+        FileChannel.open(path, StandardOpenOption.READ).use { it.force(true) }
+    }
+
+    private fun replace(temp: Path, path: Path, requireAtomic: Boolean) {
+        runCatching {
+            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }.getOrElse { failure ->
+            if (requireAtomic || failure !is Exception) throw failure
+            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
         }
     }
 

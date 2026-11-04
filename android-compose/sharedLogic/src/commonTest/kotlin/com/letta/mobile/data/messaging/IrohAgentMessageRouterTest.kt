@@ -14,6 +14,20 @@ class IrohAgentMessageRouterTest {
         )
 
     @Test
+    fun senderAliasesKeepReservationsAndOwnSiblingGuards() {
+        val router = IrohAgentMessageRouter("letta_target", setOf("letta_sibling"))
+        assertIs<IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver>(router.route("letta_sender", "stable", emptyList()))
+        assertEquals("duplicate_msg_id", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+            router.route("sender", "stable", emptyList()),
+        ).reason)
+        for (sender in listOf("target", "letta_target", "sibling", "letta_sibling")) {
+            assertEquals("ping_pong_own_or_sibling", assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(
+                router.route(sender, "other", emptyList()),
+            ).reason)
+        }
+    }
+
+    @Test
     fun firstMessageCreatesInboxAndSecondUsesSameInbox() {
         val router = IrohAgentMessageRouter("target")
         val states = mutableListOf(state("home", "lane:home"))

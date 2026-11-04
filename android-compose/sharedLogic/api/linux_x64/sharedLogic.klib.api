@@ -21525,8 +21525,64 @@ sealed interface com.letta.mobile.data.transport/ServerFrame { // com.letta.mobi
         }
     }
 
+    final class ConversationActivity : com.letta.mobile.data.transport/ServerFrame { // com.letta.mobile.data.transport/ServerFrame.ConversationActivity|null[0]
+        constructor <init>(kotlin/Int = ..., kotlin/String = ..., kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String) // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+
+        final val agentId // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.agentId|{}agentId[0]
+            final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.agentId.<get-agentId>|<get-agentId>(){}[0]
+        final val at // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.at|{}at[0]
+            final fun <get-at>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.at.<get-at>|<get-at>(){}[0]
+        final val clientMessageId // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.clientMessageId|{}clientMessageId[0]
+            final fun <get-clientMessageId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.clientMessageId.<get-clientMessageId>|<get-clientMessageId>(){}[0]
+        final val conversationId // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.conversationId|{}conversationId[0]
+            final fun <get-conversationId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+        final val id // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.id|{}id[0]
+            final fun <get-id>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.id.<get-id>|<get-id>(){}[0]
+        final val milestone // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.milestone|{}milestone[0]
+            final fun <get-milestone>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.milestone.<get-milestone>|<get-milestone>(){}[0]
+        final val sourceMessageId // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.sourceMessageId|{}sourceMessageId[0]
+            final fun <get-sourceMessageId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.sourceMessageId.<get-sourceMessageId>|<get-sourceMessageId>(){}[0]
+        final val ts // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.ts|{}ts[0]
+            final fun <get-ts>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.ts.<get-ts>|<get-ts>(){}[0]
+        final val type // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.type|{}type[0]
+            final fun <get-type>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.type.<get-type>|<get-type>(){}[0]
+        final val v // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.v|{}v[0]
+            final fun <get-v>(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.v.<get-v>|<get-v>(){}[0]
+
+        final fun component1(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component1|component1(){}[0]
+        final fun component10(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component10|component10(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component2|component2(){}[0]
+        final fun component3(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component3|component3(){}[0]
+        final fun component4(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component4|component4(){}[0]
+        final fun component5(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component5|component5(){}[0]
+        final fun component6(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component6|component6(){}[0]
+        final fun component7(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component7|component7(){}[0]
+        final fun component8(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component8|component8(){}[0]
+        final fun component9(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.component9|component9(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.transport/ServerFrame.ConversationActivity // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.transport/ServerFrame.ConversationActivity> { // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.transport/ServerFrame.ConversationActivity // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.transport/ServerFrame.ConversationActivity) // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.transport.ServerFrame.ConversationActivity){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.Companion|null[0]
+            final const val CAPABILITY // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.Companion.CAPABILITY|{}CAPABILITY[0]
+                final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.Companion.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.transport/ServerFrame.ConversationActivity> // com.letta.mobile.data.transport/ServerFrame.ConversationActivity.Companion.serializer|serializer(){}[0]
+        }
+    }
+
     final class ConversationUpdated : com.letta.mobile.data.transport/ServerFrame { // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated|null[0]
-        constructor <init>(kotlin/Int = ..., kotlin/String = ..., kotlin/String, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/String = ..., kotlin/String = ...) // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.String){}[0]
+        constructor <init>(kotlin/Int = ..., kotlin/String = ..., kotlin/String, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ...) // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.<init>|<init>(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?){}[0]
 
         final val agentId // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.agentId|{}agentId[0]
             final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.agentId.<get-agentId>|<get-agentId>(){}[0]
@@ -21536,6 +21592,8 @@ sealed interface com.letta.mobile.data.transport/ServerFrame { // com.letta.mobi
             final fun <get-conversationId>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
         final val id // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.id|{}id[0]
             final fun <get-id>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.id.<get-id>|<get-id>(){}[0]
+        final val messageId // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.messageId|{}messageId[0]
+            final fun <get-messageId>(): kotlin/String? // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.messageId.<get-messageId>|<get-messageId>(){}[0]
         final val reason // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.reason|{}reason[0]
             final fun <get-reason>(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.reason.<get-reason>|<get-reason>(){}[0]
         final val ts // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.ts|{}ts[0]
@@ -21553,7 +21611,8 @@ sealed interface com.letta.mobile.data.transport/ServerFrame { // com.letta.mobi
         final fun component6(): kotlin/String? // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.component6|component6(){}[0]
         final fun component7(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.component7|component7(){}[0]
         final fun component8(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.component8|component8(){}[0]
-        final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.transport/ServerFrame.ConversationUpdated // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.String){}[0]
+        final fun component9(): kotlin/String? // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.component9|component9(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ...): com.letta.mobile.data.transport/ServerFrame.ConversationUpdated // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.copy|copy(kotlin.Int;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.transport/ServerFrame.ConversationUpdated.toString|toString(){}[0]
@@ -39826,9 +39885,30 @@ final class com.letta.mobile.data.messaging/AgentMessageProvenance { // com.lett
 }
 
 final class com.letta.mobile.data.messaging/IrohAgentMessageRouter { // com.letta.mobile.data.messaging/IrohAgentMessageRouter|null[0]
-    constructor <init>(kotlin/String, kotlin.collections/Set<kotlin/String> = ..., kotlin/Int = ...) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.<init>|<init>(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.Int){}[0]
+    constructor <init>(kotlin/String, kotlin.collections/Set<kotlin/String> = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.<init>|<init>(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 
+    final fun restore(com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.restore|restore(com.letta.mobile.data.messaging.IrohAgentMessageRouter.Snapshot){}[0]
     final fun route(kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ConversationState>, com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision // com.letta.mobile.data.messaging/IrohAgentMessageRouter.route|route(kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.messaging.IrohAgentMessageRouter.ConversationState>;com.letta.mobile.data.messaging.IrohAgentMessageRouter.InboundAddress){}[0]
+    final fun settle(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/MessageId, com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState?) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.settle|settle(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.MessageId;com.letta.mobile.data.messaging.IrohAgentMessageRouter.ReservationState?){}[0]
+    final fun snapshot(): com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot // com.letta.mobile.data.messaging/IrohAgentMessageRouter.snapshot|snapshot(){}[0]
+
+    final enum class ReservationState : kotlin/Enum<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState> { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState|null[0]
+        enum entry ACCEPTED // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.ACCEPTED|null[0]
+        enum entry AMBIGUOUS // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.AMBIGUOUS|null[0]
+        enum entry PERSISTED // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.PERSISTED|null[0]
+        enum entry RESERVED // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.RESERVED|null[0]
+
+        final val entries // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.entries.<get-entries>|<get-entries>#static(){}[0]
+
+        final fun valueOf(kotlin/String): com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.values|values#static(){}[0]
+
+        final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.Companion.serializer|serializer(){}[0]
+            final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        }
+    }
 
     sealed interface RoutingDecision { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision|null[0]
         final class Deliver : com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.RoutingDecision.Deliver|null[0]
@@ -39907,6 +39987,40 @@ final class com.letta.mobile.data.messaging/IrohAgentMessageRouter { // com.lett
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.messaging/IrohAgentMessageRouter.InboundAddress.toString|toString(){}[0]
+    }
+
+    final class Snapshot { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot|null[0]
+        constructor <init>(kotlin/Int, kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState>>, kotlin.collections/Map<kotlin/String, kotlin/Int>) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.<init>|<init>(kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.collections.Map<kotlin.String,com.letta.mobile.data.messaging.IrohAgentMessageRouter.ReservationState>>;kotlin.collections.Map<kotlin.String,kotlin.Int>){}[0]
+
+        final val reservations // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.reservations|{}reservations[0]
+            final fun <get-reservations>(): kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState>> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.reservations.<get-reservations>|<get-reservations>(){}[0]
+        final val senderAttempts // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.senderAttempts|{}senderAttempts[0]
+            final fun <get-senderAttempts>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.senderAttempts.<get-senderAttempts>|<get-senderAttempts>(){}[0]
+        final val version // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.version|{}version[0]
+            final fun <get-version>(): kotlin/Int // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.version.<get-version>|<get-version>(){}[0]
+
+        final fun component1(): kotlin/Int // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.component1|component1(){}[0]
+        final fun component2(): kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState>> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.component2|component2(){}[0]
+        final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.component3|component3(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/Map<kotlin/String, com.letta.mobile.data.messaging/IrohAgentMessageRouter.ReservationState>> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ...): com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.copy|copy(kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.collections.Map<kotlin.String,com.letta.mobile.data.messaging.IrohAgentMessageRouter.ReservationState>>;kotlin.collections.Map<kotlin.String,kotlin.Int>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot> { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot) // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.messaging.IrohAgentMessageRouter.Snapshot){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot> // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Snapshot.Companion.serializer|serializer(){}[0]
+        }
     }
 
     final object Companion { // com.letta.mobile.data.messaging/IrohAgentMessageRouter.Companion|null[0]

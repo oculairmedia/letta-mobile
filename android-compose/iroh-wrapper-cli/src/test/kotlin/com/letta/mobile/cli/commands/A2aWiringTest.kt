@@ -1,5 +1,7 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.commands.a2a.A2aDeliveryContext
+
 import com.letta.mobile.util.textOrNull
 
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
@@ -52,6 +54,45 @@ import org.junit.jupiter.api.Test
  */
 class A2aWiringTest {
     @Test
+    fun `wrong scope or request identity is ambiguous even when acknowledgement says rejected`() = runBlocking {
+        for (wrongRequest in listOf(false, true)) {
+            val client = RecordingClient(acceptance = { command ->
+                AppServerInboundFrame.InputAccepted(
+                    if (wrongRequest) "stale-request" else requireNotNull(command.requestId),
+                    if (wrongRequest) command.runtime else command.runtime.copy(conversationId = "other"), false,
+                )
+            })
+            val message = IrohAgentMessage("sender", "recipient", "body", "stable-wake", 1L)
+            assertEquals(DeliveryOutcome(false, "application_input_scope_mismatch"),
+                handleDecision(client, message, IrohAgentMessageRouter.RoutingDecision.Deliver("inbox")))
+        }
+    }
+
+    @Test
+    fun `rejected input cannot be reported as application delivered`() = runBlocking {
+        val client = RecordingClient(acceptance = { command ->
+            AppServerInboundFrame.InputAccepted(requireNotNull(command.requestId), command.runtime, false, error = "denied")
+        })
+        val message = IrohAgentMessage("sender", "recipient", "body", "stable-wake", 1L)
+        val outcome = handleDecision(client, message, IrohAgentMessageRouter.RoutingDecision.Deliver("inbox"))
+        assertFalse(outcome.delivered)
+        assertEquals("application_input_rejected", outcome.reason)
+        assertEquals(1, client.captured.size)
+    }
+
+    @Test
+    fun `queued acceptance does not prove persisted application delivery`() = runBlocking {
+        val client = RecordingClient(acceptance = { command ->
+            AppServerInboundFrame.InputAccepted(requireNotNull(command.requestId), command.runtime, true, disposition = "queued")
+        })
+        val message = IrohAgentMessage("sender", "recipient", "body", "stable-wake", 1L)
+        val outcome = handleDecision(client, message, IrohAgentMessageRouter.RoutingDecision.Deliver("inbox"))
+        assertFalse(outcome.delivered)
+        assertEquals("application_input_accepted", outcome.reason)
+        assertEquals(1, client.captured.size)
+    }
+
+    @Test
     fun `first message creates inbox and the second inputs to the same conversation`() {
         val base = Files.createTempDirectory("lane-first-use").toFile()
         try {
@@ -69,7 +110,7 @@ class A2aWiringTest {
                 for (id in listOf("first", "second")) {
                     val message = IrohAgentMessage("sender", "agent-1", id, id, 1)
                     val decision = router.route(message.fromAgentId, id, listConversationsForAgent(store, "agent-1"))
-                    assertTrue(handleDecision(client, message, decision, store).delivered)
+                    assertEquals(DeliveryOutcome(false, "application_input_accepted"), handleDecision(client, message, decision, A2aDeliveryContext(store)))
                 }
             }
             assertEquals(1, client.capturedCreate.size)
@@ -94,7 +135,7 @@ class A2aWiringTest {
                 val states = listConversationsForAgent(store, "agent-1")
                 assertTrue(states.single { it.conversation.id.value == "home" }.busy)
                 val decision = IrohAgentMessageRouter("agent-1").route("sender", "m", states)
-                assertTrue(handleDecision(client, message, decision).delivered)
+                assertEquals(DeliveryOutcome(false, "application_input_accepted"), handleDecision(client, message, decision))
             }
             assertEquals(listOf("inbox"), client.captured.map { it.runtime.conversationId })
             assertTrue(client.captured.none { it.runtime.conversationId == "home" })
@@ -118,7 +159,8 @@ class A2aWiringTest {
     fun `created inbox has lane tag and autonomous class`() {
         val client = RecordingClient()
         val message = IrohAgentMessage("sender", "agent-1", "hello", "m", 1)
-        assertTrue(runBlocking { handleCreateAndDeliver(client, message, laneStore()) }.delivered)
+        assertEquals(DeliveryOutcome(false, "application_input_accepted"),
+            runBlocking { handleCreateAndDeliver(client, message, A2aDeliveryContext(laneStore())) })
         val body = client.capturedCreate.single().body
         assertEquals("[\"lane:inbox\"]", body["tags"].toString())
         assertEquals("autonomous", body["conversation_class"].stringOrNullSafe())
@@ -403,8 +445,8 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-deliver")
 
-        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
-        assertTrue(outcome.delivered)
+        val outcome = runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
+        assertEquals(DeliveryOutcome(false, "application_input_accepted"), outcome)
 
         assertEquals(1, client.captured.size, "expected exactly one client.input call")
         val cmd = client.captured.single()
@@ -468,7 +510,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-norm")
 
-        runBlocking { handleDecision(client, message, decision, laneStore()) }
+        runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
 
         assertEquals(1, captured.size)
         val cmd = captured.single()
@@ -510,7 +552,7 @@ class A2aWiringTest {
             ts = 1_700_000_000_000L,
         )
 
-        val outcome = runBlocking { handleCreateAndDeliver(client, message, laneStore()) }
+        val outcome = runBlocking { handleCreateAndDeliver(client, message, A2aDeliveryContext(laneStore())) }
         assertFalse(outcome.delivered)
         assertEquals("conversation_create_failure", outcome.reason)
 
@@ -551,8 +593,8 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
-        assertTrue(outcome.delivered)
+        val outcome = runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
+        assertEquals(DeliveryOutcome(false, "application_input_accepted"), outcome)
 
         assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
         val createCmd = client.capturedCreate.single()
@@ -598,7 +640,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
+        val outcome = runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
         assertFalse(outcome.delivered)
         assertEquals("conversation_create_failure", outcome.reason)
 
@@ -616,6 +658,9 @@ class A2aWiringTest {
     private class RecordingClient(
         val captured: MutableList<AppServerCommand.Input> = mutableListOf(),
         val capturedCreate: MutableList<AppServerCommand.ConversationCreate> = mutableListOf(),
+        val acceptance: (AppServerCommand.Input) -> AppServerInboundFrame.InputAccepted = { command ->
+            AppServerInboundFrame.InputAccepted(requireNotNull(command.requestId), command.runtime, true, disposition = "started")
+        },
         var conversationCreateResult: (AppServerCommand.ConversationCreate) -> AppServerInboundFrame.ConversationCreateResponse = { cmd ->
             AppServerInboundFrame.ConversationCreateResponse(
                 requestId = cmd.requestId,
@@ -629,6 +674,10 @@ class A2aWiringTest {
             error("unused path")
         override suspend fun input(command: AppServerCommand.Input) {
             captured += command
+        }
+        override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
+            captured += command
+            return acceptance(command)
         }
         override suspend fun conversationList(command: AppServerCommand.ConversationList) =
             AppServerInboundFrame.ConversationListResponse(command.requestId, true, kotlinx.serialization.json.JsonArray(emptyList()))

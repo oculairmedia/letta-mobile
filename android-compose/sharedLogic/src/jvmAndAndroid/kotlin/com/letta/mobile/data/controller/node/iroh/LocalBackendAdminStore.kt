@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.listcache.recordFilesSignature
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -117,6 +118,21 @@ open class LocalBackendAdminStore(
         offset: Int?,
     ): JsonArray? = conversationReader.listConversationsProjected(agentId, archiveStatus, limit, offset)
 
+    /** Read exactly one conversation's metadata, with an owner check and a bounded input. */
+    fun conversationRecord(conversationId: ConversationId, agentId: AgentId): JsonObject? = runCatching {
+        val resolved = messageReader.resolveConversation(conversationId.value, null) ?: return@runCatching null
+        if (resolved.second != agentId.value) return@runCatching null
+        val key = support.b64UrlEncode(support.conversationKey(resolved.first, agentId.value))
+        val file = File(conversationsDirectory, "$key/conversation.json")
+        if (!file.isFile || file.length() > MAX_CONVERSATION_RECORD_BYTES) return@runCatching null
+        (support.json.parseToJsonElement(file.readText()) as? JsonObject)
+            ?.takeIf { it["agent_id"]?.stringOrNull() == agentId.value }
+    }.getOrNull()
+
+    /** Match one committed user message in a bounded transcript tail, without unrelated run/roster reads. */
+    fun committedUserMessageId(conversationId: ConversationId, agentId: AgentId, clientId: MessageId): String? =
+        messageReader.committedUserMessageId(conversationId, agentId, clientId)
+
     /** The newest [count] messages' ids, types and content, read from the transcript's end; null on error. */
     fun newestMessageContents(conversationId: ConversationId, count: Int): JsonArray? =
         messageReader.newestMessageContents(conversationId, count)
@@ -198,3 +214,5 @@ open class LocalBackendAdminStore(
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"
     }
 }
+
+private const val MAX_CONVERSATION_RECORD_BYTES = 1024L * 1024

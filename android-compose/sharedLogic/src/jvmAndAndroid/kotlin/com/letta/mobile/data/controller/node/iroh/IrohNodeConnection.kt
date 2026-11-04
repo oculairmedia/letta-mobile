@@ -197,6 +197,10 @@ class IrohNodeConnection(
             },
             // Conversation pushes name conversations, so they reach only peers whose conversation
             // scope is unrestricted (the same rule conversation.list scoping applies, lgns8.12).
+            conversationActivityGate = { agentId ->
+                com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY in peerCapabilities.get() &&
+                    IrohPeerCapabilities.isAgentInScope(sessionAuth.agentScope(), agentId)
+            },
             conversationEventsGate = {
                 val capabilities = effectiveCapabilities()
                 authenticated.get() &&
@@ -1018,6 +1022,7 @@ class IrohNodeConnection(
         internal fun advertisedCapabilities(router: AdminRpcRouter): List<String> = buildList {
             // letta-mobile-by4vm.50: ordered event_seq is a property of the connection's write path,
             // not of any admin handler, so every host advertises it.
+            add(com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY)
             addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY, ORDERED_EVENT_SEQ_CAPABILITY) + router.featureCapabilities)
             if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
                 add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
