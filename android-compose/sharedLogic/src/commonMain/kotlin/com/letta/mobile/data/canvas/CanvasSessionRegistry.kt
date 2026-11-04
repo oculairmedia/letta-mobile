@@ -18,11 +18,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * callers could take.
  */
 class CanvasSessionRegistry {
-    private val activeSessions = MutableStateFlow<Map<CanvasId, List<Pair<Any, CanvasSession>>>>(emptyMap())
+    private val nextMountId = MutableStateFlow(0L)
+
+    private val activeSessions = MutableStateFlow<Map<CanvasId, List<Pair<Long, CanvasSession>>>>(emptyMap())
 
     /** Replaces registrations for this id. Mounts should use [registerMount] instead. */
     fun register(session: CanvasSession) {
-        update { it + (session.canvasId to listOf(Any() to session)) }
+        update { it + (session.canvasId to listOf(newMountId() to session)) }
     }
 
     /**
@@ -31,13 +33,13 @@ class CanvasSessionRegistry {
      * Callers must not share a registry across authentication contexts.
      */
     fun registerMount(session: CanvasSession): () -> Unit {
-        // A unique identity token per mount; pairs avoid a new package type.
-        val registration = Any() to session
+        // A per-registry mount id; pairs avoid adding a type to the canvas package.
+        val registration = newMountId() to session
         val canvasId = session.canvasId
         update { current -> current + (canvasId to (current[canvasId].orEmpty() + registration)) }
         return {
             update { current ->
-                val remaining = current[canvasId].orEmpty().filterNot { it === registration }
+                val remaining = current[canvasId].orEmpty().filterNot { it.first == registration.first }
                 if (remaining.isEmpty()) current - canvasId else current + (canvasId to remaining)
             }
         }
@@ -54,10 +56,17 @@ class CanvasSessionRegistry {
         update { emptyMap() }
     }
 
-    private fun update(transform: (Map<CanvasId, List<Pair<Any, CanvasSession>>>) -> Map<CanvasId, List<Pair<Any, CanvasSession>>>) {
+    private fun update(transform: (Map<CanvasId, List<Pair<Long, CanvasSession>>>) -> Map<CanvasId, List<Pair<Long, CanvasSession>>>) {
         while (true) {
             val current = activeSessions.value
             if (activeSessions.compareAndSet(current, transform(current))) return
+        }
+    }
+
+    private fun newMountId(): Long {
+        while (true) {
+            val current = nextMountId.value
+            if (nextMountId.compareAndSet(current, current + 1)) return current
         }
     }
 }
