@@ -154,7 +154,7 @@ return errors and do not mutate the in-memory snapshot. No upstream writer chang
 
 ## Router enumeration
 
-The following 133 methods were enumerated from the REAL
+The following 132 methods were enumerated from the REAL
 `AdminRpcRegistry.buildRouter().registeredMethods` with pairing and subagent sources
 configured, including the three methods added here. The capability matrix test
 checks every registered method against explicit intentional tiers; an unclassified
