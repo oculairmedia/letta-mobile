@@ -221,6 +221,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p test_documentation_index.py -v
           python3 scripts/docs/documentation-index.py --check
           node --test scripts/appserver/generate-protocol-reference.test.mjs
+          node --test android-compose/letta-code-runtime/patches/check-no-static-cursor-import.test.mjs
           node scripts/appserver/verify-v2-audit-doc.mjs
 
       # Additive module tests: the unit tests of every module a PR touches and of every

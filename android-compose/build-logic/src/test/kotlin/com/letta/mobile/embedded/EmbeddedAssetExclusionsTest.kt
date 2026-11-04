@@ -6,9 +6,14 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertEquals
 
+/**
+ * letta-mobile-m0zpv: drives the production [PrepareEmbeddedLettaCodeAssetsTask.copyNodeModules] (not a
+ * re-applied filter), so dropping its `exclude(HOST_ONLY_NODE_MODULES)` or the build-only excludes
+ * fails here.
+ */
 class EmbeddedAssetExclusionsTest {
     @TempDir
-    lateinit var modules: File
+    lateinit var root: File
 
     @Test
     fun `staging excludes host binaries cursor worker and duplicate wasm but retains android fallback`() {
@@ -32,16 +37,22 @@ class EmbeddedAssetExclusionsTest {
             "$nested/@img/sharp-win32-ia32/sharp.node",
             "$nested/.bin/rg",
             "$nested/.bin/pi-ai",
+            ".bin/letta",
+            "@babel/core/lib/index.js",
         )
         val kept = listOf("@img/sharp-wasm32/sharp.wasm", "@letta-ai/letta-code/letta.js")
+        val npmWorkDir = root.resolve("work")
         (excluded + kept).forEach { path ->
-            modules.resolve(path).apply { parentFile.mkdirs(); writeText("fixture") }
+            npmWorkDir.resolve("node_modules/$path").apply { parentFile.mkdirs(); writeText("fixture") }
         }
+        val assetRoot = root.resolve("assets")
 
-        val project = ProjectBuilder.builder().build()
-        val copied = project.fileTree(modules).matching { exclude(HOST_ONLY_NODE_MODULES) }
-            .files.map { it.relativeTo(modules).invariantSeparatorsPath }.toSet()
+        val project = ProjectBuilder.builder().withProjectDir(root.resolve("project")).build()
+        project.tasks.register("prepare", PrepareEmbeddedLettaCodeAssetsTask::class.java).get()
+            .copyNodeModules(npmWorkDir, assetRoot)
 
-        assertEquals(kept.toSet(), copied)
+        val staged = assetRoot.resolve("node_modules").walkTopDown().filter(File::isFile)
+            .map { it.relativeTo(assetRoot.resolve("node_modules")).invariantSeparatorsPath }.toSet()
+        assertEquals(kept.toSet(), staged)
     }
 }

@@ -162,7 +162,7 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
         }
     }
 
-    private fun copyNodeModules(npmWorkDir: File, assetRoot: File) {
+    internal fun copyNodeModules(npmWorkDir: File, assetRoot: File) {
         fileSystem.copy {
             from(npmWorkDir.resolve("node_modules"))
             into(assetRoot.resolve("node_modules"))
@@ -175,18 +175,13 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
     }
 
     private fun checkNoStaticCursorImport(npmWorkDir: File, stagedLettaJs: File) {
-        // Babel is installed in the work tree for the patch pipeline and is not shipped.
-        val script = """
-            const fs = require('fs');
-            const parser = require('@babel/parser');
-            const ast = parser.parse(fs.readFileSync(process.argv[1], 'utf8'), { sourceType: 'module' });
-            const forbidden = ast.program.body.some(node =>
-              ['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type) &&
-              node.source && (node.source.value === '@cursor/sdk' || node.source.value.startsWith('@cursor/sdk/'))
-            );
-            if (forbidden) throw new Error('staged letta.js statically imports @cursor/sdk, which is excluded on Android');
-        """.trimIndent()
-        run(npmWorkDir, "staged letta.js Cursor import check failed.", listOf("node", "-e", script, stagedLettaJs.absolutePath))
+        // check-no-static-cursor-import.mjs is copied into the npm work dir with the patch scripts,
+        // so @babel/parser (installed there for the patch pipeline, not shipped) resolves.
+        run(
+            npmWorkDir,
+            "staged letta.js Cursor import check failed.",
+            listOf("node", npmWorkDir.resolve(CURSOR_IMPORT_CHECK).absolutePath, stagedLettaJs.absolutePath),
+        )
     }
 
     private fun writePackageJson(assetRoot: File) {
@@ -251,6 +246,9 @@ internal val LETTA_JS_PATCHES: List<LettaJsPatch> = listOf(
     LettaJsPatch.Script("patch-provider-abort.mjs", "Provider-abort-on-cancel transform for letta.js failed."),
     LettaJsPatch.ToolGroups,
 )
+
+/** The staging-time guard that fails when letta.js statically imports the excluded Cursor SDK. */
+private const val CURSOR_IMPORT_CHECK = "check-no-static-cursor-import.mjs"
 
 /** Where sharp's package.json sits: nested under letta-code (0.34.x shrinkwrap) or hoisted. */
 private val SHARP_PACKAGE_JSON_PATHS = listOf(
