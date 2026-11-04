@@ -37,10 +37,10 @@ internal object AtomicJsonFile {
     }
 
     private fun replace(temp: Path, path: Path, requireAtomic: Boolean) {
-        try {
+        runCatching {
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (failure: Exception) {
-            if (requireAtomic) throw failure
+        }.getOrElse { failure ->
+            if (requireAtomic || failure !is Exception) throw failure
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
         }
     }

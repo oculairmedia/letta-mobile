@@ -90,19 +90,21 @@ class IrohAgentMessageRouter(
     }
 
     private fun guard(fromAgentId: String, msgId: String): RoutingDecision.Dropped? {
-        if (fromAgentId == ownAgentId || fromAgentId in siblingAgentIds) {
-            return RoutingDecision.Dropped("ping_pong_own_or_sibling")
-        }
-        if (!validIdentity(fromAgentId) || !validIdentity(msgId)) return RoutingDecision.Dropped("invalid_identity")
-        if (msgId in reservations) return RoutingDecision.Dropped("duplicate_msg_id")
-        if (reservations.size >= maxReservations || (fromAgentId !in perSenderCount && perSenderCount.size >= maxSenders)) {
-            return RoutingDecision.Dropped("reservation_capacity_exceeded")
-        }
         val count = perSenderCount[fromAgentId] ?: 0
-        if (count >= maxPerSender) return RoutingDecision.Dropped("per_sender_cap_exceeded")
-        perSenderCount[fromAgentId] = count + 1
-        reservations[msgId] = ReservationState.RESERVED
-        return null
+        val atCapacity = reservations.size >= maxReservations ||
+            (fromAgentId !in perSenderCount && perSenderCount.size >= maxSenders)
+        return when {
+            fromAgentId == ownAgentId || fromAgentId in siblingAgentIds -> RoutingDecision.Dropped("ping_pong_own_or_sibling")
+            !validIdentity(fromAgentId) || !validIdentity(msgId) -> RoutingDecision.Dropped("invalid_identity")
+            msgId in reservations -> RoutingDecision.Dropped("duplicate_msg_id")
+            atCapacity -> RoutingDecision.Dropped("reservation_capacity_exceeded")
+            count >= maxPerSender -> RoutingDecision.Dropped("per_sender_cap_exceeded")
+            else -> {
+                perSenderCount[fromAgentId] = count + 1
+                reservations[msgId] = ReservationState.RESERVED
+                null
+            }
+        }
     }
 
     private fun validIdentity(value: String): Boolean = value.isNotBlank() && value.length <= MAX_IDENTITY_CHARS
