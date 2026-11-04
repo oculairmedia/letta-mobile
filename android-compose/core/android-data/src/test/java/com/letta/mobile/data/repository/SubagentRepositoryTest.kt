@@ -210,7 +210,7 @@ class SubagentRepositoryTest {
     fun `two agents sharing default conversation receive isolated snapshots`() = runTest {
         val agentOne = running("toolu-agent-1")
         val agentTwo = running("toolu-agent-2").copy(parentAgentId = "agent-other")
-        transport.enqueueSubagentList(successList(listOf(agentOne, agentTwo)))
+        transport.enqueueSubagentList(successList(listOf(agentOne)), successList(listOf(agentTwo)))
         val repo = repository(backgroundScope)
 
         val first = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -219,13 +219,14 @@ class SubagentRepositoryTest {
 
         assertEquals(listOf("toolu-agent-1"), first.map { it.toolCallId })
         assertEquals(listOf("toolu-agent-2"), second.map { it.toolCallId })
+        assertEquals(2, transport.subagentListCalls.size)
     }
 
     @Test
     fun `conversation switch projects only the selected parent conversation`() = runTest {
         val firstConversation = running("toolu-conv-a").copy(parentConversationId = "conv-a")
         val secondConversation = running("toolu-conv-b").copy(parentConversationId = "conv-b")
-        transport.enqueueSubagentList(successList(listOf(firstConversation, secondConversation)))
+        transport.enqueueSubagentList(successList(listOf(firstConversation)), successList(listOf(secondConversation)))
         val repo = repository(backgroundScope)
 
         val first = repo.activeSubagentsFlow(SubagentParentScope("agent-parent", "conv-a"))
@@ -235,6 +236,7 @@ class SubagentRepositoryTest {
 
         assertEquals(listOf("toolu-conv-a"), first.map { it.toolCallId })
         assertEquals(listOf("toolu-conv-b"), second.map { it.toolCallId })
+        assertEquals(2, transport.subagentListCalls.size)
     }
 
     @Test
