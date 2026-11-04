@@ -1,3 +1,7 @@
+type ConversationId = string;
+type AgentId = string;
+type ConversationKey = string;
+
 export type RetryFixtureMessage = {
   type: "message" | "approval";
   role?: "user" | "assistant";
@@ -18,12 +22,12 @@ export type RetryFixtureRow = {
   metadata: { conversation_id: string; agent_id: string };
 };
 export type RetryFixtureStore = {
-  appendTurnInput: (conversationId: string, body: { agent_id: string; messages: RetryFixtureMessage[] }) => unknown;
-  appendUserLocalMessage: (conversationId: string, agentId: string, message: RetryFixtureMessage) => RetryFixtureRow;
-  localMessagesForConversation: (conversationId: string, agentId: string) => RetryFixtureRow[];
-  residentLocalMessagesForConversation: (conversationId: string, agentId: string) => RetryFixtureRow[];
-  pushLocalMessage: (conversationId: string, agentId: string, message: RetryFixtureRow) => void;
-  validateUnreadTranscriptHeadOnce: (key: string) => void;
+  appendTurnInput: (conversationId: ConversationId, body: { agent_id: string; messages: RetryFixtureMessage[] }) => unknown;
+  appendUserLocalMessage: (conversationId: ConversationId, agentId: AgentId, message: RetryFixtureMessage) => RetryFixtureRow;
+  localMessagesForConversation: (conversationId: ConversationId, agentId: AgentId) => RetryFixtureRow[];
+  residentLocalMessagesForConversation: (conversationId: ConversationId, agentId: AgentId) => RetryFixtureRow[];
+  pushLocalMessage: (conversationId: ConversationId, agentId: AgentId, message: RetryFixtureRow) => void;
+  validateUnreadTranscriptHeadOnce: (key: ConversationKey) => void;
 };
 export type RetryFixtureRuntime = {
   ensure: (messages: RetryFixtureMessage[]) => RetryFixtureMessage[];
