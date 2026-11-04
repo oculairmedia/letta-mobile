@@ -18,11 +18,11 @@ Description=Meridian agent-spawned builds (isolated from the App Server cgroup)
 Before=slices.target
 
 [Slice]
-# MemoryHigh throttles and reclaims; MemoryMax is the backstop that kills a
-# genuine runaway. Deliberately NOT applied to the App Server, which must never
-# be the thing that gets squeezed. 8G covers the configured 4g+4g heaps.
-MemoryHigh=8G
-MemoryMax=12G
+# Compiler heaps, native memory and test workers exceed the old 8G reclaim
+# threshold. Do not throttle builds via MemoryHigh when host RAM is available.
+# Keep a 24G runaway backstop, isolated from the production App Server.
+MemoryHigh=infinity
+MemoryMax=24G
 # Builds are batch work: yield CPU to the production path under contention.
 CPUWeight=20
 IOWeight=20

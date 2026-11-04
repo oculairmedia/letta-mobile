@@ -147,6 +147,42 @@ but GC/heap telemetry is required to confirm V8 pressure.
 
 ## Reading the output
 
+### Build memory budget
+
+`meridian-builds.slice` uses `MemoryHigh=infinity` and `MemoryMax=24G`.
+The former removes the soft reclaim/throttling threshold; the latter retains
+a hard runaway limit. `CPUWeight=20` and `IOWeight=20` are unchanged so batch
+work still yields to production under contention. This is not an unlimited
+memory allocation or a recommendation to increase build concurrency.
+
+The live host may have persistent overrides in
+`/etc/systemd/system.control/meridian-builds.slice.d/` set with
+`systemctl set-property`. Inspect effective properties as well as the source
+unit; do not remove overrides or restart active builds merely to reconcile
+the unit file. Apply or verify the approved budget without a restart:
+
+```sh
+systemctl set-property meridian-builds.slice MemoryHigh=infinity MemoryMax=24G
+systemctl show meridian-builds.slice -p MemoryHigh -p MemoryMax -p CPUWeight -p IOWeight
+cat /sys/fs/cgroup/meridian.slice/meridian-builds.slice/memory.events
+```
+
+Rollback to the previous budget (can reintroduce reclaim pressure):
+
+```sh
+systemctl set-property meridian-builds.slice MemoryHigh=8G MemoryMax=12G
+```
+
+Measure a necessary real build, not a synthetic heavy benchmark: record its
+commit and dirty-tree identity, exact gate, JDK/worker flags, task-cache and
+configuration-cache results, concurrent build count, elapsed time and the
+build slice's `memory.events` before/after deltas. Capture `memory.pressure`
+and actual process cgroup placement too. Counters are cumulative and slice-wide;
+if another build overlaps, the delta cannot be attributed to one gate alone.
+Retained swap usage alone does not establish current reclaim pressure.
+Without a comparable pre-change gate/cache/concurrency sample, label the result
+a new baseline, not a measured speedup.
+
 - `/var/log/meridian-probe-latency.log` — correlated `app_server_info_response`
   round-trip time series. **Healthy baseline is 5–9ms.** `reply=` is measured
   from the validated WebSocket upgrade, not process start. A `FAIL` with
