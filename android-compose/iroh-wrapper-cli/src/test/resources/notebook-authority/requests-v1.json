@@ -1,0 +1,5 @@
+{
+  "reference": {"method":"notebook.reference.resolve","params":{"document_id":"0123456789abcdef0123456789abcdef"}},
+  "open": {"method":"notebook.note.open","params":{"document_id":"0123456789abcdef0123456789abcdef"}},
+  "save": {"method":"notebook.note.save","params":{"document_id":"0123456789abcdef0123456789abcdef","expected":"before","replacement":"after"}}
+}

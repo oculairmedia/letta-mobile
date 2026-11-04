@@ -1,0 +1,6 @@
+{
+  "syncOnly": {"grantFile": null, "allowed": true},
+  "syncWithMissingGrants": {"grantFile": "missing-grants.json", "allowed": false},
+  "syncWithGrants": {"grantFile": "grants.json", "allowed": false},
+  "syncWithCorruptGrants": {"grantFile": "corrupt-grants.json", "allowed": false}
+}

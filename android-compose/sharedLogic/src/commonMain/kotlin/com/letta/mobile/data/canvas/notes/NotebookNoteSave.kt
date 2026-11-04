@@ -14,6 +14,9 @@ sealed interface NotebookNoteSave {
     /** [applied] is in memory; retry must flush it before attempting another replacement. */
     data class PendingDurability(val applied: NotebookNoteSnapshot, val reason: String) : NotebookNoteSave
 
+    /** Authority refused the operation before any mutation. */
+    data object Denied : NotebookNoteSave
+
     /** No mutation was acknowledged. A read-only, missing or failed source remains explicit. */
     data class Unavailable(val reason: String) : NotebookNoteSave
 }

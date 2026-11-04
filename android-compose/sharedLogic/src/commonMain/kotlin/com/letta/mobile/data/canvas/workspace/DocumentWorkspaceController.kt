@@ -92,9 +92,13 @@ class DocumentWorkspaceController(private val opener: DocumentWorkspaceOpener) {
         try {
             currentCoroutineContext().ensureActive()
             val current = state.value.current
+            val problem = if (target.id != id || target.references?.id?.let { it != id } == true) {
+                DocumentWorkspaceProblem.IDENTITY_MISMATCH
+            } else {
+                readyProblem(target)
+            }
             return when {
-                target.id != id || target.references?.id?.let { it != id } == true -> fail(DocumentWorkspaceProblem.IDENTITY_MISMATCH)
-                !ready(target) -> fail(DocumentWorkspaceProblem.UNAVAILABLE)
+                problem != null -> fail(problem)
                 // A freshly authorized self-open must not replace the live draft with a new session.
                 current?.id == id -> true
                 current != null && !current.note.prepareClose() -> checkedFailure(DocumentWorkspaceProblem.SAVE_FAILED)
@@ -114,13 +118,17 @@ class DocumentWorkspaceController(private val opener: DocumentWorkspaceOpener) {
         return true
     }
 
-    private suspend fun ready(target: DocumentWorkspaceSessions): Boolean {
+    private suspend fun readyProblem(target: DocumentWorkspaceSessions): DocumentWorkspaceProblem? {
         // References may be the first presentation; close must not depend on visiting Note first.
         // A retained baseline proves only an earlier load. Every open needs a current read result.
         target.note.refresh()
         currentCoroutineContext().ensureActive()
         val loaded = target.note.state.value
-        return loaded.baseline != null && !loaded.loading && !loaded.notFound && loaded.error == null
+        return when {
+            loaded.denied -> DocumentWorkspaceProblem.DENIED
+            loaded.baseline == null || loaded.loading || loaded.notFound || loaded.error != null -> DocumentWorkspaceProblem.UNAVAILABLE
+            else -> null
+        }
     }
 
     private suspend fun checkedFailure(problem: DocumentWorkspaceProblem): Boolean {

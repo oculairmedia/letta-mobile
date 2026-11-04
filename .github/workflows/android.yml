@@ -621,6 +621,8 @@ jobs:
           exit 1
 
       - name: Run remaining shared multiplatform verification task graph
+        env:
+          RUN_NOTEBOOK_NATIVE_TESTS: "true"
         # Do not request :sharedLogic:allTests (hostNativeTest hangs) or
         # :desktop:test in this job (:desktop:test hung for the 25m timeout
         # on follow-up PRs even when run before Konan). Desktop unit tests

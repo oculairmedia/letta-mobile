@@ -93,6 +93,15 @@ class IrohWrapperCliWiringTest {
     }
 
     @Test
+    fun hostGrantAdministrationIsRegistered() {
+        val grant = buildIrohWrapperCli().registeredSubcommands()
+            .single { it.commandName == "notebook-grant" }
+        val options = grant.registeredOptions().flatMap { it.names }
+        listOf("--file", "--principal", "--document", "--read", "--edit", "--reference", "--revoke")
+            .forEach { assertTrue(it in options, "missing $it") }
+    }
+
+    @Test
     fun rootCommandNameMatchesTheInstalledLauncherName() {
         // `application { applicationName }` generates bin/meridian-iroh-wrapper;
         // keep the help text's program name in sync with it.

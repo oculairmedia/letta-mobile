@@ -12,6 +12,11 @@ import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
  * explicit persisted capability set. `admin.full` is never implicit.
  */
 object IrohPeerCapabilities {
+    /** Internal gate for notebook methods; their handler requires authentication and a document grant. */
+    const val NOTEBOOK_AUTHENTICATED = "notebook.authenticated"
+    private val NOTEBOOK_METHODS = setOf(
+        "notebook.reference.resolve", "notebook.note.open", "notebook.note.save", "notebook.note.flush",
+    )
     const val CHAT_READ = "chat.read"
     const val CHAT_SEND = "chat.send"
     const val CONVERSATION_MANAGE = "conversation.manage"
@@ -101,6 +106,7 @@ object IrohPeerCapabilities {
      * classified here (and in the ownership matrix).
      */
     fun forAdminMethod(method: String): String = when {
+        method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
         method in BEADS_READ_METHODS -> BEADS_READ
         method in BEADS_WRITE_METHODS -> BEADS_WRITE
         method in WRAPPER_RECORD_READ_METHODS -> CHAT_READ
@@ -184,7 +190,7 @@ object IrohPeerCapabilities {
     }
 
     fun isAllowed(capabilities: Set<String>, required: String): Boolean =
-        ADMIN_FULL in capabilities || required in capabilities
+        required != NOTEBOOK_AUTHENTICATED && (ADMIN_FULL in capabilities || required in capabilities)
 
     /**
      * Agent scope check: null scope = every agent; a

@@ -20,6 +20,8 @@ data class NotebookNoteState(
     val loading: Boolean = false,
     val saving: Boolean = false,
     val notFound: Boolean = false,
+    /** The current host authority refused access. */
+    val denied: Boolean = false,
     val error: String? = null,
     val indeterminateWrite: NotebookNoteSnapshot? = null,
 ) {
@@ -30,7 +32,10 @@ data class NotebookNoteState(
     /** Source Markdown changed relative to the editor's CAS base. */
     val conflict: Boolean get() = baseline != null && observed != null && baseline.markdown != observed.markdown
     /** A stale source must be explicitly reloaded/discarded before another replacement. */
-    val canSave: Boolean get() = baseline != null && !loading && !saving && !conflict && !notFound
+    val canSave: Boolean get() {
+        if (denied) return false
+        return baseline != null && !loading && !saving && !conflict && !notFound
+    }
 }
 
 /** Reduce a read against the captured edit state without acknowledging pending writes. */
@@ -49,6 +54,7 @@ internal fun NotebookNoteState.afterLoad(
             notFound = false,
         )
     }
+    NotebookNoteLoad.Denied -> copy(denied = true, error = "Notebook access denied")
     NotebookNoteLoad.NotFound -> copy(notFound = true)
     is NotebookNoteLoad.Unavailable -> copy(error = result.reason)
 }
@@ -61,6 +67,7 @@ internal fun NotebookNoteState.afterSave(result: NotebookNoteSave): NotebookNote
         observed = if (applied == result.applied) observed else result.applied,
     )
     is NotebookNoteSave.Conflict -> (result.durable?.let { acknowledge(it) } ?: this).copy(observed = result.current)
+    NotebookNoteSave.Denied -> copy(denied = true, error = "Notebook access denied")
     is NotebookNoteSave.Unavailable -> copy(error = result.reason)
 }
 
@@ -72,9 +79,17 @@ internal fun NotebookNoteState.afterReconciliation(
     val durable = when (result) {
         is NotebookNoteSave.Saved -> result.snapshot
         is NotebookNoteSave.Conflict -> result.durable
-            ?: return copy(error = "Notebook write outcome unknown; retry persistence")
-        is NotebookNoteSave.PendingDurability -> return copy(error = result.reason)
-        is NotebookNoteSave.Unavailable -> return copy(error = result.reason)
+        is NotebookNoteSave.PendingDurability, NotebookNoteSave.Denied, is NotebookNoteSave.Unavailable -> null
+    }
+    if (durable == null) {
+        val reason = when (result) {
+            is NotebookNoteSave.Conflict -> "Notebook write outcome unknown; retry persistence"
+            is NotebookNoteSave.PendingDurability -> result.reason
+            NotebookNoteSave.Denied -> "Notebook access denied"
+            is NotebookNoteSave.Unavailable -> result.reason
+            is NotebookNoteSave.Saved -> error("A saved snapshot cannot be missing")
+        }
+        return copy(error = reason, denied = result == NotebookNoteSave.Denied)
     }
     // Only submitted text or the old baseline can resolve our CAS base automatically.
     // Unrelated peer text remains an explicit conflict with the retained draft.

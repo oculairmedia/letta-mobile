@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.core.subcommands
 import com.letta.mobile.cli.commands.AgentMessageCommand
 import com.letta.mobile.cli.commands.AgentMessageSendCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohCommand
+import com.letta.mobile.wrapper.notebook.NotebookGrantCommand
 import com.letta.mobile.cli.commands.PairCommand
 
 /**
@@ -51,6 +52,7 @@ fun buildIrohWrapperCli(): CliktCommand =
     IrohWrapperCli().subcommands(
         AppServerServeIrohCommand(),
         PairCommand(),
+        NotebookGrantCommand(),
         AgentMessageCommand().subcommands(AgentMessageSendCommand()),
     )
 
@@ -72,11 +74,13 @@ object Main {
         Usage:
           meridian-iroh-wrapper app-server-serve-iroh [options]
           meridian-iroh-wrapper pair [options]
+          meridian-iroh-wrapper notebook-grant [options]
           meridian-iroh-wrapper agent-message send [options]
 
         Commands:
           app-server-serve-iroh  Bridge Iroh QUIC <-> App Server WebSocket.
           pair                    Mint a QR-encoded pairing invite (letta-mobile-gw0h1).
+          notebook-grant          Provision or revoke a host notebook grant.
           agent-message send     Send a direct agent-to-agent message over Iroh (letta-mobile-e12nf).
 
         Run `meridian-iroh-wrapper <command> --help` for options.

@@ -8886,6 +8886,7 @@ public final class com/letta/mobile/data/canvas/NotebookLocalStore : com/letta/m
 	public final fun removeItem (Lorg/automerge/repo/DocumentId;Ljava/lang/String;)V
 	public final fun replaceMarkdown (Lorg/automerge/repo/DocumentId;Ljava/lang/String;Ljava/lang/String;)Z
 	public final fun repoForSync ()Lorg/automerge/repo/Repo;
+	public final fun requireGrantIsolation ()V
 	public fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 	public final fun setBoard (Lorg/automerge/repo/DocumentId;Ljava/lang/String;)V
 	public final fun startPolling (JLkotlin/jvm/functions/Function2;)V
@@ -8989,6 +8990,29 @@ public final class com/letta/mobile/data/canvas/UnauthorizedCanvasMutationExcept
 	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCanvasId ()Lcom/letta/mobile/data/model/CanvasId;
+}
+
+public final class com/letta/mobile/data/canvas/authority/FileNotebookGrantStore : com/letta/mobile/data/canvas/authority/NotebookGrantStore {
+	public fun <init> (Ljava/nio/file/Path;)V
+	public final fun provision (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/NotebookPeerGrant;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun revoke (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/authority/HostNotebookAccess {
+	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookLocalStore;Lcom/letta/mobile/data/canvas/authority/NotebookGrantStore;Ljava/lang/String;)V
+	public final fun getBackend ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;
+	public final fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
+	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/authority/NotebookGrantStore {
+	public abstract fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/authority/NotebookGrantStoreKt {
+	public static final fun mayEditNotebookContent (Lcom/letta/mobile/data/canvas/NotebookPeerGrant;)Z
+	public static final fun mayResolveNotebookReference (Lcom/letta/mobile/data/canvas/NotebookPeerGrant;)Z
 }
 
 public final class com/letta/mobile/data/canvas/bubble/CanvasBubbleLayout {
@@ -10316,6 +10340,13 @@ public abstract interface class com/letta/mobile/data/canvas/notes/NotebookNoteB
 public abstract interface class com/letta/mobile/data/canvas/notes/NotebookNoteLoad {
 }
 
+public final class com/letta/mobile/data/canvas/notes/NotebookNoteLoad$Denied : com/letta/mobile/data/canvas/notes/NotebookNoteLoad {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/notes/NotebookNoteLoad$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/canvas/notes/NotebookNoteLoad$Found : com/letta/mobile/data/canvas/notes/NotebookNoteLoad {
 	public fun <init> (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;)V
 	public final fun component1 ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
@@ -10358,6 +10389,13 @@ public final class com/letta/mobile/data/canvas/notes/NotebookNoteSave$Conflict 
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCurrent ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
 	public final fun getDurable ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/notes/NotebookNoteSave$Denied : com/letta/mobile/data/canvas/notes/NotebookNoteSave {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/notes/NotebookNoteSave$Denied;
+	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -10425,11 +10463,12 @@ public final class com/letta/mobile/data/canvas/notes/NotebookNoteSnapshot {
 }
 
 public final class com/letta/mobile/data/canvas/notes/NotebookNoteState {
-	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
+	public final fun component10 ()Z
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
 	public final fun component2 ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
 	public final fun component3 ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
 	public final fun component4 ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
@@ -10438,13 +10477,14 @@ public final class com/letta/mobile/data/canvas/notes/NotebookNoteState {
 	public final fun component7 ()Z
 	public final fun component8 ()Z
 	public final fun component9 ()Z
-	public final fun copy (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/notes/NotebookNoteState;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteState;
+	public final fun copy (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/notes/NotebookNoteState;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Ljava/lang/String;ZZZZLjava/lang/String;Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getApplied ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
 	public final fun getBaseline ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
 	public final fun getCanSave ()Z
 	public final fun getConflict ()Z
+	public final fun getDenied ()Z
 	public final fun getDirty ()Z
 	public final fun getDraft ()Ljava/lang/String;
 	public final fun getDurable ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;
@@ -18046,16 +18086,18 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry {
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext$Companion;
-	public fun <init> (ZLjava/util/Set;Ljava/util/Set;)V
-	public synthetic fun <init> (ZLjava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;)V
+	public synthetic fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun canAccessConversation (Ljava/lang/String;)Z
 	public final fun component1 ()Z
 	public final fun component2 ()Ljava/util/Set;
 	public final fun component3 ()Ljava/util/Set;
-	public final fun copy (ZLjava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ZLjava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAuthenticated ()Z
+	public final fun getAuthenticatedEndpointId ()Ljava/lang/String;
 	public final fun getAuthorizedAgentIds ()Ljava/util/Set;
 	public final fun getAuthorizedConversationIds ()Ljava/util/Set;
 	public fun hashCode ()I
@@ -18734,6 +18776,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohPeerCapabiliti
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/IrohPeerCapabilities;
 	public static final field MEMORY_READ Ljava/lang/String;
 	public static final field MEMORY_WRITE Ljava/lang/String;
+	public static final field NOTEBOOK_AUTHENTICATED Ljava/lang/String;
 	public static final field PROJECTS_MANAGE Ljava/lang/String;
 	public static final field SCHEDULE_MANAGE Ljava/lang/String;
 	public static final field SKILLS_MANAGE Ljava/lang/String;
