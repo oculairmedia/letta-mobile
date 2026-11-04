@@ -49,7 +49,8 @@ class NotebookEndpointSession private constructor(
             endpoint, peers, scope, true,
         )
 
-    // repoForSync waits for the store's startup moves; documents they retired are never announced
+    // repoForSync rejects grant-protected stores before any accept/dial attachment, then waits
+    // for the store's startup moves; documents they retired are never announced
     // to peers, and a peer offering one is neither stored nor indexed.
     private val protocol = AutomergeIrohRepoProtocol(store.repoForSync(), peers, scope, endpoint::connect)
     init {

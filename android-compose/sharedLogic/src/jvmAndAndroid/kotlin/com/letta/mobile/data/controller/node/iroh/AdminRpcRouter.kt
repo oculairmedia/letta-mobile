@@ -39,6 +39,8 @@ data class AdminRpcRequestContext(
      * [AgentScopeGuard], so no handler can forget it.
      */
     val authorizedAgentIds: Set<String>? = null,
+    /** Iroh endpoint identity established by the serving connection, never request parameters. */
+    val authenticatedEndpointId: String? = null,
 ) {
     fun canAccessConversation(conversationId: String): Boolean =
         authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)

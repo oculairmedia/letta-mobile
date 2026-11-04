@@ -304,7 +304,7 @@ class IrohNodeConnection(
             // effective capabilities at dispatch time.
             capabilityGate = { method ->
                 val required = IrohPeerCapabilities.forAdminMethod(method)
-                if (IrohPeerCapabilities.isAllowed(effectiveCapabilities(), required)) null else required
+                if (allowsAdminCapability(required)) null else required
             },
             // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
             // so the shared message.list handler has no connection identity —
@@ -321,18 +321,22 @@ class IrohNodeConnection(
      * control-channel admin_rpc frames. Empty authorized set when the peer
      * has not hydrated a conversation yet (denies scoped methods).
      */
-    private fun currentAdminRpcRequestContext(): AdminRpcRequestContext =
-        AdminRpcRequestContext(
-            authenticated = authenticated.get(),
+    private fun currentAdminRpcRequestContext(): AdminRpcRequestContext {
+        val capabilities = effectiveCapabilities()
+        val isAuthenticated = authenticated.get()
+        return AdminRpcRequestContext(
+            authenticated = isAuthenticated,
+            authenticatedEndpointId = remoteEndpointId.takeIf { isAuthenticated && it.isNotBlank() },
             // lgns8.12: conversation-content scope follows peer capabilities —
             // manage/admin peers are unrestricted (null); lesser peers are
             // bounded to the conversation they are viewing.
             authorizedConversationIds = IrohPeerCapabilities.conversationScope(
-                capabilities = effectiveCapabilities(),
+                capabilities = capabilities,
                 viewedConversationId = viewerSubscription?.currentConversation,
             ),
             authorizedAgentIds = sessionAuth.agentScope(),
         )
+    }
 
     /**
      * A runtime frame (runtime_start, input, sync, abort, queue
@@ -358,7 +362,7 @@ class IrohNodeConnection(
         // d6e8g.6: per-method capability gate BEFORE dispatch — a denial must
         // have no proxy side effects. Unknown methods require admin.full.
         val requiredCapability = IrohPeerCapabilities.forAdminMethod(method)
-        if (!IrohPeerCapabilities.isAllowed(effectiveCapabilities(), requiredCapability)) {
+        if (!allowsAdminCapability(requiredCapability)) {
             Telemetry.event(
                 "IrohNode", "authz.denied",
                 "remoteEndpointId" attr remoteEndpointId,
@@ -703,6 +707,12 @@ class IrohNodeConnection(
     }
 
     private val authFailuresOnThisConnection = java.util.concurrent.atomic.AtomicInteger(0)
+
+    private fun allowsAdminCapability(required: String): Boolean {
+        val capabilities = effectiveCapabilities()
+        return authenticated.get() && (required == IrohPeerCapabilities.NOTEBOOK_AUTHENTICATED ||
+            IrohPeerCapabilities.isAllowed(capabilities, required))
+    }
 
     /** Effective capabilities for this connection (see [PeerSessionAuth]). */
     private fun effectiveCapabilities(): Set<String> = sessionAuth.effectiveCapabilities()

@@ -1,11 +1,12 @@
 package com.letta.mobile.cli.commands
 
-import com.github.ajalt.clikt.parameters.groups.OptionGroup
-import com.github.ajalt.clikt.parameters.options.option
-
-internal fun parseNotebookPeers(directory: String?, ids: String?): Set<String>? {
+internal fun parseNotebookPeers(directory: String?, ids: String?, grantsFile: String? = null): Set<String>? {
     require((directory == null) == (ids == null)) {
         "Notebook sync requires both --notebook-dir and --notebook-peer-ids"
+    }
+    require(directory == null || grantsFile == null) {
+        "Notebook grants cannot use unrestricted repository sync. " +
+            "Use --notebook-authority-dir with --notebook-grants-file and remove --notebook-dir / --notebook-peer-ids"
     }
     if (directory == null) return null
     require(directory.isNotBlank()) { "Notebook directory must not be blank" }

@@ -75,7 +75,7 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
     private suspend fun read(discard: Boolean): Boolean {
         val generation = editGeneration
         val before = state.value
-        mutableState.value = before.copy(loading = true, error = null)
+        mutableState.value = before.copy(loading = true, error = null, denied = false)
         try {
             val result = backend.load(id)
             mutableState.value = state.value.afterLoad(result, before, discard, generation == editGeneration)
@@ -114,6 +114,7 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
             val result = withTimeoutOrNull(5.seconds) {
                 when (val loaded = backend.load(id)) {
                     is NotebookNoteLoad.Found -> backend.flush(loaded.snapshot)
+                    NotebookNoteLoad.Denied -> NotebookNoteSave.Denied
                     NotebookNoteLoad.NotFound -> {
                         mutableState.value = state.value.copy(notFound = true)
                         NotebookNoteSave.Unavailable("Local notebook not found")
@@ -140,7 +141,7 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
         failureMessage: String = "Notebook save failed",
         action: suspend () -> Unit,
     ): Boolean {
-        mutableState.value = state.value.copy(saving = true, error = null)
+        mutableState.value = state.value.copy(saving = true, error = null, denied = false)
         try {
             action()
         } catch (cancelled: CancellationException) {

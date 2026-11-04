@@ -81,6 +81,8 @@ class NotebookLocalStore(
     }
     private var polling: ScheduledFuture<*>? = null
     private var closed = false
+    private var grantProtected = false
+    private var syncExposed = false
 
     /** Indexed notebooks include local creations and explicitly registered remote documents. */
     @Synchronized
@@ -216,9 +218,27 @@ class NotebookLocalStore(
      * The repository, for peer sync, once the store's startup moves are done. A peer may still
      * offer a retired document: it is neither stored nor indexed (see [NotebookDocumentIndex]).
      */
+    @Synchronized
     fun repoForSync(): Repo {
+        check(!grantProtected) {
+            "Grant-protected notebooks cannot use unrestricted repository sync; use authenticated notebook RPC"
+        }
         health.awaitPrepared()
+        syncExposed = true
         return repo
+    }
+
+    /**
+     * Permanently isolate this store from raw sync before installing grant-bound operations.
+     * Activation fails after any repository exposure because native handles may retain active links.
+     * This is a configuration gate, not per-document native synchronization authorization.
+     */
+    @Synchronized
+    fun requireGrantIsolation() {
+        check(!syncExposed) {
+            "Notebook repository already exposed to unrestricted repository sync; restart in RPC-only grant mode"
+        }
+        grantProtected = true
     }
 
     /** Retired documents a peer offered since the store opened; each was refused. */
@@ -252,15 +272,26 @@ class NotebookLocalStore(
     private fun <T> DocHandle.writing(id: DocumentId, block: (Document) -> T): T {
         health.checkWritable()
         var newerLayout = 0L
-        val written = withDocument { document ->
-            val version = NotebookBoardStorage.layoutVersion(document)
-            if (version > NotebookBoardStorage.LAYOUT_VERSION) {
-                newerLayout = version
-                null
-            } else {
-                Written(block(document))
-            }
-        }.await()
+        val executionLock = Any()
+        var awaiting = true
+        val written = try {
+            withDocument { document ->
+                synchronized(executionLock) {
+                    if (!awaiting) return@synchronized null
+                    val version = NotebookBoardStorage.layoutVersion(document)
+                    if (version > NotebookBoardStorage.LAYOUT_VERSION) {
+                        newerLayout = version
+                        null
+                    } else {
+                        Written(block(document))
+                    }
+                }
+            }.await()
+        } finally {
+            // A timeout/interrupt must not release an outer grant lock with a runnable mutation
+            // still queued. Withdraw queued callbacks, or await an already executing transaction.
+            synchronized(executionLock) { awaiting = false }
+        }
         if (written == null) throw health.refuseLayout(id.stableKey(), newerLayout)
         return written.value
     }

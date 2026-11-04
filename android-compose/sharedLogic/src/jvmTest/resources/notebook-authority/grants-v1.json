@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "grants": [
+    {
+      "principal": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "documentId": "0123456789abcdef0123456789abcdef",
+      "mayRead": true,
+      "mayEdit": false,
+      "mayReference": true
+    }
+  ]
+}

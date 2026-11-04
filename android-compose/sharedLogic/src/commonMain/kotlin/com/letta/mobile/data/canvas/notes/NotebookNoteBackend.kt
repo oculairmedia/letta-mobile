@@ -9,6 +9,8 @@ data class NotebookNoteSnapshot(val id: NotebookDocumentId, val title: String, v
 sealed interface NotebookNoteLoad {
     /** A document exists, including when its Markdown is empty. */
     data class Found(val snapshot: NotebookNoteSnapshot) : NotebookNoteLoad
+    /** The current host authority refused access. */
+    data object Denied : NotebookNoteLoad
     /** The local repository does not have this document. */
     data object NotFound : NotebookNoteLoad
     /** The source could not be read; [reason] describes that source failure. */

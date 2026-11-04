@@ -128,7 +128,19 @@ class AppServerServeIrohCommand : CliktCommand(
     private val notebookPeerIds by option(
         "--notebook-peer-ids",
         envvar = "LETTA_NOTEBOOK_PEER_IDS",
-        help = "Comma-separated Iroh endpoint IDs authorized for notebook sync (independent of App Server auth).",
+        help = "Comma-separated Iroh endpoint IDs trusted for unrestricted repository sync; incompatible with notebook grants.",
+    )
+
+    private val notebookAuthorityDir by option(
+        "--notebook-authority-dir",
+        envvar = "LETTA_NOTEBOOK_AUTHORITY_DIR",
+        help = "Notebook directory for host grant operations without enabling repository sync.",
+    )
+
+    private val notebookGrantsFile by option(
+        "--notebook-grants-file",
+        envvar = "LETTA_NOTEBOOK_GRANTS_FILE",
+        help = "Protected host-owned notebook grant file; absent grants deny access.",
     )
 
     private val vibesyncBaseUrl by option(
@@ -365,11 +377,11 @@ class AppServerServeIrohCommand : CliktCommand(
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             
-            val canvasRelay = startCanvasRelay(scope)
-            pluginHost = startPluginHost(PluginHostFlags(pluginsMode, pluginsDir), pluginCanvas, productionToolRegistry, scope)
             val (store, protocol) = initNotebookSync(scope) { irohEndpoint }
             notebookStore = store
             notebookProtocol = protocol
+            val canvasRelay = startCanvasRelay(scope)
+            pluginHost = startPluginHost(PluginHostFlags(pluginsMode, pluginsDir), pluginCanvas, productionToolRegistry, scope)
             // The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at
             // bind); its App Server client is created after, so the receiver reads it late.
             val a2aClient = java.util.concurrent.atomic.AtomicReference<AppServerClient?>()
@@ -407,6 +419,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 scope = scope,
                 pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
                 pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
+                notebooks = notebookStore,
             )
 
             startMeridianTools(scope, nativeAdminClient)
@@ -506,16 +519,28 @@ class AppServerServeIrohCommand : CliktCommand(
         scope: CoroutineScope,
         endpointProvider: () -> IrohNodeEndpoint?,
     ): Pair<NotebookLocalStore?, AutomergeIrohRepoProtocol?> {
-        val peers = parseNotebookPeers(notebookDir, notebookPeerIds) ?: return null to null
+        val peers = parseNotebookPeers(notebookDir, notebookPeerIds, notebookGrantsFile)
+        require(notebookGrantsFile == null || !notebookGrantsFile.isNullOrBlank()) {
+            "--notebook-grants-file must not be blank"
+        }
+        require(notebookAuthorityDir == null || !notebookGrantsFile.isNullOrBlank()) {
+            "--notebook-authority-dir requires --notebook-grants-file"
+        }
+        require(notebookGrantsFile == null || notebookDir != null || !notebookAuthorityDir.isNullOrBlank()) {
+            "--notebook-grants-file requires a notebook directory"
+        }
+        val directory = notebookAuthorityDir ?: notebookDir ?: return null to null
         val keyFile = requireNotNull(irohSecretKeyPath) {
-            "Notebook sync requires --iroh-secret-key-file for stable peer identity"
+            "Notebook storage requires --iroh-secret-key-file for stable peer identity"
         }
         val peerId = IrohNodeIdentity.nodeIdHexFromSecretBytes(FileIrohSecretKeyStore(keyFile).loadOrCreate())
-        // An over-budget history moves to a new document when the store opens; the retired id is
-        // never announced to peers or stored again.
-        val store = NotebookLocalStore(java.nio.file.Path.of(requireNotNull(notebookDir)), peerId)
-        val protocol = AutomergeIrohRepoProtocol(store.repoForSync(), peers, scope) { remote, alpn ->
-            checkNotNull(endpointProvider()) { "Iroh endpoint not started" }.connect(remote, alpn)
+        val store = NotebookLocalStore(java.nio.file.Path.of(directory), peerId).also {
+            if (notebookGrantsFile != null) it.requireGrantIsolation()
+        }
+        val protocol = peers?.let {
+            AutomergeIrohRepoProtocol(store.repoForSync(), it, scope) { remote, alpn ->
+                checkNotNull(endpointProvider()) { "Iroh endpoint not started" }.connect(remote, alpn)
+            }
         }
         return store to protocol
     }
@@ -549,6 +574,7 @@ class AppServerServeIrohCommand : CliktCommand(
         scope: CoroutineScope,
         pairingQr: PairingQrConfig?,
         pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
+        notebooks: NotebookLocalStore?,
     ) {
         admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
@@ -581,6 +607,16 @@ class AppServerServeIrohCommand : CliktCommand(
             permissionModes = permissionModes,
             pluginRoutes = pluginRoutes,
         )
+        notebookGrantsFile?.let { file ->
+            val store = requireNotNull(notebooks) { "Notebook grants require a notebook store" }
+            val requestedGrantPath = java.nio.file.Path.of(file).toAbsolutePath().normalize()
+            val grantPath = requireNotNull(requestedGrantPath.parent).toRealPath().resolve(requestedGrantPath.fileName)
+            val notebookPath = java.nio.file.Path.of(notebookAuthorityDir ?: requireNotNull(notebookDir)).toRealPath()
+            require(!grantPath.startsWith(notebookPath)) { "Notebook grants must be outside notebook storage" }
+            com.letta.mobile.wrapper.notebook.registerNotebookAdminRoutes(
+                adminRpcRouter, store, com.letta.mobile.data.canvas.authority.FileNotebookGrantStore(grantPath),
+            )
+        }
         endpoint.attachPermissionModePublisher(permissionModes)
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
         subagentPublisher?.let(endpoint::attachSubagentPublisher)

@@ -32,6 +32,11 @@ val AUTOMERGE_REPO_ALPN: ByteArray get() = "meridian/automerge-repo/1".encodeToB
  *
  * [connect] must dial through the same host endpoint registered with this handler (for example,
  * IrohNodeEndpoint.connect). The allowlist must be provisioned out-of-band on both devices.
+ *
+ * This is unrestricted repository sync, not per-document grant enforcement. Both accept and dial
+ * require an unprotected repository obtained through NotebookLocalStore.repoForSync; grant-bound
+ * stores refuse that exposure. Native announce policy peers are self-reported Samod identities,
+ * never authenticated Iroh principals, and cannot enforce incoming edit rights or revocation.
  */
 class AutomergeIrohRepoProtocol(
     private val repo: Repo,

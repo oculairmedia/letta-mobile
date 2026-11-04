@@ -196,6 +196,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Current App Server protocol and admin ownership reference](reference/current-app-server-protocol.md)
 - [Documentation source audit — 2026-10-18](reference/documentation-audit-2026-10-18.md)
 - [Looking up Letta documentation](reference/letta-docs.md)
+- [Host notebook grants v1](reference/notebook-authority-v1.md)
 - [Plugin trust model](reference/plugin-trust-model.md)
 - [Plugin view bridge \`lcp-view/1\` — for plugin page authors](reference/plugin-view-bridge-v1.md)
 - [QR Pairing Protocol](reference/qr-pairing-protocol.md)

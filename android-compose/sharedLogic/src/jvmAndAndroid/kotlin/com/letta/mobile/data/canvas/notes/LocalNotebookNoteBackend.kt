@@ -25,7 +25,7 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
     }
 
     override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave = guarded {
-        val documentId = notebooks.resolveStorageId(storageId(id))
+        val documentId = notebooks.resolveStorageId(notebookStorageId(id))
             ?: return@guarded NotebookNoteSave.Unavailable("Local notebook not found")
         val before = snapshot(id) ?: return@guarded NotebookNoteSave.Unavailable("Local notebook not found")
         if (!notebooks.replaceMarkdown(documentId, expected, replacement)) {
@@ -37,7 +37,7 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
     }
 
     override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave = guarded {
-        val documentId = notebooks.resolveStorageId(storageId(applied.id))
+        val documentId = notebooks.resolveStorageId(notebookStorageId(applied.id))
             ?: return@guarded NotebookNoteSave.Unavailable("Local notebook not found")
         persist(applied, documentId)
     }
@@ -67,15 +67,8 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
         }
     }
 
-    private fun snapshot(id: NotebookDocumentId): NotebookNoteSnapshot? = notebooks.read(storageId(id))?.let {
+    private fun snapshot(id: NotebookDocumentId): NotebookNoteSnapshot? = notebooks.read(notebookStorageId(id))?.let {
         NotebookNoteSnapshot(it.id, it.title, it.markdown)
-    }
-
-    private fun storageId(id: NotebookDocumentId): DocumentId {
-        require(id.value.length == DOCUMENT_HEX_LENGTH && id.value.all { it in '0'..'9' || it in 'a'..'f' }) {
-            "Notebook ID must be the local store's lowercase hex DocumentId"
-        }
-        return DocumentId.fromBytes(id.value.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
     }
 
     private suspend fun <T> locked(action: () -> T): T = runInterruptible(Dispatchers.IO) {
@@ -90,7 +83,12 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
         NotebookNoteSave.Unavailable(expectedFailure.message ?: "Local notebook write failed")
     }
 
-    private companion object {
-        const val DOCUMENT_HEX_LENGTH = 32
+}
+
+/** Decode the exact logical notebook ID expected by the existing local repository. */
+internal fun notebookStorageId(id: NotebookDocumentId): DocumentId {
+    require(id.value.length == 32 && id.value.all { it in '0'..'9' || it in 'a'..'f' }) {
+        "Notebook ID must be the local store's lowercase hex DocumentId"
     }
+    return DocumentId.fromBytes(id.value.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
 }
