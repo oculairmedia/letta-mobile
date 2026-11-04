@@ -11,6 +11,20 @@ class A2aReservationTest {
     private val message = IrohAgentMessage("sender", "recipient", "body", "stable", 1)
 
     @Test
+    fun cancelledDispatchRemainsAmbiguousAndCannotBeExecutedAgain() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        var attempts = 0
+        val receiver = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+            { _, _ -> attempts++; entered.complete(Unit); kotlinx.coroutines.awaitCancellation() }, { _, _ -> true })
+        val dispatch = async { receiver.respond(message, "peer") }
+        entered.await()
+        dispatch.cancel()
+        dispatch.join()
+        assertEquals("duplicate_msg_id", receiver.respond(message, "peer").reason)
+        assertEquals(1, attempts)
+    }
+
+    @Test
     fun definiteRejectionAllowsRetryOfTheSameIdentity() = runTest {
         var attempts = 0
         val receiver = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },

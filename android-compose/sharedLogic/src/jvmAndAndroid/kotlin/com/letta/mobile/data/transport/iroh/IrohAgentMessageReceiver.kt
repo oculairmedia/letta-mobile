@@ -141,14 +141,15 @@ class IrohAgentMessageReceiver(
             if (error is CancellationException && error !is TimeoutCancellationException) throw error
             DeliveryOutcome(false, "delivery_timeout")
         }
-        runCatching {
+        return runCatching {
             updateRouting { router.settle(message.msgId, outcome.reservationState()) }
-        }.onFailure { error ->
+            outcome
+        }.getOrElse { error ->
             if (error is CancellationException) throw error
-            // The durable RESERVED entry is still suppressive; never release on journal failure.
+            // The durable RESERVED entry is still suppressive; never claim a released rejection.
             failures.record(error, origin = IncomingRemote("journal", "local"))
+            DeliveryOutcome(false, "reservation_journal_failure")
         }
-        return outcome
     }
 
     /** Marks authoritative transcript evidence without permitting another application dispatch. */
