@@ -498,6 +498,13 @@ class CanonicalTimelineEngine(
     suspend fun reconcilePageDetailed(
         request: TimelineEngineRequest,
         page: TimelineRemotePageResult.Page,
+    ): TimelineEngineReconcileResult = reconcilePageDetailed(request, page, catchUp = false)
+
+    /** A viewport's bounded history read remains authoritative when its live terminal was missed. */
+    internal suspend fun reconcilePageDetailed(
+        request: TimelineEngineRequest,
+        page: TimelineRemotePageResult.Page,
+        catchUp: Boolean,
     ): TimelineEngineReconcileResult = mutex.withLock {
         val requestMismatch = pendingReconcile !== request || request.selection !== mutablePublication.value.selection
         val generationMismatch = page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
@@ -506,7 +513,7 @@ class CanonicalTimelineEngine(
         }
         val turnInFlight = liveFence != null && mutableLive.value?.settlementRevision == null
         val nothingSettling = mutableSettling.value.isEmpty()
-        if (turnInFlight && nothingSettling) {
+        if (turnInFlight && nothingSettling && !catchUp) {
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
         }
         validate(page)
