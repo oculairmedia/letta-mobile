@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Use this for LEGACY / dev-dep assertions — the pinned admin-shim
 // node_modules copy (0.19.x as of writing). For modern anchors (>=0.27.x)
@@ -16,7 +17,8 @@ export function resolveLettaBundle(): string | null {
   // test file up to filesystem root, check <dir>/node_modules/@letta-ai/
   // letta-code/letta.js. Covers admin-shim/node_modules (CI) and any parent.
   const rel = "node_modules/@letta-ai/letta-code/letta.js";
-  let dir = dirname(new URL(import.meta.url).pathname);
+  // fileURLToPath decodes %20 and non-ASCII escapes that URL.pathname keeps.
+  let dir = dirname(fileURLToPath(import.meta.url));
   for (;;) {
     const candidate = join(dir, rel);
     if (existsSync(candidate)) return candidate;
