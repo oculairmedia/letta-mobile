@@ -31027,6 +31027,7 @@ final class com.letta.mobile.data.canvas/CanvasSessionRegistry { // com.letta.mo
     final fun clear() // com.letta.mobile.data.canvas/CanvasSessionRegistry.clear|clear(){}[0]
     final fun get(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.data.canvas/CanvasSessionRegistry.get|get(com.letta.mobile.data.model.CanvasId){}[0]
     final fun register(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.data.canvas/CanvasSessionRegistry.register|register(com.letta.mobile.data.canvas.CanvasSession){}[0]
+    final fun registerMount(com.letta.mobile.data.canvas/CanvasSession): kotlin/Function0<kotlin/Unit> // com.letta.mobile.data.canvas/CanvasSessionRegistry.registerMount|registerMount(com.letta.mobile.data.canvas.CanvasSession){}[0]
     final fun unregister(com.letta.mobile.data.model/CanvasId) // com.letta.mobile.data.canvas/CanvasSessionRegistry.unregister|unregister(com.letta.mobile.data.model.CanvasId){}[0]
 }
 

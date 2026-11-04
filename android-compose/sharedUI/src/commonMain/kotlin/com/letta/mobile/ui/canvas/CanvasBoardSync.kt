@@ -97,17 +97,14 @@ internal fun CanvasWorkspaceSessionLifetime(
     LaunchedEffect(session, sessionRegistry, retryGeneration.intValue) {
         val activeSession = session ?: return@LaunchedEffect
         var syncJob: Job? = null
-        var registered = false
+        var disposeRegistration: (() -> Unit)? = null
         try {
             val failure = runCatching {
                 if (activeSession.document.value == null) {
                     loadState.value = CanvasWorkspaceLoadState.Loading
                     activeSession.loadIfMissing()
                 }
-                if (sessionRegistry != null && sessionRegistry.get(activeSession.canvasId) !== activeSession) {
-                    sessionRegistry.register(activeSession)
-                    registered = true
-                }
+                disposeRegistration = sessionRegistry?.registerMount(activeSession)
                 syncJob = activeSession.startSync(this)
                 loadState.value = CanvasWorkspaceLoadState.Ready
                 awaitCancellation()
@@ -116,9 +113,7 @@ internal fun CanvasWorkspaceSessionLifetime(
         } finally {
             withContext(NonCancellable) {
                 syncJob?.cancelAndJoin()
-                if (registered && sessionRegistry?.get(activeSession.canvasId) === activeSession) {
-                    sessionRegistry.unregister(activeSession.canvasId)
-                }
+                disposeRegistration?.invoke()
             }
         }
     }

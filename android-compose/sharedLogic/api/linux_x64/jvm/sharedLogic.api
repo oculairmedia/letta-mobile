@@ -7966,6 +7966,7 @@ public final class com/letta/mobile/data/canvas/CanvasSessionRegistry {
 	public final fun clear ()V
 	public final fun get (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/CanvasSession;
 	public final fun register (Lcom/letta/mobile/data/canvas/CanvasSession;)V
+	public final fun registerMount (Lcom/letta/mobile/data/canvas/CanvasSession;)Lkotlin/jvm/functions/Function0;
 	public final fun unregister (Lcom/letta/mobile/data/model/CanvasId;)V
 }
 

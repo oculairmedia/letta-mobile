@@ -31,6 +31,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.CANVAS_VIEWER_TOGGLE_TAG
 import com.letta.mobile.ui.canvas.CanvasWorkspace
+import com.letta.mobile.ui.canvas.CanvasWorkspaceSessionLifetime
 import com.letta.mobile.ui.canvas.LocalCanvasBoardSessionImportGate
 import com.letta.mobile.ui.canvas.canvasViewerOptionTag
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
@@ -81,6 +82,86 @@ class CanvasWorkspaceViewerLifecycleTest {
         assertViewerTogglesKeepWorkspaceSync(session, sessionRegistry, transport, presenceTransport)
         assertEquals(4, presenceTransport.collectorStarts.get())
         closeWorkspace(workspaceVisible, session, sessionRegistry, transport)
+    }
+
+    @Test
+    fun closingOriginLeavesNewerSameIdSessionRegistered() = runComposeUiTest {
+        val originTransport = CountingCanvasSyncTransport()
+        val otherTransport = CountingCanvasSyncTransport()
+        val origin = session(originTransport)
+        val other = session(otherTransport)
+        val registry = CanvasSessionRegistry()
+        val originVisible = mutableStateOf(true)
+        val otherVisible = mutableStateOf(false)
+        setContent {
+            if (originVisible.value) CanvasWorkspaceSessionLifetime(origin, registry)
+            if (otherVisible.value) CanvasWorkspaceSessionLifetime(other, registry)
+        }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 1 }
+        runOnIdle { otherVisible.value = true }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
+        runOnIdle { originVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 0 }
+        assertSame(other, registry.get(origin.canvasId))
+        runOnIdle { otherVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 0 }
+        assertEquals(null, registry.get(origin.canvasId))
+    }
+
+    @Test
+    fun closingEitherSameIdMountKeepsTheSurvivorRegistered() = runComposeUiTest {
+        val originTransport = CountingCanvasSyncTransport()
+        val otherTransport = CountingCanvasSyncTransport()
+        val origin = session(originTransport)
+        val other = session(otherTransport)
+        val registry = CanvasSessionRegistry()
+        val isolatedRegistry = CanvasSessionRegistry()
+        val originVisible = mutableStateOf(true)
+        val otherVisible = mutableStateOf(false)
+
+        setContent {
+            if (originVisible.value) CanvasWorkspaceSessionLifetime(origin, registry)
+            if (otherVisible.value) CanvasWorkspaceSessionLifetime(other, registry)
+        }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 1 }
+        runOnIdle { otherVisible.value = true }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
+        assertSame(other, registry.get(origin.canvasId))
+        assertEquals(null, isolatedRegistry.get(origin.canvasId))
+
+        // Closing the current mount must reveal the still-mounted origin.
+        runOnIdle { otherVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 0 }
+        assertSame(origin, registry.get(origin.canvasId))
+
+        runOnIdle { otherVisible.value = true }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
+        runOnIdle { originVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 0 }
+        assertSame(other, registry.get(origin.canvasId))
+        runOnIdle { otherVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 0 }
+        assertEquals(null, registry.get(origin.canvasId))
+    }
+
+    @Test
+    fun closingOneOfTwoMountsOfSameSessionKeepsTheOtherRegistered() = runComposeUiTest {
+        val transport = CountingCanvasSyncTransport()
+        val shared = session(transport)
+        val registry = CanvasSessionRegistry()
+        val firstVisible = mutableStateOf(true)
+        val secondVisible = mutableStateOf(true)
+        setContent {
+            if (firstVisible.value) CanvasWorkspaceSessionLifetime(shared, registry)
+            if (secondVisible.value) CanvasWorkspaceSessionLifetime(shared, registry)
+        }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { transport.activeCollectors.get() == 2 }
+        runOnIdle { firstVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { transport.activeCollectors.get() == 1 }
+        assertSame(shared, registry.get(shared.canvasId))
+        runOnIdle { secondVisible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { transport.activeCollectors.get() == 0 }
+        assertEquals(null, registry.get(shared.canvasId))
     }
 
     @Test
