@@ -304,13 +304,17 @@ open class SubagentRepository(
         // Publish the absence clock once, after every branch above has settled.
         runningAbsentSince.value = absence.toMap()
 
-        val previousTerminals = cached.filter { previous ->
-            previous.status in TERMINAL_STATUSES &&
-                previous.cacheKey() !in incomingByKey &&
-                previous.terminalAtEpochMs?.let { now - it < TERMINAL_LINGER_MS } == true
-        }
+        val previousTerminals = retainedTerminalEntries(cached, incomingByKey.keys, now)
         return (completeIncoming + retained + previousTerminals + untouched).distinctBy { it.cacheKey() }
     }
+
+    private fun retainedTerminalEntries(
+        cached: List<SubagentEntry>,
+        incomingKeys: Set<String>,
+        now: Long,
+    ): List<SubagentEntry> = cached.filter { it.status in TERMINAL_STATUSES }
+        .filterNot { it.cacheKey() in incomingKeys }
+        .filter { it.terminalAtEpochMs?.let { ended -> now - ended < TERMINAL_LINGER_MS } == true }
 
     /**
      *  (RC3): a subagent that has ended stays ended. The host

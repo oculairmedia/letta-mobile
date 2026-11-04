@@ -565,18 +565,17 @@ class DurableSubagentRegistry(
      * it at WARN (precedent: `TurnLeaseRegistry` / `ChatSendCoordinator`).
      */
     private fun enforceCapacityLocked() {
-        if (entries.size <= maxEntries) return
+        var ordinaryCount = entries.values.count { it.terminalReason != SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
+        if (ordinaryCount <= maxEntries) return
         // letta-mobile-fxoew.3: a stale live chip must not pin the cap. Past
         // the TTL it is terminal, and therefore evictable below.
         staleRunningChips(entries.values, clock(), staleAfterMs).forEach { entries[it.key] = it }
-        val evictable = entries.values
-            .filter { it.state.isTerminal && it.terminalReason != SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
-            .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
-            .iterator()
+        val evictable = evictionCandidates().iterator()
         val evicted = mutableListOf<SubagentChipRecord>()
-        while (entries.size > maxEntries && evictable.hasNext()) {
+        while (ordinaryCount > maxEntries && evictable.hasNext()) {
             val victim = evictable.next()
             entries.remove(victim.key)
+            ordinaryCount--
             // A later chip reusing this key must not inherit the evicted one's absence clock.
             snapshotAbsence.forget(victim.key)
             evicted += victim
@@ -592,16 +591,21 @@ class DurableSubagentRegistry(
                 level = Telemetry.Level.WARN,
             )
         }
-        if (entries.size > maxEntries) {
+        if (ordinaryCount > maxEntries) {
             Telemetry.event(
                 TAG,
                 "capacity.allLive",
-                "size" attr entries.size,
+                "size" attr ordinaryCount,
                 "cap" attr maxEntries,
                 level = Telemetry.Level.WARN,
             )
         }
     }
+
+    private fun evictionCandidates(): List<SubagentChipRecord> = entries.values
+        .filter { it.state.isTerminal }
+        .filterNot { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
+        .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
 
     private fun persistLocked() {
         runCatching { store.save(entries.values.toList()) }

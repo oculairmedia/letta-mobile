@@ -1572,8 +1572,8 @@ public final class com/letta/mobile/ui/chat/subagents/ActiveSubagentRingsTags {
 }
 
 public final class com/letta/mobile/ui/chat/subagents/BackgroundTasksPanelKt {
-	public static final fun BackgroundTasksPanel (Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Landroidx/compose/runtime/Composer;II)V
-	public static final fun BackgroundTasksSidePane (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Landroidx/compose/runtime/Composer;II)V
+	public static final fun BackgroundTasksPanel (Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun BackgroundTasksSidePane (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun BackgroundTasksToggle (ILkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
 	public static final fun backgroundTasksLabel (I)Ljava/lang/String;
 }

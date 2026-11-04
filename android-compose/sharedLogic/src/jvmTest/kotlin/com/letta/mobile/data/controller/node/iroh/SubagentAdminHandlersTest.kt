@@ -207,7 +207,11 @@ class SubagentAdminHandlersTest {
         noPublisher.changeListener = SubagentRegistryChangeListener { }
         val router = AdminRpcRouter().also { SubagentAdminHandlers.register(it, noPublisher) }
         assertTrue("subagent_dismiss_v1" in IrohNodeConnection.advertisedCapabilities(router))
-        assertEquals(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.forAdminMethod("subagent.dismiss"))
+        assertEquals(IrohPeerCapabilities.forAdminMethod("conversation.update"), IrohPeerCapabilities.forAdminMethod("subagent.dismiss"))
+        val required = IrohPeerCapabilities.forAdminMethod("subagent.dismiss")
+        assertFalse(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CHAT_READ), required))
+        assertFalse(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CHAT_SEND), required))
+        assertTrue(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CONVERSATION_MANAGE), required))
     }
 
     @Test

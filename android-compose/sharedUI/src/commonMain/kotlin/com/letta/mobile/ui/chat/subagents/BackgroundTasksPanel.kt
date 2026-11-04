@@ -59,19 +59,21 @@ fun BackgroundTasksPanel(
     val coroutineScope = rememberCoroutineScope()
     var error by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf(false) }
-    val dismiss: ((SubagentEntry) -> Unit)? = if (dismissTask != null && !pending) {
-        { entry ->
-            coroutineScope.launch {
+    val dismiss: ((SubagentEntry) -> Unit)? = if (dismissTask != null) {
+        if (pending) null else { entry ->
+            if (!pending) {
                 pending = true
                 error = false
-                try {
-                    dismissTask(entry).getOrThrow()
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    error = true
-                } finally {
-                    pending = false
+                coroutineScope.launch {
+                    try {
+                        dismissTask(entry).getOrThrow()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        error = true
+                    } finally {
+                        pending = false
+                    }
                 }
             }
         }

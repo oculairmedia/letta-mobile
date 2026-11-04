@@ -43774,6 +43774,10 @@ public final class com/letta/mobile/data/repository/api/ISubagentRepository$Defa
 	public static fun dismiss-0E7RQCE (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/data/repository/api/ISubagentRepositoryKt {
+	public static final fun dismissAction (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlin/jvm/functions/Function2;
+}
+
 public abstract interface class com/letta/mobile/data/repository/api/IToolRepository {
 	public fun attachTool (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun attachTool-u2fY9uU (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

@@ -392,6 +392,18 @@ class DurableSubagentRegistryTest {
     }
 
     @Test
+    fun tombstonesDoNotConsumeOrdinaryRecordCapacity() {
+        val reg = registry(InMemorySubagentRegistryStore(), maxEntries = 2)
+        listOf("one", "two").forEach { id ->
+            reg.observe(observation(toolCallId = id))
+            reg.dismiss("conv-a", "agent-1", id)
+        }
+        reg.observe(observation(toolCallId = "completed", state = SubagentChipState.COMPLETED))
+        assertEquals(SubagentChipState.COMPLETED, reg.record("conv-a", "agent-1", "completed")?.state)
+        assertEquals(3, reg.replaySnapshot("conv-a").size)
+    }
+
+    @Test
     fun legacyExcessTombstonesAreRetainedAndBlockNewDismissals() {
         val store = InMemorySubagentRegistryStore()
         val previous = registry(store, maxEntries = 3)

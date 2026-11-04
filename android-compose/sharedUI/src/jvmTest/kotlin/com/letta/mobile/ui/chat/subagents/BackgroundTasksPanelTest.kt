@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,6 +95,24 @@ class BackgroundTasksPanelTest {
         onNodeWithText("Dismiss").performClick()
         onNodeWithText("Could not dismiss task. Please try again.").assertExists()
         runOnIdle { assertEquals(listOf(scope to "toolu_run"), calls) }
+    }
+
+    @Test
+    fun pendingDismissalCannotFallBackToAnotherAction() = runComposeUiTest {
+        val scoped = entry("toolu_run", "running").copy(parentAgentId = "agent-a", parentConversationId = "conv-a")
+        val completion = CompletableDeferred<Result<Unit>>()
+        var fallbackCalls = 0
+        setContent {
+            MaterialTheme {
+                BackgroundTasksPanel(
+                    subagents = listOf(scoped), now = { now },
+                    dismissTask = { completion.await() }, onDismiss = { fallbackCalls++ },
+                )
+            }
+        }
+        onNodeWithText("Dismiss").performClick()
+        onNodeWithText("Dismiss").assertDoesNotExist()
+        runOnIdle { assertEquals(0, fallbackCalls); completion.complete(Result.success(Unit)) }
     }
 
     @Test

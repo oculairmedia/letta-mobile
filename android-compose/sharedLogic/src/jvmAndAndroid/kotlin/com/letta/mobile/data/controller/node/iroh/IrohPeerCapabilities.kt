@@ -236,7 +236,7 @@ object IrohPeerCapabilities {
         "message.list", "message.get", "tool_return.get",
         "agent.list", "agent.count", "agent.get", "agent.context",
         "model.list", "model.list.embedding",
-        "subagent.list", "subagent.todos", "subagent.dismiss",
+        "subagent.list", "subagent.todos",
         "slash_command.list", "slash_command.list_agent",
     )
 
@@ -261,6 +261,7 @@ object IrohPeerCapabilities {
     private val CHAT_SEND_METHODS = setOf("approval.submit")
 
     private val CONVERSATION_MANAGE_METHODS = setOf(
+        "subagent.dismiss",
         "conversation.create", "conversation.update", "conversation.archive",
         "conversation.restore", "conversation.delete", "conversation.fork",
         // letta-mobile-57cta: rewrites the conversation's transcript, like fork/update.
