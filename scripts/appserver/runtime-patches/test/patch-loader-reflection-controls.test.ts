@@ -8,7 +8,10 @@ import { runInNewContext } from "node:vm";
 
 import { patchLettaCodeSourceResultForTest } from "../letta-code-patch-loader.mjs";
 
-const BUNDLE = "/root/letta-code-0.34.14/node_modules/@letta-ai/letta-code/letta.js";
+const PINNED_BUNDLE = "/root/letta-code-0.34.14/node_modules/@letta-ai/letta-code/letta.js";
+// Production points LETTA_CLI_PATH_REAL at the deployed bundle; honour it like the sibling tests,
+// falling back to the pinned 0.34.14 install. The anchors below still require 0.34.14 bytes.
+const BUNDLE = process.env["LETTA_CLI_PATH_REAL"] || PINNED_BUNDLE;
 
 // Every item is a byte-exact 0.34.14 anchor. Keep this list in lock-step with
 // the loader: this is the drift alarm before the runtime loader is allowed to
@@ -39,7 +42,7 @@ function section(source: string, start: string, end: string): string {
 }
 
 function readBundle(): string {
-  assert.ok(existsSync(BUNDLE), `expected pinned 0.34.14 bundle at ${BUNDLE}`);
+  assert.ok(existsSync(BUNDLE), `expected a 0.34.14 letta.js at ${BUNDLE} (set LETTA_CLI_PATH_REAL)`);
   return readFileSync(BUNDLE, "utf8");
 }
 
