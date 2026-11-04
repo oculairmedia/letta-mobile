@@ -9,6 +9,9 @@ import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.memory.memfs.MemfsUpdate
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcome
+import com.letta.mobile.data.model.reflection.ReflectionLastOutcomeStatus
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,10 +36,12 @@ class DreamingControllerTest {
         var saveAnswer: DreamOutcome<DreamSettings>? = null
         var runAnswer: DreamOutcome<DreamRunStart> = DreamOutcome.Done(DreamRunStart(DreamStartStatus.Started, "Started a reflection pass for this conversation."))
         var gate: CompletableDeferred<Unit>? = null
+        var settingsGate: CompletableDeferred<DreamOutcome<DreamSettings>>? = null
         val saved = mutableListOf<DreamSettingsChange>()
         val runs = mutableListOf<String?>()
 
         override suspend fun settings(target: DreamTarget): DreamOutcome<DreamSettings> {
+            settingsGate?.let { return it.await() }
             gate?.await()
             return stored
         }
@@ -166,6 +171,114 @@ class DreamingControllerTest {
         assertFalse(h.controller.state.value.dreamingNow)
         assertEquals(before + 1, h.memfs.historyCalls)
         assertEquals("New lessons", h.controller.state.value.lastRun?.summary)
+    }
+
+    @Test
+    fun modelOnlySaveRefreshesLegacyFieldsBeforeSending() = runTest {
+        val h = harness()
+        h.controller.focus(agent)
+        runCurrent()
+        val stale = h.controller.state.value.settings.settings!!
+        h.repository.stored = DreamOutcome.Done(stale.copy(trigger = DreamTrigger.Off, stepCount = 99))
+        h.controller.save(DreamSettingsChange(stale.copy(model = ReflectionModelChoice.Handle("model/new")), modelChanged = true))
+        runCurrent()
+        val saved = h.repository.saved.single().settings
+        assertEquals(DreamTrigger.Off, saved.trigger)
+        assertEquals(99, saved.stepCount)
+        assertEquals(ReflectionModelChoice.Handle("model/new"), saved.model)
+    }
+
+    @Test
+    fun focusOnlySaveRefreshesLegacyFieldsBeforeSending() = runTest {
+        val h = harness()
+        h.controller.focus(agent)
+        runCurrent()
+        val stale = h.controller.state.value.settings.settings!!
+        h.repository.stored = DreamOutcome.Done(stale.copy(merge = DreamMerge.Explicit, mergeInstructions = "newer"))
+        h.controller.save(DreamSettingsChange(stale.copy(focusInstructions = "focus"), focusInstructionsChanged = true))
+        runCurrent()
+        val saved = h.repository.saved.single().settings
+        assertEquals(DreamMerge.Explicit, saved.merge)
+        assertEquals("newer", saved.mergeInstructions)
+        assertEquals("focus", saved.focusInstructions)
+    }
+
+    @Test
+    fun failedRefreshDoesNotWriteStaleSettings() = runTest {
+        val h = harness()
+        h.controller.focus(agent)
+        runCurrent()
+        val stale = h.controller.state.value.settings.settings!!
+        h.repository.stored = DreamOutcome.Failed("refresh failed")
+        h.controller.save(DreamSettingsChange(stale.copy(model = ReflectionModelChoice.Inherit), modelChanged = true))
+        runCurrent()
+        assertTrue(h.repository.saved.isEmpty())
+        assertEquals("refresh failed", h.controller.state.value.settings.error)
+    }
+
+    @Test
+    fun endingLiveDreamReloadsSettingsEvenWithoutHistory() = runTest {
+        val h = harness(withHistory = false)
+        h.controller.focus(agent)
+        runCurrent()
+        h.live.value = listOf(SubagentEntry(toolCallId = "t1", description = "Reflection", subagentType = "Reflection", status = "running"))
+        runCurrent()
+        val outcome = ReflectionLastOutcome(ReflectionLastOutcomeStatus.Skipped, "nothing new", null, null, "now")
+        h.repository.stored = DreamOutcome.Done(DreamSettings.DEFAULT.copy(lastOutcome = outcome))
+        h.live.value = emptyList()
+        runCurrent()
+        assertEquals(outcome, h.controller.state.value.settings.settings?.lastOutcome)
+    }
+
+    @Test
+    fun oldOutcomeReloadCannotOverwriteACompletedSave() = runTest {
+        val h = harness()
+        h.controller.focus(agent)
+        runCurrent()
+        h.live.value = listOf(SubagentEntry(toolCallId = "t1", description = "Reflection", subagentType = "Reflection", status = "running"))
+        runCurrent()
+        val stale = h.controller.state.value.settings.settings!!
+        val saveGate = CompletableDeferred<Unit>()
+        val reloadGate = CompletableDeferred<DreamOutcome<DreamSettings>>()
+        h.repository.gate = saveGate
+        h.repository.settingsGate = reloadGate
+        h.controller.save(DreamSettingsChange(stale.copy(stepCount = 99)))
+        runCurrent()
+        h.live.value = emptyList()
+        runCurrent()
+        saveGate.complete(Unit)
+        runCurrent()
+        reloadGate.complete(DreamOutcome.Done(stale))
+        runCurrent()
+        assertEquals(99, h.controller.state.value.settings.settings?.stepCount)
+    }
+
+    @Test
+    fun failedSaveStillRefreshesTheCompletedOutcomeAndKeepsItsError() = runTest {
+        val h = harness()
+        h.controller.focus(agent)
+        runCurrent()
+        h.live.value = listOf(SubagentEntry(toolCallId = "t1", description = "Reflection", subagentType = "Reflection", status = "running"))
+        runCurrent()
+        val stale = h.controller.state.value.settings.settings!!
+        val saveGate = CompletableDeferred<Unit>()
+        val oldReload = CompletableDeferred<DreamOutcome<DreamSettings>>()
+        val freshReload = CompletableDeferred<DreamOutcome<DreamSettings>>()
+        h.repository.gate = saveGate
+        h.repository.settingsGate = oldReload
+        h.repository.saveAnswer = DreamOutcome.Failed("save failed")
+        h.controller.save(DreamSettingsChange(stale.copy(stepCount = 99)))
+        runCurrent()
+        h.live.value = emptyList()
+        runCurrent()
+        h.repository.settingsGate = freshReload
+        saveGate.complete(Unit)
+        runCurrent()
+        val outcome = ReflectionLastOutcome(ReflectionLastOutcomeStatus.Skipped, "nothing new", null, null, "now")
+        freshReload.complete(DreamOutcome.Done(stale.copy(lastOutcome = outcome)))
+        runCurrent()
+        assertEquals(outcome, h.controller.state.value.settings.settings?.lastOutcome)
+        assertEquals("save failed", h.controller.state.value.settings.error)
     }
 
     @Test

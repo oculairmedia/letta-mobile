@@ -4,12 +4,16 @@ package com.letta.mobile.ui.dreaming
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.dreaming.DreamActivity
 import com.letta.mobile.data.dreaming.DreamCommitKind
@@ -35,6 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** letta-mobile-iczm7: the shared Dreaming panel over fixed states. */
 class DreamingPanelUiTest {
@@ -141,6 +146,37 @@ class DreamingPanelUiTest {
         assertEquals(ReflectionModelChoice.Handle("anthropic/sonnet"), actions.saved.single().settings.model)
         assertEquals(true, actions.saved.single().modelChanged)
         assertEquals(false, actions.saved.single().focusInstructionsChanged)
+    }
+
+    @Test
+    fun focusDraftSurvivesOpeningAndChoosingAModel() = runComposeUiTest {
+        val model = LlmModel(id = "route-sonnet", handle = "anthropic/sonnet", displayNameOverride = "Claude Sonnet")
+        val actions = RecordingActions(MutableStateFlow(listOf(model)))
+        val settings = DreamSettings(model = ReflectionModelChoice.Inherit, focusInstructions = "original")
+        setContent { MaterialTheme { DreamingPanel(loaded.copy(settings = DreamSettingsState(settings = settings)), actions) } }
+        onNodeWithTag(DreamingTags.FOCUS_INSTRUCTIONS).performScrollTo().performTextReplacement("unfinished draft")
+        onNodeWithTag(DreamingTags.MODEL).performScrollTo().performClick()
+        onNodeWithTag(ModelPickerTags.ROW_PREFIX + "anthropic/sonnet").performClick()
+        onNodeWithTag(DreamingTags.FOCUS_INSTRUCTIONS).performScrollTo().assertTextContains("unfinished draft")
+    }
+
+    @Test
+    fun stalePickerTokenDoesNotSaveAnIdAsAModelHandle() = runComposeUiTest {
+        val east = LlmModel(
+            id = "east", name = "East", handle = "openai/shared", providerType = "azure",
+            modelEndpoint = "https://east.example/v1",
+        )
+        val west = east.copy(id = "west", name = "West", modelEndpoint = "https://west.example/v1")
+        val models = MutableStateFlow(listOf(east, west))
+        val actions = RecordingActions(models)
+        val settings = DreamSettings(model = ReflectionModelChoice.Inherit, focusInstructions = "")
+        setContent { MaterialTheme { DreamingPanel(loaded.copy(settings = DreamSettingsState(settings = settings)), actions) } }
+        onNodeWithTag(DreamingTags.MODEL).performScrollTo().performClick()
+        onNodeWithTag(ModelPickerTags.ROW_PREFIX + "east").performSemanticsAction(SemanticsActions.OnClick) { click ->
+            models.value = listOf(west)
+            click()
+        }
+        assertTrue(actions.saved.isEmpty(), "a stale route token must not be saved as a model handle")
     }
 
     @Test

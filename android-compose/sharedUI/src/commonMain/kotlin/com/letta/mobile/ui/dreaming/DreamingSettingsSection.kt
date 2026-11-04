@@ -17,6 +17,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,7 @@ internal fun DreamingSettingsSection(state: DreamSettingsState, actions: Dreamin
     val settings = state.settings ?: return
     var scope by remember { mutableStateOf(DreamSettingsScope.Both) }
     var pickingModel by remember { mutableStateOf(false) }
+    val focusDraft = remember(settings.focusInstructions) { mutableStateOf(settings.focusInstructions.orEmpty()) }
     if (pickingModel) {
         ReflectionModelPicker(settings, scope, actions) { pickingModel = false }
         return
@@ -61,7 +63,7 @@ internal fun DreamingSettingsSection(state: DreamSettingsState, actions: Dreamin
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         AutomaticAndReviewControls(settings, save)
-        ReflectionSettingsControls(settings, scope, actions) { pickingModel = true }
+        ReflectionSettingsControls(settings, scope, actions, focusDraft) { pickingModel = true }
         ScopeChoice(scope) { picked ->
             scope = picked
             actions.save(DreamSettingsChange(settings, picked))
@@ -88,13 +90,14 @@ private fun ReflectionSettingsControls(
     settings: DreamSettings,
     scope: DreamSettingsScope,
     actions: DreamingActions,
+    focusDraft: MutableState<String>,
     onPickModel: () -> Unit,
 ) {
     if (settings.model != ReflectionModelChoice.Unsupported && settings.focusInstructions != null) {
         ReflectionModelControl(settings, actions.models, onPick = onPickModel) { choice ->
             actions.save(DreamSettingsChange(settings.copy(model = choice), scope, modelChanged = true))
         }
-        FocusInstructions(settings) { focus ->
+        FocusInstructions(settings, focusDraft) { focus ->
             actions.save(
                 DreamSettingsChange(
                     settings.copy(focusInstructions = focus),
@@ -139,9 +142,11 @@ private fun ReflectionModelPicker(
     actions: DreamingActions,
     onDismiss: () -> Unit,
 ) {
-    val available by actions.models.collectAsState()
     val picker = rememberModelListPicker(actions.models, actions::reloadModels) { value ->
-        val handle = ModelCatalog.transportValue(available, value) ?: value
+        val available = actions.models.value
+        val handle = ModelCatalog.selectedModel(available, value)?.let(ModelCatalog::valueOf)
+            ?: value.takeIf { token -> available.any { ModelCatalog.valueOf(it) == token } }
+            ?: return@rememberModelListPicker
         actions.save(
             DreamSettingsChange(
                 settings.copy(model = ReflectionModelChoice.Handle(handle)),
@@ -155,13 +160,12 @@ private fun ReflectionModelPicker(
 }
 
 @Composable
-private fun FocusInstructions(settings: DreamSettings, onSave: (String) -> Unit) {
+private fun FocusInstructions(settings: DreamSettings, draft: MutableState<String>, onSave: (String) -> Unit) {
     val stored = settings.focusInstructions ?: return
-    var draft by remember(stored) { mutableStateOf(stored) }
-    val trimmed = draft.trim()
+    val trimmed = draft.value.trim()
     OutlinedTextField(
-        value = draft,
-        onValueChange = { draft = it },
+        value = draft.value,
+        onValueChange = { draft.value = it },
         label = { Text(DreamingStrings.FOCUS_INSTRUCTIONS) },
         modifier = Modifier.fillMaxWidth().testTag(DreamingTags.FOCUS_INSTRUCTIONS),
         minLines = 2,

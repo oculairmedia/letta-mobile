@@ -66,10 +66,36 @@ class DreamingController(
     override fun save(change: DreamSettingsChange) {
         val target = stateFlow.value.target ?: return
         val previous = stateFlow.value.settings.settings
-        updateSettings { it.copy(settings = change.settings, saving = true, error = null) }
+        jobs.remove(Slot.Settings)?.cancel()
+        updateSettings { it.copy(settings = change.settings, saving = true, loading = false, error = null) }
         launch(Slot.Save, target) {
-            val outcome = repository.save(target, change)
-            applyIfCurrent(target) { state -> state.copy(settings = state.settings.afterSave(outcome, previous)) }
+            val outcome = if (change.modelChanged || change.focusInstructionsChanged) {
+                when (val fresh = repository.settings(target)) {
+                    is DreamOutcome.Done -> repository.save(target, change.copy(settings = fresh.value.copy(
+                        model = if (change.modelChanged) change.settings.model else fresh.value.model,
+                        focusInstructions = if (change.focusInstructionsChanged) {
+                            change.settings.focusInstructions
+                        } else {
+                            fresh.value.focusInstructions
+                        },
+                    )))
+                    is DreamOutcome.Failed -> fresh
+                    is DreamOutcome.Unsupported -> fresh
+                }
+            } else {
+                repository.save(target, change)
+            }
+            val cancelledLoad = if (stateFlow.value.target == target) {
+                jobs.remove(Slot.Settings)?.let { it.cancel(); true } == true
+            } else {
+                false
+            }
+            applyIfCurrent(target) { state ->
+                state.copy(settings = state.settings.afterSave(outcome, previous).copy(loading = false))
+            }
+            if (cancelledLoad && outcome is DreamOutcome.Failed && stateFlow.value.target == target) {
+                loadSettings(target, preserveError = true)
+            }
         }
     }
 
@@ -106,11 +132,15 @@ class DreamingController(
         jobs.clear()
     }
 
-    private fun loadSettings(target: DreamTarget) {
-        updateSettings { it.copy(loading = true, error = null) }
+    private fun loadSettings(target: DreamTarget, preserveError: Boolean = false) {
+        updateSettings { it.copy(loading = true, error = if (preserveError) it.error else null) }
         launch(Slot.Settings, target) {
             val outcome = repository.settings(target)
-            applyIfCurrent(target) { state -> state.copy(settings = state.settings.afterLoad(outcome)) }
+            applyIfCurrent(target) { state ->
+                val loaded = state.settings.afterLoad(outcome)
+                val errors = listOfNotNull(state.settings.error, loaded.error).distinct().joinToString("\n")
+                state.copy(settings = if (preserveError) loaded.copy(error = errors.ifEmpty { null }) else loaded)
+            }
         }
     }
 
@@ -132,7 +162,10 @@ class DreamingController(
             activity(target.agentId).map(DreamActivity::of).distinctUntilChanged().collect { live ->
                 val ended = stateFlow.value.dreamingNow && live.isEmpty()
                 applyIfCurrent(target) { it.copy(live = live) }
-                if (ended) loadHistory(target)
+                if (ended) {
+                    loadHistory(target)
+                    loadSettings(target)
+                }
             }
         }
     }
