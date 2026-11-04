@@ -3366,14 +3366,14 @@ public final class com/letta/mobile/ui/dreaming/ComposableSingletons$DreamingPan
 public final class com/letta/mobile/ui/dreaming/ComposableSingletons$DreamingSettingsSectionKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/dreaming/ComposableSingletons$DreamingSettingsSectionKt;
 	public fun <init> ()V
+	public final fun getLambda$-1066962218$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-1139020610$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-1379494098$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1563885608$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1892512081$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-2026969553$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-2111527001$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$-38164556$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$2001419733$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$625086509$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/dreaming/DreamingHostNotes {
