@@ -379,22 +379,12 @@ class AppServerServeIrohCommand : CliktCommand(
             val backendDir = effectiveA2aBackendDir(localBackendDir, ownAppServer, System.getProperty("user.home"))
             val a2a = a2aWiringOrNull(a2aClient::get, scope, activityTarget, backendDir)
 
-            // Create the Iroh endpoint
-            val endpoint = IrohNodeEndpoint(
-                scope = scope,
-                binding = IrohEndpointBinding(
-                    bindAddr = "0.0.0.0:${irohPort}",
-                    secretKeyPath = irohSecretKeyPath,
-                ),
-                authPolicy = authPolicy,
-                pairingService = pairingService,
-                canvasRelay = canvasRelay,
-                protocolHandlers = listOfNotNull(notebookProtocol, a2a?.receiver),
-                turnIdentity = turnIdentity,
+            val endpoint = newIrohEndpoint(
+                scope, authPolicy, pairingService, canvasRelay,
+                listOfNotNull(notebookProtocol, a2a?.receiver), turnIdentity,
             )
             irohEndpoint = endpoint
             endpoint.create()
-            
             printDialInfo(endpoint)
             a2a?.let { publishA2aHost(it, endpoint, backendDir) }
 
@@ -428,6 +418,24 @@ class AppServerServeIrohCommand : CliktCommand(
             awaitServerLoop()
         }
     }
+
+    /** The host's Iroh endpoint with every protocol handler registered up front (ALPNs fix at bind). */
+    private fun newIrohEndpoint(
+        scope: CoroutineScope,
+        authPolicy: com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy,
+        pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService?,
+        canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay?,
+        protocolHandlers: List<com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler>,
+        turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger,
+    ): IrohNodeEndpoint = IrohNodeEndpoint(
+        scope = scope,
+        binding = IrohEndpointBinding(bindAddr = "0.0.0.0:${irohPort}", secretKeyPath = irohSecretKeyPath),
+        authPolicy = authPolicy,
+        pairingService = pairingService,
+        canvasRelay = canvasRelay,
+        protocolHandlers = protocolHandlers,
+        turnIdentity = turnIdentity,
+    )
 
     /**
      * letta-mobile-jna0o.4: serve the router over the registry the controller advertises, binding
