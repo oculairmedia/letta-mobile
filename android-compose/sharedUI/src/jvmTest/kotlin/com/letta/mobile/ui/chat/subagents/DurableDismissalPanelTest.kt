@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.chat.subagents
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.repository.api.dismissAction
 
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +39,6 @@ import com.letta.mobile.data.transport.ServerFrameSerializer
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
 import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -79,7 +79,7 @@ class DurableDismissalPanelTest {
             authorizedConversationIds = setOf(scope.parentConversationId),
             authorizedAgentIds = setOf(scope.parentAgentId),
         )
-        val transport = testTransport(source, router, context, eventBus, json)
+        val transport = testTransport(source, router, context, eventBus)
         val repository = SubagentRepository(transport, owner)
         val entries = listOf("tool-a", "tool-b").map { id ->
             SubagentEntry(
@@ -99,7 +99,11 @@ class DurableDismissalPanelTest {
                     BackgroundTasksPanel(subagents = current, dismissTask = repository.dismissAction(scope))
                 }
             }
-            assertDismissal(repository, scope, source, entries, path)
+            assertDismissal(repository, scope)
+            val reloaded = DurableSubagentRegistry(FileSubagentRegistryStore(path))
+            assertEquals("user_dismissed", reloaded.record("conv-a", "agent-a", "tool-a")?.terminalReason)
+            source.ingestFromSource(scope.parentConversationId, scope.parentAgentId, entries, SubagentChipSource.CONTROLLER_NATIVE)
+            assertEquals("user_dismissed", source.registry.record("conv-a", "agent-a", "tool-a")?.terminalReason)
         } finally {
             repository.close()
             publisher.close()
@@ -112,9 +116,6 @@ class DurableDismissalPanelTest {
     private fun ComposeUiTest.assertDismissal(
         repository: SubagentRepository,
         scope: SubagentParentScope,
-        source: ControllerSubagentRegistrySource,
-        entries: List<SubagentEntry>,
-        path: Path,
     ) {
         waitUntil(timeoutMillis = 10_000) { repository.currentActiveSubagents(scope).size == 2 }
         onNodeWithTag(SubagentRosterTag.RUNNING.of("tool-a")).assertExists()
@@ -129,10 +130,6 @@ class DurableDismissalPanelTest {
         onNodeWithTag(SubagentRosterTag.RUNNING.of("tool-a")).assertDoesNotExist()
         onNodeWithTag(SubagentRosterTag.RUNNING.of("tool-b")).assertExists()
         assertEquals(1, SubagentActivity.of(repository.currentActiveSubagents(scope)).running)
-        val reloaded = DurableSubagentRegistry(FileSubagentRegistryStore(path))
-        assertEquals("user_dismissed", reloaded.record("conv-a", "agent-a", "tool-a")?.terminalReason)
-        source.ingestFromSource(scope.parentConversationId, scope.parentAgentId, entries, SubagentChipSource.CONTROLLER_NATIVE)
-        assertEquals("user_dismissed", source.registry.record("conv-a", "agent-a", "tool-a")?.terminalReason)
     }
 
     private fun testTransport(
@@ -140,9 +137,9 @@ class DurableDismissalPanelTest {
         router: AdminRpcRouter,
         context: AdminRpcRequestContext,
         eventBus: MutableSharedFlow<ServerFrame>,
-        json: Json,
     ): NoOpChannelTransport =
         object : NoOpChannelTransport(), SubagentScopeAwareChannelTransport {
+            private val json = Json { ignoreUnknownKeys = true }
             override val events = eventBus
 
             override suspend fun sendSubagentListForScope(
@@ -155,14 +152,17 @@ class DurableDismissalPanelTest {
                 return ServerFrame.SubagentListResponse(id = "list", ts = "t", success = true, subagents = entries)
             }
 
-            override suspend fun dismissSubagent(scope: SubagentParentScope, toolCallId: String): Result<List<SubagentEntry>> =
+            override suspend fun dismissSubagent(
+                scope: SubagentParentScope,
+                toolCallId: ToolCallId,
+            ): Result<List<SubagentEntry>> =
                 runCatching {
                     require(scope.parentAgentId == "agent-a" && scope.parentConversationId == "conv-a")
-                    require(toolCallId == "tool-a" || toolCallId == "tool-b")
+                    require(toolCallId.value == "tool-a" || toolCallId.value == "tool-b")
                     val params = buildJsonObject {
                         put("agent_id", scope.parentAgentId)
                         put("conversation_id", scope.parentConversationId)
-                        put("tool_call_id", toolCallId)
+                        put("tool_call_id", toolCallId.value)
                     }
                     val response = router.dispatch(AdminRpcInvocation("dismiss", "subagent.dismiss", params, context))
                     val envelope = json.parseToJsonElement(response).jsonObject

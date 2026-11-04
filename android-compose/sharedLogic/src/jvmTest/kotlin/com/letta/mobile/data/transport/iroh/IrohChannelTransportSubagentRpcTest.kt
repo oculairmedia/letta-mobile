@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -151,14 +152,14 @@ class IrohChannelTransportSubagentRpcTest {
                     "\"terminal_reason\":\"user_dismissed\"}]}",
             ))
         }
-        assertEquals("user_dismissed", client.dismissSubagent(scope, "tc-1").getOrThrow().single().terminalReason)
+        assertEquals("user_dismissed", client.dismissSubagent(scope, ToolCallId("tc-1")).getOrThrow().single().terminalReason)
         assertEquals("subagent.dismiss", calls.single().method)
-        assertTrue(client.dismissSubagent(scope, "").isFailure)
+        assertTrue(runCatching { ToolCallId("") }.isFailure, "blank tool call ids cannot be constructed")
         assertEquals(1, calls.size)
 
         val oldCalls = mutableListOf<Call>()
         val oldHost = transport(calls = oldCalls) { _, _, _ -> error("unadvertised mutation was sent") }
-        assertTrue(oldHost.dismissSubagent(scope, "tc-1").isFailure)
+        assertTrue(oldHost.dismissSubagent(scope, ToolCallId("tc-1")).isFailure)
         assertTrue(oldCalls.isEmpty())
     }
 

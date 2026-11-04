@@ -5421,6 +5421,7 @@ abstract interface com.letta.mobile.data.repository.api/ISubagentRepository { //
     abstract fun currentActiveSubagents(com.letta.mobile.data.repository.api/SubagentParentScope): kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry> // com.letta.mobile.data.repository.api/ISubagentRepository.currentActiveSubagents|currentActiveSubagents(com.letta.mobile.data.repository.api.SubagentParentScope){}[0]
     abstract suspend fun refresh(): kotlin/Result<kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>> // com.letta.mobile.data.repository.api/ISubagentRepository.refresh|refresh(){}[0]
     abstract suspend fun todos(kotlin/String): kotlin/Result<kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>> // com.letta.mobile.data.repository.api/ISubagentRepository.todos|todos(kotlin.String){}[0]
+    open suspend fun dismiss(com.letta.mobile.data.repository.api/SubagentParentScope, com.letta.mobile.runtime/ToolCallId): kotlin/Result<kotlin/Unit> // com.letta.mobile.data.repository.api/ISubagentRepository.dismiss|dismiss(com.letta.mobile.data.repository.api.SubagentParentScope;com.letta.mobile.runtime.ToolCallId){}[0]
 }
 
 abstract interface com.letta.mobile.data.repository.api/IToolRepository { // com.letta.mobile.data.repository.api/IToolRepository|null[0]
@@ -5858,6 +5859,9 @@ abstract interface com.letta.mobile.data.storage/SettingsPreferencesStore { // c
 }
 
 abstract interface com.letta.mobile.data.subagents/SubagentRegistryStore { // com.letta.mobile.data.subagents/SubagentRegistryStore|null[0]
+    open val durable // com.letta.mobile.data.subagents/SubagentRegistryStore.durable|{}durable[0]
+        open fun <get-durable>(): kotlin/Boolean // com.letta.mobile.data.subagents/SubagentRegistryStore.durable.<get-durable>|<get-durable>(){}[0]
+
     abstract fun load(): kotlin.collections/List<com.letta.mobile.data.subagents/SubagentChipRecord> // com.letta.mobile.data.subagents/SubagentRegistryStore.load|load(){}[0]
     abstract fun save(kotlin.collections/List<com.letta.mobile.data.subagents/SubagentChipRecord>) // com.letta.mobile.data.subagents/SubagentRegistryStore.save|save(kotlin.collections.List<com.letta.mobile.data.subagents.SubagentChipRecord>){}[0]
 }
@@ -6072,6 +6076,7 @@ abstract interface com.letta.mobile.data.transport.api/RedialAwareChannelTranspo
 
 abstract interface com.letta.mobile.data.transport.api/SubagentScopeAwareChannelTransport { // com.letta.mobile.data.transport.api/SubagentScopeAwareChannelTransport|null[0]
     abstract suspend fun sendSubagentListForScope(com.letta.mobile.data.repository.api/SubagentParentScope, kotlin/Boolean, kotlin/Long): com.letta.mobile.data.transport/ServerFrame.SubagentListResponse // com.letta.mobile.data.transport.api/SubagentScopeAwareChannelTransport.sendSubagentListForScope|sendSubagentListForScope(com.letta.mobile.data.repository.api.SubagentParentScope;kotlin.Boolean;kotlin.Long){}[0]
+    open suspend fun dismissSubagent(com.letta.mobile.data.repository.api/SubagentParentScope, com.letta.mobile.runtime/ToolCallId): kotlin/Result<kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>> // com.letta.mobile.data.transport.api/SubagentScopeAwareChannelTransport.dismissSubagent|dismissSubagent(com.letta.mobile.data.repository.api.SubagentParentScope;com.letta.mobile.runtime.ToolCallId){}[0]
 }
 
 abstract interface com.letta.mobile.data.transport.appserver/AppServerClient { // com.letta.mobile.data.transport.appserver/AppServerClient|null[0]
@@ -49087,7 +49092,7 @@ final class com.letta.mobile.data.model/SubagentActivitySnapshot { // com.letta.
 }
 
 final class com.letta.mobile.data.model/SubagentEntry { // com.letta.mobile.data.model/SubagentEntry|null[0]
-    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., com.letta.mobile.data.model/SubagentTodoProgressWire? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.model/SubagentEntry.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;com.letta.mobile.data.model.SubagentTodoProgressWire?;kotlin.Long?;kotlin.Long;kotlin.String?;kotlin.Int?;kotlin.Long?;kotlin.String?;kotlin.Long?;kotlin.Long?;kotlin.Boolean?){}[0]
+    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., com.letta.mobile.data.model/SubagentTodoProgressWire? = ..., kotlin/String? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.model/SubagentEntry.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;com.letta.mobile.data.model.SubagentTodoProgressWire?;kotlin.String?;kotlin.Long?;kotlin.Long;kotlin.String?;kotlin.Int?;kotlin.Long?;kotlin.String?;kotlin.Long?;kotlin.Long?;kotlin.Boolean?){}[0]
 
     final val activity // com.letta.mobile.data.model/SubagentEntry.activity|{}activity[0]
         final fun <get-activity>(): com.letta.mobile.data.model/SubagentActivitySnapshot? // com.letta.mobile.data.model/SubagentEntry.activity.<get-activity>|<get-activity>(){}[0]
@@ -49125,6 +49130,8 @@ final class com.letta.mobile.data.model/SubagentEntry { // com.letta.mobile.data
         final fun <get-taskId>(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.taskId.<get-taskId>|<get-taskId>(){}[0]
     final val terminalAtEpochMs // com.letta.mobile.data.model/SubagentEntry.terminalAtEpochMs|{}terminalAtEpochMs[0]
         final fun <get-terminalAtEpochMs>(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.terminalAtEpochMs.<get-terminalAtEpochMs>|<get-terminalAtEpochMs>(){}[0]
+    final val terminalReason // com.letta.mobile.data.model/SubagentEntry.terminalReason|{}terminalReason[0]
+        final fun <get-terminalReason>(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.terminalReason.<get-terminalReason>|<get-terminalReason>(){}[0]
     final val todoProgress // com.letta.mobile.data.model/SubagentEntry.todoProgress|{}todoProgress[0]
         final fun <get-todoProgress>(): com.letta.mobile.data.model/SubagentTodoProgressWire? // com.letta.mobile.data.model/SubagentEntry.todoProgress.<get-todoProgress>|<get-todoProgress>(){}[0]
     final val toolCallCount // com.letta.mobile.data.model/SubagentEntry.toolCallCount|{}toolCallCount[0]
@@ -49139,16 +49146,17 @@ final class com.letta.mobile.data.model/SubagentEntry { // com.letta.mobile.data
     final fun component11(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component11|component11(){}[0]
     final fun component12(): com.letta.mobile.data.model/SubagentActivitySnapshot? // com.letta.mobile.data.model/SubagentEntry.component12|component12(){}[0]
     final fun component13(): com.letta.mobile.data.model/SubagentTodoProgressWire? // com.letta.mobile.data.model/SubagentEntry.component13|component13(){}[0]
-    final fun component14(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component14|component14(){}[0]
-    final fun component15(): kotlin/Long // com.letta.mobile.data.model/SubagentEntry.component15|component15(){}[0]
-    final fun component16(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component16|component16(){}[0]
-    final fun component17(): kotlin/Int? // com.letta.mobile.data.model/SubagentEntry.component17|component17(){}[0]
-    final fun component18(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component18|component18(){}[0]
-    final fun component19(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component19|component19(){}[0]
+    final fun component14(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component14|component14(){}[0]
+    final fun component15(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component15|component15(){}[0]
+    final fun component16(): kotlin/Long // com.letta.mobile.data.model/SubagentEntry.component16|component16(){}[0]
+    final fun component17(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component17|component17(){}[0]
+    final fun component18(): kotlin/Int? // com.letta.mobile.data.model/SubagentEntry.component18|component18(){}[0]
+    final fun component19(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component19|component19(){}[0]
     final fun component2(): kotlin/String // com.letta.mobile.data.model/SubagentEntry.component2|component2(){}[0]
-    final fun component20(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component20|component20(){}[0]
+    final fun component20(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component20|component20(){}[0]
     final fun component21(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component21|component21(){}[0]
-    final fun component22(): kotlin/Boolean? // com.letta.mobile.data.model/SubagentEntry.component22|component22(){}[0]
+    final fun component22(): kotlin/Long? // com.letta.mobile.data.model/SubagentEntry.component22|component22(){}[0]
+    final fun component23(): kotlin/Boolean? // com.letta.mobile.data.model/SubagentEntry.component23|component23(){}[0]
     final fun component3(): kotlin/String // com.letta.mobile.data.model/SubagentEntry.component3|component3(){}[0]
     final fun component4(): kotlin/String // com.letta.mobile.data.model/SubagentEntry.component4|component4(){}[0]
     final fun component5(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component5|component5(){}[0]
@@ -49156,7 +49164,7 @@ final class com.letta.mobile.data.model/SubagentEntry { // com.letta.mobile.data
     final fun component7(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component7|component7(){}[0]
     final fun component8(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component8|component8(){}[0]
     final fun component9(): kotlin/String? // com.letta.mobile.data.model/SubagentEntry.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., com.letta.mobile.data.model/SubagentTodoProgressWire? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Boolean? = ...): com.letta.mobile.data.model/SubagentEntry // com.letta.mobile.data.model/SubagentEntry.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;com.letta.mobile.data.model.SubagentTodoProgressWire?;kotlin.Long?;kotlin.Long;kotlin.String?;kotlin.Int?;kotlin.Long?;kotlin.String?;kotlin.Long?;kotlin.Long?;kotlin.Boolean?){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.model/SubagentActivitySnapshot? = ..., com.letta.mobile.data.model/SubagentTodoProgressWire? = ..., kotlin/String? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/String? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Boolean? = ...): com.letta.mobile.data.model/SubagentEntry // com.letta.mobile.data.model/SubagentEntry.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;com.letta.mobile.data.model.SubagentActivitySnapshot?;com.letta.mobile.data.model.SubagentTodoProgressWire?;kotlin.String?;kotlin.Long?;kotlin.Long;kotlin.String?;kotlin.Int?;kotlin.Long?;kotlin.String?;kotlin.Long?;kotlin.Long?;kotlin.Boolean?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/SubagentEntry.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/SubagentEntry.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/SubagentEntry.toString|toString(){}[0]
@@ -58369,6 +58377,8 @@ final class com.letta.mobile.data.subagents/SubagentChipRecord { // com.letta.mo
     final object Companion { // com.letta.mobile.data.subagents/SubagentChipRecord.Companion|null[0]
         final const val TERMINAL_REASON_STALE // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_STALE|{}TERMINAL_REASON_STALE[0]
             final fun <get-TERMINAL_REASON_STALE>(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_STALE.<get-TERMINAL_REASON_STALE>|<get-TERMINAL_REASON_STALE>(){}[0]
+        final const val TERMINAL_REASON_USER_DISMISSED // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_USER_DISMISSED|{}TERMINAL_REASON_USER_DISMISSED[0]
+            final fun <get-TERMINAL_REASON_USER_DISMISSED>(): kotlin/String // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.TERMINAL_REASON_USER_DISMISSED.<get-TERMINAL_REASON_USER_DISMISSED>|<get-TERMINAL_REASON_USER_DISMISSED>(){}[0]
 
         final val $childSerializers // com.letta.mobile.data.subagents/SubagentChipRecord.Companion.$childSerializers|{}$childSerializers[0]
 
@@ -68139,6 +68149,7 @@ open class com.letta.mobile.data.repository/SubagentRepository : com.letta.mobil
     final fun close() // com.letta.mobile.data.repository/SubagentRepository.close|close(){}[0]
     open fun activeSubagentsFlow(com.letta.mobile.data.repository.api/SubagentParentScope): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>> // com.letta.mobile.data.repository/SubagentRepository.activeSubagentsFlow|activeSubagentsFlow(com.letta.mobile.data.repository.api.SubagentParentScope){}[0]
     open fun currentActiveSubagents(com.letta.mobile.data.repository.api/SubagentParentScope): kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry> // com.letta.mobile.data.repository/SubagentRepository.currentActiveSubagents|currentActiveSubagents(com.letta.mobile.data.repository.api.SubagentParentScope){}[0]
+    open suspend fun dismiss(com.letta.mobile.data.repository.api/SubagentParentScope, com.letta.mobile.runtime/ToolCallId): kotlin/Result<kotlin/Unit> // com.letta.mobile.data.repository/SubagentRepository.dismiss|dismiss(com.letta.mobile.data.repository.api.SubagentParentScope;com.letta.mobile.runtime.ToolCallId){}[0]
     open suspend fun refresh(): kotlin/Result<kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>> // com.letta.mobile.data.repository/SubagentRepository.refresh|refresh(){}[0]
     open suspend fun todos(kotlin/String): kotlin/Result<kotlin.collections/List<com.letta.mobile.data.model/SubagentTodo>> // com.letta.mobile.data.repository/SubagentRepository.todos|todos(kotlin.String){}[0]
 
@@ -72968,6 +72979,7 @@ final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/monitorEventCount(): kotlin/Int // com.letta.mobile.data.chat.projection/monitorEventCount|monitorEventCount@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.plugin/PluginOrigin).com.letta.mobile.data.plugin.view/covers(com.letta.mobile.data.plugin.view/ViewLink): kotlin/Boolean // com.letta.mobile.data.plugin.view/covers|covers@com.letta.mobile.data.plugin.PluginOrigin(com.letta.mobile.data.plugin.view.ViewLink){}[0]
 final fun (com.letta.mobile.data.repository.api/ISettingsRepository).com.letta.mobile.data.repository/activeBackendUsesChannel(): kotlin/Boolean // com.letta.mobile.data.repository/activeBackendUsesChannel|activeBackendUsesChannel@com.letta.mobile.data.repository.api.ISettingsRepository(){}[0]
+final fun (com.letta.mobile.data.repository.api/ISubagentRepository).com.letta.mobile.data.repository.api/dismissAction(com.letta.mobile.data.repository.api/SubagentParentScope?): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/SubagentEntry, kotlin/Result<kotlin/Unit>>? // com.letta.mobile.data.repository.api/dismissAction|dismissAction@com.letta.mobile.data.repository.api.ISubagentRepository(com.letta.mobile.data.repository.api.SubagentParentScope?){}[0]
 final fun (com.letta.mobile.data.repository.modelcontrol/ConnectableProvider).com.letta.mobile.data.repository.modelcontrol/connectMethodOn(kotlin/Boolean): com.letta.mobile.data.repository.modelcontrol/ProviderConnectMethod // com.letta.mobile.data.repository.modelcontrol/connectMethodOn|connectMethodOn@com.letta.mobile.data.repository.modelcontrol.ConnectableProvider(kotlin.Boolean){}[0]
 final fun (com.letta.mobile.data.repository.modelcontrol/ConversationModelChoices).com.letta.mobile.data.context/windowTokensFor(kotlin/String?, com.letta.mobile.data.model/Agent?, kotlin.collections/List<com.letta.mobile.data.model/LlmModel>): kotlin/Int? // com.letta.mobile.data.context/windowTokensFor|windowTokensFor@com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices(kotlin.String?;com.letta.mobile.data.model.Agent?;kotlin.collections.List<com.letta.mobile.data.model.LlmModel>){}[0]
 final fun (com.letta.mobile.data.runtime/AgentDefaultsRepository).com.letta.mobile.data.runtime/cwd(com.letta.mobile.data.model/AgentId): kotlin/String? // com.letta.mobile.data.runtime/cwd|cwd@com.letta.mobile.data.runtime.AgentDefaultsRepository(com.letta.mobile.data.model.AgentId){}[0]
@@ -73256,7 +73268,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative]
+// Targets: [linuxX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

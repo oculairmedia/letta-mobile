@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.subagents.SubagentChipKey
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.serialization.Serializable
@@ -35,13 +36,14 @@ internal object SubagentAdminHandlers {
                 .filter { it.belongsTo(scope) }
             json.encodeToJsonElement(SubagentListResult(subagents = entries))
         }
-        if (source is ControllerSubagentRegistrySource && source.registry.supportsDurableDismissal && source.changeListener != null) {
+        if (source is ControllerSubagentRegistrySource && source.supportsDismissal()) {
             router.registerScoped("subagent.dismiss") { params, context ->
                 val scope = requireScope(params, context)
                 params.requireDismissalIdentity("conversation_id")
                 val agentId = params.requireDismissalIdentity("agent_id")
                 val toolCallId = params.requireDismissalIdentity("tool_call_id")
-                json.encodeToJsonElement(SubagentListResult(source.dismiss(scope.conversationId, agentId, toolCallId)))
+                val key = SubagentChipKey(scope.conversationId, agentId, toolCallId)
+                json.encodeToJsonElement(SubagentListResult(source.dismiss(key)))
             }
         }
         router.registerScoped("subagent.todos") { params, context ->
@@ -63,6 +65,9 @@ internal object SubagentAdminHandlers {
             )
         }
     }
+
+    private fun ControllerSubagentRegistrySource.supportsDismissal(): Boolean =
+        registry.supportsDurableDismissal && changeListener != null
 
     private fun requireScope(params: JsonObject?, context: AdminRpcRequestContext): SubagentRequestScope {
         if (!context.authenticated) adminError("unauthorized")

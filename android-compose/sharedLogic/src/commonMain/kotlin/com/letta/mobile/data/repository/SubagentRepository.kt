@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
@@ -220,8 +221,8 @@ open class SubagentRepository(
         response.todos
     }
 
-    override suspend fun dismiss(scope: SubagentParentScope, toolCallId: String): Result<Unit> = runCatching {
-        require(scope.parentAgentId.isNotBlank() && scope.parentConversationId.isNotBlank() && toolCallId.isNotBlank())
+    override suspend fun dismiss(scope: SubagentParentScope, toolCallId: ToolCallId): Result<Unit> = runCatching {
+        require(scope.parentAgentId.isNotBlank() && scope.parentConversationId.isNotBlank())
         val scoped = transport as? SubagentScopeAwareChannelTransport
             ?: throw UnsupportedOperationException("durable subagent dismissal unavailable")
         val changed = scoped.dismissSubagent(scope, toolCallId).getOrThrow()
@@ -231,9 +232,9 @@ open class SubagentRepository(
         }
     }
 
-    private fun validateDismissalReceipt(entries: List<SubagentEntry>, scope: SubagentParentScope, toolCallId: String) {
+    private fun validateDismissalReceipt(entries: List<SubagentEntry>, scope: SubagentParentScope, toolCallId: ToolCallId) {
         require(entries.isNotEmpty()) { "subagent was not dismissed" }
-        val expected = Triple(scope.parentAgentId, scope.parentConversationId, toolCallId)
+        val expected = Triple(scope.parentAgentId, scope.parentConversationId, toolCallId.value)
         require(entries.all { it.dismissalKey() == expected }) { "invalid dismissal receipt" }
         require(entries.all { it.status == SubagentStatus.CANCELLED }) { "invalid dismissal receipt" }
         require(entries.all { it.terminalReason == USER_DISMISSED_REASON }) { "invalid dismissal receipt" }

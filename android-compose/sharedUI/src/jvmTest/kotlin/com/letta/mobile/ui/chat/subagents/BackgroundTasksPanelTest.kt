@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.chat.subagents
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.repository.api.dismissAction
 
 import androidx.compose.material3.MaterialTheme
@@ -75,8 +76,8 @@ class BackgroundTasksPanelTest {
             override fun currentActiveSubagents(scope: SubagentParentScope) = listOf(scoped)
             override suspend fun refresh() = Result.success(listOf(scoped))
             override suspend fun todos(toolCallId: String) = Result.success(emptyList<SubagentTodo>())
-            override suspend fun dismiss(scope: SubagentParentScope, toolCallId: String): Result<Unit> {
-                calls += scope to toolCallId
+            override suspend fun dismiss(scope: SubagentParentScope, toolCallId: ToolCallId): Result<Unit> {
+                calls += scope to toolCallId.value
                 return Result.failure(IllegalStateException("full"))
             }
         }

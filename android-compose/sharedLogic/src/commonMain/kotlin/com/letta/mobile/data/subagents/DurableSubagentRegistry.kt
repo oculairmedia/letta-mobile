@@ -487,10 +487,9 @@ class DurableSubagentRegistry(
     }
 
     /** Persist an exact dismissal before making it visible to readers. Does not stop the worker. */
-    internal fun dismiss(conversationId: String, agentId: String, toolCallId: String): List<SubagentChipRecord> =
+    internal fun dismiss(key: SubagentChipKey): List<SubagentChipRecord> =
         synchronized(lock) {
-            require(conversationId.isNotBlank() && agentId.isNotBlank() && toolCallId.isNotBlank())
-            val key = SubagentChipKey(conversationId, agentId, toolCallId)
+            require(key.conversationId.isNotBlank() && !key.agentId.isNullOrBlank() && key.toolCallId.isNotBlank())
             val existing = entries[key] ?: return@synchronized emptyList()
             if (existing.state.isTerminal) {
                 return@synchronized listOf(existing).filter { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }

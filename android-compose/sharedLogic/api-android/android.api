@@ -41432,7 +41432,7 @@ public class com/letta/mobile/data/repository/SubagentRepository : com/letta/mob
 	public fun activeSubagentsFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public final fun close ()V
 	public fun currentActiveSubagents (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
-	public fun dismiss-0E7RQCE (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun refresh-IoAF18A (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun todos-gIAlu-s (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -42177,13 +42177,13 @@ public final class com/letta/mobile/data/repository/api/IStepRepository$DefaultI
 public abstract interface class com/letta/mobile/data/repository/api/ISubagentRepository {
 	public abstract fun activeSubagentsFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun currentActiveSubagents (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
-	public fun dismiss-0E7RQCE (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refresh-IoAF18A (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun todos-gIAlu-s (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/ISubagentRepository$DefaultImpls {
-	public static fun dismiss-0E7RQCE (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/ISubagentRepositoryKt {
@@ -57723,12 +57723,12 @@ public final class com/letta/mobile/data/transport/api/RedialWhileTurnActive {
 }
 
 public abstract interface class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport {
-	public fun dismissSubagent-0E7RQCE (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun sendSubagentListForScope (Lcom/letta/mobile/data/repository/api/SubagentParentScope;ZJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport$DefaultImpls {
-	public static fun dismissSubagent-0E7RQCE (Lcom/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransportKt {
@@ -65155,7 +65155,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohChannelTransport : c
 	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun connect (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun dismissSubagent-0E7RQCE (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getCollectorOverflows ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getFrameCollectorConnectionGeneration ()J

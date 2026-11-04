@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.api.SubagentParentScope
@@ -53,10 +54,10 @@ internal class ScopedSubagentListTransport : NoOpChannelTransport(), SubagentSco
     /** When true, deliver the host notification before its matching receipt. */
     var pushBeforeReceipt = false
 
-    override suspend fun dismissSubagent(scope: SubagentParentScope, toolCallId: String): Result<List<SubagentEntry>> {
+    override suspend fun dismissSubagent(scope: SubagentParentScope, toolCallId: ToolCallId): Result<List<SubagentEntry>> {
         val entry = entriesByConversation[scope.parentConversationId].orEmpty().singleOrNull {
             it.parentAgentId == scope.parentAgentId && it.parentConversationId == scope.parentConversationId &&
-                it.toolCallId == toolCallId && toolCallId.isNotBlank()
+                it.toolCallId == toolCallId.value
         } ?: return Result.failure(IllegalArgumentException("unknown scoped dispatch"))
         val terminal = entry.copy(status = SubagentStatus.CANCELLED, terminalReason = "user_dismissed")
         if (pushBeforeReceipt) {

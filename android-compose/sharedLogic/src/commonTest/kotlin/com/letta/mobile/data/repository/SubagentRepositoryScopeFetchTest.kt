@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.repository.ScopedSubagentListTransport.Companion.PARENT_AGENT
 import com.letta.mobile.data.repository.ScopedSubagentListTransport.Companion.running
 import com.letta.mobile.data.repository.api.SubagentParentScope
@@ -104,12 +105,12 @@ class SubagentRepositoryScopeFetchTest {
         backgroundScope.launch { repo.activeSubagentsFlow(scopeB).collect {} }
         runCurrent()
         transport.pushBeforeReceipt = true
-        repo.dismiss(scopeA, "toolu_a").getOrThrow()
+        repo.dismiss(scopeA, ToolCallId("toolu_a")).getOrThrow()
         runCurrent()
         assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
         assertEquals(listOf("toolu_b"), repo.currentActiveSubagents(scopeB).map { it.toolCallId })
         transport.pushBeforeReceipt = false
-        repo.dismiss(scopeB, "toolu_b").getOrThrow()
+        repo.dismiss(scopeB, ToolCallId("toolu_b")).getOrThrow()
         val late = running("toolu_b", CONVERSATION_B)
         transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
             id = "terminal-after-receipt", ts = "t", reason = "registry",

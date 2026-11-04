@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.api
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +12,7 @@ fun ISubagentRepository.dismissAction(scope: SubagentParentScope?): (suspend (Su
             if (entry.parentAgentId != parent.parentAgentId || entry.parentConversationId != parent.parentConversationId) {
                 Result.failure(IllegalArgumentException("subagent parent scope mismatch"))
             } else {
-                dismiss(parent, entry.toolCallId)
+                dismiss(parent, ToolCallId(entry.toolCallId))
             }
         }
     }
@@ -44,7 +45,7 @@ interface ISubagentRepository {
     fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry>
 
     /** Durably hide one exact dispatch without stopping its worker. */
-    suspend fun dismiss(scope: SubagentParentScope, toolCallId: String): Result<Unit> =
+    suspend fun dismiss(scope: SubagentParentScope, toolCallId: ToolCallId): Result<Unit> =
         Result.failure(UnsupportedOperationException("durable subagent dismissal unavailable"))
 
     /** Force a fresh `subagent_list` round-trip. */

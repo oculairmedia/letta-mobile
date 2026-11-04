@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.subagents.SubagentChipKey
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppServerSubagentSnapshotAdapter
@@ -51,9 +52,11 @@ class ControllerSubagentRegistrySource(
             .map { it.toEntry() }
 
     /** Dismiss one exact record and notify viewers only after its durable write succeeds. */
-    internal fun dismiss(conversationId: String, agentId: String, toolCallId: String): List<SubagentEntry> {
-        val changed = registry.dismiss(conversationId, agentId, toolCallId)
-        if (changed.isNotEmpty()) changeListener?.onConversationChanged(SubagentConversationKey(agentId, conversationId))
+    internal fun dismiss(key: SubagentChipKey): List<SubagentEntry> {
+        val changed = registry.dismiss(key)
+        if (changed.isNotEmpty()) {
+            changeListener?.onConversationChanged(SubagentConversationKey(requireNotNull(key.agentId), key.conversationId))
+        }
         return changed.map { it.toEntry() }
     }
 

@@ -1585,12 +1585,12 @@ public final class com/letta/mobile/ui/chat/subagents/BackgroundTasksTags {
 	public static final field TOGGLE Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterListKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterListKt;
+public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterRowsKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterRowsKt;
 	public fun <init> ()V
-	public final fun getLambda$-697919180$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$138476401$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$533406141$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1343970390$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1738900130$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$507574809$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentTodoSheetKt {

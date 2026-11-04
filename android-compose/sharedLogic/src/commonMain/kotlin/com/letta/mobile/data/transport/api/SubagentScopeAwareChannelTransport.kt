@@ -16,7 +16,10 @@ import com.letta.mobile.data.transport.ServerFrame
  */
 interface SubagentScopeAwareChannelTransport {
     /** Dismiss an exact scoped dispatch; unsupported transports fail closed. */
-    suspend fun dismissSubagent(scope: SubagentParentScope, toolCallId: String): Result<List<com.letta.mobile.data.model.SubagentEntry>> =
+    suspend fun dismissSubagent(
+        scope: SubagentParentScope,
+        toolCallId: com.letta.mobile.runtime.ToolCallId,
+    ): Result<List<com.letta.mobile.data.model.SubagentEntry>> =
         Result.failure(UnsupportedOperationException("durable subagent dismissal unavailable"))
 
     suspend fun sendSubagentListForScope(
