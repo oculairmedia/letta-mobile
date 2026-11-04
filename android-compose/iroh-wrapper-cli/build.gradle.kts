@@ -105,6 +105,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // The native authority test's opt-in must invalidate cached skipped results.
+    inputs.property("runNotebookNativeTests", providers.environmentVariable("RUN_NOTEBOOK_NATIVE_TESTS").orElse("false"))
 }
 
 // sharedLogic's KMP variants can contribute same-named resources; keep the
