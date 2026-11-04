@@ -7,6 +7,7 @@ import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.home.conversationRecency
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.lanes.ConversationPurpose
 
 /**
  * What the shell's navigation needs from a host's chat. Read when a verb runs, never captured: the
@@ -123,7 +124,9 @@ class ShellWorkspaceNavigator(
         val text = prompt.text.trim()
         if (text.isEmpty()) return
         state.editAgentId = null
-        val conversations = chat.conversations()
+        val conversations = chat.conversations().filter {
+            it.lane.canTarget && it.lane.purpose != ConversationPurpose.INBOX
+        }
         val focused = prompt.focusedAgent?.let { agent -> newest(conversations.filter { it.agent == agent }) }
         val target = focused ?: newest(conversations)
         if (target != null) {
@@ -137,7 +140,11 @@ class ShellWorkspaceNavigator(
     /** Sends [prompt] to the selected conversation; with none, the composer holds it. */
     fun sendToSelectedConversation(prompt: String) {
         val target = chat.selectedConversation
-        if (target != null) chat.send(target, prompt) else chat.stageComposerText(prompt)
+        if (target == null) {
+            chat.stageComposerText(prompt)
+        } else if (chat.conversations().any { it.id == target && it.lane.canTarget }) {
+            chat.send(target, prompt)
+        }
     }
 
     /** Closes [conversation]'s tab; closing the active tab shows the tab beside it, or Home when none is left. */
@@ -164,5 +171,6 @@ class ShellWorkspaceNavigator(
     }
 
     private fun newest(conversations: List<ShellConversationRef>): ConversationId? =
-        conversations.maxByOrNull { conversationRecency(it.updatedAtLabel) }?.id
+        (conversations.filter { it.lane.purpose == ConversationPurpose.HOME }
+            .ifEmpty { conversations }).maxByOrNull { conversationRecency(it.updatedAtLabel) }?.id
 }

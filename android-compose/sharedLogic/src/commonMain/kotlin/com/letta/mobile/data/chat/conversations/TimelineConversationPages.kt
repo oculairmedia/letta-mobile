@@ -3,6 +3,8 @@ package com.letta.mobile.data.chat.conversations
 import com.letta.mobile.data.chat.branch.PendingDraft
 import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.lanes.ConversationLane
+import com.letta.mobile.data.lanes.ConversationPurpose
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -79,11 +81,15 @@ internal fun List<Conversation>.keeping(others: List<Conversation>): List<Conver
 /** [conversation] while the list carries it. */
 internal fun TimelineConversationsState.listed(conversation: ConversationId?): ConversationId? = record(conversation)?.id
 
-/** [agent]'s newest active conversation in the list. */
+/** [agent]'s home conversation, else its newest active human conversation in the list. */
 internal fun TimelineConversationsState.activeChatOf(agent: AgentId): ConversationId? = conversations.activeChatOf(agent)
 
-internal fun List<Conversation>.activeChatOf(agent: AgentId): ConversationId? =
-    firstOrNull { it.agentId == agent && it.archived != true }?.id
+/** Inbox and work conversations are never a human fallback; the main agent's home stays the anchor. */
+internal fun List<Conversation>.activeChatOf(agent: AgentId): ConversationId? {
+    val active = filter { it.agentId == agent && it.archived != true }
+    return (active.firstOrNull { ConversationLane.fromTags(it.tags).purpose == ConversationPurpose.HOME }
+        ?: active.firstOrNull { ConversationLane.fromTags(it.tags).isHumanFallback })?.id
+}
 
 /** A first chat may be made when the host asks for one and the last attempt did not fail. */
 internal fun TimelineConversationsState.mayCreate(wanted: Boolean): Boolean = wanted && error == null

@@ -42,6 +42,7 @@ object SharedSessionGraph {
             includeAll = subagents == SubagentListing.ALL,
         ),
         contextTokenReadings = contextTokenReadingsOf(transport = transport, scope = scope, snapshots = snapshots),
+        scope = scope,
     )
 }
 
@@ -56,6 +57,7 @@ enum class SubagentListing {
 
 /** What [SharedSessionGraph.transportBound] builds; every member is fed by the graph's transport. */
 class TransportBoundSessionRepositories internal constructor(
+    internal val scope: CoroutineScope,
     val cronRepository: CronRepository,
     val selfTodoRepository: SelfTodoRepository,
     val subagentRepository: SubagentRepository,

@@ -13287,8 +13287,8 @@ public final class com/letta/mobile/data/chat/runtime/ChatConversationStore$Defa
 }
 
 public final class com/letta/mobile/data/chat/runtime/ChatConversationSummary {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Z)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZLjava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
@@ -13297,14 +13297,16 @@ public final class com/letta/mobile/data/chat/runtime/ChatConversationSummary {
 	public final fun component6 ()I
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;Z)Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;
+	public final fun component9 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZLjava/util/List;)Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getAgentName ()Ljava/lang/String;
 	public final fun getArchived ()Z
 	public final fun getId ()Ljava/lang/String;
 	public final fun getLastMessagePreview ()Ljava/lang/String;
+	public final fun getTags ()Ljava/util/List;
 	public final fun getTitle ()Ljava/lang/String;
 	public final fun getUnreadCount ()I
 	public final fun getUpdatedAtLabel ()Ljava/lang/String;
@@ -22166,6 +22168,97 @@ public final class com/letta/mobile/data/home/SettingsStoreHomePinStore : com/le
 }
 
 public final class com/letta/mobile/data/home/SettingsStoreHomePinStore$Companion {
+}
+
+public final class com/letta/mobile/data/lanes/ConversationLane {
+	public static final field Companion Lcom/letta/mobile/data/lanes/ConversationLane$Companion;
+	public fun <init> (Lcom/letta/mobile/data/lanes/ConversationPurpose;Ljava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Lcom/letta/mobile/data/lanes/ConversationPurpose;Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/lanes/ConversationLane;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/ConversationLane;Lcom/letta/mobile/data/lanes/ConversationPurpose;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/lanes/ConversationLane;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBeads ()Ljava/util/List;
+	public final fun getCanTarget ()Z
+	public final fun getPurpose ()Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public final fun getRuns ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun isHumanFallback ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/lanes/ConversationLane$Companion {
+	public final fun fromTags (Ljava/util/List;)Lcom/letta/mobile/data/lanes/ConversationLane;
+}
+
+public final class com/letta/mobile/data/lanes/ConversationLaneProjection {
+	public static final field Companion Lcom/letta/mobile/data/lanes/ConversationLaneProjection$Companion;
+	public static final field MAX_CONVERSATIONS I
+	public static final field MAX_MESSAGES I
+	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/lanes/LaneActivitySource;)V
+	public final fun accept (Lcom/letta/mobile/data/lanes/LaneArrival;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun displayed (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getActivity ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getAvailable ()Z
+}
+
+public final class com/letta/mobile/data/lanes/ConversationLaneProjection$Companion {
+}
+
+public final class com/letta/mobile/data/lanes/ConversationPurpose : java/lang/Enum {
+	public static final field HOME Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public static final field INBOX Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public static final field UNKNOWN Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public static final field UNTAGGED Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public static final field WORK Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/lanes/ConversationPurpose;
+	public static fun values ()[Lcom/letta/mobile/data/lanes/ConversationPurpose;
+}
+
+public final class com/letta/mobile/data/lanes/LaneActivity {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/lanes/LaneActivityAvailability;Ljava/lang/Integer;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/lanes/LaneActivityAvailability;Ljava/lang/Integer;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/lanes/LaneActivityAvailability;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Z
+	public final fun copy (Lcom/letta/mobile/data/lanes/LaneActivityAvailability;Ljava/lang/Integer;Z)Lcom/letta/mobile/data/lanes/LaneActivity;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/LaneActivity;Lcom/letta/mobile/data/lanes/LaneActivityAvailability;Ljava/lang/Integer;ZILjava/lang/Object;)Lcom/letta/mobile/data/lanes/LaneActivity;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailability ()Lcom/letta/mobile/data/lanes/LaneActivityAvailability;
+	public final fun getIncomplete ()Z
+	public final fun getUnreadCount ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/lanes/LaneActivityAvailability : java/lang/Enum {
+	public static final field AVAILABLE Lcom/letta/mobile/data/lanes/LaneActivityAvailability;
+	public static final field UNAVAILABLE Lcom/letta/mobile/data/lanes/LaneActivityAvailability;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/lanes/LaneActivityAvailability;
+	public static fun values ()[Lcom/letta/mobile/data/lanes/LaneActivityAvailability;
+}
+
+public abstract interface class com/letta/mobile/data/lanes/LaneActivitySource {
+	public abstract fun arrivals ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/data/lanes/LaneArrival {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/lanes/LaneArrival;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/lanes/LaneArrival;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/lanes/LaneArrival;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgent ()Ljava/lang/String;
+	public final fun getConversation ()Ljava/lang/String;
+	public final fun getSourceMessageId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/lens/LensDestination : java/lang/Enum {
@@ -48566,6 +48659,7 @@ public abstract interface class com/letta/mobile/data/session/SessionRepositoryG
 	public fun getBlockRepository ()Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
 	public abstract fun getCapabilities ()Lcom/letta/mobile/data/backend/SessionCapabilities;
 	public abstract fun getChannelTransport ()Lcom/letta/mobile/data/transport/api/IChannelTransport;
+	public fun getConversationLanes ()Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 	public abstract fun getConversationRepository ()Lcom/letta/mobile/data/repository/api/IConversationRepository;
 	public abstract fun getCronRepository ()Lcom/letta/mobile/data/repository/api/ICronRepository;
 	public abstract fun getId ()J
@@ -48586,6 +48680,7 @@ public abstract interface class com/letta/mobile/data/session/SessionRepositoryG
 
 public final class com/letta/mobile/data/session/SessionRepositoryGraph$DefaultImpls {
 	public static fun getBlockRepository (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
+	public static fun getConversationLanes (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 }
 
 public abstract interface class com/letta/mobile/data/session/SessionRepositoryGraphFactory {
@@ -48695,11 +48790,13 @@ public final class com/letta/mobile/data/session/graph/SessionAdminRepositoriesK
 }
 
 public final class com/letta/mobile/data/session/graph/SessionGraphIdentity {
-	public fun <init> (JLcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/backend/SessionCapabilities;)V
+	public fun <init> (JLcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/backend/SessionCapabilities;Lcom/letta/mobile/data/lanes/LaneActivitySource;)V
+	public synthetic fun <init> (JLcom/letta/mobile/runtime/BackendDescriptor;Lcom/letta/mobile/data/transport/api/IChannelTransport;Lcom/letta/mobile/data/backend/SessionCapabilities;Lcom/letta/mobile/data/lanes/LaneActivitySource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBackendDescriptor ()Lcom/letta/mobile/runtime/BackendDescriptor;
 	public final fun getCapabilities ()Lcom/letta/mobile/data/backend/SessionCapabilities;
 	public final fun getChannelTransport ()Lcom/letta/mobile/data/transport/api/IChannelTransport;
 	public final fun getId ()J
+	public final fun getLaneActivitySource ()Lcom/letta/mobile/data/lanes/LaneActivitySource;
 }
 
 public final class com/letta/mobile/data/session/graph/SharedSessionGraph {
@@ -48719,6 +48816,7 @@ public final class com/letta/mobile/data/session/graph/SharedSessionRepositoryGr
 	public fun getChannelTransport ()Lcom/letta/mobile/data/transport/api/IChannelTransport;
 	public final fun getContextBreakdown ()Lcom/letta/mobile/data/context/ContextBreakdownLoader;
 	public final fun getContextTokenReadings ()Lcom/letta/mobile/data/context/ContextTokenReadings;
+	public fun getConversationLanes ()Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 	public fun getConversationRepository ()Lcom/letta/mobile/data/repository/api/IConversationRepository;
 	public fun getCronRepository ()Lcom/letta/mobile/data/repository/api/ICronRepository;
 	public fun getId ()J
@@ -49219,15 +49317,19 @@ public final class com/letta/mobile/data/shell/ShellChatPort$DefaultImpls {
 }
 
 public final class com/letta/mobile/data/shell/ShellConversationRef {
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-nFOXY6g ()Ljava/lang/String;
 	public final fun component2-hzr7vF4 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy-rZu4Coc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/shell/ShellConversationRef;
-	public static synthetic fun copy-rZu4Coc$default (Lcom/letta/mobile/data/shell/ShellConversationRef;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/ShellConversationRef;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy-mrEnVtA (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/shell/ShellConversationRef;
+	public static synthetic fun copy-mrEnVtA$default (Lcom/letta/mobile/data/shell/ShellConversationRef;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/ShellConversationRef;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgent-hzr7vF4 ()Ljava/lang/String;
 	public final fun getId-nFOXY6g ()Ljava/lang/String;
+	public final fun getLane ()Lcom/letta/mobile/data/lanes/ConversationLane;
+	public final fun getTags ()Ljava/util/List;
 	public final fun getUpdatedAtLabel ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

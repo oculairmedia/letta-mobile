@@ -1,6 +1,8 @@
 package com.letta.mobile.data.chat.runtime
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.lanes.ConversationLane
+import com.letta.mobile.data.lanes.ConversationPurpose
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 
@@ -53,6 +55,15 @@ object ChatSessionReducer {
         )
 
     /**
+     * A conversation the person already opened stays open (even a view-only work record);
+     * otherwise the home lane is the anchor ahead of whatever sorts first.
+     */
+    private fun anchorSelection(current: String?, conversations: List<ChatConversationSummary>): String? =
+        conversations.firstOrNull { it.id == current }?.id
+            ?: conversations.firstOrNull { ConversationLane.fromTags(it.tags).purpose == ConversationPurpose.HOME }?.id
+            ?: conversations.firstOrNull()?.id
+
+    /**
      * The generation is the timeline observer's identity for its
      * selection, so bumping it retires the live presentation and rebuilds the whole list.
      * Re-publishing the conversation the user is already reading — which every hydration,
@@ -66,7 +77,7 @@ object ChatSessionReducer {
         liveStatusMessage: String = "Live",
         emptyStatusMessage: String = "No conversations",
     ): ChatSessionState {
-        val selectedId = conversations.firstOrNull()?.id
+        val selectedId = anchorSelection(state.selectedConversationId, conversations)
         val selectionChanged = selectedId != null && selectedId != state.selectedConversationId
         return state.copy(
             conversations = conversations,

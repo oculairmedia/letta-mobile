@@ -24,6 +24,8 @@ import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.atomicfu.atomic
+import com.letta.mobile.data.lanes.ConversationLaneProjection
+import com.letta.mobile.data.lanes.LaneActivitySource
 
 /**
  * The repositories a host binds itself for one graph generation — its own
@@ -53,6 +55,8 @@ class SessionGraphIdentity(
     val backendDescriptor: BackendDescriptor,
     val channelTransport: IChannelTransport,
     val capabilities: SessionCapabilities,
+    /** Committed inbox arrivals (mr49w); null until a host binds the capability-gated producer. */
+    val laneActivitySource: LaneActivitySource? = null,
 )
 
 /**
@@ -73,6 +77,7 @@ class SharedSessionRepositoryGraph(
     override val backendDescriptor: BackendDescriptor = identity.backendDescriptor
     override val channelTransport: IChannelTransport = identity.channelTransport
     override val capabilities: SessionCapabilities = identity.capabilities
+    override val conversationLanes = ConversationLaneProjection(transportBound.scope, identity.laneActivitySource)
 
     override val agentRepository: IAgentRepository = host.agentRepository
     override val blockRepository: IAgentBlockRepository? = host.blockRepository

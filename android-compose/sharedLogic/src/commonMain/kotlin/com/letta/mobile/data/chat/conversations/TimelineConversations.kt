@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.lanes.ConversationLane
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -181,6 +182,8 @@ class TimelineConversations(
     }
 
     override fun send(conversation: ConversationId, text: String) {
+        val record = mutableState.value.record(conversation) ?: return
+        if (!ConversationLane.fromTags(record.tags).canTarget) return
         mutableState.update { it.copy(selected = conversation).withDraft(conversation, PendingDraft(BranchDraft(text), sendNow = true)) }
     }
 
@@ -282,7 +285,9 @@ internal fun TimelineConversationsState.withDraft(conversation: ConversationId, 
     copy(drafts = drafts + (conversation to draft))
 
 /** The shell's view of a conversation: whose it is and its newest activity. */
-private fun Conversation.shellRef() = ShellConversationRef(id, agentId, updatedAtLabel = lastMessageAt ?: updatedAt ?: createdAt.orEmpty())
+private fun Conversation.shellRef() = ShellConversationRef(
+    id, agentId, updatedAtLabel = lastMessageAt ?: updatedAt ?: createdAt.orEmpty(), tags = tags,
+)
 
 /** With no [expected] title, any; else only while the row still shows it. */
 private fun Conversation.showsTitle(expected: ConversationSummary?): Boolean = expected == null || summary.orEmpty() == expected.value

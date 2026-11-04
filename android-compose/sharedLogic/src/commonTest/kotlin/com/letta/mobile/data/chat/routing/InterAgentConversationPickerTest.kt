@@ -78,6 +78,15 @@ class InterAgentConversationPickerTest {
         assertEquals("updated", pickOtherAgentConversation(Repo(rows), agent))
     }
 
+    @Test
+    fun workTaggedInboxAndForeignOwnerAreNeverSelectableTargets() = runTest {
+        val agent = AgentId("target")
+        val work = Conversation(ConversationId("work"), agent, tags = listOf("lane:work", "lane:inbox"))
+        assertNull(pickOtherAgentConversation(Repo(listOf(work)), agent))
+        val foreign = work.copy(agentId = AgentId("foreign"), tags = listOf("lane:inbox"))
+        assertNull(pickOtherAgentConversation(Repo(listOf(foreign)), agent))
+    }
+
     private data class ConversationTime(val lastMessageAt: String)
 
     @Test

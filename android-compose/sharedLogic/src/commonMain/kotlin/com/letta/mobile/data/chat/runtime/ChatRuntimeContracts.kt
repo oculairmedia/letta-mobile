@@ -28,6 +28,7 @@ data class ChatConversationSummary(
     val unreadCount: Int = 0,
     val agentId: String? = null,
     val archived: Boolean = false,
+    val tags: List<String> = emptyList(),
 )
 
 fun ChatConversationSummary.displayTitle(maxLength: Int = 56): String {
@@ -139,6 +140,7 @@ fun Conversation.toChatConversationSummary(
         lastMessagePreview = "Loaded from backend",
         agentId = agentIdValue,
         archived = archived == true,
+        tags = tags,
     )
 }
 

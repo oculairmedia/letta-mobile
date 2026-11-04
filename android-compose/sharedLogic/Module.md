@@ -299,6 +299,10 @@ The session source keeps catalogs live while Home is hidden. Page entry reuses c
 
 The session source reloads backend figures on graph changes and transport reconnection. Page-entry and error Retry requests share an in-flight load; hosts must not add their own refresh timers or reconnect handlers for these figures.
 
+# Package com.letta.mobile.data.lanes
+
+`ConversationLane` derives exact home/inbox/work purposes and bead/run references from existing conversation tags; references grant no read or send rights, work conversations are viewable but never message targets, and automatic selection anchors on home and never falls back to inbox or work. `ConversationLaneProjection` is session-graph-owned unread/activity state that shell rows render and the shared transcript acknowledges when it displays an arrival; opening, swapping or closing a view never changes it. `LaneActivitySource` is the one input: committed inbox arrivals from the capability-gated `conversation_activity` producer (mr49w), deduplicated by agent/conversation/source identity. Without a bound source unread is unknown, never zero, and metadata `conversation_updated` invalidations never count as arrivals. No history fetch or per-agent subscription is issued. Verified forwarding provenance (os2pc) is not derived here.
+
 # Package com.letta.mobile.data.lens
 
 The Work/Play presentation lens over common underlying data. It changes vocabulary and framing rather than creating separate agents, conversations or memory. Keep changes to underlying agents or memory outside lens selection; hosts map [LensDestination](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.lens/-lens-destination/index.html) and [WorkPlayMode](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.lens/-work-play-mode/index.html) to their navigation surfaces.
