@@ -18,26 +18,55 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * callers could take.
  */
 class CanvasSessionRegistry {
-    private val activeSessions = MutableStateFlow<Map<CanvasId, CanvasSession>>(emptyMap())
+    private val nextMountId = MutableStateFlow(0L)
 
+    private val activeSessions = MutableStateFlow<Map<CanvasId, List<Pair<Long, CanvasSession>>>>(emptyMap())
+
+    /** Replaces registrations for this id. Mounts should use [registerMount] instead. */
     fun register(session: CanvasSession) {
-        update { it + (session.canvasId to session) }
+        update { it + (session.canvasId to listOf(newMountId() to session)) }
     }
 
+    /**
+     * Registers one mount and returns its idempotent disposer. The newest live mount is used by
+     * [get]; disposing it reveals the previous live mount in this same owner-provided scope.
+     * Callers must not share a registry across authentication contexts.
+     */
+    fun registerMount(session: CanvasSession): () -> Unit {
+        // A per-registry mount id; pairs avoid adding a type to the canvas package.
+        val registration = newMountId() to session
+        val canvasId = session.canvasId
+        update { current -> current + (canvasId to (current[canvasId].orEmpty() + registration)) }
+        return {
+            update { current ->
+                val remaining = current[canvasId].orEmpty().filterNot { it.first == registration.first }
+                if (remaining.isEmpty()) current - canvasId else current + (canvasId to remaining)
+            }
+        }
+    }
+
+    /** Removes all registrations for an id. Mounts should dispose their own registration. */
     fun unregister(canvasId: CanvasId) {
         update { it - canvasId }
     }
 
-    fun get(canvasId: CanvasId): CanvasSession? = activeSessions.value[canvasId]
+    fun get(canvasId: CanvasId): CanvasSession? = activeSessions.value[canvasId]?.lastOrNull()?.second
 
     fun clear() {
         update { emptyMap() }
     }
 
-    private fun update(transform: (Map<CanvasId, CanvasSession>) -> Map<CanvasId, CanvasSession>) {
+    private fun update(transform: (Map<CanvasId, List<Pair<Long, CanvasSession>>>) -> Map<CanvasId, List<Pair<Long, CanvasSession>>>) {
         while (true) {
             val current = activeSessions.value
             if (activeSessions.compareAndSet(current, transform(current))) return
+        }
+    }
+
+    private fun newMountId(): Long {
+        while (true) {
+            val current = nextMountId.value
+            if (nextMountId.compareAndSet(current, current + 1)) return current
         }
     }
 }
