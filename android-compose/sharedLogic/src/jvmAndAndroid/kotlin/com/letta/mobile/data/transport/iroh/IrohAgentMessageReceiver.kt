@@ -187,13 +187,15 @@ class IrohAgentMessageReceiver(
                 val result = block()
                 val encoded = LettaJson.persisted.encodeToString(router.snapshot())
                 require(encoded.toByteArray().size <= MAX_JOURNAL_BYTES)
-                writeJournalOrRestore(file, JournalSnapshot(encoded), previous?.let(::JournalSnapshot))
+                writeJournalOrRestore(file, encoded to previous)
                 result
             }
         }
     }
 
-    private fun writeJournalOrRestore(file: File, next: JournalSnapshot, previous: JournalSnapshot?) {
+    /** Writes `next` (first) and, if that fails, restores `previous` (second) under the lock. */
+    private fun writeJournalOrRestore(file: File, snapshots: Pair<String, String?>) {
+        val (next, previous) = snapshots
         runCatching { writeJournal(file, next) }.getOrElse { failure ->
             // Rename may already have exposed a release. Restore the prior snapshot under the lock.
             if (previous != null) {
@@ -206,13 +208,8 @@ class IrohAgentMessageReceiver(
         }
     }
 
-    private fun writeJournal(file: File, snapshot: JournalSnapshot) {
-        AtomicJsonFile.write(file.toPath().toAbsolutePath(), snapshot.encoded, requireAtomic = true, syncDirectory = journalDirectorySync)
-    }
-
-    /** One encoded reservation-journal state; a type keeps journal writes from taking loose strings. */
-    @JvmInline
-    private value class JournalSnapshot(val encoded: String)
+    private fun writeJournal(file: File, encoded: String) =
+        AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true, syncDirectory = journalDirectorySync)
 
     private companion object {
         const val MAX_JOURNAL_BYTES = 4L * 1024 * 1024
