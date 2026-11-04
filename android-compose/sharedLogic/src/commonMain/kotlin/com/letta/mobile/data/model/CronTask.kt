@@ -4,13 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Wire shape of a scheduled prompt as carried over
- * the shim's mobile WS cron protocol (sister to lcp-d5g). Mirrors the
- * shim's `lib/types/crons.ts` `CronTask` interface verbatim so the
- * persisted file shape and the wire shape stay in sync.
- *
- * Authoritative reference:
- *   /opt/stacks/letta-code-parallel/admin-shim/lib/types/crons.ts
+ * Wire shape of a scheduled prompt. The App Server's native cron commands own it,
+ * reached through admin_rpc (`CronAdminHandlers`); the retired admin-shim's
+ * `lib/types/crons.ts` was the original shape and is no longer authoritative.
  *
  * Status values: `active` (waiting to fire or due to repeat), `completed`
  * (one-shot fired or recurring exhausted), `cancelled` (deleted /
