@@ -81,7 +81,7 @@ class AdminRpcContractTest {
         fun projectMethods() = setOf(
             "project.archive", "project.beadsRemoteStatus", "project.create", "project.delete",
             "project.get", "project.list", "project.provisionBeadsRemote",
-            "project.triggerSync", "project.update",
+            "project.update",
         )
 
         fun toolMethods() = setOf(

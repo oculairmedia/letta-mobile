@@ -30599,67 +30599,6 @@ public final class com/letta/mobile/data/model/ProjectSummary$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public final class com/letta/mobile/data/model/ProjectSyncTriggerRequest {
-	public static final field Companion Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest$Companion;
-	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1-FhThgns ()Ljava/lang/String;
-	public final fun copy-pJjKc-I (Ljava/lang/String;)Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest;
-	public static synthetic fun copy-pJjKc-I$default (Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getProjectId-FhThgns ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/ProjectSyncTriggerRequest$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/ProjectSyncTriggerRequest;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/ProjectSyncTriggerRequest$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/ProjectSyncTriggerResponse {
-	public static final field Companion Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse$Companion;
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getEventId ()Ljava/lang/String;
-	public final fun getMessage ()Ljava/lang/String;
-	public final fun getStatus ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class com/letta/mobile/data/model/ProjectSyncTriggerResponse$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/model/ProjectSyncTriggerResponse;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class com/letta/mobile/data/model/ProjectSyncTriggerResponse$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
 public final class com/letta/mobile/data/model/ProjectTrackerCapabilities {
 	public static final field Companion Lcom/letta/mobile/data/model/ProjectTrackerCapabilities$Companion;
 	public fun <init> ()V
@@ -33235,11 +33174,12 @@ public final class com/letta/mobile/data/model/VibesyncEvent$Companion {
 public final class com/letta/mobile/data/model/VibesyncHealthResponse {
 	public static final field Companion Lcom/letta/mobile/data/model/VibesyncHealthResponse$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component11 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component12 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Lkotlinx/serialization/json/JsonElement;
@@ -33248,14 +33188,15 @@ public final class com/letta/mobile/data/model/VibesyncHealthResponse {
 	public final fun component7 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component8 ()Lkotlinx/serialization/json/JsonElement;
 	public final fun component9 ()Lkotlinx/serialization/json/JsonElement;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/model/VibesyncHealthResponse;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/VibesyncHealthResponse;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/letta/mobile/data/model/VibesyncHealthResponse;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/model/VibesyncHealthResponse;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/VibesyncHealthResponse;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;Lkotlinx/serialization/json/JsonElement;ILjava/lang/Object;)Lcom/letta/mobile/data/model/VibesyncHealthResponse;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConfig ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getConnectionPool ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getDatabase ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getLastError ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getMemory ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getOrchestration ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getRigs ()Lkotlinx/serialization/json/JsonElement;
 	public final fun getService ()Ljava/lang/String;
 	public final fun getStatus ()Ljava/lang/String;
@@ -40042,7 +39983,6 @@ public final class com/letta/mobile/data/projects/ProjectFailure : java/lang/Enu
 	public static final field Delete Lcom/letta/mobile/data/projects/ProjectFailure;
 	public static final field Load Lcom/letta/mobile/data/projects/ProjectFailure;
 	public static final field Provision Lcom/letta/mobile/data/projects/ProjectFailure;
-	public static final field Sync Lcom/letta/mobile/data/projects/ProjectFailure;
 	public static final field Update Lcom/letta/mobile/data/projects/ProjectFailure;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getFallback ()Ljava/lang/String;
@@ -40117,7 +40057,6 @@ public abstract interface class com/letta/mobile/data/projects/ProjectsBackend {
 	public abstract fun getProjects ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun provisionBeads-_vseOa8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun reload (Lcom/letta/mobile/data/projects/ProjectReload;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun sync-_vseOa8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun update-PFf1qb4 (Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectDraft;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -40138,7 +40077,6 @@ public final class com/letta/mobile/data/projects/ProjectsPageController {
 	public final fun select-HwGzMMc (Ljava/lang/String;)V
 	public final fun setQuery (Ljava/lang/String;)V
 	public final fun start ()V
-	public final fun sync-prkdxy8 (Ljava/lang/String;)V
 	public final fun togglePinned-prkdxy8 (Ljava/lang/String;)V
 }
 
@@ -40156,12 +40094,11 @@ public final class com/letta/mobile/data/projects/ProjectsPageSources {
 }
 
 public final class com/letta/mobile/data/projects/ProjectsPageState {
-	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun beadsOf (Lcom/letta/mobile/data/model/ProjectSummary;)Lcom/letta/mobile/data/model/BeadsRemoteStatus;
 	public final fun component1 ()Ljava/util/List;
-	public final fun component10 ()Lcom/letta/mobile/data/projects/ProjectEditor;
-	public final fun component11 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
 	public final fun component2 ()Z
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -40169,9 +40106,9 @@ public final class com/letta/mobile/data/projects/ProjectsPageState {
 	public final fun component6-PE2tVCE ()Ljava/lang/String;
 	public final fun component7 ()Ljava/util/Map;
 	public final fun component8-PE2tVCE ()Ljava/lang/String;
-	public final fun component9-PE2tVCE ()Ljava/lang/String;
-	public final fun copy-vM-Y9zE (Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;)Lcom/letta/mobile/data/projects/ProjectsPageState;
-	public static synthetic fun copy-vM-Y9zE$default (Lcom/letta/mobile/data/projects/ProjectsPageState;Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/projects/ProjectsPageState;
+	public final fun component9 ()Lcom/letta/mobile/data/projects/ProjectEditor;
+	public final fun copy-YJGFh3o (Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;)Lcom/letta/mobile/data/projects/ProjectsPageState;
+	public static synthetic fun copy-YJGFh3o$default (Lcom/letta/mobile/data/projects/ProjectsPageState;Ljava/util/List;ZLjava/lang/String;Ljava/lang/String;Ljava/util/Set;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectEditor;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/projects/ProjectsPageState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBeadsStatus ()Ljava/util/Map;
 	public final fun getEditor ()Lcom/letta/mobile/data/projects/ProjectEditor;
@@ -40186,7 +40123,6 @@ public final class com/letta/mobile/data/projects/ProjectsPageState {
 	public final fun getRefreshing ()Z
 	public final fun getSelected ()Lcom/letta/mobile/data/model/ProjectSummary;
 	public final fun getSelectedKey-PE2tVCE ()Ljava/lang/String;
-	public final fun getSyncing-PE2tVCE ()Ljava/lang/String;
 	public final fun getVisibleProjects ()Ljava/util/List;
 	public fun hashCode ()I
 	public final fun isPinned (Lcom/letta/mobile/data/model/ProjectSummary;)Z
@@ -40203,7 +40139,6 @@ public final class com/letta/mobile/data/projects/RepositoryProjectsBackend : co
 	public fun getProjects ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun provisionBeads-_vseOa8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun reload (Lcom/letta/mobile/data/projects/ProjectReload;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun sync-_vseOa8 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun update-PFf1qb4 (Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectDraft;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -40459,7 +40394,6 @@ public class com/letta/mobile/data/repository/CachedProjectRepository : com/lett
 	public fun provisionBeadsRemote (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun refreshProjects (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun refreshProjectsIfStale (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun triggerSync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun updateProject (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -40785,8 +40719,6 @@ public class com/letta/mobile/data/repository/IrohAdminRpcProjectSource : com/le
 	public fun refreshProjects-YJ6oNZw (Lcom/letta/mobile/data/repository/ProjectListLimit;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun refreshProjects-YJ6oNZw$default (Lcom/letta/mobile/data/repository/IrohAdminRpcProjectSource;Lcom/letta/mobile/data/repository/ProjectListLimit;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun shouldUseIroh ()Z
-	public fun triggerSync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun triggerSync-jxSiO3E (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun updateProject (Lcom/letta/mobile/data/repository/ProjectUpdateRpcParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun updateProject (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -41725,7 +41657,6 @@ public abstract interface class com/letta/mobile/data/repository/api/IProjectRep
 	public static synthetic fun provisionBeadsRemote$default (Lcom/letta/mobile/data/repository/api/IProjectRepository;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun refreshProjects (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refreshProjectsIfStale (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun triggerSync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun updateProject (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -42102,7 +42033,6 @@ public abstract interface class com/letta/mobile/data/repository/api/ProjectIroh
 	public abstract fun provisionBeadsRemote (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refreshProjects (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun shouldUseIroh ()Z
-	public abstract fun triggerSync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun updateProject (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -42114,7 +42044,6 @@ public abstract interface class com/letta/mobile/data/repository/api/ProjectRemo
 	public abstract fun getProject (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun listProjects (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun provisionBeadsRemote (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun triggerSync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun updateProject (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

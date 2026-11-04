@@ -568,21 +568,6 @@
       "notes": "Already routes to VibeSync directly; fallback none. Typed capability_unavailable when vibesyncBaseUrl is null."
     },
     {
-      "method": "project.triggerSync",
-      "handler": "ProjectAdminHandlers.kt",
-      "current_backend": "vibesync_http POST /api/sync/trigger (LETTA_IROH_VIBESYNC_BASE_URL / default :3099; capability_unavailable if unset)",
-      "owner": "vibesync_service",
-      "public_contract": "injected VibeSync project service: trigger sync",
-      "authorization_class": "admin_write",
-      "data_store": "vibesync_registry",
-      "fallback": "none",
-      "migration_slice": "lgns8.9",
-      "production_first_route": "vibesync_http",
-      "post_shim_owner": "vibesync_service",
-      "post_shim_fallback": "none",
-      "notes": "Already routes to VibeSync directly; fallback none. Typed capability_unavailable when vibesyncBaseUrl is null."
-    },
-    {
       "method": "project.create",
       "handler": "ProjectAdminHandlers.kt",
       "current_backend": "vibesync_http POST /api/registry/projects (LETTA_IROH_VIBESYNC_BASE_URL / default :3099; capability_unavailable if unset)",

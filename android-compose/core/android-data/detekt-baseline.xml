@@ -129,7 +129,6 @@
     <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun deleteProject(identifier: String): Unit</ID>
     <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun getProject(identifier: String): ProjectSummary</ID>
     <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean</ID>
-    <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse</ID>
     <ID>MaxLineLength:SessionScopedProjectWorkRepository.kt$SessionScopedProjectWorkRepository$)</ID>
     <ID>MaxLineLength:SessionScopedProjectWorkRepository.kt$SessionScopedProjectWorkRepository$override suspend fun invalidateProjectCache(projectId: String): Unit</ID>
     <ID>MaxLineLength:SessionScopedProviderRepository.kt$SessionScopedProviderRepository$override suspend fun checkExistingProvider(providerId: ProviderId): Unit</ID>

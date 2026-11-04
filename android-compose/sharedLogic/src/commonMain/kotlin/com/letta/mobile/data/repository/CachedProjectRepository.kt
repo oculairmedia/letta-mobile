@@ -5,7 +5,6 @@ import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectSummary
-import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.ProjectIrohSource
 import com.letta.mobile.data.repository.api.ProjectRemoteSource
@@ -66,13 +65,6 @@ open class CachedProjectRepository(
         return fromActiveSource(
             iroh = { it.provisionBeadsRemote(identifier, push) },
             http = { remote.source().provisionBeadsRemote(identifier, push) },
-        )
-    }
-
-    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
-        return fromActiveSource(
-            iroh = { it.triggerSync(identifier) },
-            http = { remote.source().triggerSync(identifier) },
         )
     }
 

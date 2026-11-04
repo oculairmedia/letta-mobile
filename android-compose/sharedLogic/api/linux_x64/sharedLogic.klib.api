@@ -2396,7 +2396,6 @@ final enum class com.letta.mobile.data.projects/ProjectFailure : kotlin/Enum<com
     enum entry Delete // com.letta.mobile.data.projects/ProjectFailure.Delete|null[0]
     enum entry Load // com.letta.mobile.data.projects/ProjectFailure.Load|null[0]
     enum entry Provision // com.letta.mobile.data.projects/ProjectFailure.Provision|null[0]
-    enum entry Sync // com.letta.mobile.data.projects/ProjectFailure.Sync|null[0]
     enum entry Update // com.letta.mobile.data.projects/ProjectFailure.Update|null[0]
 
     final val entries // com.letta.mobile.data.projects/ProjectFailure.entries|#static{}entries[0]
@@ -4942,7 +4941,6 @@ abstract interface com.letta.mobile.data.projects/ProjectsBackend { // com.letta
     abstract suspend fun delete(com.letta.mobile.data.projects/ProjectKey) // com.letta.mobile.data.projects/ProjectsBackend.delete|delete(com.letta.mobile.data.projects.ProjectKey){}[0]
     abstract suspend fun provisionBeads(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.projects/ProjectsBackend.provisionBeads|provisionBeads(com.letta.mobile.data.projects.ProjectKey){}[0]
     abstract suspend fun reload(com.letta.mobile.data.projects/ProjectReload) // com.letta.mobile.data.projects/ProjectsBackend.reload|reload(com.letta.mobile.data.projects.ProjectReload){}[0]
-    abstract suspend fun sync(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.projects/ProjectsBackend.sync|sync(com.letta.mobile.data.projects.ProjectKey){}[0]
     abstract suspend fun update(com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.projects/ProjectDraft): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.projects/ProjectsBackend.update|update(com.letta.mobile.data.projects.ProjectKey;com.letta.mobile.data.projects.ProjectDraft){}[0]
 }
 
@@ -5216,7 +5214,6 @@ abstract interface com.letta.mobile.data.repository.api/IProjectRepository { // 
     abstract suspend fun provisionBeadsRemote(kotlin/String, kotlin/Boolean = ...): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.repository.api/IProjectRepository.provisionBeadsRemote|provisionBeadsRemote(kotlin.String;kotlin.Boolean){}[0]
     abstract suspend fun refreshProjects(): com.letta.mobile.data.model/ProjectCatalog // com.letta.mobile.data.repository.api/IProjectRepository.refreshProjects|refreshProjects(){}[0]
     abstract suspend fun refreshProjectsIfStale(kotlin/Long): kotlin/Boolean // com.letta.mobile.data.repository.api/IProjectRepository.refreshProjectsIfStale|refreshProjectsIfStale(kotlin.Long){}[0]
-    abstract suspend fun triggerSync(kotlin/String): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.repository.api/IProjectRepository.triggerSync|triggerSync(kotlin.String){}[0]
     abstract suspend fun updateProject(kotlin/String, kotlin/String?, kotlin/String?): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository.api/IProjectRepository.updateProject|updateProject(kotlin.String;kotlin.String?;kotlin.String?){}[0]
 }
 
@@ -5454,7 +5451,6 @@ abstract interface com.letta.mobile.data.repository.api/ProjectIrohSource { // c
     abstract suspend fun getProject(kotlin/String): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository.api/ProjectIrohSource.getProject|getProject(kotlin.String){}[0]
     abstract suspend fun provisionBeadsRemote(kotlin/String, kotlin/Boolean): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.repository.api/ProjectIrohSource.provisionBeadsRemote|provisionBeadsRemote(kotlin.String;kotlin.Boolean){}[0]
     abstract suspend fun refreshProjects(): com.letta.mobile.data.model/ProjectCatalog // com.letta.mobile.data.repository.api/ProjectIrohSource.refreshProjects|refreshProjects(){}[0]
-    abstract suspend fun triggerSync(kotlin/String): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.repository.api/ProjectIrohSource.triggerSync|triggerSync(kotlin.String){}[0]
     abstract suspend fun updateProject(kotlin/String, kotlin/String?, kotlin/String?): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository.api/ProjectIrohSource.updateProject|updateProject(kotlin.String;kotlin.String?;kotlin.String?){}[0]
 }
 
@@ -5466,7 +5462,6 @@ abstract interface com.letta.mobile.data.repository.api/ProjectRemoteSource { //
     abstract suspend fun getProject(kotlin/String): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository.api/ProjectRemoteSource.getProject|getProject(kotlin.String){}[0]
     abstract suspend fun listProjects(): com.letta.mobile.data.model/ProjectCatalog // com.letta.mobile.data.repository.api/ProjectRemoteSource.listProjects|listProjects(){}[0]
     abstract suspend fun provisionBeadsRemote(kotlin/String, kotlin/Boolean): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.repository.api/ProjectRemoteSource.provisionBeadsRemote|provisionBeadsRemote(kotlin.String;kotlin.Boolean){}[0]
-    abstract suspend fun triggerSync(kotlin/String): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.repository.api/ProjectRemoteSource.triggerSync|triggerSync(kotlin.String){}[0]
     abstract suspend fun updateProject(kotlin/String, kotlin/String?, kotlin/String?): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository.api/ProjectRemoteSource.updateProject|updateProject(kotlin.String;kotlin.String?;kotlin.String?){}[0]
 }
 
@@ -47407,64 +47402,6 @@ final class com.letta.mobile.data.model/ProjectSummary { // com.letta.mobile.dat
     }
 }
 
-final class com.letta.mobile.data.model/ProjectSyncTriggerRequest { // com.letta.mobile.data.model/ProjectSyncTriggerRequest|null[0]
-    constructor <init>(com.letta.mobile.data.model/ProjectId? = ...) // com.letta.mobile.data.model/ProjectSyncTriggerRequest.<init>|<init>(com.letta.mobile.data.model.ProjectId?){}[0]
-
-    final val projectId // com.letta.mobile.data.model/ProjectSyncTriggerRequest.projectId|{}projectId[0]
-        final fun <get-projectId>(): com.letta.mobile.data.model/ProjectId? // com.letta.mobile.data.model/ProjectSyncTriggerRequest.projectId.<get-projectId>|<get-projectId>(){}[0]
-
-    final fun component1(): com.letta.mobile.data.model/ProjectId? // com.letta.mobile.data.model/ProjectSyncTriggerRequest.component1|component1(){}[0]
-    final fun copy(com.letta.mobile.data.model/ProjectId? = ...): com.letta.mobile.data.model/ProjectSyncTriggerRequest // com.letta.mobile.data.model/ProjectSyncTriggerRequest.copy|copy(com.letta.mobile.data.model.ProjectId?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProjectSyncTriggerRequest.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProjectSyncTriggerRequest.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProjectSyncTriggerRequest.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProjectSyncTriggerRequest> { // com.letta.mobile.data.model/ProjectSyncTriggerRequest.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/ProjectSyncTriggerRequest.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProjectSyncTriggerRequest.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProjectSyncTriggerRequest.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProjectSyncTriggerRequest // com.letta.mobile.data.model/ProjectSyncTriggerRequest.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProjectSyncTriggerRequest) // com.letta.mobile.data.model/ProjectSyncTriggerRequest.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProjectSyncTriggerRequest){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/ProjectSyncTriggerRequest.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProjectSyncTriggerRequest> // com.letta.mobile.data.model/ProjectSyncTriggerRequest.Companion.serializer|serializer(){}[0]
-    }
-}
-
-final class com.letta.mobile.data.model/ProjectSyncTriggerResponse { // com.letta.mobile.data.model/ProjectSyncTriggerResponse|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/ProjectSyncTriggerResponse.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
-
-    final val eventId // com.letta.mobile.data.model/ProjectSyncTriggerResponse.eventId|{}eventId[0]
-        final fun <get-eventId>(): kotlin/String? // com.letta.mobile.data.model/ProjectSyncTriggerResponse.eventId.<get-eventId>|<get-eventId>(){}[0]
-    final val message // com.letta.mobile.data.model/ProjectSyncTriggerResponse.message|{}message[0]
-        final fun <get-message>(): kotlin/String? // com.letta.mobile.data.model/ProjectSyncTriggerResponse.message.<get-message>|<get-message>(){}[0]
-    final val status // com.letta.mobile.data.model/ProjectSyncTriggerResponse.status|{}status[0]
-        final fun <get-status>(): kotlin/String? // com.letta.mobile.data.model/ProjectSyncTriggerResponse.status.<get-status>|<get-status>(){}[0]
-
-    final fun component1(): kotlin/String? // com.letta.mobile.data.model/ProjectSyncTriggerResponse.component1|component1(){}[0]
-    final fun component2(): kotlin/String? // com.letta.mobile.data.model/ProjectSyncTriggerResponse.component2|component2(){}[0]
-    final fun component3(): kotlin/String? // com.letta.mobile.data.model/ProjectSyncTriggerResponse.component3|component3(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.model/ProjectSyncTriggerResponse.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProjectSyncTriggerResponse.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProjectSyncTriggerResponse.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProjectSyncTriggerResponse.toString|toString(){}[0]
-
-    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProjectSyncTriggerResponse> { // com.letta.mobile.data.model/ProjectSyncTriggerResponse.$serializer|null[0]
-        final val descriptor // com.letta.mobile.data.model/ProjectSyncTriggerResponse.$serializer.descriptor|{}descriptor[0]
-            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProjectSyncTriggerResponse.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
-
-        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProjectSyncTriggerResponse.$serializer.childSerializers|childSerializers(){}[0]
-        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.model/ProjectSyncTriggerResponse.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
-        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProjectSyncTriggerResponse) // com.letta.mobile.data.model/ProjectSyncTriggerResponse.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProjectSyncTriggerResponse){}[0]
-    }
-
-    final object Companion { // com.letta.mobile.data.model/ProjectSyncTriggerResponse.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProjectSyncTriggerResponse> // com.letta.mobile.data.model/ProjectSyncTriggerResponse.Companion.serializer|serializer(){}[0]
-    }
-}
-
 final class com.letta.mobile.data.model/ProjectTrackerCapabilities { // com.letta.mobile.data.model/ProjectTrackerCapabilities|null[0]
     constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.model/ProjectTrackerCapabilities.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
@@ -50228,7 +50165,7 @@ final class com.letta.mobile.data.model/VibesyncEvent { // com.letta.mobile.data
 }
 
 final class com.letta.mobile.data.model/VibesyncHealthResponse { // com.letta.mobile.data.model/VibesyncHealthResponse|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ...) // com.letta.mobile.data.model/VibesyncHealthResponse.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ...) // com.letta.mobile.data.model/VibesyncHealthResponse.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?){}[0]
 
     final val config // com.letta.mobile.data.model/VibesyncHealthResponse.config|{}config[0]
         final fun <get-config>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.config.<get-config>|<get-config>(){}[0]
@@ -50240,6 +50177,8 @@ final class com.letta.mobile.data.model/VibesyncHealthResponse { // com.letta.mo
         final fun <get-lastError>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.lastError.<get-lastError>|<get-lastError>(){}[0]
     final val memory // com.letta.mobile.data.model/VibesyncHealthResponse.memory|{}memory[0]
         final fun <get-memory>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.memory.<get-memory>|<get-memory>(){}[0]
+    final val orchestration // com.letta.mobile.data.model/VibesyncHealthResponse.orchestration|{}orchestration[0]
+        final fun <get-orchestration>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.orchestration.<get-orchestration>|<get-orchestration>(){}[0]
     final val rigs // com.letta.mobile.data.model/VibesyncHealthResponse.rigs|{}rigs[0]
         final fun <get-rigs>(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.rigs.<get-rigs>|<get-rigs>(){}[0]
     final val service // com.letta.mobile.data.model/VibesyncHealthResponse.service|{}service[0]
@@ -50256,6 +50195,7 @@ final class com.letta.mobile.data.model/VibesyncHealthResponse { // com.letta.mo
     final fun component1(): kotlin/String? // com.letta.mobile.data.model/VibesyncHealthResponse.component1|component1(){}[0]
     final fun component10(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component10|component10(){}[0]
     final fun component11(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component11|component11(){}[0]
+    final fun component12(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component12|component12(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.model/VibesyncHealthResponse.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.model/VibesyncHealthResponse.component3|component3(){}[0]
     final fun component4(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component4|component4(){}[0]
@@ -50264,7 +50204,7 @@ final class com.letta.mobile.data.model/VibesyncHealthResponse { // com.letta.mo
     final fun component7(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component7|component7(){}[0]
     final fun component8(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component8|component8(){}[0]
     final fun component9(): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.model/VibesyncHealthResponse.component9|component9(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ...): com.letta.mobile.data.model/VibesyncHealthResponse // com.letta.mobile.data.model/VibesyncHealthResponse.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ..., kotlinx.serialization.json/JsonElement? = ...): com.letta.mobile.data.model/VibesyncHealthResponse // com.letta.mobile.data.model/VibesyncHealthResponse.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?;kotlinx.serialization.json.JsonElement?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/VibesyncHealthResponse.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/VibesyncHealthResponse.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/VibesyncHealthResponse.toString|toString(){}[0]
@@ -52976,7 +52916,6 @@ final class com.letta.mobile.data.projects/ProjectsPageController { // com.letta
     final fun select(com.letta.mobile.data.projects/ProjectKey?) // com.letta.mobile.data.projects/ProjectsPageController.select|select(com.letta.mobile.data.projects.ProjectKey?){}[0]
     final fun setQuery(kotlin/String) // com.letta.mobile.data.projects/ProjectsPageController.setQuery|setQuery(kotlin.String){}[0]
     final fun start() // com.letta.mobile.data.projects/ProjectsPageController.start|start(){}[0]
-    final fun sync(com.letta.mobile.data.projects/ProjectKey) // com.letta.mobile.data.projects/ProjectsPageController.sync|sync(com.letta.mobile.data.projects.ProjectKey){}[0]
     final fun togglePinned(com.letta.mobile.data.projects/ProjectKey) // com.letta.mobile.data.projects/ProjectsPageController.togglePinned|togglePinned(com.letta.mobile.data.projects.ProjectKey){}[0]
 }
 
@@ -52992,7 +52931,7 @@ final class com.letta.mobile.data.projects/ProjectsPageSources { // com.letta.mo
 }
 
 final class com.letta.mobile.data.projects/ProjectsPageState { // com.letta.mobile.data.projects/ProjectsPageState|null[0]
-    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/ProjectSummary> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String = ..., kotlin.collections/Set<com.letta.mobile.data.projects/ProjectKey> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., kotlin.collections/Map<com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.model/BeadsRemoteStatus> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., com.letta.mobile.data.projects/ProjectKey? = ..., com.letta.mobile.data.projects/ProjectEditor? = ..., kotlin/String? = ...) // com.letta.mobile.data.projects/ProjectsPageState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.ProjectSummary>;kotlin.Boolean;kotlin.String?;kotlin.String;kotlin.collections.Set<com.letta.mobile.data.projects.ProjectKey>;com.letta.mobile.data.projects.ProjectKey?;kotlin.collections.Map<com.letta.mobile.data.projects.ProjectKey,com.letta.mobile.data.model.BeadsRemoteStatus>;com.letta.mobile.data.projects.ProjectKey?;com.letta.mobile.data.projects.ProjectKey?;com.letta.mobile.data.projects.ProjectEditor?;kotlin.String?){}[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.model/ProjectSummary> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String = ..., kotlin.collections/Set<com.letta.mobile.data.projects/ProjectKey> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., kotlin.collections/Map<com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.model/BeadsRemoteStatus> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., com.letta.mobile.data.projects/ProjectEditor? = ..., kotlin/String? = ...) // com.letta.mobile.data.projects/ProjectsPageState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.model.ProjectSummary>;kotlin.Boolean;kotlin.String?;kotlin.String;kotlin.collections.Set<com.letta.mobile.data.projects.ProjectKey>;com.letta.mobile.data.projects.ProjectKey?;kotlin.collections.Map<com.letta.mobile.data.projects.ProjectKey,com.letta.mobile.data.model.BeadsRemoteStatus>;com.letta.mobile.data.projects.ProjectKey?;com.letta.mobile.data.projects.ProjectEditor?;kotlin.String?){}[0]
 
     final val beadsStatus // com.letta.mobile.data.projects/ProjectsPageState.beadsStatus|{}beadsStatus[0]
         final fun <get-beadsStatus>(): kotlin.collections/Map<com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.model/BeadsRemoteStatus> // com.letta.mobile.data.projects/ProjectsPageState.beadsStatus.<get-beadsStatus>|<get-beadsStatus>(){}[0]
@@ -53020,15 +52959,12 @@ final class com.letta.mobile.data.projects/ProjectsPageState { // com.letta.mobi
         final fun <get-selected>(): com.letta.mobile.data.model/ProjectSummary? // com.letta.mobile.data.projects/ProjectsPageState.selected.<get-selected>|<get-selected>(){}[0]
     final val selectedKey // com.letta.mobile.data.projects/ProjectsPageState.selectedKey|{}selectedKey[0]
         final fun <get-selectedKey>(): com.letta.mobile.data.projects/ProjectKey? // com.letta.mobile.data.projects/ProjectsPageState.selectedKey.<get-selectedKey>|<get-selectedKey>(){}[0]
-    final val syncing // com.letta.mobile.data.projects/ProjectsPageState.syncing|{}syncing[0]
-        final fun <get-syncing>(): com.letta.mobile.data.projects/ProjectKey? // com.letta.mobile.data.projects/ProjectsPageState.syncing.<get-syncing>|<get-syncing>(){}[0]
     final val visibleProjects // com.letta.mobile.data.projects/ProjectsPageState.visibleProjects|{}visibleProjects[0]
         final fun <get-visibleProjects>(): kotlin.collections/List<com.letta.mobile.data.model/ProjectSummary> // com.letta.mobile.data.projects/ProjectsPageState.visibleProjects.<get-visibleProjects>|<get-visibleProjects>(){}[0]
 
     final fun beadsOf(com.letta.mobile.data.model/ProjectSummary): com.letta.mobile.data.model/BeadsRemoteStatus? // com.letta.mobile.data.projects/ProjectsPageState.beadsOf|beadsOf(com.letta.mobile.data.model.ProjectSummary){}[0]
     final fun component1(): kotlin.collections/List<com.letta.mobile.data.model/ProjectSummary> // com.letta.mobile.data.projects/ProjectsPageState.component1|component1(){}[0]
-    final fun component10(): com.letta.mobile.data.projects/ProjectEditor? // com.letta.mobile.data.projects/ProjectsPageState.component10|component10(){}[0]
-    final fun component11(): kotlin/String? // com.letta.mobile.data.projects/ProjectsPageState.component11|component11(){}[0]
+    final fun component10(): kotlin/String? // com.letta.mobile.data.projects/ProjectsPageState.component10|component10(){}[0]
     final fun component2(): kotlin/Boolean // com.letta.mobile.data.projects/ProjectsPageState.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.projects/ProjectsPageState.component3|component3(){}[0]
     final fun component4(): kotlin/String // com.letta.mobile.data.projects/ProjectsPageState.component4|component4(){}[0]
@@ -53036,8 +52972,8 @@ final class com.letta.mobile.data.projects/ProjectsPageState { // com.letta.mobi
     final fun component6(): com.letta.mobile.data.projects/ProjectKey? // com.letta.mobile.data.projects/ProjectsPageState.component6|component6(){}[0]
     final fun component7(): kotlin.collections/Map<com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.model/BeadsRemoteStatus> // com.letta.mobile.data.projects/ProjectsPageState.component7|component7(){}[0]
     final fun component8(): com.letta.mobile.data.projects/ProjectKey? // com.letta.mobile.data.projects/ProjectsPageState.component8|component8(){}[0]
-    final fun component9(): com.letta.mobile.data.projects/ProjectKey? // com.letta.mobile.data.projects/ProjectsPageState.component9|component9(){}[0]
-    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/ProjectSummary> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String = ..., kotlin.collections/Set<com.letta.mobile.data.projects/ProjectKey> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., kotlin.collections/Map<com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.model/BeadsRemoteStatus> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., com.letta.mobile.data.projects/ProjectKey? = ..., com.letta.mobile.data.projects/ProjectEditor? = ..., kotlin/String? = ...): com.letta.mobile.data.projects/ProjectsPageState // com.letta.mobile.data.projects/ProjectsPageState.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.ProjectSummary>;kotlin.Boolean;kotlin.String?;kotlin.String;kotlin.collections.Set<com.letta.mobile.data.projects.ProjectKey>;com.letta.mobile.data.projects.ProjectKey?;kotlin.collections.Map<com.letta.mobile.data.projects.ProjectKey,com.letta.mobile.data.model.BeadsRemoteStatus>;com.letta.mobile.data.projects.ProjectKey?;com.letta.mobile.data.projects.ProjectKey?;com.letta.mobile.data.projects.ProjectEditor?;kotlin.String?){}[0]
+    final fun component9(): com.letta.mobile.data.projects/ProjectEditor? // com.letta.mobile.data.projects/ProjectsPageState.component9|component9(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.model/ProjectSummary> = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/String = ..., kotlin.collections/Set<com.letta.mobile.data.projects/ProjectKey> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., kotlin.collections/Map<com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.model/BeadsRemoteStatus> = ..., com.letta.mobile.data.projects/ProjectKey? = ..., com.letta.mobile.data.projects/ProjectEditor? = ..., kotlin/String? = ...): com.letta.mobile.data.projects/ProjectsPageState // com.letta.mobile.data.projects/ProjectsPageState.copy|copy(kotlin.collections.List<com.letta.mobile.data.model.ProjectSummary>;kotlin.Boolean;kotlin.String?;kotlin.String;kotlin.collections.Set<com.letta.mobile.data.projects.ProjectKey>;com.letta.mobile.data.projects.ProjectKey?;kotlin.collections.Map<com.letta.mobile.data.projects.ProjectKey,com.letta.mobile.data.model.BeadsRemoteStatus>;com.letta.mobile.data.projects.ProjectKey?;com.letta.mobile.data.projects.ProjectEditor?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.projects/ProjectsPageState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.projects/ProjectsPageState.hashCode|hashCode(){}[0]
     final fun isPinned(com.letta.mobile.data.model/ProjectSummary): kotlin/Boolean // com.letta.mobile.data.projects/ProjectsPageState.isPinned|isPinned(com.letta.mobile.data.model.ProjectSummary){}[0]
@@ -53057,7 +52993,6 @@ final class com.letta.mobile.data.projects/RepositoryProjectsBackend : com.letta
     final suspend fun delete(com.letta.mobile.data.projects/ProjectKey) // com.letta.mobile.data.projects/RepositoryProjectsBackend.delete|delete(com.letta.mobile.data.projects.ProjectKey){}[0]
     final suspend fun provisionBeads(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.projects/RepositoryProjectsBackend.provisionBeads|provisionBeads(com.letta.mobile.data.projects.ProjectKey){}[0]
     final suspend fun reload(com.letta.mobile.data.projects/ProjectReload) // com.letta.mobile.data.projects/RepositoryProjectsBackend.reload|reload(com.letta.mobile.data.projects.ProjectReload){}[0]
-    final suspend fun sync(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.projects/RepositoryProjectsBackend.sync|sync(com.letta.mobile.data.projects.ProjectKey){}[0]
     final suspend fun update(com.letta.mobile.data.projects/ProjectKey, com.letta.mobile.data.projects/ProjectDraft): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.projects/RepositoryProjectsBackend.update|update(com.letta.mobile.data.projects.ProjectKey;com.letta.mobile.data.projects.ProjectDraft){}[0]
 }
 
@@ -67603,7 +67538,6 @@ open class com.letta.mobile.data.repository/CachedProjectRepository : com.letta.
     open suspend fun provisionBeadsRemote(kotlin/String, kotlin/Boolean): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.repository/CachedProjectRepository.provisionBeadsRemote|provisionBeadsRemote(kotlin.String;kotlin.Boolean){}[0]
     open suspend fun refreshProjects(): com.letta.mobile.data.model/ProjectCatalog // com.letta.mobile.data.repository/CachedProjectRepository.refreshProjects|refreshProjects(){}[0]
     open suspend fun refreshProjectsIfStale(kotlin/Long): kotlin/Boolean // com.letta.mobile.data.repository/CachedProjectRepository.refreshProjectsIfStale|refreshProjectsIfStale(kotlin.Long){}[0]
-    open suspend fun triggerSync(kotlin/String): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.repository/CachedProjectRepository.triggerSync|triggerSync(kotlin.String){}[0]
     open suspend fun updateProject(kotlin/String, kotlin/String?, kotlin/String?): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository/CachedProjectRepository.updateProject|updateProject(kotlin.String;kotlin.String?;kotlin.String?){}[0]
 }
 
@@ -67768,7 +67702,6 @@ open class com.letta.mobile.data.repository/IrohAdminRpcProjectSource : com.lett
     final suspend fun getProject(com.letta.mobile.data.model/ProjectId): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.getProject|getProject(com.letta.mobile.data.model.ProjectId){}[0]
     final suspend fun probeAvailability(): kotlin/Boolean // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.probeAvailability|probeAvailability(){}[0]
     final suspend fun provisionBeadsRemote(com.letta.mobile.data.model/ProjectId, kotlin/Boolean = ...): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.provisionBeadsRemote|provisionBeadsRemote(com.letta.mobile.data.model.ProjectId;kotlin.Boolean){}[0]
-    final suspend fun triggerSync(com.letta.mobile.data.model/ProjectId): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.triggerSync|triggerSync(com.letta.mobile.data.model.ProjectId){}[0]
     final suspend fun updateProject(com.letta.mobile.data.repository/ProjectUpdateRpcParams): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.updateProject|updateProject(com.letta.mobile.data.repository.ProjectUpdateRpcParams){}[0]
     open fun shouldUseIroh(): kotlin/Boolean // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.shouldUseIroh|shouldUseIroh(){}[0]
     open suspend fun archiveProject(kotlin/String): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.archiveProject|archiveProject(kotlin.String){}[0]
@@ -67779,7 +67712,6 @@ open class com.letta.mobile.data.repository/IrohAdminRpcProjectSource : com.lett
     open suspend fun provisionBeadsRemote(kotlin/String, kotlin/Boolean): com.letta.mobile.data.model/BeadsRemoteProvisionResponse // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.provisionBeadsRemote|provisionBeadsRemote(kotlin.String;kotlin.Boolean){}[0]
     open suspend fun refreshProjects(): com.letta.mobile.data.model/ProjectCatalog // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.refreshProjects|refreshProjects(){}[0]
     open suspend fun refreshProjects(com.letta.mobile.data.repository/ProjectListLimit? = ...): com.letta.mobile.data.model/ProjectCatalog // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.refreshProjects|refreshProjects(com.letta.mobile.data.repository.ProjectListLimit?){}[0]
-    open suspend fun triggerSync(kotlin/String): com.letta.mobile.data.model/ProjectSyncTriggerResponse // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.triggerSync|triggerSync(kotlin.String){}[0]
     open suspend fun updateProject(kotlin/String, kotlin/String?, kotlin/String?): com.letta.mobile.data.model/ProjectSummary // com.letta.mobile.data.repository/IrohAdminRpcProjectSource.updateProject|updateProject(kotlin.String;kotlin.String?;kotlin.String?){}[0]
 }
 

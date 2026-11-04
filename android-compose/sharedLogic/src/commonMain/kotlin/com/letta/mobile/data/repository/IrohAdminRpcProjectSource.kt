@@ -7,8 +7,6 @@ import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectDetailResponse
 import com.letta.mobile.data.model.ProjectId
-import com.letta.mobile.data.model.ProjectSyncTriggerRequest
-import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.ProjectIrohSource
@@ -30,9 +28,8 @@ import kotlinx.serialization.json.put
  *
  * Mirrors [ProjectApi]'s HTTP surface without falling back to raw HTTP in
  * iroh:// mode. This is the client half of the project.* admin_rpc parity slice:
- * the capability probe, Projects tab, create/update/archive/delete, beads-remote,
- * and sync trigger all go through the same Iroh stream as the rest of the admin
- * reads/writes.
+ * the capability probe, Projects tab, create/update/archive/delete and beads-remote
+ * go through the same Iroh stream as the rest of the admin reads/writes.
  */
 open class IrohAdminRpcProjectSource(
     private val channelTransport: IChannelTransport,
@@ -104,20 +101,6 @@ open class IrohAdminRpcProjectSource(
             ),
         ) ?: error("Iroh admin_rpc project.provisionBeadsRemote returned no result")
         return json.decodeFromJsonElement(BeadsRemoteProvisionResponse.serializer(), result)
-    }
-
-    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
-        triggerSync(ProjectId(identifier))
-
-    suspend fun triggerSync(projectId: ProjectId): ProjectSyncTriggerResponse {
-        val body = json.encodeToString(
-            ProjectSyncTriggerRequest.serializer(),
-            ProjectSyncTriggerRequest(projectId = projectId),
-        )
-        val result = rpc(
-            projectRpc(ProjectRpcMethods.TriggerSync, ProjectRpcPaths.SyncTrigger, AdminRpcJsonBody(body)),
-        ) ?: error("Iroh admin_rpc project.triggerSync returned no result")
-        return json.decodeFromJsonElement(ProjectSyncTriggerResponse.serializer(), result)
     }
 
     override suspend fun createProject(
@@ -296,7 +279,6 @@ private object ProjectRpcMethods {
     val Get: AdminRpcMethod = AdminRpcMethod("project.get")
     val BeadsRemoteStatus: AdminRpcMethod = AdminRpcMethod("project.beadsRemoteStatus")
     val ProvisionBeadsRemote: AdminRpcMethod = AdminRpcMethod("project.provisionBeadsRemote")
-    val TriggerSync: AdminRpcMethod = AdminRpcMethod("project.triggerSync")
     val Create: AdminRpcMethod = AdminRpcMethod("project.create")
     val Update: AdminRpcMethod = AdminRpcMethod("project.update")
     val Archive: AdminRpcMethod = AdminRpcMethod("project.archive")
@@ -304,7 +286,6 @@ private object ProjectRpcMethods {
 }
 
 private object ProjectRpcPaths {
-    val SyncTrigger: AdminRpcPath = AdminRpcPath("/api/sync/trigger")
     val RegistryProjects: AdminRpcPath = AdminRpcPath("/api/registry/projects")
     val BeadsRemoteSuffix = ProjectPathSuffix("/beads-remote")
     val BeadsRemoteProvisionSuffix = ProjectPathSuffix("/beads-remote/provision")

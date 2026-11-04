@@ -257,7 +257,6 @@ new method cannot pass via the `admin.full` fallback.
 - `project.get`
 - `project.list`
 - `project.provisionBeadsRemote`
-- `project.triggerSync`
 - `project.update`
 - `provider.connect`
 - `provider.disconnect`

@@ -3,7 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 /**
  * Project API parity over Iroh admin_rpc.
  *
- * These 9 methods are owned by the VibeSync product service, not lettashim.
+ * These 8 methods are owned by the VibeSync product service, not lettashim.
  * The handler talks to VibeSync DIRECTLY through an injected base URL rather
  * than routing through lettashim's `/api` reverse-proxy splice — removing
  * the shim dependency for the project surface (matrix owner: vibesync_service).
@@ -43,10 +43,6 @@ object ProjectAdminHandlers {
             )
         }
 
-        router.register("project.triggerSync") { params ->
-            api.post(AdminPath.api("sync", "trigger"), body = params.toString())
-        }
-
         router.register("project.create") { params ->
             api.post(AdminPath.api("registry", "projects"), body = params.toString())
         }
@@ -75,6 +71,6 @@ object ProjectAdminHandlers {
 
     val PROJECT_METHODS: Set<String> = setOf(
         "project.list", "project.get", "project.beadsRemoteStatus", "project.provisionBeadsRemote",
-        "project.triggerSync", "project.create", "project.update", "project.archive", "project.delete",
+        "project.create", "project.update", "project.archive", "project.delete",
     )
 }

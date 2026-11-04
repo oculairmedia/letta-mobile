@@ -31,7 +31,6 @@ import com.letta.mobile.ui.theme.LettaDimens
 object ProjectDetailKeys {
     const val OPEN_CHAT = "project-open-chat"
     const val BUG_REPORT = "project-bug-report"
-    const val SYNC = "project-sync"
     const val PROVISION = "project-provision"
     const val PIN = "project-pin"
     const val EDIT = "project-edit"
@@ -75,15 +74,12 @@ internal fun projectFacts(project: ProjectSummary, state: ProjectsPageState): Li
     )
 }
 
-/** What the open project offers, in order: chat, sync, Beads, pin, edit, archive, delete. */
+/** What the open project offers, in order: chat, Beads, pin, edit, archive, delete. */
 internal fun projectActions(project: ProjectSummary, state: ProjectsPageState, actions: ProjectsPageActions): List<SettingsRow.Link> {
     val id = project.key
     val pinned = state.isPinned(project)
     val beads = state.beadsOf(project)
     return projectChatActions(project, actions.list) + listOfNotNull(
-        SettingsRow.Link(ProjectDetailKeys.SYNC, "Sync now", enabled = state.syncing != id, value = if (state.syncing == id) "Syncing…" else null) {
-            actions.detail.onSync(id)
-        },
         SettingsRow.Link(
             ProjectDetailKeys.PROVISION,
             "Provision Beads remote",

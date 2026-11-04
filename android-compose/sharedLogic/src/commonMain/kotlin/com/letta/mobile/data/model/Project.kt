@@ -83,18 +83,6 @@ data class BeadsRemoteProvisionResponse(
 )
 
 @Serializable
-data class ProjectSyncTriggerRequest(
-    val projectId: ProjectId? = null,
-)
-
-@Serializable
-data class ProjectSyncTriggerResponse(
-    val status: String? = null,
-    val message: String? = null,
-    @SerialName("event_id") val eventId: String? = null,
-)
-
-@Serializable
 data class PmAgentMetadata(
     @SerialName("agent_id") val agentId: AgentId,
     val name: String? = null,
@@ -108,6 +96,7 @@ data class VibesyncHealthResponse(
     val version: String? = null,
     val status: String? = null,
     val uptime: JsonElement? = null,
+    val orchestration: JsonElement? = null,
     val sync: JsonElement? = null,
     val database: JsonElement? = null,
     val memory: JsonElement? = null,

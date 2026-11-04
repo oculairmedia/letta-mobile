@@ -75,7 +75,6 @@ data class ProjectsListActions(
 @Immutable
 data class ProjectDetailActions(
     val onStartEdit: (ProjectKey) -> Unit = {},
-    val onSync: (ProjectKey) -> Unit = {},
     val onProvisionBeads: (ProjectKey) -> Unit = {},
     val onArchive: (ProjectKey) -> Unit = {},
     val onDelete: (ProjectKey) -> Unit = {},
@@ -117,7 +116,6 @@ fun ProjectsPageController.projectsPageActions(onOpenChat: ((ProjectSummary, Pro
     ),
     detail = ProjectDetailActions(
         onStartEdit = editor::startEdit,
-        onSync = ::sync,
         onProvisionBeads = ::provisionBeadsRemote,
         onArchive = ::archive,
         onDelete = ::delete,

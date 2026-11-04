@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | ba81c9774cdc12d5f473653e9e5ff1e18371dc4da2b74096983dd0324230b5a4 | 08ed60e770725cedea0c4553c8be30d2a2e5d3fb |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 059a8074d8822474115bf90fd79307e82cd9956647e5159ab5366c058049b23f | 53ce84ba4956811e08566fa7e9fc3dfa32e88f29 |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 844cbb121fdefbd2c82a9e9d98d32487d00620425f56c9386d339d9ac2197945 | 97cb37833c7d6bc3d707fcaf71dede03fec55d8a |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 84e62d502a28e0fb64e50a6d4c444bf48bd2a78bca62f17c38ae083f5d22de6d | 4a7bc7339087238113f9e9ee2f79f5ad334aa72a |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -287,7 +287,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (154 methods)
+## Admin ownership (153 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
@@ -299,12 +299,12 @@ These are declared ownership decisions, not newly observed production execution.
 | controller&#95;native | 31 |
 | local&#95;backend&#95;store | 9 |
 | plugin&#95;host | 10 |
-| vibesync&#95;service | 9 |
+| vibesync&#95;service | 8 |
 
 | Fallback | Method count |
 | --- | --- |
 | deny&#95;fail&#95;closed | 46 |
-| none | 108 |
+| none | 107 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
 | --- | --- | --- | --- | --- | --- |
@@ -426,7 +426,6 @@ These are declared ownership decisions, not newly observed production execution.
 | project.get | vibesync&#95;service | none | admin&#95;read | ProjectAdminHandlers.kt | injected VibeSync project service: get |
 | project.list | vibesync&#95;service | none | admin&#95;read | ProjectAdminHandlers.kt | injected VibeSync project service: list |
 | project.provisionBeadsRemote | vibesync&#95;service | none | admin&#95;write | ProjectAdminHandlers.kt | injected VibeSync project service: provision beads remote |
-| project.triggerSync | vibesync&#95;service | none | admin&#95;write | ProjectAdminHandlers.kt | injected VibeSync project service: trigger sync |
 | project.update | vibesync&#95;service | none | admin&#95;write | ProjectAdminHandlers.kt | injected VibeSync project service: update |
 | provider.connect | app&#95;server&#95;v2 | none | admin&#95;write | ProviderAdminHandlers.kt | connect&#95;provider |
 | provider.disconnect | app&#95;server&#95;v2 | none | admin&#95;write | ProviderAdminHandlers.kt | disconnect&#95;provider |

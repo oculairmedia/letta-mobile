@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectSummary
-import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 
 /**
  * Remote HTTP project admin surface used by
@@ -17,7 +16,6 @@ interface ProjectRemoteSource {
     suspend fun getProject(identifier: String): ProjectSummary
     suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus
     suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse
-    suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse
     suspend fun createProject(
         name: String?,
         filesystemPath: String,
@@ -44,7 +42,6 @@ interface ProjectIrohSource {
     suspend fun getProject(identifier: String): ProjectSummary
     suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus
     suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse
-    suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse
     suspend fun createProject(
         name: String?,
         filesystemPath: String,

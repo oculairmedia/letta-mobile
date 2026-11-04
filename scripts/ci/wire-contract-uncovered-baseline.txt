@@ -92,7 +92,6 @@ project.delete
 project.get
 project.list
 project.provisionBeadsRemote
-project.triggerSync
 project.update
 provider.connect
 provider.disconnect
