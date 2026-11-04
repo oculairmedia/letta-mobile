@@ -6,46 +6,46 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isCursorSdk, staticCursorImports } from './check-no-static-cursor-import.mjs';
 
-/** A minimal Babel-shaped program: one top-level node per entry. */
-function program(...body) {
+/** Babel-shaped top-level module declarations: `[nodeType, specifier]` pairs (null = no source). */
+function program(...declarations) {
+  const body = declarations.map(([type, specifier]) => ({
+    type,
+    source: specifier === null ? null : { type: 'StringLiteral', value: specifier },
+  }));
   return { program: { body } };
 }
 
-const source = (value) => ({ type: 'StringLiteral', value });
+const cases = [
+  {
+    name: 'flags a top-level import of the SDK and of a subpath',
+    ast: program(['ImportDeclaration', '@cursor/sdk'], ['ImportDeclaration', '@cursor/sdk/agent']),
+    expected: ['@cursor/sdk', '@cursor/sdk/agent'],
+  },
+  {
+    name: 'flags named and star re-exports of the SDK',
+    ast: program(['ExportNamedDeclaration', '@cursor/sdk'], ['ExportAllDeclaration', '@cursor/sdk']),
+    expected: ['@cursor/sdk', '@cursor/sdk'],
+  },
+  {
+    name: 'ignores unrelated modules, local exports and look-alike names',
+    ast: program(
+      ['ImportDeclaration', 'node:fs'],
+      ['ImportDeclaration', '@cursor/sdk-linux-arm64'],
+      ['ImportDeclaration', 'cli-cursor'],
+      ['ExportNamedDeclaration', null],
+    ),
+    expected: [],
+  },
+  {
+    name: 'ignores a dynamic import, which is not a top-level module declaration',
+    ast: program(['ExpressionStatement', '@cursor/sdk']),
+    expected: [],
+  },
+];
 
-test('flags a top-level import of the SDK and of a subpath', () => {
-  const ast = program(
-    { type: 'ImportDeclaration', source: source('@cursor/sdk') },
-    { type: 'ImportDeclaration', source: source('@cursor/sdk/agent') },
-  );
-  assert.deepEqual(staticCursorImports(ast), ['@cursor/sdk', '@cursor/sdk/agent']);
-});
-
-test('flags named and star re-exports of the SDK', () => {
-  const ast = program(
-    { type: 'ExportNamedDeclaration', source: source('@cursor/sdk') },
-    { type: 'ExportAllDeclaration', source: source('@cursor/sdk') },
-  );
-  assert.deepEqual(staticCursorImports(ast), ['@cursor/sdk', '@cursor/sdk']);
-});
-
-test('ignores unrelated modules, local exports and look-alike names', () => {
-  const ast = program(
-    { type: 'ImportDeclaration', source: source('node:fs') },
-    { type: 'ImportDeclaration', source: source('@cursor/sdk-linux-arm64') },
-    { type: 'ImportDeclaration', source: source('cli-cursor') },
-    { type: 'ExportNamedDeclaration', source: null },
-  );
-  assert.deepEqual(staticCursorImports(ast), []);
-});
-
-test('ignores a dynamic import, which is not a top-level module declaration', () => {
-  const dynamicImport = {
-    type: 'ExpressionStatement',
-    expression: { type: 'CallExpression', callee: { type: 'Import' }, arguments: [source('@cursor/sdk')] },
-  };
-  assert.deepEqual(staticCursorImports(program(dynamicImport)), []);
-});
+for (const { name, ast, expected } of cases) {
+  test(name, () => assert.deepEqual(staticCursorImports(ast), expected));
+}
 
 test('isCursorSdk matches the package and subpaths only', () => {
   assert.equal(isCursorSdk('@cursor/sdk'), true);

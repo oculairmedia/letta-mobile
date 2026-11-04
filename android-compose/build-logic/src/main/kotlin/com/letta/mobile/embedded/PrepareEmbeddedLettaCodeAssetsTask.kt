@@ -76,7 +76,9 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
         nodeCheck(npmWorkDir, lettaJs)
         stageDeviceNpm(npmWorkDir)
         copyNodeModules(npmWorkDir, assetRoot)
-        checkNoStaticCursorImport(npmWorkDir, assetRoot.resolve("node_modules/@letta-ai/letta-code/letta.js"))
+        // The staged letta.js is a byte copy of this patched one; the guard reads it here, inside the
+        // npm work dir, the only place check-no-static-cursor-import.mjs (patchTarget) accepts.
+        checkNoStaticCursorImport(npmWorkDir, lettaJs)
         fileSystem.copy {
             from(runtimeDirectory)
             into(assetRoot)

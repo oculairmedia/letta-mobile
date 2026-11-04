@@ -7,6 +7,7 @@
 // Runs from the npm work dir so @babel/parser resolves (the patch pipeline installs it there).
 import { readFileSync } from 'fs';
 import { pathToFileURL } from 'url';
+import { patchTarget } from './patch-target.mjs';
 
 const STATIC_MODULE_NODES = new Set(['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration']);
 
@@ -23,8 +24,9 @@ export function staticCursorImports(ast) {
     .filter(isCursorSdk);
 }
 
-async function main(path) {
-  if (!path) throw new Error('usage: node check-no-static-cursor-import.mjs <path/to/letta.js>');
+async function main() {
+  // Same confinement as the patch scripts: only a letta.js inside the npm work dir is read.
+  const path = patchTarget();
   const { parse } = await import('@babel/parser');
   const found = staticCursorImports(parse(readFileSync(path, 'utf8'), { sourceType: 'module' }));
   if (found.length > 0) {
@@ -33,5 +35,5 @@ async function main(path) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  await main(process.argv[2]);
+  await main();
 }
