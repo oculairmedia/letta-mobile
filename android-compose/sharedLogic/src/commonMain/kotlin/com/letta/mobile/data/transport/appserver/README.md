@@ -1,27 +1,29 @@
 # App Server protocol client
 
 Kotlin client for the Letta App Server (Protocol V2, alpha hard-cut): one bidirectional
-WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.34.14`
+WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.34.39`
 (`APP_SERVER_PROTOCOL_VERSION = 1`), the one contract (letta-mobile-ckmub.5). Its command and
 message unions are those of 0.32.10 plus `launch_subagent` / `launch_subagent_response` (0.33.6)
 plus the `turn_finished_ack` command (0.34.8) plus `browser_device_mcp_oauth` /
-`browser_device_mcp_oauth_cancel` / `browser_device_mcp_oauth_response` (0.34.14, not used by the
-client), with optional 0.34 fields:
+`browser_device_mcp_oauth_cancel` / `browser_device_mcp_oauth_response` (0.34.14), plus
+`chatgpt_rate_limit_reset_credits_list` / `chatgpt_rate_limit_reset_credit_consume` and their
+responses, and `teleport_failed_ack` (0.34.39). The client does not use the credit commands;
+unknown messages decode safely. Optional 0.34 fields include:
 `input.terminal_consumer_id`, `turn_finished.terminal_consumer_ids`, `client_preferences` on
 `create_message` / `teleport_continue`, workflow `progress`, the `memory_palace` experiment.
 
 ## letta-code version pins
 
-There is **one** wire contract: **0.34.14**. Every other version below is a runtime or a
+There is **one** wire contract: **0.34.39**. Every other version below is a runtime or a
 capture that is knowingly not the contract, and says why. Each pin has one source of truth;
 everything else cites it (letta-mobile-bzvro.10, letta-mobile-ckmub.5).
 
 | Pin | Version | Source of truth | What it means |
 |---|---|---|---|
-| THE pin: wire contract, desktop bundled runtime, Android embedded runtime | 0.34.14 | `letta-code-runtime/letta-code-runtime.properties` (`lettaCodeVersion`, letta-mobile-by4vm.110 D1) | One version everywhere. The Android embedded runtime (`com.letta.mobile.embedded-runtime` build-logic plugin) and the desktop bundled runtime (`desktop/build.gradle.kts` reads the same file) are built from it, and it is THE wire contract: the protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`), 104 commands, 113 messages. Mirrors that must name it: the contract matrix `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` (`baseline.version`); `desktop/runtime/package.json`, `package-lock.json`, `runtime-manifest.json`; the `appserver-contract-baseline` CI job (it reads `baseline.version` from the matrix, never a literal); `LettaCodeContract.VERSION` (user-facing text); and the pins quoted in CLAUDE.md, AGENTS.md and the CLI READMEs. `LettaCodeVersionPinsTest` (appserver-cli) fails if any of them disagree. |
-| Deployed Linux host | 0.34.14 | the host (not in this repo) | The contract version: the host App Server runs 0.34.14 (host upgrade, letta-mobile-ckmub.14, is done). The 0.34-only `turn_finished_ack` / `terminal_consumer_id` / `client_preferences` are still sent only to a server whose `app_server_info` names a letta-code version that has them (`runtime/DurableTurnDelivery.kt`: `client_preferences` from 0.34.0, `terminal_consumer_id` + `turn_finished_ack` from 0.34.8), and decoding stays additive-tolerant (0.34-only fields are optional, unknown frames decode to `Unknown`), so older servers keep working. |
-| Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | A historical capture, not the contract. The host now runs 0.34.14, so it can be re-captured; that needs a live server (`scripts/appserver/capture-live-goldens.mjs`). Its unions equal 0.32.10, so it covers neither `launch_subagent` nor `turn_finished_ack`. |
-| Restart-replay evidence | 0.34.14 | `appserver-cli/src/test/resources/appserver/restart-replay-evidence.json` (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`) | Captured at the contract on 2026-10-17 with Node v24.18.0 and `lmstudio/MiniMax-M3` (letta-mobile-ckmub.13) by `AppServerRestartReplayProbeTest` against a real local server; every durability and identity observation (restart, reconnect, `client_message_id`) reproduced the 0.29.12 capture. It is produced by a live probe plus a model provider, so a future contract bump does not move it until the probe is re-run. |
+| THE pin: wire contract, desktop bundled runtime, Android embedded runtime | 0.34.39 | `letta-code-runtime/letta-code-runtime.properties` (`lettaCodeVersion`, letta-mobile-by4vm.110 D1) | One version everywhere. The Android embedded runtime (`com.letta.mobile.embedded-runtime` build-logic plugin) and the desktop bundled runtime (`desktop/build.gradle.kts` reads the same file) are built from it, and it is THE wire contract: the protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`), 106 commands, 116 messages. Mirrors that must name it: the contract matrix `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` (`baseline.version`); `desktop/runtime/package.json`, `package-lock.json`, `runtime-manifest.json`; the `appserver-contract-baseline` CI job (it reads `baseline.version` from the matrix, never a literal); `LettaCodeContract.VERSION` (user-facing text); and the pins quoted in CLAUDE.md, AGENTS.md and the CLI READMEs. `LettaCodeVersionPinsTest` (appserver-cli) fails if any of them disagree. |
+| Deployed Linux host | 0.34.14 | the host (not in this repo) | Last recorded host version; verify the live host before deployment (host upgrade, letta-mobile-ckmub.14, recorded 0.34.14). The 0.34-only `turn_finished_ack` / `terminal_consumer_id` / `client_preferences` are still sent only to a server whose `app_server_info` names a letta-code version that has them (`runtime/DurableTurnDelivery.kt`: `client_preferences` from 0.34.0, `terminal_consumer_id` + `turn_finished_ack` from 0.34.8), and decoding stays additive-tolerant (0.34-only fields are optional, unknown frames decode to `Unknown`), so older servers keep working. |
+| Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | A historical capture, not the contract. The host was last recorded at 0.34.14, so it can be re-captured; that needs a live server (`scripts/appserver/capture-live-goldens.mjs`). Its unions equal 0.32.10, so it covers neither `launch_subagent` nor `turn_finished_ack`. |
+| Restart-replay evidence | 0.34.14 | `appserver-cli/src/test/resources/appserver/restart-replay-evidence.json` (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`) | Captured at the then-current contract on 2026-10-17 with Node v24.18.0 and `lmstudio/MiniMax-M3` (letta-mobile-ckmub.13) by `AppServerRestartReplayProbeTest` against a real local server; every durability and identity observation (restart, reconnect, `client_message_id`) reproduced the 0.29.12 capture. It is produced by a live probe plus a model provider, so a future contract bump does not move it until the probe is re-run. |
 
 ### What "verified against a 0.33/0.34 server" means
 

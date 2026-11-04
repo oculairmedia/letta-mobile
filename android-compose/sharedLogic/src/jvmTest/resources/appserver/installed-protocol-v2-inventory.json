@@ -1,12 +1,12 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.34.14",
+    "version": "0.34.39",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "1a37d456a5e48ed003e4f5f0b1f6fcf29b0ec4e3f44d5b3b07b6ade3ac418498",
-    "protocol_corpus_sha256": "aad6304f10e25203679d0dfdca1ae45e176665ca26c0b1421199acc0e5f6e8ac",
+    "protocol_sha256": "6c50a2345e42d6b9521127cd07c1e175c73f320b5e5724a2a0782fe963eb8881",
+    "protocol_corpus_sha256": "12203bda8d79504ea99db8144d01579f046d37fd506867a4995f520aea389ab0",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -15,11 +15,14 @@
       "dist/types/types/approval-classification-protocol.d.ts",
       "dist/types/types/background-process-protocol.d.ts",
       "dist/types/types/chatgpt-oauth.d.ts",
+      "dist/types/types/chatgpt-usage-protocol.d.ts",
       "dist/types/types/client-preferences.d.ts",
       "dist/types/types/conversation-fork-protocol.d.ts",
       "dist/types/types/cwd-protocol.d.ts",
       "dist/types/types/external-tool-protocol.d.ts",
       "dist/types/types/file-write-protocol.d.ts",
+      "dist/types/types/input-command.d.ts",
+      "dist/types/types/input-create-message.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
       "dist/types/types/provider-oauth-config.d.ts",
@@ -77,6 +80,8 @@
     "connect_provider",
     "disconnect_provider",
     "chatgpt_usage_read",
+    "chatgpt_rate_limit_reset_credits_list",
+    "chatgpt_rate_limit_reset_credit_consume",
     "update_model",
     "update_toolset",
     "cron_list",
@@ -148,6 +153,7 @@
     "control_request",
     "input_accepted",
     "teleport_probe_response",
+    "teleport_failed_ack",
     "teleport_ready",
     "execute_command_response",
     "update_device_status",
@@ -187,6 +193,8 @@
     "connect_provider_response",
     "disconnect_provider_response",
     "chatgpt_usage_read_response",
+    "chatgpt_rate_limit_reset_credits_list_response",
+    "chatgpt_rate_limit_reset_credit_consume_response",
     "update_model_response",
     "update_toolset_response",
     "cron_list_response",
@@ -294,8 +302,10 @@
         "turn_finished",
         "resume_queue_response",
         "teleport_probe_response",
-        "teleport_ready"
-      ]
+        "teleport_ready",
+        "teleport_failed_ack"
+      ],
+      "client_note": "teleport_failed_ack is not required by the client and decodes as an unknown frame."
     },
     {
       "id": "agent_crud",
@@ -356,7 +366,9 @@
         "disconnect_provider",
         "chatgpt_usage_read",
         "browser_device_mcp_oauth",
-        "browser_device_mcp_oauth_cancel"
+        "browser_device_mcp_oauth_cancel",
+        "chatgpt_rate_limit_reset_credits_list",
+        "chatgpt_rate_limit_reset_credit_consume"
       ],
       "messages": [
         "list_models_response",
@@ -366,8 +378,11 @@
         "connect_provider_response",
         "disconnect_provider_response",
         "chatgpt_usage_read_response",
-        "browser_device_mcp_oauth_response"
-      ]
+        "browser_device_mcp_oauth_response",
+        "chatgpt_rate_limit_reset_credits_list_response",
+        "chatgpt_rate_limit_reset_credit_consume_response"
+      ],
+      "client_note": "chatgpt_rate_limit_reset_credits_list: unused; the client does not list reset credits. chatgpt_rate_limit_reset_credit_consume: unused; the client does not consume reset credits."
     },
     {
       "id": "memfs",
