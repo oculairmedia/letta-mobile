@@ -37,6 +37,21 @@ import org.junit.jupiter.params.provider.CsvSource
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class InboxArrivalDeliveryTest {
+    @org.junit.jupiter.api.Test
+    fun `missing user home fails clearly only when owned backend needs its default`() {
+        val prior = System.clearProperty("user.home")
+        try {
+            val failure = assertThrows(IllegalArgumentException::class.java) {
+                effectiveA2aBackendDir(null, true, System.getProperty("user.home"))
+            }
+            assertTrue(failure.message.orEmpty().contains("user.home"))
+            assertEquals(File("explicit"), effectiveA2aBackendDir("explicit", true, System.getProperty("user.home")))
+            assertNull(effectiveA2aBackendDir(null, false, System.getProperty("user.home")))
+        } finally {
+            if (prior != null) System.setProperty("user.home", prior)
+        }
+    }
+
     @ParameterizedTest
     @CsvSource("true,false", "false,false", "true,true")
     fun `queued acceptance waits for committed user identity then reaches only authorized opted in home viewers`(existingInbox: Boolean, ownedDefault: Boolean) = runTest {
@@ -86,6 +101,9 @@ class InboxArrivalDeliveryTest {
                 withTimeoutOrNull(10_000) { while (capable.frames.isEmpty()) { yield(); kotlinx.coroutines.delay(10) } }
             }
             assertEquals(1, capable.frames.size, "a committed inbox arrival must reach the opted-in home observer")
+            val journal = Json.parseToJsonElement(File(root, "a2a-receipts.json").readText()).jsonObject
+            assertEquals(2, journal["version"]!!.jsonPrimitive.int)
+            assertEquals("PERSISTED", journal["reservations"]!!.jsonObject["sender"]!!.jsonObject["stable-wake"]!!.jsonPrimitive.content)
 
             val decoded = Json.decodeFromString(ServerFrameSerializer, capable.frames.single())
             val activity = assertInstanceOf(ServerFrame.ConversationActivity::class.java, decoded)

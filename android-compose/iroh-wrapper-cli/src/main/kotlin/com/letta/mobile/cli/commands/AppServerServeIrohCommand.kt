@@ -1129,6 +1129,8 @@ internal fun sortDirectAddresses(directAddresses: List<String>): List<String> {
     })
 }
 
-internal fun effectiveA2aBackendDir(explicit: String?, ownAppServer: Boolean, home: String): java.io.File? =
+internal fun effectiveA2aBackendDir(explicit: String?, ownAppServer: Boolean, home: String?): java.io.File? =
     explicit?.takeIf { it.isNotBlank() }?.let { java.io.File(it) }
-        ?: if (ownAppServer) java.io.File(home, ".letta/lc-local-backend") else null
+        ?: if (ownAppServer) java.io.File(requireNotNull(home?.takeIf { it.isNotBlank() }) {
+            "user.home is required for the owned App Server default; set --local-backend-dir"
+        }, ".letta/lc-local-backend") else null

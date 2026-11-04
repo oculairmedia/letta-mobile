@@ -15,8 +15,12 @@ import java.nio.file.StandardOpenOption
  * then fsync the directory so the rename itself is durable where supported.
  */
 internal object AtomicJsonFile {
+    val directorySyncSupported: Boolean
+        get() = !System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
+
     fun write(
         path: Path, text: String, requireAtomic: Boolean = false,
+        directorySyncSupported: Boolean = AtomicJsonFile.directorySyncSupported,
         syncDirectory: (Path) -> Unit = ::syncDirectory,
     ) {
         path.parent?.let(Files::createDirectories)
@@ -31,7 +35,7 @@ internal object AtomicJsonFile {
             }
             replace(temp, path, requireAtomic)
             // Directory channels are unsupported on some platforms, including Windows.
-            path.parent?.let { parent ->
+            path.parent?.takeIf { directorySyncSupported }?.let { parent ->
                 syncDirectoryIfSupported(parent, requireAtomic, syncDirectory)
             }
         } finally {

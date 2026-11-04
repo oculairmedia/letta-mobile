@@ -142,7 +142,7 @@ fun buildA2aWiring(
     val router = IrohAgentMessageRouter(ownAgentId = ownAgentId)
     lateinit var receiver: IrohAgentMessageReceiver
     val arrivals = if (scope != null && backendStore != null && activityTarget != null) {
-        A2aArrivalObserver(scope, backendStore, activityTarget) { receiver.markPersisted(MessageId(it)) }
+        A2aArrivalObserver(scope, backendStore, activityTarget) { receiver.markPersisted(AgentId(it.fromAgentId), MessageId(it.msgId)) }
     } else null
     receiver = IrohAgentMessageReceiver(
         router = router,

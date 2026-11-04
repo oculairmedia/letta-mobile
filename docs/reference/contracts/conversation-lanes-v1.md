@@ -130,16 +130,29 @@ reservation; a timeout, cancellation, mismatched receipt or dispatch exception r
 Duplicates never enter application delivery. Startup treats unfinished RESERVED entries as
 ambiguous. A later persisted observation cannot be downgraded by a racing acceptance receipt.
 
-The journal retains at most 4096 message identities, 1024 sender counters, 512 characters per
+Reservations and every settlement use the canonical authenticated sender plus `msgId`, so a
+second sender may reuse a message ID without changing the first sender's reservation. Journal
+version 2 encodes reservations as sender -> message ID -> state. Version 1 has senderless keys;
+it is rejected without rewriting or dispatch, even when empty, and requires external
+reconciliation before migration. Sender-attempt counters cannot identify the owner of an old entry.
+
+The journal retains at most 4096 sender/message identities, 1024 sender counters, 512 characters per
 identity and 4 MiB of encoded data. The existing own/sibling guard and 64-attempt per-sender cap
 remain; attempts, including definite failures, consume that cap and its count survives restart.
 Admission fails closed at any bound, on malformed state, or on write failure. Accepted/ambiguous
 identities are never evicted or expired to make room. An OS lock serializes transactions between
-wrapper processes; replacement requires atomic rename after file fsync and directory fsync. An
-`UnsupportedOperationException` from directory sync is best-effort; an I/O failure fails the write
-because durability is unconfirmed. No non-atomic replacement fallback is used for this journal.
+wrapper processes; replacement requires atomic rename after file fsync and directory fsync.
+Directory sync is skipped on Windows, whose JVM cannot open directory channels, and an
+`UnsupportedOperationException` is best-effort on other platforms. Real I/O failures on platforms
+with directory channels (including Linux/macOS) fail the write because durability is unconfirmed.
+No non-atomic replacement fallback is used for this journal.
 Deleting or rotating it loses replay protection and requires external reconciliation. This finite
 journal deliberately stops new admission when full; it is not an indefinite delivery service or a
-distributed exactly-once guarantee. Removing a definite reservation can itself fail during a crash
-or storage fault, leaving safe suppression until external reconciliation. The wrapper never uses
-absence in a bounded history window to justify automatic re-execution.
+distributed exactly-once guarantee. Before journal replacement, the wrapper atomically writes
+and syncs an `a2a-receipts.json.pending`
+barrier under the journal's process lock. It removes the barrier only after a fully synced write
+or rollback. A failed rollback, including failure before rename, leaves the durable barrier;
+startup and other processes fail closed while it exists, requiring external reconciliation.
+Barrier deletion is best-effort across crashes: a resurrected barrier only denies admission.
+Removing a definite reservation can itself fail during a crash or storage fault, leaving safe
+suppression until external reconciliation. The wrapper never uses absence in a bounded history window to justify automatic re-execution.

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.messaging
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentIdNamespace
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
@@ -24,35 +25,50 @@ class IrohAgentMessageRouter(
     @Serializable
     data class Snapshot(
         val version: Int,
-        val reservations: Map<String, ReservationState>,
+        val reservations: Map<String, Map<String, ReservationState>>,
         val senderAttempts: Map<String, Int>,
     )
 
-    private val reservations = linkedMapOf<String, ReservationState>()
+    private val loopIdentities = (siblingAgentIds + ownAgentId).map(AgentIdNamespace::normalizeToBareId).toSet()
+    private val reservations = linkedMapOf<Pair<String, String>, ReservationState>()
     private val perSenderCount = mutableMapOf<String, Int>()
 
     /** Called under the receiver's routing lock, before any application dispatch. */
-    fun snapshot(): Snapshot = Snapshot(version = 1, reservations = reservations.toMap(), senderAttempts = perSenderCount.toMap())
+    fun snapshot(): Snapshot = Snapshot(
+        version = 2,
+        reservations = reservations.entries.groupBy { it.key.first }.mapValues { (_, entries) ->
+            entries.associate { it.key.second to it.value }
+        },
+        senderAttempts = perSenderCount.toMap(),
+    )
 
     /** Strict journal recovery; unfinished reservations remain suppressive after a restart. */
     fun restore(snapshot: Snapshot) {
-        require(snapshot.version == 1)
-        require(snapshot.reservations.size <= maxReservations && snapshot.senderAttempts.size <= maxSenders)
-        require(snapshot.reservations.keys.all(::validIdentity))
+        require(snapshot.version == 2) { "Senderless A2A journals require external reconciliation" }
+        require(snapshot.reservations.values.sumOf { it.size.toLong() } <= maxReservations && snapshot.senderAttempts.size <= maxSenders)
+        require(snapshot.reservations.all { (sender, messages) ->
+            validIdentity(sender) && sender in snapshot.senderAttempts && messages.isNotEmpty() && messages.keys.all(::validIdentity)
+        })
         require(snapshot.senderAttempts.all { (sender, count) -> validIdentity(sender) && count in 0..maxPerSender })
         reservations.clear()
-        reservations.putAll(snapshot.reservations.mapValues { (_, state) ->
-            if (state == ReservationState.RESERVED) ReservationState.AMBIGUOUS else state
+        reservations.putAll(snapshot.reservations.flatMap { (sender, messages) ->
+            messages.map { (message, state) ->
+                (sender to message) to if (state == ReservationState.RESERVED) ReservationState.AMBIGUOUS else state
+            }
         })
         perSenderCount.clear()
         perSenderCount.putAll(snapshot.senderAttempts)
     }
 
     /** Null releases only a definitely unexecuted attempt; every other state blocks re-execution. */
-    fun settle(msgId: String, state: ReservationState?) {
-        if (msgId !in reservations || reservations[msgId] == ReservationState.PERSISTED) return
-        if (state == null) reservations.remove(msgId) else reservations[msgId] = state
+    fun settle(sender: AgentId, message: MessageId, state: ReservationState?) {
+        val key = reservationKey(sender, message)
+        if (key !in reservations || reservations[key] == ReservationState.PERSISTED) return
+        if (state == null) reservations.remove(key) else reservations[key] = state
     }
+
+    private fun reservationKey(sender: AgentId, message: MessageId): Pair<String, String> =
+        AgentIdNamespace.normalizeToBareId(sender.value) to message.value
 
     /** A conversation with a "busy" flag (an active run in flight). */
     data class ConversationState(val conversation: Conversation, val busy: Boolean)
@@ -87,25 +103,25 @@ class IrohAgentMessageRouter(
             null -> routeLane(address, candidates)
             else -> routeExplicitTarget(ConversationId(target), candidates)
         }
-        if (decision is RoutingDecision.Dropped) reservations.remove(msgId)
+        if (decision is RoutingDecision.Dropped) reservations.remove(reservationKey(AgentId(fromAgentId), MessageId(msgId)))
         return decision
     }
 
     private fun guard(sender: AgentId, message: MessageId): RoutingDecision.Dropped? {
-        val fromAgentId = sender.value
+        val fromAgentId = AgentIdNamespace.normalizeToBareId(sender.value)
         val msgId = message.value
         val count = perSenderCount[fromAgentId] ?: 0
         val atCapacity = reservations.size >= maxReservations ||
             (fromAgentId !in perSenderCount && perSenderCount.size >= maxSenders)
         return when {
-            fromAgentId == ownAgentId || fromAgentId in siblingAgentIds -> RoutingDecision.Dropped("ping_pong_own_or_sibling")
+            fromAgentId in loopIdentities -> RoutingDecision.Dropped("ping_pong_own_or_sibling")
             !validIdentity(fromAgentId) || !validIdentity(msgId) -> RoutingDecision.Dropped("invalid_identity")
-            msgId in reservations -> RoutingDecision.Dropped("duplicate_msg_id")
+            reservationKey(sender, message) in reservations -> RoutingDecision.Dropped("duplicate_msg_id")
             atCapacity -> RoutingDecision.Dropped("reservation_capacity_exceeded")
             count >= maxPerSender -> RoutingDecision.Dropped("per_sender_cap_exceeded")
             else -> {
                 perSenderCount[fromAgentId] = count + 1
-                reservations[msgId] = ReservationState.RESERVED
+                reservations[reservationKey(sender, message)] = ReservationState.RESERVED
                 null
             }
         }

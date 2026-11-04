@@ -11,6 +11,106 @@ class A2aReservationTest {
     private val message = IrohAgentMessage("sender", "recipient", "body", "stable", 1)
 
     @Test
+    fun authenticatedSendersShareMessageIdsWithoutSharingReservationsAcrossRestart() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-senders").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            val attempts = mutableListOf<String>()
+            fun receiver() = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { msg, _ -> attempts += msg.fromAgentId; DeliveryOutcome(false, "application_input_accepted") },
+                { msg, peer -> peer == msg.fromAgentId }, file)
+            assertEquals("application_input_accepted", receiver().respond(message, "sender").reason)
+            val other = message.copy(fromAgentId = "other")
+            assertEquals("application_input_accepted", receiver().respond(other, "other").reason)
+            for (msg in listOf(message, other)) {
+                assertEquals("duplicate_msg_id", receiver().respond(msg, msg.fromAgentId).reason)
+            }
+            assertEquals(listOf("sender", "other"), attempts)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun concurrentCrossSenderReleaseDoesNotReleaseAnAcceptedReservation() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-concurrent-senders").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            val entered = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<Unit>()
+            val attempts = mutableListOf<String>()
+            fun receiver() = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { msg, _ ->
+                    attempts += msg.fromAgentId
+                    if (msg.fromAgentId == "sender") {
+                        entered.complete(Unit)
+                        finish.await()
+                        DeliveryOutcome(false, "application_input_accepted")
+                    } else DeliveryOutcome(false, "application_input_rejected")
+                }, { msg, peer -> msg.fromAgentId == peer }, file)
+            val receiver = receiver()
+            val first = async(kotlinx.coroutines.Dispatchers.Default) { receiver.respond(message, "sender") }
+            entered.await()
+            val other = message.copy(fromAgentId = "other")
+            repeat(2) { assertEquals("application_input_rejected", receiver.respond(other, "other").reason) }
+            assertEquals("duplicate_msg_id", receiver.respond(message, "sender").reason)
+            finish.complete(Unit)
+            assertEquals("application_input_accepted", first.await().reason)
+            assertEquals("duplicate_msg_id", receiver().respond(message, "sender").reason)
+            assertEquals("application_input_rejected", receiver().respond(other, "other").reason)
+            assertEquals(listOf("sender", "other", "other", "other"), attempts)
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun legacySenderlessJournalFailsClosedForEverySender() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-legacy").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            for (state in listOf("RESERVED", "ACCEPTED", "AMBIGUOUS", "PERSISTED")) {
+                file.writeText("""{"version":1,"reservations":{"stable":"$state"},"senderAttempts":{"sender":1}}""")
+                val original = file.readText()
+                var attempts = 0
+                val receiver = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                    { _, _ -> attempts++; DeliveryOutcome(true) }, { _, _ -> true }, file)
+                for (sender in listOf("sender", "other")) {
+                    assertEquals("reservation_journal_failure", receiver.respond(message.copy(fromAgentId = sender), sender).reason)
+                }
+                assertEquals(0, attempts)
+                assertEquals(original, file.readText())
+            }
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun failedReleaseAndRestoreBeforeRenameRemainSuppressiveAfterRestart() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-restore-failure").toFile()
+        try {
+            var refuseRestore = false
+            val file = object : java.io.File(dir, "receipts.json") {
+                override fun toPath(): java.nio.file.Path {
+                    if (refuseRestore) throw java.io.IOException("restore failed before rename")
+                    return super.toPath()
+                }
+            }
+            var attempts = 0
+            val receiver = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { _, _ -> attempts++; DeliveryOutcome(false, "application_input_rejected") }, { _, _ -> true }, file)
+            receiver.journalDirectorySyncSupported = true
+            receiver.journalDirectorySync = { _ ->
+                if (file.exists() && file.readText().contains("\"reservations\":{}")) {
+                    refuseRestore = true
+                    throw java.io.IOException("release directory sync failed after rename")
+                }
+            }
+            assertEquals("reservation_journal_failure", receiver.respond(message, "peer").reason)
+            assertEquals(true, refuseRestore, "fault must occur after release was renamed")
+            val restarted = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { _, _ -> attempts++; DeliveryOutcome(true) }, { _, _ -> true }, java.io.File(dir, "receipts.json"))
+            assertEquals("reservation_journal_failure", restarted.respond(message, "peer").reason)
+            assertEquals(1, attempts, "restart must not execute after the failed release and failed restore")
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
     fun cancelledDispatchRemainsAmbiguousAndCannotBeExecutedAgain() = runTest {
         val entered = CompletableDeferred<Unit>()
         var attempts = 0
@@ -81,7 +181,7 @@ class A2aReservationTest {
                 assertEquals("duplicate_msg_id", receiver().respond(message, "peer").reason)
                 assertEquals(1, attempts)
                 // Simulate a crash between durable reserve and application receipt.
-                file.writeText("""{"version":1,"reservations":{"stable":"RESERVED"},"senderAttempts":{"sender":1}}""")
+                file.writeText("""{"version":2,"reservations":{"sender":{"stable":"RESERVED"}},"senderAttempts":{"sender":1}}""")
                 assertEquals("duplicate_msg_id", receiver().respond(message, "peer").reason)
                 assertEquals(1, attempts)
             } finally { dir.deleteRecursively() }
@@ -145,13 +245,13 @@ class A2aReservationTest {
         try {
             val file = java.io.File(dir, "receipts.json")
             var attempts = 0
-            var syncs = 0
             val receiver = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
                 { _, _ -> attempts++; DeliveryOutcome(false, "application_input_rejected") }, { _, _ -> true }, file)
-            receiver.journalDirectorySync = { path ->
-                syncs++
-                if (syncs == 2) throw java.io.IOException("directory sync failed after release rename")
-                com.letta.mobile.data.controller.node.iroh.AtomicJsonFile.syncDirectory(path)
+            receiver.journalDirectorySyncSupported = true
+            receiver.journalDirectorySync = { _ ->
+                if (file.exists() && file.readText().contains("\"reservations\":{}")) {
+                    throw java.io.IOException("directory sync failed after release rename")
+                }
             }
             assertEquals("reservation_journal_failure", receiver.respond(message, "peer").reason)
             val restarted = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },

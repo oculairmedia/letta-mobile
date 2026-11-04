@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 /**
  * The direct agent-to-agent message envelope carried over
  * an Iroh QUIC BiStream. QUIC is reliable/ordered/lossless, so delivery is acked
- * (no gap-replay). The receiver dedupes on [msgId] for at-most-once processing on
+ * (no gap-replay). The receiver dedupes on ([fromAgentId], [msgId]) for at-most-once processing on
  * redelivery.
  */
 @Serializable

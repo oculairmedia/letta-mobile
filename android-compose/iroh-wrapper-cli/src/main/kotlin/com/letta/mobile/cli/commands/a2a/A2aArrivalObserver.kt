@@ -23,7 +23,7 @@ internal class A2aArrivalObserver(
     private val scope: CoroutineScope,
     private val store: LocalBackendAdminStore,
     private val target: ConversationChangeTarget,
-    private val persisted: suspend (String) -> Unit,
+    private val persisted: suspend (IrohAgentMessage) -> Unit,
 ) {
     fun observe(message: IrohAgentMessage, conversationId: String) {
         scope.launch(Dispatchers.IO) {
@@ -43,7 +43,7 @@ internal class A2aArrivalObserver(
 
     private suspend fun announce(message: IrohAgentMessage, conversationId: String, clientId: String, source: String): Boolean =
         runCatching {
-            persisted(message.msgId)
+            persisted(message)
             val now = Instant.now().toString()
             target.broadcast(buildJsonObject {
                 put("v", 1)

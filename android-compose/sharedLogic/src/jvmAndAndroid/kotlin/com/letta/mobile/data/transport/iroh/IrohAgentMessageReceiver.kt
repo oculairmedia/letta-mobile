@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Connection
@@ -61,6 +62,7 @@ class IrohAgentMessageReceiver(
      */
     override fun authorize(peer: String): Boolean = true
 
+    internal var journalDirectorySyncSupported: Boolean = AtomicJsonFile.directorySyncSupported
     internal var journalDirectorySync: (java.nio.file.Path) -> Unit = AtomicJsonFile::syncDirectory
 
     private var journalUnavailable = false
@@ -141,7 +143,7 @@ class IrohAgentMessageReceiver(
         }
         val outcome = dispatch(message, decision)
         return runCatching {
-            updateRouting { router.settle(message.msgId, outcome.reservationState()) }
+            updateRouting { router.settle(AgentId(message.fromAgentId), MessageId(message.msgId), outcome.reservationState()) }
             outcome
         }.getOrElse { error ->
             if (error is CancellationException) throw error
@@ -162,8 +164,8 @@ class IrohAgentMessageReceiver(
     }
 
     /** Marks authoritative transcript evidence without permitting another application dispatch. */
-    suspend fun markPersisted(msgId: MessageId) {
-        updateRouting { router.settle(msgId.value, IrohAgentMessageRouter.ReservationState.PERSISTED) }
+    suspend fun markPersisted(sender: AgentId, msgId: MessageId) {
+        updateRouting { router.settle(sender, msgId, IrohAgentMessageRouter.ReservationState.PERSISTED) }
     }
 
     private fun DeliveryOutcome.reservationState(): IrohAgentMessageRouter.ReservationState? = when {
@@ -177,7 +179,7 @@ class IrohAgentMessageReceiver(
         withContext(Dispatchers.IO) {
             val file = journalFile ?: return@withContext block()
             AtomicJsonFile.withProcessLock(file.toPath()) {
-                check(!journalUnavailable) { "A2A receipt journal needs reconciliation" }
+                check(!journalUnavailable && !pendingJournal(file).exists()) { "A2A receipt journal needs reconciliation" }
                 val previous = if (file.exists()) {
                     require(file.length() in 1..MAX_JOURNAL_BYTES) { "A2A receipt journal exceeds its bound" }
                     file.readText().also {
@@ -193,23 +195,35 @@ class IrohAgentMessageReceiver(
         }
     }
 
-    /** Writes `next` (first) and, if that fails, restores `previous` (second) under the lock. */
+    /** A durable barrier exists before replacement, so failed rollback cannot disappear on restart. */
     private fun writeJournalOrRestore(file: File, snapshots: Pair<String, String?>) {
         val (next, previous) = snapshots
-        runCatching { writeJournal(file, next) }.getOrElse { failure ->
-            // Rename may already have exposed a release. Restore the prior snapshot under the lock.
-            if (previous != null) {
-                runCatching { writeJournal(file, previous) }.onFailure { restoreFailure ->
-                    journalUnavailable = true
-                    failure.addSuppressed(restoreFailure)
-                }
+        val pending = pendingJournal(file)
+        writeJournal(pending, "A2A receipt journal needs reconciliation")
+        runCatching {
+            writeJournal(file, next)
+            java.nio.file.Files.delete(pending.toPath())
+        }.getOrElse { failure ->
+            // Only remove the barrier after a fully synced rollback. A failed restore leaves it
+            // durable, and every receiver checks it under the same process lock before admission.
+            runCatching {
+                checkNotNull(previous)
+                writeJournal(file, previous)
+                java.nio.file.Files.delete(pending.toPath())
+            }.onFailure { restoreFailure ->
+                journalUnavailable = true
+                failure.addSuppressed(restoreFailure)
             }
             throw failure
         }
+        // Barrier cleanup need not be durable: resurrection after a crash only denies admission.
     }
 
+    private fun pendingJournal(file: File): File = File("${file.absolutePath}.pending")
+
     private fun writeJournal(file: File, encoded: String) =
-        AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true, syncDirectory = journalDirectorySync)
+        AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true,
+            directorySyncSupported = journalDirectorySyncSupported, syncDirectory = journalDirectorySync)
 
     private companion object {
         const val MAX_JOURNAL_BYTES = 4L * 1024 * 1024
