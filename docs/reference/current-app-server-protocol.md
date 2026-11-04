@@ -451,6 +451,7 @@ These are declared ownership decisions, not newly observed production execution.
 | step.list | local&#95;backend&#95;store | deny&#95;fail&#95;closed | admin&#95;read | RunAdminHandlers.kt | controller-owned step history over the letta-code on-disk backend |
 | subagent.list | controller&#95;native | none | conversation&#95;scoped | SubagentAdminHandlers.kt | SubagentRegistrySource (m6oa1 provenance registry) |
 | subagent.todos | controller&#95;native | none | conversation&#95;scoped | SubagentAdminHandlers.kt | SubagentRegistrySource (m6oa1 provenance registry) |
+| subagent.dismiss | controller&#95;native | none | conversation&#95;scoped | SubagentAdminHandlers.kt | Durable registry dismissal; does not stop the worker |
 | tool.attach | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native tool-library command |
 | tool.create | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native tool-library command |
 | tool.delete | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native tool-library command |
@@ -465,3 +466,7 @@ These are declared ownership decisions, not newly observed production execution.
 ## Interpretation and historical evidence
 
 An upstream discriminant is not proof that the Kotlin client adopts it or that a particular host permits it. The generated [Kotlin command API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-command/index.html) describes the typed client surface. Architecture, retry semantics, state ownership rationale and dated captures remain in the [historical system audit](../architecture/app-server-v2-audit-spec.md), [migration ownership record](../architecture/iroh-admin-ownership-matrix.md) and [deployment runbook](../architecture/lettashim-retirement-deployment-runbook.md).
+
+### Scoped subagent dismissal
+
+`subagent.dismiss` requires authenticated access to `conversation_id` and nonblank `agent_id` and `tool_call_id`. It terminalizes the exact live registry record as orphaned with reason `user_dismissed`, persists before acknowledging, and publishes the changed conversation. The response has a `subagents` array of confirmed dismissal records (empty for an unknown key or a terminal record with another reason; an already-dismissed record is returned again). It does not stop or signal the worker. A missing identity fails closed. Clients must ignore late running snapshots for dismissed keys and remove the corresponding presence. File-backed hosts advertise `subagent_dismiss_v1`; unsupported hosts must not claim durable dismissal.

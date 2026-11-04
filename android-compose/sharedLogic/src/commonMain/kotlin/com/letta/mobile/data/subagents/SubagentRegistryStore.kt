@@ -3,9 +3,9 @@ package com.letta.mobile.data.subagents
 /**
  * Durable backing for [DurableSubagentRegistry].
  *
- * Deliberately tiny and whole-snapshot: the registry is bounded
- * ([DurableSubagentRegistry.MAX_ENTRIES]) so rewriting the whole set on each
- * mutation is cheap, and a whole-file atomic replace is the only shape that
+ * Deliberately whole-snapshot: terminal history and dismissal tombstones have
+ * finite budgets, while simultaneous live work may exceed the nominal cap.
+ * A whole-file atomic replace is the only shape that
  * cannot leave a half-written registry behind. This mirrors the existing
  * controller persistence precedent (`FilePairedPeerStore`) — NO new database.
  *
@@ -13,6 +13,9 @@ package com.letta.mobile.data.subagents
  * calls them while holding its own lock.
  */
 interface SubagentRegistryStore {
+    /** True only when successful saves survive a host process restart. */
+    val durable: Boolean get() = false
+
     /** Rehydrate. Must return an empty list (never throw) when nothing is stored. */
     fun load(): List<SubagentChipRecord>
 

@@ -77,6 +77,8 @@ fun SubagentRosterList(
     onOpenConversation: OpenSubagentConversation?,
     onClearFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    onDismiss: ((SubagentRosterItem) -> Unit)? = null,
+    dismissableToolCallIds: Set<String> = emptySet(),
 ) {
     if (roster.isEmpty) {
         EmptyRoster(modifier)
@@ -93,7 +95,8 @@ fun SubagentRosterList(
         ),
         modifier = modifier.fillMaxWidth(),
     ) { line, row ->
-        if (line.card) RunningCard(line.item, onOpenConversation) else EndedRow(line.item, row, onOpenConversation)
+        val dismiss = onDismiss?.takeIf { !line.item.status.isTerminal && line.item.toolCallId in dismissableToolCallIds }
+        if (line.card) RunningCard(line.item, onOpenConversation, dismiss) else EndedRow(line.item, row, onOpenConversation, dismiss)
     }
 }
 
@@ -107,13 +110,22 @@ fun SubagentRoster(
     onOpenConversation: OpenSubagentConversation?,
     modifier: Modifier = Modifier,
     now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    onDismiss: ((SubagentEntry) -> Unit)? = null,
 ) {
     var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     // The roster stays open while subagents stream status updates, so keep the projection keyed
     // to its inputs instead of re-projecting per recomposition.
     val roster = remember(entries, clearedKeys) { projectSubagentRoster(entries, now(), clearedKeys) }
+    val dismissable = entries.groupBy { it.toolCallId }.filter { (tool, matches) ->
+        val entry = matches.singleOrNull()
+        tool.isNotBlank() && entry != null && !entry.parentAgentId.isNullOrBlank() && !entry.parentConversationId.isNullOrBlank()
+    }.mapValues { it.value.single() }
     SubagentRosterList(
         roster = roster,
+        dismissableToolCallIds = dismissable.keys,
+        onDismiss = onDismiss?.let { action ->
+            { item: SubagentRosterItem -> dismissable[item.toolCallId]?.let(action); Unit }
+        },
         onOpenConversation = onOpenConversation,
         onClearFinished = { clearedKeys = clearedKeys + roster.finished.map { it.key } },
         modifier = modifier,
@@ -192,7 +204,11 @@ private const val HIDE_LABEL = "Hide"
 private val SUBAGENT_ROSTER_LIST = RosterListTag("subagent-roster")
 
 @Composable
-private fun RunningCard(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
+private fun RunningCard(
+    item: SubagentRosterItem,
+    onOpenConversation: OpenSubagentConversation?,
+    onDismiss: ((SubagentRosterItem) -> Unit)?,
+) {
     var expanded by remember(item.key) { mutableStateOf(false) }
     val canExpand = item.activity.size > 1
     val expandToggle = if (canExpand) Modifier.clickable(role = Role.Button) { expanded = !expanded } else Modifier
@@ -222,19 +238,28 @@ private fun RunningCard(item: SubagentRosterItem, onOpenConversation: OpenSubage
             }
             visibleLines.forEach { line -> ActivityLine(line) }
             ConversationAction(item, onOpenConversation)
+            if (onDismiss != null) TextButton(onClick = { onDismiss(item) }) { Text("Dismiss") }
         }
     }
 }
 
 /** An ended (or background) run: the shared roster row, its status glyph leading and its conversation trailing. */
 @Composable
-private fun EndedRow(item: SubagentRosterItem, row: RosterRowState, onOpenConversation: OpenSubagentConversation?) {
+private fun EndedRow(
+    item: SubagentRosterItem,
+    row: RosterRowState,
+    onOpenConversation: OpenSubagentConversation?,
+    onDismiss: ((SubagentRosterItem) -> Unit)?,
+) {
     RosterListRow(
         spec = LettaListRowSpec(title = item.title, subtitle = item.subtitle(), trailing = item.identity.label),
         row = row,
         slots = RosterRowSlots(
             leading = { StatusGlyph(item.status) },
-            end = { ConversationAction(item, onOpenConversation) },
+            end = {
+                ConversationAction(item, onOpenConversation)
+                if (onDismiss != null) TextButton(onClick = { onDismiss(item) }) { Text("Dismiss") }
+            },
         ),
         modifier = Modifier
             .padding(start = LettaDimens.Space.lg * item.depth)

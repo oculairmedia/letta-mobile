@@ -371,6 +371,44 @@ class DurableSubagentRegistryTest {
     // ---------------------------------------------------- bounded persistence
 
     @Test
+    fun dismissalBudgetRejectsWithoutLosingTombstonesAcrossRestartAndReplay() {
+        val store = InMemorySubagentRegistryStore()
+        val reg = registry(store, maxEntries = 2)
+        listOf("one", "two", "three").forEach { reg.observe(observation(toolCallId = it)) }
+        reg.dismiss("conv-a", "agent-1", "one")
+        reg.dismiss("conv-a", "agent-1", "two")
+
+        val failure = kotlin.runCatching { reg.dismiss("conv-a", "agent-1", "three") }.exceptionOrNull()
+        assertNotNull(failure, "dismissal must fail when the tombstone budget is full")
+        assertEquals(SubagentChipState.RUNNING, reg.record("conv-a", "agent-1", "three")?.state)
+        val restarted = registry(store, maxEntries = 2)
+        assertEquals(2, restarted.replaySnapshot("conv-a").count { it.terminalReason == "user_dismissed" })
+        listOf("one", "two").forEach { id ->
+            assertIs<DurableSubagentRegistry.ObserveResult.IllegalTransition>(restarted.observe(observation(toolCallId = id)))
+            assertEquals("user_dismissed", restarted.record("conv-a", "agent-1", id)?.terminalReason)
+        }
+        assertEquals(1, restarted.dismiss("conv-a", "agent-1", "one").size, "retry remains idempotent")
+        assertNotNull(kotlin.runCatching { restarted.dismiss("conv-a", "agent-1", "three") }.exceptionOrNull())
+    }
+
+    @Test
+    fun legacyExcessTombstonesAreRetainedAndBlockNewDismissals() {
+        val store = InMemorySubagentRegistryStore()
+        val previous = registry(store, maxEntries = 3)
+        listOf("one", "two", "three").forEach { id ->
+            previous.observe(observation(toolCallId = id))
+            previous.dismiss("conv-a", "agent-1", id)
+        }
+        val restarted = registry(store, maxEntries = 2)
+        restarted.observe(observation(toolCallId = "four"))
+        assertNotNull(kotlin.runCatching { restarted.dismiss("conv-a", "agent-1", "four") }.exceptionOrNull())
+        assertEquals(3, store.load().count { it.terminalReason == "user_dismissed" })
+        listOf("one", "two", "three").forEach { id ->
+            assertIs<DurableSubagentRegistry.ObserveResult.IllegalTransition>(restarted.observe(observation(toolCallId = id)))
+        }
+    }
+
+    @Test
     fun boundedEvictionDropsOldestTerminalChipsOnly() {
         val store = InMemorySubagentRegistryStore()
         val reg = registry(store, maxEntries = 3)

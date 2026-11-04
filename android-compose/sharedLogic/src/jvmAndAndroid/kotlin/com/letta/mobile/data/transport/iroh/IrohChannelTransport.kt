@@ -16,6 +16,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
+import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
 import com.letta.mobile.data.transport.api.CronControlTransport
 import com.letta.mobile.data.transport.api.CronPauseCommand
@@ -942,6 +943,26 @@ class IrohChannelTransport(
         timeoutMs,
     )
 
+    override suspend fun dismissSubagent(
+        scope: SubagentParentScope,
+        toolCallId: String,
+    ): Result<List<com.letta.mobile.data.model.SubagentEntry>> {
+        if (scope.parentAgentId.isBlank() || scope.parentConversationId.isBlank() || toolCallId.isBlank()) {
+            return Result.failure(IllegalArgumentException("subagent identity required"))
+        }
+        val requestId = "iroh-subagent-dismiss-${UUID.randomUUID()}"
+        val rpcScope = SubagentRpcScope(scope.parentConversationId, scope.parentAgentId)
+        val body = buildJsonObject { put("tool_call_id", toolCallId) }.toString()
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
+            labels = ScopedRpcLabels("durable subagent dismissal unavailable", "subagent.dismiss timed out", "subagent.dismiss failed"),
+            call = { callScopedSubagentRpc("subagent.dismiss", rpcScope, body) },
+            mapSuccess = { result -> Result.success(subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result).subagents) },
+            onFailure = { failure -> Result.failure(IllegalStateException(failure.error)) },
+        )
+    }
+
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
         invokeSubagentRpc(subagentTodosCall(toolCallId), currentSubagentScope(), timeoutMs)
 
@@ -1046,6 +1067,7 @@ class IrohChannelTransport(
         val handle = supervisor.ready()
         val advertised = handle.serverCapabilities
         if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
+        if (method == "subagent.dismiss" && (advertised == null || "subagent_dismiss_v1" !in advertised)) return null
         val scopedBody = buildJsonObject {
             put("conversation_id", scope.conversationId)
             scope.agentId?.let { put("agent_id", it) }

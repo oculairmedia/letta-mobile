@@ -31,6 +31,10 @@ interface ISubagentRepository {
     /** Synchronous cache projection used to avoid an empty initial emission. */
     fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry>
 
+    /** Durably hide one exact dispatch without stopping its worker. */
+    suspend fun dismiss(scope: SubagentParentScope, toolCallId: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("durable subagent dismissal unavailable"))
+
     /** Force a fresh `subagent_list` round-trip. */
     suspend fun refresh(): Result<List<SubagentEntry>>
 

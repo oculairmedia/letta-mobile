@@ -236,7 +236,7 @@ object IrohPeerCapabilities {
         "message.list", "message.get", "tool_return.get",
         "agent.list", "agent.count", "agent.get", "agent.context",
         "model.list", "model.list.embedding",
-        "subagent.list", "subagent.todos",
+        "subagent.list", "subagent.todos", "subagent.dismiss",
         "slash_command.list", "slash_command.list_agent",
     )
 

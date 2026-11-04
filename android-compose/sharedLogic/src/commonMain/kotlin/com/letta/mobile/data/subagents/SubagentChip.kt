@@ -206,6 +206,7 @@ data class SubagentChipRecord(
         activity = activity,
         todoProgress = todos?.todoProgress()?.takeIf { it.total > 0 },
         terminalAtEpochMs = terminalAtEpochMs,
+        terminalReason = terminalReason,
         toolCallCount = progress.toolCallCount,
         lastActivityAtMs = lastActivityEpochMs,
         model = progress.model,
@@ -217,6 +218,9 @@ data class SubagentChipRecord(
     companion object {
         /** The host's TTL terminalized an unobserved RUNNING chip. */
         const val TERMINAL_REASON_STALE = "stale"
+
+        /** The user hid this record without stopping its worker. */
+        const val TERMINAL_REASON_USER_DISMISSED = "user_dismissed"
     }
 }
 

@@ -68,6 +68,142 @@ class SubagentRepositoryScopeFetchTest {
         repo.close()
     }
 
+    @Test
+    fun dismissedPushRetiresOnlyItsExactIdentityAndRejectsLateRunning() = runTest {
+        val first = running("toolu_a", CONVERSATION_A).copy(description = "same title")
+        val second = running("toolu_b", CONVERSATION_A).copy(description = "same title")
+        transport.entriesByConversation[CONVERSATION_A] = listOf(first, second)
+        val repo = repository(backgroundScope)
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        runCurrent()
+        assertEquals(2, repo.currentActiveSubagents(scopeA).size)
+        val dismissed = kotlinx.serialization.json.Json.decodeFromString<com.letta.mobile.data.model.SubagentEntry>(
+            "{\"toolCallId\":\"toolu_a\",\"status\":\"cancelled\"," +
+                "\"parentAgentId\":\"agent-parent\",\"parentConversationId\":\"conv-a\"," +
+                "\"terminal_reason\":\"user_dismissed\"}",
+        )
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "dismissed", ts = "t", reason = "registry", subagentsActive = listOf(dismissed, second),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(listOf("toolu_b"), repo.currentActiveSubagents(scopeA).map { it.toolCallId })
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "late", ts = "t", reason = "registry", subagentsActive = listOf(first, second),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(listOf("toolu_b"), repo.currentActiveSubagents(scopeA).map { it.toolCallId })
+        repo.close()
+    }
+
+    @Test
+    fun receiptAndNotificationInEitherOrderRetireTheSameScopedTask() = runTest {
+        val repo = repository(backgroundScope)
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeB).collect {} }
+        runCurrent()
+        transport.pushBeforeReceipt = true
+        repo.dismiss(scopeA, "toolu_a").getOrThrow()
+        runCurrent()
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        assertEquals(listOf("toolu_b"), repo.currentActiveSubagents(scopeB).map { it.toolCallId })
+        transport.pushBeforeReceipt = false
+        repo.dismiss(scopeB, "toolu_b").getOrThrow()
+        val late = running("toolu_b", CONVERSATION_B)
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "terminal-after-receipt", ts = "t", reason = "registry",
+            subagentsActive = listOf(late.copy(status = "cancelled", terminalReason = "user_dismissed")),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_B,
+        ))
+        runCurrent()
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "after-receipt", ts = "t", reason = "registry", subagentsActive = listOf(late),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_B,
+        ))
+        runCurrent()
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeB))
+        repo.close()
+    }
+
+    @Test
+    fun mismatchedPushScopeCannotDismissAnotherConversation() = runTest {
+        val repo = repository(backgroundScope)
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        runCurrent()
+        val wrongScopeTerminal = running("toolu_a", CONVERSATION_A).copy(status = "cancelled", terminalReason = "user_dismissed")
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "wrong-scope", ts = "t", reason = "registry", subagentsActive = listOf(wrongScopeTerminal),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_B,
+        ))
+        runCurrent()
+        assertEquals(listOf("toolu_a"), repo.currentActiveSubagents(scopeA).map { it.toolCallId })
+        repo.close()
+    }
+
+    @Test
+    fun scopedReloadLearnsDismissalBeforeLateRunningSnapshot() = runTest {
+        val running = running("toolu_a", CONVERSATION_A)
+        transport.entriesByConversation[CONVERSATION_A] = listOf(
+            running.copy(status = "cancelled", terminalReason = "user_dismissed"),
+        )
+        val repo = repository(backgroundScope)
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        runCurrent()
+        assertEquals(listOf(CONVERSATION_A), transport.requestedConversations)
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "late-after-reload", ts = "t", reason = "registry", subagentsActive = listOf(running),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        repo.close()
+    }
+
+    @Test
+    fun separatorCharactersInDifferentScopesCannotCollide() = runTest {
+        val firstScope = SubagentParentScope("a|b", "c")
+        val secondScope = SubagentParentScope("a", "b|c")
+        transport.entriesByConversation["c"] = listOf(running("tool", "c").copy(parentAgentId = "a|b"))
+        transport.entriesByConversation["b|c"] = listOf(running("tool", "b|c").copy(parentAgentId = "a"))
+        val repo = repository(backgroundScope)
+        backgroundScope.launch { repo.activeSubagentsFlow(firstScope).collect {} }
+        backgroundScope.launch { repo.activeSubagentsFlow(secondScope).collect {} }
+        runCurrent()
+        assertEquals(1, repo.currentActiveSubagents(firstScope).size)
+        assertEquals(1, repo.currentActiveSubagents(secondScope).size)
+        repo.close()
+    }
+
+    @Test
+    fun terminalOutcomeDoesNotResurrectAfterTheDisplayLinger() = runTest {
+        val repo = repository(backgroundScope)
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        runCurrent()
+        val running = running("toolu_a", CONVERSATION_A)
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "terminal", ts = "t", reason = "registry", subagentsActive = listOf(running.copy(status = "completed")),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals("completed", repo.currentActiveSubagents(scopeA).single().status)
+        now += 8_001L
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "after-linger", ts = "t", reason = "registry", subagentsActive = emptyList(),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "late-running", ts = "t", reason = "registry", subagentsActive = listOf(running),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        repo.close()
+    }
+
     private fun TestScope.reconnect() {
         transport.state.value = ChannelTransportState.Disconnected(1000, "drop")
         runCurrent()

@@ -1578,6 +1578,21 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "subagent.dismiss",
+      "handler": "SubagentAdminHandlers.kt",
+      "current_backend": "ControllerSubagentRegistrySource durable exact-key transition and publisher",
+      "owner": "controller_native",
+      "public_contract": "Authenticated scoped dismissal without stopping the worker",
+      "authorization_class": "conversation_scoped",
+      "data_store": "controller_state_file",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "Only registered for a file-backed source with a change listener; user_dismissed tombstones survive restart.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "subagent.todos",
       "handler": "SubagentAdminHandlers.kt",
       "current_backend": "ControllerSubagentRegistrySource identity lookup (todos projection pending m6oa1)",

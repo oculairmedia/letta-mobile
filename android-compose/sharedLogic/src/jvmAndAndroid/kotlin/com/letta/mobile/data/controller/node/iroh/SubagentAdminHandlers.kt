@@ -5,6 +5,8 @@ import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
 
 /** Authoritative registry access. Implementations must load only the requested conversation. */
@@ -32,6 +34,15 @@ internal object SubagentAdminHandlers {
             val entries = source.list(scope.conversationId, includeTerminal)
                 .filter { it.belongsTo(scope) }
             json.encodeToJsonElement(SubagentListResult(subagents = entries))
+        }
+        if (source is ControllerSubagentRegistrySource && source.registry.supportsDurableDismissal && source.changeListener != null) {
+            router.registerScoped("subagent.dismiss") { params, context ->
+                val scope = requireScope(params, context)
+                params.requireDismissalIdentity("conversation_id")
+                val agentId = params.requireDismissalIdentity("agent_id")
+                val toolCallId = params.requireDismissalIdentity("tool_call_id")
+                json.encodeToJsonElement(SubagentListResult(source.dismiss(scope.conversationId, agentId, toolCallId)))
+            }
         }
         router.registerScoped("subagent.todos") { params, context ->
             val scope = requireScope(params, context)
@@ -62,6 +73,10 @@ internal object SubagentAdminHandlers {
             agentId = param(params, AdminParamKey("agent_id"))?.takeIf { it.isNotBlank() },
         )
     }
+
+    private fun JsonObject?.requireDismissalIdentity(key: String): String =
+        (this?.get(key) as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+            ?.takeIf { it.isNotBlank() } ?: adminError("$key required")
 
     private fun SubagentEntry.belongsTo(scope: SubagentRequestScope): Boolean =
         parentConversationId == scope.conversationId &&

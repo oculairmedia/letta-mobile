@@ -253,6 +253,8 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
         subagents = frame.lists.activeSubagents,
         onClose = { navigator.showBackgroundTasks = false },
         onOpenConversation = frame.subagentViews?.holder?.rosterOpener(navigator::showChat),
+        repository = context.panels.subagents.repository,
+        parentScope = subagentParentScope(frame.chatState.selectedConversation?.agentId, frame.chatState.selectedConversationId),
     )
 }
 

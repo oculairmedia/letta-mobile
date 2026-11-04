@@ -1028,6 +1028,7 @@ class IrohNodeConnection(
             // not of any admin handler, so every host advertises it.
             add(com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY)
             addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY, ORDERED_EVENT_SEQ_CAPABILITY) + router.featureCapabilities)
+            if ("subagent.dismiss" in router.registeredMethods) add("subagent_dismiss_v1")
             if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
                 add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
             }

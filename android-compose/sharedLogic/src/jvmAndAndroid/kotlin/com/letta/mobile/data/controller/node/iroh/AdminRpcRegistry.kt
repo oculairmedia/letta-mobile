@@ -72,6 +72,7 @@ object AdminRpcRegistry {
         "agent.count",
         "subagent.list",
         "subagent.todos",
+        "subagent.dismiss",
         "health.check",
         "run.record", "lease.upsert", "lease.list",
         "approval.submit",
@@ -150,12 +151,12 @@ object AdminRpcRegistry {
             ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
 
         router.requireNonEmpty()
-        val enabledMethods = if (services.subagentRegistrySource == null) {
-            canonicalMethods - subagentMethods
-        } else {
-            canonicalMethods
-        }
-        val missingMethods = enabledMethods - router.registeredMethods
+        val missingMethods = when (val source = services.subagentRegistrySource) {
+            null -> canonicalMethods - subagentMethods
+            is ControllerSubagentRegistrySource -> if (source.registry.supportsDurableDismissal &&
+                source.changeListener != null) canonicalMethods else canonicalMethods - "subagent.dismiss"
+            else -> canonicalMethods - "subagent.dismiss"
+        } - router.registeredMethods
         check(missingMethods.isEmpty()) {
             "Admin RPC registry missing canonical methods: ${missingMethods.sorted().joinToString(", ")}"
         }
@@ -163,7 +164,7 @@ object AdminRpcRegistry {
         return router
     }
 
-    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
+    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
 
     private fun registerBeads(router: AdminRpcRouter, services: AdminRpcHostServices) {
         if (!services.beadsBaseUrl.isNullOrBlank()) {

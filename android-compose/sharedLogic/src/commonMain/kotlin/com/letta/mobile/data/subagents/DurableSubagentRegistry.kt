@@ -50,6 +50,7 @@ class DurableSubagentRegistry(
     /** How long a live chip may go unobserved; see [staleRunningChips]. */
     private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
 ) {
+    internal val supportsDurableDismissal: Boolean = store.durable
     private val lock = SynchronizedObject()
     private val snapshotAbsence = SubagentSnapshotAbsence()
 
@@ -485,6 +486,29 @@ class DurableSubagentRegistry(
         return retained
     }
 
+    /** Persist an exact dismissal before making it visible to readers. Does not stop the worker. */
+    internal fun dismiss(conversationId: String, agentId: String, toolCallId: String): List<SubagentChipRecord> =
+        synchronized(lock) {
+            require(conversationId.isNotBlank() && agentId.isNotBlank() && toolCallId.isNotBlank())
+            val key = SubagentChipKey(conversationId, agentId, toolCallId)
+            val existing = entries[key] ?: return@synchronized emptyList()
+            if (existing.state.isTerminal) {
+                return@synchronized listOf(existing).filter { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
+            }
+            check(entries.values.count { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED } < maxEntries) {
+                "dismissal storage is full"
+            }
+            val dismissed = existing.copy(
+                state = SubagentChipState.ORPHANED,
+                terminalReason = SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED,
+                terminalAtEpochMs = clock(),
+            )
+            // A failed write must not acknowledge a mutation that will be lost on restart.
+            store.save(entries.values.map { if (it.key == key) dismissed else it })
+            entries[key] = dismissed
+            listOf(dismissed)
+        }
+
     // -------------------------------------------------------------- snapshots
 
     /** Chips for [conversationId]; terminal chips included only when asked. */
@@ -531,6 +555,10 @@ class DurableSubagentRegistry(
     /**
      * Evict terminal chips oldest-first until the registry fits [maxEntries].
      *
+     * User-dismissed tombstones are retained to reject stale observations. Their
+     * separate budget is [maxEntries]; further dismissals fail when it is full.
+     * Previously stored tombstones are never discarded, including legacy excess.
+     *
      * LIVE CHIPS ARE NEVER EVICTED — evicting a running chip is exactly the
      * "silently vanish" failure this bead exists to remove. If the whole
      * registry is live and over cap we exceed the cap deliberately and record
@@ -542,7 +570,7 @@ class DurableSubagentRegistry(
         // the TTL it is terminal, and therefore evictable below.
         staleRunningChips(entries.values, clock(), staleAfterMs).forEach { entries[it.key] = it }
         val evictable = entries.values
-            .filter { it.state.isTerminal }
+            .filter { it.state.isTerminal && it.terminalReason != SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
             .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
             .iterator()
         val evicted = mutableListOf<SubagentChipRecord>()

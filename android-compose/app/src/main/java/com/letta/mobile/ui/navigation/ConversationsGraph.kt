@@ -117,7 +117,12 @@ internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
     val subagents by remember(graph, agent, conversation) {
         graph.subagentRepository.activeSubagentsFlow(SubagentParentScope(agent.value, conversation.value))
     }.collectAsStateWithLifecycle(emptyList())
-    BackgroundTasksSidePane(subagents = subagents, onClose = { workspace.showBackgroundTasks = false })
+    BackgroundTasksSidePane(
+        subagents = subagents,
+        onClose = { workspace.showBackgroundTasks = false },
+        repository = graph.subagentRepository,
+        parentScope = SubagentParentScope(agent.value, conversation.value),
+    )
 }
 
 /** The workspace's overlays: the New conversation directory, the command palette and the shortcut help. */

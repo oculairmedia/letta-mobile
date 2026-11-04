@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrix.requiredString
 import com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrix.stringSet
-import com.letta.mobile.data.model.SubagentEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,18 +23,18 @@ class IrohAdminOwnershipMatrixTest {
     private val operations = IrohAdminOwnershipMatrix.operations
     private val enums = IrohAdminOwnershipMatrix.enums
 
-    private object EmptySubagentSource : SubagentRegistrySource {
-        override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> = emptyList()
-
-        override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? = null
-    }
-
     @Test
     fun matrixCoversExactlyTheRegisteredAdminRpcMethods() {
         val router = AdminRpcRegistry.buildRouter(
             services = AdminRpcHostServices(
                 controller = null,
-                subagentRegistrySource = EmptySubagentSource,
+                subagentRegistrySource = ControllerSubagentRegistrySource(
+                    com.letta.mobile.data.subagents.DurableSubagentRegistry(
+                        store = com.letta.mobile.data.subagents.FileSubagentRegistryStore(
+                            java.nio.file.Files.createTempDirectory("subagent-matrix-test").resolve("registry.json"),
+                        ),
+                    ),
+                ).also { it.changeListener = SubagentRegistryChangeListener { } },
             ),
             pairing = AdminRpcPairing(
                 pairingService = IrohPairingService(InMemoryPairedPeerStore()),
