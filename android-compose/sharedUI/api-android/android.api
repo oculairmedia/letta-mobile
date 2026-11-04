@@ -779,7 +779,10 @@ public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers {
 	public static final field Companion Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers$Companion;
 	public final fun contains-7y3mhsM (Ljava/lang/String;)Z
 	public final fun getAll ()Ljava/util/List;
+	public final fun getRuntimeViews ()Ljava/util/List;
 	public final fun register (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
+	public final fun register (Lcom/letta/mobile/ui/plugin/RuntimeObjectView;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
+	public final fun unregister (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
 	public final fun unregister-7y3mhsM (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
 	public final fun viewerFor-7y3mhsM (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
 }
@@ -801,8 +804,8 @@ public final class com/letta/mobile/ui/canvas/plugin/CanvasPluginLayerKt {
 public final class com/letta/mobile/ui/canvas/plugin/ComposableSingletons$CanvasDocumentViewersKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/plugin/ComposableSingletons$CanvasDocumentViewersKt;
 	public fun <init> ()V
-	public final fun getLambda$-1304293009$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
-	public final fun getLambda$-342667794$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$1544534536$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$582909321$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$965638652$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
@@ -887,6 +890,7 @@ public final class com/letta/mobile/ui/canvas/plugin/PluginElementRenderers {
 	public final fun register (Ljava/lang/String;Lkotlin/jvm/functions/Function4;)Lcom/letta/mobile/ui/canvas/plugin/PluginElementRenderers;
 	public final fun registeredFor (Ljava/lang/String;)Lkotlin/jvm/functions/Function4;
 	public final fun rendererFor (Lcom/letta/mobile/ui/canvas/plugin/PluginElementView;)Lkotlin/jvm/functions/Function4;
+	public final fun unregister (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/PluginElementRenderers;
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/PluginElementRenderers$Companion {
@@ -1058,6 +1062,10 @@ public final class com/letta/mobile/ui/canvas/plugin/PluginViewSession {
 	public final fun getPermissions ()Ljava/util/Set;
 	public final fun getSpec ()Lcom/letta/mobile/data/plugin/view/PluginViewSpec;
 	public final fun readPage (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/RuntimeObjectViewHostKt {
+	public static final fun RuntimeObjectViewHost (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/PluginRegistryState;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/canvas/references/ComposableSingletons$NotebookReferencePreviewKt {
@@ -5694,6 +5702,13 @@ public abstract interface class com/letta/mobile/ui/pairing/composition/PairingS
 
 public final class com/letta/mobile/ui/pairing/composition/PairingShellPortsKt {
 	public static final fun installAndPairBindings (Lcom/letta/mobile/data/pairing/composition/PairingPorts;Lcom/letta/mobile/ui/pairing/composition/PairingShellPorts;)Lcom/letta/mobile/ui/pairing/InstallAndPairBindings;
+}
+
+public final class com/letta/mobile/ui/plugin/RuntimeObjectView {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;Lkotlin/jvm/functions/Function6;)V
+	public final fun getDescriptor ()Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;
+	public final fun getRender ()Lkotlin/jvm/functions/Function6;
 }
 
 public final class com/letta/mobile/ui/providers/icons/ProviderBrand : java/lang/Enum {

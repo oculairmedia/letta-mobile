@@ -5,58 +5,81 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.plugin.RuntimeObjectView
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_viewer_canvas
 import com.letta.mobile.sharedui.resources.canvas_viewer_text
 import com.letta.mobile.ui.canvas.viewer.CanvasTextViewer
 import org.jetbrains.compose.resources.stringResource
 
-/** Registered renderers available to a canvas workspace. */
+/** Trusted document views: legacy canvas adapters and neutral object views in one registry. */
 @Immutable
 class CanvasDocumentViewers private constructor(
-    private val entries: List<CanvasDocumentViewer>,
+    private val entries: List<Contribution>,
     private val fallbackId: CanvasDocumentViewerId,
 ) {
     /** Viewers shown in the workspace's selector, in registration order. */
-    val all: List<CanvasDocumentViewer> get() = entries.toList()
+    val all: List<CanvasDocumentViewer> get() = entries.filterIsInstance<Contribution.Canvas>().map { it.viewer }
 
     /** Add or replace an extension. The built-in canvas identity is reserved. */
-    fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewers {
-        require(viewer.id != fallbackId) { "the fallback canvas document viewer cannot be replaced" }
-        val replacement = if (contains(viewer.id)) entries.map { if (it.id == viewer.id) viewer else it }
-        else entries + viewer
+    fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewers = register(Contribution.Canvas(viewer))
+
+    private fun register(contribution: Contribution): CanvasDocumentViewers {
+        require(contribution.id != fallbackId.value) { "the fallback canvas document viewer cannot be replaced" }
+        val replacement = if (entries.any { it.id == contribution.id }) entries.map { if (it.id == contribution.id) contribution else it }
+        else entries + contribution
         return CanvasDocumentViewers(replacement, fallbackId)
     }
 
     /** Remove a registered viewer. The built-in canvas viewer cannot be removed. */
-    fun unregister(id: CanvasDocumentViewerId): CanvasDocumentViewers {
-        require(id != fallbackId) { "the fallback canvas document viewer cannot be removed" }
-        return if (contains(id)) CanvasDocumentViewers(entries.filterNot { it.id == id }, fallbackId) else this
+    fun unregister(id: CanvasDocumentViewerId): CanvasDocumentViewers = unregister(id.value)
+
+    /** Resolve a canvas adapter, using the built-in canvas after its extension is removed. */
+    fun viewerFor(id: CanvasDocumentViewerId): CanvasDocumentViewer =
+        all.firstOrNull { it.id == id } ?: all.first { it.id == fallbackId }
+
+    fun contains(id: CanvasDocumentViewerId): Boolean = all.any { it.id == id }
+
+    /** Trusted neutral views share this registration path; they need no canvas adapter. */
+    fun register(view: RuntimeObjectView): CanvasDocumentViewers = register(Contribution.Object(view))
+
+    /** Remove either kind of contribution by its stable ID. */
+    fun unregister(viewId: String): CanvasDocumentViewers {
+        require(viewId != fallbackId.value) { "the fallback canvas document viewer cannot be removed" }
+        return CanvasDocumentViewers(entries.filterNot { it.id == viewId }, fallbackId)
     }
 
-    /** Resolve an ID, using the built-in canvas viewer after an extension is removed. */
-    fun viewerFor(id: CanvasDocumentViewerId): CanvasDocumentViewer =
-        entries.firstOrNull { it.id == id } ?: entries.first { it.id == fallbackId }
+    /** Discover registered neutral implementations and their schema/contract metadata. */
+    val runtimeViews: List<RuntimeObjectView> get() = entries.filterIsInstance<Contribution.Object>().map { it.view }
 
-    /** Whether this registry currently contains [id]. */
-    fun contains(id: CanvasDocumentViewerId): Boolean = entries.any { it.id == id }
+    private sealed interface Contribution {
+        val id: String
+
+        class Canvas(val viewer: CanvasDocumentViewer) : Contribution {
+            override val id: String get() = viewer.id.value
+        }
+
+        class Object(val view: RuntimeObjectView) : Contribution {
+            override val id: String get() = view.descriptor.id
+        }
+    }
 
     companion object {
         /** Core's canvas and read-only text presentations. */
         val Core: CanvasDocumentViewers = CanvasDocumentViewers(
             entries = listOf(
-                CanvasDocumentViewer(
+                Contribution.Canvas(CanvasDocumentViewer(
                     id = CanvasDocumentViewerId.CANVAS,
                     label = { stringResource(Res.string.canvas_viewer_canvas) },
                     render = { context, modifier ->
                         LocalCanvasDocumentCanvasContent.current(context, modifier)
                     },
-                ),
-                CanvasDocumentViewer(
+                )),
+                Contribution.Canvas(CanvasDocumentViewer(
                     id = CanvasDocumentViewerId.TEXT,
                     label = { stringResource(Res.string.canvas_viewer_text) },
                     render = { context, modifier -> CanvasTextViewer(context.sceneJson, modifier) },
-                ),
+                )),
             ),
             fallbackId = CanvasDocumentViewerId.CANVAS,
         )

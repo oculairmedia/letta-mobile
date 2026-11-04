@@ -383,6 +383,8 @@ Heap and memory-pressure signals for shared consumers. Platform observers produc
 
 Plugin manifests, capabilities, packages, registry transitions and settings/secrets templates. These describe installation and consent; platform package readers and host drivers supply execution where available. Keep native process execution and product widgets outside portable plugin state; provide packages through [PluginPackageReader](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin/-plugin-package-reader/index.html) and action effects through [PluginActionInvoker](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin/-plugin-action-invoker/index.html).
 
+Runtime view bindings live on `InstalledPlugin` and change through `PluginRegistryReducer.configureView` / `unbindView`. Configuration selects trusted code only; it cannot consent, enable, install, or retarget an occupied mount. Canonical object content stays with its source.
+
 # Package com.letta.mobile.data.plugin.catalog
 
 Plugin catalog ports and management-page state. Controllers expose inspection and consent workflows while the connected host remains authoritative for installed state. Keep locally inferred installation authority outside catalog state; supply host-backed inventory through [HostPluginCatalog](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.catalog/-host-plugin-catalog/index.html) and mutations through [PluginsPageActions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.catalog/-plugins-page-actions/index.html).
@@ -404,6 +406,10 @@ JVM/Android admin-RPC adapters for plugin catalogs and live views. Operations fo
 # Package com.letta.mobile.data.plugin.view
 
 The shared lcp-view/1 bridge: handshake, validated messages, lifecycle, rate limits, CSP and host ports. Platform page containers bind rendering while the bridge defines supported method/permission boundaries. Keep platform WebView construction outside bridge policy; connect messaging through [PostMessagePort](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.view/-post-message-port/index.html), actions through [PluginViewTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.view/-plugin-view-transport/index.html) and access decisions through [PluginViewConsent](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.view/-plugin-view-consent/index.html).
+
+# Package com.letta.mobile.data.plugin.runtimeview
+
+`RuntimeObjectReference`, `RuntimeViewObject`, `RuntimeViewDescriptor` and `RuntimeViewBinding` provide a neutral native-view contract. Object schema ID/version, view-contract version and mount identity are independent. Full JSON content (including unknown fields) is read-only; source authority is an opaque part of the reference. Schema incompatibility, absent owners/objects/implementations and reported renderer failure use explicit fallback. Native implementations are supplied by trusted host code, never fetched from configuration.
 
 # Package com.letta.mobile.data.plugin.wire
 

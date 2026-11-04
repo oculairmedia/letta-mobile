@@ -182,7 +182,8 @@ private fun PluginElementHost(
                 .testTag(CanvasPluginTestTags.element(element.id))
                 .pressToSelect(element.id, state.eraseMode) { if (state.eraseMode) edits.remove() else state.onSelect() },
         ) {
-            InWorldUnits { LocalPluginElementRenderers.current.rendererFor(view.value)(view.value, chrome) }
+            val renderer = LocalPluginElementRenderers.current.rendererFor(view.value)
+            InWorldUnits { key(renderer) { renderer(view.value, chrome) } }
         }
         if (state.selected) {
             PluginSelectionChrome(viewport = viewport, contentSize = size, onResize = resize, onResizeEnd = commit)
