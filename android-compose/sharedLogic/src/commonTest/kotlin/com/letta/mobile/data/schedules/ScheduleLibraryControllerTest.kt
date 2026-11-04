@@ -16,6 +16,11 @@ import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.InMemoryAgentRepository
+import com.letta.mobile.data.schedules.runs.LeaseHistory
+import com.letta.mobile.data.schedules.leases.Lease
+import com.letta.mobile.data.schedules.leases.LeaseState
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -29,11 +34,63 @@ import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScheduleLibraryControllerTest {
+    private val lease = Lease("lease", "a1", "work", Instant.parse("2026-11-02T12:00:00Z"),
+        Instant.parse("2026-11-02T13:00:00Z"), LeaseState.ACTIVE)
+
+    @Test
+    fun coldScheduleFailureStillLoadsSelectedAgentsLeases() = runTest {
+        val schedules = FakeScheduleRepository().apply { error = RuntimeException("schedule failure") }
+        val controller = ScheduleLibraryController(FakeAgentRepository(), schedules, this,
+            recordSources = ScheduleRecordSources(leases = { listOf(lease) }))
+        controller.start()
+        advanceUntilIdle()
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertEquals(listOf(lease), controller.state.value.leases)
+        assertEquals("schedule failure", controller.state.value.errorMessage)
+    }
+
+    @Test
+    fun failedLeaseReloadAfterCreateAndDeleteKeepsExistingLeases() = runTest {
+        var fail = false
+        val schedules = FakeScheduleRepository()
+        val controller = ScheduleLibraryController(FakeAgentRepository(), schedules, this,
+            scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
+            recordSources = ScheduleRecordSources(leases = { if (fail) error("lease failure") else listOf(lease) }))
+        controller.start()
+        advanceUntilIdle()
+        fail = true
+        controller.createRecurringSchedule(ScheduleCreateRequest(null, "Digest", "work", "0 18 * * *", "UTC"))
+        advanceUntilIdle()
+        assertEquals(listOf(lease), controller.state.value.leases, "create must preserve leases on reload failure")
+        controller.deleteSchedule("s1")
+        advanceUntilIdle()
+        assertEquals(listOf(lease), controller.state.value.leases, "delete must preserve leases on reload failure")
+        schedules.error = RouteUnavailableException()
+        controller.loadData()
+        advanceUntilIdle()
+        assertEquals(listOf(lease), controller.state.value.leases, "route fallback must preserve leases on reload failure")
+    }
+
+    @Test
+    fun runAndLeaseFailuresAreBothReported() = runTest {
+        val controller = ScheduleLibraryController(FakeAgentRepository(), FakeScheduleRepository(), this,
+            recordSources = ScheduleRecordSources(
+                runHistory = { _, _ -> error("run failure") },
+                leases = { error("lease failure") },
+            ))
+        controller.start()
+        advanceUntilIdle()
+        val message = controller.state.value.errorMessage.orEmpty()
+        assertTrue("run failure" in message, message)
+        assertTrue("lease failure" in message, message)
+    }
+
     @Test
     fun loadDataSelectsFirstAgentAndLoadsSchedules() = runTest {
         val controller = controller()
@@ -83,10 +140,12 @@ class ScheduleLibraryControllerTest {
             agentRepository = FakeAgentRepository(),
             scheduleRepository = FakeScheduleRepository(),
             scope = this,
-            runHistorySource = { agent, ids ->
-                calls += agent.value to ids
-                listOf(RunRecord(ids.single(), Instant.parse("2026-11-02T00:00:00Z"), true, reason = "review", source = "human"))
-            },
+            recordSources = ScheduleRecordSources(
+                runHistory = { agent, ids ->
+                    calls += agent.value to ids
+                    listOf(RunRecord(ids.single(), Instant.parse("2026-11-02T00:00:00Z"), true, reason = "review", source = "human"))
+                },
+            ),
         )
         controller.start()
         advanceUntilIdle()
@@ -96,6 +155,24 @@ class ScheduleLibraryControllerTest {
         advanceUntilIdle()
         assertEquals("a2" to listOf("s2"), calls.last())
         assertEquals(setOf("s2"), controller.state.value.runHistory.keys)
+    }
+
+    @Test
+    fun oldWrapperWithoutLeaseMethodDoesNotProduceAnError() = runTest {
+        val transport = object : NoOpChannelTransport() {
+            override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
+                error("lease.list must not be called on an older wrapper")
+        }
+        val controller = ScheduleLibraryController(
+            agentRepository = FakeAgentRepository(),
+            scheduleRepository = FakeScheduleRepository(),
+            scope = this,
+            recordSources = ScheduleRecordSources(leases = LeaseHistory(transport)::load),
+        )
+        controller.start()
+        advanceUntilIdle()
+        assertNull(controller.state.value.errorMessage)
+        assertTrue(controller.state.value.leases.isEmpty())
     }
 
     @Test

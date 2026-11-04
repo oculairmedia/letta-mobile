@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.schedules.leases.Lease
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.coroutines.CancellationException
@@ -47,6 +48,8 @@ data class ScheduleLibraryState(
     val cronMode: Boolean = false,
     /** Recorded runs keyed by their cron task ID. */
     val runHistory: Map<String, List<RunRecord>> = emptyMap(),
+    /** Read-only leases owned by the selected agent. */
+    val leases: List<Lease> = emptyList(),
 ) {
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
     val cronsForSelectedAgent: List<CronTask>
@@ -127,8 +130,8 @@ class ScheduleLibraryController(
      * "admin unavailable" state straight away.
      */
     nativeScheduleRoute: Boolean = true,
-    /** Optional shared transport for a selected agent’s run history. */
-    private val runHistorySource: (suspend (AgentId, List<String>) -> List<RunRecord>)? = null,
+    /** Optional shared wrapper readers for run history and read-only leases. */
+    private val recordSources: ScheduleRecordSources? = null,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
@@ -178,11 +181,11 @@ class ScheduleLibraryController(
             try {
                 val agents = agentRepository.listAgentSummaries()
                 loadedAgents = agents
-                val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                val target = targetForAgents(agents)
+                val selectedAgentId = target.selectedAgentId
                 // If a prior load already proved the native schedule route is
                 // unavailable on this backend, skip the doomed native round-trip
                 // and go straight to the cron-backed source.
-                val target = ScheduleLibraryState(agents = agents, selectedAgentId = selectedAgentId)
                 if (nativeScheduleRouteUnavailable) {
                     publishCronFallbackOrUnavailable(target)
                     return@launch
@@ -190,20 +193,25 @@ class ScheduleLibraryController(
                 val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
                 stateFlow.value = target.withSchedules(schedules)
                 loadRunHistory()
+                loadLeases()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    val selectedAgentId = loadedAgents.resolveSelection(stateFlow.value.selectedAgentId)
                     latchNativeUnavailableIfCronBacked()
-                    publishCronFallbackOrUnavailable(ScheduleLibraryState(agents = loadedAgents, selectedAgentId = selectedAgentId))
+                    publishCronFallbackOrUnavailable(targetForAgents(loadedAgents))
                 } else {
-                    stateFlow.update {
-                        it.copy(
+                    val selectedAgentId = loadedAgents.resolveSelection(stateFlow.value.selectedAgentId)
+                    stateFlow.update { current ->
+                        current.copy(
+                            agents = loadedAgents,
+                            selectedAgentId = selectedAgentId,
+                            leases = current.leases.takeIf { selectedAgentId == current.selectedAgentId }.orEmpty(),
                             isLoading = false,
                             errorMessage = errorMessageMapper(t, "Failed to load schedules"),
                         )
                     }
+                    loadLeases()
                 }
             }
         }
@@ -213,7 +221,10 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             val current = stateFlow.value
-            val target = current.copy(selectedAgentId = agentId)
+            val target = current.copy(
+                selectedAgentId = agentId,
+                leases = current.leases.takeIf { agentId == current.selectedAgentId }.orEmpty(),
+            )
             // If a prior load already proved the native schedule route is
             // unavailable on this backend, skip the doomed native round-trip
             // and go straight to the cron-backed source.
@@ -224,6 +235,7 @@ class ScheduleLibraryController(
             try {
                 stateFlow.value = target.withSchedules(loadSchedulesForAgent(agentId)).copy(runHistory = emptyMap())
                 loadRunHistory()
+                loadLeases()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -247,8 +259,13 @@ class ScheduleLibraryController(
             try {
                 scheduleRepository.createSchedule(agentId, params)
                 val schedules = scheduleRepository.getSchedules(agentId).first()
-                stateFlow.value = current.copy(selectedAgentId = agentId, runHistory = emptyMap()).withSchedules(schedules)
+                stateFlow.value = current.copy(
+                    selectedAgentId = agentId,
+                    runHistory = emptyMap(),
+                    leases = current.leases.takeIf { agentId == current.selectedAgentId }.orEmpty(),
+                ).withSchedules(schedules)
                 loadRunHistory()
+                loadLeases()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -280,8 +297,14 @@ class ScheduleLibraryController(
             val agentId = current.selectedAgentId ?: return@launch
             try {
                 scheduleRepository.deleteSchedule(agentId, scheduledMessageId)
-                stateFlow.value = current.withSchedules(scheduleRepository.getSchedules(agentId).first()).copy(runHistory = emptyMap())
+                stateFlow.value = current.withSchedules(
+                    scheduleRepository.getSchedules(agentId).first(),
+                ).copy(
+                    runHistory = emptyMap(),
+                    leases = current.leases,
+                )
                 loadRunHistory()
+                loadLeases()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
@@ -300,6 +323,16 @@ class ScheduleLibraryController(
     override fun close() {
         loadJob?.cancel()
         mutationJob?.cancel()
+    }
+
+    private fun targetForAgents(agents: List<AgentSummary>): ScheduleLibraryState {
+        val current = stateFlow.value
+        val selected = agents.resolveSelection(current.selectedAgentId)
+        return ScheduleLibraryState(
+            agents = agents,
+            selectedAgentId = selected,
+            leases = current.leases.takeIf { selected == current.selectedAgentId }.orEmpty(),
+        )
     }
 
     private suspend fun loadSchedulesForAgent(agentId: String): List<ScheduledMessage> {
@@ -336,13 +369,15 @@ class ScheduleLibraryController(
             ScheduleLibraryState(
                 agents = target.agents,
                 selectedAgentId = target.agents.resolveSelection(target.selectedAgentId),
+                leases = target.leases,
             ).adminUnavailable()
         }
         loadRunHistory()
+        loadLeases()
     }
 
     private suspend fun loadRunHistory() {
-        val source = runHistorySource ?: return
+        val source = recordSources?.runHistory ?: return
         val state = stateFlow.value
         val agent = state.selectedAgentId ?: return
         val ids = (state.schedules.map { it.id } + state.crons.map { it.id }).distinct()
@@ -355,6 +390,26 @@ class ScheduleLibraryController(
             throw cancelled
         } catch (t: Throwable) {
             stateFlow.update { it.copy(errorMessage = errorMessageMapper(t, "Failed to load run history")) }
+        }
+    }
+
+    private suspend fun loadLeases() {
+        val source = recordSources?.leases ?: return
+        val agent = stateFlow.value.selectedAgentId ?: return
+        try {
+            val leases = source(AgentId(agent))
+            stateFlow.update { if (it.selectedAgentId == agent) it.copy(leases = leases) else it }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            stateFlow.update {
+                if (it.selectedAgentId == agent) {
+                    val message = errorMessageMapper(t, "Failed to load leases")
+                    it.copy(errorMessage = listOfNotNull(it.errorMessage, message).joinToString("\n"))
+                } else {
+                    it
+                }
+            }
         }
     }
 

@@ -41,7 +41,13 @@ data class CalendarColumn(val date: LocalDate, val isToday: Boolean)
 
 /** Where a [CalendarTimeGrid] child sits: a time of day, in lane [lane] of [lanes] side-by-side lanes. */
 @Immutable
-data class CalendarSlot(val minuteOfDay: Int, val lane: Int = 0, val lanes: Int = 1)
+data class CalendarSlot(
+    val minuteOfDay: Int, val lane: Int = 0, val lanes: Int = 1,
+    /** When present, size the block to this many grid minutes. */
+    val durationMinutes: Float? = null,
+    /** Optional fractional start minute for a sub-minute timestamp. */
+    val exactMinuteOfDay: Float? = null,
+)
 
 /** Places this child of a [CalendarTimeGrid] column at [slot]. */
 fun Modifier.calendarSlot(slot: CalendarSlot): Modifier = layoutId(slot)
@@ -146,7 +152,7 @@ private fun GridColumn(
     }
 }
 
-/** Measures every child to one lane's width and the event height, and places it at its [CalendarSlot]. */
+/** Measures every child to one lane's width and its [CalendarSlot] height, then places it in the grid. */
 @Composable
 private fun SlotLayout(content: @Composable () -> Unit) {
     val density = LocalDensity.current
@@ -158,8 +164,13 @@ private fun SlotLayout(content: @Composable () -> Unit) {
         val placed = measurables.map { measurable ->
             val slot = measurable.layoutId as? CalendarSlot ?: CalendarSlot(0)
             val laneWidth = (width - gapPx) / slot.lanes.coerceAtLeast(1)
-            val placeable = measurable.measure(Constraints.fixed((laneWidth - gapPx).coerceAtLeast(0), eventPx))
-            Triple(placeable, gapPx + slot.lane * laneWidth, (hourPx * slot.minuteOfDay / MINUTES_PER_HOUR).roundToInt())
+            val height = slot.durationMinutes?.let {
+                (hourPx * it.coerceAtLeast(0f) / MINUTES_PER_HOUR).roundToInt()
+            } ?: eventPx
+            val placeable = measurable.measure(Constraints.fixed((laneWidth - gapPx).coerceAtLeast(0), height))
+            val minute = slot.exactMinuteOfDay ?: slot.minuteOfDay.toFloat()
+            val y = (hourPx * minute / MINUTES_PER_HOUR).roundToInt()
+            Triple(placeable, gapPx + slot.lane * laneWidth, y)
         }
         layout(width, constraints.maxHeight) {
             placed.forEach { (placeable, x, y) -> placeable.place(x, y) }

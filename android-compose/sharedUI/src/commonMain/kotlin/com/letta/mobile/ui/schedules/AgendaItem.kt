@@ -21,6 +21,7 @@ internal sealed interface AgendaItem {
             get() = when (entry) {
                 is CalendarEntry.Event -> "r:${entry.event.run.scheduleId}:${entry.event.run.instant}:${entry.event.run.recordId.orEmpty()}"
                 is CalendarEntry.Band -> "b:$date:${entry.band.scheduleId}"
+                is CalendarEntry.LeaseEntry -> "l:$date:${entry.span.lease.id}"
             }
     }
 

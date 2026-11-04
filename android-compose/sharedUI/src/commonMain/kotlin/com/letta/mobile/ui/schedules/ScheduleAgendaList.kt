@@ -19,11 +19,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.schedules.CalendarBand
@@ -51,6 +53,14 @@ fun ScheduleAgendaList(params: ScheduleCalendarParams, modifier: Modifier = Modi
     val nowIndex = items.indexOfFirst { it is AgendaItem.Now }
     val initial = if (header == null) (nowIndex - NOW_LEAD_ROWS).coerceAtLeast(0) else 0
     val state = rememberLazyListState(initialFirstVisibleItemIndex = initial)
+    val target = items.indexOfFirst {
+        it is AgendaItem.Entry && it.entry is CalendarEntry.Event &&
+            it.entry.event.run.recordId != null && it.entry.event.run.recordId == params.highlightedRunId
+    }
+    val targetKey = items.getOrNull(target)?.key
+    LaunchedEffect(targetKey, header == null) {
+        if (target >= 0 && header == null) state.scrollToItem(target)
+    }
     LazyColumn(modifier.fillMaxSize(), state = state, contentPadding = PaddingValues(LettaDimens.Space.lg)) {
         header?.invoke(this)
         items(items, key = { it.key }) { item -> AgendaLine(item, params) }
@@ -69,6 +79,9 @@ private fun AgendaLine(item: AgendaItem, params: ScheduleCalendarParams) {
         is AgendaItem.Entry -> when (val entry = item.entry) {
             is CalendarEntry.Event -> RunRow(entry, params)
             is CalendarEntry.Band -> BandRow(entry.band, params)
+            is CalendarEntry.LeaseEntry -> LeaseAgendaRow(entry.span.lease, params.clock.zone) {
+                params.actions.onLeaseClick(entry.span.lease)
+            }
         }
     }
 }
@@ -77,6 +90,7 @@ private fun AgendaLine(item: AgendaItem, params: ScheduleCalendarParams) {
 private fun RunRow(entry: CalendarEntry.Event, params: ScheduleCalendarParams) {
     val run = entry.event.run
     val cadence = params.cadenceById[run.scheduleId]
+    val isLinked = run.recordId != null && run.recordId == params.highlightedRunId
     val subtitle = run.reason?.takeIf { it.isNotBlank() }?.let { reason ->
         listOfNotNull(cadence, "woke: $reason").joinToString(" · ")
     } ?: cadence
@@ -85,11 +99,12 @@ private fun RunRow(entry: CalendarEntry.Event, params: ScheduleCalendarParams) {
             title = run.scheduleName,
             subtitle = subtitle,
             trailing = ScheduleRunText.trailing(run, params.clock.now),
-            emphasized = run.status == RunStatus.Next,
+            emphasized = run.status == RunStatus.Next || isLinked,
             quiet = run.status.isPast || run.status == RunStatus.Paused,
         ),
         onClick = { params.actions.onRunClick(run) },
-        modifier = Modifier.heightIn(min = LettaDimens.Control.minTouchTarget),
+        modifier = Modifier.heightIn(min = LettaDimens.Control.minTouchTarget)
+            .then(if (isLinked) Modifier.testTag("linked-run-${run.recordId}") else Modifier),
         leading = { AgendaLeading(ScheduleFormat.timeOfDay(run.instant, params.clock.zone), scheduleAccentOfRaw(run.agentId)) },
         end = outcomeBadge(run.status)?.let { badge -> { BadgeIcon(badge) } },
     )

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.schedules
 
 import kotlinx.datetime.LocalDate
+import com.letta.mobile.data.schedules.leases.Lease
+import com.letta.mobile.data.schedules.leases.LeaseState
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,6 +11,16 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class ScheduleCalendarTest {
+    @Test
+    fun leaseOnlyOwnerDoesNotAddRunDot() {
+        val lease = Lease("lease", "lease-owner", "work", Instant.parse("2026-10-28T15:00:00Z"),
+            Instant.parse("2026-10-28T16:00:00Z"), LeaseState.ACTIVE)
+        val query = CalendarQuery(ScheduleClock(noonWednesday, newYork), leases = listOf(lease))
+        val day = ScheduleCalendar.days(listOf(def("run", "0 9 * * *")), listOf(wednesday), query).single()
+        assertEquals(listOf("agent-run"), day.agentIds)
+        assertEquals("lease-owner", day.leases.single().lease.owner)
+    }
+
     private val newYork = TimeZone.of("America/New_York")
     private val utc = TimeZone.UTC
 

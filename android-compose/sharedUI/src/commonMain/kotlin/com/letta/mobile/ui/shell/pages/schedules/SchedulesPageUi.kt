@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CalendarDay
+import com.letta.mobile.data.schedules.CalendarEvent
 import com.letta.mobile.data.schedules.CalendarLabels
 import com.letta.mobile.data.schedules.CalendarQuery
 import com.letta.mobile.data.schedules.CalendarRange
@@ -32,6 +35,8 @@ import com.letta.mobile.data.schedules.ScheduleFormDraft
 import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.SchedulesPageModel
 import com.letta.mobile.data.schedules.SchedulesView
+import com.letta.mobile.data.schedules.ScheduleRun
+import com.letta.mobile.data.schedules.leases.Lease
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaPane
@@ -66,6 +71,7 @@ internal class SchedulesData(
     /** Each schedule's recurrence in words ("Every weekday at 9:00 AM"). */
     val cadenceById: Map<String, String>,
     val agentNames: Map<String, String>,
+    val leases: List<Lease>,
 ) {
     val hasPaused: Boolean get() = defs.any { !it.active }
 }
@@ -94,7 +100,10 @@ internal fun rememberSchedulesData(state: SchedulesPageState, clock: ScheduleClo
     val cadence = remember(defs, clock.zone) { defs.associate { it.id to ScheduleRailText.cadence(it, clock.zone) } }
     val agentNames = remember(state.library.agents) { state.library.agents.associate { it.id.value to it.name } }
     val history = remember(historyDefs, clock, runHistory) { ScheduleProjection.history(historyDefs, clock.now, clock.zone, runHistory) }
-    return SchedulesData(defs, historyDefs, defsById, clock, history, runHistory, cadence, agentNames)
+    val leases = state.library.leases.takeIf {
+        state.focusedAgentId == null || state.focusedAgentId == state.library.selectedAgentId
+    }.orEmpty()
+    return SchedulesData(defs, historyDefs, defsById, clock, history, runHistory, cadence, agentNames, leases)
 }
 
 /** What the main content draws and reports. */
@@ -127,6 +136,8 @@ internal class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate
 
     /** The day the calendar shows: its week, its month, or the agenda's first day. */
     var anchor by mutableStateOf(today)
+    var linkedRun by mutableStateOf<ScheduleRun?>(null)
+    var leaseNotice by mutableStateOf<String?>(null)
 
     /** The chosen view, else Week on a wide page and Agenda on a phone. */
     fun view(wide: Boolean): SchedulesView = chosenView ?: if (wide) SchedulesView.Week else SchedulesView.Agenda
@@ -140,7 +151,7 @@ internal class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate
     }
 
     /** Rail and calendar callbacks; an empty slot starts a draft only when the page can create. */
-    fun calendarActions(canCreate: Boolean) = ScheduleCalendarActions(
+    fun calendarActions(canCreate: Boolean, data: SchedulesData) = ScheduleCalendarActions(
         onRunClick = { rail = ScheduleRailState.Run(it) },
         onScheduleClick = { rail = ScheduleRailState.Detail(it) },
         onSelectDate = { anchor = it },
@@ -149,7 +160,27 @@ internal class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate
             chosenView = SchedulesView.Week
         },
         onEmptySlot = if (canCreate) { date, hour -> form = SchedulesPageModel.draftAt(date, hour) } else null,
+        onLeaseClick = { lease -> openLease(lease, data) },
     )
+
+    private fun openLease(lease: Lease, data: SchedulesData) {
+        val record = data.runHistory.values.flatten().firstOrNull { it.recordId == lease.runId && lease.runId != null }
+        if (record == null) {
+            leaseNotice = if (lease.runId == null) "This lease has no linked run" else "Linked run is unavailable"
+            return
+        }
+        leaseNotice = null
+        val def = data.historyDefs.firstOrNull { it.id == record.scheduleId }
+        val run = ScheduleRun(
+            record.scheduleId, record.scheduleName ?: def?.name ?: "Run", record.instant, record.status,
+            record.durationMillis, record.exitCode, record.error, def?.agentId, record.reason, record.source, record.recordId,
+        )
+        linkedRun = run
+        anchor = run.instant.toLocalDateTime(data.clock.zone).date
+        chosenView = SchedulesView.Agenda
+        rail = ScheduleRailState.Run(run)
+    }
+
 }
 
 /** The view survives configuration changes; the anchor follows today; the rail, dialogs and filter persist. */
@@ -174,21 +205,36 @@ internal fun rememberSchedulesPageUi(clock: ScheduleClock, initialView: Schedule
 internal fun rememberCalendarDays(ui: SchedulesPageUi, view: SchedulesView, data: SchedulesData): List<CalendarDay> {
     val anchor = ui.anchor
     val showPaused = ui.showPaused
-    return remember(data.defs, data.historyDefs, data.runHistory, view, anchor, data.clock, showPaused) {
+    val isAgenda = view == SchedulesView.Agenda
+    val linkedRun = ui.linkedRun?.takeIf { run ->
+        run.recordId != null && data.runHistory[run.scheduleId].orEmpty().any { it.recordId == run.recordId }
+    }
+    return remember(data.defs, data.historyDefs, data.runHistory, data.leases, view, anchor, data.clock, showPaused, linkedRun) {
         if (!view.hasRange) {
             emptyList()
         } else {
-            ScheduleCalendar.days(
-                if (view == SchedulesView.Agenda) data.historyDefs else data.defs,
+            val days = ScheduleCalendar.days(
+                if (isAgenda) data.historyDefs else data.defs,
                 CalendarRange.dates(view, anchor),
                 CalendarQuery(
                     data.clock,
                     history = data.runHistory,
                     includePaused = showPaused,
-                    includeUnscheduled = view == SchedulesView.Agenda,
+                    includeUnscheduled = isAgenda,
+                    leases = data.leases,
                 ),
             )
+            addLinkedRun(days, linkedRun.takeIf { isAgenda }, data.clock.zone)
         }
+    }
+}
+
+private fun addLinkedRun(days: List<CalendarDay>, run: ScheduleRun?, zone: kotlinx.datetime.TimeZone): List<CalendarDay> {
+    if (run == null) return days
+    val local = run.instant.toLocalDateTime(zone)
+    return days.map { day ->
+        if (day.date != local.date || day.events.any { it.run.recordId == run.recordId }) day
+        else day.copy(events = ScheduleCalendar.layoutLanes(day.events + CalendarEvent(run, local.hour * 60 + local.minute)))
     }
 }
 
@@ -200,11 +246,14 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
         val docked = maxWidth >= CalendarDimens.railDockBreakpoint
         val view = ui.view(wide)
         val days = rememberCalendarDays(ui, view, data)
-        val actions = ui.calendarActions(input.state.canCreate)
-        val calendar = ScheduleCalendarParams(days, ui.today, ui.anchor, data.clock, data.cadenceById, actions)
+        val actions = ui.calendarActions(input.state.canCreate, data)
+        val calendar = ScheduleCalendarParams(days, ui.today, ui.anchor, data.clock, data.cadenceById, actions, ui.linkedRun?.recordId)
         Column(Modifier.fillMaxSize()) {
             SchedulesHeader(headerParams(ui, input, view, wide))
             SchedulesFilters(filterParams(ui, input))
+            ui.leaseNotice?.let { notice ->
+                Text(notice, Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm))
+            }
             val selectedId = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
             val body = SchedulesBody(input.state, data, view, calendar, selectedId, input.actions.onRefresh)
             Row(Modifier.weight(1f).fillMaxWidth()) {
