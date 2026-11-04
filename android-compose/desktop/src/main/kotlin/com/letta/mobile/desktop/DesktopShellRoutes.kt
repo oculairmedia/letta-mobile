@@ -102,7 +102,7 @@ internal class DesktopShellChatPort(
     private val chatState: State<DesktopChatSurfaceState>,
 ) : ShellChatPort {
     override fun conversations(): List<ShellConversationRef> = chatState.value.conversations.map {
-        ShellConversationRef(ConversationId(it.id), it.agentId?.let(::AgentId), it.updatedAtLabel)
+        ShellConversationRef(ConversationId(it.id), it.agentId?.let(::AgentId), it.updatedAtLabel, tags = it.tags)
     }
 
     override val selectedConversation: ConversationId?

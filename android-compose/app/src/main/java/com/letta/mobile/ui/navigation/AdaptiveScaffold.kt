@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.lanes.ConversationLaneProjection
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -141,18 +142,23 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
                 reducedMotion = rememberReducedMotionEnabled(),
             ),
         ),
-        host = LettaShellWorkspaceHost(
-            actions = androidNavigationActions(shell),
-            slots = androidSlots(shell, agents),
-            chrome = ShellWindowChrome.Inline,
-            drawer = shell.drawer,
-            events = ShellWorkspaceEvents(
-                onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
-                shortcuts = rememberAndroidShortcuts(shell, agents),
-            ),
-        ),
+        host = androidHost(shell, agents, sources.sessions.currentGraph.collectAsStateWithLifecycle().value.conversationLanes),
     )
 }
+
+/** The shell's actions, slots and events, with the session graph's lane activity for its rows. */
+@Composable
+private fun androidHost(shell: WorkspaceShell, agents: List<Agent>, lanes: ConversationLaneProjection?) = LettaShellWorkspaceHost(
+    actions = androidNavigationActions(shell),
+    slots = androidSlots(shell, agents),
+    chrome = ShellWindowChrome.Inline,
+    drawer = shell.drawer,
+    conversationLanes = lanes,
+    events = ShellWorkspaceEvents(
+        onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
+        shortcuts = rememberAndroidShortcuts(shell, agents),
+    ),
+)
 
 /** The page, the open chat's card in the panel, the background tasks beside the page, and the overlays. */
 private fun androidSlots(shell: WorkspaceShell, agents: List<Agent>) = LettaShellWorkspaceSlots(

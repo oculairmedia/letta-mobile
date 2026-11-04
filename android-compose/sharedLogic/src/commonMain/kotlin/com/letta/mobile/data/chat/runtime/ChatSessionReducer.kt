@@ -1,6 +1,8 @@
 package com.letta.mobile.data.chat.runtime
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.lanes.ConversationLane
+import com.letta.mobile.data.lanes.ConversationPurpose
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 
@@ -66,7 +68,11 @@ object ChatSessionReducer {
         liveStatusMessage: String = "Live",
         emptyStatusMessage: String = "No conversations",
     ): ChatSessionState {
-        val selectedId = conversations.firstOrNull()?.id
+        // A conversation the person already opened stays open (even a view-only work record);
+        // otherwise the home lane is the anchor ahead of whatever sorts first.
+        val selectedId = conversations.firstOrNull { it.id == state.selectedConversationId }?.id
+            ?: conversations.firstOrNull { ConversationLane.fromTags(it.tags).purpose == ConversationPurpose.HOME }?.id
+            ?: conversations.firstOrNull()?.id
         val selectionChanged = selectedId != null && selectedId != state.selectedConversationId
         return state.copy(
             conversations = conversations,

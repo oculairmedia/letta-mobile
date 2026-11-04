@@ -130,19 +130,20 @@ fun ChatSurface(
     onDockGeometryChange: (ChatDockGeometry) -> Unit = {},
     recents: ChatRecentInteractions? = null,
 ) {
+    val viewedPort = rememberLaneTranscriptPort(port, recents)
     // Lifecycle-aware on Android: a backgrounded app stops collecting, so the owner's
     // WhileSubscribed flows (the composer projection) can stop with it.
     // Held as a State and read only where a value is used: the page itself never reads it, so a
     // streaming token recomposes the timeline and the few readers of run state, not every layer.
-    val uiState = port.uiState.collectForChatSurface()
-    val composer by port.composer.collectForChatSurface()
-    val capabilities by port.capabilities.collectForChatSurface()
+    val uiState = viewedPort.uiState.collectForChatSurface()
+    val composer by viewedPort.composer.collectForChatSurface()
+    val capabilities by viewedPort.capabilities.collectForChatSurface()
     val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
     // Hosts pass fresh lambdas per recomposition; these keep one instance so rows stay skippable.
     val stableOnIntent = rememberLatestIntent(onIntent)
     val stableHost = rememberStableHost(host)
     val stablePlatform = rememberStablePlatform(platform)
-    val canvasActions = remember(port, shareFailed) { ChatCanvasActions(port.actions, stableOnIntent, shareFailed) }
+    val canvasActions = remember(viewedPort, shareFailed) { ChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed) }
     // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
     // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
@@ -152,6 +153,7 @@ fun ChatSurface(
     val conversationId by remember(uiState) {
         derivedStateOf { (uiState.value.conversationState as? ConversationState.Ready)?.conversationId }
     }
+    AcknowledgeLaneTranscript(uiState)
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
     val dockReady = dockGeometry != null
@@ -161,8 +163,8 @@ fun ChatSurface(
     val imageAttacher = rememberComposerImageAttacher()
     // The page's one composer-companion seat; the composers only say where it should stand.
     val companionAnchors = remember { CompanionSeatAnchors() }
-    val session = remember(port, uiState, composer, capabilities, pagedTimeline, listState) {
-        ChatSurfaceSession(port, uiState, composer, capabilities, pagedTimeline, listState)
+    val session = remember(viewedPort, uiState, composer, capabilities, pagedTimeline, listState) {
+        ChatSurfaceSession(viewedPort, uiState, composer, capabilities, pagedTimeline, listState)
     }
     val frame = ChatSurfaceFrame(
         session = session,
@@ -182,7 +184,7 @@ fun ChatSurface(
     // letta-mobile-ckmub.3.15 (S13): the page's messages go to the window's overlay queue (its own
     // when composed without a window root); its snackbar slot draws them above the composer.
     ProvideOverlayHost { overlays ->
-        ChatSurfaceOverlays(uiState, port, overlays)
+        ChatSurfaceOverlays(uiState, viewedPort, overlays)
         // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
         CompositionLocalProvider(
             LocalComposerImageAttacher provides imageAttacher,

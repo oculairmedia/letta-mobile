@@ -64,6 +64,8 @@ import com.letta.mobile.ui.shell.shortcuts.rememberShellShortcuts
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.drop
+import com.letta.mobile.ui.components.LocalConversationLanes
+import com.letta.mobile.ui.components.LocalConversationPurposes
 
 /**
  * Shared shell workspace mounted by the desktop window, the browser and the Android activity.
@@ -100,8 +102,16 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                         LaunchedEffect(width) { host.events.onWidthChanged(width.value) }
                         val fit = workspaceFit(state.layout, width)
                         ProvideWorkspaceIdiom(fit) {
-                            WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
-                            host.slots.overlays()
+                            val purposes = remember(state.navigation.panel.conversations) {
+                                state.navigation.panel.conversations.mapNotNull { row -> row.lane?.let { row.id to it } }.toMap()
+                            }
+                            CompositionLocalProvider(
+                                LocalConversationLanes provides host.conversationLanes,
+                                LocalConversationPurposes provides purposes,
+                            ) {
+                                WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
+                                host.slots.overlays()
+                            }
                         }
                     }
                 }

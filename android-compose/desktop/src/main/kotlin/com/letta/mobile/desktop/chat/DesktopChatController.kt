@@ -1101,7 +1101,7 @@ class DesktopChatController(
         )
         _state.update { it.withRuntimeState(loadedRuntime) }
         val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
-            ?: summaries.firstOrNull()?.id
+            ?: loadedRuntime.selectedConversationId
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
 
@@ -1135,7 +1135,8 @@ class DesktopChatController(
         if (closed || gateway !== nextGateway) return false
         mergeConversationRoster(summaries)
         if (runtime.selectedConversationId == null) {
-            summaries.firstOrNull()?.let { selectRemoteConversation(it.id, _state.value.selectionGeneration) }
+            // The shared reducer chose the anchor (home first) while merging; open that one.
+            _state.value.runtimeState.selectedConversationId?.let { selectRemoteConversation(it, _state.value.selectionGeneration) }
         }
         return true
     }

@@ -1449,6 +1449,31 @@ final enum class com.letta.mobile.data.home/HomeShortcut : kotlin/Enum<com.letta
     }
 }
 
+final enum class com.letta.mobile.data.lanes/ConversationPurpose : kotlin/Enum<com.letta.mobile.data.lanes/ConversationPurpose> { // com.letta.mobile.data.lanes/ConversationPurpose|null[0]
+    enum entry HOME // com.letta.mobile.data.lanes/ConversationPurpose.HOME|null[0]
+    enum entry INBOX // com.letta.mobile.data.lanes/ConversationPurpose.INBOX|null[0]
+    enum entry UNKNOWN // com.letta.mobile.data.lanes/ConversationPurpose.UNKNOWN|null[0]
+    enum entry UNTAGGED // com.letta.mobile.data.lanes/ConversationPurpose.UNTAGGED|null[0]
+    enum entry WORK // com.letta.mobile.data.lanes/ConversationPurpose.WORK|null[0]
+
+    final val entries // com.letta.mobile.data.lanes/ConversationPurpose.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.lanes/ConversationPurpose> // com.letta.mobile.data.lanes/ConversationPurpose.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.lanes/ConversationPurpose // com.letta.mobile.data.lanes/ConversationPurpose.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.lanes/ConversationPurpose> // com.letta.mobile.data.lanes/ConversationPurpose.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.lanes/LaneActivityAvailability : kotlin/Enum<com.letta.mobile.data.lanes/LaneActivityAvailability> { // com.letta.mobile.data.lanes/LaneActivityAvailability|null[0]
+    enum entry AVAILABLE // com.letta.mobile.data.lanes/LaneActivityAvailability.AVAILABLE|null[0]
+    enum entry UNAVAILABLE // com.letta.mobile.data.lanes/LaneActivityAvailability.UNAVAILABLE|null[0]
+
+    final val entries // com.letta.mobile.data.lanes/LaneActivityAvailability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.lanes/LaneActivityAvailability> // com.letta.mobile.data.lanes/LaneActivityAvailability.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.lanes/LaneActivityAvailability // com.letta.mobile.data.lanes/LaneActivityAvailability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.lanes/LaneActivityAvailability> // com.letta.mobile.data.lanes/LaneActivityAvailability.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.lens/LensDestination : kotlin/Enum<com.letta.mobile.data.lens/LensDestination> { // com.letta.mobile.data.lens/LensDestination|null[0]
     enum entry Channels // com.letta.mobile.data.lens/LensDestination.Channels|null[0]
     enum entry Conversations // com.letta.mobile.data.lens/LensDestination.Conversations|null[0]
@@ -3907,6 +3932,10 @@ abstract fun interface com.letta.mobile.data.home/HomeMessageSearch { // com.let
     }
 }
 
+abstract fun interface com.letta.mobile.data.lanes/LaneActivitySource { // com.letta.mobile.data.lanes/LaneActivitySource|null[0]
+    abstract fun arrivals(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.lanes/LaneArrival> // com.letta.mobile.data.lanes/LaneActivitySource.arrivals|arrivals(){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.meridian/AgentToolsModes { // com.letta.mobile.data.meridian/AgentToolsModes|null[0]
     abstract fun modeFor(kotlin/String?): com.letta.mobile.data.meridian/AgentToolsMode // com.letta.mobile.data.meridian/AgentToolsModes.modeFor|modeFor(kotlin.String?){}[0]
 
@@ -5751,6 +5780,8 @@ abstract interface com.letta.mobile.data.session/SessionRepositoryGraph { // com
         abstract fun <get-vibesyncEventStreamRepository>(): com.letta.mobile.data.repository.api/IVibesyncEventStreamRepository // com.letta.mobile.data.session/SessionRepositoryGraph.vibesyncEventStreamRepository.<get-vibesyncEventStreamRepository>|<get-vibesyncEventStreamRepository>(){}[0]
     open val blockRepository // com.letta.mobile.data.session/SessionRepositoryGraph.blockRepository|{}blockRepository[0]
         open fun <get-blockRepository>(): com.letta.mobile.data.repository.api/IAgentBlockRepository? // com.letta.mobile.data.session/SessionRepositoryGraph.blockRepository.<get-blockRepository>|<get-blockRepository>(){}[0]
+    open val conversationLanes // com.letta.mobile.data.session/SessionRepositoryGraph.conversationLanes|{}conversationLanes[0]
+        open fun <get-conversationLanes>(): com.letta.mobile.data.lanes/ConversationLaneProjection? // com.letta.mobile.data.session/SessionRepositoryGraph.conversationLanes.<get-conversationLanes>|<get-conversationLanes>(){}[0]
 
     abstract fun close() // com.letta.mobile.data.session/SessionRepositoryGraph.close|close(){}[0]
 }
@@ -33434,7 +33465,7 @@ final class com.letta.mobile.data.chat.runtime/ChatConversationGroup { // com.le
 }
 
 final class com.letta.mobile.data.chat.runtime/ChatConversationSummary { // com.letta.mobile.data.chat.runtime/ChatConversationSummary|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.chat.runtime/ChatConversationSummary.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Int;kotlin.String?;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin.collections/List<kotlin/String> = ...) // com.letta.mobile.data.chat.runtime/ChatConversationSummary.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Int;kotlin.String?;kotlin.Boolean;kotlin.collections.List<kotlin.String>){}[0]
 
     final val agentId // com.letta.mobile.data.chat.runtime/ChatConversationSummary.agentId|{}agentId[0]
         final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.chat.runtime/ChatConversationSummary.agentId.<get-agentId>|<get-agentId>(){}[0]
@@ -33446,6 +33477,8 @@ final class com.letta.mobile.data.chat.runtime/ChatConversationSummary { // com.
         final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.runtime/ChatConversationSummary.id.<get-id>|<get-id>(){}[0]
     final val lastMessagePreview // com.letta.mobile.data.chat.runtime/ChatConversationSummary.lastMessagePreview|{}lastMessagePreview[0]
         final fun <get-lastMessagePreview>(): kotlin/String // com.letta.mobile.data.chat.runtime/ChatConversationSummary.lastMessagePreview.<get-lastMessagePreview>|<get-lastMessagePreview>(){}[0]
+    final val tags // com.letta.mobile.data.chat.runtime/ChatConversationSummary.tags|{}tags[0]
+        final fun <get-tags>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.runtime/ChatConversationSummary.tags.<get-tags>|<get-tags>(){}[0]
     final val title // com.letta.mobile.data.chat.runtime/ChatConversationSummary.title|{}title[0]
         final fun <get-title>(): kotlin/String // com.letta.mobile.data.chat.runtime/ChatConversationSummary.title.<get-title>|<get-title>(){}[0]
     final val unreadCount // com.letta.mobile.data.chat.runtime/ChatConversationSummary.unreadCount|{}unreadCount[0]
@@ -33461,7 +33494,8 @@ final class com.letta.mobile.data.chat.runtime/ChatConversationSummary { // com.
     final fun component6(): kotlin/Int // com.letta.mobile.data.chat.runtime/ChatConversationSummary.component6|component6(){}[0]
     final fun component7(): kotlin/String? // com.letta.mobile.data.chat.runtime/ChatConversationSummary.component7|component7(){}[0]
     final fun component8(): kotlin/Boolean // com.letta.mobile.data.chat.runtime/ChatConversationSummary.component8|component8(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean = ...): com.letta.mobile.data.chat.runtime/ChatConversationSummary // com.letta.mobile.data.chat.runtime/ChatConversationSummary.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Int;kotlin.String?;kotlin.Boolean){}[0]
+    final fun component9(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.runtime/ChatConversationSummary.component9|component9(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.chat.runtime/ChatConversationSummary // com.letta.mobile.data.chat.runtime/ChatConversationSummary.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Int;kotlin.String?;kotlin.Boolean;kotlin.collections.List<kotlin.String>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.runtime/ChatConversationSummary.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.runtime/ChatConversationSummary.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.runtime/ChatConversationSummary.toString|toString(){}[0]
@@ -38165,6 +38199,90 @@ final class com.letta.mobile.data.home/SettingsStoreHomePinStore : com.letta.mob
         final const val DEFAULT_STORAGE_KEY // com.letta.mobile.data.home/SettingsStoreHomePinStore.Companion.DEFAULT_STORAGE_KEY|{}DEFAULT_STORAGE_KEY[0]
             final fun <get-DEFAULT_STORAGE_KEY>(): kotlin/String // com.letta.mobile.data.home/SettingsStoreHomePinStore.Companion.DEFAULT_STORAGE_KEY.<get-DEFAULT_STORAGE_KEY>|<get-DEFAULT_STORAGE_KEY>(){}[0]
     }
+}
+
+final class com.letta.mobile.data.lanes/ConversationLane { // com.letta.mobile.data.lanes/ConversationLane|null[0]
+    constructor <init>(com.letta.mobile.data.lanes/ConversationPurpose, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.lanes/ConversationLane.<init>|<init>(com.letta.mobile.data.lanes.ConversationPurpose;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>){}[0]
+
+    final val beads // com.letta.mobile.data.lanes/ConversationLane.beads|{}beads[0]
+        final fun <get-beads>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.lanes/ConversationLane.beads.<get-beads>|<get-beads>(){}[0]
+    final val canTarget // com.letta.mobile.data.lanes/ConversationLane.canTarget|{}canTarget[0]
+        final fun <get-canTarget>(): kotlin/Boolean // com.letta.mobile.data.lanes/ConversationLane.canTarget.<get-canTarget>|<get-canTarget>(){}[0]
+    final val isHumanFallback // com.letta.mobile.data.lanes/ConversationLane.isHumanFallback|{}isHumanFallback[0]
+        final fun <get-isHumanFallback>(): kotlin/Boolean // com.letta.mobile.data.lanes/ConversationLane.isHumanFallback.<get-isHumanFallback>|<get-isHumanFallback>(){}[0]
+    final val purpose // com.letta.mobile.data.lanes/ConversationLane.purpose|{}purpose[0]
+        final fun <get-purpose>(): com.letta.mobile.data.lanes/ConversationPurpose // com.letta.mobile.data.lanes/ConversationLane.purpose.<get-purpose>|<get-purpose>(){}[0]
+    final val runs // com.letta.mobile.data.lanes/ConversationLane.runs|{}runs[0]
+        final fun <get-runs>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.lanes/ConversationLane.runs.<get-runs>|<get-runs>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.lanes/ConversationPurpose // com.letta.mobile.data.lanes/ConversationLane.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.lanes/ConversationLane.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.lanes/ConversationLane.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.lanes/ConversationPurpose = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.lanes/ConversationLane // com.letta.mobile.data.lanes/ConversationLane.copy|copy(com.letta.mobile.data.lanes.ConversationPurpose;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes/ConversationLane.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes/ConversationLane.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes/ConversationLane.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.lanes/ConversationLane.Companion|null[0]
+        final fun fromTags(kotlin.collections/List<kotlin/String>): com.letta.mobile.data.lanes/ConversationLane // com.letta.mobile.data.lanes/ConversationLane.Companion.fromTags|fromTags(kotlin.collections.List<kotlin.String>){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes/ConversationLaneProjection { // com.letta.mobile.data.lanes/ConversationLaneProjection|null[0]
+    constructor <init>(kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.lanes/LaneActivitySource?) // com.letta.mobile.data.lanes/ConversationLaneProjection.<init>|<init>(kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.lanes.LaneActivitySource?){}[0]
+
+    final val activity // com.letta.mobile.data.lanes/ConversationLaneProjection.activity|{}activity[0]
+        final fun <get-activity>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<kotlin/String, com.letta.mobile.data.lanes/LaneActivity>> // com.letta.mobile.data.lanes/ConversationLaneProjection.activity.<get-activity>|<get-activity>(){}[0]
+    final val available // com.letta.mobile.data.lanes/ConversationLaneProjection.available|{}available[0]
+        final fun <get-available>(): kotlin/Boolean // com.letta.mobile.data.lanes/ConversationLaneProjection.available.<get-available>|<get-available>(){}[0]
+
+    final suspend fun accept(com.letta.mobile.data.lanes/LaneArrival) // com.letta.mobile.data.lanes/ConversationLaneProjection.accept|accept(com.letta.mobile.data.lanes.LaneArrival){}[0]
+    final suspend fun displayed(kotlin/String, kotlin/String, kotlin.collections/Set<kotlin/String>) // com.letta.mobile.data.lanes/ConversationLaneProjection.displayed|displayed(kotlin.String;kotlin.String;kotlin.collections.Set<kotlin.String>){}[0]
+
+    final object Companion { // com.letta.mobile.data.lanes/ConversationLaneProjection.Companion|null[0]
+        final const val MAX_CONVERSATIONS // com.letta.mobile.data.lanes/ConversationLaneProjection.Companion.MAX_CONVERSATIONS|{}MAX_CONVERSATIONS[0]
+            final fun <get-MAX_CONVERSATIONS>(): kotlin/Int // com.letta.mobile.data.lanes/ConversationLaneProjection.Companion.MAX_CONVERSATIONS.<get-MAX_CONVERSATIONS>|<get-MAX_CONVERSATIONS>(){}[0]
+        final const val MAX_MESSAGES // com.letta.mobile.data.lanes/ConversationLaneProjection.Companion.MAX_MESSAGES|{}MAX_MESSAGES[0]
+            final fun <get-MAX_MESSAGES>(): kotlin/Int // com.letta.mobile.data.lanes/ConversationLaneProjection.Companion.MAX_MESSAGES.<get-MAX_MESSAGES>|<get-MAX_MESSAGES>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.lanes/LaneActivity { // com.letta.mobile.data.lanes/LaneActivity|null[0]
+    constructor <init>(com.letta.mobile.data.lanes/LaneActivityAvailability = ..., kotlin/Int? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.lanes/LaneActivity.<init>|<init>(com.letta.mobile.data.lanes.LaneActivityAvailability;kotlin.Int?;kotlin.Boolean){}[0]
+
+    final val availability // com.letta.mobile.data.lanes/LaneActivity.availability|{}availability[0]
+        final fun <get-availability>(): com.letta.mobile.data.lanes/LaneActivityAvailability // com.letta.mobile.data.lanes/LaneActivity.availability.<get-availability>|<get-availability>(){}[0]
+    final val incomplete // com.letta.mobile.data.lanes/LaneActivity.incomplete|{}incomplete[0]
+        final fun <get-incomplete>(): kotlin/Boolean // com.letta.mobile.data.lanes/LaneActivity.incomplete.<get-incomplete>|<get-incomplete>(){}[0]
+    final val unreadCount // com.letta.mobile.data.lanes/LaneActivity.unreadCount|{}unreadCount[0]
+        final fun <get-unreadCount>(): kotlin/Int? // com.letta.mobile.data.lanes/LaneActivity.unreadCount.<get-unreadCount>|<get-unreadCount>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.lanes/LaneActivityAvailability // com.letta.mobile.data.lanes/LaneActivity.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.data.lanes/LaneActivity.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.lanes/LaneActivity.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.lanes/LaneActivityAvailability = ..., kotlin/Int? = ..., kotlin/Boolean = ...): com.letta.mobile.data.lanes/LaneActivity // com.letta.mobile.data.lanes/LaneActivity.copy|copy(com.letta.mobile.data.lanes.LaneActivityAvailability;kotlin.Int?;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes/LaneActivity.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes/LaneActivity.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes/LaneActivity.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.lanes/LaneArrival { // com.letta.mobile.data.lanes/LaneArrival|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String) // com.letta.mobile.data.lanes/LaneArrival.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val agent // com.letta.mobile.data.lanes/LaneArrival.agent|{}agent[0]
+        final fun <get-agent>(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.agent.<get-agent>|<get-agent>(){}[0]
+    final val conversation // com.letta.mobile.data.lanes/LaneArrival.conversation|{}conversation[0]
+        final fun <get-conversation>(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.conversation.<get-conversation>|<get-conversation>(){}[0]
+    final val sourceMessageId // com.letta.mobile.data.lanes/LaneArrival.sourceMessageId|{}sourceMessageId[0]
+        final fun <get-sourceMessageId>(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.sourceMessageId.<get-sourceMessageId>|<get-sourceMessageId>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.lanes/LaneArrival // com.letta.mobile.data.lanes/LaneArrival.copy|copy(kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.lanes/LaneArrival.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.lanes/LaneArrival.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.lanes/LaneArrival.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.memory.graph/MemoryBlockDeletion { // com.letta.mobile.data.memory.graph/MemoryBlockDeletion|null[0]
@@ -57333,7 +57451,7 @@ final class com.letta.mobile.data.session.graph/SessionAdminRepositories { // co
 }
 
 final class com.letta.mobile.data.session.graph/SessionGraphIdentity { // com.letta.mobile.data.session.graph/SessionGraphIdentity|null[0]
-    constructor <init>(kotlin/Long, com.letta.mobile.runtime/BackendDescriptor, com.letta.mobile.data.transport.api/IChannelTransport, com.letta.mobile.data.backend/SessionCapabilities) // com.letta.mobile.data.session.graph/SessionGraphIdentity.<init>|<init>(kotlin.Long;com.letta.mobile.runtime.BackendDescriptor;com.letta.mobile.data.transport.api.IChannelTransport;com.letta.mobile.data.backend.SessionCapabilities){}[0]
+    constructor <init>(kotlin/Long, com.letta.mobile.runtime/BackendDescriptor, com.letta.mobile.data.transport.api/IChannelTransport, com.letta.mobile.data.backend/SessionCapabilities, com.letta.mobile.data.lanes/LaneActivitySource? = ...) // com.letta.mobile.data.session.graph/SessionGraphIdentity.<init>|<init>(kotlin.Long;com.letta.mobile.runtime.BackendDescriptor;com.letta.mobile.data.transport.api.IChannelTransport;com.letta.mobile.data.backend.SessionCapabilities;com.letta.mobile.data.lanes.LaneActivitySource?){}[0]
 
     final val backendDescriptor // com.letta.mobile.data.session.graph/SessionGraphIdentity.backendDescriptor|{}backendDescriptor[0]
         final fun <get-backendDescriptor>(): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.session.graph/SessionGraphIdentity.backendDescriptor.<get-backendDescriptor>|<get-backendDescriptor>(){}[0]
@@ -57343,6 +57461,8 @@ final class com.letta.mobile.data.session.graph/SessionGraphIdentity { // com.le
         final fun <get-channelTransport>(): com.letta.mobile.data.transport.api/IChannelTransport // com.letta.mobile.data.session.graph/SessionGraphIdentity.channelTransport.<get-channelTransport>|<get-channelTransport>(){}[0]
     final val id // com.letta.mobile.data.session.graph/SessionGraphIdentity.id|{}id[0]
         final fun <get-id>(): kotlin/Long // com.letta.mobile.data.session.graph/SessionGraphIdentity.id.<get-id>|<get-id>(){}[0]
+    final val laneActivitySource // com.letta.mobile.data.session.graph/SessionGraphIdentity.laneActivitySource|{}laneActivitySource[0]
+        final fun <get-laneActivitySource>(): com.letta.mobile.data.lanes/LaneActivitySource? // com.letta.mobile.data.session.graph/SessionGraphIdentity.laneActivitySource.<get-laneActivitySource>|<get-laneActivitySource>(){}[0]
 }
 
 final class com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph : com.letta.mobile.data.session/SessionRepositoryGraph { // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph|null[0]
@@ -57362,6 +57482,8 @@ final class com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph : c
         final fun <get-contextBreakdown>(): com.letta.mobile.data.context/ContextBreakdownLoader // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.contextBreakdown.<get-contextBreakdown>|<get-contextBreakdown>(){}[0]
     final val contextTokenReadings // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.contextTokenReadings|{}contextTokenReadings[0]
         final fun <get-contextTokenReadings>(): com.letta.mobile.data.context/ContextTokenReadings // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.contextTokenReadings.<get-contextTokenReadings>|<get-contextTokenReadings>(){}[0]
+    final val conversationLanes // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.conversationLanes|{}conversationLanes[0]
+        final fun <get-conversationLanes>(): com.letta.mobile.data.lanes/ConversationLaneProjection // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.conversationLanes.<get-conversationLanes>|<get-conversationLanes>(){}[0]
     final val conversationRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.conversationRepository|{}conversationRepository[0]
         final fun <get-conversationRepository>(): com.letta.mobile.data.repository.api/IConversationRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.conversationRepository.<get-conversationRepository>|<get-conversationRepository>(){}[0]
     final val cronRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.cronRepository|{}cronRepository[0]
@@ -57683,19 +57805,24 @@ final class com.letta.mobile.data.shell/SessionShellChatPort : com.letta.mobile.
 }
 
 final class com.letta.mobile.data.shell/ShellConversationRef { // com.letta.mobile.data.shell/ShellConversationRef|null[0]
-    constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId?, kotlin/String) // com.letta.mobile.data.shell/ShellConversationRef.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId?;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId?, kotlin/String, kotlin.collections/List<kotlin/String> = ...) // com.letta.mobile.data.shell/ShellConversationRef.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId?;kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
 
     final val agent // com.letta.mobile.data.shell/ShellConversationRef.agent|{}agent[0]
         final fun <get-agent>(): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell/ShellConversationRef.agent.<get-agent>|<get-agent>(){}[0]
     final val id // com.letta.mobile.data.shell/ShellConversationRef.id|{}id[0]
         final fun <get-id>(): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.shell/ShellConversationRef.id.<get-id>|<get-id>(){}[0]
+    final val lane // com.letta.mobile.data.shell/ShellConversationRef.lane|{}lane[0]
+        final fun <get-lane>(): com.letta.mobile.data.lanes/ConversationLane // com.letta.mobile.data.shell/ShellConversationRef.lane.<get-lane>|<get-lane>(){}[0]
+    final val tags // com.letta.mobile.data.shell/ShellConversationRef.tags|{}tags[0]
+        final fun <get-tags>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.shell/ShellConversationRef.tags.<get-tags>|<get-tags>(){}[0]
     final val updatedAtLabel // com.letta.mobile.data.shell/ShellConversationRef.updatedAtLabel|{}updatedAtLabel[0]
         final fun <get-updatedAtLabel>(): kotlin/String // com.letta.mobile.data.shell/ShellConversationRef.updatedAtLabel.<get-updatedAtLabel>|<get-updatedAtLabel>(){}[0]
 
     final fun component1(): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.shell/ShellConversationRef.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell/ShellConversationRef.component2|component2(){}[0]
     final fun component3(): kotlin/String // com.letta.mobile.data.shell/ShellConversationRef.component3|component3(){}[0]
-    final fun copy(com.letta.mobile.data.model/ConversationId = ..., com.letta.mobile.data.model/AgentId? = ..., kotlin/String = ...): com.letta.mobile.data.shell/ShellConversationRef // com.letta.mobile.data.shell/ShellConversationRef.copy|copy(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId?;kotlin.String){}[0]
+    final fun component4(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.shell/ShellConversationRef.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.model/ConversationId = ..., com.letta.mobile.data.model/AgentId? = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.shell/ShellConversationRef // com.letta.mobile.data.shell/ShellConversationRef.copy|copy(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId?;kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell/ShellConversationRef.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell/ShellConversationRef.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.shell/ShellConversationRef.toString|toString(){}[0]

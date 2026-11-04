@@ -10,6 +10,8 @@ import com.letta.mobile.data.home.conversationRecency
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.lanes.ConversationLane
+import com.letta.mobile.data.lanes.ConversationPurpose
 
 /**
  *  (W3): what the shell shows, in one holder every client binds - the page,
@@ -179,9 +181,13 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
      */
     fun resolveAgentChat(agent: AgentId, conversations: List<ShellConversationRef>): ConversationId? {
         val own = conversations.filter { it.agent == agent }
+        val home = own.firstOrNull { it.lane.purpose == ConversationPurpose.HOME }
+        if (home != null) return home.id
         val unverified = partialConversationAuthority?.let { agent !in it } == true
         val lastActive = lastActiveByAgent[agent]?.takeIf { id -> unverified || own.any { it.id == id } }
-        return lastActive ?: own.maxByOrNull { conversationRecency(it.updatedAtLabel) }?.id
+        return lastActive?.takeIf { id -> own.none { it.id == id && !it.lane.canTarget } }
+            ?: own.filter { it.lane.canTarget && it.lane.purpose != ConversationPurpose.INBOX }
+                .maxByOrNull { conversationRecency(it.updatedAtLabel) }?.id
     }
 
     /**
@@ -224,7 +230,11 @@ data class ShellConversationRef(
     val agent: AgentId?,
     /** ISO-8601 update time, or a sentinel label ("Queued") for local rows. */
     val updatedAtLabel: String,
-)
+    val tags: List<String> = emptyList(),
+) {
+    val lane: ConversationLane
+        get() = ConversationLane.fromTags(tags)
+}
 
 /** The chat and a board are the same page; the board is a panel of it. */
 private val ShellDestination.isChatPage: Boolean

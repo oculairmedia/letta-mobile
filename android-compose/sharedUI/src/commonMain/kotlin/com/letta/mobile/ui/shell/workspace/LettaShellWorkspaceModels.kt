@@ -16,6 +16,7 @@ import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
+import com.letta.mobile.data.lanes.ConversationLaneProjection
 
 object LettaShellWorkspaceTags {
     const val WORKSPACE = "shell-workspace"
@@ -103,6 +104,7 @@ class LettaShellWorkspaceHost(
     /** The compact drawer's state; the host owns it so its own chrome can open the drawer. */
     val drawer: ShellWorkspaceDrawer,
     val events: ShellWorkspaceEvents,
+    val conversationLanes: ConversationLaneProjection? = null,
 )
 
 /** The window events the workspace reports. */

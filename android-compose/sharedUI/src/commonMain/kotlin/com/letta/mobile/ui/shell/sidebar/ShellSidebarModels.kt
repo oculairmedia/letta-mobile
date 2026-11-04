@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.lanes.ConversationLane
 
 /** The agent panel's Active / Archived / All scope; it applies to conversations and canvases alike. */
 enum class ShellArchiveFilter(val label: String) {
@@ -52,6 +53,8 @@ data class ShellConversationRowModel(
     val marker: String? = null,
     /**  (G37): the title of the conversation this one was forked from; its preview line says so. */
     val forkedFrom: String? = null,
+    val unreadCount: Int = 0,
+    val lane: ConversationLane? = null,
 ) {
     /** The line under the title: where a fork came from, else the latest message. */
     val subtitle: String get() = forkedFrom?.let { "Forked from $it" } ?: preview

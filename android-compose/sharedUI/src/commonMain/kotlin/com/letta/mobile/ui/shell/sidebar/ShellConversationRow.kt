@@ -53,6 +53,11 @@ import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import androidx.compose.runtime.collectAsState
+import com.letta.mobile.data.lanes.ConversationLane
+import com.letta.mobile.data.lanes.ConversationPurpose
+import com.letta.mobile.data.lanes.LaneActivity
+import com.letta.mobile.ui.components.LocalConversationLanes
 
 /** What a conversation row can do besides open (the roster's selection opens it); a null rename or pin is one the host does not offer. */
 data class ShellConversationRowActions(
@@ -115,13 +120,18 @@ fun ShellConversationRow(
     row: RosterRowState,
     ui: ShellConversationListUi,
 ) {
+    val lanes = LocalConversationLanes.current
+    val laneState = lanes?.activity?.collectAsState()?.value?.get(model.id)
+    val laneActivity = laneActivityLabel(model, laneState, lanes?.available == true)
+    val laneLabel = laneDescription(model.lane)
+    val subtitle = listOf(laneLabel, model.subtitle).filter(String::isNotBlank).joinToString(" · ")
     Box {
         LocalLettaHost.current.tooltip(model.title) {
             RosterListRow(
                 spec = LettaListRowSpec(
                     title = model.marker?.let { "$it ${model.title}" } ?: model.title,
                     selected = model.selected,
-                    subtitle = model.subtitle.takeIf { it.isNotBlank() && it != model.title },
+                    subtitle = subtitle.takeIf { it.isNotBlank() && it != model.title },
                     emphasized = model.selected,
                     quiet = model.deleting || model.settled,
                     enabled = !model.deleting,
@@ -129,7 +139,7 @@ fun ShellConversationRow(
                 row = row,
                 slots = RosterRowSlots(
                     leading = { ConversationLeadingIcon(model = model, hovered = row.hovered, onArchiveToggle = actions.onArchiveToggle) },
-                    end = { ConversationRowEnd(model) },
+                    end = { ConversationRowEnd(model, laneActivity) },
                 ),
             )
         }
@@ -214,10 +224,13 @@ private fun ShellMarkerPicker(model: ShellConversationRowModel, marks: ShellConv
 
 /** The settled and pinned marks, then the time (or "Deleting…"). */
 @Composable
-private fun ConversationRowEnd(model: ShellConversationRowModel) {
+private fun ConversationRowEnd(model: ShellConversationRowModel, activity: String?) {
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
         if (model.settled) RowMarkIcon(Icons.Outlined.TaskAlt, "Settled", ShellConversationTags.SETTLED)
         if (model.pinned) RowMarkIcon(Icons.Outlined.PushPin, "Pinned", ShellConversationTags.PINNED)
+        activity?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+        }
         Text(
             text = if (model.deleting) "Deleting…" else model.timeLabel,
             style = MaterialTheme.typography.labelSmall,
@@ -322,3 +335,25 @@ fun ShellCanvasRow(model: ShellCanvasRowModel, row: RosterRowState, onArchiveTog
 private val PIN_ICON_SIZE = 12.dp
 private const val PULSE_MIN_ALPHA = 0.4f
 private const val PULSE_MS = 700
+
+/** Purpose and bead references decorate the existing row; references grant no access. */
+private fun laneDescription(lane: ConversationLane?): String {
+    val purpose = when (lane?.purpose) {
+        ConversationPurpose.HOME -> "Home"
+        ConversationPurpose.INBOX -> "Inbox"
+        ConversationPurpose.WORK -> "Work · View only"
+        ConversationPurpose.UNKNOWN -> "Unknown lane"
+        ConversationPurpose.UNTAGGED, null -> ""
+    }
+    return (listOf(purpose) + lane?.beads.orEmpty()).filter(String::isNotBlank).joinToString(" · ")
+}
+
+/** A live count when a producer is bound; the row's own count otherwise; unknown, never zero, for an unbound inbox. */
+private fun laneActivityLabel(model: ShellConversationRowModel, activity: LaneActivity?, producerBound: Boolean): String? {
+    val unread = activity?.unreadCount ?: model.unreadCount
+    return when {
+        unread > 0 -> "$unread${if (activity?.incomplete == true) "+" else ""} unread"
+        model.lane?.purpose == ConversationPurpose.INBOX && !producerBound -> "Unread unavailable"
+        else -> null
+    }
+}

@@ -54,7 +54,7 @@ class AndroidShellChatPort(
     val draft = mutableStateOf<String?>(null)
 
     override fun conversations(): List<ShellConversationRef> = fleet().map {
-        ShellConversationRef(it.id, it.agentId, it.lastMessageAt ?: it.updatedAt ?: it.createdAt.orEmpty())
+        ShellConversationRef(it.id, it.agentId, it.lastMessageAt ?: it.updatedAt ?: it.createdAt.orEmpty(), tags = it.tags)
     }
 
     override val selectedConversation: ConversationId? get() = workspace.selectedConversationId

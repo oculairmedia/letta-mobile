@@ -100,8 +100,8 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                         desktopWorkspaceActions(context, currentFrame, deleteBehaviorState, fontScaleSetter),
                         desktopWorkspaceSlots(context, currentFrame),
                         ShellWindowChrome.Hoisted { hoistedHeader.value(it) },
-                        drawer,
-                        ShellWorkspaceEvents(onWindowWidthChanged, shortcuts),
+                        drawer, ShellWorkspaceEvents(onWindowWidthChanged, shortcuts),
+                        conversationLanes = context.core.sessionGraph.value.conversationLanes,
                     )
                 },
             )

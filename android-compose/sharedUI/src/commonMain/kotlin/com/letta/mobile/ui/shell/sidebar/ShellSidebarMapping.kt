@@ -10,6 +10,7 @@ import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Instant
+import com.letta.mobile.data.lanes.ConversationLane
 
 /** Which conversations a host marks: the open one, the one whose agent is working, those being deleted. */
 data class ShellConversationMarks(
@@ -100,6 +101,8 @@ object ShellSidebarMapping {
                 thinking = conversation.id == marks.thinkingId,
                 deleting = conversation.id in marks.deletingIds,
                 archived = conversation.archived,
+                unreadCount = conversation.unreadCount,
+                lane = ConversationLane.fromTags(conversation.tags),
                 pinned = conversation.id in marks.pinnedIds,
                 settled = conversation.id in marks.settledIds,
                 marker = marks.markers[conversation.id],

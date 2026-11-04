@@ -25,6 +25,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.letta.mobile.data.lanes.ConversationLaneProjection
 
 /**
  * KMP-safe session graph surface for chat, timeline, and runtime wiring.
@@ -38,6 +39,8 @@ import kotlinx.coroutines.flow.StateFlow
  * so Android and Desktop share rebuild / switch semantics.
  */
 interface SessionRepositoryGraph {
+    /** Session-owned activity/read state, independent of the view displaying it. */
+    val conversationLanes: ConversationLaneProjection? get() = null
     val id: Long
     val backendDescriptor: BackendDescriptor
     val agentRepository: IAgentRepository
