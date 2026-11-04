@@ -1,0 +1,34 @@
+{
+  "method": "reflection.set",
+  "version": 2,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ReflectionAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "legacy-update-preserves-v2",
+      "context": {"authenticated": true, "authorized_agent_ids": ["agent-1"], "authorized_conversation_ids": ["conversation-1"]},
+      "host_state": {
+        "controller_state": "connected",
+        "reflection_settings": {
+          "trigger": "compaction-event", "step_count": 25, "merge": "auto", "merge_instructions": "",
+          "model": "anthropic/claude-sonnet-4-5", "focus_instructions": "Prefer durable project lessons.",
+          "last_outcome": {"status": "completed", "model": "anthropic/claude-sonnet-4-5", "at": "2026-10-31T14:30:00Z"}
+        }
+      },
+      "params": {
+        "agent_id": "agent-1", "conversation_id": "conversation-1",
+        "trigger": "step-count", "step_count": "40", "scope": "global"
+      },
+      "expected_response": {
+        "type": "admin_rpc_response", "request_id": "contract", "success": true,
+        "result": {
+          "reflection_settings": {
+            "trigger": "step-count", "step_count": 40, "merge": "auto", "merge_instructions": "",
+            "model": "anthropic/claude-sonnet-4-5", "focus_instructions": "Prefer durable project lessons.",
+            "last_outcome": {"status": "completed", "model": "anthropic/claude-sonnet-4-5", "at": "2026-10-31T14:30:00Z"}
+          },
+          "scope": "global"
+        }
+      }
+    }
+  ]
+}

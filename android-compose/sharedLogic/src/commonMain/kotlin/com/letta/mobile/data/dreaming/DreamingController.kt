@@ -1,6 +1,7 @@
 package com.letta.mobile.data.dreaming
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,8 @@ class DreamingController(
     private val history: DreamHistorySource?,
     private val scope: CoroutineScope,
     private val activity: (AgentId) -> Flow<List<SubagentEntry>> = { emptyFlow() },
+    override val models: StateFlow<List<LlmModel>> = MutableStateFlow(emptyList()),
+    private val reloadModelsAction: suspend () -> Unit = {},
 ) : DreamingActions, AutoCloseable {
     private val stateFlow = MutableStateFlow(DreamingState())
     val state: StateFlow<DreamingState> = stateFlow.asStateFlow()
@@ -51,6 +54,8 @@ class DreamingController(
         follow(target)
     }
 
+    override suspend fun reloadModels() = reloadModelsAction()
+
     /** Re-reads the settings and the dream log of the focused agent. */
     override fun refresh() {
         val target = stateFlow.value.target ?: return
@@ -61,10 +66,23 @@ class DreamingController(
     override fun save(change: DreamSettingsChange) {
         val target = stateFlow.value.target ?: return
         val previous = stateFlow.value.settings.settings
-        updateSettings { it.copy(settings = change.settings, saving = true, error = null) }
+        jobs.remove(Slot.Settings)?.cancel()
+        updateSettings { it.copy(settings = change.settings, saving = true, loading = false, error = null) }
         launch(Slot.Save, target) {
-            val outcome = repository.save(target, change)
-            applyIfCurrent(target) { state -> state.copy(settings = state.settings.afterSave(outcome, previous)) }
+            val outcome = repository.saveWithFreshSettings(target, change)
+            val cancelledLoad = if (stateFlow.value.target == target) {
+                jobs.remove(Slot.Settings)?.let { it.cancel(); true } == true
+            } else {
+                false
+            }
+            applyIfCurrent(target) { state ->
+                state.copy(settings = state.settings.afterSave(outcome, previous).copy(loading = false))
+            }
+            if (cancelledLoad) {
+                if (outcome is DreamOutcome.Failed) {
+                    if (stateFlow.value.target == target) loadSettings(target, preserveError = true)
+                }
+            }
         }
     }
 
@@ -101,11 +119,15 @@ class DreamingController(
         jobs.clear()
     }
 
-    private fun loadSettings(target: DreamTarget) {
-        updateSettings { it.copy(loading = true, error = null) }
+    private fun loadSettings(target: DreamTarget, preserveError: Boolean = false) {
+        updateSettings { it.copy(loading = true, error = if (preserveError) it.error else null) }
         launch(Slot.Settings, target) {
             val outcome = repository.settings(target)
-            applyIfCurrent(target) { state -> state.copy(settings = state.settings.afterLoad(outcome)) }
+            applyIfCurrent(target) { state ->
+                val loaded = state.settings.afterLoad(outcome)
+                val errors = listOfNotNull(state.settings.error, loaded.error).distinct().joinToString("\n")
+                state.copy(settings = if (preserveError) loaded.copy(error = errors.ifEmpty { null }) else loaded)
+            }
         }
     }
 
@@ -127,7 +149,10 @@ class DreamingController(
             activity(target.agentId).map(DreamActivity::of).distinctUntilChanged().collect { live ->
                 val ended = stateFlow.value.dreamingNow && live.isEmpty()
                 applyIfCurrent(target) { it.copy(live = live) }
-                if (ended) loadHistory(target)
+                if (ended) {
+                    loadHistory(target)
+                    loadSettings(target)
+                }
             }
         }
     }
@@ -148,6 +173,25 @@ class DreamingController(
     private companion object {
         const val HISTORY_FAILED = "Couldn't read the memory history"
         const val DIFF_FAILED = "Couldn't read this dream's changes"
+    }
+}
+
+private suspend fun DreamingRepository.saveWithFreshSettings(
+    target: DreamTarget,
+    change: DreamSettingsChange,
+): DreamOutcome<DreamSettings> {
+    if (!change.modelChanged && !change.focusInstructionsChanged) return save(target, change)
+    return when (val fresh = settings(target)) {
+        is DreamOutcome.Done -> save(target, change.copy(settings = fresh.value.copy(
+            model = if (change.modelChanged) change.settings.model else fresh.value.model,
+            focusInstructions = if (change.focusInstructionsChanged) {
+                change.settings.focusInstructions
+            } else {
+                fresh.value.focusInstructions
+            },
+        )))
+        is DreamOutcome.Failed -> fresh
+        is DreamOutcome.Unsupported -> fresh
     }
 }
 

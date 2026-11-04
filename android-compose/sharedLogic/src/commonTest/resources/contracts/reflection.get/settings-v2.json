@@ -1,0 +1,47 @@
+{
+  "method": "reflection.get",
+  "version": 2,
+  "handler": "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ReflectionAdminHandlers.kt",
+  "cases": [
+    {
+      "name": "patched-host",
+      "context": {"authenticated": true, "authorized_agent_ids": ["agent-1"], "authorized_conversation_ids": ["conversation-1"]},
+      "host_state": {
+        "controller_state": "connected",
+        "reflection_settings": {
+          "trigger": "compaction-event", "step_count": 25, "merge": "auto", "merge_instructions": "",
+          "model": null, "focus_instructions": "Prefer durable project lessons.",
+          "last_outcome": {
+            "status": "skipped", "reason": "no_new_messages", "trigger_source": "compaction-event",
+            "model": "openai/gpt-5", "at": "2026-10-31T14:30:00Z"
+          }
+        }
+      },
+      "params": {"agent_id": "agent-1", "conversation_id": "conversation-1"},
+      "expected_response": {
+        "type": "admin_rpc_response", "request_id": "contract", "success": true,
+        "result": {"reflection_settings": {
+          "trigger": "compaction-event", "step_count": 25, "merge": "auto", "merge_instructions": "",
+          "model": null, "focus_instructions": "Prefer durable project lessons.",
+          "last_outcome": {
+            "status": "skipped", "reason": "no_new_messages", "trigger_source": "compaction-event",
+            "model": "openai/gpt-5", "at": "2026-10-31T14:30:00Z"
+          }
+        }}
+      }
+    },
+    {
+      "name": "legacy-host",
+      "context": {"authenticated": true},
+      "host_state": {
+        "controller_state": "connected",
+        "reflection_settings": {"trigger": "step-count", "step_count": 10, "merge": "explicit", "merge_instructions": "Check facts."}
+      },
+      "params": {"agent_id": "agent-2"},
+      "expected_response": {
+        "type": "admin_rpc_response", "request_id": "contract", "success": true,
+        "result": {"reflection_settings": {"trigger": "step-count", "step_count": 10, "merge": "explicit", "merge_instructions": "Check facts."}}
+      }
+    }
+  ]
+}

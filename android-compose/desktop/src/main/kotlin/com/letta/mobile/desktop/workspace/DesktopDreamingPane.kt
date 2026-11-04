@@ -29,6 +29,7 @@ import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
 import com.letta.mobile.desktop.runtime.windowsBlocksAutoReflection
 import com.letta.mobile.ui.dreaming.DreamingHostNotes
 import com.letta.mobile.ui.dreaming.DreamingPanelHost
+import com.letta.mobile.ui.chat.session.ConversationModels
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -38,14 +39,16 @@ import kotlinx.coroutines.flow.emptyFlow
  * or an App Server URL); the dream log from the same MemFS route as the memory browser; live runs
  * from the subagent registry; and the Windows automatic-dream switch of the bundled runtime.
  */
-/** The desktop session pieces the Dreaming view reads: the settings store and the subagent registry. */
-internal class DesktopDreamingDeps(val store: SecureSettingsStore, val subagents: ISubagentRepository?)
+/** The desktop session pieces the Dreaming view reads: settings, subagents and the model catalog. */
+internal class DesktopDreamingDeps(
+    val store: SecureSettingsStore, val subagents: ISubagentRepository?, val models: ConversationModels,
+)
 
 @Composable
 internal fun DesktopDreamingPane(agentId: String, scope: CoroutineScope, deps: DesktopDreamingDeps, modifier: Modifier = Modifier) {
     val subagents = deps.subagents
     val store = deps.store
-    val controller = remember(agentId, scope, subagents) {
+    val controller = remember(agentId, scope, subagents, deps.models.available) {
         val sources = DesktopWorkspaceSources()
         DreamingController(
             repository = desktopDreamingRepository(),
@@ -54,6 +57,8 @@ internal fun DesktopDreamingPane(agentId: String, scope: CoroutineScope, deps: D
             activity = { id ->
                 subagents?.activeSubagentsFlow(SubagentParentScope(id.value, ConversationCompactRpc.DEFAULT_CONVERSATION)) ?: emptyFlow()
             },
+            models = deps.models.available,
+            reloadModelsAction = deps.models::reload,
         )
     }
     DisposableEffect(controller) { onDispose { controller.close() } }

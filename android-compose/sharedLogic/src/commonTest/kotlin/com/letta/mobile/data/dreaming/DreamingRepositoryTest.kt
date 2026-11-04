@@ -2,6 +2,7 @@ package com.letta.mobile.data.dreaming
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ModelControlException
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -11,6 +12,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
@@ -58,6 +60,25 @@ class DreamingRepositoryTest {
         assertEquals("off", sent.settings.getValue("trigger").jsonPrimitive.content)
         assertEquals(7, sent.settings.getValue("step_count").jsonPrimitive.int)
         assertEquals("auto", sent.settings.getValue("merge").jsonPrimitive.content)
+    }
+
+    @Test
+    fun appServerSendsOnlyReflectionV2FieldsThatChanged() = runTest {
+        val client = FakeClient(settings = stored)
+        val settings = DreamSettings(
+            trigger = DreamTrigger.StepCount,
+            model = ReflectionModelChoice.Handle("anthropic/sonnet"),
+            focusInstructions = "Keep durable facts",
+        )
+        val change = DreamSettingsChange(settings, modelChanged = true)
+        AppServerDreamingRepository(client = { client }).save(onConversation, change)
+        val sent = client.sets.single().settings
+        assertEquals("anthropic/sonnet", sent.getValue(DreamSettings.MODEL).jsonPrimitive.content)
+        assertNull(sent[DreamSettings.FOCUS_INSTRUCTIONS])
+
+        val clear = DreamSettingsChange(settings.copy(model = ReflectionModelChoice.Inherit), modelChanged = true)
+        AppServerDreamingRepository(client = { client }).save(onConversation, clear)
+        assertEquals(JsonNull, client.sets.last().settings[DreamSettings.MODEL])
     }
 
     @Test
@@ -119,6 +140,24 @@ class DreamingRepositoryTest {
         assertEquals(10, params.getValue("step_count").jsonPrimitive.int)
         assertEquals("explicit", params.getValue("merge").jsonPrimitive.content)
         assertNull(params["scope"])
+    }
+
+    @Test
+    fun irohSendsChangedFocusWithoutResendingAnUnchangedModel() = runTest {
+        var sent: JsonObject? = null
+        val repository = AdminRpcDreamingRepository(
+            AdminRpcInvoker { _, params ->
+                sent = params
+                buildJsonObject { put("reflection_settings", stored) }
+            },
+        )
+        val settings = DreamSettings(
+            model = ReflectionModelChoice.Handle("anthropic/sonnet"),
+            focusInstructions = "Project conventions",
+        )
+        repository.save(onDefault, DreamSettingsChange(settings, focusInstructionsChanged = true))
+        assertEquals("Project conventions", sent?.get(DreamSettings.FOCUS_INSTRUCTIONS)?.jsonPrimitive?.content)
+        assertNull(sent?.get(DreamSettings.MODEL))
     }
 
     @Test
