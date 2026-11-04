@@ -147,7 +147,6 @@ class AdminRpcP1HandlersTest {
         router.dispatchResult("project.get", params("identifier" to "vibesync"))
         router.dispatchResult("project.beadsRemoteStatus", params("identifier" to "vibesync"))
         router.dispatchResult("project.provisionBeadsRemote", params("identifier" to "vibesync", "push" to "true"))
-        router.dispatchResult("project.triggerSync", params("projectId" to "vibesync"))
         router.dispatchResult("project.create", params("filesystem_path" to "/opt/stacks/new"))
         router.dispatchResult("project.update", params("identifier" to "vibesync", "git_url" to "https://github.com/o/r.git"))
         router.dispatchResult("project.archive", params("identifier" to "vibesync", "status" to "archived"))
@@ -159,7 +158,6 @@ class AdminRpcP1HandlersTest {
                 ProxyCall("GET", "http://admin.test/api/projects/vibesync", null),
                 ProxyCall("GET", "http://admin.test/api/projects/vibesync/beads-remote", null),
                 ProxyCall("POST", "http://admin.test/api/projects/vibesync/beads-remote/provision", "{\"push\":\"true\"}"),
-                ProxyCall("POST", "http://admin.test/api/sync/trigger", "{\"projectId\":\"vibesync\"}"),
                 ProxyCall("POST", "http://admin.test/api/registry/projects", "{\"filesystem_path\":\"/opt/stacks/new\"}"),
                 ProxyCall("PATCH", "http://admin.test/api/registry/projects/vibesync", "{\"git_url\":\"https://github.com/o/r.git\"}"),
                 ProxyCall("PATCH", "http://admin.test/api/registry/projects/vibesync", "{\"status\":\"archived\"}"),

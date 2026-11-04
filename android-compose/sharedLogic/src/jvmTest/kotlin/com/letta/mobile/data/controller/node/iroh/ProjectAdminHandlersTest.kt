@@ -66,10 +66,12 @@ class ProjectAdminHandlersTest {
     }
 
     @Test
-    fun allNineProjectMethodsAreRegistered() {
-        assertEquals(9, ProjectAdminHandlers.PROJECT_METHODS.size)
+    fun allEightProjectMethodsAreRegistered() {
+        assertEquals(8, ProjectAdminHandlers.PROJECT_METHODS.size)
         val r = router("http://127.0.0.1:3099")
         assertTrue(ProjectAdminHandlers.PROJECT_METHODS.all { it in r.registeredMethods })
+        assertFalse("project.triggerSync" in r.registeredMethods)
+        assertFalse("project.triggerSync" in router(null).registeredMethods)
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectSummary
-import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import kotlinx.coroutines.flow.StateFlow
 
 interface IProjectRepository {
@@ -14,7 +13,6 @@ interface IProjectRepository {
     suspend fun getProject(identifier: String): ProjectSummary
     suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus
     suspend fun provisionBeadsRemote(identifier: String, push: Boolean = true): BeadsRemoteProvisionResponse
-    suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse
     suspend fun createProject(
         name: String?,
         filesystemPath: String,

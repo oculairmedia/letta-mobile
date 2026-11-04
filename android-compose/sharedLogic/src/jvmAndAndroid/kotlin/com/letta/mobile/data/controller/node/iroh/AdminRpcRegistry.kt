@@ -79,7 +79,6 @@ object AdminRpcRegistry {
         "project.get",
         "project.beadsRemoteStatus",
         "project.provisionBeadsRemote",
-        "project.triggerSync",
         "project.create",
         "project.update",
         "project.archive",

@@ -8584,21 +8584,19 @@ public final class com/letta/mobile/ui/shell/pages/projects/ProjectChatIntent : 
 public final class com/letta/mobile/ui/shell/pages/projects/ProjectDetailActions {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function1;
 	public final fun component2 ()Lkotlin/jvm/functions/Function1;
 	public final fun component3 ()Lkotlin/jvm/functions/Function1;
 	public final fun component4 ()Lkotlin/jvm/functions/Function1;
-	public final fun component5 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/shell/pages/projects/ProjectDetailActions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/pages/projects/ProjectDetailActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/pages/projects/ProjectDetailActions;
+	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/shell/pages/projects/ProjectDetailActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/pages/projects/ProjectDetailActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/pages/projects/ProjectDetailActions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getOnArchive ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnDelete ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnProvisionBeads ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnStartEdit ()Lkotlin/jvm/functions/Function1;
-	public final fun getOnSync ()Lkotlin/jvm/functions/Function1;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -8618,7 +8616,6 @@ public final class com/letta/mobile/ui/shell/pages/projects/ProjectDetailKeys {
 	public static final field PIN Ljava/lang/String;
 	public static final field PROVISION Ljava/lang/String;
 	public static final field SAVE Ljava/lang/String;
-	public static final field SYNC Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/shell/pages/projects/ProjectEditorActions {

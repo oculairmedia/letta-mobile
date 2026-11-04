@@ -23,7 +23,6 @@ enum class ProjectFailure(val fallback: String) {
     Load("Failed to load projects"),
     Create("Failed to create project"),
     Update("Failed to update project settings"),
-    Sync("Failed to trigger sync"),
     Provision("Failed to provision Beads remote"),
     Archive("Failed to archive project"),
     Delete("Failed to delete project"),
@@ -43,7 +42,7 @@ fun interface ProjectFailureWords {
 
 /**
  *  (hard cut S17): the projects catalog shared by every host, over an Iroh
- * host's `project.*` relay - list, search, pin, sync, Beads remote, archive, delete, and the
+ * host's `project.*` relay - list, search, pin, Beads remote, archive, delete, and the
  * create / edit form ([editor]). Project work items (issues) have no App Server route and are not
  * offered.
  */
@@ -85,16 +84,6 @@ class ProjectsPageController(
         val pin = if (key in stateFlow.value.pinned) ProjectPin.Unpinned else ProjectPin.Pinned
         stateFlow.update { it.copy(pinned = if (pin == ProjectPin.Pinned) it.pinned + key else it.pinned - key) }
         scope.launch { sources.pins.set(key, pin) }
-    }
-
-    fun sync(key: ProjectKey) {
-        stateFlow.update { it.copy(syncing = key) }
-        scope.launch {
-            val outcome = runCatchingCancellable { backend.sync(key) }
-            val notice = outcome.fold({ it.message ?: SYNC_TRIGGERED }, { words.describe(it, ProjectFailure.Sync) })
-            stateFlow.update { it.copy(syncing = null, notice = notice) }
-            if (outcome.isSuccess) load(ProjectReload.Force)
-        }
     }
 
     fun provisionBeadsRemote(key: ProjectKey) {
@@ -147,9 +136,6 @@ class ProjectsPageController(
         else -> copy(projects = fresh.ifEmpty { projects }, loading = false, notice = failure)
     }
 
-    private companion object {
-        const val SYNC_TRIGGERED = "Sync triggered"
-    }
 }
 
 /** What the form controller shares with the page controller. */

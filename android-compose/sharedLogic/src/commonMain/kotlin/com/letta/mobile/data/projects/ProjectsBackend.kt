@@ -3,7 +3,6 @@ package com.letta.mobile.data.projects
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectSummary
-import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -40,7 +39,6 @@ interface ProjectsBackend {
 
     suspend fun provisionBeads(key: ProjectKey): BeadsRemoteProvisionResponse
 
-    suspend fun sync(key: ProjectKey): ProjectSyncTriggerResponse
 
     /** Creates a project from [draft] (name, path, optional git URL). */
     suspend fun create(draft: ProjectDraft): ProjectSummary
@@ -69,7 +67,6 @@ class RepositoryProjectsBackend(private val repository: IProjectRepository) : Pr
     override suspend fun provisionBeads(key: ProjectKey): BeadsRemoteProvisionResponse =
         repository.provisionBeadsRemote(key.value, push = true)
 
-    override suspend fun sync(key: ProjectKey): ProjectSyncTriggerResponse = repository.triggerSync(key.value)
 
     override suspend fun create(draft: ProjectDraft): ProjectSummary =
         repository.createProject(name = draft.name, filesystemPath = draft.filesystemPath, gitUrl = draft.gitUrlOrNull)

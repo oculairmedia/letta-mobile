@@ -59,7 +59,6 @@ data class ProjectsPageState(
     val pinned: Set<ProjectKey> = emptySet(),
     val selectedKey: ProjectKey? = null,
     val beadsStatus: Map<ProjectKey, BeadsRemoteStatus> = emptyMap(),
-    val syncing: ProjectKey? = null,
     val provisioning: ProjectKey? = null,
     val editor: ProjectEditor? = null,
     val notice: String? = null,

@@ -3,7 +3,6 @@ package com.letta.mobile.data.projects
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectSummary
-import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -129,12 +128,8 @@ class ProjectsPageControllerTest {
     }
 
     @Test
-    fun syncAndProvisionReportTheirOutcome() = runTest {
+    fun provisionReportsItsOutcome() = runTest {
         val h = harness()
-        h.controller.sync(alpha.key)
-        runCurrent()
-        assertNull(h.controller.state.value.syncing)
-        assertEquals("sync queued", h.controller.state.value.notice)
         h.controller.provisionBeadsRemote(alpha.key)
         runCurrent()
         assertEquals("https://beads.example/alpha", h.controller.state.value.notice)
@@ -187,7 +182,6 @@ class ProjectsPageControllerTest {
             return BeadsRemoteProvisionResponse(status = "provisioned", remoteUrl = "https://beads.example/${key.value}")
         }
 
-        override suspend fun sync(key: ProjectKey) = ProjectSyncTriggerResponse(message = "sync queued")
 
         override suspend fun create(draft: ProjectDraft): ProjectSummary {
             created += draft

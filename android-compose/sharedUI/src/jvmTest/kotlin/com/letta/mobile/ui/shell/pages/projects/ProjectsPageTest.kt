@@ -91,16 +91,21 @@ class ProjectsPageTest {
         val calls = mutableListOf<String>()
         val actions = ProjectsPageActions(
             list = ProjectsListActions(onOpenChat = { project, intent -> calls += "${project.identifier}:$intent" }),
-            detail = ProjectDetailActions(onSync = { calls += "sync:${it.value}" }, onDelete = { calls += "delete:${it.value}" }),
+            detail = ProjectDetailActions(onDelete = { calls += "delete:${it.value}" }),
         )
         show(loaded(alpha).copy(selectedKey = alpha.key, beadsStatus = mapOf(alpha.key to BeadsRemoteStatus(status = "provisioned"))), actions)
         onNodeWithTag(ProjectsPageTags.DETAIL).assertExists()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.PROVISION).assertDoesNotExist()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.BUG_REPORT).performScrollTo().performClick()
-        onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.SYNC).performScrollTo().performClick()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.DELETE).performScrollTo().performClick()
-        assertEquals(listOf("alpha:BugReport", "sync:alpha"), calls, "delete asks first")
+        assertEquals(listOf("alpha:BugReport"), calls, "delete asks first")
         onNodeWithText("Delete project?").assertExists()
+    }
+
+    @Test
+    fun detailDoesNotOfferRetiredSync() = runComposeUiTest {
+        show(loaded(alpha).copy(selectedKey = alpha.key))
+        onNodeWithTag(SettingsSectionTags.ROW_PREFIX + "project-sync").assertDoesNotExist()
     }
 
     @Test
@@ -125,10 +130,9 @@ class ProjectsPageTest {
 
     @Test
     fun factsAndActionsFollowTheHost() {
-        val state = loaded(alpha).copy(syncing = alpha.key)
+        val state = loaded(alpha)
         val facts = projectFacts(alpha, state).map { it.key }
         assertEquals(listOf("project-id", "project-path"), facts)
-        val sync = projectActions(alpha, state, ProjectsPageActions()).first { it.key == ProjectDetailKeys.SYNC }
-        assertEquals(false, sync.enabled)
+        assertEquals(false, projectActions(alpha, state, ProjectsPageActions()).any { it.key == "project-sync" })
     }
 }
