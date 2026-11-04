@@ -23,6 +23,14 @@ function evaluate(source: string, anthropic: Catalog, openai: Catalog): { anthro
 const haiku: CatalogEntry = { id: "claude-haiku-4-5", name: "Haiku 4.5", contextWindow: 200000, maxTokens: 64000, api: "anthropic-messages", provider: "anthropic" };
 const sol: CatalogEntry = { id: "gpt-6.1-sol", name: "Sol", contextWindow: 272000, maxTokens: 128000, api: "openai-responses", provider: "openai" };
 
+function assertOpenaiWindows(result: ReturnType<typeof evaluate>, openai: Catalog) {
+  for (const id of [...Object.keys(openai), "gpt-6.1-terra"]) {
+    assert.equal(result.openai[id]?.contextWindow, 872000, id);
+    assert.equal(result.openai[id]?.maxTokens, 128000, id);
+    assert.equal(result.openai[id]?.provider, "openai", id);
+  }
+}
+
 test("lcp-model-catalog adds verified native models and corrects GPT-6 windows", () => {
   const { source, appliedPatches } = patchLettaCodeSourceResultForTest(fixture);
   assert.equal(appliedPatches, 1);
@@ -31,11 +39,7 @@ test("lcp-model-catalog adds verified native models and corrects GPT-6 windows",
   assert.equal(result.anthropic["claude-haiku-5-5"]?.contextWindow, 200000);
   assert.equal(result.anthropic["claude-haiku-5-5"]?.maxTokens, 65536);
   assert.equal(result.anthropic["claude-haiku-5-5"]?.api, "anthropic-messages");
-  for (const id of [...Object.keys(openai), "gpt-6.1-terra"]) {
-    assert.equal(result.openai[id]?.contextWindow, 872000, id);
-    assert.equal(result.openai[id]?.maxTokens, 128000, id);
-    assert.equal(result.openai[id]?.provider, "openai", id);
-  }
+  assertOpenaiWindows(result, openai);
   assert.equal(result.openai["gpt-6.1-terra"]?.name, "GPT-6.1 Terra");
   assert.equal(result.openai["gpt-6.1-luna"], undefined);
   assert.equal(result.openai["spark"]?.contextWindow, 128000);
@@ -60,15 +64,32 @@ test("lcp-model-catalog preserves native future entries and tolerates absent tem
   assert.equal(Object.keys(evaluate(source, {}, {}).openai).length, 0);
 });
 
-test("lcp-model-catalog evaluates the actual deployed provider data and flattening sites", t => {
-  // Same deployed-bundle preference as patch-loader.test.ts; CI without a
-  // deployed CLI still runs all fixture behavior and drift tests above.
+function findDeployedBundle(): string | undefined {
   const versioned = existsSync("/root") ? readdirSync("/root")
     .filter(name => name.startsWith("letta-code-") && !name.endsWith(".tgz"))
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
     .map(name => `/root/${name}/node_modules/@letta-ai/letta-code/letta.js`) : [];
-  const path = [process.env["LETTA_CLI_PATH_REAL"], ...versioned]
+  return [process.env["LETTA_CLI_PATH_REAL"], ...versioned]
     .find((candidate): candidate is string => Boolean(candidate && existsSync(candidate)));
+}
+
+function assertContextWindow(entry: unknown, expected: number) {
+  assert.ok(entry && typeof entry === "object" && "contextWindow" in entry);
+  assert.equal(entry.contextWindow, expected);
+}
+
+function assertDeployedCatalog(chunks: string[], context: object) {
+  const actual: unknown = runInNewContext(`${chunks.join("\n")}\ninit_anthropic_models(); init_openai_models(); ({ haiku: ANTHROPIC_MODELS["claude-haiku-5-5"], terra: OPENAI_MODELS["gpt-6.1-terra"], sol: OPENAI_MODELS["gpt-6.1-sol"] });`, context);
+  assert.ok(actual && typeof actual === "object" && "haiku" in actual && "terra" in actual && "sol" in actual);
+  for (const [key, expected] of [["haiku", 200000], ["terra", 872000], ["sol", 872000]] as const) {
+    assertContextWindow(actual[key], expected);
+  }
+}
+
+test("lcp-model-catalog evaluates the actual deployed provider data and flattening sites", t => {
+  // Same deployed-bundle preference as patch-loader.test.ts; CI without a
+  // deployed CLI still runs all fixture behavior and drift tests above.
+  const path = findDeployedBundle();
   if (!path) { t.skip("no deployed letta-code bundle available"); return; }
   const raw = readFileSync(path, "utf8");
   const result = patchLettaCodeSourceResultForTest(raw);
@@ -85,11 +106,5 @@ test("lcp-model-catalog evaluates the actual deployed provider data and flatteni
     assert.ok(start > 0 && end > start);
     return result.source.slice(start, end);
   });
-  const actual: unknown = runInNewContext(`${chunks.join("\n")}\ninit_anthropic_models(); init_openai_models(); ({ haiku: ANTHROPIC_MODELS["claude-haiku-5-5"], terra: OPENAI_MODELS["gpt-6.1-terra"], sol: OPENAI_MODELS["gpt-6.1-sol"] });`, context);
-  assert.ok(actual && typeof actual === "object" && "haiku" in actual && "terra" in actual && "sol" in actual);
-  for (const [key, expected] of [["haiku", 200000], ["terra", 872000], ["sol", 872000]] as const) {
-    const entry: unknown = actual[key];
-    assert.ok(entry && typeof entry === "object" && "contextWindow" in entry);
-    assert.equal(entry.contextWindow, expected);
-  }
+  assertDeployedCatalog(chunks, context);
 });

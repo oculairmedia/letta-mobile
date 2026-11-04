@@ -1194,16 +1194,9 @@ function countOccurrences(source, token) {
   return source.split(token).length - 1;
 }
 
-/**
- * @param {string} raw
- * @param {string} path
- * @param {boolean} warn
- * @returns {{ source: string; appliedPatches: number; skippedPatches: number }}
- */
-function patchLettaCodeSource(raw, path, warn) {
-  let patched = raw;
-  let appliedPatches = 0;
-  let skippedPatches = 0;
+function retryOtid(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // Both changes must land together: stable OTIDs alone do not stop appends,
   // and dedupe alone cannot recognize the refreshed identities of a retry.
@@ -1223,13 +1216,20 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function agentLazyload(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // All three land together: lazy loading alone fixes nothing while the read paths
   // still test the map directly, and the read paths alone would never find the agent.
   {
     const refreshCount = countOccurrences(patched, AGENT_LAZYLOAD_REFRESH_TOKEN);
     const listConversationCount = countOccurrences(patched, AGENT_LAZYLOAD_LIST_CONVERSATION_TOKEN);
     const listAgentCount = countOccurrences(patched, AGENT_LAZYLOAD_LIST_AGENT_TOKEN);
-    if (refreshCount === 1 && listConversationCount === 1 && listAgentCount === 1) {
+    if ([refreshCount, listConversationCount, listAgentCount].every((count) => count === 1)) {
       patched = patched.replace(AGENT_LAZYLOAD_REFRESH_TOKEN, AGENT_LAZYLOAD_REFRESH_REPLACEMENT);
       patched = patched.replace(AGENT_LAZYLOAD_LIST_CONVERSATION_TOKEN, AGENT_LAZYLOAD_LIST_CONVERSATION_REPLACEMENT);
       patched = patched.replace(AGENT_LAZYLOAD_LIST_AGENT_TOKEN, AGENT_LAZYLOAD_LIST_AGENT_REPLACEMENT);
@@ -1244,27 +1244,39 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
-  if (patched.includes(SETTLE_BUG_LITERAL)) {
-    patched = patched.replace(SETTLE_BUG_LITERAL, SETTLE_FIX_LITERAL);
-    appliedPatches += 1;
-  } else {
-    skippedPatches += 1;
-    if (warn) process.stderr.write(
-      `[letta-code-patch] WARN: settle-bug literal not found in ${path} — ` +
-      `running unpatched (letta-code likely upgraded past 0.26.1)\n`,
-    );
-  }
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
 
-  if (patched.includes(THINKING_SETTINGS_BUG_LITERAL)) {
-    patched = patched.replaceAll(THINKING_SETTINGS_BUG_LITERAL, THINKING_SETTINGS_FIX_LITERAL);
-    appliedPatches += 1;
-  } else {
-    skippedPatches += 1;
-    if (warn) process.stderr.write(
-      `[letta-code-patch] WARN: thinking-settings literal not found in ${path} — ` +
+function simplePatch({ token, replacement, replaceAll, helper, warning }) {
+  return (state) => {
+    if (!state.patched.includes(token)) {
+      state.skippedPatches += 1;
+      if (state.warn) process.stderr.write(warning(state.path));
+      return;
+    }
+    state.patched = replaceAll
+      ? state.patched.replaceAll(token, replacement)
+      : state.patched.replace(token, replacement);
+    state.appliedPatches += 1;
+    if (helper) state.patched = injectHelperAfterShebang(state.patched, helper);
+  };
+}
+
+const settle = simplePatch({
+  token: SETTLE_BUG_LITERAL, replacement: SETTLE_FIX_LITERAL,
+  replaceAll: false, helper: null,
+  warning: (path) => `[letta-code-patch] WARN: settle-bug literal not found in ${path} — ` +
+      `running unpatched (letta-code likely upgraded past 0.26.1)\n`,
+});
+const thinkingSettings = simplePatch({
+  token: THINKING_SETTINGS_BUG_LITERAL, replacement: THINKING_SETTINGS_FIX_LITERAL,
+  replaceAll: true, helper: null,
+  warning: (path) => `[letta-code-patch] WARN: thinking-settings literal not found in ${path} — ` +
       `running without lcp-9pn settings guard\n`,
-    );
-  }
+});
+function thinkingRequest(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   {
     const guard = matchOnce(patched, THINKING_REQUEST_GUARD_PATTERN);
@@ -1279,6 +1291,13 @@ function patchLettaCodeSource(raw, path, warn) {
       );
     }
   }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function thinkingChokepoint(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-7kk: universal chokepoint normalizer for every Anthropic request.
   let appliedThinkingChokepoint = false;
@@ -1302,6 +1321,13 @@ function patchLettaCodeSource(raw, path, warn) {
     );
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function modelSettings(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   let appliedModelSettingsGuard = false;
   if (patched.includes(MODEL_SETTINGS_RETURN_TOKEN)) {
     patched = patched.replaceAll(MODEL_SETTINGS_RETURN_TOKEN, MODEL_SETTINGS_RETURN_REPLACEMENT);
@@ -1323,17 +1349,18 @@ function patchLettaCodeSource(raw, path, warn) {
     );
   }
 
-  if (patched.includes(LOCAL_VISION_INPUT_TOKEN)) {
-    patched = patched.replace(LOCAL_VISION_INPUT_TOKEN, LOCAL_VISION_INPUT_REPLACEMENT);
-    appliedPatches += 1;
-    patched = injectHelperAfterShebang(patched, LOCAL_VISION_INPUT_HELPER_DEFINITION);
-  } else {
-    skippedPatches += 1;
-    if (warn) process.stderr.write(
-      `[letta-code-patch] WARN: local vision input token not found in ${path} — ` +
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+const localVisionInput = simplePatch({
+  token: LOCAL_VISION_INPUT_TOKEN, replacement: LOCAL_VISION_INPUT_REPLACEMENT,
+  replaceAll: false, helper: LOCAL_VISION_INPUT_HELPER_DEFINITION,
+  warning: (path) => `[letta-code-patch] WARN: local vision input token not found in ${path} — ` +
       `Read(image) may still be placeholdered by model.input gates\n`,
-    );
-  }
+});
+function visionGate(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-qi2f: inbound user-image gate at the request-build site.
   if (patched.includes(VISION_GATE_TOKEN)) {
@@ -1350,6 +1377,13 @@ function patchLettaCodeSource(raw, path, warn) {
     );
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function downgradeImages(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-qi2f: downgradeUnsupportedImages — the real inbound user-image strip.
   if (patched.includes(DOWNGRADE_IMAGES_TOKEN)) {
     patched = patched.replace(DOWNGRADE_IMAGES_TOKEN, DOWNGRADE_IMAGES_REPLACEMENT);
@@ -1363,6 +1397,13 @@ function patchLettaCodeSource(raw, path, warn) {
     );
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function multimodalToolReturn(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   const multimodalVariant = MULTIMODAL_TOOL_RETURN_VARIANTS.find((variant) => patched.includes(variant.token));
   if (multimodalVariant) {
     patched = patched.replace(multimodalVariant.token, multimodalVariant.replacement);
@@ -1375,17 +1416,36 @@ function patchLettaCodeSource(raw, path, warn) {
     );
   }
 
-  if (patched.includes(TOOL_RETURN_CONTENT_TOKEN)) {
-    patched = patched.replace(TOOL_RETURN_CONTENT_TOKEN, TOOL_RETURN_CONTENT_REPLACEMENT);
-    appliedPatches += 1;
-    patched = injectHelperAfterShebang(patched, TOOL_RETURN_CONTENT_HELPER_DEFINITION);
-  } else {
-    skippedPatches += 1;
-    if (warn) process.stderr.write(
-      `[letta-code-patch] WARN: tool-return content coercion token not found in ${path} — ` +
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+const toolReturnContent = simplePatch({
+  token: TOOL_RETURN_CONTENT_TOKEN, replacement: TOOL_RETURN_CONTENT_REPLACEMENT,
+  replaceAll: false, helper: TOOL_RETURN_CONTENT_HELPER_DEFINITION,
+  warning: (path) => `[letta-code-patch] WARN: tool-return content coercion token not found in ${path} — ` +
       `Read(image) approval turns may still be normalized to text only\n`,
-    );
+});
+function patchToolsetCatalog(patched) {
+  let appliedCount = 0;
+  // letta-code >= 0.32.17 toolset catalog (see TOOLSET_CATALOG_*_TOKEN).
+  /** @type {Array<[string, string]>} */
+  const toolsetCatalogVariants = [
+    [TOOLSET_CATALOG_DEFAULT_TOKEN, TOOLSET_CATALOG_DEFAULT_REPLACEMENT],
+    [TOOLSET_CATALOG_CODEX_TOKEN, TOOLSET_CATALOG_CODEX_REPLACEMENT],
+    [TOOLSET_CATALOG_LETTA_TOKEN, TOOLSET_CATALOG_LETTA_REPLACEMENT],
+  ];
+  for (const [token, replacement] of toolsetCatalogVariants) {
+    if (countOccurrences(patched, token) === 1) {
+      patched = patched.replace(token, replacement);
+      appliedCount += 1;
+    }
   }
+  return { patched, appliedCount };
+}
+
+function generateImageTool(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   let appliedGenerateImageTool = false;
   if (patched.includes(TOOL_DEFINITIONS_ASSIGN_TOKEN)) {
@@ -1413,20 +1473,10 @@ function patchLettaCodeSource(raw, path, warn) {
     appliedPatches += 1;
     appliedGenerateImageTool = true;
   }
-  // letta-code >= 0.32.17 toolset catalog (see TOOLSET_CATALOG_*_TOKEN).
-  /** @type {Array<[string, string]>} */
-  const toolsetCatalogVariants = [
-    [TOOLSET_CATALOG_DEFAULT_TOKEN, TOOLSET_CATALOG_DEFAULT_REPLACEMENT],
-    [TOOLSET_CATALOG_CODEX_TOKEN, TOOLSET_CATALOG_CODEX_REPLACEMENT],
-    [TOOLSET_CATALOG_LETTA_TOKEN, TOOLSET_CATALOG_LETTA_REPLACEMENT],
-  ];
-  for (const [token, replacement] of toolsetCatalogVariants) {
-    if (countOccurrences(patched, token) === 1) {
-      patched = patched.replace(token, replacement);
-      appliedPatches += 1;
-      appliedGenerateImageTool = true;
-    }
-  }
+  const catalog = patchToolsetCatalog(patched);
+  patched = catalog.patched;
+  appliedPatches += catalog.appliedCount;
+  if (catalog.appliedCount) appliedGenerateImageTool = true;
   if (appliedGenerateImageTool) {
     patched = injectHelperAfterShebang(patched, GENERATE_IMAGE_TOOL_HELPER_DEFINITION);
   } else {
@@ -1436,6 +1486,13 @@ function patchLettaCodeSource(raw, path, warn) {
       `native image generation tool will not be registered\n`,
     );
   }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function systemPrompt(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-aioi8-p1 (patch #18): dirty-check system-prompt.json writes.
   // FAIL-OPEN with a unique-match assertion: anchor absent OR matched more
@@ -1459,6 +1516,13 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function cloneMap(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-aioi8-p2 (patch #19): dehydrate the persisted-message dedupe map.
   // ATOMIC: all three anchors must each match exactly once or NONE are
   // applied — a partial apply would mix clone-objects and JSON strings in the
@@ -1473,7 +1537,7 @@ function patchLettaCodeSource(raw, path, warn) {
     const bulkVariant = bulkVariants.find(([token]) => countOccurrences(patched, token) === 1);
     const appendOccurrences = countOccurrences(patched, CLONE_MAP_APPEND_TOKEN);
     const compareOccurrences = countOccurrences(patched, CLONE_MAP_COMPARE_TOKEN);
-    if (bulkOccurrences === 1 && bulkVariant && appendOccurrences === 1 && compareOccurrences === 1) {
+    if (bulkVariant && [bulkOccurrences, appendOccurrences, compareOccurrences].every((count) => count === 1)) {
       const [bulkToken, bulkReplacement] = bulkVariant;
       patched = patched.replace(bulkToken, bulkReplacement);
       patched = patched.replace(CLONE_MAP_APPEND_TOKEN, CLONE_MAP_APPEND_REPLACEMENT);
@@ -1488,6 +1552,13 @@ function patchLettaCodeSource(raw, path, warn) {
       );
     }
   }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function openaiApproval(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-oaiap: stop the OpenAI API from aborting auto-approved tool turns.
   {
@@ -1506,6 +1577,13 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function assistantOtid(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-otid: carry the streamed segment otid onto the durable assistant record,
   // so clients can pair the streamed row with the settled one by identity rather
   // than by matching their text. Both anchors must be unique and both must land,
@@ -1518,7 +1596,7 @@ function patchLettaCodeSource(raw, path, warn) {
     const stampOccurrences = stamp ? 1 : 0;
     const persistOccurrences = countOccurrences(patched, OTID_PERSIST_TOKEN);
     const projectOccurrences = countOccurrences(patched, OTID_PROJECT_TOKEN);
-    if (stamp && persistOccurrences === 1 && projectOccurrences === 1) {
+    if (stamp && [persistOccurrences, projectOccurrences].every((count) => count === 1)) {
       patched = patched.replace(stamp.token, stamp.replacement);
       patched = patched.replace(OTID_PERSIST_TOKEN, OTID_PERSIST_REPLACEMENT);
       patched = patched.replace(OTID_PROJECT_TOKEN, OTID_PROJECT_REPLACEMENT);
@@ -1534,6 +1612,13 @@ function patchLettaCodeSource(raw, path, warn) {
       );
     }
   }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function conversationLastRun(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-clr: conversation-scoped lastRunAt for the agent-info reminder.
   // Unique-match assertion (skip on miss or duplicate rather than patching
@@ -1557,6 +1642,13 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function buildAgentInfo(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-clr-x: rewrite buildAgentInfo to dispatch on the structured object
   // returned by the lcp-clr helper. Fail-open on count != 1 — never patch
   // the wrong site or break the reminder builder. The two patches are
@@ -1579,6 +1671,13 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function reflectionControls(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-reflection-controls: Keep command wire shape, per-agent persistence,
   // and launch behavior coherent. A partial patch would advertise settings that
   // are dropped by persistence or a model that never reaches the subagent, so
@@ -1600,6 +1699,13 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function modelCatalog(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-model-catalog: unique anchors, atomic update, fail open on drift.
   {
     const counts = MODEL_CATALOG_PATCHES.map(({ token }) => countOccurrences(patched, token));
@@ -1616,6 +1722,13 @@ function patchLettaCodeSource(raw, path, warn) {
       );
     }
   }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function contextCap(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-ctxcap: lmStudioDiscover clamps every discovered model's context window
   // to LOCAL_ENDPOINT_DEFAULT_CONTEXT_WINDOW (128k) even when the endpoint
@@ -1637,6 +1750,13 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function reflectionHide(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
+
   // lcp-reflhide: reflection integration runs as the PARENT agent (existingAgentId) in a fresh
   // conversation that it only titles, so every integration landed in the parent's conversation
   // list (126 on PM-letta-mobile by 2026-10-22; letta-code archives one only when the integration
@@ -1657,6 +1777,13 @@ function patchLettaCodeSource(raw, path, warn) {
       );
     }
   }
+
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+function subagentErrorLog(state) {
+  let { patched, appliedPatches, skippedPatches } = state;
+  const { path, warn } = state;
 
   // lcp-subagent-errlog: a subagent runs as a child `letta -p` process and letta-code reports its
   // failures only through debugWarn, which writes nothing unless debug logging is on, so a failed
@@ -1685,7 +1812,47 @@ function patchLettaCodeSource(raw, path, warn) {
     }
   }
 
-  return { source: patched, appliedPatches, skippedPatches };
+  Object.assign(state, { patched, appliedPatches, skippedPatches });
+}
+
+// Patch order is significant: each step receives the previous step's output.
+const PATCH_STEPS = [
+  retryOtid,
+  agentLazyload,
+  settle,
+  thinkingSettings,
+  thinkingRequest,
+  thinkingChokepoint,
+  modelSettings,
+  localVisionInput,
+  visionGate,
+  downgradeImages,
+  multimodalToolReturn,
+  toolReturnContent,
+  generateImageTool,
+  systemPrompt,
+  cloneMap,
+  openaiApproval,
+  assistantOtid,
+  conversationLastRun,
+  buildAgentInfo,
+  reflectionControls,
+  modelCatalog,
+  contextCap,
+  reflectionHide,
+  subagentErrorLog,
+];
+
+/**
+ * @param {string} raw
+ * @param {string} path
+ * @param {boolean} warn
+ * @returns {{ source: string; appliedPatches: number; skippedPatches: number }}
+ */
+function patchLettaCodeSource(raw, path, warn) {
+  const state = { patched: raw, appliedPatches: 0, skippedPatches: 0, path, warn };
+  for (const step of PATCH_STEPS) step(state);
+  return { source: state.patched, appliedPatches: state.appliedPatches, skippedPatches: state.skippedPatches };
 }
 
 /**
@@ -1730,21 +1897,25 @@ function injectHelperAfterShebang(source, helper) {
   return helper + source;
 }
 
+function targetPath(url) {
+  if (!TARGET_PATH || !url.startsWith("file://")) return null;
+  let path;
+  try { path = fileURLToPath(url); } catch { return null; }
+  return path === TARGET_PATH ? path : null;
+}
+
+function sourceText(source) {
+  if (typeof source === "string") return source;
+  if (source instanceof Uint8Array) return Buffer.from(source).toString("utf8");
+  return null;
+}
+
 /** @type {import("node:module").LoadHook} */
 export async function load(url, context, nextLoad) {
   const result = await nextLoad(url, context);
-  if (!TARGET_PATH || !url.startsWith("file://")) return result;
-
-  let path;
-  try { path = fileURLToPath(url); } catch { return result; }
-  if (path !== TARGET_PATH) return result;
-
-  const raw =
-    typeof result.source === "string"
-      ? result.source
-      : result.source instanceof Uint8Array
-        ? Buffer.from(result.source).toString("utf8")
-        : null;
+  const path = targetPath(url);
+  if (path === null) return result;
+  const raw = sourceText(result.source);
   if (raw === null) return result;
 
   const { source: patched, appliedPatches, skippedPatches } = patchLettaCodeSource(raw, path, !appliedOnce);

@@ -83,7 +83,7 @@ test("lcp-reflection-controls leaves the fully patched letta.js bundle parseable
   }
 });
 
-test("lcp-reflection-controls settings round-trip and wrapper behavior execute from patched bundle", async () => {
+function createReflectionFixture() {
   const { source } = patchLettaCodeSourceResultForTest(readBundle());
   const helper = section(source, "globalThis.__lcpReflectionOutcomes =", "\n\":\" //#");
   const memorySettings = section(source, "function isValidStepCount", "// src/agent/memory-runtime.ts");
@@ -130,14 +130,38 @@ test("lcp-reflection-controls settings round-trip and wrapper behavior execute f
     settings: { trigger: "step-count", step_count: 5, merge: "auto" },
   };
 
-  assert.equal(api.isSetReflectionSettingsCommand({ ...base, settings: { ...base.settings, model: 123 } }), false);
-  assert.equal(api.isSetReflectionSettingsCommand({ ...base, settings: { ...base.settings, model: null, focus_instructions: "focus" } }), true);
-
   const send = (...args: unknown[]) => {
     const response = args[1];
     assert.ok(response && typeof response === "object", "settings command must send a response object");
     sent.push(response as Record<string, unknown>);
   };
+  return { state, context, api, base, sent, send, wrapper };
+}
+
+function assertLaunchOutcome({ launch, received, launchApi, api }: {
+  launch: { launched: boolean; reason?: string };
+  received: Record<string, unknown> | undefined;
+  launchApi: { outcomes: Map<string, Record<string, unknown>> };
+  api: ReturnType<typeof createReflectionFixture>["api"];
+}) {
+  assert.deepEqual(launch, { launched: false, reason: "parent_dirty" });
+  assert.equal(received?.model, "gpt-reflection");
+  assert.match(String(received?.instruction), /Built-in reflection instruction\.[\s\S]*Prioritize durable mobile facts\./);
+  const outcome = launchApi.outcomes.get("agent-1");
+  assert.equal(outcome?.status, "skipped");
+  assert.equal(outcome?.reason, "parent_dirty");
+  assert.equal(outcome?.trigger_source, "manual");
+  assert.equal(outcome?.model, "gpt-reflection");
+  assert.ok(Number.isFinite(Date.parse(String(outcome?.at))));
+  assert.equal(api.toReflectionSettingsResponse("agent-1", "/fixture").last_outcome, outcome);
+}
+
+test("lcp-reflection-controls settings round-trip and wrapper behavior execute from patched bundle", async () => {
+  const { state, context, api, base, sent, send, wrapper } = createReflectionFixture();
+
+  assert.equal(api.isSetReflectionSettingsCommand({ ...base, settings: { ...base.settings, model: 123 } }), false);
+  assert.equal(api.isSetReflectionSettingsCommand({ ...base, settings: { ...base.settings, model: null, focus_instructions: "focus" } }), true);
+
   await api.handleReflectionSettingsCommand({
     ...base,
     settings: { ...base.settings, model: "gpt-reflection", focus_instructions: "Keep durable mobile facts." },
@@ -179,16 +203,7 @@ test("lcp-reflection-controls settings round-trip and wrapper behavior execute f
     outcomes: Map<string, Record<string, unknown>>;
   };
   const launch = await launchApi.launchReflectionSubagent({ agentId: "agent-1", triggerSource: "manual", instruction: "Built-in reflection instruction." });
-  assert.deepEqual(launch, { launched: false, reason: "parent_dirty" });
-  assert.equal(received?.model, "gpt-reflection");
-  assert.match(String(received?.instruction), /Built-in reflection instruction\.[\s\S]*Prioritize durable mobile facts\./);
-  const outcome = launchApi.outcomes.get("agent-1");
-  assert.equal(outcome?.status, "skipped");
-  assert.equal(outcome?.reason, "parent_dirty");
-  assert.equal(outcome?.trigger_source, "manual");
-  assert.equal(outcome?.model, "gpt-reflection");
-  assert.ok(Number.isFinite(Date.parse(String(outcome?.at))));
-  assert.equal(api.toReflectionSettingsResponse("agent-1", "/fixture").last_outcome, outcome);
+  assertLaunchOutcome({ launch, received, launchApi, api });
 
   // The TUI's /sleeptime selector only sends these four settings. Its save
   // must retain the per-agent model and focus set by the mobile controls.
