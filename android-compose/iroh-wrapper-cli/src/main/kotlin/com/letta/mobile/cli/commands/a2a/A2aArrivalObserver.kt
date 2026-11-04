@@ -1,4 +1,4 @@
-package com.letta.mobile.cli.commands
+package com.letta.mobile.cli.commands.a2a
 
 import com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore

@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.commands.a2a.A2aArrivalObserver
 import com.letta.mobile.util.telemetryAttributes
 
 import com.letta.mobile.util.attr

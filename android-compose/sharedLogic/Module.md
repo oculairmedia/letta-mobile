@@ -578,6 +578,12 @@ Tool-library controller state and operations. Source loading and selection are c
 
 Channel events, server frames and chat bridge mappings. Scope routing and ingest deduplication are transport boundaries; these types do not themselves own a durable timeline. Keep durable timeline storage and product rendering outside frame routing; supply the channel through [IChannelTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.api/-i-channel-transport/index.html) when integrating [WsChatBridge](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport/-ws-chat-bridge/index.html) and `AgentEventRouter`.
 
+# Package com.letta.mobile.data.transport.serialization
+
+Internal deserializers for replay envelopes and unknown transport frames. The public
+`ServerFrameSerializer` selects these inbound-only helpers; they preserve raw payloads and reject
+accidental encoding. Keep frame contracts in `data.transport` and byte framing in the transport binding.
+
 # Package com.letta.mobile.data.transport.api
 
 Channel/control interfaces consumed by session, chat and repository code. Explicit no-op/unavailable implementations support hosts lacking a particular connection capability. Keep unsupported optional operations explicit rather than simulating them; implement [IChannelTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.api/-i-channel-transport/index.html) and opt into capability interfaces such as [CronControlTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.api/-cron-control-transport/index.html) or [LivenessProbingChannelTransport](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.api/-liveness-probing-channel-transport/index.html) only when supported.
