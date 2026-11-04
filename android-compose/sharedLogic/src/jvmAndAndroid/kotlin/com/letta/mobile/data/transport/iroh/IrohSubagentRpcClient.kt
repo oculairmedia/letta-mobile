@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
 import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
@@ -79,7 +80,7 @@ internal class IrohSubagentRpcClient(
 
         return try {
             withTimeoutOrNull(timeoutMs.milliseconds) {
-                val response = callScopedSubagentRpc(method, scope, payload)
+                val response = callScopedSubagentRpc(method, scope, payload.toString())
                     ?: return@withTimeoutOrNull onFailure(frameId, ts, reqId, SUBAGENT_RPC_UNSUPPORTED)
                 if (!response.success) return@withTimeoutOrNull onFailure(frameId, ts, reqId, response.error ?: "$method failed")
                 val result = response.result ?: return@withTimeoutOrNull onFailure(frameId, ts, reqId, "$method failed: no result")
@@ -93,18 +94,18 @@ internal class IrohSubagentRpcClient(
         }
     }
 
-    private suspend fun callScopedSubagentRpc(
+    suspend fun callScopedSubagentRpc(
         method: String,
         scope: SubagentRpcScope,
-        payload: JsonObject,
+        body: String,
     ): AppServerInboundFrame.AdminRpcResponse? {
         val handle = readyHandle()
         val advertised = handle.serverCapabilities
-        if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
+        if (!supportsScopedSubagentRpc(method, advertised)) return null
         val scopedBody = buildJsonObject {
             put("conversation_id", scope.conversationId)
             scope.agentId?.let { put("agent_id", it) }
-            payload.forEach { (key, value) -> put(key, value) }
+            json.parseToJsonElement(body).jsonObject.forEach { (key, value) -> put(key, value) }
         }.toString()
         val response = adminRpc(method, "/v1/conversations/${scope.conversationId}/subagents", scopedBody)
         return response.takeUnless {

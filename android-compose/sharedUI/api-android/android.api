@@ -1572,8 +1572,8 @@ public final class com/letta/mobile/ui/chat/subagents/ActiveSubagentRingsTags {
 }
 
 public final class com/letta/mobile/ui/chat/subagents/BackgroundTasksPanelKt {
-	public static final fun BackgroundTasksPanel (Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
-	public static final fun BackgroundTasksSidePane (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun BackgroundTasksPanel (Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun BackgroundTasksSidePane (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun BackgroundTasksToggle (ILkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;ZLandroidx/compose/runtime/Composer;II)V
 	public static final fun backgroundTasksLabel (I)Ljava/lang/String;
 }
@@ -1585,10 +1585,12 @@ public final class com/letta/mobile/ui/chat/subagents/BackgroundTasksTags {
 	public static final field TOGGLE Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterListKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterListKt;
+public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterRowsKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentRosterRowsKt;
 	public fun <init> ()V
-	public final fun getLambda$533406141$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1343970390$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1738900130$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$507574809$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/chat/subagents/ComposableSingletons$SubagentTodoSheetKt {
@@ -1707,8 +1709,8 @@ public final class com/letta/mobile/ui/chat/subagents/SubagentRingsState {
 
 public final class com/letta/mobile/ui/chat/subagents/SubagentRosterListKt {
 	public static final field SUBAGENT_ROSTER_EMPTY_TAG Ljava/lang/String;
-	public static final fun SubagentRoster (Ljava/util/List;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
-	public static final fun SubagentRosterList (Lcom/letta/mobile/data/subagents/SubagentRoster;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun SubagentRoster (Ljava/util/List;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)V
+	public static final fun SubagentRosterList (Lcom/letta/mobile/data/subagents/SubagentRoster;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function1;Ljava/util/Set;Landroidx/compose/runtime/Composer;II)V
 	public static final fun openWith (Lcom/letta/mobile/data/subagents/SubagentRosterItem;Lkotlin/jvm/functions/Function2;)V
 	public static final fun statusWord (Lcom/letta/mobile/data/subagents/SubagentRosterStatus;)Ljava/lang/String;
 	public static final fun subtitle (Lcom/letta/mobile/data/subagents/SubagentRosterItem;)Ljava/lang/String;

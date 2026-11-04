@@ -22,6 +22,8 @@ import kotlinx.serialization.json.Json
  * `rehydrate.failed`) so a bad file can never stop the controller booting.
  */
 class FileSubagentRegistryStore(private val path: Path) : SubagentRegistryStore {
+    override val durable: Boolean get() = true
+
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true

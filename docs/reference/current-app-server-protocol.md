@@ -26,7 +26,7 @@ The upstream source commit is distinct from the Git blob identities below. Hashe
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | ba81c9774cdc12d5f473653e9e5ff1e18371dc4da2b74096983dd0324230b5a4 | 08ed60e770725cedea0c4553c8be30d2a2e5d3fb |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | 844cbb121fdefbd2c82a9e9d98d32487d00620425f56c9386d339d9ac2197945 | 97cb37833c7d6bc3d707fcaf71dede03fec55d8a |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | d0e27cc832f1b6859d32fd916dad1d265f5e75c958dae2522be79d8705934ebe | 8636c927698a1d7d890cbe05c34d5d5fad16bb95 |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 84e62d502a28e0fb64e50a6d4c444bf48bd2a78bca62f17c38ae083f5d22de6d | 4a7bc7339087238113f9e9ee2f79f5ad334aa72a |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
@@ -287,7 +287,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file&#95;response |
 | write&#95;memory&#95;file&#95;response |
 
-## Admin ownership (153 methods)
+## Admin ownership (154 methods)
 
 These are declared ownership decisions, not newly observed production execution. Method-registration parity remains enforced by [IrohAdminOwnershipMatrixTest](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAdminOwnershipMatrixTest.kt); the generator does not parse Kotlin or replace that test.
 
@@ -296,7 +296,7 @@ These are declared ownership decisions, not newly observed production execution.
 | app&#95;server&#95;v2 | 57 |
 | beads&#95;service | 21 |
 | capability&#95;gated&#95;unsupported | 17 |
-| controller&#95;native | 31 |
+| controller&#95;native | 32 |
 | local&#95;backend&#95;store | 9 |
 | plugin&#95;host | 10 |
 | vibesync&#95;service | 8 |
@@ -304,7 +304,7 @@ These are declared ownership decisions, not newly observed production execution.
 | Fallback | Method count |
 | --- | --- |
 | deny&#95;fail&#95;closed | 46 |
-| none | 107 |
+| none | 108 |
 
 | Method | Owner | Fallback | Authorization | Handler | Public contract |
 | --- | --- | --- | --- | --- | --- |
@@ -449,6 +449,7 @@ These are declared ownership decisions, not newly observed production execution.
 | slash&#95;command.list | controller&#95;native | none | admin&#95;read | SlashCommandAdminHandlers.kt | SlashCommandsResponse rows with catalog&#95;source provenance |
 | slash&#95;command.list&#95;agent | controller&#95;native | none | admin&#95;read | SlashCommandAdminHandlers.kt | SlashCommandsResponse rows with catalog&#95;source provenance |
 | step.list | local&#95;backend&#95;store | deny&#95;fail&#95;closed | admin&#95;read | RunAdminHandlers.kt | controller-owned step history over the letta-code on-disk backend |
+| subagent.dismiss | controller&#95;native | none | conversation&#95;scoped | SubagentAdminHandlers.kt | Authenticated scoped dismissal without stopping the worker |
 | subagent.list | controller&#95;native | none | conversation&#95;scoped | SubagentAdminHandlers.kt | SubagentRegistrySource (m6oa1 provenance registry) |
 | subagent.todos | controller&#95;native | none | conversation&#95;scoped | SubagentAdminHandlers.kt | SubagentRegistrySource (m6oa1 provenance registry) |
 | tool.attach | capability&#95;gated&#95;unsupported | deny&#95;fail&#95;closed | admin&#95;write | ToolAdminHandlers.kt | explicit capability denial pending a native tool-library command |

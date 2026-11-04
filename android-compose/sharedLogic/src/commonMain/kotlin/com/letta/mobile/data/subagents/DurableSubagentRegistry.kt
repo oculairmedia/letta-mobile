@@ -50,6 +50,7 @@ class DurableSubagentRegistry(
     /** How long a live chip may go unobserved; see [staleRunningChips]. */
     private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
 ) {
+    internal val supportsDurableDismissal: Boolean = store.durable
     private val lock = SynchronizedObject()
     private val snapshotAbsence = SubagentSnapshotAbsence()
 
@@ -317,26 +318,6 @@ class DurableSubagentRegistry(
             (observation.activity != null && observation.activity.lines != activity?.lines)
     }
 
-    private fun newerActivity(
-        current: com.letta.mobile.data.model.SubagentActivitySnapshot?,
-        incoming: com.letta.mobile.data.model.SubagentActivitySnapshot?,
-        currentGeneration: Long,
-        incomingGeneration: Long,
-    ): com.letta.mobile.data.model.SubagentActivitySnapshot? {
-        if (incoming == null) return current
-        if (current == null) return incoming
-        val currentAt = current.updatedAt
-        val incomingAt = incoming.updatedAt
-        return when {
-            currentAt == null && incomingAt == null ->
-                if (incomingGeneration >= currentGeneration) incoming else current
-            currentAt == null -> incoming
-            incomingAt == null -> current
-            incomingAt >= currentAt -> incoming
-            else -> current
-        }
-    }
-
     // ------------------------------------------------------------- reconcile
 
     data class ReconcileResult(
@@ -485,6 +466,28 @@ class DurableSubagentRegistry(
         return retained
     }
 
+    /** Persist an exact dismissal before making it visible to readers. Does not stop the worker. */
+    internal fun dismiss(key: SubagentChipKey): List<SubagentChipRecord> =
+        synchronized(lock) {
+            require(key.conversationId.isNotBlank() && !key.agentId.isNullOrBlank() && key.toolCallId.isNotBlank())
+            val existing = entries[key] ?: return@synchronized emptyList()
+            if (existing.state.isTerminal) {
+                return@synchronized listOf(existing).filter { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
+            }
+            check(entries.values.count { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED } < maxEntries) {
+                "dismissal storage is full"
+            }
+            val dismissed = existing.copy(
+                state = SubagentChipState.ORPHANED,
+                terminalReason = SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED,
+                terminalAtEpochMs = clock(),
+            )
+            // A failed write must not acknowledge a mutation that will be lost on restart.
+            store.save(entries.values.map { if (it.key == key) dismissed else it })
+            entries[key] = dismissed
+            listOf(dismissed)
+        }
+
     // -------------------------------------------------------------- snapshots
 
     /** Chips for [conversationId]; terminal chips included only when asked. */
@@ -531,24 +534,27 @@ class DurableSubagentRegistry(
     /**
      * Evict terminal chips oldest-first until the registry fits [maxEntries].
      *
+     * User-dismissed tombstones are retained to reject stale observations. Their
+     * separate budget is [maxEntries]; further dismissals fail when it is full.
+     * Previously stored tombstones are never discarded, including legacy excess.
+     *
      * LIVE CHIPS ARE NEVER EVICTED — evicting a running chip is exactly the
      * "silently vanish" failure this bead exists to remove. If the whole
      * registry is live and over cap we exceed the cap deliberately and record
      * it at WARN (precedent: `TurnLeaseRegistry` / `ChatSendCoordinator`).
      */
     private fun enforceCapacityLocked() {
-        if (entries.size <= maxEntries) return
+        var ordinaryCount = entries.values.count { it.terminalReason != SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
+        if (ordinaryCount <= maxEntries) return
         // letta-mobile-fxoew.3: a stale live chip must not pin the cap. Past
         // the TTL it is terminal, and therefore evictable below.
         staleRunningChips(entries.values, clock(), staleAfterMs).forEach { entries[it.key] = it }
-        val evictable = entries.values
-            .filter { it.state.isTerminal }
-            .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
-            .iterator()
+        val evictable = evictionCandidates().iterator()
         val evicted = mutableListOf<SubagentChipRecord>()
-        while (entries.size > maxEntries && evictable.hasNext()) {
+        while (ordinaryCount > maxEntries && evictable.hasNext()) {
             val victim = evictable.next()
             entries.remove(victim.key)
+            ordinaryCount--
             // A later chip reusing this key must not inherit the evicted one's absence clock.
             snapshotAbsence.forget(victim.key)
             evicted += victim
@@ -564,16 +570,21 @@ class DurableSubagentRegistry(
                 level = Telemetry.Level.WARN,
             )
         }
-        if (entries.size > maxEntries) {
+        if (ordinaryCount > maxEntries) {
             Telemetry.event(
                 TAG,
                 "capacity.allLive",
-                "size" attr entries.size,
+                "size" attr ordinaryCount,
                 "cap" attr maxEntries,
                 level = Telemetry.Level.WARN,
             )
         }
     }
+
+    private fun evictionCandidates(): List<SubagentChipRecord> = entries.values
+        .filter { it.state.isTerminal }
+        .filterNot { it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
+        .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
 
     private fun persistLocked() {
         runCatching { store.save(entries.values.toList()) }

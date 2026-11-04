@@ -1,10 +1,14 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.subagents.SubagentChipKey
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
 
 /** Authoritative registry access. Implementations must load only the requested conversation. */
@@ -24,6 +28,13 @@ data class SubagentTodosSnapshot(
 internal object SubagentAdminHandlers {
     private val json = Json { ignoreUnknownKeys = true }
 
+    fun advertisedCapabilities(methods: Set<String>): List<String> = buildList {
+        if ("subagent.dismiss" in methods) add("subagent_dismiss_v1")
+        if (setOf("subagent.list", "subagent.todos").all { it in methods }) {
+            add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
+        }
+    }
+
     fun register(router: AdminRpcRouter, source: SubagentRegistrySource?) {
         if (source == null) return
         router.registerScoped("subagent.list") { params, context ->
@@ -32,6 +43,16 @@ internal object SubagentAdminHandlers {
             val entries = source.list(scope.conversationId, includeTerminal)
                 .filter { it.belongsTo(scope) }
             json.encodeToJsonElement(SubagentListResult(subagents = entries))
+        }
+        if (source is ControllerSubagentRegistrySource && source.supportsDismissal()) {
+            router.registerScoped("subagent.dismiss") { params, context ->
+                val scope = requireScope(params, context)
+                params.requireDismissalIdentity("conversation_id")
+                val agentId = params.requireDismissalIdentity("agent_id")
+                val toolCallId = params.requireDismissalIdentity("tool_call_id")
+                val key = SubagentChipKey(scope.conversationId, agentId, toolCallId)
+                json.encodeToJsonElement(SubagentListResult(source.dismiss(key)))
+            }
         }
         router.registerScoped("subagent.todos") { params, context ->
             val scope = requireScope(params, context)
@@ -53,6 +74,9 @@ internal object SubagentAdminHandlers {
         }
     }
 
+    private fun ControllerSubagentRegistrySource.supportsDismissal(): Boolean =
+        registry.supportsDurableDismissal && changeListener != null
+
     private fun requireScope(params: JsonObject?, context: AdminRpcRequestContext): SubagentRequestScope {
         if (!context.authenticated) adminError("unauthorized")
         val conversationId = params.requireParam(AdminParamKey("conversation_id"))
@@ -62,6 +86,10 @@ internal object SubagentAdminHandlers {
             agentId = param(params, AdminParamKey("agent_id"))?.takeIf { it.isNotBlank() },
         )
     }
+
+    private fun JsonObject?.requireDismissalIdentity(key: String): String =
+        (this?.get(key) as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+            ?.takeIf { it.isNotBlank() } ?: adminError("$key required")
 
     private fun SubagentEntry.belongsTo(scope: SubagentRequestScope): Boolean =
         parentConversationId == scope.conversationId &&

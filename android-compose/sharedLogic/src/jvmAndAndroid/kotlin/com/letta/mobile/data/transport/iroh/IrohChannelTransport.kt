@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.SyncBudgetPolicy
@@ -16,6 +17,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
+import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
 import com.letta.mobile.data.transport.api.CronControlTransport
 import com.letta.mobile.data.transport.api.CronPauseCommand
@@ -49,7 +51,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.runtime.AgentDefaultsRepository
@@ -942,6 +943,26 @@ class IrohChannelTransport(
         timeoutMs,
     )
 
+    override suspend fun dismissSubagent(
+        scope: SubagentParentScope,
+        toolCallId: ToolCallId,
+    ): Result<List<com.letta.mobile.data.model.SubagentEntry>> {
+        if (!scope.hasDismissalIdentity()) {
+            return Result.failure(IllegalArgumentException("subagent identity required"))
+        }
+        val requestId = "iroh-subagent-dismiss-${UUID.randomUUID()}"
+        val rpcScope = SubagentRpcScope(scope.parentConversationId, scope.parentAgentId)
+        val body = buildJsonObject { put("tool_call_id", toolCallId.value) }.toString()
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
+            labels = ScopedRpcLabels("durable subagent dismissal unavailable", "subagent.dismiss timed out", "subagent.dismiss failed"),
+            call = { subagentRpcClient.callScopedSubagentRpc("subagent.dismiss", rpcScope, body) },
+            mapSuccess = { result -> Result.success(subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result).subagents) },
+            onFailure = { failure -> Result.failure(IllegalStateException(failure.error)) },
+        )
+    }
+
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
         invokeSubagentRpc(subagentTodosCall(toolCallId), currentSubagentScope(), timeoutMs)
 
@@ -970,7 +991,7 @@ class IrohChannelTransport(
                 timedOut = "${rpc.method} timed out",
                 failed = "${rpc.method} failed",
             ),
-            call = { callScopedSubagentRpc(method = rpc.method, scope = scope, body = rpc.body.toString()) },
+            call = { subagentRpcClient.callScopedSubagentRpc(method = rpc.method, scope = scope, body = rpc.body.toString()) },
             mapSuccess = { result -> rpc.mapSuccess(requestId, result) },
             onFailure = rpc.onFailure,
         )
@@ -1038,24 +1059,8 @@ class IrohChannelTransport(
         onFailure(ScopedRpcFailure(requestId, error.message ?: labels.failed))
     }
 
-    private suspend fun callScopedSubagentRpc(
-        method: String,
-        scope: SubagentRpcScope,
-        body: String,
-    ): AppServerInboundFrame.AdminRpcResponse? {
-        val handle = supervisor.ready()
-        val advertised = handle.serverCapabilities
-        if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
-        val scopedBody = buildJsonObject {
-            put("conversation_id", scope.conversationId)
-            scope.agentId?.let { put("agent_id", it) }
-            subagentJson.parseToJsonElement(body).jsonObject.forEach { (key, value) -> put(key, value) }
-        }.toString()
-        val response = adminRpc(method, "/v1/conversations/${scope.conversationId}/subagents", scopedBody)
-        return response.takeUnless {
-            !it.success && AdminRpcErrors.isUnknownMethod(it.error)
-        }
-    }
+    private fun SubagentParentScope.hasDismissalIdentity(): Boolean =
+        parentAgentId.isNotBlank() && parentConversationId.isNotBlank()
 
     private fun currentSubagentScope(): SubagentRpcScope? {
         val conversationId = connectionSession.currentViewedConversationId() ?: return null

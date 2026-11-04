@@ -11,10 +11,12 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
@@ -137,6 +139,61 @@ class SubagentRegistryPublisherTest {
         assertEquals(AGENT, pushed.parentAgentId)
         assertEquals(CONVERSATION, pushed.parentConversationId)
         publisher.close()
+    }
+
+    @Test
+    fun scopedDismissalFlowsFromFileStoreThroughPublisherToClientProjection() = runTest {
+        val path = java.nio.file.Files.createTempDirectory("subagent-publisher-test").resolve("registry.json")
+        val durable = DurableSubagentRegistry(store = com.letta.mobile.data.subagents.FileSubagentRegistryStore(path), clock = { nowMs })
+        val liveSource = ControllerSubagentRegistrySource(durable)
+        val eventBus = kotlinx.coroutines.flow.MutableSharedFlow<ServerFrame>(extraBufferCapacity = 16)
+        val scope = com.letta.mobile.data.repository.api.SubagentParentScope(AGENT, CONVERSATION)
+        val transport = object : com.letta.mobile.data.transport.api.NoOpChannelTransport(),
+            com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport {
+            override val events = eventBus
+            override suspend fun sendSubagentListForScope(
+                scope: com.letta.mobile.data.repository.api.SubagentParentScope,
+                all: Boolean,
+                timeoutMs: Long,
+            ): ServerFrame.SubagentListResponse {
+                require(scope.parentAgentId == AGENT && scope.parentConversationId == CONVERSATION)
+                return ServerFrame.SubagentListResponse(
+                    id = "list", ts = "t", success = true,
+                    subagents = liveSource.list(scope.parentConversationId, all).filter { it.parentAgentId == scope.parentAgentId },
+                )
+            }
+        }
+        val repository = com.letta.mobile.data.repository.SubagentRepository(transport, backgroundScope, clock = { nowMs })
+        val publisher = SubagentRegistryPublisher(backgroundScope, liveSource, clock = { Instant.ofEpochMilli(nowMs) })
+        publisher.attach { conversationId, frame ->
+            require(conversationId == CONVERSATION)
+            eventBus.emit(decode(frame))
+            1
+        }
+        liveSource.changeListener = publisher
+        backgroundScope.launch { repository.activeSubagentsFlow(scope).collect {} }
+        liveSource.ingest(stateFrame(1, chip("tool-a", "running"), chip("tool-b", "running")))
+        runCurrent()
+        assertEquals(setOf("tool-a", "tool-b"), repository.currentActiveSubagents(scope).map { it.toolCallId }.toSet())
+        val router = AdminRpcRouter().also { SubagentAdminHandlers.register(it, liveSource) }
+        val response = router.dispatch(AdminRpcInvocation("dismiss", "subagent.dismiss", buildJsonObject {
+            put("agent_id", AGENT); put("conversation_id", CONVERSATION); put("tool_call_id", "tool-a")
+        }, AdminRpcRequestContext(authenticated = true, authorizedConversationIds = setOf(CONVERSATION))))
+        assertTrue(decoder.parseToJsonElement(response).jsonObject["success"]!!.toString().toBoolean())
+        runCurrent()
+        val remaining = repository.currentActiveSubagents(scope)
+        assertEquals(listOf("tool-b"), remaining.map { it.toolCallId })
+        val roster = com.letta.mobile.data.subagents.projectSubagentRoster(remaining, nowMs)
+        assertEquals(listOf("tool-b"), roster.running.map { it.toolCallId })
+        assertEquals(1, com.letta.mobile.data.presence.SubagentActivity.of(remaining).running)
+        assertEquals("user_dismissed", DurableSubagentRegistry(
+            store = com.letta.mobile.data.subagents.FileSubagentRegistryStore(path), clock = { nowMs },
+        ).record(CONVERSATION, AGENT, "tool-a")?.terminalReason)
+        liveSource.ingest(stateFrame(2, chip("tool-a", "running"), chip("tool-b", "running")))
+        runCurrent()
+        assertEquals(listOf("tool-b"), repository.currentActiveSubagents(scope).map { it.toolCallId })
+        publisher.close()
+        repository.close()
     }
 
     @Test

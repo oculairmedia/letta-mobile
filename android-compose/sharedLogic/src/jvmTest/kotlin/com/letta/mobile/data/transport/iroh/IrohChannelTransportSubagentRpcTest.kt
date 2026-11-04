@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -130,6 +131,36 @@ class IrohChannelTransportSubagentRpcTest {
 
         assertFalse(result.success)
         assertTrue(result.error.orEmpty().contains("registry read failed"))
+    }
+
+    @Test
+    fun `dismiss sends an exact scoped identity only when advertised`() = runTest {
+        val calls = mutableListOf<Call>()
+        val scope = com.letta.mobile.data.repository.api.SubagentParentScope("agent-a", "conv-a")
+        val client = transport(
+            capabilities = setOf(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY, "subagent_dismiss_v1"),
+            calls = calls,
+        ) { method, _, body ->
+            val params = json.parseToJsonElement(requireNotNull(body)).jsonObject
+            check(method == "subagent.dismiss")
+            check(params["agent_id"]?.jsonPrimitive?.content == "agent-a")
+            check(params["conversation_id"]?.jsonPrimitive?.content == "conv-a")
+            check(params["tool_call_id"]?.jsonPrimitive?.content == "tc-1")
+            response("dismiss", result = json.parseToJsonElement(
+                "{\"subagents\":[{\"toolCallId\":\"tc-1\",\"status\":\"cancelled\"," +
+                    "\"parentAgentId\":\"agent-a\",\"parentConversationId\":\"conv-a\"," +
+                    "\"terminal_reason\":\"user_dismissed\"}]}",
+            ))
+        }
+        assertEquals("user_dismissed", client.dismissSubagent(scope, ToolCallId("tc-1")).getOrThrow().single().terminalReason)
+        assertEquals("subagent.dismiss", calls.single().method)
+        assertTrue(runCatching { ToolCallId("") }.isFailure, "blank tool call ids cannot be constructed")
+        assertEquals(1, calls.size)
+
+        val oldCalls = mutableListOf<Call>()
+        val oldHost = transport(calls = oldCalls) { _, _, _ -> error("unadvertised mutation was sent") }
+        assertTrue(oldHost.dismissSubagent(scope, ToolCallId("tc-1")).isFailure)
+        assertTrue(oldCalls.isEmpty())
     }
 
     private fun kotlinx.coroutines.test.TestScope.transport(

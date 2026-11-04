@@ -4,7 +4,6 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -56,6 +55,7 @@ class ShimOffParityGateTest {
 
     private var savedFactory: (() -> AdminProxyTransport)? = null
     private val proxyDialCount = java.util.concurrent.atomic.AtomicInteger(0)
+    private val subagentDirectory = java.nio.file.Files.createTempDirectory("subagent-parity")
 
     @BeforeTest
     fun shimOff() {
@@ -73,12 +73,14 @@ class ShimOffParityGateTest {
     @AfterTest
     fun restore() {
         savedFactory?.let { AdminProxyClient.defaultTransportFactory = it }
+        subagentDirectory.toFile().deleteRecursively()
     }
 
-    private object EmptySubagentSource : SubagentRegistrySource {
-        override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> = emptyList()
-
-        override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? = null
+    private fun durableSubagentSource(): ControllerSubagentRegistrySource {
+        val store = com.letta.mobile.data.subagents.FileSubagentRegistryStore(subagentDirectory.resolve("registry.json"))
+        return ControllerSubagentRegistrySource(com.letta.mobile.data.subagents.DurableSubagentRegistry(store = store)).also {
+            it.changeListener = SubagentRegistryChangeListener { }
+        }
     }
 
     /** Serves every runtime-native op successfully; abstract turn ops are unused by admin_rpc. */
@@ -335,7 +337,7 @@ class ShimOffParityGateTest {
         AdminRpcRegistry.buildRouter(
             services = AdminRpcHostServices(
                 controller = controller,
-                subagentRegistrySource = EmptySubagentSource,
+                subagentRegistrySource = durableSubagentSource(),
                 vibesyncBaseUrl = null,
                 // VibeSync not injected
                 pluginRoutes = pluginRoutes,

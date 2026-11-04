@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
@@ -9,6 +10,7 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
 import com.letta.mobile.data.transport.api.sendSubagentListFor
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -100,6 +102,8 @@ open class SubagentRepository(
     // snapshot, mutates a private local copy, and publishes it once.
     private val runningAbsentSince = atomic<Map<String, Long>>(emptyMap())
     private val stateMutex = Mutex()
+    private val dismissedKeys = mutableSetOf<Triple<String, String, String>>()
+    private val terminalKeys = mutableSetOf<Triple<String, String, String>>()
 
     private val pushJob = repositoryScope.launch { observePushEvents() }
     private val reconnectJob = repositoryScope.launch { observeReconnects() }
@@ -217,6 +221,32 @@ open class SubagentRepository(
         response.todos
     }
 
+    override suspend fun dismiss(scope: SubagentParentScope, toolCallId: ToolCallId): Result<Unit> = runCatching {
+        require(scope.parentAgentId.isNotBlank() && scope.parentConversationId.isNotBlank())
+        val scoped = transport as? SubagentScopeAwareChannelTransport
+            ?: throw UnsupportedOperationException("durable subagent dismissal unavailable")
+        val changed = scoped.dismissSubagent(scope, toolCallId).getOrThrow()
+        validateDismissalReceipt(changed, scope, toolCallId)
+        stateMutex.withLock {
+            state.value = mergeSnapshot(changed, kind = SnapshotKind.INCREMENTAL, scope = scope)
+        }
+    }
+
+    private fun validateDismissalReceipt(entries: List<SubagentEntry>, scope: SubagentParentScope, toolCallId: ToolCallId) {
+        require(entries.isNotEmpty()) { "subagent was not dismissed" }
+        val expected = Triple(scope.parentAgentId, scope.parentConversationId, toolCallId.value)
+        require(entries.all { it.dismissalKey() == expected }) { "invalid dismissal receipt" }
+        require(entries.all { it.status == SubagentStatus.CANCELLED }) { "invalid dismissal receipt" }
+        require(entries.all { it.terminalReason == USER_DISMISSED_REASON }) { "invalid dismissal receipt" }
+    }
+
+    private fun SubagentEntry.dismissalKey(): Triple<String, String, String>? {
+        val agent = parentAgentId?.takeIf { it.isNotBlank() } ?: return null
+        val conversation = parentConversationId?.takeIf { it.isNotBlank() } ?: return null
+        val tool = toolCallId.takeIf { it.isNotBlank() } ?: return null
+        return Triple(agent, conversation, tool)
+    }
+
     enum class SnapshotKind { AUTHORITATIVE, INCREMENTAL }
 
     /**
@@ -235,13 +265,19 @@ open class SubagentRepository(
         kind: SnapshotKind,
         scope: SubagentParentScope? = null,
     ): List<SubagentEntry> {
+        val acceptedTerminals = rememberTerminalObservations(incoming + listOfNotNull(terminal), scope)
+        val visibleIncoming = incoming.filter { it.isInOptionalScope(scope) }
+            .filterNot { it.dismissalKey() in dismissedKeys || it.isRetiredRunning() }
         val now = clock()
         val stampedTerminal = terminal
+            ?.takeIf { it.isInOptionalScope(scope) }
+            ?.takeUnless { it.dismissalKey() in dismissedKeys }
             ?.takeIf { it.status in TERMINAL_STATUSES }
             ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: now) }
-        val (cached, untouched) = state.value.partition { scope == null || it.isInScope(scope) }
+        val (cached, untouched) = state.value.filterNot { it.dismissalKey() in dismissedKeys || it.isRetiredRunning() }
+            .partition { it.isInOptionalScope(scope) }
         val completeIncoming = keepTerminalOutcomes(
-            incoming = (if (stampedTerminal == null) incoming else incoming + stampedTerminal)
+            incoming = (if (stampedTerminal == null) visibleIncoming else visibleIncoming + stampedTerminal)
                 .map { entry -> entry.markSeen(now) },
             cached = cached,
         )
@@ -252,6 +288,7 @@ open class SubagentRepository(
         // mutations below go to this private local copy and are published once
         // at the end, so no other thread can observe a half-updated map.
         val absence = runningAbsentSince.value.toMutableMap()
+        acceptedTerminals.forEach { absence.remove(it.cacheKey()) }
 
         // Clear absence tracking for entries that ARE present in this snapshot.
         incomingByKey.keys.forEach { key -> absence.remove(key) }
@@ -268,13 +305,17 @@ open class SubagentRepository(
         // Publish the absence clock once, after every branch above has settled.
         runningAbsentSince.value = absence.toMap()
 
-        val previousTerminals = cached.filter { previous ->
-            previous.status in TERMINAL_STATUSES &&
-                previous.cacheKey() !in incomingByKey &&
-                previous.terminalAtEpochMs?.let { now - it < TERMINAL_LINGER_MS } == true
-        }
+        val previousTerminals = retainedTerminalEntries(cached, incomingByKey.keys, now)
         return (completeIncoming + retained + previousTerminals + untouched).distinctBy { it.cacheKey() }
     }
+
+    private fun retainedTerminalEntries(
+        cached: List<SubagentEntry>,
+        incomingKeys: Set<String>,
+        now: Long,
+    ): List<SubagentEntry> = cached.filter { it.status in TERMINAL_STATUSES }
+        .filterNot { it.cacheKey() in incomingKeys }
+        .filter { it.terminalAtEpochMs?.let { ended -> now - ended < TERMINAL_LINGER_MS } == true }
 
     /**
      *  (RC3): a subagent that has ended stays ended. The host
@@ -301,8 +342,32 @@ open class SubagentRepository(
         }
     }
 
+    private fun rememberTerminalObservations(
+        observations: List<SubagentEntry>,
+        scope: SubagentParentScope?,
+    ): List<SubagentEntry> {
+        val accepted = observations.filter { it.isInOptionalScope(scope) }
+            .filter { it.status in TERMINAL_STATUSES }
+            .filter { it.dismissalKey() != null }
+        accepted.mapNotNullTo(terminalKeys) { it.dismissalKey() }
+        accepted.filter { it.terminalReason == USER_DISMISSED_REASON }
+            .filter { it.status == SubagentStatus.CANCELLED }
+            .mapNotNullTo(dismissedKeys) { it.dismissalKey() }
+        return accepted
+    }
+
+    private fun SubagentEntry.isRetiredRunning(): Boolean =
+        status == SubagentStatus.RUNNING && dismissalKey()?.let { it in terminalKeys } == true
+
     private fun SubagentEntry.markSeen(now: Long): SubagentEntry =
-        if (status == SubagentStatus.RUNNING) copy(lastSeenAtMs = now) else this
+        when (status) {
+            SubagentStatus.RUNNING -> copy(lastSeenAtMs = now)
+            in TERMINAL_STATUSES -> copy(terminalAtEpochMs = terminalAtEpochMs ?: now)
+            else -> this
+        }
+
+    private fun SubagentEntry.isInOptionalScope(scope: SubagentParentScope?): Boolean =
+        scope == null || isInScope(scope)
 
     private fun SubagentEntry.isInScope(scope: SubagentParentScope): Boolean =
         parentAgentId == scope.parentAgentId && parentConversationId == scope.parentConversationId
@@ -381,7 +446,7 @@ open class SubagentRepository(
         toolCallId.takeIf { it.isNotBlank() }
             ?: taskId?.takeIf { it.isNotBlank() }
             ?: hashCode().toString(),
-    ).joinToString("|")
+    ).joinToString("|") { "${it.length}:$it" }
 
     private fun List<SubagentEntry>.inParentScope(scope: SubagentParentScope): List<SubagentEntry> =
         filter { entry -> entry.isInScope(scope) }
@@ -507,6 +572,7 @@ open class SubagentRepository(
     }
 
     companion object {
+        private const val USER_DISMISSED_REASON = "user_dismissed"
         private const val TERMINAL_LINGER_MS = 8_000L
         private const val RUNNING_ABSENCE_LINGER_MS = 60_000L
         // letta-mobile-ulcg6 (RC1): a RUNNING entry nobody has mentioned for

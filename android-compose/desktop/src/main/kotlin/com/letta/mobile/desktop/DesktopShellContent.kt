@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.repository.api.dismissAction
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -246,35 +247,34 @@ private fun desktopWorkspaceActions(
 
 @Composable
 private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: DesktopShellFrame) {
-    val navigator = context.navigator
-    if (!navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
-    // The roster opens in the window's inspector (docked beside the main pane when wide).
+    if (!context.navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
     BackgroundTasksSidePane(
         subagents = frame.lists.activeSubagents,
-        onClose = { navigator.showBackgroundTasks = false },
-        onOpenConversation = frame.subagentViews?.holder?.rosterOpener(navigator::showChat),
+        onClose = { context.navigator.showBackgroundTasks = false },
+        onOpenConversation = frame.subagentViews?.holder?.rosterOpener(context.navigator::showChat),
+        dismissTask = context.panels.subagents.repository?.dismissAction(
+            subagentParentScope(frame.chatState.selectedConversation?.agentId, frame.chatState.selectedConversationId)),
     )
 }
 
 @Composable
 private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShellFrame) {
     val core = context.core
-    val focus = frame.focus
     DesktopAppOverlays(
         visibility = context.overlays,
         data = DesktopOverlayData(
             workspace = ShellWorkspaceOverlayData(
                 searchSources = frame.lists.search,
-                railAgents = focus.railAgents,
-                rosterAgents = focus.rosterAgents,
-                avatarStyleByAgentId = focus.avatarStyleByAgentId,
+                railAgents = frame.focus.railAgents,
+                rosterAgents = frame.focus.rosterAgents,
+                avatarStyleByAgentId = frame.focus.avatarStyleByAgentId,
                 isDragActive = context.imageIntake.isDragActive.value,
             ),
         ),
         actions = createDesktopOverlayActions(
             CreateDesktopOverlayActionsParams(
                 onOpenAgent = { context.router.openAgent(AgentId(it)) },
-                onNewCanvas = { core.canvasShell.createNew(focus.selectedAgentId) },
+                onNewCanvas = { core.canvasShell.createNew(frame.focus.selectedAgentId) },
                 onOpenSearchHit = { context.router.openSearchHit(it) },
                 onNewAgent = context.navigator::openNewAgent,
                 onIrohIdentityReset = {

@@ -1,54 +1,28 @@
 package com.letta.mobile.ui.chat.subagents
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.subagents.SubagentRoster
 import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.data.subagents.SubagentRosterStatus
 import com.letta.mobile.data.subagents.projectSubagentRoster
-import com.letta.mobile.ui.chat.AgentActivity
-import com.letta.mobile.ui.chat.AgentActivityOrb
-import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
-import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterOptions
-import com.letta.mobile.ui.components.list.RosterRowSlots
-import com.letta.mobile.ui.components.list.RosterRowState
-import com.letta.mobile.ui.components.list.RosterSection
 import com.letta.mobile.ui.components.list.RosterSelection
 import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Clock
 
@@ -77,6 +51,8 @@ fun SubagentRosterList(
     onOpenConversation: OpenSubagentConversation?,
     onClearFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    onDismiss: ((SubagentRosterItem) -> Unit)? = null,
+    dismissableToolCallIds: Set<String> = emptySet(),
 ) {
     if (roster.isEmpty) {
         EmptyRoster(modifier)
@@ -93,7 +69,8 @@ fun SubagentRosterList(
         ),
         modifier = modifier.fillMaxWidth(),
     ) { line, row ->
-        if (line.card) RunningCard(line.item, onOpenConversation) else EndedRow(line.item, row, onOpenConversation)
+        val dismiss = onDismiss?.takeIf { !line.item.status.isTerminal && line.item.toolCallId in dismissableToolCallIds }
+        if (line.card) RunningCard(line.item, onOpenConversation, dismiss) else EndedRow(line.item, row, onOpenConversation, dismiss)
     }
 }
 
@@ -107,13 +84,22 @@ fun SubagentRoster(
     onOpenConversation: OpenSubagentConversation?,
     modifier: Modifier = Modifier,
     now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    onDismiss: ((SubagentEntry) -> Unit)? = null,
 ) {
     var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     // The roster stays open while subagents stream status updates, so keep the projection keyed
     // to its inputs instead of re-projecting per recomposition.
     val roster = remember(entries, clearedKeys) { projectSubagentRoster(entries, now(), clearedKeys) }
+    val dismissable = entries.groupBy { it.toolCallId }.filter { (tool, matches) ->
+        val entry = matches.singleOrNull()
+        tool.isNotBlank() && entry != null && !entry.parentAgentId.isNullOrBlank() && !entry.parentConversationId.isNullOrBlank()
+    }.mapValues { it.value.single() }
     SubagentRosterList(
         roster = roster,
+        dismissableToolCallIds = dismissable.keys,
+        onDismiss = onDismiss?.let { action ->
+            { item: SubagentRosterItem -> dismissable[item.toolCallId]?.let(action); Unit }
+        },
         onOpenConversation = onOpenConversation,
         onClearFinished = { clearedKeys = clearedKeys + roster.finished.map { it.key } },
         modifier = modifier,
@@ -127,44 +113,6 @@ fun SubagentRosterItem.openWith(open: (agentId: String, conversationId: String) 
     open(agentId, conversationId)
 }
 
-/** One roster row: a running [card] (activity lines) or an ended row. */
-@Immutable
-private data class SubagentRosterLine(val item: SubagentRosterItem, val card: Boolean)
-
-/** The section headers' actions: Finished's Clear and Background's Show / Hide. */
-private class SubagentRosterHeaderActions(val onClearFinished: () -> Unit, val onToggleBackground: () -> Unit)
-
-private fun subagentRosterSections(
-    roster: SubagentRoster,
-    backgroundShown: Boolean,
-    actions: SubagentRosterHeaderActions,
-): List<RosterSection<SubagentRosterLine>> = buildList {
-    if (roster.running.isNotEmpty()) {
-        add(RosterSection("running", roster.running.map { SubagentRosterLine(it, card = true) }, title = "Running · ${roster.running.size}"))
-    }
-    if (roster.finished.isNotEmpty()) {
-        add(
-            RosterSection(
-                "finished",
-                roster.finished.map { SubagentRosterLine(it, card = false) },
-                title = "Finished · ${roster.finished.size}",
-                headerEnd = { SectionAction(CLEAR_LABEL, actions.onClearFinished) },
-            ),
-        )
-    }
-    if (roster.background.isNotEmpty()) {
-        val shown = if (backgroundShown) roster.background else emptyList()
-        add(
-            RosterSection(
-                "background",
-                shown.map { SubagentRosterLine(it, card = false) },
-                title = "Background · ${roster.background.size}",
-                headerEnd = { SectionAction(if (backgroundShown) HIDE_LABEL else SHOW_LABEL, actions.onToggleBackground) },
-            ),
-        )
-    }
-}
-
 @Composable
 private fun EmptyRoster(modifier: Modifier) {
     Text(
@@ -175,140 +123,7 @@ private fun EmptyRoster(modifier: Modifier) {
     )
 }
 
-@Composable
-private fun SectionAction(label: String, onClick: () -> Unit) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.clickable(role = Role.Button, onClick = onClick),
-    )
-}
-
-private const val CLEAR_LABEL = "Clear"
-private const val SHOW_LABEL = "Show"
-private const val HIDE_LABEL = "Hide"
 private val SUBAGENT_ROSTER_LIST = RosterListTag("subagent-roster")
-
-@Composable
-private fun RunningCard(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
-    var expanded by remember(item.key) { mutableStateOf(false) }
-    val canExpand = item.activity.size > 1
-    val expandToggle = if (canExpand) Modifier.clickable(role = Role.Button) { expanded = !expanded } else Modifier
-    val orbActivity = if (item.status == SubagentRosterStatus.QUIET) AgentActivity.Idle else AgentActivity.Working
-    val visibleLines = if (expanded) item.activity else item.activity.takeLast(1)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = LettaDimens.Space.lg * item.depth)
-            .testTag(SubagentRosterTag.RUNNING.of(item.key)),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(
-            modifier = Modifier
-                .then(expandToggle)
-                .padding(LettaDimens.Space.md),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AgentActivityOrb(size = LettaDimens.Orb.sm, activity = orbActivity)
-                TitleBlock(item, modifier = Modifier.weight(1f))
-            }
-            visibleLines.forEach { line -> ActivityLine(line) }
-            ConversationAction(item, onOpenConversation)
-        }
-    }
-}
-
-/** An ended (or background) run: the shared roster row, its status glyph leading and its conversation trailing. */
-@Composable
-private fun EndedRow(item: SubagentRosterItem, row: RosterRowState, onOpenConversation: OpenSubagentConversation?) {
-    RosterListRow(
-        spec = LettaListRowSpec(title = item.title, subtitle = item.subtitle(), trailing = item.identity.label),
-        row = row,
-        slots = RosterRowSlots(
-            leading = { StatusGlyph(item.status) },
-            end = { ConversationAction(item, onOpenConversation) },
-        ),
-        modifier = Modifier
-            .padding(start = LettaDimens.Space.lg * item.depth)
-            .testTag(SubagentRosterTag.ENDED.of(item.key)),
-    )
-}
-
-/** A check or an error mark once ended; a background run still going keeps its orb. */
-@Composable
-private fun StatusGlyph(status: SubagentRosterStatus) {
-    if (!status.isTerminal) {
-        AgentActivityOrb(size = LettaDimens.Control.icon, activity = AgentActivity.Working)
-        return
-    }
-    val failed = status == SubagentRosterStatus.FAILED || status == SubagentRosterStatus.CANCELLED
-    val icon = if (failed) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle
-    val tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.customColors.successColor
-    Icon(
-        imageVector = icon,
-        contentDescription = statusWord(status),
-        tint = tint,
-        modifier = Modifier.size(LettaDimens.Control.icon),
-    )
-}
-
-@Composable
-private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            ExternalAgentBadge(item.identity, testTag = SubagentRosterTag.BADGE.of(item.key))
-        }
-        Text(
-            text = item.subtitle(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.testTag(SubagentRosterTag.SUBTITLE.of(item.key)),
-        )
-    }
-}
-
-@Composable
-private fun ActivityLine(text: String) {
-    Text(
-        text = "› $text",
-        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-@Composable
-private fun ConversationAction(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
-    if (onOpenConversation == null || !item.canOpenConversation) return
-    TextButton(
-        onClick = { onOpenConversation(item) },
-        modifier = Modifier.testTag(SubagentRosterTag.OPEN.of(item.key)),
-    ) {
-        Text("View conversation", style = MaterialTheme.typography.labelMedium)
-    }
-}
 
 /** "General-purpose · 1m 28s · 12 tools · claude-sonnet-5-5 · quiet". */
 fun SubagentRosterItem.subtitle(): String {

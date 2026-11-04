@@ -70,6 +70,8 @@ data class SubagentEntry(
     @SerialName("startedAt") val startedAt: String? = null,
     val activity: SubagentActivitySnapshot? = null,
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
+    /** Host-provided reason for a terminal registry transition, if known. */
+    @SerialName("terminal_reason") val terminalReason: String? = null,
     /** Client-owned lifecycle timestamp; never encoded onto the wire. */
     @Transient val terminalAtEpochMs: Long? = null,
     /**  AC#4 (stream-timeout watchdog): last observed progress

@@ -136,8 +136,11 @@ class AppServerServeIrohProductionWiringTest {
         val defaultRouter = buildProductionAdminRouter(controller = controller)
         val explicit = buildProductionAdminRouter(controller = controller, subagentRegistrySource = EmptySource)
 
-        assertTrue(defaultRouter.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
-        assertTrue(explicit.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
+        val readMethods = AdminRpcRegistry.subagentMethods - "subagent.dismiss"
+        assertTrue(defaultRouter.registeredMethods.containsAll(readMethods))
+        assertTrue(explicit.registeredMethods.containsAll(readMethods))
+        assertFalse("subagent.dismiss" in defaultRouter.registeredMethods)
+        assertFalse("subagent.dismiss" in explicit.registeredMethods)
     }
 
     @Test
