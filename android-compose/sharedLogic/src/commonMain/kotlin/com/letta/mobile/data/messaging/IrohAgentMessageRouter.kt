@@ -21,16 +21,16 @@ class IrohAgentMessageRouter(
 
     @Serializable
     data class Snapshot(
-        val version: Int = 1,
-        val reservations: Map<String, ReservationState> = emptyMap(),
-        val senderAttempts: Map<String, Int> = emptyMap(),
+        val version: Int,
+        val reservations: Map<String, ReservationState>,
+        val senderAttempts: Map<String, Int>,
     )
 
     private val reservations = linkedMapOf<String, ReservationState>()
     private val perSenderCount = mutableMapOf<String, Int>()
 
     /** Called under the receiver's routing lock, before any application dispatch. */
-    fun snapshot(): Snapshot = Snapshot(reservations = reservations.toMap(), senderAttempts = perSenderCount.toMap())
+    fun snapshot(): Snapshot = Snapshot(version = 1, reservations = reservations.toMap(), senderAttempts = perSenderCount.toMap())
 
     /** Strict journal recovery; unfinished reservations remain suppressive after a restart. */
     fun restore(snapshot: Snapshot) {

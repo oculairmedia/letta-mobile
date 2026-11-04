@@ -155,7 +155,8 @@ internal class IrohObserverIngestor(
         val frame = runCatching {
             DEVICE_PUSH_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
         }.getOrNull()?.takeIf {
-            it is ServerFrame.ConversationActivity || it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated || it is ServerFrame.SubagentsUpdated ||
+            it is ServerFrame.ConversationActivity || it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated ||
+                it is ServerFrame.SubagentsUpdated ||
                 it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated
         }
         if (frame == null) {

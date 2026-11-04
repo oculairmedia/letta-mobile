@@ -57,7 +57,9 @@ class InboxArrivalContractTest {
             val key = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString("conversation:conv-inbox".toByteArray())
             val dir = java.io.File(root, "conversations/$key").apply { mkdirs() }
             java.io.File(dir, "conversation.json").writeText("""{"id":"conv-inbox","agent_id":"agent-recipient","tags":["lane:inbox"]}""")
-            java.io.File(dir, "messages.jsonl").writeText("""{"id":"source-1","role":"user","otid":"client-stable","content":[{"type":"text","text":"wake"}]}""" + "\n")
+            java.io.File(dir, "messages.jsonl").writeText(
+                """{"id":"source-1","role":"user","otid":"client-stable","content":[{"type":"text","text":"wake"}]}""" + "\n",
+            )
             val store = com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore(root)
             val messages = checkNotNull(store.listMessagesProjected("conv-inbox", "agent-recipient",
                 com.letta.mobile.data.controller.node.iroh.MessagePage(64, null, null, "desc")))

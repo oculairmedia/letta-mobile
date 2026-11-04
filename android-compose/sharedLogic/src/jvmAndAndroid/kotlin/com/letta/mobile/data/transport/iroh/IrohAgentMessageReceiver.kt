@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
 import java.io.File
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.encodeToString
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -169,10 +169,10 @@ class IrohAgentMessageReceiver(
             AtomicJsonFile.withProcessLock(file.toPath()) {
                 if (file.exists()) {
                     require(file.length() in 1..MAX_JOURNAL_BYTES) { "A2A receipt journal exceeds its bound" }
-                    router.restore(Json.decodeFromString<IrohAgentMessageRouter.Snapshot>(file.readText()))
+                    router.restore(LettaJson.persisted.decodeFromString<IrohAgentMessageRouter.Snapshot>(file.readText()))
                 }
                 val result = block()
-                val encoded = Json.encodeToString(router.snapshot())
+                val encoded = LettaJson.persisted.encodeToString(router.snapshot())
                 require(encoded.toByteArray().size <= MAX_JOURNAL_BYTES)
                 AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true)
                 result

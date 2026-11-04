@@ -18,26 +18,30 @@ internal object AtomicJsonFile {
     fun write(path: Path, text: String, requireAtomic: Boolean = false) {
         path.parent?.let(Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
-        // fsync contents+metadata BEFORE the rename so a power loss can never
-        // expose a partially written or zero-byte file through the durable name.
-        FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).use { channel ->
-            val buffer = ByteBuffer.wrap(text.toByteArray(Charsets.UTF_8))
-            while (buffer.hasRemaining()) channel.write(buffer)
-            channel.force(true)
+        try {
+            // Sync the new contents before making them visible under the durable name.
+            FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).use {
+                channel ->
+                val buffer = ByteBuffer.wrap(text.toByteArray(Charsets.UTF_8))
+                while (buffer.hasRemaining()) channel.write(buffer)
+                channel.force(true)
+            }
+            replace(temp, path, requireAtomic)
+            // Directory channels are unsupported on some platforms, including Windows.
+            path.parent?.let { parent ->
+                runCatching { FileChannel.open(parent, StandardOpenOption.READ).use { it.force(true) } }
+            }
+        } finally {
+            Files.deleteIfExists(temp)
         }
+    }
+
+    private fun replace(temp: Path, path: Path, requireAtomic: Boolean) {
         try {
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         } catch (failure: Exception) {
-            if (requireAtomic) {
-                Files.deleteIfExists(temp)
-                throw failure
-            }
+            if (requireAtomic) throw failure
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
-        }
-        // Directory fsync is unsupported on some platforms (Windows throws when
-        // opening a directory channel); the file fsync + rename still hold.
-        path.parent?.let { parent ->
-            runCatching { FileChannel.open(parent, StandardOpenOption.READ).use { it.force(true) } }
         }
     }
 

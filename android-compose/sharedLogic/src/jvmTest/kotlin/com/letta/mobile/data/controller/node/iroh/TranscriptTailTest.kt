@@ -30,7 +30,8 @@ class TranscriptTailTest {
             assertEquals(null, store.committedUserMessageId("inbox", "recipient", "direct"))
             transcript.writeText(row("source", "user", "\"otid\":\"direct\","))
             transcript.appendText((1..64).joinToString("") { row("new-$it", "user") })
-            assertEquals(null, store.committedUserMessageId("inbox", "recipient", "direct"), "out-of-window absence must not invent evidence")
+            assertEquals(null, store.committedUserMessageId("inbox", "recipient", "direct"),
+                "out-of-window absence must not invent evidence")
         } finally { root.deleteRecursively() }
     }
 

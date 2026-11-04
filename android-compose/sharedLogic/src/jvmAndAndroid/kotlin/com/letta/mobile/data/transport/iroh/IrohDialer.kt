@@ -241,7 +241,10 @@ internal class IrohDialer(
             AppServerCommand.Auth(
                 requestId = "auth-${UUID.randomUUID()}",
                 token = token,
-                capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY, com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY),
+                capabilities = listOf(
+                    IrohFrameCodec.FRAME_PART_CAPABILITY,
+                    com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY,
+                ),
             ),
         )
         // letta-mobile-dpv7m.2: a denied auth is terminal even without a token. A

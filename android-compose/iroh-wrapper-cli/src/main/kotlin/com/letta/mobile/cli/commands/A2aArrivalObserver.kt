@@ -3,7 +3,6 @@ package com.letta.mobile.cli.commands
 import com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.AgentMessageClientId
-import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -11,9 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.Instant
 
 /** Tracks only accepted inputs on their resolved inbox, never a roster or a client subscription. */
@@ -43,11 +42,18 @@ internal class A2aArrivalObserver(
         runCatching {
             persisted(message.msgId)
             val now = Instant.now().toString()
-            target.broadcast(WIRE_JSON.encodeToString(ServerFrame.ConversationActivity(
-                id = "activity-${message.msgId}", ts = now,
-                agentId = message.toAgentId, conversationId = conversationId,
-                milestone = "persisted", sourceMessageId = source, clientMessageId = clientId, at = now,
-            )))
+            target.broadcast(buildJsonObject {
+                put("v", 1)
+                put("type", "conversation_activity")
+                put("id", "activity-${message.msgId}")
+                put("ts", now)
+                put("agent_id", message.toAgentId)
+                put("conversation_id", conversationId)
+                put("milestone", "persisted")
+                put("source_message_id", source)
+                put("client_message_id", clientId)
+                put("at", now)
+            }.toString())
             true
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
@@ -66,7 +72,6 @@ internal class A2aArrivalObserver(
     }
 
     private companion object {
-        val WIRE_JSON = Json { encodeDefaults = true }
         const val RECHECK_MS = 1_000L
     }
 }

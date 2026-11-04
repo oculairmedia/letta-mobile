@@ -67,7 +67,7 @@ class A2aReservationTest {
                 assertEquals("duplicate_msg_id", receiver().respond(message, "peer").reason)
                 assertEquals(1, attempts)
                 // Simulate a crash between durable reserve and application receipt.
-                file.writeText("""{"reservations":{"stable":"RESERVED"},"senderAttempts":{"sender":1}}""")
+                file.writeText("""{"version":1,"reservations":{"stable":"RESERVED"},"senderAttempts":{"sender":1}}""")
                 assertEquals("duplicate_msg_id", receiver().respond(message, "peer").reason)
                 assertEquals(1, attempts)
             } finally { dir.deleteRecursively() }
@@ -99,14 +99,30 @@ class A2aReservationTest {
             receiver().respond(message, "peer")
             assertEquals("reservation_capacity_exceeded", receiver().respond(message.copy(msgId = "other"), "peer").reason)
             assertEquals("duplicate_msg_id", receiver().respond(message, "peer").reason)
-            file.writeText("broken")
-            assertEquals("reservation_journal_failure", receiver().respond(message, "peer").reason)
+            for (corruption in listOf("broken", "{}", "{\"version\":99,\"reservations\":{},\"senderAttempts\":{}}")) {
+                file.writeText(corruption)
+                assertEquals("reservation_journal_failure", receiver().respond(message, "peer").reason)
+            }
             val badPath = java.io.File(dir, "parent-file").apply { writeText("not a directory") }
             val blocked = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
                 { _, _ -> attempts++; DeliveryOutcome(true) }, { _, _ -> true }, java.io.File(badPath, "receipts.json"))
             assertEquals("reservation_journal_failure", blocked.respond(message, "peer").reason)
             assertEquals(1, attempts)
         } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun failedAtomicReplacementLeavesNoUnboundedTemporaryFiles() {
+        val root = java.nio.file.Files.createTempDirectory("receipt-atomic").toFile()
+        try {
+            val destination = java.io.File(root, "state").apply { mkdirs() }
+            java.io.File(destination, "existing").writeText("preserve")
+            kotlin.test.assertFailsWith<Exception> {
+                com.letta.mobile.data.controller.node.iroh.AtomicJsonFile.write(destination.toPath(), "{}", requireAtomic = true)
+            }
+            assertEquals(listOf("state"), root.listFiles()!!.map { it.name })
+            assertEquals("preserve", java.io.File(destination, "existing").readText())
+        } finally { root.deleteRecursively() }
     }
 
 }
