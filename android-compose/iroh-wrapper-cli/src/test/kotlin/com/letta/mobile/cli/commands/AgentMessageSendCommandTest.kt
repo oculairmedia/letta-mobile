@@ -175,6 +175,17 @@ class AgentMessageSendEnvelopeTest {
     }
 
     @Test
+    fun retryPreservesMessageIdAndCorrelationOnWire() {
+        val args = arrayOf("--msg-id", "retry-1", "--lane", "home", "--correlation", "bead=x=y")
+        val first = send(*args)
+        val retry = send(*args)
+        assertEquals("retry-1", first.msgId)
+        assertEquals(first.msgId, retry.msgId)
+        assertEquals(mapOf("bead" to "x=y"), first.correlation)
+        assertEquals(first.correlation, retry.correlation)
+    }
+
+    @Test
     fun jsonCorrelationPreservesArbitraryKeysAndEmptyMaps() {
         assertEquals(mapOf("a=b" to "value", "" to "empty"), send("--correlation-json", """{"a=b":"value","":"empty"}""").correlation)
         assertEquals(emptyMap<String, String>(), send("--correlation-json", "{}").correlation)

@@ -102,6 +102,10 @@ class CustomIrohMessagingTool(
                 put("description", "Message body. Multi-line content round-trips exactly " +
                     "(the wrapper pipes this through stdin to avoid shell-quoting collapse).")
             })
+            put("msg_id", buildJsonObject {
+                put("type", "string")
+                put("description", "Idempotency ID; reuse the same ID when retrying the same message.")
+            })
             put("lane", buildJsonObject {
                 put("type", "string")
                 put("description", "Destination lane; omitted means inbox. Ignored when conversation_id is supplied.")
@@ -215,7 +219,14 @@ class CustomIrohMessagingTool(
                 """{"ok":true,"delivered":true,"msgId":"${result.msgId}","to":"$toAgentId"}""",
             )
             is IrohCliSendResult.Accepted -> ExternalToolResult.Success(
-                """{"ok":true,"accepted":true,"delivered":false,"msgId":"${result.msgId}","to":"${result.toAgentId}"}""",
+                buildJsonObject {
+                    put("ok", true)
+                    put("accepted", true)
+                    put("delivered", false)
+                    put("msgId", result.msgId)
+                    put("to", result.toAgentId)
+                    result.reason?.let { put("reason", it) }
+                }.toString(),
             )
             is IrohCliSendResult.Unaddressable -> ExternalToolResult.Error(
                 "agent_message_send: target '$toAgentId' is unaddressable (msgId unavailable at resolution): ${result.reason}",
@@ -266,5 +277,5 @@ private fun parseMessageOptions(input: JsonObject): IrohMessageOptions {
             value.content
         }
     }
-    return IrohMessageOptions(conversationId, if (conversationId == null) lane else null, correlation)
+    return IrohMessageOptions(conversationId, if (conversationId == null) lane else null, correlation, optionalString("msg_id"))
 }

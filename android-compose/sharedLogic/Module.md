@@ -659,4 +659,4 @@ Maps merged wrapper cron-run and lease pages into shared schedule history record
 
 # Package com.letta.mobile.data.controller.extras.messaging
 
-Optional recipient addressing and task correlation for agent-message CLI invocations.
+Optional recipient addressing, task correlation, and a caller-supplied retry idempotency ID for agent-message CLI invocations.

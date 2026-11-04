@@ -71,11 +71,9 @@ class DefaultIrohCliRunner(
         body: String,
         paths: IrohCliPaths,
     ): IrohCliSendResult {
-        // Generate the idempotency id at the wrapper so the CLI's default
-        // `msg-${UUID}` only fires when an upstream caller didn't pin one.
-        // For this tool surface the agent never supplies a msgId, so we mint
-        // one here and surface it back on Delivered for the agent's log.
-        val msgId = "msg-${UUID.randomUUID()}"
+        // Keep a caller-supplied idempotency ID across retries; otherwise mint
+        // one here so the CLI and its result share the same identity.
+        val msgId = paths.message.msgId ?: "msg-${UUID.randomUUID()}"
 
         val command = buildCommand(
             binary = binary,
@@ -256,7 +254,7 @@ class DefaultIrohCliRunner(
                 parsed.accepted && parsed.applicationDelivered ->
                     IrohCliSendResult.Delivered(msgId = parsed.msgId)
                 parsed.accepted && !parsed.applicationDelivered ->
-                    IrohCliSendResult.Accepted(msgId = parsed.msgId, toAgentId = toAgentId)
+                    IrohCliSendResult.Accepted(msgId = parsed.msgId, toAgentId = toAgentId, reason = parsed.reason)
                 else -> if (parsed.error == "unaddressable") {
                     IrohCliSendResult.Unaddressable(
                         toAgentId = parsed.toAgentId,

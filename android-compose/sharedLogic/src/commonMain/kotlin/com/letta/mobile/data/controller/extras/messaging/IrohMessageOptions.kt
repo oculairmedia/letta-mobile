@@ -8,4 +8,6 @@ data class IrohMessageOptions(
     val lane: String? = null,
     /** Free-form string correlation (for example a bead id) carried to the recipient unchanged. */
     val correlation: Map<String, String>? = null,
+    /** Caller-supplied idempotency ID; reuse it unchanged when retrying the same message. */
+    val msgId: String? = null,
 )
