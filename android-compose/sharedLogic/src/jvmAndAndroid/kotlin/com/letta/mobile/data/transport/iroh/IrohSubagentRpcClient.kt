@@ -101,8 +101,7 @@ internal class IrohSubagentRpcClient(
     ): AppServerInboundFrame.AdminRpcResponse? {
         val handle = readyHandle()
         val advertised = handle.serverCapabilities
-        if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
-        if (method == "subagent.dismiss" && !advertised.supportsDismissal()) return null
+        if (!supportsScopedSubagentRpc(method, advertised)) return null
         val scopedBody = buildJsonObject {
             put("conversation_id", scope.conversationId)
             scope.agentId?.let { put("agent_id", it) }
@@ -113,8 +112,6 @@ internal class IrohSubagentRpcClient(
             !it.success && AdminRpcErrors.isUnknownMethod(it.error)
         }
     }
-
-    private fun Set<String>?.supportsDismissal(): Boolean = this != null && "subagent_dismiss_v1" in this
 
     @Serializable
     private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())

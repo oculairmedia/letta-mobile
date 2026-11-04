@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.subagents.SubagentChipKey
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.serialization.Serializable
@@ -26,6 +27,13 @@ data class SubagentTodosSnapshot(
 
 internal object SubagentAdminHandlers {
     private val json = Json { ignoreUnknownKeys = true }
+
+    fun advertisedCapabilities(methods: Set<String>): List<String> = buildList {
+        if ("subagent.dismiss" in methods) add("subagent_dismiss_v1")
+        if (setOf("subagent.list", "subagent.todos").all { it in methods }) {
+            add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
+        }
+    }
 
     fun register(router: AdminRpcRouter, source: SubagentRegistrySource?) {
         if (source == null) return

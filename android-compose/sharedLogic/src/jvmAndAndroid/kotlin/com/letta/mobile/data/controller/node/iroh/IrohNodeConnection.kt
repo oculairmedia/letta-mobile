@@ -12,7 +12,6 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -1016,8 +1015,6 @@ class IrohNodeConnection(
     }
 
     companion object {
-        private val SUBAGENT_RPC_METHODS = setOf("subagent.list", "subagent.todos")
-
         /** Control frames that address an agent and so are subject to the peer's agent scope. */
         private val AGENT_ADDRESSED_FRAME_TYPES = setOf(
             "runtime_start", "input", "sync", "abort_message", "remove_queue_item", "resume_queue",
@@ -1028,10 +1025,7 @@ class IrohNodeConnection(
             // not of any admin handler, so every host advertises it.
             add(com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY)
             addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY, ORDERED_EVENT_SEQ_CAPABILITY) + router.featureCapabilities)
-            if ("subagent.dismiss" in router.registeredMethods) add("subagent_dismiss_v1")
-            if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
-                add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
-            }
+            addAll(SubagentAdminHandlers.advertisedCapabilities(router.registeredMethods))
         }
         const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
         // Raised 5s -> 60s (P3): a heavy final turn (large tool_return, long
