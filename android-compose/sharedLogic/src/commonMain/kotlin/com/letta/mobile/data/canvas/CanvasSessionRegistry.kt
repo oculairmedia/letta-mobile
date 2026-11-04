@@ -18,13 +18,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * callers could take.
  */
 class CanvasSessionRegistry {
-    private class Registration(val session: CanvasSession)
-
-    private val activeSessions = MutableStateFlow<Map<CanvasId, List<Registration>>>(emptyMap())
+    private val activeSessions = MutableStateFlow<Map<CanvasId, List<Pair<Any, CanvasSession>>>>(emptyMap())
 
     /** Replaces registrations for this id. Mounts should use [registerMount] instead. */
     fun register(session: CanvasSession) {
-        update { it + (session.canvasId to listOf(Registration(session))) }
+        update { it + (session.canvasId to listOf(Any() to session)) }
     }
 
     /**
@@ -33,7 +31,8 @@ class CanvasSessionRegistry {
      * Callers must not share a registry across authentication contexts.
      */
     fun registerMount(session: CanvasSession): () -> Unit {
-        val registration = Registration(session)
+        // A unique identity token per mount; pairs avoid a new package type.
+        val registration = Any() to session
         val canvasId = session.canvasId
         update { current -> current + (canvasId to (current[canvasId].orEmpty() + registration)) }
         return {
@@ -49,13 +48,13 @@ class CanvasSessionRegistry {
         update { it - canvasId }
     }
 
-    fun get(canvasId: CanvasId): CanvasSession? = activeSessions.value[canvasId]?.lastOrNull()?.session
+    fun get(canvasId: CanvasId): CanvasSession? = activeSessions.value[canvasId]?.lastOrNull()?.second
 
     fun clear() {
         update { emptyMap() }
     }
 
-    private fun update(transform: (Map<CanvasId, List<Registration>>) -> Map<CanvasId, List<Registration>>) {
+    private fun update(transform: (Map<CanvasId, List<Pair<Any, CanvasSession>>>) -> Map<CanvasId, List<Pair<Any, CanvasSession>>>) {
         while (true) {
             val current = activeSessions.value
             if (activeSessions.compareAndSet(current, transform(current))) return
