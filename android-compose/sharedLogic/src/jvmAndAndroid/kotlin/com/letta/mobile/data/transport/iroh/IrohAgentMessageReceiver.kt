@@ -27,8 +27,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * envelope from an accepted connection, apply the [IrohAgentMessageRouter] policy, hand the
  * delivery decision to [onDeliver] (which lands the message in the chosen
  * conversation and triggers a turn), then ack the outcome. A dropped/duplicate/ping-pong
- * message is still acked (delivery is at-most-once on OUR side) but not delivered. NO HTTP
- * fallback.
+ * message is still acked without a repeat dispatch. A persisted duplicate is acknowledged as
+ * already delivered. NO HTTP fallback.
  *
  * this used to run its own accept loop on a SECOND endpoint bound with
  * the host's secret key. Both endpoints registered the same node id with the relay, which keeps
@@ -139,7 +139,7 @@ class IrohAgentMessageReceiver(
             return DeliveryOutcome(false, "reservation_journal_failure")
         }
         if (decision is IrohAgentMessageRouter.RoutingDecision.Dropped) {
-            return DeliveryOutcome(false, decision.reason)
+            return DeliveryOutcome(decision.reason == "duplicate_persisted", decision.reason)
         }
         val outcome = dispatch(message, decision)
         return runCatching {

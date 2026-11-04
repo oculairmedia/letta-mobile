@@ -83,7 +83,7 @@ class IrohAgentMessageRouter(
         data object CreateAndDeliver : RoutingDecision
         /** The chosen conversation is busy — queue on it (do not reroute). */
         data class Queue(val conversationId: String) : RoutingDecision
-        /** Dropped for a policy reason, including loop-safety or an invalid lane. */
+        /** Suppress dispatch for a policy reason or an already reserved message. */
         data class Dropped(val reason: String) : RoutingDecision
     }
 
@@ -116,6 +116,7 @@ class IrohAgentMessageRouter(
         return when {
             fromAgentId in loopIdentities -> RoutingDecision.Dropped("ping_pong_own_or_sibling")
             !validIdentity(fromAgentId) || !validIdentity(msgId) -> RoutingDecision.Dropped("invalid_identity")
+            reservations[reservationKey(sender, message)] == ReservationState.PERSISTED -> RoutingDecision.Dropped("duplicate_persisted")
             reservationKey(sender, message) in reservations -> RoutingDecision.Dropped("duplicate_msg_id")
             atCapacity -> RoutingDecision.Dropped("reservation_capacity_exceeded")
             count >= maxPerSender -> RoutingDecision.Dropped("per_sender_cap_exceeded")

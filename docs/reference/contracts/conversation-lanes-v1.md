@@ -130,6 +130,14 @@ reservation; a timeout, cancellation, mismatched receipt or dispatch exception r
 Duplicates never enter application delivery. Startup treats unfinished RESERVED entries as
 ambiguous. A later persisted observation cannot be downgraded by a racing acceptance receipt.
 
+| Duplicate reservation state | `applicationDelivered` | Ack reason |
+| --- | --- | --- |
+| RESERVED, ACCEPTED, AMBIGUOUS | `false` | `duplicate_msg_id` |
+| PERSISTED | `true` | `duplicate_persisted` |
+
+A persisted duplicate confirms the earlier delivery; it does not dispatch a second input.
+The PERSISTED state and its acknowledgement survive journal recovery.
+
 Reservations and every settlement use the canonical authenticated sender plus `msgId`, so a
 second sender may reuse a message ID without changing the first sender's reservation. Journal
 version 2 encodes reservations as sender -> message ID -> state. Version 1 has senderless keys;

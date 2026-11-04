@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.transport.appserver.*
+import com.letta.mobile.data.transport.iroh.DeliveryOutcome
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import computer.iroh.Connection
@@ -87,6 +88,8 @@ class InboxArrivalDeliveryTest {
 
             val outcome = withContext(Dispatchers.IO) { wiring.receiver.respond(message, sender.nodeIdHex) }
             assertEquals("application_input_accepted", outcome.reason)
+            assertFalse(outcome.delivered)
+            assertEquals(DeliveryOutcome(false, "duplicate_msg_id"), wiring.receiver.respond(message, sender.nodeIdHex))
             runCurrent()
             assertTrue(capable.frames.isEmpty(), "acceptance alone must never create a persisted arrival")
             val input = client.inputs.single()
@@ -107,12 +110,7 @@ class InboxArrivalDeliveryTest {
 
             val decoded = Json.decodeFromString(ServerFrameSerializer, capable.frames.single())
             val activity = assertInstanceOf(ServerFrame.ConversationActivity::class.java, decoded)
-            assertEquals("persisted", activity.milestone)
-            assertEquals("committed-source", activity.sourceMessageId)
-            assertEquals(clientId, activity.clientMessageId)
-            assertEquals("recipient", activity.agentId)
-            assertEquals("inbox", activity.conversationId)
-            assertNull(WsFrameMapper.toLettaMessage(activity), "activity must not append to the home timeline")
+            assertCommittedActivity(activity, clientId)
             assertTrue(legacy.frames.isEmpty(), "old clients receive neither activity nor conversation invalidation")
             assertTrue(scoped.frames.isEmpty())
             assertTrue(otherAgent.frames.isEmpty())
@@ -120,10 +118,22 @@ class InboxArrivalDeliveryTest {
             assertEquals(5, registry.viewersFor("home").size)
             assertTrue(registry.viewersFor("inbox").isEmpty(), "arrival observation must never subscribe a home viewer to inbox")
             assertFalse(File(home, "messages.jsonl").exists())
-            assertEquals("duplicate_msg_id", wiring.receiver.respond(message, sender.nodeIdHex).reason)
+            assertEquals(DeliveryOutcome(true, "duplicate_persisted"), wiring.receiver.respond(message, sender.nodeIdHex))
+            val restarted = buildA2aWiring(A2aWiringConfig(File(root, "identities"), File(root, "addresses.kv")),
+                { client }, backend, scope = backgroundScope, activityTarget = endpoint.conversationActivityTarget())
+            assertEquals(DeliveryOutcome(true, "duplicate_persisted"), restarted.receiver.respond(message, sender.nodeIdHex))
             assertEquals(1, client.inputs.size)
             assertEquals(if (existingInbox) 0 else 1, client.creates)
         } finally { root.deleteRecursively() }
+    }
+
+    private fun assertCommittedActivity(activity: ServerFrame.ConversationActivity, clientId: String) {
+        assertEquals("persisted", activity.milestone)
+        assertEquals("committed-source", activity.sourceMessageId)
+        assertEquals(clientId, activity.clientMessageId)
+        assertEquals("recipient", activity.agentId)
+        assertEquals("inbox", activity.conversationId)
+        assertNull(WsFrameMapper.toLettaMessage(activity), "activity must not append to the home timeline")
     }
 
     private fun conversation(root: File, id: String, lane: String): File {

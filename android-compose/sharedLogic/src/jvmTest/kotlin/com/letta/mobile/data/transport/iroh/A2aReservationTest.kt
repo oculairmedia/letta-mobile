@@ -1,6 +1,8 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.MessageId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -9,6 +11,51 @@ import kotlin.test.assertEquals
 
 class A2aReservationTest {
     private val message = IrohAgentMessage("sender", "recipient", "body", "stable", 1)
+
+    @Test
+    fun duplicateOutcomesMatchReservationStateAndSenderClassification() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-duplicate-states").toFile()
+        try {
+            val sender = IrohAgentMessageSender(
+                endpointProvider = { error("no dial") },
+                resolver = IrohAgentAddressResolver(HostEndpointAddressStore(java.io.File(dir, "addresses"))),
+            )
+            for (state in IrohAgentMessageRouter.ReservationState.entries) {
+                val router = IrohAgentMessageRouter("self")
+                router.route("sender", "stable", emptyList())
+                router.settle(AgentId("sender"), MessageId("stable"), state)
+                var dispatches = 0
+                val receiver = IrohAgentMessageReceiver(router, { emptyList() },
+                    { _, _ -> dispatches++; DeliveryOutcome(false) }, { _, _ -> true })
+                val outcome = receiver.respond(message, "sender")
+                val persisted = state == IrohAgentMessageRouter.ReservationState.PERSISTED
+                assertEquals(persisted, outcome.delivered, state.name)
+                assertEquals(if (persisted) "duplicate_persisted" else "duplicate_msg_id", outcome.reason, state.name)
+                val ack = IrohAgentMessageAck.decode(IrohAgentMessageAck(message.msgId, true, outcome.delivered, outcome.reason).encode())
+                val result = sender.classifyAck(message, ack)
+                if (persisted) assertEquals(AgentSendResult.Delivered(message.msgId), result)
+                else assertEquals(AgentSendResult.Accepted(message.msgId, message.toAgentId, "duplicate_msg_id"), result)
+                assertEquals(0, dispatches, state.name)
+            }
+        } finally { dir.deleteRecursively() }
+    }
+
+    @Test
+    fun persistedReceiptSurvivesJournalRestartWithoutDispatch() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-persisted").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            var attempts = 0
+            fun receiver() = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { _, _ -> attempts++; DeliveryOutcome(false, "application_input_accepted") }, { _, _ -> true }, file)
+            val first = receiver()
+            assertEquals(DeliveryOutcome(false, "application_input_accepted"), first.respond(message, "sender"))
+            first.markPersisted(AgentId("sender"), MessageId("stable"))
+            assertEquals(DeliveryOutcome(true, "duplicate_persisted"), first.respond(message, "sender"))
+            assertEquals(DeliveryOutcome(true, "duplicate_persisted"), receiver().respond(message, "sender"))
+            assertEquals(1, attempts)
+        } finally { dir.deleteRecursively() }
+    }
 
     @Test
     fun authenticatedSendersShareMessageIdsWithoutSharingReservationsAcrossRestart() = runTest {
