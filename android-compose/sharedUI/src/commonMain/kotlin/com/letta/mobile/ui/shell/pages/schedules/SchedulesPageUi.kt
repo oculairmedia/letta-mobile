@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
@@ -135,6 +137,7 @@ internal class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate
     /** The day the calendar shows: its week, its month, or the agenda's first day. */
     var anchor by mutableStateOf(today)
     var linkedRun by mutableStateOf<ScheduleRun?>(null)
+    var leaseNotice by mutableStateOf<String?>(null)
 
     /** The chosen view, else Week on a wide page and Agenda on a phone. */
     fun view(wide: Boolean): SchedulesView = chosenView ?: if (wide) SchedulesView.Week else SchedulesView.Agenda
@@ -161,7 +164,12 @@ internal class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate
     )
 
     private fun openLease(lease: Lease, data: SchedulesData) {
-        val record = data.runHistory.values.flatten().firstOrNull { it.recordId == lease.runId && lease.runId != null } ?: return
+        val record = data.runHistory.values.flatten().firstOrNull { it.recordId == lease.runId && lease.runId != null }
+        if (record == null) {
+            leaseNotice = if (lease.runId == null) "This lease has no linked run" else "Linked run is unavailable"
+            return
+        }
+        leaseNotice = null
         val def = data.historyDefs.firstOrNull { it.id == record.scheduleId }
         val run = ScheduleRun(
             record.scheduleId, record.scheduleName ?: def?.name ?: "Run", record.instant, record.status,
@@ -243,6 +251,9 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
         Column(Modifier.fillMaxSize()) {
             SchedulesHeader(headerParams(ui, input, view, wide))
             SchedulesFilters(filterParams(ui, input))
+            ui.leaseNotice?.let { notice ->
+                Text(notice, Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm))
+            }
             val selectedId = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
             val body = SchedulesBody(input.state, data, view, calendar, selectedId, input.actions.onRefresh)
             Row(Modifier.weight(1f).fillMaxWidth()) {

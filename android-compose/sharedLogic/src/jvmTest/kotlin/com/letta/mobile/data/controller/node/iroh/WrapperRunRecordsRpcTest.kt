@@ -2,6 +2,12 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore
+import com.letta.mobile.data.controller.node.iroh.records.RecordedLeaseInput
+import com.letta.mobile.data.controller.node.iroh.records.RecordedLeaseState
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.schedules.runs.LeaseHistory
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.controller.node.iroh.records.WrapperRecordStore
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
@@ -43,6 +49,50 @@ class WrapperRunRecordsRpcTest {
     private val epoch = Instant.parse("2026-11-02T00:00:00Z").toEpochMilli()
     private fun router(store: WrapperRecordStore = FileWrapperRecordStore(clock = { epoch })) =
         AdminRpcRegistry.buildRouter(native = AdminRpcNativeSources(nativeClient = upstream(), wrapperRecords = store))
+
+    @Test
+    fun clientDeduplicatesShiftedRowsFromTheAuthenticatedLeaseHandler() = runTest {
+        val store = FileWrapperRecordStore(clock = { epoch })
+        val initial = (0..200).map { index ->
+            RecordedLeaseInput(
+                id = "lease-${index.toString().padStart(3, '0')}",
+                owner = "agent-A",
+                label = "old",
+                startedAtMs = epoch - index * 1_000L,
+                dueAtMs = epoch + 3_600_000L,
+                state = RecordedLeaseState.ACTIVE,
+            )
+        }
+        initial.forEach(store::upsert)
+        val router = router(store)
+        val authorizedParams = buildJsonObject { put("agentId", "agent-A"); put("limit", 200); put("offset", 0) }
+        val unauthenticated = call(router, "lease.list", authorizedParams, authenticated = false)
+        assertEquals(false, unauthenticated.getValue("success").jsonPrimitive.boolean)
+        val wrongAgent = call(router, "lease.list", buildJsonObject { put("agentId", "agent-B") })
+        assertEquals(false, wrongAgent.getValue("success").jsonPrimitive.boolean)
+        val pageSizes = mutableListOf<Int>()
+        val transport = object : NoOpChannelTransport() {
+            override val hostCapabilities = router.featureCapabilities
+            override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+                assertEquals("lease.list", method)
+                assertEquals("/v1/leases", path)
+                val params = Json.parseToJsonElement(requireNotNull(body)).jsonObject
+                assertEquals(200, params.getValue("limit").jsonPrimitive.int)
+                if (params.getValue("offset").jsonPrimitive.int == 200) {
+                    store.upsert(initial[199].copy(label = "new"))
+                    store.upsert(initial[0].copy(id = "lease-new", startedAtMs = epoch + 1L))
+                }
+                val response = this@WrapperRunRecordsRpcTest.call(router, method, params)
+                assertEquals(true, response.getValue("success").jsonPrimitive.boolean, "$response")
+                pageSizes += response.getValue("result").jsonObject.getValue("leases").jsonArray.size
+                return AppServerProtocol.json.decodeFromJsonElement(AppServerInboundFrame.AdminRpcResponse.serializer(), response)
+            }
+        }
+        val leases = LeaseHistory(transport).load(AgentId("agent-A"))
+        assertEquals(listOf(200, 2), pageSizes)
+        assertEquals(initial.map { it.id }, leases.map { it.id })
+        assertEquals("new", leases.single { it.id == initial[199].id }.label)
+    }
 
     @Test
     fun recordAndUpstreamMergeBeforePagingWithNullableProvenance() = runTest {

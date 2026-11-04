@@ -64,9 +64,11 @@ fun leaseSpan(lease: Lease, date: LocalDate, zone: TimeZone): LeaseSpan? {
     val dayEnd = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone)
     val effectiveEnd = if (lease.dueAt <= lease.startedAt) lease.startedAt + minimumVisibleLeaseDuration else lease.dueAt
     if (lease.startedAt >= dayEnd || effectiveEnd <= dayStart) return null
-    val start = if (lease.startedAt <= dayStart) 0f else localMinute(lease.startedAt, zone)
-    val end = if (effectiveEnd >= dayEnd) 1440f else localMinute(effectiveEnd, zone)
-    return LeaseSpan(lease, start, (end - start).coerceAtLeast(0f))
+    val clippedStart = maxOf(lease.startedAt, dayStart)
+    val clippedEnd = minOf(effectiveEnd, dayEnd)
+    val start = if (clippedStart == dayStart) 0f else localMinute(clippedStart, zone)
+    val duration = (clippedEnd - clippedStart).inWholeMilliseconds / 60_000f
+    return LeaseSpan(lease, start, duration.coerceAtLeast(1f))
 }
 
 private fun localMinute(instant: Instant, zone: TimeZone): Float {

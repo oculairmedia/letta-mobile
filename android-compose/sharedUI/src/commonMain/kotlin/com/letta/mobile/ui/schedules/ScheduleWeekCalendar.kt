@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.data.schedules.CalendarDay
 import com.letta.mobile.data.schedules.CalendarLabels
 import com.letta.mobile.data.schedules.ScheduleClock
+import com.letta.mobile.data.schedules.ScheduleCalendar
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.data.schedules.leases.Lease
@@ -93,7 +94,8 @@ private fun WeekGrid(params: ScheduleCalendarParams, days: List<CalendarDay>, sh
             }
         }
         if (days.any { it.bands.isNotEmpty() }) FrequentLane(days, params)
-        CalendarTimeGrid(gridSpec(params, columns), Modifier.weight(1f)) { index ->
+        CalendarTimeGrid(gridSpec(params, days, columns), Modifier.weight(1f)) { index ->
+            val separatesLeases = days[index].hasLeaseRunOverlap()
             days[index].leases.forEach { span ->
                 LeaseCalendarBlock(
                     lease = span.lease,
@@ -101,6 +103,7 @@ private fun WeekGrid(params: ScheduleCalendarParams, days: List<CalendarDay>, sh
                     modifier = Modifier.calendarSlot(
                         CalendarSlot(
                             minuteOfDay = span.startMinute.toInt(),
+                            lanes = if (separatesLeases) 2 else 1,
                             durationMinutes = span.durationMinutes,
                             exactMinuteOfDay = span.startMinute,
                         ),
@@ -111,7 +114,11 @@ private fun WeekGrid(params: ScheduleCalendarParams, days: List<CalendarDay>, sh
                 CalendarEventBlock(
                     spec = runEventSpec(event.run, params.clock.zone, params.clock.now, showTime = event.lanes == 1),
                     onClick = { params.actions.onRunClick(event.run) },
-                    modifier = Modifier.calendarSlot(CalendarSlot(event.minuteOfDay, event.lane, event.lanes)),
+                    modifier = Modifier.calendarSlot(CalendarSlot(
+                        event.minuteOfDay,
+                        if (separatesLeases) event.lane + event.lanes else event.lane,
+                        if (separatesLeases) event.lanes * 2 else event.lanes,
+                    )),
                 )
             }
         }
@@ -138,11 +145,18 @@ private fun FrequentLane(days: List<CalendarDay>, params: ScheduleCalendarParams
     }
 }
 
-private fun gridSpec(params: ScheduleCalendarParams, columns: List<CalendarColumn>): CalendarTimeGridSpec {
+private fun CalendarDay.hasLeaseRunOverlap(): Boolean = leases.any { span ->
+    events.any { event ->
+        span.startMinute < event.minuteOfDay + ScheduleCalendar.EVENT_SPAN_MINUTES &&
+            event.minuteOfDay < span.startMinute + span.durationMinutes
+    }
+}
+
+private fun gridSpec(params: ScheduleCalendarParams, days: List<CalendarDay>, columns: List<CalendarColumn>): CalendarTimeGridSpec {
     val now = params.clock.now.toLocalDateTime(params.clock.zone)
     val nowMinute = now.hour * MINUTES + now.minute
     val showsToday = columns.any { it.isToday }
-    val firstEvent = params.days.flatMap { day ->
+    val firstEvent = days.flatMap { day ->
         day.events.map { it.minuteOfDay } + day.leases.map { it.startMinute.toInt() }
     }.minOrNull()
     val initial = when {

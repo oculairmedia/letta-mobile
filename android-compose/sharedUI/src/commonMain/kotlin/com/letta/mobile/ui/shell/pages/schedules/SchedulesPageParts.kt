@@ -53,7 +53,8 @@ internal fun SchedulesMainContent(body: SchedulesBody, modifier: Modifier) {
     val error = library.errorMessage
     val showsHistory = body.view == SchedulesView.Agenda || body.view == SchedulesView.History
     val hasContent = body.data.defs.isNotEmpty() || (showsHistory && body.data.runHistory.isNotEmpty()) ||
-        (body.view in listOf(SchedulesView.Week, SchedulesView.Agenda, SchedulesView.Month) && body.data.leases.isNotEmpty())
+        (error == null && body.view in listOf(SchedulesView.Week, SchedulesView.Agenda, SchedulesView.Month) &&
+            body.data.leases.isNotEmpty())
     LettaRefreshable(refreshing = library.isLoading, onRefresh = body.onRefresh, modifier = modifier) {
         when {
             hasContent -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) {

@@ -58,15 +58,15 @@ class LeaseHistory(private val transport: IChannelTransport) {
     /** Loads leases visible to [agentId]. */
     suspend fun load(agentId: AgentId): List<Lease> {
         if ("lease.list" !in transport.hostCapabilities) return emptyList()
-        val leases = mutableListOf<Lease>()
+        val leases = linkedMapOf<String, Lease>()
         var offset = 0
         do {
             val body = buildJsonObject { put("agentId", agentId.value); put("limit", 200); put("offset", offset) }
             val response = transport.adminRpc("lease.list", "/v1/leases", body.toString())
             check(response.success) { response.error ?: "lease.list failed" }
             val page = response.result as? JsonObject ?: error("lease.list missing page")
-            leases += leaseRecords(response)
-            offset = nextOffset(page, offset) ?: return leases
+            leaseRecords(response).forEach { leases[it.id] = it }
+            offset = nextOffset(page, offset) ?: return leases.values.toList()
         } while (true)
     }
 

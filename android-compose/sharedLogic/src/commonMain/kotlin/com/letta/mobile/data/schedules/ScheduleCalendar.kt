@@ -87,7 +87,7 @@ data class CalendarDay(
             ).sortedBy { it.minuteOfDay }
 
     /** The agents with runs that day, first-run first; null for a schedule with no agent. */
-    val agentIds: List<String?> get() = entries.map { entryAgent(it) }.distinct()
+    val agentIds: List<String?> get() = entries.filterNot { it is CalendarEntry.LeaseEntry }.map { entryAgent(it) }.distinct()
 
     private fun entryAgent(entry: CalendarEntry): String? = when (entry) {
         is CalendarEntry.Event -> entry.event.run.agentId

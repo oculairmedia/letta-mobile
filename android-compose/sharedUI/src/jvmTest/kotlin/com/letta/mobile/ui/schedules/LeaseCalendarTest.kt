@@ -8,15 +8,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CalendarDay
+import com.letta.mobile.data.schedules.CalendarEvent
+import com.letta.mobile.data.schedules.ScheduleRun
+import com.letta.mobile.data.schedules.RunStatus
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.RunRecord
 import com.letta.mobile.data.schedules.ScheduleLibraryState
@@ -67,6 +75,61 @@ class LeaseCalendarTest {
         return leaseRecords(frame.copy(result = modified)).single().copy(
             startedAt = Instant.parse("2026-11-02T12:00:00Z"), dueAt = Instant.parse("2026-11-02T13:00:00Z"),
         )
+    }
+
+    @Test
+    fun minuteTickDoesNotScrollBackToHighlightedRun() = runComposeUiTest {
+        val clock = mutableStateOf(now)
+        val events = (0 until 30).map { index ->
+            CalendarEvent(ScheduleRun("schedule-$index", "Run $index", now, RunStatus.Done,
+                recordId = "record-$index"), index)
+        }
+        val day = CalendarDay(date, events, emptyList())
+        setContent { MaterialTheme {
+            val params = ScheduleCalendarParams(listOf(day), date, date, ScheduleClock(clock.value, TimeZone.UTC), emptyMap(),
+                ScheduleCalendarActions({}, {}, {}, {}, null), highlightedRunId = "record-0")
+            Box(Modifier.width(360.dp).height(400.dp)) { ScheduleAgendaList(params, Modifier.testTag("agenda")) }
+        } }
+        onNodeWithTag("agenda").performScrollToNode(hasText("Run 29"))
+        onNodeWithText("Run 29").assertIsDisplayed()
+        runOnIdle { clock.value = Instant.parse("2026-11-02T12:01:00Z") }
+        onNodeWithText("Run 29").assertIsDisplayed()
+    }
+
+    @Test
+    fun overlappingRunAndLeaseHaveSeparateTappableAreas() = runComposeUiTest {
+        val item = lease("overlap", LeaseState.ACTIVE, "2026-11-02T12:00:00Z", "2026-11-02T13:00:00Z")
+        val run = ScheduleRun("run", "Overlapping run", now, RunStatus.Upcoming)
+        val day = CalendarDay(date, listOf(CalendarEvent(run, 12 * 60)), emptyList(),
+            listOf(leaseSpan(item, date, TimeZone.UTC)!!))
+        var runClicks = 0
+        var leaseClicks = 0
+        val params = ScheduleCalendarParams(listOf(day), date, date, ScheduleClock(now, TimeZone.UTC), emptyMap(),
+            ScheduleCalendarActions({ runClicks++ }, {}, {}, {}, null, { leaseClicks++ }))
+        setContent { MaterialTheme { Box(Modifier.width(800.dp).height(900.dp)) { ScheduleWeekCalendar(params) } } }
+        val leaseNode = onNodeWithTag("lease-active-overlap")
+        val runNode = onNodeWithContentDescription("Overlapping run", substring = true)
+        val leaseBounds = leaseNode.fetchSemanticsNode().boundsInRoot
+        val runBounds = runNode.fetchSemanticsNode().boundsInRoot
+        assertTrue(leaseBounds.right <= runBounds.left || runBounds.right <= leaseBounds.left)
+        leaseNode.performClick()
+        runNode.performClick()
+        assertTrue(leaseClicks == 1 && runClicks == 1)
+    }
+
+    @Test
+    fun compactGridInitiallyScrollsToSelectedDaysLease() = runComposeUiTest {
+        val selected = LocalDate(2026, 11, 3)
+        val early = lease("early", LeaseState.ACTIVE, "2026-11-02T01:00:00Z", "2026-11-02T02:00:00Z")
+        val late = lease("late", LeaseState.ACTIVE, "2026-11-03T15:00:00Z", "2026-11-03T16:00:00Z")
+        val days = listOf(
+            CalendarDay(date, emptyList(), emptyList(), listOf(leaseSpan(early, date, TimeZone.UTC)!!)),
+            CalendarDay(selected, emptyList(), emptyList(), listOf(leaseSpan(late, selected, TimeZone.UTC)!!)),
+        )
+        val params = ScheduleCalendarParams(days, date, selected, ScheduleClock(now, TimeZone.UTC), emptyMap(),
+            ScheduleCalendarActions({}, {}, {}, {}, null))
+        setContent { MaterialTheme { Box(Modifier.width(360.dp).height(600.dp)) { ScheduleWeekCalendar(params) } } }
+        onNodeWithTag("lease-active-late").assertIsDisplayed()
     }
 
     @Test
@@ -136,6 +199,41 @@ class LeaseCalendarTest {
         onNodeWithTag("lease-row-done-unlinked").performClick()
         onNodeWithTag("lease-row-active-linked").performClick()
         onNodeWithTag("linked-run-run-1").assertIsDisplayed()
+    }
+
+    @Test
+    fun missingLinkedRunShowsFeedbackWhenLeaseIsTapped() = runComposeUiTest {
+        val linked = lease("missing", LeaseState.ACTIVE, "2026-11-02T12:00:00Z", "2026-11-02T13:00:00Z")
+            .copy(runId = "absent-run")
+        val library = ScheduleLibraryState(isLoading = false, selectedAgentId = "agent-A", leases = listOf(linked))
+        setContent { MaterialTheme {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer.copy(sheet = LettaPaneDefaults.Dialog)) {
+                Box(Modifier.width(1100.dp).height(900.dp)) {
+                    SchedulesPage(SchedulesPageState(library = library, focusedAgentId = "agent-A"), SchedulesPageActions(),
+                        options = SchedulesPageOptions(initialView = SchedulesView.Agenda, fixedClock = ScheduleClock(now, TimeZone.UTC)))
+                }
+            }
+        } }
+        onNodeWithTag("lease-row-active-missing").performClick()
+        onNodeWithText("Linked run is unavailable").assertIsDisplayed()
+    }
+
+    @Test
+    fun leaseOnlyLoadErrorShowsRetry() = runComposeUiTest {
+        val item = lease("stale", LeaseState.ACTIVE, "2026-11-02T12:00:00Z", "2026-11-02T13:00:00Z")
+        val library = ScheduleLibraryState(isLoading = false, selectedAgentId = "agent-A", leases = listOf(item),
+            errorMessage = "Schedule load failed")
+        var retries = 0
+        setContent { MaterialTheme {
+            Box(Modifier.width(1100.dp).height(900.dp)) {
+                SchedulesPage(SchedulesPageState(library = library, focusedAgentId = "agent-A"),
+                    SchedulesPageActions(onRefresh = { retries++ }),
+                    options = SchedulesPageOptions(initialView = SchedulesView.Agenda, fixedClock = ScheduleClock(now, TimeZone.UTC)))
+            }
+        } }
+        onNodeWithText("Schedule load failed").assertIsDisplayed()
+        onNodeWithText("Retry").performClick()
+        assertTrue(retries == 1)
     }
 
 }

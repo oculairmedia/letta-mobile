@@ -85,7 +85,10 @@ class LeaseTest {
                 assertEquals("agent-A", params.getValue("agentId").jsonPrimitive.content)
                 val offset = params.getValue("offset").jsonPrimitive.content.toInt()
                 offsets += offset
+                val row = base.getValue("leases").jsonArray.single().jsonObject
+                val uniqueRow = kotlinx.serialization.json.JsonObject(row + ("id" to JsonPrimitive("lease-$offset")))
                 val page = kotlinx.serialization.json.JsonObject(base + mapOf(
+                    "leases" to kotlinx.serialization.json.JsonArray(listOf(uniqueRow)),
                     "hasMore" to JsonPrimitive(offset == 0),
                     "nextOffset" to if (offset == 0) JsonPrimitive(1) else kotlinx.serialization.json.JsonNull,
                 ))
@@ -94,6 +97,28 @@ class LeaseTest {
         }
         assertEquals(2, LeaseHistory(transport).load(AgentId("agent-A")).size)
         assertEquals(listOf(0, 1), offsets)
+    }
+
+    @Test
+    fun shiftedLeaseAppearsOnceWithNewestPageCopy() = runTest {
+        val original = fixture()
+        val base = original.result!!.jsonObject
+        val row = base.getValue("leases").jsonArray.single().jsonObject
+        val transport = object : NoOpChannelTransport() {
+            override val hostCapabilities = setOf("lease.list")
+            override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+                val offset = Json.parseToJsonElement(body!!).jsonObject.getValue("offset").jsonPrimitive.content.toInt()
+                val copy = kotlinx.serialization.json.JsonObject(row + ("label" to JsonPrimitive(if (offset == 0) "old" else "new")))
+                return original.copy(result = kotlinx.serialization.json.JsonObject(base + mapOf(
+                    "leases" to kotlinx.serialization.json.JsonArray(listOf(copy)),
+                    "hasMore" to JsonPrimitive(offset == 0),
+                    "nextOffset" to if (offset == 0) JsonPrimitive(1) else kotlinx.serialization.json.JsonNull,
+                )))
+            }
+        }
+        val leases = LeaseHistory(transport).load(AgentId("agent-A"))
+        assertEquals(listOf("lease-1"), leases.map { it.id })
+        assertEquals("new", leases.single().label)
     }
 
     @Test

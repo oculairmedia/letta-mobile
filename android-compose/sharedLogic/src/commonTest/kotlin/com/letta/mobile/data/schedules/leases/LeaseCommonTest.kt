@@ -12,6 +12,17 @@ import kotlin.time.Instant
 
 class LeaseCommonTest {
     @Test
+    fun fallBackLeaseUsesElapsedDurationAcrossRepeatedHour() {
+        val lease = Lease(
+            "dst", "owner", "label", Instant.parse("2026-11-01T05:50:00Z"),
+            Instant.parse("2026-11-01T06:10:00Z"), LeaseState.ACTIVE,
+        )
+        val span = leaseSpan(lease, LocalDate(2026, 11, 1), TimeZone.of("America/New_York"))!!
+        assertEquals(110f, span.startMinute)
+        assertEquals(20f, span.durationMinutes)
+    }
+
+    @Test
     fun midnightSplitAndMinimumVisibleDurationRuleArePortable() {
         val lease = Lease(
             "lease", "owner", "label", Instant.parse("2026-11-02T23:30:00Z"),

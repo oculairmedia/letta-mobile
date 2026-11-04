@@ -53,11 +53,12 @@ fun ScheduleAgendaList(params: ScheduleCalendarParams, modifier: Modifier = Modi
     val nowIndex = items.indexOfFirst { it is AgendaItem.Now }
     val initial = if (header == null) (nowIndex - NOW_LEAD_ROWS).coerceAtLeast(0) else 0
     val state = rememberLazyListState(initialFirstVisibleItemIndex = initial)
-    LaunchedEffect(params.highlightedRunId, items) {
-        val target = items.indexOfFirst {
-            it is AgendaItem.Entry && it.entry is CalendarEntry.Event &&
-                it.entry.event.run.recordId != null && it.entry.event.run.recordId == params.highlightedRunId
-        }
+    val target = items.indexOfFirst {
+        it is AgendaItem.Entry && it.entry is CalendarEntry.Event &&
+            it.entry.event.run.recordId != null && it.entry.event.run.recordId == params.highlightedRunId
+    }
+    val targetKey = items.getOrNull(target)?.key
+    LaunchedEffect(targetKey, header == null) {
         if (target >= 0 && header == null) state.scrollToItem(target)
     }
     LazyColumn(modifier.fillMaxSize(), state = state, contentPadding = PaddingValues(LettaDimens.Space.lg)) {

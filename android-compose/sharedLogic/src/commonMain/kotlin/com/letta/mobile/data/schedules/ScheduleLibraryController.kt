@@ -181,11 +181,11 @@ class ScheduleLibraryController(
             try {
                 val agents = agentRepository.listAgentSummaries()
                 loadedAgents = agents
-                val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                val target = targetForAgents(agents)
+                val selectedAgentId = target.selectedAgentId
                 // If a prior load already proved the native schedule route is
                 // unavailable on this backend, skip the doomed native round-trip
                 // and go straight to the cron-backed source.
-                val target = ScheduleLibraryState(agents = agents, selectedAgentId = selectedAgentId)
                 if (nativeScheduleRouteUnavailable) {
                     publishCronFallbackOrUnavailable(target)
                     return@launch
@@ -198,16 +198,20 @@ class ScheduleLibraryController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    val selectedAgentId = loadedAgents.resolveSelection(stateFlow.value.selectedAgentId)
                     latchNativeUnavailableIfCronBacked()
-                    publishCronFallbackOrUnavailable(ScheduleLibraryState(agents = loadedAgents, selectedAgentId = selectedAgentId))
+                    publishCronFallbackOrUnavailable(targetForAgents(loadedAgents))
                 } else {
-                    stateFlow.update {
-                        it.copy(
+                    val selectedAgentId = loadedAgents.resolveSelection(stateFlow.value.selectedAgentId)
+                    stateFlow.update { current ->
+                        current.copy(
+                            agents = loadedAgents,
+                            selectedAgentId = selectedAgentId,
+                            leases = current.leases.takeIf { selectedAgentId == current.selectedAgentId }.orEmpty(),
                             isLoading = false,
                             errorMessage = errorMessageMapper(t, "Failed to load schedules"),
                         )
                     }
+                    loadLeases()
                 }
             }
         }
@@ -217,7 +221,10 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             val current = stateFlow.value
-            val target = current.copy(selectedAgentId = agentId)
+            val target = current.copy(
+                selectedAgentId = agentId,
+                leases = current.leases.takeIf { agentId == current.selectedAgentId }.orEmpty(),
+            )
             // If a prior load already proved the native schedule route is
             // unavailable on this backend, skip the doomed native round-trip
             // and go straight to the cron-backed source.
@@ -226,7 +233,7 @@ class ScheduleLibraryController(
                 return@launch
             }
             try {
-                stateFlow.value = target.withSchedules(loadSchedulesForAgent(agentId)).copy(runHistory = emptyMap(), leases = emptyList())
+                stateFlow.value = target.withSchedules(loadSchedulesForAgent(agentId)).copy(runHistory = emptyMap())
                 loadRunHistory()
                 loadLeases()
             } catch (cancelled: CancellationException) {
@@ -255,7 +262,7 @@ class ScheduleLibraryController(
                 stateFlow.value = current.copy(
                     selectedAgentId = agentId,
                     runHistory = emptyMap(),
-                    leases = emptyList(),
+                    leases = current.leases.takeIf { agentId == current.selectedAgentId }.orEmpty(),
                 ).withSchedules(schedules)
                 loadRunHistory()
                 loadLeases()
@@ -294,7 +301,7 @@ class ScheduleLibraryController(
                     scheduleRepository.getSchedules(agentId).first(),
                 ).copy(
                     runHistory = emptyMap(),
-                    leases = emptyList(),
+                    leases = current.leases,
                 )
                 loadRunHistory()
                 loadLeases()
@@ -316,6 +323,16 @@ class ScheduleLibraryController(
     override fun close() {
         loadJob?.cancel()
         mutationJob?.cancel()
+    }
+
+    private fun targetForAgents(agents: List<AgentSummary>): ScheduleLibraryState {
+        val current = stateFlow.value
+        val selected = agents.resolveSelection(current.selectedAgentId)
+        return ScheduleLibraryState(
+            agents = agents,
+            selectedAgentId = selected,
+            leases = current.leases.takeIf { selected == current.selectedAgentId }.orEmpty(),
+        )
     }
 
     private suspend fun loadSchedulesForAgent(agentId: String): List<ScheduledMessage> {
@@ -347,11 +364,12 @@ class ScheduleLibraryController(
     private suspend fun publishCronFallbackOrUnavailable(target: ScheduleLibraryState) {
         val crons = cronSource?.let { source -> runCatching { source.listCrons(target.selectedAgentId) }.getOrNull() }
         stateFlow.value = if (crons != null) {
-            target.withSchedules(emptyList()).copy(crons = crons, cronMode = true, runHistory = emptyMap(), leases = emptyList())
+            target.withSchedules(emptyList()).copy(crons = crons, cronMode = true, runHistory = emptyMap())
         } else {
             ScheduleLibraryState(
                 agents = target.agents,
                 selectedAgentId = target.agents.resolveSelection(target.selectedAgentId),
+                leases = target.leases,
             ).adminUnavailable()
         }
         loadRunHistory()
@@ -386,7 +404,8 @@ class ScheduleLibraryController(
         } catch (t: Throwable) {
             stateFlow.update {
                 if (it.selectedAgentId == agent) {
-                    it.copy(errorMessage = errorMessageMapper(t, "Failed to load leases"))
+                    val message = errorMessageMapper(t, "Failed to load leases")
+                    it.copy(errorMessage = listOfNotNull(it.errorMessage, message).joinToString("\n"))
                 } else {
                     it
                 }
