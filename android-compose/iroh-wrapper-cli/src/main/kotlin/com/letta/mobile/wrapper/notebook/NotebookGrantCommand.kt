@@ -23,15 +23,32 @@ class NotebookGrantCommand : CliktCommand(name = "notebook-grant") {
     private val revoke by option("--revoke", help = "Remove this principal/document grant.").flag()
 
     override fun run() = runBlocking {
-        val filePath = file?.takeIf { it.isNotBlank() } ?: fail("--file is required")
-        val peer = principal?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
-            ?: fail("--principal must be a lowercase Iroh endpoint ID")
-        val id = document?.takeIf { it.matches(Regex("[0-9a-f]{32}")) }
-            ?: fail("--document must be an exact lowercase notebook ID")
-        if (revoke && (read || edit || reference)) fail("--revoke cannot be combined with capabilities")
-        val store = FileNotebookGrantStore(Path.of(filePath))
-        if (revoke) store.revoke(peer, NotebookDocumentId(id))
-        else store.provision(NotebookDocumentId(id), NotebookPeerGrant(peer, read, edit, mayReference = reference))
+        val path = grantPath()
+        val peer = grantPrincipal()
+        val id = grantDocument()
+        validateCapabilities()
+        val store = FileNotebookGrantStore(path)
+        if (revoke) store.revoke(peer, id)
+        else store.provision(id, NotebookPeerGrant(peer, read, edit, mayReference = reference))
     }
+
+    private fun grantPath(): Path {
+        val filePath = file?.takeIf { it.isNotBlank() } ?: fail("--file is required")
+        return Path.of(filePath)
+    }
+
+    private fun grantPrincipal(): String = principal?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+        ?: fail("--principal must be a lowercase Iroh endpoint ID")
+
+    private fun grantDocument(): NotebookDocumentId = NotebookDocumentId(
+        document?.takeIf { it.matches(Regex("[0-9a-f]{32}")) }
+            ?: fail("--document must be an exact lowercase notebook ID"),
+    )
+
+    private fun validateCapabilities() {
+        if (!revoke) return
+        if (listOf(read, edit, reference).any { it }) fail("--revoke cannot be combined with capabilities")
+    }
+
     private fun fail(message: String): Nothing = throw UsageError(message)
 }

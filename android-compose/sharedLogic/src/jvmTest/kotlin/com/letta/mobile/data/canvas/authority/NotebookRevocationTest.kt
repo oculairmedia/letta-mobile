@@ -34,9 +34,10 @@ class NotebookRevocationTest {
                     val barrier = Thread.currentThread().stackTrace.any {
                         it.className.endsWith("NotebookStorageHealth") && it.methodName == "persistChunk"
                     }
-                    return if (hold.get() && barrier && entered.complete(Unit)) {
-                        release.thenCompose { delegate.put(key, value) }
-                    } else delegate.put(key, value)
+                    if (!hold.get()) return delegate.put(key, value)
+                    if (!barrier) return delegate.put(key, value)
+                    if (!entered.complete(Unit)) return delegate.put(key, value)
+                    return release.thenCompose { delegate.put(key, value) }
                 }
             }
         }

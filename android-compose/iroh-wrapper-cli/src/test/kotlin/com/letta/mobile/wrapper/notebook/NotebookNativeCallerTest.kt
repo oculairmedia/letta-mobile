@@ -71,7 +71,7 @@ class NotebookNativeCallerTest {
                 ))
                 IrohNodeEndpoint::class.java.getDeclaredField("endpoint").apply { isAccessible = true }.set(host, nativeHost)
                 host.start(DefaultAppServerController(UnusedClient))
-                withTimeout(30_000) { assertAuthorities(root, notebooks, host, alice, bob) }
+                withTimeout(30_000) { assertAuthorities(root, notebooks, host.addr(), listOf(alice, bob)) }
             }
         } finally {
             host.shutdown()
@@ -86,17 +86,17 @@ class NotebookNativeCallerTest {
     private suspend fun assertAuthorities(
         root: Path,
         notebooks: NotebookLocalStore,
-        host: IrohNodeEndpoint,
-        alice: Endpoint,
-        bob: Endpoint,
+        host: computer.iroh.EndpointAddr,
+        peers: List<Endpoint>,
     ) {
+        val (alice, bob) = peers
         val aliceId = endpointId(alice)
         val bobId = endpointId(bob)
         val storageId = notebooks.create("Secret")
         val otherId = requireNotNull(notebooks.read(notebooks.create("Other"))).id.value
         val id = requireNotNull(notebooks.read(storageId)).id.value
-        alice.connect(host.addr(), IrohNodeEndpoint.DEFAULT_ALPN).use { aliceConnection ->
-            bob.connect(host.addr(), IrohNodeEndpoint.DEFAULT_ALPN).use { bobConnection ->
+        alice.connect(host, IrohNodeEndpoint.DEFAULT_ALPN).use { aliceConnection ->
+            bob.connect(host, IrohNodeEndpoint.DEFAULT_ALPN).use { bobConnection ->
                 val aliceControl = authenticate(aliceConnection)
                 val bobControl = authenticate(bobConnection)
                 val args = listOf("--file", root.resolve("grants.json").toString(),

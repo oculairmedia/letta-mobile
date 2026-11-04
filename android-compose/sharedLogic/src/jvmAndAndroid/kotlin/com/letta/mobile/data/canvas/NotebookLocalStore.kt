@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.mutations.NotebookMutationFence
 import com.letta.mobile.util.attr
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
@@ -272,12 +273,10 @@ class NotebookLocalStore(
     private fun <T> DocHandle.writing(id: DocumentId, block: (Document) -> T): T {
         health.checkWritable()
         var newerLayout = 0L
-        val executionLock = Any()
-        var awaiting = true
+        val fence = NotebookMutationFence()
         val written = try {
             withDocument { document ->
-                synchronized(executionLock) {
-                    if (!awaiting) return@synchronized null
+                fence.runIfActive {
                     val version = NotebookBoardStorage.layoutVersion(document)
                     if (version > NotebookBoardStorage.LAYOUT_VERSION) {
                         newerLayout = version
@@ -290,7 +289,7 @@ class NotebookLocalStore(
         } finally {
             // A timeout/interrupt must not release an outer grant lock with a runnable mutation
             // still queued. Withdraw queued callbacks, or await an already executing transaction.
-            synchronized(executionLock) { awaiting = false }
+            fence.withdraw()
         }
         if (written == null) throw health.refuseLayout(id.stableKey(), newerLayout)
         return written.value

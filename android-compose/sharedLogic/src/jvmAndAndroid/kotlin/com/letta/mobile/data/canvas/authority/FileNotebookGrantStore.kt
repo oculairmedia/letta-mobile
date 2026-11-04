@@ -107,16 +107,20 @@ class FileNotebookGrantStore(file: Path) : NotebookGrantStore {
         val entries = root["grants"] as? JsonArray ?: error("Invalid grant list")
         entries.forEach { value ->
             val entry = value as? JsonObject ?: error("Invalid grant entry")
-            require(entry.keys == setOf("principal", "documentId", "mayRead", "mayEdit", "mayReference")) {
-                "Invalid grant fields"
-            }
-            listOf("principal", "documentId").forEach { key ->
-                require((entry[key] as? JsonPrimitive)?.isString == true) { "Invalid grant key" }
-            }
-            listOf("mayRead", "mayEdit", "mayReference").forEach { key ->
-                val capability = entry[key] as? JsonPrimitive ?: error("Invalid grant capability")
-                require(!capability.isString && capability.content in setOf("true", "false")) { "Invalid grant capability" }
-            }
+            requireGrantEntry(entry)
+        }
+    }
+
+    private fun requireGrantEntry(entry: JsonObject) {
+        require(entry.keys == setOf("principal", "documentId", "mayRead", "mayEdit", "mayReference")) {
+            "Invalid grant fields"
+        }
+        listOf("principal", "documentId").forEach { key ->
+            require((entry[key] as? JsonPrimitive)?.isString == true) { "Invalid grant key" }
+        }
+        listOf("mayRead", "mayEdit", "mayReference").forEach { key ->
+            val capability = entry[key] as? JsonPrimitive ?: error("Invalid grant capability")
+            require(!capability.isString && capability.content in setOf("true", "false")) { "Invalid grant capability" }
         }
     }
 

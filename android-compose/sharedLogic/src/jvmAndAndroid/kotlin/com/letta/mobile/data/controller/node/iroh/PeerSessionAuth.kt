@@ -114,6 +114,13 @@ internal class PeerSessionAuth(
         }
     }
 
+    /** Notebook handlers require authenticated identity, then enforce their exact document grant. */
+    fun allowsAdminCapability(required: String): Boolean {
+        val capabilities = effectiveCapabilities()
+        return authenticated.get() && (required == IrohPeerCapabilities.NOTEBOOK_AUTHENTICATED ||
+            IrohPeerCapabilities.isAllowed(capabilities, required))
+    }
+
     /** Agents this session may address; null = every agent (bootstrap sessions, unscoped peers). */
     fun agentScope(): Set<String>? =
         if (pairedSession.get()) pairing?.peer(remoteId)?.agentIds else null

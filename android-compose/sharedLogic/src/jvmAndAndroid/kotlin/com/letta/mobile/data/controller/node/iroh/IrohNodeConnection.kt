@@ -304,7 +304,7 @@ class IrohNodeConnection(
             // effective capabilities at dispatch time.
             capabilityGate = { method ->
                 val required = IrohPeerCapabilities.forAdminMethod(method)
-                if (allowsAdminCapability(required)) null else required
+                if (sessionAuth.allowsAdminCapability(required)) null else required
             },
             // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
             // so the shared message.list handler has no connection identity —
@@ -362,7 +362,7 @@ class IrohNodeConnection(
         // d6e8g.6: per-method capability gate BEFORE dispatch — a denial must
         // have no proxy side effects. Unknown methods require admin.full.
         val requiredCapability = IrohPeerCapabilities.forAdminMethod(method)
-        if (!allowsAdminCapability(requiredCapability)) {
+        if (!sessionAuth.allowsAdminCapability(requiredCapability)) {
             Telemetry.event(
                 "IrohNode", "authz.denied",
                 "remoteEndpointId" attr remoteEndpointId,
@@ -707,12 +707,6 @@ class IrohNodeConnection(
     }
 
     private val authFailuresOnThisConnection = java.util.concurrent.atomic.AtomicInteger(0)
-
-    private fun allowsAdminCapability(required: String): Boolean {
-        val capabilities = effectiveCapabilities()
-        return authenticated.get() && (required == IrohPeerCapabilities.NOTEBOOK_AUTHENTICATED ||
-            IrohPeerCapabilities.isAllowed(capabilities, required))
-    }
 
     /** Effective capabilities for this connection (see [PeerSessionAuth]). */
     private fun effectiveCapabilities(): Set<String> = sessionAuth.effectiveCapabilities()
