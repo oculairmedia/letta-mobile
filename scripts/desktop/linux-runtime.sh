@@ -114,6 +114,10 @@ for path in sorted(Path(sys.argv[1]).rglob('package.json'), key=lambda p: len(p.
                     shutil.rmtree(platform)
         shutil.rmtree(path.parent / 'third_party' / 'conpty', ignore_errors=True)
 PYTHON
+    # Pruning platform packages can strand npm bin links: letta-code 0.34.39's nested
+    # node_modules/.bin/rg points at @cursor/sdk-darwin-arm64/bin/rg, removed above, and the
+    # packaging copy (prepareAppResources) refuses to follow a dangling link. Drop only broken links.
+    find "$dest/node_modules" -xtype l -delete
     [[ -n $(find "$dest/node_modules" -type d -path '*/@img/sharp-linux-x64' -print -quit) ]] || {
       echo 'sharp-linux-x64 missing from staged runtime' >&2; exit 1;
     }

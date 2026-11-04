@@ -11,27 +11,27 @@ Regenerate with `node scripts/appserver/generate-protocol-reference.mjs --write`
 | Field | Pinned value |
 | --- | --- |
 | Package | @letta-ai/letta-code |
-| Version | 0.34.14 |
+| Version | 0.34.39 |
 | Node | v24.18.0 |
 | Upstream source Git SHA | Unavailable: the inventory fixture does not record an upstream source Git SHA. |
-| Capture date (contract baseline) | 2026-10-16 |
+| Capture date (contract baseline) | 2026-11-04 |
 | Public declaration export | dist/types/types/app-server-protocol.d.ts |
 | Protocol declaration | dist/types/types/protocol&#95;v2.d.ts |
-| Protocol SHA-256 | 1a37d456a5e48ed003e4f5f0b1f6fcf29b0ec4e3f44d5b3b07b6ade3ac418498 |
-| Declaration corpus SHA-256 | aad6304f10e25203679d0dfdca1ae45e176665ca26c0b1421199acc0e5f6e8ac |
+| Protocol SHA-256 | 6c50a2345e42d6b9521127cd07c1e175c73f320b5e5724a2a0782fe963eb8881 |
+| Declaration corpus SHA-256 | 12203bda8d79504ea99db8144d01579f046d37fd506867a4995f520aea389ab0 |
 | Upstream recapture command | scripts/appserver/verify-contract-baseline.mjs --package-root &lt;installed-package-root-or-npm-prefix&gt; |
 
 The upstream source commit is distinct from the Git blob identities below. Hashes use UTF-8 fixture bytes with CRLF normalized to LF, matching Git text normalization, so Windows and CI render identical provenance. They include historical notes but do not identify the upstream package commit or a deployed release. No current checkout HEAD is embedded, so regeneration remains deterministic across commits.
 
 | Authoritative fixture | SHA-256 (LF-normalized bytes) | Git blob SHA-1 (LF-normalized bytes) |
 | --- | --- | --- |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | ba81c9774cdc12d5f473653e9e5ff1e18371dc4da2b74096983dd0324230b5a4 | 08ed60e770725cedea0c4553c8be30d2a2e5d3fb |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json | 8497018ab5029688fb39e12649cb23eb590579e4089d23c953f7328f43e7dd48 | 084ee402a409222c1fddc297f3a9e2f2af1bbb0d |
 | android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json | d0e27cc832f1b6859d32fd916dad1d265f5e75c958dae2522be79d8705934ebe | 8636c927698a1d7d890cbe05c34d5d5fad16bb95 |
-| android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 84e62d502a28e0fb64e50a6d4c444bf48bd2a78bca62f17c38ae083f5d22de6d | 4a7bc7339087238113f9e9ee2f79f5ad334aa72a |
+| android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json | 68d58b33f8c43e2f576c401895964a7ba3c0b9a2c4f0feef05ce769c063bcfc1 | ab8544019a9bc743793d7405cb93d4c1248e465d |
 
 Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [admin ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) and [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json). These source files may contain dated annotations; this generator does not upgrade their evidence dates.
 
-## Declaration corpus (24 files)
+## Declaration corpus (27 files)
 
 | Package-relative file |
 | --- |
@@ -42,11 +42,14 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | dist/types/types/approval-classification-protocol.d.ts |
 | dist/types/types/background-process-protocol.d.ts |
 | dist/types/types/chatgpt-oauth.d.ts |
+| dist/types/types/chatgpt-usage-protocol.d.ts |
 | dist/types/types/client-preferences.d.ts |
 | dist/types/types/conversation-fork-protocol.d.ts |
 | dist/types/types/cwd-protocol.d.ts |
 | dist/types/types/external-tool-protocol.d.ts |
 | dist/types/types/file-write-protocol.d.ts |
+| dist/types/types/input-command.d.ts |
+| dist/types/types/input-create-message.d.ts |
 | dist/types/types/loop-status-protocol.d.ts |
 | dist/types/types/protocol&#95;v2.d.ts |
 | dist/types/types/provider-oauth-config.d.ts |
@@ -60,7 +63,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | dist/types/types/toolset-protocol.d.ts |
 | dist/types/types/turn-finished-protocol.d.ts |
 
-## Upstream commands (104)
+## Upstream commands (106)
 
 | Discriminant |
 | --- |
@@ -94,6 +97,8 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | channel&#95;target&#95;bind |
 | channel&#95;targets&#95;list |
 | channels&#95;list |
+| chatgpt&#95;rate&#95;limit&#95;reset&#95;credit&#95;consume |
+| chatgpt&#95;rate&#95;limit&#95;reset&#95;credits&#95;list |
 | chatgpt&#95;usage&#95;read |
 | checkout&#95;branch |
 | connect&#95;provider |
@@ -169,7 +174,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | write&#95;file |
 | write&#95;memory&#95;file |
 
-## Upstream messages (113)
+## Upstream messages (116)
 
 | Discriminant |
 | --- |
@@ -206,6 +211,8 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | channel&#95;targets&#95;updated |
 | channels&#95;list&#95;response |
 | channels&#95;updated |
+| chatgpt&#95;rate&#95;limit&#95;reset&#95;credit&#95;consume&#95;response |
+| chatgpt&#95;rate&#95;limit&#95;reset&#95;credits&#95;list&#95;response |
 | chatgpt&#95;usage&#95;read&#95;response |
 | checkout&#95;branch&#95;response |
 | connect&#95;provider&#95;response |
@@ -272,6 +279,7 @@ Sources: [installed protocol inventory](../../android-compose/sharedLogic/src/jv
 | skills&#95;updated |
 | stream&#95;delta |
 | sync&#95;response |
+| teleport&#95;failed&#95;ack |
 | teleport&#95;probe&#95;response |
 | teleport&#95;ready |
 | terminal&#95;exited |

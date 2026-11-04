@@ -16,5 +16,5 @@ object LettaCodeContract {
      * gated by the advertised server version. Decoding remains additive-tolerant for extra fields;
      * neither tolerance nor a field gate certifies support for another runtime release.
      */
-    const val VERSION: String = "0.34.14"
+    const val VERSION: String = "0.34.39"
 }

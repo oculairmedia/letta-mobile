@@ -8,7 +8,7 @@ Letta Mobile is a Kotlin Multiplatform project that ships **three clients** from
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.
 - **Browser WASM** — shared domain and Compose UI, with browser host bindings.
 
-The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code pin, `@letta-ai/letta-code@0.34.14`, in `android-compose/letta-code-runtime/letta-code-runtime.properties` (= wire contract = desktop bundled runtime = Android embedded runtime = `appserver-contract-baseline` CI job); the embedded runtime ships in the `full` release APK (nodejs-mobile Node 18, arm64-v8a only, a loopback App Server the app dials over ws:// through the same channel as an Iroh host, letta-mobile-by4vm.110.6; the `lite` APK has no runtime, see `docs/RELEASE.md`); the deployed host version must be checked live rather than inferred from this pin; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
+The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code pin, `@letta-ai/letta-code@0.34.39`, in `android-compose/letta-code-runtime/letta-code-runtime.properties` (= wire contract = desktop bundled runtime = Android embedded runtime = `appserver-contract-baseline` CI job); the embedded runtime ships in the `full` release APK (nodejs-mobile Node 18, arm64-v8a only, a loopback App Server the app dials over ws:// through the same channel as an Iroh host, letta-mobile-by4vm.110.6; the `lite` APK has no runtime, see `docs/RELEASE.md`); the deployed host version must be checked live rather than inferred from this pin; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
 
 **Location:** use the current checkout root; `/opt/stacks/letta-mobile` is the historical Linux host path.
 **Build root:** `android-compose/` (the Gradle workspace)
@@ -41,7 +41,7 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # launcher; configured daemon uses J
 
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
-For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). The embedded runtime uses the same package pin; platform capability and Node 18 compatibility still require embedded-runtime validation.
+For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.39`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). The embedded runtime uses the same package pin; platform capability and Node 18 compatibility still require embedded-runtime validation.
 
 ---
 

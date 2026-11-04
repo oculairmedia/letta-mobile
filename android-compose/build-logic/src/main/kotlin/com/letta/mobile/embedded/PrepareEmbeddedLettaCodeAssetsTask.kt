@@ -76,6 +76,9 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
         nodeCheck(npmWorkDir, lettaJs)
         stageDeviceNpm(npmWorkDir)
         copyNodeModules(npmWorkDir, assetRoot)
+        // The staged letta.js is a byte copy of this patched one; the guard reads it here, inside the
+        // npm work dir, the only place check-no-static-cursor-import.mjs (patchTarget) accepts.
+        checkNoStaticCursorImport(npmWorkDir, lettaJs)
         fileSystem.copy {
             from(runtimeDirectory)
             into(assetRoot)
@@ -161,7 +164,7 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
         }
     }
 
-    private fun copyNodeModules(npmWorkDir: File, assetRoot: File) {
+    internal fun copyNodeModules(npmWorkDir: File, assetRoot: File) {
         fileSystem.copy {
             from(npmWorkDir.resolve("node_modules"))
             into(assetRoot.resolve("node_modules"))
@@ -171,6 +174,16 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
             exclude("@babel/**", ".bin/**", "@jridgewell/**", "browserslist/**", "caniuse-lite/**", "electron-to-chromium/**")
             exclude(HOST_ONLY_NODE_MODULES)
         }
+    }
+
+    private fun checkNoStaticCursorImport(npmWorkDir: File, stagedLettaJs: File) {
+        // check-no-static-cursor-import.mjs is copied into the npm work dir with the patch scripts,
+        // so @babel/parser (installed there for the patch pipeline, not shipped) resolves.
+        run(
+            npmWorkDir,
+            "staged letta.js Cursor import check failed.",
+            listOf("node", npmWorkDir.resolve(CURSOR_IMPORT_CHECK).absolutePath, stagedLettaJs.absolutePath),
+        )
     }
 
     private fun writePackageJson(assetRoot: File) {
@@ -236,6 +249,9 @@ internal val LETTA_JS_PATCHES: List<LettaJsPatch> = listOf(
     LettaJsPatch.ToolGroups,
 )
 
+/** The staging-time guard that fails when letta.js statically imports the excluded Cursor SDK. */
+private const val CURSOR_IMPORT_CHECK = "check-no-static-cursor-import.mjs"
+
 /** Where sharp's package.json sits: nested under letta-code (0.34.x shrinkwrap) or hoisted. */
 private val SHARP_PACKAGE_JSON_PATHS = listOf(
     "node_modules/@letta-ai/letta-code/node_modules/sharp/package.json",
@@ -252,7 +268,14 @@ private val SHARP_PACKAGE_JSON_PATHS = listOf(
  *  - sharp's per-platform binaries: sharp looks up `@img/sharp-android-<arch>`, misses, and falls
  *    back to `@img/sharp-wasm32`, which IS kept (see installSharpWasm). `@janhapke/sharp-electron`
  *    is a linux-x64 Electron build letta-code only loads on Linux desktops.
+ *  - FreeBSD and WebContainers sharp wrappers and their nested wasm copies cannot load on Android.
+ *  - The nested letta-code sharp wasm copy duplicates the version-matched root install.
+ *  - Cursor's SDK is used only by the separate worker, whose native binaries cannot run on Android;
+ *    omit both so Cursor requests fail cleanly when the worker is resolved, while startup stays intact.
  *  - `@vscode/ripgrep-*` binaries: upstream skips ripgrep on android.
+ *  - nested `node_modules/.bin` launchers: the root-level `.bin` exclude misses them, and 0.34.39's
+ *    nested `.bin/rg` resolves to a 1.7 MB macOS (Mach-O) ripgrep from `@cursor/sdk-darwin-arm64`.
+ *    Nothing on android executes a `.bin` shim; the runtime invokes its entrypoints directly.
  *  - the orphan `letta-code/node_modules/@letta-ai/letta-code` tree the 0.34 shrinkwrap leaves
  *    (no package.json, nothing resolves into it).
  *  - TypeScript declaration files and source maps, which the runtime never reads.
@@ -267,8 +290,14 @@ internal val HOST_ONLY_NODE_MODULES: List<String> = listOf(
     "**/@img/sharp-libvips-darwin*/**",
     "**/@img/sharp-darwin*/**",
     "**/@img/sharp-win32*/**",
+    "**/@img/sharp-freebsd-wasm32/**",
+    "**/@img/sharp-webcontainers-wasm32/**",
+    "**/@letta-ai/letta-code/node_modules/@img/sharp-wasm32/**",
+    "**/@letta-ai/letta-code/node_modules/@cursor/**",
+    "**/@letta-ai/letta-code/cursor-worker.js",
     "**/@janhapke/**",
     "**/@vscode/ripgrep-*/**",
+    "**/node_modules/.bin/**",
     "**/@letta-ai/letta-code/node_modules/@letta-ai/letta-code/**",
     "**/*.d.ts",
     "**/*.d.mts",
