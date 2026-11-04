@@ -32,7 +32,10 @@ data class NotebookNoteState(
     /** Source Markdown changed relative to the editor's CAS base. */
     val conflict: Boolean get() = baseline != null && observed != null && baseline.markdown != observed.markdown
     /** A stale source must be explicitly reloaded/discarded before another replacement. */
-    val canSave: Boolean get() = baseline != null && !loading && !saving && !conflict && !notFound
+    val canSave: Boolean get() {
+        if (denied) return false
+        return baseline != null && !loading && !saving && !conflict && !notFound
+    }
 }
 
 /** Reduce a read against the captured edit state without acknowledging pending writes. */

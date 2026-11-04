@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.authority
 
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookPeerGrant
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
@@ -176,6 +177,7 @@ class FileNotebookGrantStore internal constructor(
     private fun write(data: FileData) {
         val encoded = Json.encodeToString(FileData.serializer(), data)
         require(encoded.encodeToByteArray().size <= MAX_BYTES) { "Notebook grant store is too large" }
+        confirmDirectorySync()
         val temp = Files.createTempFile(path.parent, ".notebook-grants-", ".tmp")
         try {
             FileChannel.open(temp, WRITE).use { channel ->
@@ -184,10 +186,18 @@ class FileNotebookGrantStore internal constructor(
                 channel.force(true)
             }
             Files.move(temp, path, ATOMIC_MOVE, REPLACE_EXISTING)
-            runCatching { directorySync(path.parent) }
+            confirmDirectorySync()
         } finally {
             Files.deleteIfExists(temp)
         }
+    }
+
+    private fun confirmDirectorySync() = try {
+        directorySync(path.parent)
+    } catch (unsupported: UnsupportedOperationException) {
+        throw UnsupportedOperationException("Notebook grant administration requires directory synchronization", unsupported)
+    } catch (failure: IOException) {
+        throw IOException("Notebook grant directory synchronization failed; durability is unconfirmed", failure)
     }
 
     private fun validateKey(principal: String, documentId: NotebookDocumentId) {

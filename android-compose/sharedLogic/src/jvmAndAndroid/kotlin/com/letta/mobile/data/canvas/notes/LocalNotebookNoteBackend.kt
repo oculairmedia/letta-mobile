@@ -63,7 +63,7 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
         return when {
             current == null -> NotebookNoteSave.Unavailable("Local notebook disappeared after persistence")
             current.markdown != applied.markdown -> NotebookNoteSave.Conflict(current, durable = applied)
-            else -> NotebookNoteSave.Saved(applied)
+            else -> NotebookNoteSave.Saved(current)
         }
     }
 
