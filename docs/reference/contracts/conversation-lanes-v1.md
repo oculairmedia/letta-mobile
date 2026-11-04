@@ -135,8 +135,9 @@ identity and 4 MiB of encoded data. The existing own/sibling guard and 64-attemp
 remain; attempts, including definite failures, consume that cap and its count survives restart.
 Admission fails closed at any bound, on malformed state, or on write failure. Accepted/ambiguous
 identities are never evicted or expired to make room. An OS lock serializes transactions between
-wrapper processes; replacement requires atomic rename after file fsync, with best-effort directory
-fsync on platforms that support it. No non-atomic replacement fallback is used for this journal.
+wrapper processes; replacement requires atomic rename after file fsync and directory fsync. An
+`UnsupportedOperationException` from directory sync is best-effort; an I/O failure fails the write
+because durability is unconfirmed. No non-atomic replacement fallback is used for this journal.
 Deleting or rotating it loses replay protection and requires external reconciliation. This finite
 journal deliberately stops new admission when full; it is not an indefinite delivery service or a
 distributed exactly-once guarantee. Removing a definite reservation can itself fail during a crash

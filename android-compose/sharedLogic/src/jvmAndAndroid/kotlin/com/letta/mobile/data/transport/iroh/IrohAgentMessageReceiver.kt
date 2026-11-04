@@ -61,6 +61,9 @@ class IrohAgentMessageReceiver(
      */
     override fun authorize(peer: String): Boolean = true
 
+    internal var journalDirectorySync: (java.nio.file.Path) -> Unit = AtomicJsonFile::syncDirectory
+
+    private var journalUnavailable = false
     private val routingMutex = Mutex()
 
     private val failures = IrohFailureLog("A2aHost", "a2a.recv_failed")
@@ -174,17 +177,37 @@ class IrohAgentMessageReceiver(
         withContext(Dispatchers.IO) {
             val file = journalFile ?: return@withContext block()
             AtomicJsonFile.withProcessLock(file.toPath()) {
-                if (file.exists()) {
+                check(!journalUnavailable) { "A2A receipt journal needs reconciliation" }
+                val previous = if (file.exists()) {
                     require(file.length() in 1..MAX_JOURNAL_BYTES) { "A2A receipt journal exceeds its bound" }
-                    router.restore(LettaJson.persisted.decodeFromString<IrohAgentMessageRouter.Snapshot>(file.readText()))
-                }
+                    file.readText().also {
+                        router.restore(LettaJson.persisted.decodeFromString<IrohAgentMessageRouter.Snapshot>(it))
+                    }
+                } else null
                 val result = block()
                 val encoded = LettaJson.persisted.encodeToString(router.snapshot())
                 require(encoded.toByteArray().size <= MAX_JOURNAL_BYTES)
-                AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true)
+                writeJournalOrRestore(file, encoded, previous)
                 result
             }
         }
+    }
+
+    private fun writeJournalOrRestore(file: File, encoded: String, previous: String?) {
+        runCatching { writeJournal(file, encoded) }.getOrElse { failure ->
+            // Rename may already have exposed a release. Restore the prior snapshot under the lock.
+            if (previous != null) {
+                runCatching { writeJournal(file, previous) }.onFailure { restoreFailure ->
+                    journalUnavailable = true
+                    failure.addSuppressed(restoreFailure)
+                }
+            }
+            throw failure
+        }
+    }
+
+    private fun writeJournal(file: File, encoded: String) {
+        AtomicJsonFile.write(file.toPath().toAbsolutePath(), encoded, requireAtomic = true, syncDirectory = journalDirectorySync)
     }
 
     private companion object {

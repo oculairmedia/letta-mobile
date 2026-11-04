@@ -12,10 +12,13 @@ import java.nio.file.StandardOpenOption
 /**
  * Crash-safe replacement of a small JSON state file (paired peers, pending
  * invites): write a temp sibling, fsync it, atomically rename over the target,
- * then best-effort fsync the directory so the rename itself is durable.
+ * then fsync the directory so the rename itself is durable where supported.
  */
 internal object AtomicJsonFile {
-    fun write(path: Path, text: String, requireAtomic: Boolean = false) {
+    fun write(
+        path: Path, text: String, requireAtomic: Boolean = false,
+        syncDirectory: (Path) -> Unit = ::syncDirectory,
+    ) {
         path.parent?.let(Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
         try {
@@ -29,11 +32,27 @@ internal object AtomicJsonFile {
             replace(temp, path, requireAtomic)
             // Directory channels are unsupported on some platforms, including Windows.
             path.parent?.let { parent ->
-                runCatching { FileChannel.open(parent, StandardOpenOption.READ).use { it.force(true) } }
+                syncDirectoryIfSupported(parent, requireAtomic, syncDirectory)
             }
         } finally {
             Files.deleteIfExists(temp)
         }
+    }
+
+    private fun syncDirectoryIfSupported(path: Path, requireAtomic: Boolean, sync: (Path) -> Unit) {
+        if (!requireAtomic) {
+            runCatching { sync(path) }
+            return
+        }
+        try {
+            sync(path)
+        } catch (_: UnsupportedOperationException) {
+            // Directory channels are not supported on every platform.
+        }
+    }
+
+    fun syncDirectory(path: Path) {
+        FileChannel.open(path, StandardOpenOption.READ).use { it.force(true) }
     }
 
     private fun replace(temp: Path, path: Path, requireAtomic: Boolean) {

@@ -376,7 +376,8 @@ class AppServerServeIrohCommand : CliktCommand(
             val activityTarget = com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget { frame ->
                 irohEndpoint?.conversationActivityTarget()?.broadcast(frame)
             }
-            val a2a = a2aWiringOrNull(a2aClient::get, scope, activityTarget)
+            val backendDir = effectiveA2aBackendDir(localBackendDir, ownAppServer, System.getProperty("user.home"))
+            val a2a = a2aWiringOrNull(a2aClient::get, scope, activityTarget, backendDir)
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -395,11 +396,11 @@ class AppServerServeIrohCommand : CliktCommand(
             endpoint.create()
             
             printDialInfo(endpoint)
-            a2a?.let { publishA2aHost(it, endpoint) }
+            a2a?.let { publishA2aHost(it, endpoint, backendDir) }
 
             // lgns8.18 (Path A, desktop): optionally run + OWN the App Server child on an
             // ephemeral loopback port, instead of connecting to an external URL.
-            ownedServer = if (ownAppServer) ownedAppServerHost(scope) else null
+            ownedServer = if (ownAppServer) ownedAppServerHost(scope, requireNotNull(backendDir)) else null
             val ownedLease = ownedServer?.let { startOwnedAppServer(it, scope) }
 
             // Create the controller. With --own-app-server this connects the WS
@@ -454,28 +455,24 @@ class AppServerServeIrohCommand : CliktCommand(
         )
     }
 
-    private fun a2aLocalBackendDir(): java.io.File? =
-        (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
-            ?.takeIf { it.isNotBlank() }
-            ?.let { java.io.File(it) }
-
     /** letta-mobile-by4vm.112: the a2a protocol handler for the host endpoint, or null when disabled. */
     private fun a2aWiringOrNull(
         client: () -> AppServerClient?,
         scope: CoroutineScope,
         activityTarget: com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget,
+        backendDir: java.io.File?,
     ): A2aWiring? {
         if (a2aPort < 0) {
             println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
             return null
         }
-        return runCatching { buildA2aWiring(a2aConfig(), client, a2aLocalBackendDir(), scope = scope, activityTarget = activityTarget) }
+        return runCatching { buildA2aWiring(a2aConfig(), client, backendDir, scope = scope, activityTarget = activityTarget) }
             .onFailure { println("[iroh-app-server] a2a receiver: DISABLED (${it.message})") }
             .getOrNull()
     }
 
     /** Write the host's address-book record once the endpoint is bound; the receiver itself is already served. */
-    private suspend fun publishA2aHost(wiring: A2aWiring, endpoint: IrohNodeEndpoint) {
+    private suspend fun publishA2aHost(wiring: A2aWiring, endpoint: IrohNodeEndpoint, backendDir: java.io.File?) {
         val config = a2aConfig()
         runCatching { publishHost(config, endpoint.addr(), wiring.addressStore) }
             .onSuccess { record ->
@@ -483,7 +480,7 @@ class AppServerServeIrohCommand : CliktCommand(
                     "[iroh-app-server] a2a receiver: ON host endpoint " +
                         "(node=${record.nodeIdHex}, alpn=/letta/a2a/0, " +
                         "address_book=${config.addressBook.absolutePath}, " +
-                        "local_backend=${a2aLocalBackendDir()?.absolutePath ?: "UNSET (membership gate disabled)"})",
+                        "local_backend=${backendDir?.absolutePath ?: "UNSET (membership gate disabled)"})",
                 )
             }
             .onFailure {
@@ -654,9 +651,8 @@ class AppServerServeIrohCommand : CliktCommand(
         }
     }
 
-    private fun ownedAppServerHost(scope: CoroutineScope): LocalAppServerHost {
-        val backendDir = localBackendDir ?: "${System.getProperty("user.home")}/.letta/lc-local-backend"
-        return ownedLocalAppServerHost(listOf(lettaCommand), backendDir, scope) { System.err.println("[app-server] $it") }
+    private fun ownedAppServerHost(scope: CoroutineScope, backendDir: java.io.File): LocalAppServerHost {
+        return ownedLocalAppServerHost(listOf(lettaCommand), backendDir.path, scope) { System.err.println("[app-server] $it") }
     }
 
     /**
@@ -1124,3 +1120,7 @@ internal fun sortDirectAddresses(directAddresses: List<String>): List<String> {
         if (p1 != p2) p1.compareTo(p2) else addr1.compareTo(addr2)
     })
 }
+
+internal fun effectiveA2aBackendDir(explicit: String?, ownAppServer: Boolean, home: String): java.io.File? =
+    explicit?.takeIf { it.isNotBlank() }?.let { java.io.File(it) }
+        ?: if (ownAppServer) java.io.File(home, ".letta/lc-local-backend") else null

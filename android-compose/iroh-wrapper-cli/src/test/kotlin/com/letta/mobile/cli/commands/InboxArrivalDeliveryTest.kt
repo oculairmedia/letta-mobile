@@ -29,7 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.CsvSource
 
 /** Real receiver -> wrapper -> persisted transcript -> endpoint -> authenticated home viewer -> decoder.
  * Only the App Server boundary and the JNI byte sink are substituted. The boundary refuses missing
@@ -38,11 +38,14 @@ import org.junit.jupiter.params.provider.ValueSource
 @OptIn(ExperimentalCoroutinesApi::class)
 class InboxArrivalDeliveryTest {
     @ParameterizedTest
-    @ValueSource(booleans = [true, false])
-    fun `queued acceptance waits for committed user identity then reaches only authorized opted in home viewers`(existingInbox: Boolean) = runTest {
+    @CsvSource("true,false", "false,false", "true,true")
+    fun `queued acceptance waits for committed user identity then reaches only authorized opted in home viewers`(existingInbox: Boolean, ownedDefault: Boolean) = runTest {
         val root = Files.createTempDirectory("arrival-delivery").toFile()
         try {
-            val backend = File(root, "backend")
+            val backend = if (ownedDefault) effectiveA2aBackendDir(null, true, root.path) else File(root, "backend")
+            assertNotNull(backend, "owned App Server default must build the arrival observer")
+            backend!!
+            if (ownedDefault) assertEquals(File(root, ".letta/lc-local-backend"), backend)
             File(backend, "agents").mkdirs()
             File(backend, "agents/recipient.json").writeText("""{"id":"recipient"}""")
             val inbox = conversationDir(backend, "inbox")

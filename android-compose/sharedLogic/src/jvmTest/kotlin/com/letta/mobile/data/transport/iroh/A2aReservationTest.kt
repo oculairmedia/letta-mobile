@@ -139,4 +139,26 @@ class A2aReservationTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test
+    fun failedDirectorySyncOnReleaseKeepsTheReservationSuppressive() = runTest {
+        val dir = java.nio.file.Files.createTempDirectory("a2a-release-sync").toFile()
+        try {
+            val file = java.io.File(dir, "receipts.json")
+            var attempts = 0
+            var syncs = 0
+            val receiver = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { _, _ -> attempts++; DeliveryOutcome(false, "application_input_rejected") }, { _, _ -> true }, file)
+            receiver.journalDirectorySync = { path ->
+                syncs++
+                if (syncs == 2) throw java.io.IOException("directory sync failed after release rename")
+                com.letta.mobile.data.controller.node.iroh.AtomicJsonFile.syncDirectory(path)
+            }
+            assertEquals("reservation_journal_failure", receiver.respond(message, "peer").reason)
+            val restarted = IrohAgentMessageReceiver(IrohAgentMessageRouter("self"), { emptyList() },
+                { _, _ -> attempts++; DeliveryOutcome(false, "application_input_rejected") }, { _, _ -> true }, file)
+            assertEquals("duplicate_msg_id", restarted.respond(message, "peer").reason)
+            assertEquals(1, attempts)
+        } finally { dir.deleteRecursively() }
+    }
+
 }
