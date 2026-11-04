@@ -100,11 +100,9 @@ class CanvasWorkspaceViewerLifecycleTest {
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 1 }
         runOnIdle { otherVisible.value = true }
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
-        runOnIdle { originVisible.value = false }
-        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 0 }
+        closeMount(originVisible, originTransport)
         assertSame(other, registry.get(origin.canvasId))
-        runOnIdle { otherVisible.value = false }
-        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 0 }
+        closeMount(otherVisible, otherTransport)
         assertEquals(null, registry.get(origin.canvasId))
     }
 
@@ -130,17 +128,14 @@ class CanvasWorkspaceViewerLifecycleTest {
         assertEquals(null, isolatedRegistry.get(origin.canvasId))
 
         // Closing the current mount must reveal the still-mounted origin.
-        runOnIdle { otherVisible.value = false }
-        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 0 }
+        closeMount(otherVisible, otherTransport)
         assertSame(origin, registry.get(origin.canvasId))
 
         runOnIdle { otherVisible.value = true }
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 1 }
-        runOnIdle { originVisible.value = false }
-        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { originTransport.activeCollectors.get() == 0 }
+        closeMount(originVisible, originTransport)
         assertSame(other, registry.get(origin.canvasId))
-        runOnIdle { otherVisible.value = false }
-        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { otherTransport.activeCollectors.get() == 0 }
+        closeMount(otherVisible, otherTransport)
         assertEquals(null, registry.get(origin.canvasId))
     }
 
@@ -264,6 +259,11 @@ class CanvasWorkspaceViewerLifecycleTest {
         } finally {
             releaseSessionBImport.complete(Unit)
         }
+    }
+
+    private fun ComposeUiTest.closeMount(visible: MutableState<Boolean>, transport: CountingCanvasSyncTransport) {
+        runOnIdle { visible.value = false }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { transport.activeCollectors.get() == 0 }
     }
 
     private fun pluginViewer(id: CanvasDocumentViewerId): CanvasDocumentViewer = CanvasDocumentViewer(
