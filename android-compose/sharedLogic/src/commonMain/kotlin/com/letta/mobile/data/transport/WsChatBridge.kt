@@ -403,6 +403,7 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     // letta-mobile-a4tm7: permission-mode pushes feed the chip, not the timeline.
     is ServerFrame.PermissionModeUpdated,
     // letta-mobile-lks7m: conversation pushes route to the conversation lists, not chat content.
+    is ServerFrame.ConversationActivity,
     is ServerFrame.ConversationUpdated,
     // letta-mobile-2rkdj: subscribe wrappers don't surface to chat
     // directly — the inner BridgeFrame is unwrapped and re-routed

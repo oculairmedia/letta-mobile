@@ -371,7 +371,10 @@ class AppServerServeIrohCommand : CliktCommand(
             // The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at
             // bind); its App Server client is created after, so the receiver reads it late.
             val a2aClient = java.util.concurrent.atomic.AtomicReference<AppServerClient?>()
-            val a2a = a2aWiringOrNull(a2aClient::get)
+            val activityTarget = com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget { frame ->
+                irohEndpoint?.conversationActivityTarget()?.broadcast(frame)
+            }
+            val a2a = a2aWiringOrNull(a2aClient::get, scope, activityTarget)
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -455,12 +458,16 @@ class AppServerServeIrohCommand : CliktCommand(
             ?.let { java.io.File(it) }
 
     /** letta-mobile-by4vm.112: the a2a protocol handler for the host endpoint, or null when disabled. */
-    private fun a2aWiringOrNull(client: () -> AppServerClient?): A2aWiring? {
+    private fun a2aWiringOrNull(
+        client: () -> AppServerClient?,
+        scope: CoroutineScope,
+        activityTarget: com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget,
+    ): A2aWiring? {
         if (a2aPort < 0) {
             println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
             return null
         }
-        return runCatching { buildA2aWiring(a2aConfig(), client, a2aLocalBackendDir()) }
+        return runCatching { buildA2aWiring(a2aConfig(), client, a2aLocalBackendDir(), scope = scope, activityTarget = activityTarget) }
             .onFailure { println("[iroh-app-server] a2a receiver: DISABLED (${it.message})") }
             .getOrNull()
     }

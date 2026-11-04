@@ -68,7 +68,7 @@ class AppServerClientChannel(
                 .getOrNull()
                 ?.takeIf {
                     it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated ||
-                        it is ServerFrame.ConversationUpdated
+                        it is ServerFrame.ConversationActivity || it is ServerFrame.ConversationUpdated
                 }
 
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)

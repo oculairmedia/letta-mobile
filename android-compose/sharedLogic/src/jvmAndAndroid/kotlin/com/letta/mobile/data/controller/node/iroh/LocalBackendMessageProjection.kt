@@ -67,7 +67,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         val ctx = ProjCtx(
             id = id,
             created = created,
-            projectedOtid = (id?.let { sidecars.otid[it] }) ?: id,
+            projectedOtid = localMsg["otid"]?.stringOrNull() ?: (id?.let { sidecars.otid[it] }) ?: id,
             projectedRunId = (id?.let { sidecars.runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull,
             attachmentRefs = id?.let { sidecars.attachments[it] },
         )

@@ -15,7 +15,7 @@ import java.nio.file.StandardOpenOption
  * then best-effort fsync the directory so the rename itself is durable.
  */
 internal object AtomicJsonFile {
-    fun write(path: Path, text: String) {
+    fun write(path: Path, text: String, requireAtomic: Boolean = false) {
         path.parent?.let(Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
         // fsync contents+metadata BEFORE the rename so a power loss can never
@@ -27,7 +27,11 @@ internal object AtomicJsonFile {
         }
         try {
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: Exception) {
+        } catch (failure: Exception) {
+            if (requireAtomic) {
+                Files.deleteIfExists(temp)
+                throw failure
+            }
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
         }
         // Directory fsync is unsupported on some platforms (Windows throws when

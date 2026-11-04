@@ -323,6 +323,13 @@ Caller-bound Meridian tool service and request/response wire handling. Live-call
 
 Inter-agent delivery routing and structured provenance. Stable sender/recipient relationships and delivery state remain separate from display-only labels used by presentation. Keep display labels out of routing trust decisions; carry identity and provenance through [AgentMessageClientId](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.messaging/-agent-message-client-id/index.html) and [AgentMessageProvenanceProjection](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.messaging/-agent-message-provenance-projection/index.html) when integrating [IrohAgentMessageRouter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.messaging/-iroh-agent-message-router/index.html).
 
+`IrohAgentMessageRouter` reserves identities before delivery and exposes bounded snapshots for the
+JVM receiver's atomic receipt journal. Only definite application refusal releases an identity;
+accepted and ambiguous attempts remain suppressive across restart. Inbox activity uses the separate
+`conversation_activity_v1` capability and committed source/client identities; it is neither a
+conversation-list invalidation nor a timeline message. See the conversation lanes contract for
+capacity, observation-window and reconnect limits.
+
 # Package com.letta.mobile.data.model
 
 Shared dispatch and task-notification wire parsers live here so controller ingestion and chat projection consume the same interpretation without depending on each other.

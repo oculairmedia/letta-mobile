@@ -155,7 +155,7 @@ internal class IrohObserverIngestor(
         val frame = runCatching {
             DEVICE_PUSH_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
         }.getOrNull()?.takeIf {
-            it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated || it is ServerFrame.SubagentsUpdated ||
+            it is ServerFrame.ConversationActivity || it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated || it is ServerFrame.SubagentsUpdated ||
                 it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated
         }
         if (frame == null) {
@@ -627,7 +627,7 @@ internal class IrohObserverIngestor(
         private const val SUBAGENTS_UPDATED_TYPE = "subagents_updated"
 
         private val HOST_PUSH_TYPES = setOf(
-            AGENT_UPDATED_TYPE, CONVERSATION_UPDATED_TYPE, SUBAGENTS_UPDATED_TYPE,
+            "conversation_activity", AGENT_UPDATED_TYPE, CONVERSATION_UPDATED_TYPE, SUBAGENTS_UPDATED_TYPE,
             // letta-mobile-bzvro.40: the host's parked-approval snapshots.
             com.letta.mobile.data.runtime.ApprovalRelay.FRAME_TYPE,
             // letta-mobile-a4tm7: another client changed a conversation's permission mode.

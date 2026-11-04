@@ -81,6 +81,8 @@ data class A2aWiringConfig(
      * [identityDir]; false only logs the mismatch and delivers (a rollout escape hatch).
      */
     val enforceSenderAuth: Boolean = true,
+    /** Wrapper-owned replay journal, independent of the App Server's read-only backend. */
+    val receiptsFile: File = File(addressBook.absoluteFile.parentFile, "a2a-receipts.json"),
 )
 
 /** `--a2a-sender-auth` values. */
@@ -119,6 +121,8 @@ fun buildA2aWiring(
      * via the per-sender cap + seen-msgId dedupe).
      */
     ownAgentId: String = "",
+    scope: kotlinx.coroutines.CoroutineScope? = null,
+    activityTarget: com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget? = null,
 ): A2aWiring {
     // M3 (PR #1125): ONE [HostEndpointAddressStore] instance per bind, shared by
     // publishHost and the receiver, so the kv file has one in-memory owner.
@@ -132,11 +136,20 @@ fun buildA2aWiring(
         else listConversationsForAgent(backendStore, AgentIdNamespace.normalizeToBareId(agentId))
     }
     val router = IrohAgentMessageRouter(ownAgentId = ownAgentId)
-    val receiver = IrohAgentMessageReceiver(
+    lateinit var receiver: IrohAgentMessageReceiver
+    val arrivals = if (scope != null && backendStore != null && activityTarget != null) {
+        A2aArrivalObserver(scope, backendStore, activityTarget) { receiver.markPersisted(it) }
+    } else null
+    receiver = IrohAgentMessageReceiver(
         router = router,
         conversationsFor = conversationsFor,
-        onDeliver = { message, decision -> handleDecision(client(), message, decision, backendStore) },
+        onDeliver = { message, decision ->
+            handleDecision(client(), message, decision, backendStore) { accepted, conversation ->
+                arrivals?.observe(accepted, conversation)
+            }
+        },
         authenticate = { message, peer -> authenticateSender(config, message, peer) },
+        journalFile = config.receiptsFile,
     )
     return A2aWiring(
         receiver = receiver,
@@ -351,6 +364,7 @@ internal suspend fun handleDecision(
     message: IrohAgentMessage,
     decision: IrohAgentMessageRouter.RoutingDecision,
     store: LocalBackendAdminStore? = null,
+    onAccepted: (IrohAgentMessage, String) -> Unit = { _, _ -> },
 ): DeliveryOutcome {
     val normMessage = message.copy(
         fromAgentId = AgentIdNamespace.normalizeToBareId(message.fromAgentId),
@@ -365,7 +379,7 @@ internal suspend fun handleDecision(
                 "msgId" attr normMessage.msgId,
                 "conversationId" attr decision.conversationId,
             )
-            return inputOnConversation(client, normMessage, decision.conversationId)
+            return inputOnConversation(client, normMessage, decision.conversationId, onAccepted)
         }
         is IrohAgentMessageRouter.RoutingDecision.Queue -> {
             // Same as Deliver but no second turn: the app-server already serializes
@@ -381,10 +395,10 @@ internal suspend fun handleDecision(
                 "decision" attr "queue",
                 "conversationId" attr decision.conversationId,
             )
-            return inputOnConversation(client, normMessage, decision.conversationId)
+            return inputOnConversation(client, normMessage, decision.conversationId, onAccepted)
         }
         is IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver -> {
-            return handleCreateAndDeliver(client, normMessage, store)
+            return handleCreateAndDeliver(client, normMessage, store, onAccepted)
         }
         is IrohAgentMessageRouter.RoutingDecision.Dropped -> {
             Telemetry.event(
@@ -403,6 +417,7 @@ internal suspend fun handleCreateAndDeliver(
     client: AppServerClient?,
     message: IrohAgentMessage,
     store: LocalBackendAdminStore? = null,
+    onAccepted: (IrohAgentMessage, String) -> Unit = { _, _ -> },
 ): DeliveryOutcome {
     if (client == null) {
         Telemetry.event(
@@ -431,7 +446,7 @@ internal suspend fun handleCreateAndDeliver(
             "msgId" attr message.msgId,
             "conversationId" attr createdId,
         )
-        return inputOnConversation(client, message, createdId)
+        return inputOnConversation(client, message, createdId, onAccepted)
     } else {
         val dropAttrs = mutableListOf(
             "fromAgentId" to message.fromAgentId,
@@ -466,6 +481,7 @@ private suspend fun inputOnConversation(
     client: AppServerClient?,
     message: IrohAgentMessage,
     conversationId: String,
+    onAccepted: (IrohAgentMessage, String) -> Unit,
 ): DeliveryOutcome {
     if (client == null) {
         Telemetry.event(
@@ -478,9 +494,11 @@ private suspend fun inputOnConversation(
         )
         return DeliveryOutcome(false, "application_enqueue_failure")
     }
+    val requestId = java.util.UUID.randomUUID().toString()
     return runCatching {
-        client.input(
+        client.inputAwaitingAcceptance(
             AppServerCommand.Input(
+                requestId = requestId,
                 runtime = AppServerRuntimeScope(
                     agentId = message.toAgentId,
                     conversationId = conversationId,
@@ -511,14 +529,20 @@ private suspend fun inputOnConversation(
                 ),
             ),
         )
-    }.map {
+    }.map { acceptance ->
+        val correlated = acceptance.requestId == requestId && acceptance.runtime.agentId == message.toAgentId &&
+            acceptance.runtime.conversationId == conversationId
+        if (!correlated) return@map DeliveryOutcome(false, "application_input_scope_mismatch")
+        val accepted = acceptance.accepted
+        if (accepted) onAccepted(message, conversationId)
         Telemetry.event(
-            "A2aHost", "a2a.application_delivered",
+            "A2aHost", if (accepted) "a2a.input_accepted" else "a2a.input_rejected",
             "msgId" attr message.msgId,
             "toAgentId" attr message.toAgentId,
             "conversationId" attr conversationId,
         )
-        DeliveryOutcome(true)
+        // An accepted input may only be queued; no persisted message has been observed here.
+        DeliveryOutcome(false, if (accepted) "application_input_accepted" else "application_input_rejected")
     }.getOrElse { t ->
         if (t is CancellationException) throw t
         Telemetry.event(

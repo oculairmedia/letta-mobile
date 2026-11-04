@@ -58,10 +58,14 @@ internal class IrohViewerHandle(
     private val frameParts: () -> Boolean,
     private val maxFrameBytes: Int,
     private val agentEventsGate: () -> Boolean = { false },
+    private val conversationActivityGate: (String) -> Boolean = { false },
     private val conversationEventsGate: () -> Boolean = { false },
 ) : ViewerHandle {
 
     override fun receivesAgentEvents(): Boolean = agentEventsGate()
+
+    override fun receivesConversationActivity(agentId: String): Boolean =
+        receivesConversationEvents() && conversationActivityGate(agentId)
 
     override fun receivesConversationEvents(): Boolean = conversationEventsGate()
 

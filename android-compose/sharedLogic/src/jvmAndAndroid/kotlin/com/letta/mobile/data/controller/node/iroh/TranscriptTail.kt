@@ -37,6 +37,36 @@ internal fun LocalBackendMessageReader.newestMessageContents(conversationId: Con
 }.getOrNull()
 
 /**
+ * Finds a persisted user identity in one conversation's bounded tail, without roster, run,
+ * attachment or timestamp hydration. Direct transcript otid and legacy sidecars are supported.
+ */
+internal fun LocalBackendMessageReader.committedUserMessageId(
+    conversationId: String,
+    agentId: String,
+    clientId: String,
+): String? = runCatching {
+    val resolved = resolveConversation(conversationId, null) ?: return@runCatching null
+    if (resolved.second != agentId) return@runCatching null
+    val dir = File(File(support.baseDir, "conversations"), support.b64UrlEncode(support.conversationKey(resolved.first, agentId)))
+    val messages = File(dir, "messages.jsonl").tailLines(ARRIVAL_WINDOW * 2, TAIL_MAX_BYTES)
+        .mapNotNull { line -> runCatching { support.json.parseToJsonElement(line) }.getOrNull() as? JsonObject }
+        .mapNotNull { normalizeMessage(it)?.takeIf(::isLocalMessage) }
+        .takeLast(ARRIVAL_WINDOW)
+        .filter { it["role"]?.stringOrNull() == "user" }
+    val direct = messages.lastOrNull { it["otid"]?.stringOrNull() == clientId }?.get("id")?.stringOrNull()
+    if (direct != null) return@runCatching direct
+    val sidecar = File(dir, "_otid-map.json")
+    if (!sidecar.isFile || sidecar.length() > ARRIVAL_SIDECAR_MAX_BYTES) return@runCatching null
+    val identities = support.readStringMap(sidecar)
+    messages.lastOrNull {
+        it["otid"]?.stringOrNull() == null && identities[it["id"]?.stringOrNull()] == clientId
+    }?.get("id")?.stringOrNull()
+}.getOrNull()
+
+private const val ARRIVAL_WINDOW = 64
+private const val ARRIVAL_SIDECAR_MAX_BYTES = 4L * 1024 * 1024
+
+/**
  * The last [maxLines] non-blank lines of this file, read backwards from its end so the cost follows
  * the lines wanted rather than the file's length. Reads at most [maxBytes] from the end; a line that
  * starts before that window is left out, so fewer lines can come back. Empty when the file is

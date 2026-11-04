@@ -34,6 +34,9 @@ interface ViewerHandle {
      * is viewing must not learn other conversation ids). Evaluated at send time. Default: no.
      */
     fun receivesConversationEvents(): Boolean = false
+
+    /** Whether the client negotiated the separate persisted-activity frame. Authorization is checked separately. */
+    fun receivesConversationActivity(agentId: String): Boolean = false
 }
 
 /** Told when a connection starts viewing a conversation. */
