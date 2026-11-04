@@ -56,6 +56,11 @@ cd "bash-$BASH_VERSION_TARGET"
 #    (-c only), so no line editing and no termcap/locale dependencies.
 #  - --enable-static-link: a single self-contained binary; no DT_NEEDED
 #    lookups against the app's linker namespace.
+#  - CFLAGS_FOR_BUILD=-std=gnu17: bash 5.2's build-host generators
+#    (builtins/mkbuiltins.c etc.) use K&R declarations, which GCC 15's
+#    C23 default rejects ("too many arguments to function 'xmalloc'";
+#    ubuntu-26.04 runners). The cross target is NDK clang, unaffected.
+CFLAGS_FOR_BUILD="${CFLAGS_FOR_BUILD:--g} -std=gnu17" \
 ./configure \
   --host=aarch64-linux-android \
   --without-bash-malloc \
