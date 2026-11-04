@@ -98,12 +98,15 @@ class LaneDropReachesSenderTest {
             val first = assertIs<AgentSendResult.Accepted>(senderSees(IrohAgentMessage.decode(message.encode())))
             val retry = assertIs<AgentSendResult.Accepted>(senderSees(IrohAgentMessage.decode(message.encode())))
             assertEquals(reason, first.reason)
-            assertEquals("duplicate_msg_id", retry.reason)
+            // A definite rejection releases its reservation (conversation-lanes-v1), so the
+            // retry is evaluated again and reports the same reason rather than a duplicate.
+            assertEquals(reason, retry.reason)
             assertEquals(message.msgId, first.msgId)
             assertEquals(message.msgId, retry.msgId)
-            assertEquals(listOf(message.msgId, message.msgId), observed.takeLast(2).map { it.msgId })
-            assertEquals(listOf(correlation, correlation), observed.takeLast(2).map { it.correlation })
+            assertEquals(correlation, IrohAgentMessage.decode(message.encode()).correlation)
         }
+        // Policy drops return before application delivery (mr49w), so neither attempt is observed.
+        assertTrue(observed.isEmpty())
         assertTrue(delivered.isEmpty())
     }
 
