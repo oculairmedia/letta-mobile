@@ -58,24 +58,28 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         localMsg: JsonObject,
         sidecars: MessageSidecars,
     ): List<JsonObject> {
+        val ctx = projectionContext(localMsg, sidecars)
+        val role = localMsg["role"]?.stringOrNull() ?: "system"
+        val parts = localMsg["parts"] as? JsonArray ?: JsonArray(emptyList())
+        return when (role) {
+            "user", "system" -> projectUserOrSystem(ctx, role, parts)
+            "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
+            else -> projectAssistantParts(ctx, parts)
+        }
+    }
+
+    private fun projectionContext(localMsg: JsonObject, sidecars: MessageSidecars): ProjCtx {
         val id = localMsg["id"]?.stringOrNull()
         val sentinel = (localMsg["metadata"] as? JsonObject)?.get("created_at")?.stringOrNull()
         val real = id?.let { sidecars.realTimes[it] }
         val created = real ?: sentinel ?: support.isoMillis(System.currentTimeMillis())
-        val role = localMsg["role"]?.stringOrNull() ?: "system"
-        val parts = localMsg["parts"] as? JsonArray ?: JsonArray(emptyList())
-        val ctx = ProjCtx(
+        return ProjCtx(
             id = id,
             created = created,
             projectedOtid = localMsg["otid"]?.stringOrNull() ?: (id?.let { sidecars.otid[it] }) ?: id,
             projectedRunId = (id?.let { sidecars.runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull,
             attachmentRefs = id?.let { sidecars.attachments[it] },
         )
-        return when (role) {
-            "user", "system" -> projectUserOrSystem(ctx, role, parts)
-            "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
-            else -> projectAssistantParts(ctx, parts)
-        }
     }
 
     /** Shared per-message projection context computed once in [localMessageToConversationMessages]. */

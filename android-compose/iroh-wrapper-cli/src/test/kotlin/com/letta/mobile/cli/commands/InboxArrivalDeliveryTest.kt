@@ -53,9 +53,12 @@ class InboxArrivalDeliveryTest {
                 connectionRegistry = registry)
             val capable = homeViewer("capable", registry, advertised = true)
             val legacy = homeViewer("legacy", registry, advertised = false)
-            val scoped = homeViewer("scoped", registry, advertised = true,
-                grants = IrohPeerCapabilities.CHAT_ROLE - IrohPeerCapabilities.CONVERSATION_MANAGE)
-            val otherAgent = homeViewer("other-agent", registry, advertised = true, agents = setOf("someone-else"))
+            val scoped = homeViewer("scoped", registry, advertised = true, peer = PairedPeer(
+                "scoped", "scoped", 0, IrohPeerCapabilities.CHAT_ROLE - IrohPeerCapabilities.CONVERSATION_MANAGE, null,
+            ))
+            val otherAgent = homeViewer("other-agent", registry, advertised = true, peer = PairedPeer(
+                "other-agent", "other-agent", 0, IrohPeerCapabilities.CHAT_ROLE, setOf("someone-else"),
+            ))
             val revoked = homeViewer("revoked", registry, advertised = true)
             revoked.connection.revokeSession()
             val client = TranscriptClient(backend)
@@ -64,7 +67,8 @@ class InboxArrivalDeliveryTest {
                 { client }, backend, scope = backgroundScope, activityTarget = endpoint.conversationActivityTarget())
             val message = IrohAgentMessage("sender", "recipient", "wake", "stable-wake", 1)
 
-            assertEquals("application_input_accepted", wiring.receiver.respond(message, sender.nodeIdHex).reason)
+            val outcome = withContext(Dispatchers.IO) { wiring.receiver.respond(message, sender.nodeIdHex) }
+            assertEquals("application_input_accepted", outcome.reason)
             runCurrent()
             assertTrue(capable.frames.isEmpty(), "acceptance alone must never create a persisted arrival")
             val input = client.inputs.single()
@@ -124,10 +128,9 @@ class InboxArrivalDeliveryTest {
         id: String,
         registry: ConnectionRegistry,
         advertised: Boolean,
-        grants: Set<String> = IrohPeerCapabilities.CHAT_ROLE,
-        agents: Set<String>? = null,
+        peer: PairedPeer = PairedPeer(id, id, 0, IrohPeerCapabilities.CHAT_ROLE, null),
     ): HomeViewer {
-        val peers = InMemoryPairedPeerStore().apply { save(PairedPeer(id, id, 0, grants, agents)) }
+        val peers = InMemoryPairedPeerStore().apply { save(peer) }
         val unusedController = Proxy.newProxyInstance(AppServerController::class.java.classLoader,
             arrayOf(AppServerController::class.java)) { _, method, _ -> error("unexpected controller call: ${method.name}") } as AppServerController
         val node = IrohNodeConnection(Connection(NoHandle), unusedController,
@@ -156,10 +159,12 @@ class InboxArrivalDeliveryTest {
     }
 
     private inner class TranscriptClient(private val backend: File) : AppServerClient {
+        private val loadedAgents = setOf("recipient").also { require(File(backend, "agents/recipient.json").isFile) }
         var creates = 0
         val inputs = mutableListOf<AppServerCommand.Input>()
         override val events = emptyFlow<AppServerReceivedFrame>()
         override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
+            require(command.runtime.agentId in loadedAgents)
             require(File(backend, "agents/${command.runtime.agentId}.json").isFile)
             require(command.runtime.agentId == "recipient" && command.runtime.conversationId == "inbox")
             require(File(conversationDir(backend, "inbox"), "conversation.json").isFile)
@@ -169,8 +174,23 @@ class InboxArrivalDeliveryTest {
             inputs += command
             return AppServerInboundFrame.InputAccepted(command.requestId!!, command.runtime, true, disposition = "queued")
         }
+        override suspend fun conversationList(command: AppServerCommand.ConversationList): AppServerInboundFrame.ConversationListResponse {
+            require(command.requestId.isNotBlank())
+            val query = requireNotNull(command.query)
+            require(query["agent_id"]?.jsonPrimitive?.content == "recipient")
+            require(query["limit"]?.jsonPrimitive?.int == 500)
+            require(query["include_hidden"]?.jsonPrimitive?.boolean == true)
+            val rows = File(backend, "conversations").listFiles().orEmpty().mapNotNull { directory ->
+                File(directory, "conversation.json").takeIf { it.isFile }?.let {
+                    Json.parseToJsonElement(it.readText()).jsonObject
+                }
+            }.filter { it["agent_id"]?.jsonPrimitive?.content == "recipient" }.sortedBy { it["id"]!!.jsonPrimitive.content }
+            // This fixture only models the first, short page; refuse requests it cannot model faithfully.
+            require(query["after"] == null && rows.size < 500)
+            return AppServerInboundFrame.ConversationListResponse(command.requestId, true, JsonArray(rows))
+        }
         override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): AppServerInboundFrame.ConversationCreateResponse {
-            require(command.body["agent_id"]?.jsonPrimitive?.content == "recipient")
+            require(command.body["agent_id"]?.jsonPrimitive?.content in loadedAgents)
             require(File(backend, "agents/recipient.json").isFile)
             require(command.body["tags"] == JsonArray(listOf(JsonPrimitive("lane:inbox"))))
             require(command.body["conversation_class"]?.jsonPrimitive?.content == "autonomous")

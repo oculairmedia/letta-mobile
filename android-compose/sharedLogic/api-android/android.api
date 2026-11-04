@@ -18750,8 +18750,8 @@ public class com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore {
 	public fun agentFilesSignature ()Ljava/lang/Long;
 	public final fun blockCountProjected ()I
 	public final fun blocksForAgentProjected (Ljava/lang/String;)Lkotlinx/serialization/json/JsonArray;
-	public final fun committedUserMessageId (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-	public final fun conversationRecord (Ljava/lang/String;Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
+	public final fun committedUserMessageId-UtWwnB0 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public final fun conversationRecord-5ovmR3Q (Ljava/lang/String;Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
 	public fun conversationRecordsSignature ()Ljava/lang/Long;
 	public final fun countAgents ()Ljava/lang/Integer;
 	public final fun getBlockProjected (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
@@ -19370,14 +19370,14 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerHandle {
 	public abstract fun getConnectionId ()Ljava/lang/String;
 	public fun receivesAgentEvents ()Z
-	public fun receivesConversationActivity (Ljava/lang/String;)Z
+	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
 	public fun receivesConversationEvents ()Z
 	public abstract fun writeFrame (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$DefaultImpls {
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
-	public static fun receivesConversationActivity (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
+	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 }
 
@@ -64864,7 +64864,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentMessageReceiver
 	public fun accept (Lcomputer/iroh/Connection;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun authorize (Ljava/lang/String;)Z
 	public fun getAlpn ()[B
-	public final fun markPersisted (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun markPersisted-jmYxp0c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun respond (Lcom/letta/mobile/data/transport/iroh/IrohAgentMessage;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

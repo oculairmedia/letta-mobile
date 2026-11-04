@@ -1,5 +1,7 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.commands.a2a.A2aDeliveryContext
+
 import com.letta.mobile.util.textOrNull
 
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
@@ -108,7 +110,7 @@ class A2aWiringTest {
                 for (id in listOf("first", "second")) {
                     val message = IrohAgentMessage("sender", "agent-1", id, id, 1)
                     val decision = router.route(message.fromAgentId, id, listConversationsForAgent(store, "agent-1"))
-                    assertEquals(DeliveryOutcome(false, "application_input_accepted"), handleDecision(client, message, decision, store))
+                    assertEquals(DeliveryOutcome(false, "application_input_accepted"), handleDecision(client, message, decision, A2aDeliveryContext(store)))
                 }
             }
             assertEquals(1, client.capturedCreate.size)
@@ -158,7 +160,7 @@ class A2aWiringTest {
         val client = RecordingClient()
         val message = IrohAgentMessage("sender", "agent-1", "hello", "m", 1)
         assertEquals(DeliveryOutcome(false, "application_input_accepted"),
-            runBlocking { handleCreateAndDeliver(client, message, laneStore()) })
+            runBlocking { handleCreateAndDeliver(client, message, A2aDeliveryContext(laneStore())) })
         val body = client.capturedCreate.single().body
         assertEquals("[\"lane:inbox\"]", body["tags"].toString())
         assertEquals("autonomous", body["conversation_class"].stringOrNullSafe())
@@ -443,7 +445,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-deliver")
 
-        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
+        val outcome = runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
         assertEquals(DeliveryOutcome(false, "application_input_accepted"), outcome)
 
         assertEquals(1, client.captured.size, "expected exactly one client.input call")
@@ -508,7 +510,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-norm")
 
-        runBlocking { handleDecision(client, message, decision, laneStore()) }
+        runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
 
         assertEquals(1, captured.size)
         val cmd = captured.single()
@@ -550,7 +552,7 @@ class A2aWiringTest {
             ts = 1_700_000_000_000L,
         )
 
-        val outcome = runBlocking { handleCreateAndDeliver(client, message, laneStore()) }
+        val outcome = runBlocking { handleCreateAndDeliver(client, message, A2aDeliveryContext(laneStore())) }
         assertFalse(outcome.delivered)
         assertEquals("conversation_create_failure", outcome.reason)
 
@@ -591,7 +593,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
+        val outcome = runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
         assertEquals(DeliveryOutcome(false, "application_input_accepted"), outcome)
 
         assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
@@ -638,7 +640,7 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        val outcome = runBlocking { handleDecision(client, message, decision, laneStore()) }
+        val outcome = runBlocking { handleDecision(client, message, decision, A2aDeliveryContext(laneStore())) }
         assertFalse(outcome.delivered)
         assertEquals("conversation_create_failure", outcome.reason)
 

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
+
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.HostId
@@ -131,7 +133,7 @@ class IrohNodeEndpoint(
         val activity = kotlinx.serialization.json.Json.decodeFromString(
             com.letta.mobile.data.transport.ServerFrame.ConversationActivity.serializer(), frame,
         )
-        connectionRegistry.broadcast(frame) { it.receivesConversationActivity(activity.agentId) }
+        connectionRegistry.broadcast(frame) { it.receivesConversationActivity(AgentId(activity.agentId)) }
     }
 
     /**

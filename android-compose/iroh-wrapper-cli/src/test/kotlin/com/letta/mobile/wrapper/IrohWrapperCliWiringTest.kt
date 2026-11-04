@@ -1,5 +1,7 @@
 package com.letta.mobile.wrapper
 
+import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
+
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -129,9 +131,9 @@ class IrohWrapperCliWiringTest {
             )
         }
 
-        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("lo", isLoopback = true), "loopback must be filtered out")
-        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("eth0", isUp = false), "down interface must be filtered out")
-        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("ppp0", isPointToPoint = true), "point-to-point must be filtered out")
+        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("lo", flags = NetworkInterfaceFlags(isLoopback = true)), "loopback must be filtered out")
+        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("eth0", flags = NetworkInterfaceFlags(isUp = false)), "down interface must be filtered out")
+        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("ppp0", flags = NetworkInterfaceFlags(isPointToPoint = true)), "point-to-point must be filtered out")
 
         val physicalNames = listOf("eth0", "wlan0", "enp3s0", "wlp2s0", "en0", "wl0")
         physicalNames.forEach { name ->

@@ -1,5 +1,7 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
+
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -994,11 +996,9 @@ internal suspend fun awaitManagementLaneReady(state: Flow<ReconnectingClientStat
 internal fun isRealNetworkInterfaceName(
     name: String,
     displayName: String? = null,
-    isUp: Boolean = true,
-    isLoopback: Boolean = false,
-    isPointToPoint: Boolean = false,
+    flags: NetworkInterfaceFlags = NetworkInterfaceFlags(),
 ): Boolean {
-    if (!isUp || isLoopback || isPointToPoint) return false
+    if (!flags.isUp || flags.isLoopback || flags.isPointToPoint) return false
     val nameLower = name.lowercase()
     val displayLower = (displayName ?: "").lowercase()
     val virtualKeywords = listOf(
@@ -1015,9 +1015,7 @@ internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
         isRealNetworkInterfaceName(
             name = iface.name,
             displayName = iface.displayName,
-            isUp = iface.isUp,
-            isLoopback = iface.isLoopback,
-            isPointToPoint = iface.isPointToPoint,
+            flags = NetworkInterfaceFlags(iface.isUp, iface.isLoopback, iface.isPointToPoint),
         )
     } catch (_: Exception) {
         false

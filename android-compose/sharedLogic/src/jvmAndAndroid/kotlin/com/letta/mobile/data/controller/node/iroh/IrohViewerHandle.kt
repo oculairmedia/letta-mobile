@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
+
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -64,8 +66,8 @@ internal class IrohViewerHandle(
 
     override fun receivesAgentEvents(): Boolean = agentEventsGate()
 
-    override fun receivesConversationActivity(agentId: String): Boolean =
-        receivesConversationEvents() && conversationActivityGate(agentId)
+    override fun receivesConversationActivity(agentId: AgentId): Boolean =
+        receivesConversationEvents() && conversationActivityGate(agentId.value)
 
     override fun receivesConversationEvents(): Boolean = conversationEventsGate()
 

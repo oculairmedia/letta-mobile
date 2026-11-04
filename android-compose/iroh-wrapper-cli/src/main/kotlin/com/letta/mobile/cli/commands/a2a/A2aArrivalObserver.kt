@@ -3,6 +3,9 @@ package com.letta.mobile.cli.commands.a2a
 import com.letta.mobile.data.controller.node.iroh.ConversationChangeTarget
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.AgentMessageClientId
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -62,11 +65,11 @@ internal class A2aArrivalObserver(
 
     private fun findSource(agentId: String, conversationId: String, clientId: String): String? {
         if (!isInbox(agentId, conversationId)) return null
-        return store.committedUserMessageId(conversationId, agentId, clientId)?.takeIf { it.isNotBlank() }
+        return store.committedUserMessageId(ConversationId(conversationId), AgentId(agentId), MessageId(clientId))?.takeIf { it.isNotBlank() }
     }
 
     private fun isInbox(agentId: String, conversationId: String): Boolean {
-        val conversation = store.conversationRecord(conversationId, agentId) ?: return false
+        val conversation = store.conversationRecord(ConversationId(conversationId), AgentId(agentId)) ?: return false
         val tags = conversation["tags"] as? kotlinx.serialization.json.JsonArray ?: return false
         return JsonPrimitive("lane:inbox") in tags
     }

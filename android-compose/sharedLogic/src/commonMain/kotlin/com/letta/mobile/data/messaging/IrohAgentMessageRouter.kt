@@ -1,7 +1,9 @@
 package com.letta.mobile.data.messaging
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import kotlinx.serialization.Serializable
 
 /** Routes inbound messages by conversation lane, after loop-safety checks. */
@@ -80,16 +82,18 @@ class IrohAgentMessageRouter(
         candidates: List<ConversationState>,
         address: InboundAddress = InboundAddress(),
     ): RoutingDecision {
-        guard(fromAgentId, msgId)?.let { return it }
+        guard(AgentId(fromAgentId), MessageId(msgId))?.let { return it }
         val decision = when (val target = address.targetConversationId) {
-            null -> routeLane(address.lane ?: "inbox", candidates)
+            null -> routeLane(address, candidates)
             else -> routeExplicitTarget(ConversationId(target), candidates)
         }
         if (decision is RoutingDecision.Dropped) reservations.remove(msgId)
         return decision
     }
 
-    private fun guard(fromAgentId: String, msgId: String): RoutingDecision.Dropped? {
+    private fun guard(sender: AgentId, message: MessageId): RoutingDecision.Dropped? {
+        val fromAgentId = sender.value
+        val msgId = message.value
         val count = perSenderCount[fromAgentId] ?: 0
         val atCapacity = reservations.size >= maxReservations ||
             (fromAgentId !in perSenderCount && perSenderCount.size >= maxSenders)
@@ -109,21 +113,22 @@ class IrohAgentMessageRouter(
 
     private fun validIdentity(value: String): Boolean = value.isNotBlank() && value.length <= MAX_IDENTITY_CHARS
 
-    private fun routeLane(lane: String, candidates: List<ConversationState>): RoutingDecision = when (lane) {
-        "home" -> RoutingDecision.Dropped("home_lane_forbidden")
-        "inbox" -> {
-            val matches = laneMatches(candidates.map { it.conversation }, lane)
-            when (matches.size) {
-                0 -> RoutingDecision.CreateAndDeliver
-                1 -> {
-                    val inbox = matches.single()
-                    routeExplicitTarget(inbox.id, candidates)
+    private fun routeLane(address: InboundAddress, candidates: List<ConversationState>): RoutingDecision =
+        when (val lane = address.lane ?: "inbox") {
+            "home" -> RoutingDecision.Dropped("home_lane_forbidden")
+            "inbox" -> {
+                val matches = laneMatches(candidates.map { it.conversation }, lane)
+                when (matches.size) {
+                    0 -> RoutingDecision.CreateAndDeliver
+                    1 -> {
+                        val inbox = matches.single()
+                        routeExplicitTarget(inbox.id, candidates)
+                    }
+                    else -> RoutingDecision.Dropped("duplicate_lane_tags")
                 }
-                else -> RoutingDecision.Dropped("duplicate_lane_tags")
             }
+            else -> RoutingDecision.Dropped("unsupported_lane")
         }
-        else -> RoutingDecision.Dropped("unsupported_lane")
-    }
 
     companion object {
         private const val MAX_IDENTITY_CHARS = 512

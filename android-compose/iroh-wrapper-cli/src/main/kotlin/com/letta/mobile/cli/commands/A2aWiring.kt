@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.letta.mobile.cli.commands.a2a.A2aArrivalObserver
+import com.letta.mobile.cli.commands.a2a.A2aDeliveryContext
 import com.letta.mobile.util.telemetryAttributes
 
 import com.letta.mobile.util.attr
@@ -13,6 +14,8 @@ import com.letta.mobile.data.model.AgentIdNamespace
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationClass
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
@@ -139,15 +142,15 @@ fun buildA2aWiring(
     val router = IrohAgentMessageRouter(ownAgentId = ownAgentId)
     lateinit var receiver: IrohAgentMessageReceiver
     val arrivals = if (scope != null && backendStore != null && activityTarget != null) {
-        A2aArrivalObserver(scope, backendStore, activityTarget) { receiver.markPersisted(it) }
+        A2aArrivalObserver(scope, backendStore, activityTarget) { receiver.markPersisted(MessageId(it)) }
     } else null
     receiver = IrohAgentMessageReceiver(
         router = router,
         conversationsFor = conversationsFor,
         onDeliver = { message, decision ->
-            handleDecision(client(), message, decision, backendStore) { accepted, conversation ->
+            handleDecision(client(), message, decision, A2aDeliveryContext(backendStore) { accepted, conversation ->
                 arrivals?.observe(accepted, conversation)
-            }
+            })
         },
         authenticate = { message, peer -> authenticateSender(config, message, peer) },
         journalFile = config.receiptsFile,
@@ -364,8 +367,7 @@ internal suspend fun handleDecision(
     client: AppServerClient?,
     message: IrohAgentMessage,
     decision: IrohAgentMessageRouter.RoutingDecision,
-    store: LocalBackendAdminStore? = null,
-    onAccepted: (IrohAgentMessage, String) -> Unit = { _, _ -> },
+    context: A2aDeliveryContext = A2aDeliveryContext(),
 ): DeliveryOutcome {
     val normMessage = message.copy(
         fromAgentId = AgentIdNamespace.normalizeToBareId(message.fromAgentId),
@@ -380,7 +382,7 @@ internal suspend fun handleDecision(
                 "msgId" attr normMessage.msgId,
                 "conversationId" attr decision.conversationId,
             )
-            return inputOnConversation(client, normMessage, decision.conversationId, onAccepted)
+            return inputOnConversation(client, normMessage, decision.conversationId, context.onAccepted)
         }
         is IrohAgentMessageRouter.RoutingDecision.Queue -> {
             // Same as Deliver but no second turn: the app-server already serializes
@@ -396,10 +398,10 @@ internal suspend fun handleDecision(
                 "decision" attr "queue",
                 "conversationId" attr decision.conversationId,
             )
-            return inputOnConversation(client, normMessage, decision.conversationId, onAccepted)
+            return inputOnConversation(client, normMessage, decision.conversationId, context.onAccepted)
         }
         is IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver -> {
-            return handleCreateAndDeliver(client, normMessage, store, onAccepted)
+            return handleCreateAndDeliver(client, normMessage, context)
         }
         is IrohAgentMessageRouter.RoutingDecision.Dropped -> {
             Telemetry.event(
@@ -417,8 +419,7 @@ internal suspend fun handleDecision(
 internal suspend fun handleCreateAndDeliver(
     client: AppServerClient?,
     message: IrohAgentMessage,
-    store: LocalBackendAdminStore? = null,
-    onAccepted: (IrohAgentMessage, String) -> Unit = { _, _ -> },
+    context: A2aDeliveryContext = A2aDeliveryContext(),
 ): DeliveryOutcome {
     if (client == null) {
         Telemetry.event(
@@ -433,7 +434,7 @@ internal suspend fun handleCreateAndDeliver(
     }
     var appServerError: String? = null
     val createdId = runCatching {
-        ConversationAdminHandlers.createInbox(client, message.toAgentId, store)
+        ConversationAdminHandlers.createInbox(client, message.toAgentId, context.store)
     }.onFailure { t ->
         if (t is CancellationException) throw t
         appServerError = t.message ?: t::class.simpleName
@@ -447,7 +448,7 @@ internal suspend fun handleCreateAndDeliver(
             "msgId" attr message.msgId,
             "conversationId" attr createdId,
         )
-        return inputOnConversation(client, message, createdId, onAccepted)
+        return inputOnConversation(client, message, createdId, context.onAccepted)
     } else {
         val dropAttrs = mutableListOf(
             "fromAgentId" to message.fromAgentId,
@@ -531,9 +532,9 @@ private suspend fun inputOnConversation(
             ),
         )
     }.map { acceptance ->
-        val correlated = acceptance.requestId == requestId && acceptance.runtime.agentId == message.toAgentId &&
-            acceptance.runtime.conversationId == conversationId
-        if (!correlated) return@map DeliveryOutcome(false, "application_input_scope_mismatch")
+        if (!acceptanceMatches(acceptance, requestId, message, conversationId)) {
+            return@map DeliveryOutcome(false, "application_input_scope_mismatch")
+        }
         val accepted = acceptance.accepted
         if (accepted) onAccepted(message, conversationId)
         Telemetry.event(
@@ -557,3 +558,11 @@ private suspend fun inputOnConversation(
         DeliveryOutcome(false, "application_input_failure")
     }
 }
+
+private fun acceptanceMatches(
+    acceptance: AppServerInboundFrame.InputAccepted,
+    requestId: String,
+    message: IrohAgentMessage,
+    conversationId: String,
+): Boolean = acceptance.requestId == requestId && acceptance.runtime.agentId == message.toAgentId &&
+    acceptance.runtime.conversationId == conversationId

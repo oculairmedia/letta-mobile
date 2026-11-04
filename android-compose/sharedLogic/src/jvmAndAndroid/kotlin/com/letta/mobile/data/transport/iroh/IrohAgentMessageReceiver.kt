@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Connection
 import kotlinx.coroutines.CancellationException
@@ -135,12 +136,7 @@ class IrohAgentMessageReceiver(
         if (decision is IrohAgentMessageRouter.RoutingDecision.Dropped) {
             return DeliveryOutcome(false, decision.reason)
         }
-        val outcome = runCatching {
-            withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) { onDeliver(message, decision) }
-        }.getOrElse { error ->
-            if (error is CancellationException && error !is TimeoutCancellationException) throw error
-            DeliveryOutcome(false, "delivery_timeout")
-        }
+        val outcome = dispatch(message, decision)
         return runCatching {
             updateRouting { router.settle(message.msgId, outcome.reservationState()) }
             outcome
@@ -152,9 +148,19 @@ class IrohAgentMessageReceiver(
         }
     }
 
+    private suspend fun dispatch(
+        message: IrohAgentMessage,
+        decision: IrohAgentMessageRouter.RoutingDecision,
+    ): DeliveryOutcome = runCatching {
+        withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) { onDeliver(message, decision) }
+    }.getOrElse { error ->
+        if (error is CancellationException && error !is TimeoutCancellationException) throw error
+        DeliveryOutcome(false, "delivery_timeout")
+    }
+
     /** Marks authoritative transcript evidence without permitting another application dispatch. */
-    suspend fun markPersisted(msgId: String) {
-        updateRouting { router.settle(msgId, IrohAgentMessageRouter.ReservationState.PERSISTED) }
+    suspend fun markPersisted(msgId: MessageId) {
+        updateRouting { router.settle(msgId.value, IrohAgentMessageRouter.ReservationState.PERSISTED) }
     }
 
     private fun DeliveryOutcome.reservationState(): IrohAgentMessageRouter.ReservationState? = when {

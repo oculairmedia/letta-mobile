@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -36,7 +37,7 @@ interface ViewerHandle {
     fun receivesConversationEvents(): Boolean = false
 
     /** Whether the client negotiated the separate persisted-activity frame. Authorization is checked separately. */
-    fun receivesConversationActivity(agentId: String): Boolean = false
+    fun receivesConversationActivity(agentId: AgentId): Boolean = false
 }
 
 /** Told when a connection starts viewing a conversation. */

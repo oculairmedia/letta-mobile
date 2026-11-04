@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -21,16 +24,19 @@ class TranscriptTailTest {
             val store = LocalBackendAdminStore(root)
             transcript.writeText(row("source", "user", "\"otid\":\"direct\","))
             File(dir, "_otid-map.json").writeText("""{"source":"legacy"}""")
-            assertEquals("source", store.committedUserMessageId("inbox", "recipient", "direct"))
-            assertEquals(null, store.committedUserMessageId("inbox", "other-agent", "direct"))
-            assertEquals(null, store.committedUserMessageId("inbox", "recipient", "legacy"), "direct identity wins over a stale sidecar")
+            assertEquals("source", store.committedUserMessageId(ConversationId("inbox"), AgentId("recipient"), MessageId("direct")))
+            assertEquals(null, store.committedUserMessageId(ConversationId("inbox"), AgentId("other-agent"), MessageId("direct")))
+            assertEquals(
+                null, store.committedUserMessageId(ConversationId("inbox"), AgentId("recipient"), MessageId("legacy")),
+                "direct identity wins over a stale sidecar",
+            )
             transcript.writeText(row("source", "user"))
-            assertEquals("source", store.committedUserMessageId("inbox", "recipient", "legacy"))
+            assertEquals("source", store.committedUserMessageId(ConversationId("inbox"), AgentId("recipient"), MessageId("legacy")))
             transcript.writeText(row("source", "assistant", "\"otid\":\"direct\","))
-            assertEquals(null, store.committedUserMessageId("inbox", "recipient", "direct"))
+            assertEquals(null, store.committedUserMessageId(ConversationId("inbox"), AgentId("recipient"), MessageId("direct")))
             transcript.writeText(row("source", "user", "\"otid\":\"direct\","))
             transcript.appendText((1..64).joinToString("") { row("new-$it", "user") })
-            assertEquals(null, store.committedUserMessageId("inbox", "recipient", "direct"),
+            assertEquals(null, store.committedUserMessageId(ConversationId("inbox"), AgentId("recipient"), MessageId("direct")),
                 "out-of-window absence must not invent evidence")
         } finally { root.deleteRecursively() }
     }

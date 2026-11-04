@@ -154,11 +154,7 @@ internal class IrohObserverIngestor(
         if (unknown.type !in HOST_PUSH_TYPES) return false
         val frame = runCatching {
             DEVICE_PUSH_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
-        }.getOrNull()?.takeIf {
-            it is ServerFrame.ConversationActivity || it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated ||
-                it is ServerFrame.SubagentsUpdated ||
-                it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated
-        }
+        }.getOrNull()?.takeIf(::isDevicePushFrame)
         if (frame == null) {
             Telemetry.event("IrohObserver", "${unknown.type}.undecodable", level = Telemetry.Level.WARN)
             return true
@@ -166,6 +162,11 @@ internal class IrohObserverIngestor(
         emitBoth(frame)
         return true
     }
+
+    private fun isDevicePushFrame(frame: ServerFrame): Boolean =
+        frame is ServerFrame.ConversationActivity || frame is ServerFrame.AgentUpdated ||
+            frame is ServerFrame.ConversationUpdated || frame is ServerFrame.SubagentsUpdated ||
+            frame is ServerFrame.PendingApprovalsUpdated || frame is ServerFrame.PermissionModeUpdated
 
     suspend fun ingestObserverFrame(request: ObserverFrameRequest) {
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
