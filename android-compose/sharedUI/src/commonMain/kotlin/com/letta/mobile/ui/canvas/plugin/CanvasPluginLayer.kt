@@ -197,14 +197,16 @@ private class PluginViewHolder(val value: PluginElementView, val fault: (String)
 /** The view of [element]: its snapshot as it arrives, what the board knows of its plugin, its fault. */
 @Composable
 private fun rememberPluginElementView(element: CanvasPluginElement, board: PluginBoard): PluginViewHolder {
-    var faulted by remember(element.id, element.type) { mutableStateOf(false) }
+    val registered = LocalPluginElementRenderers.current.registeredFor(element.type)
+    var faulted by remember(element.id, element.type, registered) { mutableStateOf(false) }
     val snapshot = rememberPluginSnapshot(element.snapshot, board.snapshots)
     val availability = LocalPluginAvailability.current.availabilityOf(element)
     val canvasId = board.session.canvasId.value
     val view = remember(element, snapshot, availability, faulted, canvasId) {
         PluginElementView(element, availability, snapshot, faulted, canvasId)
     }
-    return remember(view) { PluginViewHolder(view) { faulted = true } }
+    // A same-data replacement still needs a callback targeting its fresh fault state.
+    return remember(view, registered) { PluginViewHolder(view) { faulted = true } }
 }
 
 /** The chrome of [element]'s card: its handle bar's drag, its Open, its way to report a fault. */

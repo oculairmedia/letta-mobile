@@ -383,7 +383,7 @@ Heap and memory-pressure signals for shared consumers. Platform observers produc
 
 Plugin manifests, capabilities, packages, registry transitions and settings/secrets templates. These describe installation and consent; platform package readers and host drivers supply execution where available. Keep native process execution and product widgets outside portable plugin state; provide packages through [PluginPackageReader](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin/-plugin-package-reader/index.html) and action effects through [PluginActionInvoker](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin/-plugin-action-invoker/index.html).
 
-Runtime view bindings live on `InstalledPlugin` and change through `PluginRegistryReducer.configureView` / `unbindView`. Configuration selects trusted code only; it cannot consent, enable, install, or retarget an occupied mount. Canonical object content stays with its source.
+Runtime view bindings live on `InstalledPlugin` and change through `PluginRegistryReducer.configureView` / `unbindView`. Configuration selects trusted code only; it cannot consent, enable, install, or retarget an occupied mount. Configuration and unbinding honor the package-update guard. Canonical object content stays with its source.
 
 # Package com.letta.mobile.data.plugin.catalog
 

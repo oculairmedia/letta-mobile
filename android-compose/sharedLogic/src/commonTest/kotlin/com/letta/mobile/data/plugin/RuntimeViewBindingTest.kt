@@ -67,6 +67,20 @@ class RuntimeViewBindingTest {
         ).refusal)
     }
 
+    @Test
+    fun anUpdatingPluginKeepsItsMountUntilTheUpdateCompletes() {
+        val bound = configure(enabled(), binding)
+        val staged = apply(bound, PluginCommand.StageUpdate(
+            PluginRegistryFixtures.version("1.3.0"), PluginRegistryFixtures.SHA_B, null, PluginRegistryFixtures.NOW + 1,
+        ))
+        val configured = PluginRegistryReducer.configureView(staged, OWNER, binding)
+        assertEquals(PluginRefusal.UPDATE_IN_PROGRESS, assertIs<PluginTransition.Refused>(configured).refusal)
+        val removed = PluginRegistryReducer.unbindView(staged, OWNER, binding.mountId)
+        assertEquals(PluginRefusal.UPDATE_IN_PROGRESS, assertIs<PluginTransition.Refused>(removed).refusal)
+        val completed = apply(staged, PluginCommand.CompleteUpdate(OWNER))
+        assertEquals(listOf(binding), completed[OWNER]!!.viewBindings)
+    }
+
     private fun configure(state: PluginRegistryState, binding: RuntimeViewBinding): PluginRegistryState =
         assertIs<PluginTransition.Applied>(PluginRegistryReducer.configureView(state, OWNER, binding)).state
 
