@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding
 
 /** A change to the registry, as the management API (.30) and the drivers (.28) ask for it. */
@@ -135,7 +136,7 @@ object PluginRegistryReducer {
     }
 
     /** Remove selection only; canonical object and mount lifetime remain with the host. */
-    fun unbindView(state: PluginRegistryState, pluginId: PluginId, mountId: String): PluginTransition {
+    fun unbindView(state: PluginRegistryState, pluginId: PluginId, mountId: RuntimeViewMountId): PluginTransition {
         val plugin = state[pluginId] ?: return refuse(PluginRefusal.UNKNOWN_PLUGIN, "no plugin '${pluginId.value}' is installed")
         return applied(state, plugin.copy(viewBindings = plugin.viewBindings.filterNot { it.mountId == mountId }))
     }

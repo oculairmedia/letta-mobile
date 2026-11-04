@@ -782,8 +782,8 @@ public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers {
 	public final fun getRuntimeViews ()Ljava/util/List;
 	public final fun register (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
 	public final fun register (Lcom/letta/mobile/ui/plugin/RuntimeObjectView;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
-	public final fun unregister (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
 	public final fun unregister-7y3mhsM (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
+	public final fun unregister-u4EiHk4 (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
 	public final fun viewerFor-7y3mhsM (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
 }
 
@@ -1065,7 +1065,7 @@ public final class com/letta/mobile/ui/canvas/plugin/PluginViewSession {
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/RuntimeObjectViewHostKt {
-	public static final fun RuntimeObjectViewHost (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/PluginRegistryState;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+	public static final fun RuntimeObjectViewHost-BHICdLY (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/PluginRegistryState;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/canvas/references/ComposableSingletons$NotebookReferencePreviewKt {

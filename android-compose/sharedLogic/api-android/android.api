@@ -37544,7 +37544,7 @@ public final class com/letta/mobile/data/plugin/PluginRegistryReducer {
 	public static final field INSTANCE Lcom/letta/mobile/data/plugin/PluginRegistryReducer;
 	public final fun configureView-ASfF9-0 (Lcom/letta/mobile/data/plugin/PluginRegistryState;Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;)Lcom/letta/mobile/data/plugin/PluginTransition;
 	public final fun reduce (Lcom/letta/mobile/data/plugin/PluginRegistryState;Lcom/letta/mobile/data/plugin/PluginCommand;)Lcom/letta/mobile/data/plugin/PluginTransition;
-	public final fun unbindView-ASfF9-0 (Lcom/letta/mobile/data/plugin/PluginRegistryState;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/plugin/PluginTransition;
+	public final fun unbindView-BySlI8I (Lcom/letta/mobile/data/plugin/PluginRegistryState;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/plugin/PluginTransition;
 }
 
 public final class com/letta/mobile/data/plugin/PluginRegistryState {
@@ -37562,7 +37562,7 @@ public final class com/letta/mobile/data/plugin/PluginRegistryState {
 	public final fun getPlugins ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-	public final fun viewBinding (Ljava/lang/String;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
+	public final fun viewBinding-5hSguBk (Ljava/lang/String;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
 	public final fun viewFallback (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewFallback;
 }
 
@@ -39070,21 +39070,21 @@ public final class com/letta/mobile/data/plugin/runtimeview/RuntimeObjectReferen
 public final class com/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding {
 	public static final field CONTRACT_VERSION I
 	public static final field Companion Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding$Companion;
-	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;)V
 	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-Ksj-Ves ()Ljava/lang/String;
 	public final fun component2 ()Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;
-	public final fun component3 ()Ljava/lang/String;
+	public final fun component3-p0dNODo ()Ljava/lang/String;
 	public final fun component4 ()I
 	public final fun component5 ()Lkotlinx/serialization/json/JsonObject;
-	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
+	public final fun copy-yNIkpEY (Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
+	public static synthetic fun copy-yNIkpEY$default (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;Ljava/lang/String;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConfiguration ()Lkotlinx/serialization/json/JsonObject;
 	public final fun getContractVersion ()I
-	public final fun getMountId ()Ljava/lang/String;
+	public final fun getMountId-Ksj-Ves ()Ljava/lang/String;
 	public final fun getObjectReference ()Lcom/letta/mobile/data/plugin/runtimeview/RuntimeObjectReference;
-	public final fun getViewId ()Ljava/lang/String;
+	public final fun getViewId-p0dNODo ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -39105,17 +39105,17 @@ public final class com/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding$C
 }
 
 public final class com/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;I)V
-	public final fun component1 ()Ljava/lang/String;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-p0dNODo ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/util/Set;
 	public final fun component5 ()I
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;I)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;IILjava/lang/Object;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;
+	public final fun copy-1VAf6pQ (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;I)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;
+	public static synthetic fun copy-1VAf6pQ$default (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;IILjava/lang/Object;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getContractVersion ()I
-	public final fun getId ()Ljava/lang/String;
+	public final fun getId-p0dNODo ()Ljava/lang/String;
 	public final fun getPluginId ()Ljava/lang/String;
 	public final fun getSchemaId ()Ljava/lang/String;
 	public final fun getSchemaVersions ()Ljava/util/Set;

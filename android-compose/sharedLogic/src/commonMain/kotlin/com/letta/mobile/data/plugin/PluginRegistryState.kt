@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewDescriptor
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewFallback
@@ -124,7 +125,7 @@ data class PluginRegistryState(val plugins: List<InstalledPlugin> = emptyList())
     operator fun get(pluginId: PluginId): InstalledPlugin? = plugins.firstOrNull { it.pluginId == pluginId }
 
     /** A unique mount selection. Ambiguous persisted selections fail closed as unbound. */
-    fun viewBinding(mountId: String): RuntimeViewBinding? =
+    fun viewBinding(mountId: RuntimeViewMountId): RuntimeViewBinding? =
         plugins.flatMap { it.viewBindings }.filter { it.mountId == mountId }.singleOrNull()
 
     /** Validate read-only view inputs without resolving or mutating the canonical object. */

@@ -14,6 +14,8 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
 import com.letta.mobile.data.plugin.PluginCommand
 import com.letta.mobile.data.plugin.PluginConsent
 import com.letta.mobile.data.plugin.PluginManifestParser
@@ -176,13 +178,13 @@ class RuntimeObjectViewHostTest {
         assertIs<PluginTransition.Applied>(PluginRegistryReducer.reduce(state, command)).state
 
     private companion object {
-        const val MOUNT = "workspace.detail"
+        val MOUNT = RuntimeViewMountId("workspace.detail")
         const val CONTENT = "runtime-object-content"
         val OWNER = PluginId("test.reader")
         val reference = RuntimeObjectReference("beads:external-project", "existing-42")
         const val CANONICAL_JSON = """{"id":"existing-42","content":"Keep this text","_future":{"opaque":[1,2,3]}}"""
         val objectValue = RuntimeViewObject(reference, "issue", 7, Json.parseToJsonElement(CANONICAL_JSON).jsonObject)
-        val binding = RuntimeViewBinding(MOUNT, reference, "test.reader.detail", 1)
+        val binding = RuntimeViewBinding(MOUNT, reference, RuntimeViewId("test.reader.detail"), 1)
         val descriptor = RuntimeViewDescriptor(binding.viewId, OWNER.value, "issue", setOf(7), 1)
     }
 }

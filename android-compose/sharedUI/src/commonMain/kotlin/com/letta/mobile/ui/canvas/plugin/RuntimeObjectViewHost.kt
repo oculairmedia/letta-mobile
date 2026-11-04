@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.letta.mobile.data.model.view.RuntimeViewMountId
 import com.letta.mobile.data.plugin.PluginRegistryState
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewFallback
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject
@@ -19,7 +20,7 @@ import com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject
  */
 @Composable
 fun RuntimeObjectViewHost(
-    mountId: String,
+    mountId: RuntimeViewMountId,
     value: RuntimeViewObject?,
     state: PluginRegistryState,
     modifier: Modifier = Modifier,

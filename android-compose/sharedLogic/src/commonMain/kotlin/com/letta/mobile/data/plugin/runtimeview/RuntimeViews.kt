@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin.runtimeview
 
+import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -19,14 +21,14 @@ data class RuntimeViewObject(
 
 /** Metadata for an already trusted implementation, independent of object identity and mount ownership. */
 data class RuntimeViewDescriptor(
-    val id: String,
+    val id: RuntimeViewId,
     val pluginId: String,
     val schemaId: String,
     val schemaVersions: Set<Int>,
     val contractVersion: Int,
 ) {
     init {
-        require(id.isNotBlank() && pluginId.isNotBlank() && schemaId.isNotBlank())
+        require(pluginId.isNotBlank() && schemaId.isNotBlank())
         require(schemaVersions.isNotEmpty() && schemaVersions.all { it > 0 })
         require(contractVersion > 0)
     }
@@ -39,14 +41,13 @@ data class RuntimeViewDescriptor(
 /** Runtime selection/configuration only. It contains neither executable locations nor capabilities. */
 @Serializable
 data class RuntimeViewBinding(
-    val mountId: String,
+    val mountId: RuntimeViewMountId,
     val objectReference: RuntimeObjectReference,
-    val viewId: String,
+    val viewId: RuntimeViewId,
     val contractVersion: Int,
     val configuration: JsonObject = JsonObject(emptyMap()),
 ) {
     init {
-        require(mountId.isNotBlank() && viewId.isNotBlank())
         require(contractVersion > 0)
     }
 

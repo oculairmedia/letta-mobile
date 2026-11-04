@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.plugin.RuntimeObjectView
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_viewer_canvas
@@ -25,14 +26,14 @@ class CanvasDocumentViewers private constructor(
     fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewers = register(Contribution.Canvas(viewer))
 
     private fun register(contribution: Contribution): CanvasDocumentViewers {
-        require(contribution.id != fallbackId.value) { "the fallback canvas document viewer cannot be replaced" }
+        require(contribution.id.value != fallbackId.value) { "the fallback canvas document viewer cannot be replaced" }
         val replacement = if (entries.any { it.id == contribution.id }) entries.map { if (it.id == contribution.id) contribution else it }
         else entries + contribution
         return CanvasDocumentViewers(replacement, fallbackId)
     }
 
     /** Remove a registered viewer. The built-in canvas viewer cannot be removed. */
-    fun unregister(id: CanvasDocumentViewerId): CanvasDocumentViewers = unregister(id.value)
+    fun unregister(id: CanvasDocumentViewerId): CanvasDocumentViewers = unregister(RuntimeViewId(id.value))
 
     /** Resolve a canvas adapter, using the built-in canvas after its extension is removed. */
     fun viewerFor(id: CanvasDocumentViewerId): CanvasDocumentViewer =
@@ -44,8 +45,8 @@ class CanvasDocumentViewers private constructor(
     fun register(view: RuntimeObjectView): CanvasDocumentViewers = register(Contribution.Object(view))
 
     /** Remove either kind of contribution by its stable ID. */
-    fun unregister(viewId: String): CanvasDocumentViewers {
-        require(viewId != fallbackId.value) { "the fallback canvas document viewer cannot be removed" }
+    fun unregister(viewId: RuntimeViewId): CanvasDocumentViewers {
+        require(viewId.value != fallbackId.value) { "the fallback canvas document viewer cannot be removed" }
         return CanvasDocumentViewers(entries.filterNot { it.id == viewId }, fallbackId)
     }
 
@@ -53,14 +54,14 @@ class CanvasDocumentViewers private constructor(
     val runtimeViews: List<RuntimeObjectView> get() = entries.filterIsInstance<Contribution.Object>().map { it.view }
 
     private sealed interface Contribution {
-        val id: String
+        val id: RuntimeViewId
 
         class Canvas(val viewer: CanvasDocumentViewer) : Contribution {
-            override val id: String get() = viewer.id.value
+            override val id: RuntimeViewId get() = RuntimeViewId(viewer.id.value)
         }
 
         class Object(val view: RuntimeObjectView) : Contribution {
-            override val id: String get() = view.descriptor.id
+            override val id: RuntimeViewId get() = view.descriptor.id
         }
     }
 

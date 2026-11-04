@@ -409,7 +409,7 @@ The shared lcp-view/1 bridge: handshake, validated messages, lifecycle, rate lim
 
 # Package com.letta.mobile.data.plugin.runtimeview
 
-`RuntimeObjectReference`, `RuntimeViewObject`, `RuntimeViewDescriptor` and `RuntimeViewBinding` provide a neutral native-view contract. Object schema ID/version, view-contract version and mount identity are independent. Full JSON content (including unknown fields) is read-only; source authority is an opaque part of the reference. Schema incompatibility, absent owners/objects/implementations and reported renderer failure use explicit fallback. Native implementations are supplied by trusted host code, never fetched from configuration.
+`RuntimeViewId` and `RuntimeViewMountId` come from `core:ids` and keep selection separate from mount ownership. `RuntimeObjectReference`, `RuntimeViewObject`, `RuntimeViewDescriptor` and `RuntimeViewBinding` provide a neutral native-view contract. Object schema ID/version, view-contract version and mount identity are independent. Full JSON content (including unknown fields) is read-only; source authority is an opaque part of the reference. Schema incompatibility, absent owners/objects/implementations and reported renderer failure use explicit fallback. Native implementations are supplied by trusted host code, never fetched from configuration.
 
 # Package com.letta.mobile.data.plugin.wire
 

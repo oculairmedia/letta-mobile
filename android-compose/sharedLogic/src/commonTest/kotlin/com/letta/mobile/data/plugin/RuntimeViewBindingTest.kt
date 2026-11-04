@@ -1,6 +1,8 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
 import com.letta.mobile.data.plugin.runtimeview.RuntimeObjectReference
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding
 import kotlinx.serialization.json.JsonObject
@@ -14,7 +16,9 @@ class RuntimeViewBindingTest {
     fun configurationPreservesMountReferenceAndConsentAcrossRoundTripAndRemoval() {
         val initial = enabled()
         val bound = configure(initial, binding)
-        val configured = binding.copy(viewId = "reader.alternative", configuration = JsonObject(mapOf("unknown" to JsonPrimitive(42))))
+        val configured = binding.copy(
+            viewId = RuntimeViewId("reader.alternative"), configuration = JsonObject(mapOf("unknown" to JsonPrimitive(42))),
+        )
         val updated = configure(bound, configured)
         assertEquals(listOf(configured), updated[OWNER]!!.viewBindings)
         assertEquals(initial[OWNER]!!.current, updated[OWNER]!!.current)
@@ -75,6 +79,8 @@ class RuntimeViewBindingTest {
 
     private companion object {
         val OWNER = PluginId("letta.example")
-        val binding = RuntimeViewBinding("detail", RuntimeObjectReference("external", "existing"), "reader.detail", 1)
+        val binding = RuntimeViewBinding(
+            RuntimeViewMountId("detail"), RuntimeObjectReference("external", "existing"), RuntimeViewId("reader.detail"), 1,
+        )
     }
 }
