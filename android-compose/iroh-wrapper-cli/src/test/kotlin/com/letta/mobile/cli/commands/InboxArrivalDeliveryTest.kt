@@ -28,7 +28,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 /** Real receiver -> wrapper -> persisted transcript -> endpoint -> authenticated home viewer -> decoder.
  * Only the App Server boundary and the JNI byte sink are substituted. The boundary refuses missing
@@ -36,14 +37,16 @@ import org.junit.jupiter.api.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class InboxArrivalDeliveryTest {
-    @Test
-    fun `queued acceptance waits for committed user identity then reaches only authorized opted in home viewers`() = runTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `queued acceptance waits for committed user identity then reaches only authorized opted in home viewers`(existingInbox: Boolean) = runTest {
         val root = Files.createTempDirectory("arrival-delivery").toFile()
         try {
             val backend = File(root, "backend")
             File(backend, "agents").mkdirs()
             File(backend, "agents/recipient.json").writeText("""{"id":"recipient"}""")
-            val inbox = conversation(backend, "inbox", "lane:inbox")
+            val inbox = conversationDir(backend, "inbox")
+            if (existingInbox) conversation(backend, "inbox", "lane:inbox")
             val home = conversation(backend, "home", "lane:home")
             val registry = ConnectionRegistry()
             val endpoint = IrohNodeEndpoint(scope = backgroundScope, authPolicy = IrohAuthPolicy.PairedPeersOnly,
@@ -93,15 +96,20 @@ class InboxArrivalDeliveryTest {
             assertFalse(File(home, "messages.jsonl").exists())
             assertEquals("duplicate_msg_id", wiring.receiver.respond(message, sender.nodeIdHex).reason)
             assertEquals(1, client.inputs.size)
+            assertEquals(if (existingInbox) 0 else 1, client.creates)
         } finally { root.deleteRecursively() }
     }
 
     private fun conversation(root: File, id: String, lane: String): File {
-        val key = Base64.getUrlEncoder().withoutPadding().encodeToString("conversation:$id".toByteArray())
-        return File(root, "conversations/$key").apply {
+        return conversationDir(root, id).apply {
             mkdirs()
             File(this, "conversation.json").writeText("""{"id":"$id","agent_id":"recipient","tags":["$lane"]}""")
         }
+    }
+
+    private fun conversationDir(root: File, id: String): File {
+        val key = Base64.getUrlEncoder().withoutPadding().encodeToString("conversation:$id".toByteArray())
+        return File(root, "conversations/$key")
     }
 
     private fun row(id: String, role: String, otid: String): String = buildJsonObject {
@@ -146,17 +154,29 @@ class InboxArrivalDeliveryTest {
         return HomeViewer(node, frames)
     }
 
-    private class TranscriptClient(private val backend: File) : AppServerClient {
+    private inner class TranscriptClient(private val backend: File) : AppServerClient {
+        var creates = 0
         val inputs = mutableListOf<AppServerCommand.Input>()
         override val events = emptyFlow<AppServerReceivedFrame>()
         override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
             require(File(backend, "agents/${command.runtime.agentId}.json").isFile)
             require(command.runtime.agentId == "recipient" && command.runtime.conversationId == "inbox")
+            require(File(conversationDir(backend, "inbox"), "conversation.json").isFile)
             require(!command.requestId.isNullOrBlank())
             val messages = (command.payload as AppServerInputPayload.CreateMessage).messages
             require(messages.size == 1 && messages.single().role == "user" && !messages.single().clientMessageId.isNullOrBlank())
             inputs += command
             return AppServerInboundFrame.InputAccepted(command.requestId!!, command.runtime, true, disposition = "queued")
+        }
+        override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): AppServerInboundFrame.ConversationCreateResponse {
+            require(command.body["agent_id"]?.jsonPrimitive?.content == "recipient")
+            require(File(backend, "agents/recipient.json").isFile)
+            require(command.body["tags"] == JsonArray(listOf(JsonPrimitive("lane:inbox"))))
+            require(command.body["conversation_class"]?.jsonPrimitive?.content == "autonomous")
+            creates++
+            val directory = conversation(backend, "inbox", "lane:inbox")
+            return AppServerInboundFrame.ConversationCreateResponse(command.requestId, true,
+                Json.parseToJsonElement(File(directory, "conversation.json").readText()).jsonObject)
         }
         override suspend fun input(command: AppServerCommand.Input) = error("must await correlated acceptance")
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse = error("unused")
