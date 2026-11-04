@@ -17,6 +17,15 @@ import org.junit.jupiter.api.Assertions.assertTrue
  * the shape must be stable for delivered / unaddressable / failed.
  */
 class AgentMessageSendCommandTest {
+    @Test
+    fun homeLaneDenialIsIncludedInResultJson() {
+        val json = agentSendResultJson(AgentSendResult.Accepted("home-1", "agent-x", "home_lane_forbidden"), "home-1")
+        assertEquals(
+            """{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":"home-1","toAgentId":"agent-x","reason":"home_lane_forbidden"}""",
+            json,
+        )
+    }
+
 
     @Test
     fun deliveredResultJsonContract() {
