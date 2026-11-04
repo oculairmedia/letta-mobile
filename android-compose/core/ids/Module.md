@@ -18,3 +18,7 @@ names and default/optimistic identifier forms. These opaque values must not acqu
 parsing, transport authorization or assumptions about numeric ordering. Extend shared identity
 with distinct wrappers and format helpers here, preserving each type's serialization contract
 and keeping parsing or permission decisions in its owning subsystem.
+
+# Package com.letta.mobile.data.model.view
+
+`RuntimeViewId` names a trusted view implementation; `RuntimeViewMountId` names a host-owned mount. They remain distinct from canonical object references and schema/contract versions, and both preserve bare-string serialization for persisted runtime bindings. These IDs grant no capabilities and import no canvas or UI types.

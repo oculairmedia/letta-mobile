@@ -48,11 +48,17 @@ Read-only nested Markdown previews of a shared bounded notebook reference tree. 
 
 Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering. `ProvideCanvasDocumentViewers` registers native sharedUI document renderers with typed IDs; `CanvasWorkspace` keeps the existing `CanvasSession` mounted and supplies extensions only an immutable `CanvasId`/revision/scene snapshot. Registration is an in-process UI extension point; installed process plugins are not loaded as viewers. The canvas viewer ID is reserved and cannot be replaced or removed. The selector scrolls on compact widths. Initial session loading and synchronization belong to the workspace; switching away from the board waits for its pending drawing edits to persist, and a failed save keeps the board and draft visible. Successful switches dispose board rendering and presence work.
 
+The same `CanvasDocumentViewers` registry accepts neutral `RuntimeObjectView` contributions and exposes their descriptors through `runtimeViews`. These do not enter the canvas selector or require a scene, element frame or session. `PluginElementRenderers` registrations are also evaluated on recomposition and can be removed at runtime. Faulted elements retry a replacement registered renderer; their failure callback stays paired with that implementation.
+
 # Package com.letta.mobile.ui.canvas.viewer
 
 Internal document viewer surfaces, including the read-only text rendering used by the canvas viewer SPI.
 
 Drawing handoff waits for the session's durable save result. Repeated identical storage failures retain the mounted draft; a successful retry can switch viewers while the historical storage diagnostic remains visible on the board.
+
+# Package com.letta.mobile.ui.plugin
+
+`RuntimeObjectViewHost` binds an existing host-supplied object to a mount in `PluginRegistryState`, resolving trusted implementations from the existing `CanvasDocumentViewers` registry. It checks source/reference, owner availability/consent, object schema and view contract before rendering. Replacement, configuration change, unbind, disable, failure and unregister dispose the old composition and its effects. Content updates keep the binding. Renderers report recoverable failures through their supplied callback; exceptions from arbitrary trusted Compose code are not sandboxed. This is an in-process shared Android/Desktop/WASM hook, with rendered JVM acceptance; no new product route, remote loader, Penpot integration or capability grant is supplied.
 
 # Package com.letta.mobile.ui.chat
 

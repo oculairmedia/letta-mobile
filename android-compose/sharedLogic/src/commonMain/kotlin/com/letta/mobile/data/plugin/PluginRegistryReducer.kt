@@ -1,6 +1,8 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
+import com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding
 
 /** A change to the registry, as the management API (.30) and the drivers (.28) ask for it. */
 sealed interface PluginCommand {
@@ -115,6 +117,29 @@ object PluginRegistryReducer {
         is PluginCommand.SecretsSet -> applied(state, plugin.copy(secretsStatus = plugin.manifest.secrets.associate { it.name to (command.status[it.name] ?: SecretState.UNSET) }))
         is PluginCommand.HealthReported -> applied(state, plugin.copy(health = command.health))
         else -> PluginLifecycle.reduce(state, plugin, command)
+    }
+
+    /** Runtime selection only: never installs, enables or grants capabilities. */
+    fun configureView(state: PluginRegistryState, pluginId: PluginId, binding: RuntimeViewBinding): PluginTransition {
+        val plugin = state[pluginId] ?: return refuse(PluginRefusal.UNKNOWN_PLUGIN, "no plugin '${pluginId.value}' is installed")
+        updating(plugin)?.let { return it }
+        val occupied = state.plugins.flatMap { owner -> owner.viewBindings.map { owner.pluginId to it } }
+            .filter { (_, current) -> current.mountId == binding.mountId }
+        return when {
+            !plugin.state.advertises -> refuse(PluginRefusal.INVALID_STATE, "${plugin.id} is not enabled")
+            !plugin.ready -> refuse(PluginRefusal.NOT_READY, "${plugin.id} needs its required settings and secrets")
+            !plugin.consented -> refuse(PluginRefusal.CONSENT_REQUIRED, "${plugin.id} is not consented")
+            occupied.any { (owner, current) -> owner != pluginId || current.objectReference != binding.objectReference } ->
+                refuse(PluginRefusal.INVALID_STATE, "mount '${binding.mountId}' is owned by another plugin or object")
+            else -> applied(state, plugin.copy(viewBindings = plugin.viewBindings.filterNot { it.mountId == binding.mountId } + binding))
+        }
+    }
+
+    /** Remove selection only; canonical object and mount lifetime remain with the host. */
+    fun unbindView(state: PluginRegistryState, pluginId: PluginId, mountId: RuntimeViewMountId): PluginTransition {
+        val plugin = state[pluginId] ?: return refuse(PluginRefusal.UNKNOWN_PLUGIN, "no plugin '${pluginId.value}' is installed")
+        updating(plugin)?.let { return it }
+        return applied(state, plugin.copy(viewBindings = plugin.viewBindings.filterNot { it.mountId == mountId }))
     }
 
     private fun recordConsent(state: PluginRegistryState, plugin: InstalledPlugin, consent: PluginConsent): PluginTransition {

@@ -39,6 +39,54 @@ final class com.letta.mobile.data.model/CanvasId { // com.letta.mobile.data.mode
     }
 }
 
+final value class com.letta.mobile.data.model.view/RuntimeViewId { // com.letta.mobile.data.model.view/RuntimeViewId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model.view/RuntimeViewId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model.view/RuntimeViewId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model.view/RuntimeViewId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.view/RuntimeViewId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.view/RuntimeViewId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model.view/RuntimeViewId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model.view/RuntimeViewId> { // com.letta.mobile.data.model.view/RuntimeViewId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model.view/RuntimeViewId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model.view/RuntimeViewId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model.view/RuntimeViewId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.model.view/RuntimeViewId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model.view/RuntimeViewId) // com.letta.mobile.data.model.view/RuntimeViewId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.view.RuntimeViewId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model.view/RuntimeViewId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model.view/RuntimeViewId> // com.letta.mobile.data.model.view/RuntimeViewId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model.view/RuntimeViewMountId { // com.letta.mobile.data.model.view/RuntimeViewMountId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model.view/RuntimeViewMountId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model.view/RuntimeViewMountId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model.view/RuntimeViewMountId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model.view/RuntimeViewMountId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model.view/RuntimeViewMountId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model.view/RuntimeViewMountId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model.view/RuntimeViewMountId> { // com.letta.mobile.data.model.view/RuntimeViewMountId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model.view/RuntimeViewMountId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model.view/RuntimeViewMountId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model.view/RuntimeViewMountId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model.view/RuntimeViewMountId // com.letta.mobile.data.model.view/RuntimeViewMountId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model.view/RuntimeViewMountId) // com.letta.mobile.data.model.view/RuntimeViewMountId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.view.RuntimeViewMountId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model.view/RuntimeViewMountId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model.view/RuntimeViewMountId> // com.letta.mobile.data.model.view/RuntimeViewMountId.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final value class com.letta.mobile.data.model/A2uiComponentId { // com.letta.mobile.data.model/A2uiComponentId|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.model/A2uiComponentId.<init>|<init>(kotlin.String){}[0]
 

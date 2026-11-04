@@ -1,6 +1,11 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.model.view.RuntimeViewMountId
+import com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding
+import com.letta.mobile.data.plugin.runtimeview.RuntimeViewDescriptor
+import com.letta.mobile.data.plugin.runtimeview.RuntimeViewFallback
+import com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -85,6 +90,8 @@ data class InstalledPlugin(
     val previousVersion: PluginVersionRecord? = null,
     val pendingUpdate: PendingUpdate? = null,
     val lastFault: String? = null,
+    /** Runtime view selections owned by this plugin; canonical objects remain with their source. */
+    val viewBindings: List<RuntimeViewBinding> = emptyList(),
 ) {
     val manifest: PluginManifest get() = current.manifest
     val id: String get() = manifest.id
@@ -116,6 +123,28 @@ data class InstalledPlugin(
 @Serializable
 data class PluginRegistryState(val plugins: List<InstalledPlugin> = emptyList()) {
     operator fun get(pluginId: PluginId): InstalledPlugin? = plugins.firstOrNull { it.pluginId == pluginId }
+
+    /** A unique mount selection. Ambiguous persisted selections fail closed as unbound. */
+    fun viewBinding(mountId: RuntimeViewMountId): RuntimeViewBinding? =
+        plugins.flatMap { it.viewBindings }.filter { it.mountId == mountId }.singleOrNull()
+
+    /** Validate read-only view inputs without resolving or mutating the canonical object. */
+    fun viewFallback(
+        binding: RuntimeViewBinding?,
+        value: RuntimeViewObject?,
+        descriptor: RuntimeViewDescriptor?,
+    ): RuntimeViewFallback? = when {
+        binding == null -> RuntimeViewFallback.UNBOUND
+        value == null -> RuntimeViewFallback.MISSING_OBJECT
+        binding.objectReference != value.reference -> RuntimeViewFallback.OBJECT_MISMATCH
+        descriptor == null || descriptor.id != binding.viewId -> RuntimeViewFallback.MISSING_VIEW
+        !viewOwnerAvailable(binding, descriptor) -> RuntimeViewFallback.UNAVAILABLE_OWNER
+        !descriptor.supports(value, binding) -> RuntimeViewFallback.INCOMPATIBLE
+        else -> null
+    }
+
+    private fun viewOwnerAvailable(binding: RuntimeViewBinding, descriptor: RuntimeViewDescriptor): Boolean =
+        plugins.any { it.id == descriptor.pluginId && it.runnable && it.advertised && binding in it.viewBindings }
 
     /** The plugins whose agent tools are advertised. */
     val advertised: List<InstalledPlugin> get() = plugins.filter { it.advertised }

@@ -3,7 +3,6 @@ package com.letta.mobile.ui.canvas.plugin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 
@@ -44,6 +43,9 @@ class PluginElementRenderers private constructor(
         return PluginElementRenderers(byPrefix + (typePrefix to renderer), fallback)
     }
 
+    /** Remove a trusted renderer; matching elements return to the next prefix or fallback. */
+    fun unregister(typePrefix: String): PluginElementRenderers = PluginElementRenderers(byPrefix - typePrefix, fallback)
+
     /** The type prefixes that have a renderer of their own. */
     val prefixes: Set<String> get() = byPrefix.keys
 
@@ -62,8 +64,7 @@ fun ProvidePluginElementRenderers(
     registrations: PluginElementRenderers.() -> PluginElementRenderers,
     content: @Composable () -> Unit,
 ) {
-    // Worked out once per base set: a new set on every recomposition would recompose every card.
     val base = LocalPluginElementRenderers.current
-    val renderers = remember(base) { base.registrations() }
+    val renderers = base.registrations()
     CompositionLocalProvider(LocalPluginElementRenderers provides renderers, content = content)
 }

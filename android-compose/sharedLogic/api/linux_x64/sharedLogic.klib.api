@@ -2033,6 +2033,22 @@ final enum class com.letta.mobile.data.plugin.host/PluginHostEvent : kotlin/Enum
     final fun values(): kotlin/Array<com.letta.mobile.data.plugin.host/PluginHostEvent> // com.letta.mobile.data.plugin.host/PluginHostEvent.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback : kotlin/Enum<com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback> { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback|null[0]
+    enum entry FAILED // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.FAILED|null[0]
+    enum entry INCOMPATIBLE // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.INCOMPATIBLE|null[0]
+    enum entry MISSING_OBJECT // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.MISSING_OBJECT|null[0]
+    enum entry MISSING_VIEW // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.MISSING_VIEW|null[0]
+    enum entry OBJECT_MISMATCH // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.OBJECT_MISMATCH|null[0]
+    enum entry UNAVAILABLE_OWNER // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.UNAVAILABLE_OWNER|null[0]
+    enum entry UNBOUND // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.UNBOUND|null[0]
+
+    final val entries // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback> // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback> // com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.plugin.view/ViewBridgeState : kotlin/Enum<com.letta.mobile.data.plugin.view/ViewBridgeState> { // com.letta.mobile.data.plugin.view/ViewBridgeState|null[0]
     enum entry AWAITING_READY // com.letta.mobile.data.plugin.view/ViewBridgeState.AWAITING_READY|null[0]
     enum entry CLOSED // com.letta.mobile.data.plugin.view/ViewBridgeState.CLOSED|null[0]
@@ -51231,6 +51247,124 @@ final class com.letta.mobile.data.plugin.catalog/UnavailablePluginCatalog : com.
     }
 }
 
+final class com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference { // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val id // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.id.<get-id>|<get-id>(){}[0]
+    final val source // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.source|{}source[0]
+        final fun <get-source>(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.source.<get-source>|<get-source>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference> { // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference) // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.plugin.runtimeview.RuntimeObjectReference){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference> // com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding|null[0]
+    constructor <init>(com.letta.mobile.data.model.view/RuntimeViewMountId, com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference, com.letta.mobile.data.model.view/RuntimeViewId, kotlin/Int, kotlinx.serialization.json/JsonObject = ...) // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.<init>|<init>(com.letta.mobile.data.model.view.RuntimeViewMountId;com.letta.mobile.data.plugin.runtimeview.RuntimeObjectReference;com.letta.mobile.data.model.view.RuntimeViewId;kotlin.Int;kotlinx.serialization.json.JsonObject){}[0]
+
+    final val configuration // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.configuration|{}configuration[0]
+        final fun <get-configuration>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.configuration.<get-configuration>|<get-configuration>(){}[0]
+    final val contractVersion // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val mountId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.mountId|{}mountId[0]
+        final fun <get-mountId>(): com.letta.mobile.data.model.view/RuntimeViewMountId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.mountId.<get-mountId>|<get-mountId>(){}[0]
+    final val objectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.objectReference|{}objectReference[0]
+        final fun <get-objectReference>(): com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.objectReference.<get-objectReference>|<get-objectReference>(){}[0]
+    final val viewId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.viewId|{}viewId[0]
+        final fun <get-viewId>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.viewId.<get-viewId>|<get-viewId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model.view/RuntimeViewMountId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.component4|component4(){}[0]
+    final fun component5(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.model.view/RuntimeViewMountId = ..., com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference = ..., com.letta.mobile.data.model.view/RuntimeViewId = ..., kotlin/Int = ..., kotlinx.serialization.json/JsonObject = ...): com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.copy|copy(com.letta.mobile.data.model.view.RuntimeViewMountId;com.letta.mobile.data.plugin.runtimeview.RuntimeObjectReference;com.letta.mobile.data.model.view.RuntimeViewId;kotlin.Int;kotlinx.serialization.json.JsonObject){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding> { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding) // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.Companion|null[0]
+        final const val CONTRACT_VERSION // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.Companion.CONTRACT_VERSION|{}CONTRACT_VERSION[0]
+            final fun <get-CONTRACT_VERSION>(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.Companion.CONTRACT_VERSION.<get-CONTRACT_VERSION>|<get-CONTRACT_VERSION>(){}[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding> // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor|null[0]
+    constructor <init>(com.letta.mobile.data.model.view/RuntimeViewId, kotlin/String, kotlin/String, kotlin.collections/Set<kotlin/Int>, kotlin/Int) // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.<init>|<init>(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String;kotlin.String;kotlin.collections.Set<kotlin.Int>;kotlin.Int){}[0]
+
+    final val contractVersion // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val id // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.id|{}id[0]
+        final fun <get-id>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.id.<get-id>|<get-id>(){}[0]
+    final val pluginId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.pluginId|{}pluginId[0]
+        final fun <get-pluginId>(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.pluginId.<get-pluginId>|<get-pluginId>(){}[0]
+    final val schemaId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.schemaId|{}schemaId[0]
+        final fun <get-schemaId>(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.schemaId.<get-schemaId>|<get-schemaId>(){}[0]
+    final val schemaVersions // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.schemaVersions|{}schemaVersions[0]
+        final fun <get-schemaVersions>(): kotlin.collections/Set<kotlin/Int> // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.schemaVersions.<get-schemaVersions>|<get-schemaVersions>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/Set<kotlin/Int> // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.component4|component4(){}[0]
+    final fun component5(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.model.view/RuntimeViewId = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin/Int = ...): com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.copy|copy(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String;kotlin.String;kotlin.collections.Set<kotlin.Int>;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.hashCode|hashCode(){}[0]
+    final fun supports(com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject, com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding): kotlin/Boolean // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.supports|supports(com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject;com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject|null[0]
+    constructor <init>(com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference, kotlin/String, kotlin/Int, kotlinx.serialization.json/JsonObject) // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.<init>|<init>(com.letta.mobile.data.plugin.runtimeview.RuntimeObjectReference;kotlin.String;kotlin.Int;kotlinx.serialization.json.JsonObject){}[0]
+
+    final val content // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.content|{}content[0]
+        final fun <get-content>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.content.<get-content>|<get-content>(){}[0]
+    final val reference // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.reference|{}reference[0]
+        final fun <get-reference>(): com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.reference.<get-reference>|<get-reference>(){}[0]
+    final val schemaId // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.schemaId|{}schemaId[0]
+        final fun <get-schemaId>(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.schemaId.<get-schemaId>|<get-schemaId>(){}[0]
+    final val schemaVersion // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.schemaVersion|{}schemaVersion[0]
+        final fun <get-schemaVersion>(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.schemaVersion.<get-schemaVersion>|<get-schemaVersion>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.component3|component3(){}[0]
+    final fun component4(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.plugin.runtimeview/RuntimeObjectReference = ..., kotlin/String = ..., kotlin/Int = ..., kotlinx.serialization.json/JsonObject = ...): com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.copy|copy(com.letta.mobile.data.plugin.runtimeview.RuntimeObjectReference;kotlin.String;kotlin.Int;kotlinx.serialization.json.JsonObject){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.plugin.view/PluginViewActionCall { // com.letta.mobile.data.plugin.view/PluginViewActionCall|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlinx.serialization.json/JsonObject) // com.letta.mobile.data.plugin.view/PluginViewActionCall.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlinx.serialization.json.JsonObject){}[0]
 
@@ -51642,7 +51776,7 @@ final class com.letta.mobile.data.plugin.view/ViewSafeArea { // com.letta.mobile
 }
 
 final class com.letta.mobile.data.plugin/InstalledPlugin { // com.letta.mobile.data.plugin/InstalledPlugin|null[0]
-    constructor <init>(com.letta.mobile.data.plugin/PluginVersionRecord, com.letta.mobile.data.plugin/PluginState = ..., com.letta.mobile.data.plugin/PluginSettingsSummary = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.plugin/SecretState> = ..., com.letta.mobile.data.plugin/PluginHealth = ..., com.letta.mobile.data.plugin/PluginVersionRecord? = ..., com.letta.mobile.data.plugin/PendingUpdate? = ..., kotlin/String? = ...) // com.letta.mobile.data.plugin/InstalledPlugin.<init>|<init>(com.letta.mobile.data.plugin.PluginVersionRecord;com.letta.mobile.data.plugin.PluginState;com.letta.mobile.data.plugin.PluginSettingsSummary;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.plugin.SecretState>;com.letta.mobile.data.plugin.PluginHealth;com.letta.mobile.data.plugin.PluginVersionRecord?;com.letta.mobile.data.plugin.PendingUpdate?;kotlin.String?){}[0]
+    constructor <init>(com.letta.mobile.data.plugin/PluginVersionRecord, com.letta.mobile.data.plugin/PluginState = ..., com.letta.mobile.data.plugin/PluginSettingsSummary = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.plugin/SecretState> = ..., com.letta.mobile.data.plugin/PluginHealth = ..., com.letta.mobile.data.plugin/PluginVersionRecord? = ..., com.letta.mobile.data.plugin/PendingUpdate? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding> = ...) // com.letta.mobile.data.plugin/InstalledPlugin.<init>|<init>(com.letta.mobile.data.plugin.PluginVersionRecord;com.letta.mobile.data.plugin.PluginState;com.letta.mobile.data.plugin.PluginSettingsSummary;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.plugin.SecretState>;com.letta.mobile.data.plugin.PluginHealth;com.letta.mobile.data.plugin.PluginVersionRecord?;com.letta.mobile.data.plugin.PendingUpdate?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding>){}[0]
 
     final val advertised // com.letta.mobile.data.plugin/InstalledPlugin.advertised|{}advertised[0]
         final fun <get-advertised>(): kotlin/Boolean // com.letta.mobile.data.plugin/InstalledPlugin.advertised.<get-advertised>|<get-advertised>(){}[0]
@@ -51680,6 +51814,8 @@ final class com.letta.mobile.data.plugin/InstalledPlugin { // com.letta.mobile.d
         final fun <get-state>(): com.letta.mobile.data.plugin/PluginState // com.letta.mobile.data.plugin/InstalledPlugin.state.<get-state>|<get-state>(){}[0]
     final val version // com.letta.mobile.data.plugin/InstalledPlugin.version|{}version[0]
         final fun <get-version>(): kotlin/String // com.letta.mobile.data.plugin/InstalledPlugin.version.<get-version>|<get-version>(){}[0]
+    final val viewBindings // com.letta.mobile.data.plugin/InstalledPlugin.viewBindings|{}viewBindings[0]
+        final fun <get-viewBindings>(): kotlin.collections/List<com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding> // com.letta.mobile.data.plugin/InstalledPlugin.viewBindings.<get-viewBindings>|<get-viewBindings>(){}[0]
 
     final fun component1(): com.letta.mobile.data.plugin/PluginVersionRecord // com.letta.mobile.data.plugin/InstalledPlugin.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.plugin/PluginState // com.letta.mobile.data.plugin/InstalledPlugin.component2|component2(){}[0]
@@ -51689,7 +51825,8 @@ final class com.letta.mobile.data.plugin/InstalledPlugin { // com.letta.mobile.d
     final fun component6(): com.letta.mobile.data.plugin/PluginVersionRecord? // com.letta.mobile.data.plugin/InstalledPlugin.component6|component6(){}[0]
     final fun component7(): com.letta.mobile.data.plugin/PendingUpdate? // com.letta.mobile.data.plugin/InstalledPlugin.component7|component7(){}[0]
     final fun component8(): kotlin/String? // com.letta.mobile.data.plugin/InstalledPlugin.component8|component8(){}[0]
-    final fun copy(com.letta.mobile.data.plugin/PluginVersionRecord = ..., com.letta.mobile.data.plugin/PluginState = ..., com.letta.mobile.data.plugin/PluginSettingsSummary = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.plugin/SecretState> = ..., com.letta.mobile.data.plugin/PluginHealth = ..., com.letta.mobile.data.plugin/PluginVersionRecord? = ..., com.letta.mobile.data.plugin/PendingUpdate? = ..., kotlin/String? = ...): com.letta.mobile.data.plugin/InstalledPlugin // com.letta.mobile.data.plugin/InstalledPlugin.copy|copy(com.letta.mobile.data.plugin.PluginVersionRecord;com.letta.mobile.data.plugin.PluginState;com.letta.mobile.data.plugin.PluginSettingsSummary;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.plugin.SecretState>;com.letta.mobile.data.plugin.PluginHealth;com.letta.mobile.data.plugin.PluginVersionRecord?;com.letta.mobile.data.plugin.PendingUpdate?;kotlin.String?){}[0]
+    final fun component9(): kotlin.collections/List<com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding> // com.letta.mobile.data.plugin/InstalledPlugin.component9|component9(){}[0]
+    final fun copy(com.letta.mobile.data.plugin/PluginVersionRecord = ..., com.letta.mobile.data.plugin/PluginState = ..., com.letta.mobile.data.plugin/PluginSettingsSummary = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.plugin/SecretState> = ..., com.letta.mobile.data.plugin/PluginHealth = ..., com.letta.mobile.data.plugin/PluginVersionRecord? = ..., com.letta.mobile.data.plugin/PendingUpdate? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding> = ...): com.letta.mobile.data.plugin/InstalledPlugin // com.letta.mobile.data.plugin/InstalledPlugin.copy|copy(com.letta.mobile.data.plugin.PluginVersionRecord;com.letta.mobile.data.plugin.PluginState;com.letta.mobile.data.plugin.PluginSettingsSummary;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.plugin.SecretState>;com.letta.mobile.data.plugin.PluginHealth;com.letta.mobile.data.plugin.PluginVersionRecord?;com.letta.mobile.data.plugin.PendingUpdate?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.plugin/InstalledPlugin.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.plugin/InstalledPlugin.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.plugin/InstalledPlugin.toString|toString(){}[0]
@@ -52346,6 +52483,8 @@ final class com.letta.mobile.data.plugin/PluginRegistryState { // com.letta.mobi
     final fun get(com.letta.mobile.data.model/PluginId): com.letta.mobile.data.plugin/InstalledPlugin? // com.letta.mobile.data.plugin/PluginRegistryState.get|get(com.letta.mobile.data.model.PluginId){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.plugin/PluginRegistryState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.plugin/PluginRegistryState.toString|toString(){}[0]
+    final fun viewBinding(com.letta.mobile.data.model.view/RuntimeViewMountId): com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding? // com.letta.mobile.data.plugin/PluginRegistryState.viewBinding|viewBinding(com.letta.mobile.data.model.view.RuntimeViewMountId){}[0]
+    final fun viewFallback(com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding?, com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject?, com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor?): com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback? // com.letta.mobile.data.plugin/PluginRegistryState.viewFallback|viewFallback(com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding?;com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject?;com.letta.mobile.data.plugin.runtimeview.RuntimeViewDescriptor?){}[0]
 
     final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.plugin/PluginRegistryState> { // com.letta.mobile.data.plugin/PluginRegistryState.$serializer|null[0]
         final val descriptor // com.letta.mobile.data.plugin/PluginRegistryState.$serializer.descriptor|{}descriptor[0]
@@ -70969,7 +71108,9 @@ final object com.letta.mobile.data.plugin/PluginPackages { // com.letta.mobile.d
 }
 
 final object com.letta.mobile.data.plugin/PluginRegistryReducer { // com.letta.mobile.data.plugin/PluginRegistryReducer|null[0]
+    final fun configureView(com.letta.mobile.data.plugin/PluginRegistryState, com.letta.mobile.data.model/PluginId, com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding): com.letta.mobile.data.plugin/PluginTransition // com.letta.mobile.data.plugin/PluginRegistryReducer.configureView|configureView(com.letta.mobile.data.plugin.PluginRegistryState;com.letta.mobile.data.model.PluginId;com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding){}[0]
     final fun reduce(com.letta.mobile.data.plugin/PluginRegistryState, com.letta.mobile.data.plugin/PluginCommand): com.letta.mobile.data.plugin/PluginTransition // com.letta.mobile.data.plugin/PluginRegistryReducer.reduce|reduce(com.letta.mobile.data.plugin.PluginRegistryState;com.letta.mobile.data.plugin.PluginCommand){}[0]
+    final fun unbindView(com.letta.mobile.data.plugin/PluginRegistryState, com.letta.mobile.data.model/PluginId, com.letta.mobile.data.model.view/RuntimeViewMountId): com.letta.mobile.data.plugin/PluginTransition // com.letta.mobile.data.plugin/PluginRegistryReducer.unbindView|unbindView(com.letta.mobile.data.plugin.PluginRegistryState;com.letta.mobile.data.model.PluginId;com.letta.mobile.data.model.view.RuntimeViewMountId){}[0]
 }
 
 final object com.letta.mobile.data.plugin/PluginSettings { // com.letta.mobile.data.plugin/PluginSettings|null[0]
