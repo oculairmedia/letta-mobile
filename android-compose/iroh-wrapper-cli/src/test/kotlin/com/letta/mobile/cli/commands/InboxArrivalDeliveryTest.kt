@@ -22,7 +22,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -76,8 +76,9 @@ class InboxArrivalDeliveryTest {
             assertTrue(capable.frames.isEmpty())
             File(inbox, "messages.jsonl").appendText(row("committed-source", "user", clientId))
             withContext(Dispatchers.IO) {
-                withTimeout(10_000) { while (capable.frames.isEmpty()) { yield(); kotlinx.coroutines.delay(10) } }
+                withTimeoutOrNull(10_000) { while (capable.frames.isEmpty()) { yield(); kotlinx.coroutines.delay(10) } }
             }
+            assertEquals(1, capable.frames.size, "a committed inbox arrival must reach the opted-in home observer")
 
             val decoded = Json.decodeFromString(ServerFrameSerializer, capable.frames.single())
             val activity = assertInstanceOf(ServerFrame.ConversationActivity::class.java, decoded)

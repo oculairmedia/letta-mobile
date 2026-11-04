@@ -1,8 +1,7 @@
 package com.letta.mobile.data.transport
 
 import kotlin.test.Test
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -27,12 +26,17 @@ class InboxArrivalContractTest {
             }
         } as com.letta.mobile.data.transport.appserver.AppServerClient
         val channel = com.letta.mobile.data.transport.api.AppServerClientChannel(client, backgroundScope)
-        val result = async { channel.events.first() }
+        val received = mutableListOf<ServerFrame>()
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            channel.events.collect { received += it }
+        }
         runCurrent()
         val wire = checkNotNull(javaClass.getResource("/inbox-arrival/conversation-activity.json")).readText()
         source.emit(com.letta.mobile.data.transport.appserver.AppServerProtocol.decodeFrame(wire,
             com.letta.mobile.data.transport.appserver.AppServerChannel.Stream))
-        assertIs<ServerFrame.ConversationActivity>(result.await())
+        runCurrent()
+        assertEquals(1, received.size, "the client channel must publish the activity frame")
+        assertIs<ServerFrame.ConversationActivity>(received.single())
     }
 
     @Test
