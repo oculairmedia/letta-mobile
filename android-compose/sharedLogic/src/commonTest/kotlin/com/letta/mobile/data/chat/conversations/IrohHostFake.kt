@@ -29,6 +29,7 @@ internal data class HostConversation(
     val summary: String? = null,
     val archived: Boolean = false,
     val lastMessageAt: String? = null,
+    val tags: List<String> = emptyList(),
 ) {
     fun json(): JsonObject = buildJsonObject {
         put("id", id)
@@ -36,6 +37,7 @@ internal data class HostConversation(
         summary?.let { put("summary", it) }
         put("archived", archived)
         lastMessageAt?.let { put("last_message_at", it) }
+        if (tags.isNotEmpty()) put("tags", JsonArray(tags.map(::JsonPrimitive)))
     }
 }
 

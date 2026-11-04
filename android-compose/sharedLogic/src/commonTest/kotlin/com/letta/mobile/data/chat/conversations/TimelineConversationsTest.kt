@@ -373,6 +373,17 @@ class TimelineConversationsTest {
     }
 
     @Test
+    fun aSendToAWorkConversationIsRefusedAndQueuesNothing() = runTest {
+        val owner = owner(IrohHost(HostConversation("w1", "agent-1", tags = listOf("lane:work"))))
+        runCurrent()
+
+        owner.send(ConversationId("w1"), "hello")
+
+        assertTrue(owner.state.value.drafts.isEmpty(), "a work record is viewable, never a message target")
+        assertEquals(null, owner.selectedConversation)
+    }
+
+    @Test
     fun forkCommandForksTheOpenChatRecordsItsParentAndKeepsItsPin() = runTest {
         val host = IrohHost(HostConversation("c1", "agent-1"))
         val owner = owner(host)
