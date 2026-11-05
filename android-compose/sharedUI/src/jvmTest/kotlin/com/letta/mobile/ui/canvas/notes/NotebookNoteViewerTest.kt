@@ -124,6 +124,18 @@ class NotebookNoteViewerTest {
         runOnIdle { assertEquals("changed elsewhere", backend.source.markdown) }
     }
 
+    @Test
+    fun aNoteThatNeverLoadedLetsThePersonLeave() = runComposeUiTest {
+        val backend = ViewerTestBackend().apply { source = source.copy(id = NotebookDocumentId("ffeeddccbbaa99887766554433221100")) }
+        mount(backend, identity = FixedIdentity(NOTEBOOK))
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { backend.loaded.isNotEmpty() }
+
+        onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.CANVAS)).performClick()
+
+        onNodeWithTag(BOARD).assertExists()
+    }
+
     private fun ComposeUiTest.mount(
         backend: ViewerTestBackend,
         identity: CanvasNotebookIdentity,

@@ -42,18 +42,19 @@ internal const val NOTEBOOK_NOTE_FAILED_TAG = "notebook-note-viewer-failed"
 /**
  * The canvas's own note, edited in place: the same notebook document the board draws, resolved
  * through [identity], never a copy. Leaving the view saves the draft first and stays when a
- * conflict or a failed write remains. Each note's session lives as long as this viewer, so a
- * draft survives its view being unmounted (the pane closing, another canvas opening) and is there
- * when the note shows again. A host registers it only where its canvases are notebooks.
+ * conflict or a failed write remains; a note with nothing unsaved (one that never loaded) just
+ * leaves. Each canvas's note session lives as long as this viewer, keyed by the canvas, so a draft
+ * survives its view being unmounted (the pane closing, another canvas opening) and a compaction
+ * that gives the notebook a new ID. A host registers it only where its canvases are notebooks.
  */
 fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer {
-    val sessions = mutableMapOf<NotebookDocumentId, NotebookNoteSession>()
+    val sessions = mutableMapOf<CanvasId, NotebookNoteSession>()
     return CanvasDocumentViewer(
         id = NOTEBOOK_NOTE_VIEWER_ID,
         label = { stringResource(Res.string.notebook_note_title) },
         render = { context, modifier ->
             NotebookNoteView(context.canvasId, identity, modifier) { notebook ->
-                sessions.getOrPut(notebook) { NotebookNoteSession(notebook, backend) }
+                sessions.getOrPut(context.canvasId) { NotebookNoteSession(notebook, backend) }
             }
         },
     )
@@ -97,7 +98,7 @@ private fun NotebookNoteView(
         }
         is NoteLookup.Found -> {
             val session = remember(found.notebook) { sessionFor(found.notebook) }
-            CanvasViewerLeaveCheck(session::prepareClose)
+            CanvasViewerLeaveCheck { !session.state.value.dirty || session.prepareClose() }
             NotebookNoteEditorContent(session, modifier.fillMaxSize())
         }
     }
