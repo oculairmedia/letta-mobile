@@ -214,7 +214,10 @@ internal fun DesktopNucleusEffects(
                 actions.onOpenSettings()
             },
             onCheckForUpdates = bindings.controller::checkForUpdates,
-            onQuit = rememberShellQuit(actions.prepareQuit, exit = { exitProcess(0) }, onRefused = activate),
+            onQuit = rememberShellQuit(actions.prepareQuit, exit = { exitProcess(0) }) {
+                bindings.controller.notifyFailure("A note could not be saved. Save or copy it, or Quit again to discard it.", activate)
+                activate()
+            },
         ),
     )
 
