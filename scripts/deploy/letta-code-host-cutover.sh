@@ -50,7 +50,9 @@ if [ -n "$NODE_DIR" ] && grep -q '^PATH=' "$ENV" && ! grep -qF "$PATH_MARKER" "$
   echo "ABORT: $ENV already sets a PATH this script did not write; refusing to guess"; exit 1
 fi
 VERSION_NODE=${NODE_BIN:-node}
-STAGED=$("$VERSION_NODE" "$NEW_JS" --version 2>&1 | tail -1) || { echo "ABORT: $NEW_JS --version failed: $STAGED"; exit 1; }
+# Capture the full output first so a failing --version is not masked by a pipeline (no pipefail here).
+STAGED_OUT=$("$VERSION_NODE" "$NEW_JS" --version 2>&1) || { echo "ABORT: $NEW_JS --version failed: $STAGED_OUT"; exit 1; }
+STAGED=$(printf '%s\n' "$STAGED_OUT" | tail -1)
 case "$STAGED" in "$NEW "*|"$NEW") ;; *) echo "ABORT: staged package reports '$STAGED', expected $NEW"; exit 1;; esac
 cp -a "$ENV" "$BAK" && cmp -s "$ENV" "$BAK" || { echo "ABORT: env backup to $BAK failed; nothing changed"; exit 1; }
 echo "env backup: $BAK"
