@@ -21,10 +21,10 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteBackend
 import com.letta.mobile.data.canvas.notes.NotebookNoteSession
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.canvas_viewer_note
 import com.letta.mobile.sharedui.resources.canvas_viewer_note_failed
 import com.letta.mobile.sharedui.resources.canvas_viewer_note_missing
 import com.letta.mobile.sharedui.resources.canvas_viewer_retry
+import com.letta.mobile.sharedui.resources.notebook_note_title
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
 import com.letta.mobile.ui.canvas.plugin.CanvasViewerLeaveCheck
@@ -50,7 +50,7 @@ fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBa
     val sessions = mutableMapOf<NotebookDocumentId, NotebookNoteSession>()
     return CanvasDocumentViewer(
         id = NOTEBOOK_NOTE_VIEWER_ID,
-        label = { stringResource(Res.string.canvas_viewer_note) },
+        label = { stringResource(Res.string.notebook_note_title) },
         render = { context, modifier ->
             NotebookNoteView(context.canvasId, identity, modifier) { notebook ->
                 sessions.getOrPut(notebook) { NotebookNoteSession(notebook, backend) }

@@ -2,6 +2,7 @@ package com.letta.mobile.ui.canvas.plugin
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 
@@ -11,14 +12,14 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * and keeps the viewer when any says no, so switching views never drops unsaved work.
  */
 class CanvasViewerLeaveChecks {
-    private val checks = mutableListOf<() -> (suspend () -> Boolean)>()
+    private val checks = mutableListOf<State<suspend () -> Boolean>>()
 
-    internal fun add(check: () -> (suspend () -> Boolean)): () -> Unit {
+    internal fun add(check: State<suspend () -> Boolean>): () -> Unit {
         checks += check
         return { checks -= check }
     }
 
-    suspend fun allowLeave(): Boolean = checks.toList().all { it()() }
+    suspend fun allowLeave(): Boolean = checks.toList().all { it.value() }
 }
 
 val LocalCanvasViewerLeaveChecks = staticCompositionLocalOf<CanvasViewerLeaveChecks?> { null }
@@ -29,7 +30,7 @@ fun CanvasViewerLeaveCheck(check: suspend () -> Boolean) {
     val checks = LocalCanvasViewerLeaveChecks.current ?: return
     val current = rememberUpdatedState(check)
     DisposableEffect(checks) {
-        val remove = checks.add { current.value }
+        val remove = checks.add(current)
         onDispose(remove)
     }
 }
