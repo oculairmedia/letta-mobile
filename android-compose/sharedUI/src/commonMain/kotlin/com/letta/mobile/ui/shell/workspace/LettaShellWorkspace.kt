@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
+import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentViewerRegistry
+import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry
 import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.InspectorHost
 import com.letta.mobile.ui.host.LocalPaneWindowClass
@@ -84,6 +87,9 @@ import com.letta.mobile.ui.components.LocalConversationPurposes
 fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspaceHost, modifier: Modifier = Modifier) {
     ReleaseCachesUnderPressure()
     val drawer = host.drawer
+    // The shell's live views (n2stx.2.1): a host may own the registry above the shell, otherwise the shell keeps one.
+    val ownViewers = remember { CanvasDocumentViewerRegistry() }
+    val viewers = LocalCanvasDocumentViewerRegistry.current ?: ownViewers
     ProvideShortcutHub {
         Surface(
             modifier = modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WORKSPACE),
@@ -109,8 +115,10 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalConversationLanes provides host.conversationLanes,
                                 LocalConversationPurposes provides purposes,
                             ) {
-                                WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
-                                host.slots.overlays()
+                                ProvideCanvasDocumentViewerRegistry(viewers) {
+                                    WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
+                                    host.slots.overlays()
+                                }
                             }
                         }
                     }
