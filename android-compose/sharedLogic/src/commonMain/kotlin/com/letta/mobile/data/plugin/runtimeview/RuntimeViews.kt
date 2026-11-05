@@ -56,6 +56,17 @@ data class RuntimeViewBinding(
     }
 }
 
+/**
+ * Where a mount finds its binding and why it cannot render: the host's [com.letta.mobile.data.plugin.PluginRegistryState],
+ * or a client's own store of the bindings it was sent. A view host reads only this, never the whole registry.
+ */
+interface RuntimeViewBindings {
+    fun viewBinding(mountId: RuntimeViewMountId): RuntimeViewBinding?
+
+    /** Validate read-only view inputs without resolving or mutating the canonical object; null renders the view. */
+    fun viewFallback(binding: RuntimeViewBinding?, value: RuntimeViewObject?, descriptor: RuntimeViewDescriptor?): RuntimeViewFallback?
+}
+
 /** Explicit reasons a mount cannot render its selected implementation. */
 enum class RuntimeViewFallback {
     UNBOUND, MISSING_OBJECT, OBJECT_MISMATCH, MISSING_VIEW, UNAVAILABLE_OWNER, INCOMPATIBLE, FAILED,

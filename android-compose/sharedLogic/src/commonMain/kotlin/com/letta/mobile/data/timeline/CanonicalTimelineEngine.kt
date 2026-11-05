@@ -495,18 +495,21 @@ class CanonicalTimelineEngine(
         page: TimelineRemotePageResult.Page,
     ): TimelineEnginePageOutcome = reconcilePageDetailed(request, page).outcome
 
-    suspend fun reconcilePageDetailed(
+    suspend fun reconcilePageDetailed(request: TimelineEngineRequest, page: TimelineRemotePageResult.Page): TimelineEngineReconcileResult =
+        reconcilePageDetailed(request, page, catchUp = false)
+
+    /** A viewport's bounded history read remains authoritative when its live terminal was missed. */
+    internal suspend fun reconcilePageDetailed(
         request: TimelineEngineRequest,
         page: TimelineRemotePageResult.Page,
+        catchUp: Boolean,
     ): TimelineEngineReconcileResult = mutex.withLock {
         val requestMismatch = pendingReconcile !== request || request.selection !== mutablePublication.value.selection
         val generationMismatch = page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
         if (requestMismatch || generationMismatch) {
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
         }
-        val turnInFlight = liveFence != null && mutableLive.value?.settlementRevision == null
-        val nothingSettling = mutableSettling.value.isEmpty()
-        if (turnInFlight && nothingSettling) {
+        if (shouldDeferLiveReconcile(catchUp)) {
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
         }
         validate(page)
@@ -548,6 +551,11 @@ class CanonicalTimelineEngine(
         pendingReconcile = null
         TimelineEngineReconcileResult(TimelineEnginePageOutcome.Applied, appended,
             page.records.mapNotNull { it.message.seqId?.toLong() }.maxOrNull())
+    }
+
+    private fun shouldDeferLiveReconcile(catchUp: Boolean): Boolean {
+        if (catchUp || mutableSettling.value.isNotEmpty()) return false
+        return liveFence != null && mutableLive.value?.settlementRevision == null
     }
 
     /**

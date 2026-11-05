@@ -37797,7 +37797,7 @@ public final class com/letta/mobile/data/plugin/PluginRegistryReducer {
 	public final fun unbindView-BySlI8I (Lcom/letta/mobile/data/plugin/PluginRegistryState;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/plugin/PluginTransition;
 }
 
-public final class com/letta/mobile/data/plugin/PluginRegistryState {
+public final class com/letta/mobile/data/plugin/PluginRegistryState : com/letta/mobile/data/plugin/runtimeview/RuntimeViewBindings {
 	public static final field Companion Lcom/letta/mobile/data/plugin/PluginRegistryState$Companion;
 	public fun <init> ()V
 	public fun <init> (Ljava/util/List;)V
@@ -37812,8 +37812,8 @@ public final class com/letta/mobile/data/plugin/PluginRegistryState {
 	public final fun getPlugins ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-	public final fun viewBinding-5hSguBk (Ljava/lang/String;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
-	public final fun viewFallback (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewFallback;
+	public fun viewBinding-5hSguBk (Ljava/lang/String;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
+	public fun viewFallback (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewFallback;
 }
 
 public final synthetic class com/letta/mobile/data/plugin/PluginRegistryState$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
@@ -39939,6 +39939,11 @@ public final synthetic class com/letta/mobile/data/plugin/runtimeview/RuntimeVie
 
 public final class com/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/plugin/runtimeview/RuntimeViewBindings {
+	public abstract fun viewBinding-5hSguBk (Ljava/lang/String;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;
+	public abstract fun viewFallback (Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewBinding;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewObject;Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor;)Lcom/letta/mobile/data/plugin/runtimeview/RuntimeViewFallback;
 }
 
 public final class com/letta/mobile/data/plugin/runtimeview/RuntimeViewDescriptor {

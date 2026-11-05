@@ -4953,6 +4953,11 @@ abstract interface com.letta.mobile.data.plugin.catalog/PluginsPageActions { // 
     open fun uploadPicked() // com.letta.mobile.data.plugin.catalog/PluginsPageActions.uploadPicked|uploadPicked(){}[0]
 }
 
+abstract interface com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings|null[0]
+    abstract fun viewBinding(com.letta.mobile.data.model.view/RuntimeViewMountId): com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding? // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings.viewBinding|viewBinding(com.letta.mobile.data.model.view.RuntimeViewMountId){}[0]
+    abstract fun viewFallback(com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding?, com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject?, com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor?): com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback? // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings.viewFallback|viewFallback(com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding?;com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject?;com.letta.mobile.data.plugin.runtimeview.RuntimeViewDescriptor?){}[0]
+}
+
 abstract interface com.letta.mobile.data.plugin.view/PluginViewTransport { // com.letta.mobile.data.plugin.view/PluginViewTransport|null[0]
     abstract suspend fun action(com.letta.mobile.data.plugin.view/PluginViewActionCall): com.letta.mobile.data.plugin.view/PluginViewActionOutcome // com.letta.mobile.data.plugin.view/PluginViewTransport.action|action(com.letta.mobile.data.plugin.view.PluginViewActionCall){}[0]
     abstract suspend fun readPage(com.letta.mobile.data.plugin.view/PluginViewPageRef): kotlin/ByteArray // com.letta.mobile.data.plugin.view/PluginViewTransport.readPage|readPage(com.letta.mobile.data.plugin.view.PluginViewPageRef){}[0]
@@ -52731,7 +52736,7 @@ final class com.letta.mobile.data.plugin/PluginPageCsp { // com.letta.mobile.dat
     }
 }
 
-final class com.letta.mobile.data.plugin/PluginRegistryState { // com.letta.mobile.data.plugin/PluginRegistryState|null[0]
+final class com.letta.mobile.data.plugin/PluginRegistryState : com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings { // com.letta.mobile.data.plugin/PluginRegistryState|null[0]
     constructor <init>(kotlin.collections/List<com.letta.mobile.data.plugin/InstalledPlugin> = ...) // com.letta.mobile.data.plugin/PluginRegistryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.plugin.InstalledPlugin>){}[0]
 
     final val advertised // com.letta.mobile.data.plugin/PluginRegistryState.advertised|{}advertised[0]

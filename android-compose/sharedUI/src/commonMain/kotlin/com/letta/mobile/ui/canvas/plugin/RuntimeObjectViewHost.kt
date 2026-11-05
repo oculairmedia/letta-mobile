@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.model.view.RuntimeViewMountId
-import com.letta.mobile.data.plugin.PluginRegistryState
+import com.letta.mobile.data.plugin.runtimeview.RuntimeViewBindings
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewFallback
 import com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject
 
@@ -22,13 +22,13 @@ import com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject
 fun RuntimeObjectViewHost(
     mountId: RuntimeViewMountId,
     value: RuntimeViewObject?,
-    state: PluginRegistryState,
+    bindings: RuntimeViewBindings,
     modifier: Modifier = Modifier,
     fallback: @Composable (RuntimeViewFallback, Modifier) -> Unit,
 ) {
-    val binding = state.viewBinding(mountId)
+    val binding = bindings.viewBinding(mountId)
     val view = LocalCanvasDocumentViewers.current.runtimeViews.firstOrNull { it.descriptor.id == binding?.viewId }
-    val unavailable = state.viewFallback(binding, value, view?.descriptor)
+    val unavailable = bindings.viewFallback(binding, value, view?.descriptor)
     key(mountId, view, binding, value?.reference) {
         var failure by remember { mutableStateOf<String?>(null) }
         val reason = unavailable ?: failure?.let { RuntimeViewFallback.FAILED }
