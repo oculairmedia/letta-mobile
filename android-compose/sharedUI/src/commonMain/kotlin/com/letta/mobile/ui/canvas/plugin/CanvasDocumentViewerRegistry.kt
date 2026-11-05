@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * The shell's live view registry (letta-mobile-n2stx.2.1, ADR-2): canvas viewers and neutral object
+ * The shell's live view registry: canvas viewers and neutral object
  * views registered while the app runs, not only when a composition builds its list. Every mount under
  * [ProvideCanvasDocumentViewerRegistry] sees a registration at once and loses it when its handle
  * closes; a mount showing a removed viewer falls back to the built-in canvas.
