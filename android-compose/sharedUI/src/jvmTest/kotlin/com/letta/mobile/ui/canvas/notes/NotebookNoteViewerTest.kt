@@ -5,11 +5,15 @@ package com.letta.mobile.ui.canvas.notes
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
@@ -28,6 +32,7 @@ import com.letta.mobile.ui.canvas.canvasViewerOptionTag
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -61,11 +66,46 @@ class NotebookNoteViewerTest {
         mount(backend, identity = FixedIdentity(NOTEBOOK))
         onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
         onNodeWithTag(MARKDOWN).performTextReplacement("typed before switching")
+        val release = CompletableDeferred<Unit>()
+        runOnIdle { backend.saveRelease = release }
 
         onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.CANVAS)).performClick()
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { backend.saveEntered.isCompleted }
+        onNodeWithTag(BOARD).assertDoesNotExist()
+        onNodeWithTag(MARKDOWN).assertExists()
 
-        onNodeWithTag(BOARD).assertExists()
+        runOnIdle { release.complete(Unit) }
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) { onAllNodesWithTag(BOARD).fetchSemanticsNodes().isNotEmpty() }
         runOnIdle { assertEquals("typed before switching", backend.source.markdown) }
+    }
+
+    @Test
+    fun aLookupThatFailsOffersARetry() = runComposeUiTest {
+        val identity = FlakyIdentity(NOTEBOOK)
+        mount(ViewerTestBackend(), identity)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+
+        onNodeWithTag(NOTEBOOK_NOTE_FAILED_TAG).assertExists()
+        runOnIdle { identity.failing = false }
+        onNodeWithText("Retry").performClick()
+        onNodeWithTag(MARKDOWN).assertTextContains("original")
+    }
+
+    @Test
+    fun aDraftSurvivesItsViewBeingUnmounted() = runComposeUiTest {
+        val backend = ViewerTestBackend()
+        val shown = mutableStateOf(true)
+        mount(backend, identity = FixedIdentity(NOTEBOOK), shown = shown)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        onNodeWithTag(MARKDOWN).performTextReplacement("unsaved thought")
+
+        runOnIdle { shown.value = false }
+        onNodeWithTag(MARKDOWN).assertDoesNotExist()
+        runOnIdle { shown.value = true }
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+
+        onNodeWithTag(MARKDOWN).assertTextContains("unsaved thought")
+        runOnIdle { assertEquals("original", backend.source.markdown) }
     }
 
     @Test
@@ -84,7 +124,11 @@ class NotebookNoteViewerTest {
         runOnIdle { assertEquals("changed elsewhere", backend.source.markdown) }
     }
 
-    private fun ComposeUiTest.mount(backend: ViewerTestBackend, identity: CanvasNotebookIdentity) {
+    private fun ComposeUiTest.mount(
+        backend: ViewerTestBackend,
+        identity: CanvasNotebookIdentity,
+        shown: MutableState<Boolean> = mutableStateOf(true),
+    ) {
         val session = runBlocking {
             CanvasSession.create(
                 store = InMemoryCanvasDocumentStore(),
@@ -95,7 +139,7 @@ class NotebookNoteViewerTest {
         setContent {
             MaterialTheme {
                 ProvideCanvasDocumentViewerRegistry(registry) {
-                    CanvasDocumentViewerHost(session, Modifier.fillMaxSize()) { Text("Board", it.testTag(BOARD)) }
+                    if (shown.value) CanvasDocumentViewerHost(session, Modifier.fillMaxSize()) { Text("Board", it.testTag(BOARD)) }
                 }
             }
         }
@@ -106,9 +150,18 @@ class NotebookNoteViewerTest {
         override suspend fun canvasOf(notebook: NotebookDocumentId): CanvasId? = CANVAS.takeIf { notebook == this.notebook }
     }
 
+    private class FlakyIdentity(private val notebook: NotebookDocumentId) : CanvasNotebookIdentity {
+        var failing = true
+        override suspend fun notebookOf(canvasId: CanvasId): NotebookDocumentId? =
+            if (failing) error("notebook store unavailable") else notebook
+        override suspend fun canvasOf(notebook: NotebookDocumentId): CanvasId? = null
+    }
+
     private class ViewerTestBackend : NotebookNoteBackend {
         var source = NotebookNoteSnapshot(NOTEBOOK, "Plan", "original")
         val loaded = mutableListOf<NotebookDocumentId>()
+        val saveEntered = CompletableDeferred<Unit>()
+        var saveRelease: CompletableDeferred<Unit>? = null
 
         override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad {
             loaded += id
@@ -116,6 +169,8 @@ class NotebookNoteViewerTest {
         }
 
         override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave {
+            saveEntered.complete(Unit)
+            saveRelease?.await()
             if (source.markdown != expected) return NotebookNoteSave.Conflict(source)
             source = source.copy(markdown = replacement)
             return NotebookNoteSave.Saved(source)
@@ -129,5 +184,6 @@ class NotebookNoteViewerTest {
         val NOTEBOOK = NotebookDocumentId("00112233445566778899aabbccddeeff")
         const val MARKDOWN = "notebook-note-markdown"
         const val BOARD = "note-viewer-board"
+        const val TIMEOUT_MILLIS = 10_000L
     }
 }

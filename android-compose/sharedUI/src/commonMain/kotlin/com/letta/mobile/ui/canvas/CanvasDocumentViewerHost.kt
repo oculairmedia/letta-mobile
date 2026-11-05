@@ -33,6 +33,8 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerContext
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewers
+import com.letta.mobile.ui.canvas.plugin.CanvasViewerLeaveChecks
+import com.letta.mobile.ui.canvas.plugin.LocalCanvasViewerLeaveChecks
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentCanvasContent
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentViewers
 

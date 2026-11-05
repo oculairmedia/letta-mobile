@@ -1,12 +1,17 @@
 package com.letta.mobile.ui.canvas.notes
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -17,53 +22,88 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteSession
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_viewer_note
+import com.letta.mobile.sharedui.resources.canvas_viewer_note_failed
 import com.letta.mobile.sharedui.resources.canvas_viewer_note_missing
-import com.letta.mobile.ui.canvas.CanvasViewerLeaveCheck
+import com.letta.mobile.sharedui.resources.canvas_viewer_retry
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
+import com.letta.mobile.ui.canvas.plugin.CanvasViewerLeaveCheck
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
+import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.stringResource
 
 /** The note view of a notebook-backed canvas. */
 val NOTEBOOK_NOTE_VIEWER_ID = CanvasDocumentViewerId("note")
 
 internal const val NOTEBOOK_NOTE_MISSING_TAG = "notebook-note-viewer-missing"
+internal const val NOTEBOOK_NOTE_FAILED_TAG = "notebook-note-viewer-failed"
 
 /**
  * The canvas's own note, edited in place: the same notebook document the board draws, resolved
  * through [identity], never a copy. Leaving the view saves the draft first and stays when a
- * conflict or a failed write remains. A host registers it only where its canvases are notebooks.
+ * conflict or a failed write remains. Each note's session lives as long as this viewer, so a
+ * draft survives its view being unmounted (the pane closing, another canvas opening) and is there
+ * when the note shows again. A host registers it only where its canvases are notebooks.
  */
-fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer =
-    CanvasDocumentViewer(
+fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer {
+    val sessions = mutableMapOf<NotebookDocumentId, NotebookNoteSession>()
+    return CanvasDocumentViewer(
         id = NOTEBOOK_NOTE_VIEWER_ID,
         label = { stringResource(Res.string.canvas_viewer_note) },
-        render = { context, modifier -> NotebookNoteView(context.canvasId, identity, backend, modifier) },
+        render = { context, modifier ->
+            NotebookNoteView(context.canvasId, identity, modifier) { notebook ->
+                sessions.getOrPut(notebook) { NotebookNoteSession(notebook, backend) }
+            }
+        },
     )
+}
 
 private sealed interface NoteLookup {
     data object Resolving : NoteLookup
     data object Missing : NoteLookup
+    data object Failed : NoteLookup
     data class Found(val notebook: NotebookDocumentId) : NoteLookup
 }
 
 @Composable
-private fun NotebookNoteView(canvasId: CanvasId, identity: CanvasNotebookIdentity, backend: NotebookNoteBackend, modifier: Modifier) {
-    val lookup by produceState<NoteLookup>(NoteLookup.Resolving, canvasId, identity) {
-        value = identity.notebookOf(canvasId)?.let(NoteLookup::Found) ?: NoteLookup.Missing
+private fun NotebookNoteView(
+    canvasId: CanvasId,
+    identity: CanvasNotebookIdentity,
+    modifier: Modifier,
+    sessionFor: (NotebookDocumentId) -> NotebookNoteSession,
+) {
+    var attempt by remember(canvasId) { mutableIntStateOf(0) }
+    val lookup by produceState<NoteLookup>(NoteLookup.Resolving, canvasId, identity, attempt) {
+        value = NoteLookup.Resolving
+        value = try {
+            identity.notebookOf(canvasId)?.let(NoteLookup::Found) ?: NoteLookup.Missing
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            NoteLookup.Failed
+        }
     }
     when (val found = lookup) {
-        NoteLookup.Resolving -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LettaSpinner(size = LettaDimens.Control.spinnerLg)
-        }
-        NoteLookup.Missing -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        NoteLookup.Resolving -> Centered(modifier) { LettaSpinner(size = LettaDimens.Control.spinnerLg) }
+        NoteLookup.Missing -> Centered(modifier) {
             Text(stringResource(Res.string.canvas_viewer_note_missing), Modifier.testTag(NOTEBOOK_NOTE_MISSING_TAG))
         }
+        NoteLookup.Failed -> Centered(modifier) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+                Text(stringResource(Res.string.canvas_viewer_note_failed), Modifier.testTag(NOTEBOOK_NOTE_FAILED_TAG))
+                TextButton(onClick = { attempt++ }) { Text(stringResource(Res.string.canvas_viewer_retry)) }
+            }
+        }
         is NoteLookup.Found -> {
-            val session = remember(found.notebook, backend) { NotebookNoteSession(found.notebook, backend) }
+            val session = remember(found.notebook) { sessionFor(found.notebook) }
             CanvasViewerLeaveCheck(session::prepareClose)
             NotebookNoteEditorContent(session, modifier.fillMaxSize())
         }
     }
+}
+
+@Composable
+private fun Centered(modifier: Modifier, content: @Composable () -> Unit) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
 }

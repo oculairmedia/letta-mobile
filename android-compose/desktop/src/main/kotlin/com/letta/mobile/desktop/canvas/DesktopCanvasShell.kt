@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
+import com.letta.mobile.ui.canvas.notes.notebookCanvasViewers
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.library.CanvasLibraryController
@@ -20,9 +21,8 @@ import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * The shell's canvas wiring in one place: the store, the library the sidebar lists, and the
- * canvas currently open. The rail, sidebar, content pane and overlays all read [activeSession]
- * and call the open/create/close verbs instead of each writing the session state themselves.
+ * The shell's canvas wiring in one place: the store, the library the sidebar lists, the canvas open
+ * ([activeSession], which every pane reads and changes only through these verbs) and its views.
  */
 internal class DesktopCanvasShell(
     val store: CanvasDocumentStore,
@@ -31,7 +31,7 @@ internal class DesktopCanvasShell(
     sessionState: MutableState<CanvasSession?>,
     /** The window's live boards, where its mounts register and its canvas_* tools look them up. */
     val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-    val viewers: CanvasDocumentViewerRegistry = desktopCanvasViewers(),
+    val viewers: CanvasDocumentViewerRegistry = notebookCanvasViewers(DesktopNotebookCanvasStore.notebooks),
 ) {
     var activeSession: CanvasSession? by sessionState
 
