@@ -8657,12 +8657,6 @@ public final class com/letta/mobile/data/canvas/NotebookCanvasDocumentStore : co
 	public synthetic fun upsertIfRevision (Lcom/letta/mobile/data/document/DocumentSnapshot;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class com/letta/mobile/data/canvas/NotebookCanvasIdentity : com/letta/mobile/data/canvas/CanvasNotebookIdentity {
-	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookLocalStore;)V
-	public fun canvasOf (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun notebookOf (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
 public final class com/letta/mobile/data/canvas/NotebookDocument {
 	public static final field Companion Lcom/letta/mobile/data/canvas/NotebookDocument$Companion;
 	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
@@ -10339,6 +10333,12 @@ public final class com/letta/mobile/data/canvas/notes/LocalNotebookNoteBackend :
 	public fun flush (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun load (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun save (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/notes/NotebookCanvasIdentity : com/letta/mobile/data/canvas/CanvasNotebookIdentity {
+	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookLocalStore;)V
+	public fun canvasOf (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun notebookOf (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/canvas/notes/NotebookNoteBackend {

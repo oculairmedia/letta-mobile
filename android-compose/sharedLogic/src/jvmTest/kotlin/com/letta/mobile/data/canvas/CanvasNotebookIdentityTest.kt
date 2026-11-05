@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.notes.LocalNotebookNoteBackend
+import com.letta.mobile.data.canvas.notes.NotebookCanvasIdentity
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.model.CanvasId
