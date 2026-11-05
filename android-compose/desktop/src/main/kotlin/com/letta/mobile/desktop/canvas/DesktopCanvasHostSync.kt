@@ -3,6 +3,10 @@ package com.letta.mobile.desktop.canvas
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.canvas.notes.LocalNotebookNoteBackend
+import com.letta.mobile.data.canvas.notes.NotebookCanvasIdentity
+import com.letta.mobile.ui.canvas.notes.notebookNoteViewer
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -45,6 +49,12 @@ internal object DesktopNotebookCanvasStore {
     }
     val notebooks: NotebookLocalStore by lazy { NotebookLocalStore(directory, peerId) }
     val documents: NotebookCanvasDocumentStore by lazy { NotebookCanvasDocumentStore(notebooks) }
+}
+
+/** The views a desktop window offers: the core ones, and each canvas's note, since every desktop canvas is a notebook. */
+internal fun desktopCanvasViewers(): CanvasDocumentViewerRegistry = CanvasDocumentViewerRegistry().also { viewers ->
+    val notebooks = DesktopNotebookCanvasStore.notebooks
+    viewers.register(notebookNoteViewer(NotebookCanvasIdentity(notebooks), LocalNotebookNoteBackend(notebooks)))
 }
 
 object DesktopCanvasHostSync {

@@ -52,6 +52,7 @@ internal fun CanvasDocumentViewerHost(
         mutableStateOf(CanvasDocumentViewerId.CANVAS)
     }
     val scope = rememberCoroutineScope()
+    val leaveChecks = remember(session) { CanvasViewerLeaveChecks() }
     var switching by remember(session) { mutableStateOf(false) }
     val document by session.document.collectAsState()
     val viewers = LocalCanvasDocumentViewers.current
@@ -68,6 +69,7 @@ internal fun CanvasDocumentViewerHost(
     Box(modifier = modifier.fillMaxSize()) {
         CompositionLocalProvider(
             LocalCanvasDocumentCanvasContent provides { _, canvasModifier -> canvasContent(canvasModifier) },
+            LocalCanvasViewerLeaveChecks provides leaveChecks,
         ) {
             key(selectedViewer) {
                 selectedViewer.render(context, Modifier.fillMaxSize())
@@ -81,7 +83,7 @@ internal fun CanvasDocumentViewerHost(
                     switching = true
                     scope.launch {
                         try {
-                            if (beforeViewerChange()) selectedViewerId = id
+                            if (beforeViewerChange() && leaveChecks.allowLeave()) selectedViewerId = id
                         } finally {
                             switching = false
                         }

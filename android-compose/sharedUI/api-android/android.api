@@ -527,6 +527,7 @@ public final class com/letta/mobile/ui/canvas/CanvasSelectionBarKt {
 }
 
 public final class com/letta/mobile/ui/canvas/CanvasSessionRegistryLocalKt {
+	public static final fun ProvideCanvasHost (Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalCanvasSessionRegistry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
@@ -541,6 +542,10 @@ public final class com/letta/mobile/ui/canvas/CanvasTableBlock {
 	public final fun getDescriptor ()Lio/github/linreal/cascade/editor/registry/BlockDescriptor;
 	public final fun registry ()Lio/github/linreal/cascade/editor/registry/BlockRegistry;
 	public final fun rowsOf (Lio/github/linreal/cascade/editor/core/Block;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/ui/canvas/CanvasViewerLeaveChecksKt {
+	public static final fun CanvasViewerLeaveCheck (Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/canvas/CanvasWorkspaceKt {
@@ -732,6 +737,11 @@ public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$Noteboo
 public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {
 	public static final fun NotebookNoteEditor (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun NotebookNoteEditorContent (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Lkotlinx/coroutines/CoroutineScope;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/canvas/notes/NotebookNoteViewerKt {
+	public static final fun getNOTEBOOK_NOTE_VIEWER_ID ()Ljava/lang/String;
+	public static final fun notebookNoteViewer (Lcom/letta/mobile/data/canvas/CanvasNotebookIdentity;Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer {
