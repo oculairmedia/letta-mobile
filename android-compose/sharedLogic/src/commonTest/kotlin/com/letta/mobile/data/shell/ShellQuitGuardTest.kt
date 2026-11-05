@@ -2,6 +2,7 @@ package com.letta.mobile.data.shell
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -40,5 +41,15 @@ class ShellQuitGuardTest {
         release.complete(Unit)
         assertFalse(first.await())
         assertTrue(guard.requestQuit())
+    }
+
+    @Test
+    fun aDiscardingQuitDoesNotWaitForeverOnAStalledSave() = runTest {
+        var attempts = 0
+        val guard = ShellQuitGuard { attempts++; if (attempts > 1) awaitCancellation() else false }
+
+        assertFalse(guard.requestQuit())
+        assertTrue(guard.requestQuit())
+        assertEquals(2, attempts)
     }
 }

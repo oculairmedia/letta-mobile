@@ -57885,7 +57885,7 @@ final class com.letta.mobile.data.shell/ShellOverlays { // com.letta.mobile.data
 }
 
 final class com.letta.mobile.data.shell/ShellQuitGuard { // com.letta.mobile.data.shell/ShellQuitGuard|null[0]
-    constructor <init>(kotlin.coroutines/SuspendFunction0<kotlin/Boolean>) // com.letta.mobile.data.shell/ShellQuitGuard.<init>|<init>(kotlin.coroutines.SuspendFunction0<kotlin.Boolean>){}[0]
+    constructor <init>(kotlin.time/Duration = ..., kotlin.coroutines/SuspendFunction0<kotlin/Boolean>) // com.letta.mobile.data.shell/ShellQuitGuard.<init>|<init>(kotlin.time.Duration;kotlin.coroutines.SuspendFunction0<kotlin.Boolean>){}[0]
 
     final suspend fun requestQuit(): kotlin/Boolean // com.letta.mobile.data.shell/ShellQuitGuard.requestQuit|requestQuit(){}[0]
 }

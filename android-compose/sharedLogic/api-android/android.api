@@ -48065,7 +48065,8 @@ public final class com/letta/mobile/data/shell/ShellPageKind : java/lang/Enum {
 }
 
 public final class com/letta/mobile/data/shell/ShellQuitGuard {
-	public fun <init> (Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (JLkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLkotlin/jvm/functions/Function1;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun requestQuit (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
