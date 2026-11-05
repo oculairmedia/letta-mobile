@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -44,9 +45,9 @@ internal const val NOTEBOOK_NOTE_FAILED_TAG = "notebook-note-viewer-failed"
  * The canvas's own note, edited in place: the same notebook document the board draws, resolved
  * through [identity], never a copy. Leaving the view saves the draft first and stays when a
  * conflict or a failed write remains; a note with nothing unsaved (one that never loaded) just
- * leaves. Each canvas's note session lives as long as this viewer, keyed by the canvas, so a draft
- * survives its view being unmounted (the pane closing, another canvas opening) and a compaction
- * that gives the notebook a new ID. A host registers it only where its canvases are notebooks.
+ * leaves. A canvas's note session with unsaved work lives as long as this viewer, keyed by the
+ * canvas, so the draft survives its view being unmounted (the pane closing, another canvas opening)
+ * and a compaction that gives the notebook a new ID; a clean session is released with its view. A host registers it only where its canvases are notebooks.
  */
 fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer {
     val sessions = mutableMapOf<CanvasId, NotebookNoteSession>()
@@ -54,9 +55,14 @@ fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBa
         id = NOTEBOOK_NOTE_VIEWER_ID,
         label = { stringResource(Res.string.notebook_note_title) },
         render = { context, modifier ->
-            NotebookNoteView(context.canvasId, identity, modifier) { notebook ->
-                sessions.getOrPut(context.canvasId) { NotebookNoteSession(notebook, backend) }
-            }
+            NotebookNoteView(
+                context.canvasId, identity, modifier,
+                sessionFor = { notebook -> sessions.getOrPut(context.canvasId) { NotebookNoteSession(notebook, backend) } },
+                // Only unsaved work outlives its view; a clean note reloads when it shows again.
+                release = { session ->
+                    if (!session.state.value.dirty && sessions[context.canvasId] === session) sessions.remove(context.canvasId)
+                },
+            )
         },
     )
 }
@@ -78,6 +84,7 @@ private fun NotebookNoteView(
     identity: CanvasNotebookIdentity,
     modifier: Modifier,
     sessionFor: (NotebookDocumentId) -> NotebookNoteSession,
+    release: (NotebookNoteSession) -> Unit,
 ) {
     var attempt by remember(canvasId) { mutableIntStateOf(0) }
     val lookup by produceState<NoteLookup>(NoteLookup.Resolving, canvasId, identity, attempt) {
@@ -103,6 +110,7 @@ private fun NotebookNoteView(
         }
         is NoteLookup.Found -> {
             val session = remember(found.notebook) { sessionFor(found.notebook) }
+            DisposableEffect(session) { onDispose { release(session) } }
             CanvasViewerLeaveCheck { !session.state.value.dirty || session.prepareClose() }
             NotebookNoteEditorContent(session, modifier.fillMaxSize())
         }
