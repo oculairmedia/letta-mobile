@@ -137,6 +137,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [letta-code runtime patches](deploy/appserver-runtime-patches.md)
 - [Iroh agent address book — operator runbook](deploy/iroh-agent-address-book.md)
+- [letta-code upgrade runbook](deploy/letta-code-upgrade.md)
 - [Redeploy meridian-iroh-wrapper for the workspace relay \(letta-mobile-bzvro.37\)](deploy/workspace-relay-host-redeploy.md)
 
 ### design
