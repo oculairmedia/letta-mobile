@@ -26,7 +26,6 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
-import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasOpLog
 import com.letta.mobile.data.model.CanvasId
@@ -66,8 +65,6 @@ data class ShellChatBoard(
     val presence: CanvasPresenceTransport? = null,
     /** Where the board keeps its images; null keeps them inline. */
     val assets: AssetStore? = null,
-    /** The host's live boards, which its canvas_* tools edit in place; null when the host serves none. */
-    val sessions: CanvasSessionRegistry? = null,
 )
 
 /** Whose board it is: the open conversation (none yet for a new chat) and its agent. */
@@ -231,7 +228,6 @@ private fun ConversationBoard(inputs: BoardInputs, actions: ChatCanvasActions) {
     }
     CanvasWorkspace(
         session = session,
-        sessionRegistry = inputs.board.sessions,
         presenceTransport = inputs.board.presence,
         assets = inputs.board.assets,
         // The canvas is the page: no title bar or back arrow, just its actions pill.

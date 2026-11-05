@@ -28,10 +28,7 @@ internal class DesktopCanvasShell(
     val library: CanvasLibraryController,
     private val scope: CoroutineScope,
     sessionState: MutableState<CanvasSession?>,
-    /**
-     * The window's live boards: every mount registers here, and the window's canvas_* tools look
-     * the open session up here, so an agent edit lands on the board on screen.
-     */
+    /** The window's live boards, where its mounts register and its canvas_* tools look them up. */
     val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) {
     var activeSession: CanvasSession? by sessionState

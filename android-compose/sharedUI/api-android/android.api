@@ -526,6 +526,10 @@ public final class com/letta/mobile/ui/canvas/CanvasSelectionBarKt {
 	public static final fun CanvasSelectionBar (Lio/ak1/drawbox/ui/controls/ControlsBarState;Lcom/letta/mobile/ui/canvas/CanvasProperties;ZLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/canvas/NoteBarActions;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/canvas/ShapeTextActions;Lcom/letta/mobile/ui/canvas/ShapeReshapeActions;Landroidx/compose/runtime/Composer;III)V
 }
 
+public final class com/letta/mobile/ui/canvas/CanvasSessionRegistryLocalKt {
+	public static final fun getLocalCanvasSessionRegistry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/canvas/CanvasTableBlock {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/CanvasTableBlock;
@@ -10279,21 +10283,19 @@ public final class com/letta/mobile/ui/shell/workspace/ShellCanvasOwner {
 
 public final class com/letta/mobile/ui/shell/workspace/ShellChatBoard {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/canvas/CanvasDocumentStore;
 	public final fun component2 ()Lcom/letta/mobile/data/canvas/CanvasOpLog;
 	public final fun component3 ()Lcom/letta/mobile/data/canvas/CanvasSyncTransport;
 	public final fun component4 ()Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;
 	public final fun component5 ()Lcom/letta/mobile/data/storage/AssetStore;
-	public final fun component6 ()Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;
-	public final fun copy (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;)Lcom/letta/mobile/ui/shell/workspace/ShellChatBoard;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellChatBoard;Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellChatBoard;
+	public final fun copy (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;)Lcom/letta/mobile/ui/shell/workspace/ShellChatBoard;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellChatBoard;Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasSyncTransport;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellChatBoard;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssets ()Lcom/letta/mobile/data/storage/AssetStore;
 	public final fun getOpLog ()Lcom/letta/mobile/data/canvas/CanvasOpLog;
 	public final fun getPresence ()Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;
-	public final fun getSessions ()Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;
 	public final fun getStore ()Lcom/letta/mobile/data/canvas/CanvasDocumentStore;
 	public final fun getSyncTransport ()Lcom/letta/mobile/data/canvas/CanvasSyncTransport;
 	public fun hashCode ()I

@@ -7469,7 +7469,7 @@ final class com.letta.mobile.ui.shell.workspace/ShellCanvasOwner { // com.letta.
 }
 
 final class com.letta.mobile.ui.shell.workspace/ShellChatBoard { // com.letta.mobile.ui.shell.workspace/ShellChatBoard|null[0]
-    constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, com.letta.mobile.data.canvas/CanvasOpLog = ..., com.letta.mobile.data.canvas/CanvasSyncTransport? = ..., com.letta.mobile.data.canvas/CanvasPresenceTransport? = ..., com.letta.mobile.data.storage/AssetStore? = ..., com.letta.mobile.data.canvas/CanvasSessionRegistry? = ...) // com.letta.mobile.ui.shell.workspace/ShellChatBoard.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasOpLog;com.letta.mobile.data.canvas.CanvasSyncTransport?;com.letta.mobile.data.canvas.CanvasPresenceTransport?;com.letta.mobile.data.storage.AssetStore?;com.letta.mobile.data.canvas.CanvasSessionRegistry?){}[0]
+    constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, com.letta.mobile.data.canvas/CanvasOpLog = ..., com.letta.mobile.data.canvas/CanvasSyncTransport? = ..., com.letta.mobile.data.canvas/CanvasPresenceTransport? = ..., com.letta.mobile.data.storage/AssetStore? = ...) // com.letta.mobile.ui.shell.workspace/ShellChatBoard.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasOpLog;com.letta.mobile.data.canvas.CanvasSyncTransport?;com.letta.mobile.data.canvas.CanvasPresenceTransport?;com.letta.mobile.data.storage.AssetStore?){}[0]
 
     final val assets // com.letta.mobile.ui.shell.workspace/ShellChatBoard.assets|{}assets[0]
         final fun <get-assets>(): com.letta.mobile.data.storage/AssetStore? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.assets.<get-assets>|<get-assets>(){}[0]
@@ -7477,8 +7477,6 @@ final class com.letta.mobile.ui.shell.workspace/ShellChatBoard { // com.letta.mo
         final fun <get-opLog>(): com.letta.mobile.data.canvas/CanvasOpLog // com.letta.mobile.ui.shell.workspace/ShellChatBoard.opLog.<get-opLog>|<get-opLog>(){}[0]
     final val presence // com.letta.mobile.ui.shell.workspace/ShellChatBoard.presence|{}presence[0]
         final fun <get-presence>(): com.letta.mobile.data.canvas/CanvasPresenceTransport? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.presence.<get-presence>|<get-presence>(){}[0]
-    final val sessions // com.letta.mobile.ui.shell.workspace/ShellChatBoard.sessions|{}sessions[0]
-        final fun <get-sessions>(): com.letta.mobile.data.canvas/CanvasSessionRegistry? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.sessions.<get-sessions>|<get-sessions>(){}[0]
     final val store // com.letta.mobile.ui.shell.workspace/ShellChatBoard.store|{}store[0]
         final fun <get-store>(): com.letta.mobile.data.canvas/CanvasDocumentStore // com.letta.mobile.ui.shell.workspace/ShellChatBoard.store.<get-store>|<get-store>(){}[0]
     final val syncTransport // com.letta.mobile.ui.shell.workspace/ShellChatBoard.syncTransport|{}syncTransport[0]
@@ -7489,8 +7487,7 @@ final class com.letta.mobile.ui.shell.workspace/ShellChatBoard { // com.letta.mo
     final fun component3(): com.letta.mobile.data.canvas/CanvasSyncTransport? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.canvas/CanvasPresenceTransport? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.component4|component4(){}[0]
     final fun component5(): com.letta.mobile.data.storage/AssetStore? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.component5|component5(){}[0]
-    final fun component6(): com.letta.mobile.data.canvas/CanvasSessionRegistry? // com.letta.mobile.ui.shell.workspace/ShellChatBoard.component6|component6(){}[0]
-    final fun copy(com.letta.mobile.data.canvas/CanvasDocumentStore = ..., com.letta.mobile.data.canvas/CanvasOpLog = ..., com.letta.mobile.data.canvas/CanvasSyncTransport? = ..., com.letta.mobile.data.canvas/CanvasPresenceTransport? = ..., com.letta.mobile.data.storage/AssetStore? = ..., com.letta.mobile.data.canvas/CanvasSessionRegistry? = ...): com.letta.mobile.ui.shell.workspace/ShellChatBoard // com.letta.mobile.ui.shell.workspace/ShellChatBoard.copy|copy(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasOpLog;com.letta.mobile.data.canvas.CanvasSyncTransport?;com.letta.mobile.data.canvas.CanvasPresenceTransport?;com.letta.mobile.data.storage.AssetStore?;com.letta.mobile.data.canvas.CanvasSessionRegistry?){}[0]
+    final fun copy(com.letta.mobile.data.canvas/CanvasDocumentStore = ..., com.letta.mobile.data.canvas/CanvasOpLog = ..., com.letta.mobile.data.canvas/CanvasSyncTransport? = ..., com.letta.mobile.data.canvas/CanvasPresenceTransport? = ..., com.letta.mobile.data.storage/AssetStore? = ...): com.letta.mobile.ui.shell.workspace/ShellChatBoard // com.letta.mobile.ui.shell.workspace/ShellChatBoard.copy|copy(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasOpLog;com.letta.mobile.data.canvas.CanvasSyncTransport?;com.letta.mobile.data.canvas.CanvasPresenceTransport?;com.letta.mobile.data.storage.AssetStore?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellChatBoard.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.workspace/ShellChatBoard.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.workspace/ShellChatBoard.toString|toString(){}[0]
@@ -11504,6 +11501,8 @@ final val com.letta.mobile.ui.canvas/LocalCanvasPenRegistry // com.letta.mobile.
     final fun <get-LocalCanvasPenRegistry>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas/CanvasPenRegistry> // com.letta.mobile.ui.canvas/LocalCanvasPenRegistry.<get-LocalCanvasPenRegistry>|<get-LocalCanvasPenRegistry>(){}[0]
 final val com.letta.mobile.ui.canvas/LocalCanvasPenTarget // com.letta.mobile.ui.canvas/LocalCanvasPenTarget|{}LocalCanvasPenTarget[0]
     final fun <get-LocalCanvasPenTarget>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas/CanvasPenTarget> // com.letta.mobile.ui.canvas/LocalCanvasPenTarget.<get-LocalCanvasPenTarget>|<get-LocalCanvasPenTarget>(){}[0]
+final val com.letta.mobile.ui.canvas/LocalCanvasSessionRegistry // com.letta.mobile.ui.canvas/LocalCanvasSessionRegistry|{}LocalCanvasSessionRegistry[0]
+    final fun <get-LocalCanvasSessionRegistry>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.data.canvas/CanvasSessionRegistry?> // com.letta.mobile.ui.canvas/LocalCanvasSessionRegistry.<get-LocalCanvasSessionRegistry>|<get-LocalCanvasSessionRegistry>(){}[0]
 final val com.letta.mobile.ui.canvas/LocalRecentColors // com.letta.mobile.ui.canvas/LocalRecentColors|{}LocalRecentColors[0]
     final fun <get-LocalRecentColors>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas/RecentColors?> // com.letta.mobile.ui.canvas/LocalRecentColors.<get-LocalRecentColors>|<get-LocalRecentColors>(){}[0]
 final val com.letta.mobile.ui.canvas/LocalWheelZoomRegions // com.letta.mobile.ui.canvas/LocalWheelZoomRegions|{}LocalWheelZoomRegions[0]

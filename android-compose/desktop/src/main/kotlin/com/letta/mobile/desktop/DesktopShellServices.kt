@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.FocusRequester
-import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
@@ -106,7 +105,8 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val iroh = rememberDesktopIrohLink(bootstrap, chatScope)
-    val chatController = rememberShellChatController(bootstrap, chatScope, iroh, agentDefaults, canvasShell.sessions)
+    val chatRuntime = DesktopChatRuntime(bootstrap.bootstrapState, chatScope, bootstrap.dataBindings, agentDefaults, canvasShell.sessions)
+    val chatController = rememberShellChatController(bootstrap, iroh, chatRuntime)
     val localConfig = rememberDesktopLocalConfigState(
         scope = chatScope,
         secureSettingsStore = bootstrap.secureSettingsStore,
@@ -180,18 +180,9 @@ private fun rememberDesktopIrohLink(bootstrap: DesktopConfigBootstrap, chatScope
 @Composable
 private fun rememberShellChatController(
     bootstrap: DesktopConfigBootstrap,
-    chatScope: CoroutineScope,
     iroh: DesktopIrohLink,
-    agentDefaults: AgentDefaultsRepository,
-    canvasSessions: CanvasSessionRegistry,
+    runtime: DesktopChatRuntime,
 ): DesktopChatController {
-    val runtime = DesktopChatRuntime(
-        bootstrapState = bootstrap.bootstrapState,
-        chatScope = chatScope,
-        dataBindings = bootstrap.dataBindings,
-        agentDefaults = agentDefaults,
-        canvasSessions = canvasSessions,
-    )
     return rememberDesktopChatController(
         DesktopChatControllerBindings(
             runtime = runtime,
