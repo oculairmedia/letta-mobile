@@ -10,6 +10,7 @@ import com.letta.mobile.data.controller.node.iroh.NativeReadTiers
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
@@ -109,7 +110,7 @@ class CanonicalTimelineCatchUpTest {
                 "state=${presenter.loadStateFlow.value} reads=${host.reads}")
 
             // A starts streaming while selected; the writer and its unfinished fence outlive the view.
-            val prefix = reply("reply", "first ", 3)
+            val prefix = reply(MessageId("reply"), JsonPrimitive("first "), 3)
             coordinator.ingestExternal(owner, hostStamped(prefix))
             advanceUntilIdle()
             assertFalse(owner.session.live.value?.block?.terminal ?: true)
@@ -135,7 +136,7 @@ class CanonicalTimelineCatchUpTest {
                 UserMessage(id = "prompt", contentRaw = JsonPrimitive("question"), date = date(1)),
                 ReasoningMessage(id = "reason", reasoning = "considering", date = date(2)),
                 prefix.copy(contentRaw = JsonPrimitive("first complete reply")),
-                reply("followup", "second complete reply", 4),
+                reply(MessageId("followup"), JsonPrimitive("second complete reply"), 4),
             )
             val requestsBeforeOpen = host.reads.size
             val sync = if (reconnect) {
@@ -198,7 +199,7 @@ class CanonicalTimelineCatchUpTest {
 
     /** Only storage/controller effects are fake; both RPC and sync validation are the real wrapper's. */
     private class TranscriptHost : NoOpChannelTransport() {
-        val messages = mutableMapOf("A" to mutableListOf<LettaMessage>(reply("old", "earlier reply", 0)),
+        val messages = mutableMapOf("A" to mutableListOf<LettaMessage>(reply(MessageId("old"), JsonPrimitive("earlier reply"), 0)),
             "B" to mutableListOf<LettaMessage>())
         val reads = mutableListOf<String>()
         val synced = mutableListOf<AppServerRuntimeScope>()
@@ -271,8 +272,8 @@ class CanonicalTimelineCatchUpTest {
 
     companion object {
         private fun date(second: Int) = "2026-11-04T22:12:0${second}Z"
-        private fun reply(id: String, content: String, second: Int) =
-            AssistantMessage(id = id, contentRaw = JsonPrimitive(content), date = date(second))
+        private fun reply(id: MessageId, content: JsonPrimitive, second: Int) =
+            AssistantMessage(id = id.value, contentRaw = content, date = date(second))
 
         private inline fun <reified T> proxy(crossinline call: (String, Array<out Any?>) -> Any?): T =
             Proxy.newProxyInstance(T::class.java.classLoader, arrayOf(T::class.java)) { _, method, args ->
