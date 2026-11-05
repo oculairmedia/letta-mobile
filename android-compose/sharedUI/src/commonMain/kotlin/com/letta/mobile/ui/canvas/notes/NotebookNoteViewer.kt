@@ -72,8 +72,14 @@ private class NoteSessions(private val backend: NotebookNoteBackend) {
         if (!session.state.value.dirty && byCanvas[canvasId] === session) byCanvas.remove(canvasId)
     }
 
-    /** Saves every retained dirty note; true when none is left unsaved. */
-    suspend fun prepareClose(): Boolean = byCanvas.values.toList().map { !it.state.value.dirty || it.prepareClose() }.all { it }
+    /**
+     * Saves every retained dirty note, then checks them all again: a note edited while another was
+     * saving, or opened meanwhile, is still unsaved. True when none is.
+     */
+    suspend fun prepareClose(): Boolean {
+        val saved = byCanvas.values.toList().map { !it.state.value.dirty || it.prepareClose() }.all { it }
+        return saved && byCanvas.values.none { it.state.value.dirty }
+    }
 }
 
 /** The views a host whose canvases are all notebooks offers: the core ones, and each canvas's note. */
