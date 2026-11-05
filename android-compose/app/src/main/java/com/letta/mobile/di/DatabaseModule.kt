@@ -10,6 +10,10 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.canvas.notes.LocalNotebookNoteBackend
+import com.letta.mobile.data.canvas.notes.NotebookCanvasIdentity
+import com.letta.mobile.ui.canvas.notes.notebookCanvasViewers
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.data.local.CanvasOpDao
 import com.letta.mobile.data.local.RoomCanvasOpLog
 import dagger.Module
@@ -98,6 +102,12 @@ object DatabaseModule {
     @Singleton
     fun provideCanvasDocumentStore(notebooks: NotebookLocalStore): CanvasDocumentStore =
         NotebookCanvasDocumentStore(notebooks)
+
+    /** The canvas views: the core ones, and each canvas's note, since every Android canvas is a notebook. */
+    @Provides
+    @Singleton
+    fun provideCanvasDocumentViewers(notebooks: NotebookLocalStore): CanvasDocumentViewerRegistry =
+        notebookCanvasViewers(NotebookCanvasIdentity(notebooks), LocalNotebookNoteBackend(notebooks))
 
     @Provides
     fun provideCanvasOpDao(database: LettaDatabase): CanvasOpDao {

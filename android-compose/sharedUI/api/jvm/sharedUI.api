@@ -733,9 +733,9 @@ public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$Noteboo
 public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteViewerKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteViewerKt;
 	public fun <init> ()V
-	public final fun getLambda$-1141080636$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-302857834$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1157161503$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1165339360$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1467601335$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$609703922$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/notes/NotebookCanvasViewersKt {
@@ -749,6 +749,7 @@ public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {
 
 public final class com/letta/mobile/ui/canvas/notes/NotebookNoteViewerKt {
 	public static final fun getNOTEBOOK_NOTE_VIEWER_ID ()Ljava/lang/String;
+	public static final fun notebookCanvasViewers (Lcom/letta/mobile/data/canvas/CanvasNotebookIdentity;Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;
 	public static final fun notebookNoteViewer (Lcom/letta/mobile/data/canvas/CanvasNotebookIdentity;Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
 }
 

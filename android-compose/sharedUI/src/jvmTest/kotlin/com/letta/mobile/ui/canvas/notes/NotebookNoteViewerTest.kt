@@ -167,6 +167,24 @@ class NotebookNoteViewerTest {
         assertEquals("changed elsewhere", backend.source.markdown)
     }
 
+    @Test
+    fun aCleanNoteIsReleasedWithItsView() = runComposeUiTest {
+        val backend = ViewerTestBackend()
+        val shown = mutableStateOf(true)
+        mount(backend, identity = FixedIdentity(NOTEBOOK), shown = shown)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        onNodeWithTag(MARKDOWN).assertTextContains("original")
+        val loadsWhileShown = runOnIdle { backend.loaded.size }
+
+        runOnIdle { shown.value = false }
+        runOnIdle { backend.source = backend.source.copy(markdown = "edited elsewhere") }
+        runOnIdle { shown.value = true }
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+
+        onNodeWithTag(MARKDOWN).assertTextContains("edited elsewhere")
+        runOnIdle { assertTrue(backend.loaded.size > loadsWhileShown) }
+    }
+
     private fun ComposeUiTest.mount(
         backend: ViewerTestBackend,
         identity: CanvasNotebookIdentity,
