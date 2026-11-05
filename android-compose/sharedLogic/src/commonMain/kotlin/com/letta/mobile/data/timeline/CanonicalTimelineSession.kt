@@ -306,7 +306,7 @@ class CanonicalTimelineCoordinator(
 /** Host-neutral session. Transport calls happen outside the engine storage mutex. */
 class CanonicalTimelineSession(
     store: TimelineBoundedStore,
-    private val transport: TimelineTransport,
+    internal val transport: TimelineTransport,
     private val scope: TimelineScope,
     enabled: Boolean = false,
     budget: TimelinePageBudget = TimelinePageBudget(64, 2L * 1024 * 1024),
@@ -370,7 +370,7 @@ class CanonicalTimelineSession(
         discarded
     }
 
-    private suspend fun refreshPending(historyPage: TimelineRemotePageResult.Page? = null) = pendingMutex.withLock {
+    internal suspend fun refreshPending(historyPage: TimelineRemotePageResult.Page? = null) = pendingMutex.withLock {
         val loaded = pendingStore.load(scope)
         recoveryHistoryStart = (listOfNotNull(recoveryHistoryStart) + historyPage?.records.orEmpty().mapNotNull {
             it.message.date?.let(::parseTimelineInstantOrNull)
@@ -419,21 +419,8 @@ class CanonicalTimelineSession(
     /** Fetch one bounded recent page without consuming the older-history continuation. */
     suspend fun reconcileRecent(selection: TimelineEngineSelection): TimelineEnginePageOutcome = reconcileRecentDetailed(selection).outcome
 
-    suspend fun reconcileRecentDetailed(selection: TimelineEngineSelection): TimelineEngineReconcileResult {
-        val request = engine.beginReconcile(selection)
-        try {
-            return when (val response = transport.listConversationMessagePage(request.remote)) {
-                is TimelineRemotePageResult.Page -> engine.reconcilePageDetailed(request, response).also {
-                    if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending(historyPage = response)
-                }
-                is TimelineRemotePageResult.NoProgress -> TimelineEngineReconcileResult(engine.rejectReconcileNoProgress(request, response))
-            }
-        } finally {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                engine.cancelReconcile(request)
-            }
-        }
-    }
+    suspend fun reconcileRecentDetailed(selection: TimelineEngineSelection): TimelineEngineReconcileResult =
+        reconcileRecentDetailed(selection, catchUp = false)
 
     suspend fun beginLive(selection: TimelineEngineSelection): TimelineLiveFence = engine.beginLive(selection)
 
@@ -458,3 +445,23 @@ class CanonicalTimelineSession(
 private fun streamingSince(lastFrameMillis: Long): Boolean =
     lastFrameMillis > 0 &&
         timelineCurrentTimeMillis() - lastFrameMillis < CanonicalPendingLocalStore.LOST_ECHO_HORIZON_MILLIS
+
+/** Catch up the selected viewport without completing or replacing its transport-owned live fence. */
+internal suspend fun CanonicalTimelineSession.reconcileRecentDetailed(
+    selection: TimelineEngineSelection,
+    catchUp: Boolean,
+): TimelineEngineReconcileResult {
+    val request = engine.beginReconcile(selection)
+    try {
+        return when (val response = transport.listConversationMessagePage(request.remote)) {
+            is TimelineRemotePageResult.Page -> engine.reconcilePageDetailed(request, response, catchUp).also {
+                if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending(historyPage = response)
+            }
+            is TimelineRemotePageResult.NoProgress -> TimelineEngineReconcileResult(engine.rejectReconcileNoProgress(request, response))
+        }
+    } finally {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            engine.cancelReconcile(request)
+        }
+    }
+}

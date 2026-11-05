@@ -449,8 +449,11 @@ class IrohNodeConnection(
         val requestId = obj["request_id"]?.jsonPrimitive?.content
             ?: return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
         return recoverUnlessCancelled(action = {
-            val agentId = obj["agent_id"]?.jsonPrimitive?.content
-            val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
+            // AppServerCommand.Sync (and upstream Listen V2) nests its scope under runtime.
+            // Retain the flat form for older peers, but never mix two different scope sources.
+            val scope = (obj["runtime"] as? JsonObject) ?: obj
+            val agentId = scope["agent_id"]?.jsonPrimitive?.content
+            val conversationId = scope["conversation_id"]?.jsonPrimitive?.content
             if (agentId == null || conversationId == null) {
                 """{"type":"sync_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id required for sync"}"""
             } else {
@@ -460,12 +463,9 @@ class IrohNodeConnection(
                 val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
                 val forceDeviceStatus = obj["force_device_status"]?.jsonPrimitive?.booleanOrNull ?: false
                 val response = controller.sync(runtime, recoverApprovals, forceDeviceStatus)
-                if (response.success) {
-                    """{"type":"sync_response","request_id":"$requestId","success":true}"""
-                } else {
-                    val error = response.error?.replace("\"", "\\\"") ?: "sync failed"
-                    """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
-                }
+                AppServerProtocol.json.encodeToString(
+                    AppServerInboundFrame.serializer(), response.copy(requestId = requestId),
+                )
             }
         }, recover = { error ->
             val message = error.message?.replace("\"", "\\\"") ?: "sync error"

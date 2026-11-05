@@ -168,7 +168,10 @@ internal class TimelineHistoryMediator(
         if (session.publication.value.selection !== selection) {
             return MediatorResult.Success(endOfPaginationReached = true)
         }
-        val result = session.reconcileRecentDetailed(selection)
+        // A writer outlives its viewport. Switching away or losing the wrapper can miss Done,
+        // leaving a live fence indefinitely; that is no reason to discard persisted history on
+        // reopening. Keep the fence for later live frames, but admit this bounded, scoped page.
+        val result = session.reconcileRecentDetailed(selection, catchUp = true)
         return when (result.outcome) {
             TimelineEnginePageOutcome.Applied -> MediatorResult.Success(result.appended == 0)
             TimelineEnginePageOutcome.NoProgress -> MediatorResult.Success(endOfPaginationReached = true)
