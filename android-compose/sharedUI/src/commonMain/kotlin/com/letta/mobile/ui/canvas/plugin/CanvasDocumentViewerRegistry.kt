@@ -34,6 +34,9 @@ class CanvasDocumentViewerRegistry(base: CanvasDocumentViewers = CanvasDocumentV
     /** The views registered now. */
     val current: CanvasDocumentViewers get() = table.value.viewers
 
+    /** Asks every registered viewer to save what it keeps before the app quits; true when all of it is safe. */
+    suspend fun prepareClose(): Boolean = current.all.map { it.prepareClose?.invoke() ?: true }.all { it }
+
     /** Adds [viewer], replacing any viewer with its ID; closing the handle removes it. */
     fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewerRegistration =
         add(RuntimeViewId(viewer.id.value)) { it.register(viewer) }

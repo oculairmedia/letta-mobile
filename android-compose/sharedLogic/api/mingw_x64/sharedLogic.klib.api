@@ -57884,6 +57884,12 @@ final class com.letta.mobile.data.shell/ShellOverlays { // com.letta.mobile.data
         final fun <set-shortcutHelp>(kotlin/Boolean) // com.letta.mobile.data.shell/ShellOverlays.shortcutHelp.<set-shortcutHelp>|<set-shortcutHelp>(kotlin.Boolean){}[0]
 }
 
+final class com.letta.mobile.data.shell/ShellQuitGuard { // com.letta.mobile.data.shell/ShellQuitGuard|null[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction0<kotlin/Boolean>) // com.letta.mobile.data.shell/ShellQuitGuard.<init>|<init>(kotlin.coroutines.SuspendFunction0<kotlin.Boolean>){}[0]
+
+    final suspend fun requestQuit(): kotlin/Boolean // com.letta.mobile.data.shell/ShellQuitGuard.requestQuit|requestQuit(){}[0]
+}
+
 final class com.letta.mobile.data.shell/ShellWorkspaceNavigator { // com.letta.mobile.data.shell/ShellWorkspaceNavigator|null[0]
     constructor <init>(com.letta.mobile.data.shell/ShellWorkspaceState, com.letta.mobile.data.shell/ShellChatPort) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.<init>|<init>(com.letta.mobile.data.shell.ShellWorkspaceState;com.letta.mobile.data.shell.ShellChatPort){}[0]
 

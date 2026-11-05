@@ -36,6 +36,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * The note view of a canvas (letta-mobile-n2stx.2.1, B3): it edits the canvas's own notebook, and
@@ -136,11 +138,40 @@ class NotebookNoteViewerTest {
         onNodeWithTag(BOARD).assertExists()
     }
 
+    @Test
+    fun quittingSavesADraftThatIsNoLongerOnShow() = runComposeUiTest {
+        val backend = ViewerTestBackend()
+        val shown = mutableStateOf(true)
+        val registry = mount(backend, identity = FixedIdentity(NOTEBOOK), shown = shown)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        onNodeWithTag(MARKDOWN).performTextReplacement("written, then the pane closed")
+        runOnIdle { shown.value = false }
+        onNodeWithTag(MARKDOWN).assertDoesNotExist()
+
+        assertTrue(runBlocking { registry.prepareClose() })
+        assertEquals("written, then the pane closed", backend.source.markdown)
+    }
+
+    @Test
+    fun aRetainedDraftThatCannotSaveHoldsTheQuit() = runComposeUiTest {
+        val backend = ViewerTestBackend()
+        val shown = mutableStateOf(true)
+        val registry = mount(backend, identity = FixedIdentity(NOTEBOOK), shown = shown)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        onNodeWithTag(MARKDOWN).assertTextContains("original")
+        onNodeWithTag(MARKDOWN).performTextReplacement("mine")
+        runOnIdle { shown.value = false }
+        runOnIdle { backend.source = backend.source.copy(markdown = "changed elsewhere") }
+
+        assertFalse(runBlocking { registry.prepareClose() })
+        assertEquals("changed elsewhere", backend.source.markdown)
+    }
+
     private fun ComposeUiTest.mount(
         backend: ViewerTestBackend,
         identity: CanvasNotebookIdentity,
         shown: MutableState<Boolean> = mutableStateOf(true),
-    ) {
+    ): CanvasDocumentViewerRegistry {
         val session = runBlocking {
             CanvasSession.create(
                 store = InMemoryCanvasDocumentStore(),
@@ -155,6 +186,7 @@ class NotebookNoteViewerTest {
                 }
             }
         }
+        return registry
     }
 
     private class FixedIdentity(private val notebook: NotebookDocumentId?) : CanvasNotebookIdentity {

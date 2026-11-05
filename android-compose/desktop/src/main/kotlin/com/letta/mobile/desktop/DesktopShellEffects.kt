@@ -88,6 +88,7 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
         ),
         actions = DesktopNucleusEffectActions(
             onOpenCommandPalette = { context.overlays.commandPalette = true },
+            prepareQuit = context.core.canvasShell.viewers::prepareClose,
             // Clear the full-page agent editor like the sidebar and deep-link
             // paths do, or the editor branch keeps rendering over Settings.
             onOpenSettings = { context.navigator.navigate(DesktopDestination.Settings) },

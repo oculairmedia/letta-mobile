@@ -45,7 +45,8 @@ internal const val NOTEBOOK_NOTE_FAILED_TAG = "notebook-note-viewer-failed"
  * conflict or a failed write remains; a note with nothing unsaved (one that never loaded) just
  * leaves. Each canvas's note session lives as long as this viewer, keyed by the canvas, so a draft
  * survives its view being unmounted (the pane closing, another canvas opening) and a compaction
- * that gives the notebook a new ID. A host registers it only where its canvases are notebooks.
+ * that gives the notebook a new ID; quitting saves every retained draft first. A host registers
+ * it only where its canvases are notebooks.
  */
 fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer {
     val sessions = mutableMapOf<CanvasId, NotebookNoteSession>()
@@ -57,6 +58,8 @@ fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBa
                 sessions.getOrPut(context.canvasId) { NotebookNoteSession(notebook, backend) }
             }
         },
+        // Every retained note, shown or not: each dirty one saves; any that cannot holds the quit.
+        prepareClose = { sessions.values.toList().map { !it.state.value.dirty || it.prepareClose() }.all { it } },
     )
 }
 
