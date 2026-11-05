@@ -195,7 +195,7 @@ class LocalNotebookNoteBackendTest {
             assertEquals("", assertIs<NotebookNoteLoad.Found>(backend.load(id)).snapshot.markdown)
             val missing = DocumentId.generate().getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
             assertEquals(NotebookNoteLoad.NotFound, backend.load(NotebookDocumentId(missing)))
-            assertIs<NotebookNoteLoad.Unavailable>(backend.load(NotebookDocumentId.generate()))
+            assertIs<NotebookNoteLoad.Unavailable>(backend.load(NotebookDocumentId("notebook-not-a-storage-id")))
             assertIs<NotebookNoteSave.Unavailable>(backend.save(NotebookDocumentId("abcd"), "", "draft"))
             assertEquals(1, store.listDocuments().size)
         }

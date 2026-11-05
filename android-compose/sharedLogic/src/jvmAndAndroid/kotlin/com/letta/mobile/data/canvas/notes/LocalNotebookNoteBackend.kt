@@ -92,3 +92,7 @@ internal fun notebookStorageId(id: NotebookDocumentId): DocumentId {
     }
     return DocumentId.fromBytes(id.value.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
 }
+
+/** The inverse of [notebookStorageId]: a storage DocumentId as the notebook ID notes and references use. */
+internal fun notebookDocumentId(id: DocumentId): NotebookDocumentId =
+    NotebookDocumentId(id.getBytes().joinToString("") { byte -> (byte.toInt() and 255).toString(16).padStart(2, '0') })
