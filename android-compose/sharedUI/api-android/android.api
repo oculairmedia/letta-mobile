@@ -527,6 +527,7 @@ public final class com/letta/mobile/ui/canvas/CanvasSelectionBarKt {
 }
 
 public final class com/letta/mobile/ui/canvas/CanvasSessionRegistryLocalKt {
+	public static final fun ProvideCanvasHost (Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalCanvasSessionRegistry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
@@ -729,9 +730,22 @@ public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$Noteboo
 	public final fun getLambda$490734485$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteViewerKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteViewerKt;
+	public fun <init> ()V
+	public final fun getLambda$-1141080636$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-302857834$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1157161503$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {
 	public static final fun NotebookNoteEditor (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun NotebookNoteEditorContent (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Lkotlinx/coroutines/CoroutineScope;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/canvas/notes/NotebookNoteViewerKt {
+	public static final fun getNOTEBOOK_NOTE_VIEWER_ID ()Ljava/lang/String;
+	public static final fun notebookNoteViewer (Lcom/letta/mobile/data/canvas/CanvasNotebookIdentity;Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer {
@@ -824,6 +838,17 @@ public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewersKt {
 public final class com/letta/mobile/ui/canvas/plugin/CanvasPluginLayerKt {
 	public static final fun CanvasPluginLayer (Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;Lio/ak1/drawbox/domain/model/Viewport;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/canvas/plugin/PluginBoardSelection;Landroidx/compose/runtime/Composer;II)V
 	public static final fun rememberPluginBoard (Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasDocument;Lcom/letta/mobile/data/storage/AssetStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasViewerLeaveChecks {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun allowLeave (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasViewerLeaveChecksKt {
+	public static final fun CanvasViewerLeaveCheck (Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalCanvasViewerLeaveChecks ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/ComposableSingletons$CanvasDocumentViewersKt {

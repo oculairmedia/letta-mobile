@@ -2,6 +2,8 @@
 <resources>
     <string name="canvas_viewer_canvas">Canvas</string>
     <string name="canvas_viewer_text">Text</string>
+    <string name="canvas_viewer_note_missing">This canvas has no note</string>
+    <string name="canvas_viewer_note_failed">The note could not be found</string>
     <string name="canvas_viewer_waiting">Waiting for canvas content</string>
     <string name="canvas_viewer_load_failed">Canvas could not be loaded</string>
     <string name="canvas_viewer_retry">Retry</string>

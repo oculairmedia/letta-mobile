@@ -33,6 +33,8 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerContext
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewers
+import com.letta.mobile.ui.canvas.plugin.CanvasViewerLeaveChecks
+import com.letta.mobile.ui.canvas.plugin.LocalCanvasViewerLeaveChecks
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentCanvasContent
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentViewers
 
@@ -52,6 +54,7 @@ internal fun CanvasDocumentViewerHost(
         mutableStateOf(CanvasDocumentViewerId.CANVAS)
     }
     val scope = rememberCoroutineScope()
+    val leaveChecks = remember(session) { CanvasViewerLeaveChecks() }
     var switching by remember(session) { mutableStateOf(false) }
     val document by session.document.collectAsState()
     val viewers = LocalCanvasDocumentViewers.current
@@ -68,6 +71,7 @@ internal fun CanvasDocumentViewerHost(
     Box(modifier = modifier.fillMaxSize()) {
         CompositionLocalProvider(
             LocalCanvasDocumentCanvasContent provides { _, canvasModifier -> canvasContent(canvasModifier) },
+            LocalCanvasViewerLeaveChecks provides leaveChecks,
         ) {
             key(selectedViewer) {
                 selectedViewer.render(context, Modifier.fillMaxSize())
@@ -81,7 +85,7 @@ internal fun CanvasDocumentViewerHost(
                     switching = true
                     scope.launch {
                         try {
-                            if (beforeViewerChange()) selectedViewerId = id
+                            if (beforeViewerChange() && leaveChecks.allowLeave()) selectedViewerId = id
                         } finally {
                             switching = false
                         }
