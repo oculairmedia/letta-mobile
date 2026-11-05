@@ -11501,6 +11501,8 @@ final val com.letta.mobile.ui.canvas/LocalCanvasPenRegistry // com.letta.mobile.
     final fun <get-LocalCanvasPenRegistry>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas/CanvasPenRegistry> // com.letta.mobile.ui.canvas/LocalCanvasPenRegistry.<get-LocalCanvasPenRegistry>|<get-LocalCanvasPenRegistry>(){}[0]
 final val com.letta.mobile.ui.canvas/LocalCanvasPenTarget // com.letta.mobile.ui.canvas/LocalCanvasPenTarget|{}LocalCanvasPenTarget[0]
     final fun <get-LocalCanvasPenTarget>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas/CanvasPenTarget> // com.letta.mobile.ui.canvas/LocalCanvasPenTarget.<get-LocalCanvasPenTarget>|<get-LocalCanvasPenTarget>(){}[0]
+final val com.letta.mobile.ui.canvas/LocalCanvasSessionRegistry // com.letta.mobile.ui.canvas/LocalCanvasSessionRegistry|{}LocalCanvasSessionRegistry[0]
+    final fun <get-LocalCanvasSessionRegistry>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.data.canvas/CanvasSessionRegistry?> // com.letta.mobile.ui.canvas/LocalCanvasSessionRegistry.<get-LocalCanvasSessionRegistry>|<get-LocalCanvasSessionRegistry>(){}[0]
 final val com.letta.mobile.ui.canvas/LocalRecentColors // com.letta.mobile.ui.canvas/LocalRecentColors|{}LocalRecentColors[0]
     final fun <get-LocalRecentColors>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas/RecentColors?> // com.letta.mobile.ui.canvas/LocalRecentColors.<get-LocalRecentColors>|<get-LocalRecentColors>(){}[0]
 final val com.letta.mobile.ui.canvas/LocalWheelZoomRegions // com.letta.mobile.ui.canvas/LocalWheelZoomRegions|{}LocalWheelZoomRegions[0]

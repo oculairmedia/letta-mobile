@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.library.CanvasLibraryController
 import com.letta.mobile.data.model.CanvasId
@@ -27,6 +28,8 @@ internal class DesktopCanvasShell(
     val library: CanvasLibraryController,
     private val scope: CoroutineScope,
     sessionState: MutableState<CanvasSession?>,
+    /** The window's live boards, where its mounts register and its canvas_* tools look them up. */
+    val sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) {
     var activeSession: CanvasSession? by sessionState
 

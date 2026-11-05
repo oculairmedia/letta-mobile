@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +16,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
+import com.letta.mobile.ui.canvas.LocalCanvasSessionRegistry
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellSearchContext
@@ -69,9 +71,12 @@ internal fun LettaDesktopApp(
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
-        DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
-            // The workspace hoists its header into the window title bar, a sibling of the shell (letta-mobile-3arhe.1).
-            DesktopShellWindowContent(context, frame, DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange))
+        CompositionLocalProvider(LocalCanvasSessionRegistry provides context.core.canvasShell.sessions) {
+            DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
+                // Boards register where the canvas_* tools look (n2stx.2.1); the header hoists into the title bar (3arhe.1).
+                val header = DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange)
+                DesktopShellWindowContent(context, frame, header)
+            }
         }
     }
 }

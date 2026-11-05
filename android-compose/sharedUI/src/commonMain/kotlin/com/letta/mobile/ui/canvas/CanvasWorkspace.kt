@@ -55,10 +55,10 @@ fun CanvasWorkspace(
     controller: DrawBoxController = remember { DrawBoxController(Reducer(UseCase())) },
     session: CanvasSession? = null,
     /**
-     * The registry external tools look the open session up in. Null means agent commands only
-     * reach the store, not this session, so a host that wires canvas tools must pass its own.
+     * The registry external tools look the open session up in; the host's [LocalCanvasSessionRegistry]
+     * unless passed. Null means agent commands only reach the store, not this session.
      */
-    sessionRegistry: CanvasSessionRegistry? = null,
+    sessionRegistry: CanvasSessionRegistry? = LocalCanvasSessionRegistry.current,
     initialJson: String? = null,
     presenceTransport: CanvasPresenceTransport? = null,
     /**

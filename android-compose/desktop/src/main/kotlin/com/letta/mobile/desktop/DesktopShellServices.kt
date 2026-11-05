@@ -105,7 +105,8 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val iroh = rememberDesktopIrohLink(bootstrap, chatScope)
-    val chatController = rememberShellChatController(bootstrap, chatScope, iroh, agentDefaults)
+    val chatRuntime = DesktopChatRuntime(bootstrap.bootstrapState, chatScope, bootstrap.dataBindings, agentDefaults, canvasShell.sessions)
+    val chatController = rememberShellChatController(bootstrap, iroh, chatRuntime)
     val localConfig = rememberDesktopLocalConfigState(
         scope = chatScope,
         secureSettingsStore = bootstrap.secureSettingsStore,
@@ -179,16 +180,9 @@ private fun rememberDesktopIrohLink(bootstrap: DesktopConfigBootstrap, chatScope
 @Composable
 private fun rememberShellChatController(
     bootstrap: DesktopConfigBootstrap,
-    chatScope: CoroutineScope,
     iroh: DesktopIrohLink,
-    agentDefaults: AgentDefaultsRepository,
+    runtime: DesktopChatRuntime,
 ): DesktopChatController {
-    val runtime = DesktopChatRuntime(
-        bootstrapState = bootstrap.bootstrapState,
-        chatScope = chatScope,
-        dataBindings = bootstrap.dataBindings,
-        agentDefaults = agentDefaults,
-    )
     return rememberDesktopChatController(
         DesktopChatControllerBindings(
             runtime = runtime,

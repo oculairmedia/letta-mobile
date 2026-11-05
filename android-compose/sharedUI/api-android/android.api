@@ -526,6 +526,10 @@ public final class com/letta/mobile/ui/canvas/CanvasSelectionBarKt {
 	public static final fun CanvasSelectionBar (Lio/ak1/drawbox/ui/controls/ControlsBarState;Lcom/letta/mobile/ui/canvas/CanvasProperties;ZLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/canvas/NoteBarActions;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/canvas/ShapeTextActions;Lcom/letta/mobile/ui/canvas/ShapeReshapeActions;Landroidx/compose/runtime/Composer;III)V
 }
 
+public final class com/letta/mobile/ui/canvas/CanvasSessionRegistryLocalKt {
+	public static final fun getLocalCanvasSessionRegistry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/canvas/CanvasTableBlock {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/CanvasTableBlock;
