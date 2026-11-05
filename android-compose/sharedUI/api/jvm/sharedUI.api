@@ -733,9 +733,9 @@ public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$Noteboo
 public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteViewerKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteViewerKt;
 	public fun <init> ()V
-	public final fun getLambda$-1757201129$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1276928617$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1482566578$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1165339360$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1467601335$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$609703922$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/notes/NotebookCanvasViewersKt {
