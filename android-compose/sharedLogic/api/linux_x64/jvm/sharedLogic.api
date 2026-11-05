@@ -6057,6 +6057,11 @@ public final class com/letta/mobile/data/canvas/CanvasModelsKt {
 	public static final field CANVAS_PRIMARY_DOCUMENT_ID Ljava/lang/String;
 }
 
+public abstract interface class com/letta/mobile/data/canvas/CanvasNotebookIdentity {
+	public abstract fun canvasOf (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun notebookOf (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public abstract interface class com/letta/mobile/data/canvas/CanvasOp : com/letta/mobile/data/document/DocumentOp {
 	public static final field Companion Lcom/letta/mobile/data/canvas/CanvasOp$Companion;
 	public abstract fun getActorId ()Ljava/lang/String;
@@ -8652,6 +8657,12 @@ public final class com/letta/mobile/data/canvas/NotebookCanvasDocumentStore : co
 	public synthetic fun upsertIfRevision (Lcom/letta/mobile/data/document/DocumentSnapshot;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/data/canvas/NotebookCanvasIdentity : com/letta/mobile/data/canvas/CanvasNotebookIdentity {
+	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookLocalStore;)V
+	public fun canvasOf (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun notebookOf (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/canvas/NotebookDocument {
 	public static final field Companion Lcom/letta/mobile/data/canvas/NotebookDocument$Companion;
 	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
@@ -8712,7 +8723,6 @@ public final synthetic class com/letta/mobile/data/canvas/NotebookDocumentId$$se
 }
 
 public final class com/letta/mobile/data/canvas/NotebookDocumentId$Companion {
-	public final fun generate ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 

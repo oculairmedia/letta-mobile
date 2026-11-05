@@ -1,17 +1,14 @@
 package com.letta.mobile.data.canvas
 
 import kotlinx.serialization.Serializable
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-/** A notebook document is independent of any conversation or agent. */
+/**
+ * A notebook document is independent of any conversation or agent. Its value is the notebook store's
+ * lowercase-hex document ID, which the store mints; there is no client-side generator, since an
+ * invented ID would name no stored document.
+ */
 @Serializable
-data class NotebookDocumentId(val value: String) {
-    companion object {
-        @OptIn(ExperimentalUuidApi::class)
-        fun generate(): NotebookDocumentId = NotebookDocumentId("notebook-${Uuid.random()}")
-    }
-}
+data class NotebookDocumentId(val value: String)
 
 /** Stable, versioned item references; unknown kinds and payloads round-trip unchanged. */
 @Serializable

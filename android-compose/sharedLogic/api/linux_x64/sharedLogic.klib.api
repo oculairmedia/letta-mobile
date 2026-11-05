@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [linuxX64.hostNative, wasmJs]
+// Targets: [mingwX64.hostNative, wasmJs]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -4325,6 +4325,11 @@ abstract interface com.letta.mobile.data.canvas/CanvasDocumentStore : com.letta.
     abstract suspend fun createForConversationIfAbsent(com.letta.mobile.data.canvas/CanvasDocument): com.letta.mobile.data.canvas/CanvasDocument // com.letta.mobile.data.canvas/CanvasDocumentStore.createForConversationIfAbsent|createForConversationIfAbsent(com.letta.mobile.data.canvas.CanvasDocument){}[0]
     abstract suspend fun getForConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.canvas/CanvasDocument? // com.letta.mobile.data.canvas/CanvasDocumentStore.getForConversation|getForConversation(com.letta.mobile.data.model.ConversationId){}[0]
     abstract suspend fun listForAgent(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> // com.letta.mobile.data.canvas/CanvasDocumentStore.listForAgent|listForAgent(com.letta.mobile.data.model.AgentId){}[0]
+}
+
+abstract interface com.letta.mobile.data.canvas/CanvasNotebookIdentity { // com.letta.mobile.data.canvas/CanvasNotebookIdentity|null[0]
+    abstract suspend fun canvasOf(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas/CanvasNotebookIdentity.canvasOf|canvasOf(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
+    abstract suspend fun notebookOf(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas/CanvasNotebookIdentity.notebookOf|notebookOf(com.letta.mobile.data.model.CanvasId){}[0]
 }
 
 abstract interface com.letta.mobile.data.canvas/CanvasOpLog : com.letta.mobile.data.document/OpLog<com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.canvas/CanvasOp> { // com.letta.mobile.data.canvas/CanvasOpLog|null[0]
@@ -31614,7 +31619,6 @@ final class com.letta.mobile.data.canvas/NotebookDocumentId { // com.letta.mobil
     }
 
     final object Companion { // com.letta.mobile.data.canvas/NotebookDocumentId.Companion|null[0]
-        final fun generate(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas/NotebookDocumentId.Companion.generate|generate(){}[0]
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas/NotebookDocumentId> // com.letta.mobile.data.canvas/NotebookDocumentId.Companion.serializer|serializer(){}[0]
     }
 }
@@ -73268,7 +73272,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [linuxX64.hostNative]
+// Targets: [mingwX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

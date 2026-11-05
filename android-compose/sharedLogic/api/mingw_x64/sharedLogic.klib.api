@@ -4327,6 +4327,11 @@ abstract interface com.letta.mobile.data.canvas/CanvasDocumentStore : com.letta.
     abstract suspend fun listForAgent(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> // com.letta.mobile.data.canvas/CanvasDocumentStore.listForAgent|listForAgent(com.letta.mobile.data.model.AgentId){}[0]
 }
 
+abstract interface com.letta.mobile.data.canvas/CanvasNotebookIdentity { // com.letta.mobile.data.canvas/CanvasNotebookIdentity|null[0]
+    abstract suspend fun canvasOf(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas/CanvasNotebookIdentity.canvasOf|canvasOf(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
+    abstract suspend fun notebookOf(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas/CanvasNotebookIdentity.notebookOf|notebookOf(com.letta.mobile.data.model.CanvasId){}[0]
+}
+
 abstract interface com.letta.mobile.data.canvas/CanvasOpLog : com.letta.mobile.data.document/OpLog<com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.canvas/CanvasOp> { // com.letta.mobile.data.canvas/CanvasOpLog|null[0]
     abstract fun observe(com.letta.mobile.data.model/CanvasId): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.canvas/CanvasOp> // com.letta.mobile.data.canvas/CanvasOpLog.observe|observe(com.letta.mobile.data.model.CanvasId){}[0]
     abstract suspend fun append(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.canvas/CanvasOp) // com.letta.mobile.data.canvas/CanvasOpLog.append|append(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.canvas.CanvasOp){}[0]
@@ -31614,7 +31619,6 @@ final class com.letta.mobile.data.canvas/NotebookDocumentId { // com.letta.mobil
     }
 
     final object Companion { // com.letta.mobile.data.canvas/NotebookDocumentId.Companion|null[0]
-        final fun generate(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas/NotebookDocumentId.Companion.generate|generate(){}[0]
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas/NotebookDocumentId> // com.letta.mobile.data.canvas/NotebookDocumentId.Companion.serializer|serializer(){}[0]
     }
 }
