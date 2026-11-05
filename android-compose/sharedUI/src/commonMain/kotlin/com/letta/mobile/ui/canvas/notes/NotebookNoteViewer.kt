@@ -27,6 +27,7 @@ import com.letta.mobile.sharedui.resources.canvas_viewer_retry
 import com.letta.mobile.sharedui.resources.notebook_note_title
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.CanvasViewerLeaveCheck
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
@@ -59,6 +60,10 @@ fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBa
         },
     )
 }
+
+/** The views a host whose canvases are all notebooks offers: the core ones, and each canvas's note. */
+fun notebookCanvasViewers(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewerRegistry =
+    CanvasDocumentViewerRegistry().also { it.register(notebookNoteViewer(identity, backend)) }
 
 private sealed interface NoteLookup {
     data object Resolving : NoteLookup

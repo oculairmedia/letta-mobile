@@ -27,6 +27,8 @@ import com.letta.mobile.data.plugin.view.ViewPlatform
 import com.letta.mobile.pluginview.ProvidePluginViews
 import com.letta.mobile.pluginview.WebViewPluginViewHost
 import com.letta.mobile.ui.canvas.CanvasWorkspace
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
+import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +49,7 @@ class CanvasViewModel @Inject constructor(
     val assets: com.letta.mobile.data.storage.AssetStore,
     /** The host's enabled plugins, their view transport and this device's live-views switch (letta-mobile-cdgpr.8). */
     val pluginViews: PluginViewsModel,
+    val viewers: CanvasDocumentViewerRegistry,
 ) : ViewModel() {
     private val _session = MutableStateFlow<CanvasSession?>(null)
     val session: StateFlow<CanvasSession?> = _session.asStateFlow()
@@ -107,6 +110,7 @@ fun CanvasScreen(
         // The view model's scope outlives a removed element, so a page's teardown can finish.
         val pluginHost = remember(viewModel) { WebViewPluginViewHost(viewModel.viewModelScope) }
         ProvidePluginViews(viewModel.pluginViews, pluginHost, activeSession.canvasId.value, ViewPlatform.ANDROID) {
+          ProvideCanvasDocumentViewerRegistry(viewModel.viewers) {
             CanvasWorkspace(
                 session = activeSession,
                 presenceTransport = viewModel.presenceTransport,
@@ -117,6 +121,7 @@ fun CanvasScreen(
                 chromeTopInset = chromeTopInset,
                 cameraRequest = cameraRequest,
             )
+          }
         }
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

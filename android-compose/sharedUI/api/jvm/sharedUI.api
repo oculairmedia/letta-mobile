@@ -749,6 +749,7 @@ public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {
 
 public final class com/letta/mobile/ui/canvas/notes/NotebookNoteViewerKt {
 	public static final fun getNOTEBOOK_NOTE_VIEWER_ID ()Ljava/lang/String;
+	public static final fun notebookCanvasViewers (Lcom/letta/mobile/data/canvas/CanvasNotebookIdentity;Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;
 	public static final fun notebookNoteViewer (Lcom/letta/mobile/data/canvas/CanvasNotebookIdentity;Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
 }
 
