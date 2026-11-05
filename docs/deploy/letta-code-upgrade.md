@@ -52,8 +52,9 @@ if the repo's copies disagree. The host is separate: it moves only in the cutove
 
 ## 2. Android embedded runtime size (28 MiB gzip budget, not raised without approval)
 
-Stage and measure it the way CI does:
+Stage and measure it the way CI does, from the `android-compose/` directory of the checkout:
 ```bash
+cd <checkout>/android-compose
 ./gradlew :app:prepareEmbeddedLettaCodeAssets -PembedLettaCodeAssets=true
 tar -C app/build/generated/embedded-lettacode-assets/letta-code -czf /tmp/s.tgz . && stat -c %s /tmp/s.tgz
 ```
@@ -115,13 +116,19 @@ Give the App Server its own Node instead.
 6. **Run detached** (so the restart cannot kill the caller), after writing the recovery plan to the
    PM checkpoint:
    ```bash
-   install -m 0755 scripts/deploy/letta-code-host-cutover.sh /usr/local/sbin/
+   # absolute path: step 1 left the shell inside /root/letta-code-<new>
+   install -m 0755 <checkout>/scripts/deploy/letta-code-host-cutover.sh /usr/local/sbin/
    systemd-run --unit=letta-code-cutover --collect --no-block \
      /usr/local/sbin/letta-code-host-cutover.sh <old> <new> /opt/meridian/node/v<ver>/bin
    ```
-   It changes the symlink, `LETTA_CLI_PATH_REAL` and an optional service-only `PATH` line, restarts
-   once, and requires `lcp-patches applied=<N> skipped=0`, the new node as the live exe, the new
-   env in the live process and `:4500`. On any failure it restores all three and restarts.
+   It takes a lock (one cutover at a time), refuses to start unless the staged package reports
+   `<new>` and the env backup verifies, then changes the symlink, `LETTA_CLI_PATH_REAL` and an
+   optional service-only `PATH` line and restarts once. It requires a **new** boot line
+   `lcp-patches applied=<N> skipped=0` (it survives log rotation or truncation), the new node as the
+   live exe, the new env in the live process, the symlink on the new install, and the `:4500`
+   listener inside the service's cgroup. On any failure, or a TERM/INT/HUP, it restores all three
+   and restarts. If the env restore itself fails, it leaves the link and service alone and prints
+   the manual commands.
 7. **Verify from the live process**: read `/var/log/letta-code-cutover-<new>.log` for `RESULT: OK`,
    `readlink /proc/<pid>/exe` and `/proc/<pid>/environ`. Then relaunch any interrupted workers from
    their saved state.
