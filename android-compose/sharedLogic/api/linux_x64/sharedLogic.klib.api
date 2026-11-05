@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [linuxX64.hostNative, wasmJs]
+// Targets: [mingwX64.hostNative, wasmJs]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -4946,6 +4946,11 @@ abstract interface com.letta.mobile.data.plugin.catalog/PluginsPageActions { // 
     open fun setEnabled(com.letta.mobile.data.model/PluginId, kotlin/Boolean) // com.letta.mobile.data.plugin.catalog/PluginsPageActions.setEnabled|setEnabled(com.letta.mobile.data.model.PluginId;kotlin.Boolean){}[0]
     open fun setLiveViews(kotlin/Boolean) // com.letta.mobile.data.plugin.catalog/PluginsPageActions.setLiveViews|setLiveViews(kotlin.Boolean){}[0]
     open fun uploadPicked() // com.letta.mobile.data.plugin.catalog/PluginsPageActions.uploadPicked|uploadPicked(){}[0]
+}
+
+abstract interface com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings { // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings|null[0]
+    abstract fun viewBinding(com.letta.mobile.data.model.view/RuntimeViewMountId): com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding? // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings.viewBinding|viewBinding(com.letta.mobile.data.model.view.RuntimeViewMountId){}[0]
+    abstract fun viewFallback(com.letta.mobile.data.plugin.runtimeview/RuntimeViewBinding?, com.letta.mobile.data.plugin.runtimeview/RuntimeViewObject?, com.letta.mobile.data.plugin.runtimeview/RuntimeViewDescriptor?): com.letta.mobile.data.plugin.runtimeview/RuntimeViewFallback? // com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings.viewFallback|viewFallback(com.letta.mobile.data.plugin.runtimeview.RuntimeViewBinding?;com.letta.mobile.data.plugin.runtimeview.RuntimeViewObject?;com.letta.mobile.data.plugin.runtimeview.RuntimeViewDescriptor?){}[0]
 }
 
 abstract interface com.letta.mobile.data.plugin.view/PluginViewTransport { // com.letta.mobile.data.plugin.view/PluginViewTransport|null[0]
@@ -52727,7 +52732,7 @@ final class com.letta.mobile.data.plugin/PluginPageCsp { // com.letta.mobile.dat
     }
 }
 
-final class com.letta.mobile.data.plugin/PluginRegistryState { // com.letta.mobile.data.plugin/PluginRegistryState|null[0]
+final class com.letta.mobile.data.plugin/PluginRegistryState : com.letta.mobile.data.plugin.runtimeview/RuntimeViewBindings { // com.letta.mobile.data.plugin/PluginRegistryState|null[0]
     constructor <init>(kotlin.collections/List<com.letta.mobile.data.plugin/InstalledPlugin> = ...) // com.letta.mobile.data.plugin/PluginRegistryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.plugin.InstalledPlugin>){}[0]
 
     final val advertised // com.letta.mobile.data.plugin/PluginRegistryState.advertised|{}advertised[0]
@@ -73268,7 +73273,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [linuxX64.hostNative]
+// Targets: [mingwX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 
