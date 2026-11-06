@@ -20240,11 +20240,11 @@ public final class com/letta/mobile/data/desktopshell/ConversationTabCloseResult
 public final class com/letta/mobile/data/desktopshell/ConversationTabsReducer {
 	public static final field INSTANCE Lcom/letta/mobile/data/desktopshell/ConversationTabsReducer;
 	public final fun close (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabCloseResult;
-	public final fun pin (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
+	public final fun pin (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;I)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun reorder (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;I)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun retainAvailable (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/util/Set;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun select (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
-	public final fun unpin (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
+	public final fun unpin (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;IZ)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 }
 
 public final class com/letta/mobile/data/desktopshell/ConversationTabsState {

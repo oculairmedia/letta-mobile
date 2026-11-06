@@ -159,13 +159,15 @@ class ShellWorkspaceNavigator(
 
     /** Keeps the preview tab until explicitly closed or unpinned. */
     fun pinConversationTab(conversation: ConversationId) {
-        state.tabs = ConversationTabsReducer.pin(state.tabs, conversation.value)
+        state.tabs = ConversationTabsReducer.pin(state.tabs, state.tabs.openConversationIds.indexOf(conversation.value))
     }
 
     /** Makes the active tab a preview, or removes an inactive tab. */
     fun unpinConversationTab(conversation: ConversationId) {
         val displayed = chat.selectedConversation ?: state.selectedConversationId
-        state.tabs = ConversationTabsReducer.unpin(state.tabs, conversation.value, displayed?.value)
+        state.tabs = ConversationTabsReducer.unpin(
+            state.tabs, state.tabs.pinnedConversationIds.indexOf(conversation.value), conversation == displayed,
+        )
     }
 
     /** Moves [conversation]'s tab to [targetIndex]. */

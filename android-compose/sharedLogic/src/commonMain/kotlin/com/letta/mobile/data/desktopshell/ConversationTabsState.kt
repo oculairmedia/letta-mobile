@@ -17,18 +17,23 @@ object ConversationTabsReducer {
     fun select(state: ConversationTabsState, conversationId: String): ConversationTabsState =
         if (conversationId in state.pinnedConversationIds) state else state.copy(transientConversationId = conversationId)
 
-    fun pin(state: ConversationTabsState, conversationId: String): ConversationTabsState =
-        if (state.transientConversationId != conversationId) state else state.copy(
-            pinnedConversationIds = state.pinnedConversationIds + conversationId,
+    /** Keeps the preview at [tabIndex], if that position names the preview. */
+    fun pin(state: ConversationTabsState, tabIndex: Int): ConversationTabsState {
+        val preview = state.transientConversationId ?: return state
+        return if (state.openConversationIds.getOrNull(tabIndex) != preview) state else state.copy(
+            pinnedConversationIds = state.pinnedConversationIds + preview,
             transientConversationId = null,
         )
+    }
 
-    /** Unpinning the selected tab makes it the preview; any other unpinned tab closes. */
-    fun unpin(state: ConversationTabsState, conversationId: String, selectedConversationId: String?): ConversationTabsState =
-        if (conversationId !in state.pinnedConversationIds) state else state.copy(
-            pinnedConversationIds = state.pinnedConversationIds - conversationId,
-            transientConversationId = if (conversationId == selectedConversationId) conversationId else state.transientConversationId,
+    /** Unpinning the displayed tab makes it the preview; any other unpinned tab closes. */
+    fun unpin(state: ConversationTabsState, tabIndex: Int, displayed: Boolean): ConversationTabsState {
+        val conversation = state.pinnedConversationIds.getOrNull(tabIndex) ?: return state
+        return state.copy(
+            pinnedConversationIds = state.pinnedConversationIds - conversation,
+            transientConversationId = if (displayed) conversation else state.transientConversationId,
         )
+    }
 
     fun retainAvailable(
         state: ConversationTabsState,

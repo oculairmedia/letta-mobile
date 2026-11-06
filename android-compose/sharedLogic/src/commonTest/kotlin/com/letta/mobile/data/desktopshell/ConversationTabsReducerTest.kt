@@ -13,8 +13,10 @@ class ConversationTabsReducerTest {
 
     @Test
     fun `pinning keeps a tab while opening and revisiting others`() {
-        val a = ConversationTabsReducer.pin(ConversationTabsReducer.select(ConversationTabsState(), "a"), "a")
+        val a = ConversationTabsReducer.pin(ConversationTabsReducer.select(ConversationTabsState(), "a"), 0)
         val b = ConversationTabsReducer.select(a, "b")
+        assertEquals(b, ConversationTabsReducer.pin(b, 0))
+        assertEquals(b, ConversationTabsReducer.unpin(b, -1, displayed = false))
         assertEquals(listOf("a"), b.pinnedConversationIds)
         assertEquals("b", b.transientConversationId)
         assertEquals(b, ConversationTabsReducer.select(b, "a"))
@@ -30,9 +32,9 @@ class ConversationTabsReducerTest {
         assertEquals(listOf("b", "c", "a", "preview"), ConversationTabsReducer.reorder(state, "a", 3).openConversationIds)
         val kept = ConversationTabsReducer.retainAvailable(state, setOf("a", "c", "preview"), null)
         assertEquals(listOf("a", "c", "preview"), kept.openConversationIds)
-        val unpinned = ConversationTabsReducer.unpin(kept, "a", "preview")
+        val unpinned = ConversationTabsReducer.unpin(kept, 0, displayed = false)
         assertEquals(listOf("c", "preview"), unpinned.openConversationIds)
-        val selected = ConversationTabsReducer.unpin(unpinned, "c", "c")
+        val selected = ConversationTabsReducer.unpin(unpinned, 0, displayed = true)
         assertEquals(listOf("c"), selected.openConversationIds)
         assertEquals("c", selected.transientConversationId)
         assertEquals(selected, ConversationTabsReducer.reorder(selected, "c", 0))

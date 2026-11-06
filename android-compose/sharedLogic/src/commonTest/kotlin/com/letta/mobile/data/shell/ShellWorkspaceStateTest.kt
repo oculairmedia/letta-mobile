@@ -94,7 +94,7 @@ class ShellWorkspaceStateTest {
     fun partialCatalogPrunesOnlyCompletedAgentsAndKeepsOtherMemories() {
         val state = ShellWorkspaceState(ShellDestination.Chat())
         state.conversationShown(cOld, a1)
-        state.tabs = com.letta.mobile.data.desktopshell.ConversationTabsReducer.pin(state.tabs, cOld.value)
+        state.tabs = com.letta.mobile.data.desktopshell.ConversationTabsReducer.pin(state.tabs, 0)
         state.conversationShown(cOther, a2)
         state.conversationShown(null, null)
         state.conversationsReported(mapOf(cNew to a1), emptySet())
