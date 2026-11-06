@@ -268,8 +268,7 @@ class SettingsStoreHomePinStore(
     val binding = DevicePins.bind(store, source)
     init {
         val keys = setOf(DEFAULT_STORAGE_KEY, "desktop.home.pinnedItems", storageKey)
-        binding.store.importLegacy(LegacyPinSources.secure(store, keys))
-        binding.store.seedHomeDefaults(defaults)
+        if (binding.store.tryImportLegacy(LegacyPinSources.secure(store, keys))) binding.store.seedHomeDefaults(defaults)
     }
     override val pinnedKeys: StateFlow<List<String>> = DerivedStateFlow(
         binding.references.map { refs -> homeKeys(refs) }, { homeKeys(binding.references.value) },

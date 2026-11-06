@@ -37019,14 +37019,17 @@ public final class com/letta/mobile/data/pins/DevicePinStore {
 	public static final field STORAGE_KEY Ljava/lang/String;
 	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;)V
 	public final fun facets (Lcom/letta/mobile/data/pins/ScopedObjectRef;)Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public final fun getAvailability ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getHasReadableState ()Z
 	public final fun getJournal ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun importLegacy (Ljava/util/List;Lkotlin/jvm/functions/Function2;)V
 	public static synthetic fun importLegacy$default (Lcom/letta/mobile/data/pins/DevicePinStore;Ljava/util/List;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
-	public final fun reload ()V
+	public final fun reload ()Z
 	public final fun reorder (Ljava/util/List;)V
 	public final fun resolvePending (Lkotlin/jvm/functions/Function2;)V
-	public final fun seedHomeDefaults (Ljava/util/List;)V
+	public final fun seedHomeDefaults (Ljava/util/List;)Z
 	public final fun setPinned (Lcom/letta/mobile/data/pins/ScopedObjectRef;Z)V
+	public final fun tryImportLegacy (Ljava/util/List;)Z
 }
 
 public final class com/letta/mobile/data/pins/DevicePinStore$Companion {
@@ -37055,8 +37058,8 @@ public final class com/letta/mobile/data/pins/LegacyPinSources {
 
 public final class com/letta/mobile/data/pins/PinImportRecord {
 	public static final field Companion Lcom/letta/mobile/data/pins/PinImportRecord$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/util/List;
@@ -37064,8 +37067,9 @@ public final class com/letta/mobile/data/pins/PinImportRecord {
 	public final fun component5 ()Z
 	public final fun component6 ()Z
 	public final fun component7 ()Ljava/util/Map;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;)Lcom/letta/mobile/data/pins/PinImportRecord;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/PinImportRecord;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/PinImportRecord;
+	public final fun component8 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;)Lcom/letta/mobile/data/pins/PinImportRecord;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/PinImportRecord;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/PinImportRecord;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCaptured ()Z
 	public final fun getComplete ()Z
@@ -37074,6 +37078,7 @@ public final class com/letta/mobile/data/pins/PinImportRecord {
 	public final fun getKey ()Ljava/lang/String;
 	public final fun getRaw ()Ljava/lang/String;
 	public final fun getResolved ()Ljava/util/Map;
+	public final fun getSnapshots ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -37090,6 +37095,38 @@ public final synthetic class com/letta/mobile/data/pins/PinImportRecord$$seriali
 }
 
 public final class com/letta/mobile/data/pins/PinImportRecord$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinImportSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/pins/PinImportSnapshot$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/pins/PinImportSnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/PinImportSnapshot;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/PinImportSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getError ()Ljava/lang/String;
+	public final fun getRaw ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/pins/PinImportSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/PinImportSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/pins/PinImportSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/pins/PinImportSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinImportSnapshot$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 

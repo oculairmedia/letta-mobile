@@ -112,7 +112,7 @@ class SettingsStoreProjectPinStore(
 ) : ProjectPinStore {
     val binding = DevicePins.bind(store, source)
     init {
-        binding.store.importLegacy(LegacyPinSources.secure(store, setOf(DEFAULT_STORAGE_KEY, storageKey)))
+        binding.store.tryImportLegacy(LegacyPinSources.secure(store, setOf(DEFAULT_STORAGE_KEY, storageKey)))
     }
     override val pinned: Flow<Set<ProjectKey>> = binding.ids("project").map { ids -> ids.mapTo(mutableSetOf(), ::ProjectKey) }
 

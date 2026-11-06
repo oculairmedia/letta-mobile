@@ -74,6 +74,7 @@ fun ProvideObjectVerbs(
 ) {
     val refs = pins?.references?.collectAsState()?.value
     val source = pins?.source?.collectAsState()?.value
-    val menus = remember(pins, refs, source, onOutcome) { pins?.let { objectVerbMenus(it, onOutcome) } }
+    val available = pins?.store?.availability?.collectAsState()?.value
+    val menus = remember(pins, refs, source, available, onOutcome) { pins?.let { objectVerbMenus(it, onOutcome) } }
     CompositionLocalProvider(LocalObjectVerbs provides menus, content = content)
 }

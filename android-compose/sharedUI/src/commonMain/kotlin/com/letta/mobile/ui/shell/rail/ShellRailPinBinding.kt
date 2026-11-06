@@ -14,7 +14,8 @@ fun rememberPinnedRailState(state: ShellLibraryRailState, pins: PinBinding?): Sh
     if (pins == null) return state
     val refs = pins.references.collectAsState().value
     val source = pins.source.collectAsState().value
-    return remember(state, pins, refs, source) {
+    val available = pins.store.availability.collectAsState().value
+    return remember(state, pins, refs, source, available) {
         val registry = pins.registry
         val facets = state.agents.associate { (id, _) ->
             id to (registry.describe(ObjectRef("agent", id), VerbContext("rail"))?.facets ?: ObjectFacets())

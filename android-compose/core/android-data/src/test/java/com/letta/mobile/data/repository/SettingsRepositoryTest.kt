@@ -41,6 +41,30 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `settings Home and conversation adapters share scoped confirmed pins`() = runTest {
+        val storage = InMemorySecureSettingsStore()
+        val settings = SettingsRepository(createTestPreferencesDataStore(), storage)
+        val config = LettaConfig(id = "pins", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://pins.invalid")
+        settings.saveConfig(config)
+        val namespace = com.letta.mobile.data.session.remoteLettaBackendDescriptor(
+            config, com.letta.mobile.data.session.ANDROID_REMOTE_LETTA_ID_PREFIX,
+        ).backendId.value
+        val source = kotlinx.coroutines.flow.MutableStateFlow<String?>(namespace)
+        val home = com.letta.mobile.data.home.SettingsStoreHomePinStore(storage, emptyList(), source = source)
+        settings.setAgentPinned("alpha", true)
+        assertEquals(listOf("agent:alpha"), home.pinnedKeys.value)
+        assertEquals(listOf("alpha"), settings.getPinnedAgentOrder().first())
+        home.setPinned("agent:alpha", false)
+        assertEquals(emptyList<String>(), settings.getPinnedAgentOrder().first())
+        settings.setConversationPinned("chat", true)
+        val conversations = com.letta.mobile.data.chat.runtime.PinnedConversations(storage, source = source)
+        assertEquals(setOf("chat"), conversations.pinned.value)
+        conversations.inherit("chat", "fork")
+        assertEquals(setOf("chat", "fork"), settings.getPinnedConversationIds().first())
+        assertTrue(home.binding.store.journal.value.imports.none { it.key == "desktop.conversations.pinned" && it.complete })
+    }
+
+    @Test
     fun `initial state has empty configs`() {
         assertTrue(repository.configs.value.isEmpty())
     }

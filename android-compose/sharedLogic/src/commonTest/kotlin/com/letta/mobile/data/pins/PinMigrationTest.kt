@@ -14,6 +14,78 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class PinMigrationTest {
     @Test
+    fun incompleteSnapshotRereadsItsSourceAndRetainsNewPinsBeforeCheckpointing() {
+        val backing = InterruptingStore()
+        backing.putString("home.pinnedItems", "agent:a")
+        var reads = 0
+        val actual = LegacyPinSources.secure(backing, setOf("home.pinnedItems")).single()
+        val source = LegacyPinSource(actual.key, { reads++; actual.read() }, actual.decode)
+        val first = DevicePinStore(backing)
+        backing.failOnWrite = 2
+        assertFailsWith<IllegalStateException> { first.importLegacy(listOf(source), ::owner) }
+        backing.putString("home.pinnedItems", "agent:a\nagent:b")
+        backing.failOnWrite = null
+        val resumed = DevicePinStore(backing)
+        resumed.importLegacy(listOf(source), ::owner)
+        assertEquals(listOf(ref("agent", "a"), ref("agent", "b")), resumed.journal.value.pins)
+        assertEquals(2, reads)
+        val imported = resumed.journal.value.imports.single { it.key == actual.key }
+        assertEquals("agent:a\nagent:b", imported.raw)
+        assertEquals(listOf("agent:a", "agent:a\nagent:b"), imported.snapshots.map { it.raw })
+        resumed.setPinned(ref("agent", "a"), false)
+        resumed.importLegacy(listOf(source), ::owner)
+        assertEquals(2, reads, "a completed source must not be reread after cutover")
+        assertEquals(listOf(ref("agent", "b")), resumed.journal.value.pins)
+    }
+
+    @Test
+    fun legacyParsingPreservesOpaqueHomeAndProjectIdsAndUsesConversationTrimRules() {
+        val raw = mapOf(
+            "home.pinnedItems" to "agent:with space \n shortcut:TOOLS\nshortcut:TOOLS ",
+            "projects.pinned" to " project key ",
+            "conversations.pinned" to " chat ",
+        )
+        val parsed = LegacyPinSources.secure(InMemorySecureSettingsStore(raw), raw.keys)
+            .associate { it.key to it.decode(checkNotNull(raw[it.key])) }
+        assertEquals(listOf("agent:with space ", " shortcut:TOOLS", "shortcut:TOOLS "), parsed["home.pinnedItems"])
+        assertEquals(listOf("project: project key "), parsed["projects.pinned"])
+        assertEquals(listOf("conversation:chat"), parsed["conversations.pinned"])
+    }
+
+    @Test
+    fun unreadableCanonicalJournalKeepsTheWorkspaceAvailableWithoutTreatingTheReadAsEmpty() {
+        val backing = FailableSettings(readFails = true)
+        val created = runCatching { SettingsStoreHomePinStore(backing, emptyList()) }
+        assertTrue(created.isSuccess, "a failed pin backing must not prevent the workspace from opening")
+        val pins = created.getOrThrow().binding
+        assertEquals(null, pins.registry.describe(
+            ObjectRef("shortcut", "TOOLS"), com.letta.mobile.data.objectverbs.VerbContext("home-tile"),
+        ))
+        assertEquals(0, backing.writes)
+        assertEquals("shortcut:TOOLS", backing.values["home.pinnedItems"])
+        assertFalse(pins.store.journal.value.imports.any { it.complete })
+        backing.readFails = false
+        val reopened = SettingsStoreHomePinStore(backing, emptyList())
+        assertEquals(listOf("shortcut:TOOLS"), reopened.pinnedKeys.value)
+    }
+
+    @Test
+    fun failedSnapshotWriteKeepsLegacyPinsAndLeavesAnUnavailableProvider() {
+        val backing = FailableSettings(writeFails = true)
+        val created = runCatching { SettingsStoreHomePinStore(backing, emptyList()) }
+        assertTrue(created.isSuccess, "a failed snapshot write must not prevent the workspace from opening")
+        assertEquals("shortcut:TOOLS", backing.values["home.pinnedItems"])
+        assertEquals(null, backing.values[DevicePinStore.STORAGE_KEY])
+        val pins = created.getOrThrow().binding
+        assertFalse(pins.store.journal.value.imports.any { it.complete })
+        assertEquals("disabled", pins.registry.describe(
+            ObjectRef("shortcut", "TOOLS"), com.letta.mobile.data.objectverbs.VerbContext("home-tile"),
+        )?.verbs?.single()?.availability?.state)
+        backing.writeFails = false
+        assertEquals(listOf("shortcut:TOOLS"), SettingsStoreHomePinStore(backing, emptyList()).pinnedKeys.value)
+    }
+
+    @Test
     fun importsBothHomeBackingsWithoutLosingMembershipOrOrder() {
         val storage = InMemorySecureSettingsStore(mapOf(
             "desktop.home.pinnedItems" to "shortcut:TOOLS\nshortcut:AGENTS",
@@ -80,14 +152,24 @@ class PinMigrationTest {
     fun failedReadAndCorruptDecodeAreNeverEmptyOrCompletedAndCanRetry() {
         val backing = InMemorySecureSettingsStore()
         val store = DevicePinStore(backing)
-        val failed = LegacyPinSource("pinned_items_order", { error("unavailable") }) { emptyList() }
-        val corrupt = LegacyPinSource("home.pinnedItems", { "corrupt" }) { error("bad encoding") }
+        val home = LegacyPinSources.secure(
+            InMemorySecureSettingsStore(mapOf("desktop.home.pinnedItems" to "agent:restored")),
+            setOf("desktop.home.pinnedItems"),
+        ).single()
+        val failed = LegacyPinSource(home.key, { error("unavailable") }, home.decode)
+        val snapshot = object : com.letta.mobile.data.storage.SettingsPreferencesSnapshot {
+            override fun getString(key: String): String? = "corrupt"
+            override fun getStringSet(key: String): Set<String>? = null
+            override fun getBoolean(key: String): Boolean? = null
+            override fun getFloat(key: String): Float? = null
+        }
+        val corrupt = LegacyPinSources.settings(snapshot).first()
         store.importLegacy(listOf(failed, corrupt))
         val records = store.journal.value.imports
         assertFalse(records.single { it.key == failed.key }.complete)
         assertFalse(records.single { it.key == corrupt.key }.complete)
         assertEquals("corrupt", records.single { it.key == corrupt.key }.raw)
-        store.importLegacy(listOf(LegacyPinSource(failed.key, { "ok" }) { listOf("agent:restored") }), ::owner)
+        store.importLegacy(listOf(home), ::owner)
         assertEquals(listOf(ref("agent", "restored")), store.journal.value.pins)
         assertFalse(store.journal.value.imports.single { it.key == "desktop.conversations.pinned" }.complete)
     }
@@ -95,7 +177,13 @@ class PinMigrationTest {
     @Test
     fun crashAfterUnionBeforeCheckpointResumesWithoutDuplicatesAndUnpinCannotResurrect() {
         val backing = InterruptingStore()
-        val sources = listOf(LegacyPinSource("pinned_items_order", { "saved" }) { listOf("agent:b", "agent:a") })
+        val snapshot = object : com.letta.mobile.data.storage.SettingsPreferencesSnapshot {
+            override fun getString(key: String): String? = "[\"agent:b\",\"agent:a\"]"
+            override fun getStringSet(key: String): Set<String>? = null
+            override fun getBoolean(key: String): Boolean? = null
+            override fun getFloat(key: String): Float? = null
+        }
+        val sources = listOf(LegacyPinSources.settings(snapshot).first())
         val interrupted = DevicePinStore(backing)
         backing.failOnWrite = 3
         assertFailsWith<IllegalStateException> { interrupted.importLegacy(sources, ::owner) }
@@ -141,6 +229,22 @@ class PinMigrationTest {
         ?.takeUnless { it.kind == "shortcut" }?.let { ScopedObjectRef("backend", it) }
 
     private fun ref(kind: String, id: String, source: String = "backend") = ScopedObjectRef(source, ObjectRef(kind, id))
+
+    private class FailableSettings(var readFails: Boolean = false, var writeFails: Boolean = false) : SecureSettingsStore {
+        val values = mutableMapOf("home.pinnedItems" to "shortcut:TOOLS")
+        var writes = 0
+        override fun getString(key: String, defaultValue: String?): String? {
+            check(!readFails || key != DevicePinStore.STORAGE_KEY) { "read unavailable" }
+            return values[key] ?: defaultValue
+        }
+        override fun putString(key: String, value: String) {
+            check(!writeFails) { "write unavailable" }
+            writes++
+            values[key] = value
+        }
+        override fun remove(key: String) { values.remove(key) }
+        override fun clear() { values.clear() }
+    }
 
     private class InterruptingStore : SecureSettingsStore by InMemorySecureSettingsStore() {
         var writes = 0

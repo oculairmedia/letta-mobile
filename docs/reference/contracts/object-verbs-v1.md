@@ -21,7 +21,7 @@ bound source. It never identifies a row, tab, view implementation or mount.
 | `canvas` | `CanvasId` | its `value`, unwrapped at this boundary only |
 | `shortcut` | `HomeShortcut` | existing stable `name`, such as `TOOLS` |
 
-The typed factories in [ObjectRef.kt](../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/objectverbs/ObjectRef.kt)
+The typed companion extensions in [ObjectRefs.kt](../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/objectverbs/refs/ObjectRefs.kt)
 reuse these types. Agent/conversation/project wrappers live in
 [DomainIds.kt](../../../android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt);
 [CanvasIds.kt](../../../android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/CanvasIds.kt)

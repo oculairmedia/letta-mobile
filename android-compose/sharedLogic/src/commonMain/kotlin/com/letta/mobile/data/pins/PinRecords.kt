@@ -13,6 +13,10 @@ data class ScopedObjectRef(val source: String, val objectRef: ObjectRef) {
     }
 }
 
+/** Every distinct read/decode attempt is retained until the source's import is verified. */
+@Serializable
+data class PinImportSnapshot(val raw: String?, val entries: List<String> = emptyList(), val error: String? = null)
+
 /** Recoverable raw snapshot and parse result for one legacy backing; null raw means absent. */
 @Serializable
 data class PinImportRecord(
@@ -23,6 +27,7 @@ data class PinImportRecord(
     val captured: Boolean = false,
     val complete: Boolean = false,
     val resolved: Map<String, ScopedObjectRef> = emptyMap(),
+    val snapshots: List<PinImportSnapshot> = emptyList(),
 )
 
 /** One durable journal contains membership, explicit-unpin tombstones, snapshots and checkpoints. */

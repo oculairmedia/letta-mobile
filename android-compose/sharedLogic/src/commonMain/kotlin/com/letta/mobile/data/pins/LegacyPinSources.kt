@@ -22,9 +22,10 @@ object LegacyPinSources {
     /** Only the supplied secure backings are readable here. Android must never checkpoint desktop keys. */
     fun secure(store: SecureSettingsStore, available: Set<String>): List<LegacyPinSource> = keys.filter { it in available }.map { key ->
         LegacyPinSource(key, { store.getString(key) }) { raw ->
-            raw.split('\n').map(String::trim).filter(String::isNotEmpty).let { entries ->
+            raw.split('\n').filter(String::isNotBlank).let { entries ->
                 when (key) {
-                    "desktop.conversations.pinned", "conversations.pinned" -> entries.sorted().map { "conversation:$it" }
+                    "desktop.conversations.pinned", "conversations.pinned" ->
+                        entries.map(String::trim).filter(String::isNotEmpty).sorted().map { "conversation:$it" }
                     "projects.pinned", "desktop.projects.pinned" -> entries.sorted().map { "project:$it" }
                     else -> entries
                 }

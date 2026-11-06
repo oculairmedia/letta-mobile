@@ -51512,16 +51512,21 @@ final class com.letta.mobile.data.pairing/SettingsPairedHostStore : com.letta.mo
 final class com.letta.mobile.data.pins/DevicePinStore { // com.letta.mobile.data.pins/DevicePinStore|null[0]
     constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore) // com.letta.mobile.data.pins/DevicePinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
 
+    final val availability // com.letta.mobile.data.pins/DevicePinStore.availability|{}availability[0]
+        final fun <get-availability>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.pins/DevicePinStore.availability.<get-availability>|<get-availability>(){}[0]
+    final val hasReadableState // com.letta.mobile.data.pins/DevicePinStore.hasReadableState|{}hasReadableState[0]
+        final fun <get-hasReadableState>(): kotlin/Boolean // com.letta.mobile.data.pins/DevicePinStore.hasReadableState.<get-hasReadableState>|<get-hasReadableState>(){}[0]
     final val journal // com.letta.mobile.data.pins/DevicePinStore.journal|{}journal[0]
         final fun <get-journal>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.pins/PinJournal> // com.letta.mobile.data.pins/DevicePinStore.journal.<get-journal>|<get-journal>(){}[0]
 
     final fun facets(com.letta.mobile.data.pins/ScopedObjectRef): com.letta.mobile.data.objectverbs/ObjectFacets // com.letta.mobile.data.pins/DevicePinStore.facets|facets(com.letta.mobile.data.pins.ScopedObjectRef){}[0]
     final fun importLegacy(kotlin.collections/List<com.letta.mobile.data.pins/LegacyPinSource>, kotlin/Function2<kotlin/String, kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef?> = ...) // com.letta.mobile.data.pins/DevicePinStore.importLegacy|importLegacy(kotlin.collections.List<com.letta.mobile.data.pins.LegacyPinSource>;kotlin.Function2<kotlin.String,kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef?>){}[0]
-    final fun reload() // com.letta.mobile.data.pins/DevicePinStore.reload|reload(){}[0]
+    final fun reload(): kotlin/Boolean // com.letta.mobile.data.pins/DevicePinStore.reload|reload(){}[0]
     final fun reorder(kotlin.collections/List<com.letta.mobile.data.pins/ScopedObjectRef>) // com.letta.mobile.data.pins/DevicePinStore.reorder|reorder(kotlin.collections.List<com.letta.mobile.data.pins.ScopedObjectRef>){}[0]
     final fun resolvePending(kotlin/Function2<kotlin/String, kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef?>) // com.letta.mobile.data.pins/DevicePinStore.resolvePending|resolvePending(kotlin.Function2<kotlin.String,kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef?>){}[0]
-    final fun seedHomeDefaults(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.pins/DevicePinStore.seedHomeDefaults|seedHomeDefaults(kotlin.collections.List<kotlin.String>){}[0]
+    final fun seedHomeDefaults(kotlin.collections/List<kotlin/String>): kotlin/Boolean // com.letta.mobile.data.pins/DevicePinStore.seedHomeDefaults|seedHomeDefaults(kotlin.collections.List<kotlin.String>){}[0]
     final fun setPinned(com.letta.mobile.data.pins/ScopedObjectRef, kotlin/Boolean) // com.letta.mobile.data.pins/DevicePinStore.setPinned|setPinned(com.letta.mobile.data.pins.ScopedObjectRef;kotlin.Boolean){}[0]
+    final fun tryImportLegacy(kotlin.collections/List<com.letta.mobile.data.pins/LegacyPinSource>): kotlin/Boolean // com.letta.mobile.data.pins/DevicePinStore.tryImportLegacy|tryImportLegacy(kotlin.collections.List<com.letta.mobile.data.pins.LegacyPinSource>){}[0]
 
     final object Companion { // com.letta.mobile.data.pins/DevicePinStore.Companion|null[0]
         final const val STORAGE_KEY // com.letta.mobile.data.pins/DevicePinStore.Companion.STORAGE_KEY|{}STORAGE_KEY[0]
@@ -51541,7 +51546,7 @@ final class com.letta.mobile.data.pins/LegacyPinSource { // com.letta.mobile.dat
 }
 
 final class com.letta.mobile.data.pins/PinImportRecord { // com.letta.mobile.data.pins/PinImportRecord|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> = ...) // com.letta.mobile.data.pins/PinImportRecord.<init>|<init>(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef>){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> = ..., kotlin.collections/List<com.letta.mobile.data.pins/PinImportSnapshot> = ...) // com.letta.mobile.data.pins/PinImportRecord.<init>|<init>(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef>;kotlin.collections.List<com.letta.mobile.data.pins.PinImportSnapshot>){}[0]
 
     final val captured // com.letta.mobile.data.pins/PinImportRecord.captured|{}captured[0]
         final fun <get-captured>(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.captured.<get-captured>|<get-captured>(){}[0]
@@ -51557,6 +51562,8 @@ final class com.letta.mobile.data.pins/PinImportRecord { // com.letta.mobile.dat
         final fun <get-raw>(): kotlin/String? // com.letta.mobile.data.pins/PinImportRecord.raw.<get-raw>|<get-raw>(){}[0]
     final val resolved // com.letta.mobile.data.pins/PinImportRecord.resolved|{}resolved[0]
         final fun <get-resolved>(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinImportRecord.resolved.<get-resolved>|<get-resolved>(){}[0]
+    final val snapshots // com.letta.mobile.data.pins/PinImportRecord.snapshots|{}snapshots[0]
+        final fun <get-snapshots>(): kotlin.collections/List<com.letta.mobile.data.pins/PinImportSnapshot> // com.letta.mobile.data.pins/PinImportRecord.snapshots.<get-snapshots>|<get-snapshots>(){}[0]
 
     final fun component1(): kotlin/String // com.letta.mobile.data.pins/PinImportRecord.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.pins/PinImportRecord.component2|component2(){}[0]
@@ -51565,7 +51572,8 @@ final class com.letta.mobile.data.pins/PinImportRecord { // com.letta.mobile.dat
     final fun component5(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.component5|component5(){}[0]
     final fun component6(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.component6|component6(){}[0]
     final fun component7(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinImportRecord.component7|component7(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> = ...): com.letta.mobile.data.pins/PinImportRecord // com.letta.mobile.data.pins/PinImportRecord.copy|copy(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef>){}[0]
+    final fun component8(): kotlin.collections/List<com.letta.mobile.data.pins/PinImportSnapshot> // com.letta.mobile.data.pins/PinImportRecord.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> = ..., kotlin.collections/List<com.letta.mobile.data.pins/PinImportSnapshot> = ...): com.letta.mobile.data.pins/PinImportRecord // com.letta.mobile.data.pins/PinImportRecord.copy|copy(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef>;kotlin.collections.List<com.letta.mobile.data.pins.PinImportSnapshot>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins/PinImportRecord.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.pins/PinImportRecord.toString|toString(){}[0]
@@ -51583,6 +51591,40 @@ final class com.letta.mobile.data.pins/PinImportRecord { // com.letta.mobile.dat
         final val $childSerializers // com.letta.mobile.data.pins/PinImportRecord.Companion.$childSerializers|{}$childSerializers[0]
 
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.pins/PinImportRecord> // com.letta.mobile.data.pins/PinImportRecord.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.pins/PinImportSnapshot { // com.letta.mobile.data.pins/PinImportSnapshot|null[0]
+    constructor <init>(kotlin/String?, kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...) // com.letta.mobile.data.pins/PinImportSnapshot.<init>|<init>(kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
+
+    final val entries // com.letta.mobile.data.pins/PinImportSnapshot.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.pins/PinImportSnapshot.entries.<get-entries>|<get-entries>(){}[0]
+    final val error // com.letta.mobile.data.pins/PinImportSnapshot.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.pins/PinImportSnapshot.error.<get-error>|<get-error>(){}[0]
+    final val raw // com.letta.mobile.data.pins/PinImportSnapshot.raw|{}raw[0]
+        final fun <get-raw>(): kotlin/String? // com.letta.mobile.data.pins/PinImportSnapshot.raw.<get-raw>|<get-raw>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.pins/PinImportSnapshot.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.pins/PinImportSnapshot.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.pins/PinImportSnapshot.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...): com.letta.mobile.data.pins/PinImportSnapshot // com.letta.mobile.data.pins/PinImportSnapshot.copy|copy(kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins/PinImportSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins/PinImportSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.pins/PinImportSnapshot.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.pins/PinImportSnapshot> { // com.letta.mobile.data.pins/PinImportSnapshot.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.pins/PinImportSnapshot.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.pins/PinImportSnapshot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.pins/PinImportSnapshot.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.pins/PinImportSnapshot // com.letta.mobile.data.pins/PinImportSnapshot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.pins/PinImportSnapshot) // com.letta.mobile.data.pins/PinImportSnapshot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.pins.PinImportSnapshot){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.pins/PinImportSnapshot.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.pins/PinImportSnapshot.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.pins/PinImportSnapshot> // com.letta.mobile.data.pins/PinImportSnapshot.Companion.serializer|serializer(){}[0]
     }
 }
 

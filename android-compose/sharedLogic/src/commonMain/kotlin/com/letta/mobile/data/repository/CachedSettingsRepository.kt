@@ -243,7 +243,7 @@ open class CachedSettingsRepository(
 
     private suspend fun importPins() {
         val snapshot = preferencesStore.snapshots.first()
-        objectPins.store.importLegacy(LegacyPinSources.settings(snapshot))
+        objectPins.store.tryImportLegacy(LegacyPinSources.settings(snapshot))
     }
 
     private fun pinnedIds(kind: String): Flow<List<String>> = flow {

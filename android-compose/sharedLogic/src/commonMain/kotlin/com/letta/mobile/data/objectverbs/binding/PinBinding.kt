@@ -60,13 +60,11 @@ object DevicePins {
     private val owners = mutableMapOf<SecureSettingsStore, DevicePinStore>()
 
     fun store(backing: SecureSettingsStore): DevicePinStore = synchronized(lock) {
-        owners.getOrPut(backing) {
-            DevicePinStore(backing).also { pins ->
-                pins.importLegacy(LegacyPinSources.secure(backing, setOf(
+        owners.getOrPut(backing) { DevicePinStore(backing) }.also { pins ->
+                pins.tryImportLegacy(LegacyPinSources.secure(backing, setOf(
                     LegacyPinSources.HOME_PRODUCTION, LegacyPinSources.HOME_DEFAULT,
                     "conversations.pinned", "projects.pinned", "desktop.projects.pinned",
                 )))
-            }
         }
     }
 

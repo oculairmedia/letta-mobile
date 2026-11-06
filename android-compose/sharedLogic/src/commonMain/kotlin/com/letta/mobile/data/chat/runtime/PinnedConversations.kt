@@ -26,7 +26,7 @@ class PinnedConversations(
     val binding = DevicePins.bind(store, source)
     init {
         val available = if (key == DEFAULT_KEY) setOf(DEFAULT_KEY) else setOf(DEFAULT_KEY, key)
-        binding.store.importLegacy(LegacyPinSources.secure(store, available))
+        binding.store.tryImportLegacy(LegacyPinSources.secure(store, available))
     }
     val pinned: StateFlow<Set<String>> = DerivedStateFlow(
         binding.ids("conversation").map { it.toSet() }, { binding.ids("conversation").value.toSet() },

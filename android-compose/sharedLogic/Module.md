@@ -709,7 +709,7 @@ Session bindings project the one device pin journal into canonical references, f
 
 # Package com.letta.mobile.data.pins
 
-Device-local scoped pin membership/order, explicit-unpin tombstones and recoverable legacy import journal. Snapshot every available backing before union, retain raw/opaque entries and read/decode failures, verify persisted state before per-source checkpoints, and resume idempotently. Only trusted ownership evidence may resolve pending domain entries; active backend alone is never evidence.
+Device-local scoped pin membership/order, explicit-unpin tombstones and recoverable legacy import journal. Snapshot every available backing before union, retain raw/opaque entries and read/decode failures, verify persisted state before per-source checkpoints, and resume idempotently. Unfinished sources are reread with every distinct raw/parse snapshot retained; completed sources are never reread. Initialization failures preserve legacy data and expose unavailable or disabled pin actions while allowing the host to open. Only trusted ownership evidence may resolve pending domain entries; active backend alone is never evidence.
 
 # Package com.letta.mobile.data.objectverbs.refs
 
