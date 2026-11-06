@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell.rail
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +28,8 @@ class ShellAgentLibraryTest {
     @Test
     fun pinOrderFacetsWinOverRecencyAndSharedNamesAndFollowReorder() {
         val pins = com.letta.mobile.data.objectverbs.binding.DevicePins.bind(
-            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), kotlinx.coroutines.flow.MutableStateFlow("backend"),
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore().withDevicePins(),
+            kotlinx.coroutines.flow.MutableStateFlow("backend"),
         )
         val a = com.letta.mobile.data.objectverbs.ObjectRef("agent", "a")
         val b = com.letta.mobile.data.objectverbs.ObjectRef("agent", "b")
@@ -48,7 +51,7 @@ class ShellAgentLibraryTest {
 
     @Test
     fun aPersistedPinKeepsItsSlotWhileTenNewerAgentsBecomeActive() {
-        val backing = com.letta.mobile.data.storage.InMemorySecureSettingsStore()
+        val backing = com.letta.mobile.data.storage.InMemorySecureSettingsStore().withDevicePins()
         val source = kotlinx.coroutines.flow.MutableStateFlow<String?>("backend")
         val original = com.letta.mobile.data.objectverbs.binding.DevicePins.bind(backing, source)
         original.setPinned(com.letta.mobile.data.objectverbs.ObjectRef("agent", "anchor"), true)

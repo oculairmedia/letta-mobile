@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.ui.components.ProvideObjectVerbs
 
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -107,7 +109,7 @@ class ShellLongPressMenuTest {
     @Test
     fun longPressingAnAgentOrbOffersItsMenu() = runComposeUiTest {
         val events = mutableListOf<String>()
-        val pins = DevicePins.bind(InMemorySecureSettingsStore(), MutableStateFlow("fixture"))
+        val pins = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
         pins.setPinned(ObjectRef("agent", "a1"), true)
         val entries = ShellRailMapping.entries(
             ShellRailMapping.groups(listOf("a1" to "Alpha"), selectedAgentId = null),

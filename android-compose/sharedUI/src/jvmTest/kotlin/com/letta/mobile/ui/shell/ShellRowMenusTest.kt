@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.ui.components.objectVerbMenus
 import com.letta.mobile.ui.components.items
 
@@ -58,7 +60,7 @@ class ShellRowMenusTest {
     fun aConversationOffersRenameAndPinWhenTheHostDoes() {
         // letta-mobile-bzvro.17
         val events = mutableListOf<String>()
-        val binding = DevicePins.bind(InMemorySecureSettingsStore(), MutableStateFlow("fixture"))
+        val binding = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
         val ref = ObjectRef("conversation", "chat-1")
         val verbs = objectVerbMenus(binding) { outcome, _ -> if (outcome is VerbOutcome.Updated) events += "pin" }
         val manage = ShellConversationManageMenu(
@@ -120,7 +122,7 @@ class ShellRowMenusTest {
         assertEquals(listOf("Open"), ShellRowMenus.agent(entry, ShellAgentRailActions()).map { it.label })
 
         val events = mutableListOf<String>()
-        val binding = DevicePins.bind(InMemorySecureSettingsStore(), MutableStateFlow("fixture"))
+        val binding = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
         val verbs = objectVerbMenus(binding) { outcome, _ ->
             if (outcome is VerbOutcome.Updated) events += "pin:${outcome.snapshot.objectRef.id}:${outcome.snapshot.facets.pinned}"
         }

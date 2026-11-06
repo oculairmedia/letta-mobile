@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasRelayClient
 import com.letta.mobile.data.canvas.CanvasRelayDial
 import com.letta.mobile.data.canvas.KeyValueCanvasStorage
 import com.letta.mobile.data.chat.display.OpenChatsOnCanvas
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.KeyValueStore
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
@@ -31,9 +32,11 @@ internal class WebChatCanvas(
  * ([canvases]). Everything above this is the shared code desktop runs over its own files.
  */
 internal class WebStorage(
-    val settings: SecureSettingsStore = LocalStorageSettingsStore(),
+    settings: SecureSettingsStore = LocalStorageSettingsStore(),
     documents: KeyValueStore = IndexedDbKeyValueStore(),
 ) {
+    val settings: SecureSettingsStore = settings.withDevicePins()
+
     /** The boards and their op log, the stores the shared canvas session and relay take. */
     val canvases: KeyValueCanvasStorage = KeyValueCanvasStorage(documents)
 

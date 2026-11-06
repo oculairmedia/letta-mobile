@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
@@ -134,6 +136,6 @@ class TimelineConversationsIrohTest {
         backgroundScope,
         host.chatGateway(backgroundScope),
         roster.map { Agent(id = AgentId(it), name = it) },
-        ConversationManagementPrefs.from(MapSettingsStore(), MutableStateFlow("fixture")),
+        ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture")),
     )
 }

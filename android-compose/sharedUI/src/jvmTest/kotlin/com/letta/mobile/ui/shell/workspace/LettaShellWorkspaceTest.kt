@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -304,7 +306,8 @@ class LettaShellWorkspaceTest {
     fun thePillOpensTheDrawerOnTapAndPinsOnLongPress() = runComposeUiTest {
         val drawer = ShellWorkspaceDrawer()
         val binding = com.letta.mobile.data.objectverbs.binding.DevicePins.bind(
-            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), kotlinx.coroutines.flow.MutableStateFlow("fixture"),
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore().withDevicePins(),
+            kotlinx.coroutines.flow.MutableStateFlow("fixture"),
         )
         setContent {
             LettaShellWorkspace(workspaceState(), workspaceHost(drawer = drawer, objectPins = binding), sized(400.dp))
@@ -322,7 +325,8 @@ class LettaShellWorkspaceTest {
         val pinned = Navigation.copy(rail = Navigation.rail.copy(focus = Navigation.rail.focus.copy(pinnedAgentIds = setOf("agent-a"))))
         val pins = mutableListOf<Pair<String, Boolean>>()
         val binding = com.letta.mobile.data.objectverbs.binding.DevicePins.bind(
-            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), kotlinx.coroutines.flow.MutableStateFlow("fixture"),
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore().withDevicePins(),
+            kotlinx.coroutines.flow.MutableStateFlow("fixture"),
         )
         binding.setPinned(com.letta.mobile.data.objectverbs.ObjectRef("agent", "agent-a"), true)
         val verbs = com.letta.mobile.ui.components.objectVerbMenus(binding) { outcome, _ ->

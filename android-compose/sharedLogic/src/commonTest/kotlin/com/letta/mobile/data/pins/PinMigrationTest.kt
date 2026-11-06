@@ -2,6 +2,7 @@ package com.letta.mobile.data.pins
 
 import com.letta.mobile.data.home.SettingsStoreHomePinStore
 import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.objectverbs.binding.PinBinding
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -55,7 +56,7 @@ class PinMigrationTest {
     @Test
     fun unreadableCanonicalJournalKeepsTheWorkspaceAvailableWithoutTreatingTheReadAsEmpty() {
         val backing = FailableSettings(readFails = true)
-        val created = runCatching { SettingsStoreHomePinStore(backing, emptyList()) }
+        val created = runCatching { SettingsStoreHomePinStore(backing.withDevicePins(), emptyList()) }
         assertTrue(created.isSuccess, "a failed pin backing must not prevent the workspace from opening")
         val pins = created.getOrThrow().binding
         assertEquals(null, pins.registry.describe(
@@ -65,14 +66,14 @@ class PinMigrationTest {
         assertEquals("shortcut:TOOLS", backing.values["home.pinnedItems"])
         assertFalse(pins.store.journal.value.imports.any { it.complete })
         backing.readFails = false
-        val reopened = SettingsStoreHomePinStore(backing, emptyList())
+        val reopened = SettingsStoreHomePinStore(backing.withDevicePins(), emptyList())
         assertEquals(listOf("shortcut:TOOLS"), reopened.pinnedKeys.value)
     }
 
     @Test
     fun failedSnapshotWriteKeepsLegacyPinsAndLeavesAnUnavailableProvider() {
         val backing = FailableSettings(writeFails = true)
-        val created = runCatching { SettingsStoreHomePinStore(backing, emptyList()) }
+        val created = runCatching { SettingsStoreHomePinStore(backing.withDevicePins(), emptyList()) }
         assertTrue(created.isSuccess, "a failed snapshot write must not prevent the workspace from opening")
         assertEquals("shortcut:TOOLS", backing.values["home.pinnedItems"])
         assertEquals(null, backing.values[DevicePinStore.STORAGE_KEY])
@@ -82,7 +83,7 @@ class PinMigrationTest {
             ObjectRef("shortcut", "TOOLS"), com.letta.mobile.data.objectverbs.VerbContext("home-tile"),
         )?.verbs?.single()?.availability?.state)
         backing.writeFails = false
-        assertEquals(listOf("shortcut:TOOLS"), SettingsStoreHomePinStore(backing, emptyList()).pinnedKeys.value)
+        assertEquals(listOf("shortcut:TOOLS"), SettingsStoreHomePinStore(backing.withDevicePins(), emptyList()).pinnedKeys.value)
     }
 
     @Test
@@ -91,7 +92,7 @@ class PinMigrationTest {
             "desktop.home.pinnedItems" to "shortcut:TOOLS\nshortcut:AGENTS",
             "home.pinnedItems" to "shortcut:AGENTS\nshortcut:CONVERSATIONS",
         ))
-        val home = SettingsStoreHomePinStore(storage, emptyList(), "desktop.home.pinnedItems")
+        val home = SettingsStoreHomePinStore(storage.withDevicePins(), emptyList(), "desktop.home.pinnedItems")
         assertEquals(listOf("shortcut:TOOLS", "shortcut:AGENTS", "shortcut:CONVERSATIONS"), home.pinnedKeys.value)
     }
 
@@ -219,12 +220,12 @@ class PinMigrationTest {
     @Test
     fun explicitEmptyHomeDoesNotSeedDefaultsAndAbsentDoes() {
         val empty = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to ""))
-        assertEquals(emptyList(), SettingsStoreHomePinStore(empty, listOf("shortcut:TOOLS")).pinnedKeys.value)
+        assertEquals(emptyList(), SettingsStoreHomePinStore(empty.withDevicePins(), listOf("shortcut:TOOLS")).pinnedKeys.value)
         val absent = InMemorySecureSettingsStore()
-        val home = SettingsStoreHomePinStore(absent, listOf("shortcut:TOOLS"))
+        val home = SettingsStoreHomePinStore(absent.withDevicePins(), listOf("shortcut:TOOLS"))
         assertEquals(listOf("shortcut:TOOLS"), home.pinnedKeys.value)
         home.setPinned("shortcut:TOOLS", false)
-        assertEquals(emptyList(), SettingsStoreHomePinStore(absent, listOf("shortcut:TOOLS")).pinnedKeys.value)
+        assertEquals(emptyList(), SettingsStoreHomePinStore(absent.withDevicePins(), listOf("shortcut:TOOLS")).pinnedKeys.value)
     }
 
     private val owner: (String, String) -> ScopedObjectRef? = { _, entry ->

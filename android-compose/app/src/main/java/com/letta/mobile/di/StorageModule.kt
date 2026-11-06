@@ -6,6 +6,7 @@ import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.util.EncryptedPrefsHelper
 import dagger.Module
@@ -42,7 +43,7 @@ object StorageModule {
     @Singleton
     fun provideSecureSettingsStore(
         @EncryptedPrefs sharedPreferences: SharedPreferences,
-    ): SecureSettingsStore = SharedPreferencesSecureSettingsStore(sharedPreferences)
+    ): SecureSettingsStore = SharedPreferencesSecureSettingsStore(sharedPreferences).withDevicePins()
 }
 
 private class SharedPreferencesSecureSettingsStore(

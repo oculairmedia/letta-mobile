@@ -50809,6 +50809,16 @@ final class com.letta.mobile.data.notify/StoredAttentionPrefs : com.letta.mobile
     }
 }
 
+final class com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore : com.letta.mobile.data.storage/SecureSettingsStore { // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore|null[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore) // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
+
+    final fun clear() // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore.clear|clear(){}[0]
+    final fun getString(kotlin/String, kotlin/String?): kotlin/String? // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore.getString|getString(kotlin.String;kotlin.String?){}[0]
+    final fun putDurableString(kotlin/String, kotlin/String) // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore.putDurableString|putDurableString(kotlin.String;kotlin.String){}[0]
+    final fun putString(kotlin/String, kotlin/String) // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore.putString|putString(kotlin.String;kotlin.String){}[0]
+    final fun remove(kotlin/String) // com.letta.mobile.data.objectverbs.binding/DevicePinSettingsStore.remove|remove(kotlin.String){}[0]
+}
+
 final class com.letta.mobile.data.objectverbs.binding/PinBinding { // com.letta.mobile.data.objectverbs.binding/PinBinding|null[0]
     constructor <init>(com.letta.mobile.data.pins/DevicePinStore, kotlinx.coroutines.flow/StateFlow<kotlin/String?>) // com.letta.mobile.data.objectverbs.binding/PinBinding.<init>|<init>(com.letta.mobile.data.pins.DevicePinStore;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
 
@@ -73787,6 +73797,7 @@ final fun (com.letta.mobile.data.session.graph/SharedSessionGraph).com.letta.mob
 final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobile.data.session/agentRosterOrEmpty(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/Agent>> // com.letta.mobile.data.session/agentRosterOrEmpty|agentRosterOrEmpty@com.letta.mobile.data.session.SessionRepositoryGraph(){}[0]
 final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobile.data.session/llmModelsOrEmpty(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.session/llmModelsOrEmpty|llmModelsOrEmpty@com.letta.mobile.data.session.SessionRepositoryGraph(){}[0]
 final fun (com.letta.mobile.data.session/SessionRepositoryGraphProvider<out com.letta.mobile.data.session/SessionRepositoryGraph>).com.letta.mobile.data.session.pins/pinSource(): kotlinx.coroutines.flow/StateFlow<kotlin/String?> // com.letta.mobile.data.session.pins/pinSource|pinSource@com.letta.mobile.data.session.SessionRepositoryGraphProvider<out|com.letta.mobile.data.session.SessionRepositoryGraph>(){}[0]
+final fun (com.letta.mobile.data.storage/SecureSettingsStore).com.letta.mobile.data.objectverbs.binding/withDevicePins(): com.letta.mobile.data.storage/SecureSettingsStore // com.letta.mobile.data.objectverbs.binding/withDevicePins|withDevicePins@com.letta.mobile.data.storage.SecureSettingsStore(){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentChipObservation).com.letta.mobile.data.subagents/withNativeTodos(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.subagents/SubagentChipObservation // com.letta.mobile.data.subagents/withNativeTodos|withNativeTodos@com.letta.mobile.data.subagents.SubagentChipObservation(kotlinx.serialization.json.JsonObject){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentRosterItem).com.letta.mobile.data.subagents/toSubagentView(): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/toSubagentView|toSubagentView@com.letta.mobile.data.subagents.SubagentRosterItem(){}[0]
 final fun (com.letta.mobile.data.system1/System1Assessment).com.letta.mobile.data.system1/toMetadata(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.system1/toMetadata|toMetadata@com.letta.mobile.data.system1.System1Assessment(){}[0]

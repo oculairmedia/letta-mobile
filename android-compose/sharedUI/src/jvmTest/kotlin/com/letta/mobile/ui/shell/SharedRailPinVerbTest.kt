@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.ui.components.ProvideObjectVerbs
 
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class SharedRailPinVerbTest {
     @Test
     fun railOrbPinsAndUnpinsThroughTheSharedDesktopBindingAndHomeSeesBoth() = runComposeUiTest {
-        val backing = InMemorySecureSettingsStore()
+        val backing = InMemorySecureSettingsStore().withDevicePins()
         val home = SettingsStoreHomePinStore(backing, emptyList(), source = MutableStateFlow("desktop-backend"))
         val pins = home.binding
         setContent {

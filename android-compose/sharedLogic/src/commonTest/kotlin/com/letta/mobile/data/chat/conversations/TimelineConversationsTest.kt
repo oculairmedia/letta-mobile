@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.branch.BranchKind
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
@@ -194,7 +196,7 @@ class TimelineConversationsTest {
             backgroundScope,
             host.chatGateway(backgroundScope),
             emptyList(),
-            ConversationManagementPrefs.from(MapSettingsStore(), MutableStateFlow("fixture")),
+            ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture")),
         )
         runCurrent()
 
@@ -441,7 +443,7 @@ class TimelineConversationsTest {
         backgroundScope,
         gateway,
         listOf(Agent(id = nora, name = "Nora"), Agent(id = ivo, name = "Ivo")),
-        ConversationManagementPrefs.from(MapSettingsStore(), MutableStateFlow("fixture")),
+        ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture")),
     )
 
     /** A gateway whose agents' lists cannot be read right now. */

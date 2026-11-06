@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -108,7 +110,7 @@ class HomePageTest {
         host: LettaHost = LettaHost.Touch,
     ) {
         val pinStore = com.letta.mobile.data.home.SettingsStoreHomePinStore(
-            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), emptyList(),
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore().withDevicePins(), emptyList(),
             source = kotlinx.coroutines.flow.MutableStateFlow("fixture"),
         )
         state.pinKeys.forEach { pinStore.setPinned(it, true) }

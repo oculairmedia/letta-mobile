@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -33,7 +35,7 @@ class SettingsRepositoryTest {
     fun setup() {
         repository = SettingsRepository(
             dataStore = createTestPreferencesDataStore(),
-            secureSettingsStore = InMemorySecureSettingsStore(),
+            secureSettingsStore = InMemorySecureSettingsStore().withDevicePins(),
         )
         runBlocking {
             repository.clearAllData()
@@ -42,7 +44,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `settings Home and conversation adapters share scoped confirmed pins`() = runTest {
-        val storage = InMemorySecureSettingsStore()
+        val storage = InMemorySecureSettingsStore().withDevicePins()
         val settings = SettingsRepository(createTestPreferencesDataStore(), storage)
         val config = LettaConfig(id = "pins", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://pins.invalid")
         settings.saveConfig(config)
@@ -115,7 +117,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `saveConfig persists local on-device model metadata`() = runTest {
-        val secureStore = InMemorySecureSettingsStore()
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
         val dataStore = createTestPreferencesDataStore()
         val scopedRepository = SettingsRepository(
             dataStore = dataStore,
@@ -221,7 +223,7 @@ class SettingsRepositoryTest {
         val activeIdsAtClear = mutableListOf<String?>()
         scopedRepository = SettingsRepository.forTests(
             dataStore = createTestPreferencesDataStore(),
-            secureSettingsStore = InMemorySecureSettingsStore(),
+            secureSettingsStore = InMemorySecureSettingsStore().withDevicePins(),
             clearBackendScopedCaches = {
                 activeIdsAtClear += scopedRepository.activeConfig.value?.id
                 BackendSwitchClearResult(successes = 1, failures = emptyList())
@@ -375,7 +377,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `stored agent name survives restart after a blank selection write`() {
-        val secureStore = InMemorySecureSettingsStore()
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
         val dataStore = createTestPreferencesDataStore()
         val initialRepo = SettingsRepository(
             dataStore = dataStore,

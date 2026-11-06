@@ -36428,6 +36428,15 @@ public final class com/letta/mobile/data/objectverbs/VerbToggleState$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/objectverbs/binding/DevicePinSettingsStore : com/letta/mobile/data/storage/SecureSettingsStore {
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;)V
+	public fun clear ()V
+	public fun getString (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public fun putDurableString (Ljava/lang/String;Ljava/lang/String;)V
+	public fun putString (Ljava/lang/String;Ljava/lang/String;)V
+	public fun remove (Ljava/lang/String;)V
+}
+
 public final class com/letta/mobile/data/objectverbs/binding/DevicePins {
 	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/binding/DevicePins;
 	public final fun bind (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/flow/StateFlow;)Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
@@ -36445,6 +36454,10 @@ public final class com/letta/mobile/data/objectverbs/binding/PinBinding {
 	public final fun reorder (Ljava/util/List;)V
 	public final fun scoped (Lcom/letta/mobile/data/objectverbs/ObjectRef;)Lcom/letta/mobile/data/pins/ScopedObjectRef;
 	public final fun setPinned (Lcom/letta/mobile/data/objectverbs/ObjectRef;Z)Lcom/letta/mobile/data/objectverbs/VerbOutcome;
+}
+
+public final class com/letta/mobile/data/objectverbs/binding/PinBindingKt {
+	public static final fun withDevicePins (Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/storage/SecureSettingsStore;
 }
 
 public final class com/letta/mobile/data/objectverbs/refs/ObjectRefsKt {

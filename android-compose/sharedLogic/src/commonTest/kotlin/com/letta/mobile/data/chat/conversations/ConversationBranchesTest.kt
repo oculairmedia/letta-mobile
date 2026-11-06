@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -98,7 +100,7 @@ class ConversationBranchesTest {
         .map { (_, params) -> Triple(params.text("conversation_id"), params.text("agent_id"), params.text("message_id")) }
 
     private class RecordingHost(override val gateway: ChatGateway?) : ConversationListHost {
-        val prefs = ConversationManagementPrefs.from(MapSettingsStore(), MutableStateFlow("fixture"))
+        val prefs = ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
         val opened = mutableListOf<OpenedBranch>()
         val errors = mutableListOf<String>()
 

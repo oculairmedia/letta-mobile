@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.runtime
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,7 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class PinnedConversationsTest {
     @Test
     fun pinsSurviveARestart() {
-        val store = MapSettingsStore()
+        val store = MapSettingsStore().withDevicePins()
         PinnedConversations(store, source = MutableStateFlow("fixture")).apply {
             setPinned("conv-b", true)
             setPinned("conv-a", true)
@@ -25,7 +27,7 @@ class PinnedConversationsTest {
 
     @Test
     fun unpinningTheLastPinClearsTheKey() {
-        val store = MapSettingsStore()
+        val store = MapSettingsStore().withDevicePins()
         val pins = PinnedConversations(store, source = MutableStateFlow("fixture"))
         pins.toggle("conv-a")
         assertTrue(pins.isPinned("conv-a"))
@@ -44,7 +46,7 @@ class PinnedConversationsTest {
 
     @Test
     fun aForkOfAPinnedConversationIsPinned() {
-        val pins = PinnedConversations(MapSettingsStore(), source = MutableStateFlow("fixture"))
+        val pins = PinnedConversations(MapSettingsStore().withDevicePins(), source = MutableStateFlow("fixture"))
         pins.setPinned("source", true)
 
         pins.inherit("source", "fork")
@@ -55,7 +57,7 @@ class PinnedConversationsTest {
 
     @Test
     fun aBlankIdIsNeverPinned() {
-        val pins = PinnedConversations(MapSettingsStore(), source = MutableStateFlow("fixture"))
+        val pins = PinnedConversations(MapSettingsStore().withDevicePins(), source = MutableStateFlow("fixture"))
         pins.setPinned(" ", true)
         assertEquals(emptySet(), pins.pinned.value)
     }

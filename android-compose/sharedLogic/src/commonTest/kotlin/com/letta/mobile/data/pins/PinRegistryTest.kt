@@ -1,5 +1,7 @@
 package com.letta.mobile.data.pins
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.objectverbs.ObjectRef
 import com.letta.mobile.data.objectverbs.VerbContext
 import com.letta.mobile.data.objectverbs.VerbInvocation
@@ -20,7 +22,7 @@ import kotlinx.serialization.json.put
 class PinRegistryTest {
     @Test
     fun staleRegistryCannotWriteToAReplacementBackend() {
-        val store = DevicePinStore(InMemorySecureSettingsStore())
+        val store = DevicePinStore(InMemorySecureSettingsStore().withDevicePins())
         val source = MutableStateFlow<String?>("one")
         val registry = PinBinding(store, source).registry
         val request = VerbInvocation(ObjectRef("agent", "a"), "core.pin", VerbContext("rail"),
@@ -32,7 +34,7 @@ class PinRegistryTest {
 
     @Test
     fun registryRechecksObjectAndDesiredStateAndAllLensesSeeTheSameFacets() {
-        val store = DevicePinStore(InMemorySecureSettingsStore())
+        val store = DevicePinStore(InMemorySecureSettingsStore().withDevicePins())
         val ref = ObjectRef("agent", "a")
         var present = true
         val registry = VerbRegistry(CoreVerbProvider(store, { "source" }) { it == ref && present })
@@ -55,7 +57,7 @@ class PinRegistryTest {
 
     @Test
     fun homeAgentWriterAndRailBindingShareOneStore() {
-        val backing = InMemorySecureSettingsStore()
+        val backing = InMemorySecureSettingsStore().withDevicePins()
         val source = MutableStateFlow<String?>("backend")
         val home = com.letta.mobile.data.home.SettingsStoreHomePinStore(backing, emptyList(), source = source)
         val rail = DevicePins.bind(backing, source)
@@ -67,7 +69,7 @@ class PinRegistryTest {
 
     @Test
     fun missingOrMalformedInputAndUnknownKindsCannotWrite() {
-        val store = DevicePinStore(InMemorySecureSettingsStore())
+        val store = DevicePinStore(InMemorySecureSettingsStore().withDevicePins())
         val registry = VerbRegistry(CoreVerbProvider(store, { "backend" }) { true })
         val request = VerbInvocation(ObjectRef("agent", "a"), "core.pin", VerbContext("rail"))
         assertIs<VerbOutcome.InvalidInput>(registry.invoke(request))

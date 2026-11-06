@@ -705,7 +705,7 @@ The shared VerbRegistry and trusted core provider implement core.pin once over D
 
 # Package com.letta.mobile.data.objectverbs.binding
 
-Session bindings project the one device pin journal into canonical references, facets and legacy adapter reads. A binding follows the trusted session graph's backend namespace; bindings share a device store and retain separate session scopes.
+The device settings facade owns one pin journal for its lifecycle, with no process-global owner map. Session bindings project that journal into canonical references, facets and legacy adapter reads. A binding follows the trusted session graph's backend namespace; bindings share a device store and retain separate session scopes.
 
 # Package com.letta.mobile.data.pins
 

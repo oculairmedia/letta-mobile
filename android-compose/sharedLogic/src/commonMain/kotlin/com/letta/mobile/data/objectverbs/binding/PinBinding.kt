@@ -12,8 +12,6 @@ import com.letta.mobile.data.pins.PinJournal
 import com.letta.mobile.data.pins.ScopedObjectRef
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.flow.DerivedStateFlow
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -54,18 +52,30 @@ class PinBinding(val store: DevicePinStore, val source: StateFlow<String?>) {
         .filter { it.source == namespace || it.source == ScopedObjectRef.DEVICE_SOURCE }.map { it.objectRef }
 }
 
-/** Device-lifetime owners, keyed by the host's storage object. Sessions share state, never source bindings. */
-object DevicePins {
-    private val lock = SynchronizedObject()
-    private val owners = mutableMapOf<SecureSettingsStore, DevicePinStore>()
+/**
+ * Device settings composition root. Create once per application/tab and pass this facade to every
+ * pin adapter. Ownership ends with the settings instance; no process registry retains old devices.
+ * All persistence, including confirmed writes, delegates to the real host backing.
+ */
+class DevicePinSettingsStore(backing: SecureSettingsStore) : SecureSettingsStore by backing {
+    internal val pins: DevicePinStore by lazy { DevicePinStore(backing) }
+}
 
-    fun store(backing: SecureSettingsStore): DevicePinStore = synchronized(lock) {
-        owners.getOrPut(backing) { DevicePinStore(backing) }.also { pins ->
-                pins.tryImportLegacy(LegacyPinSources.secure(backing, setOf(
-                    LegacyPinSources.HOME_PRODUCTION, LegacyPinSources.HOME_DEFAULT,
-                    "conversations.pinned", "projects.pinned", "desktop.projects.pinned",
-                )))
+/** Attach the pin owner once at the settings composition root; already-owned ports retain identity. */
+fun SecureSettingsStore.withDevicePins(): SecureSettingsStore =
+    if (this is DevicePinSettingsStore) this else DevicePinSettingsStore(this)
+
+/** Stateless access to the one settings-owned journal; sessions share state, never source bindings. */
+object DevicePins {
+    fun store(backing: SecureSettingsStore): DevicePinStore {
+        val pins = requireNotNull((backing as? DevicePinSettingsStore)?.pins) {
+            "Bind the device settings owner with withDevicePins before constructing pin adapters"
         }
+        pins.tryImportLegacy(LegacyPinSources.secure(backing, setOf(
+            LegacyPinSources.HOME_PRODUCTION, LegacyPinSources.HOME_DEFAULT,
+            "conversations.pinned", "projects.pinned", "desktop.projects.pinned",
+        )))
+        return pins
     }
 
     fun bind(backing: SecureSettingsStore, source: StateFlow<String?> = MutableStateFlow(null)): PinBinding =

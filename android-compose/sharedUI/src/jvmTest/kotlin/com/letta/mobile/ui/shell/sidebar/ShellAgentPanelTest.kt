@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -309,7 +311,7 @@ class ShellAgentPanelTest {
     @Test
     fun aPinnedRowShowsItsPinAndItsMenuOffersUnpin() = runComposeUiTest {
         val pins = mutableListOf<Pair<String, Boolean>>()
-        val binding = DevicePins.bind(InMemorySecureSettingsStore(), MutableStateFlow("panel-backend"))
+        val binding = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), MutableStateFlow("panel-backend"))
         val ref = ObjectRef("conversation", "c1")
         binding.setPinned(ref, true)
         val pinned = state.copy(conversations = state.conversations.map { it.copy(pinned = true) })
