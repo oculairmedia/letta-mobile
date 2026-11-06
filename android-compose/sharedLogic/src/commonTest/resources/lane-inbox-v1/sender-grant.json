@@ -1,0 +1,14 @@
+{
+  "_contract": "lane-inbox-v1 \u00a74",
+  "sender_endpoint": "5debcec3bdfb9866e318974673ce8bf8bc3400e05ee0866902c6cf12747774fe",
+  "trackers": [
+    "letta_mobile"
+  ],
+  "proposal_kinds": [
+    "deploy_wrapper"
+  ],
+  "max_messages_per_hour": 60,
+  "max_open_proposals": 5,
+  "receipts": "full",
+  "memory_view": []
+}

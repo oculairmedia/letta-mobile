@@ -1,0 +1,12 @@
+{
+  "_contract": "lane-inbox-v1 \u00a71",
+  "correlation_id": "0193f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f",
+  "origin_agent": "agent-c356b54a-8b37-4d53-b9d0-b43164749b6f",
+  "origin_conversation": "local-conv-95806078",
+  "expected_replier": {
+    "endpoint": "5debcec3bdfb9866e318974673ce8bf8bc3400e05ee0866902c6cf12747774fe",
+    "agent_id": "agent-a9db7a7a-0ca7-4a3a-b124-11e8ab7fd7e1"
+  },
+  "created_at": "2026-11-05T03:48:00Z",
+  "expires_at": "2026-11-12T03:48:00Z"
+}

@@ -1,0 +1,11 @@
+{
+  "_contract": "lane-inbox-v1 \u00a71",
+  "client_message_id": "msg-cb0ac4c8-b4ae-4fa2-be82-e677e7710361",
+  "sender": {
+    "endpoint": "5debcec3bdfb9866e318974673ce8bf8bc3400e05ee0866902c6cf12747774fe",
+    "agent_id": "agent-a9db7a7a-0ca7-4a3a-b124-11e8ab7fd7e1"
+  },
+  "sent_at": "2026-11-05T03:39:36Z",
+  "expires_at": "2026-11-12T03:39:36Z",
+  "body": "Request: shared memory as a runtime feature."
+}
