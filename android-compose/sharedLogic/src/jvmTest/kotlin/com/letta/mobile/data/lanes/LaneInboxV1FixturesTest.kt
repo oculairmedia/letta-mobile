@@ -68,7 +68,10 @@ class LaneInboxV1FixturesTest {
 
     @Test
     fun senderGrantsMatchSection4AndDefaultDenies() {
-        val fields = setOf("sender_endpoint", "trackers", "proposal_kinds", "max_messages_per_hour", "max_open_proposals", "receipts", "memory_view")
+        val fields = setOf(
+            "sender_endpoint", "trackers", "proposal_kinds", "max_messages_per_hour",
+            "max_open_proposals", "receipts", "memory_view",
+        )
         assertFields("sender-grant.json", fields)
         assertFields("sender-grant-default.json", fields)
         val default = fixture("sender-grant-default.json")
@@ -90,7 +93,10 @@ class LaneInboxV1FixturesTest {
     fun digestEntryAndMarkersMatchSection6() {
         assertFields(
             "digest-entry.json",
-            setOf("entry_id", "message_key", "sender", "received_at", "finished_at", "outcome", "refs", "denied_tools", "summary_quote", "pinned"),
+            setOf(
+                "entry_id", "message_key", "sender", "received_at", "finished_at",
+                "outcome", "refs", "denied_tools", "summary_quote", "pinned",
+            ),
         )
         val entry = fixture("digest-entry.json")
         assertTrue(entry["outcome"]!!.jsonPrimitive.content in DIGEST_OUTCOMES)
@@ -116,7 +122,9 @@ class LaneInboxV1FixturesTest {
 
     @Test
     fun retentionNumbersHoldAndDedupeOutlastsTheLongestRequest() {
-        listOf("7 days", "24h", "500", "72h", "14 days", "24h retry horizon").forEach { assertTrue(it in contract, "retention value $it is in the contract") }
+        listOf("7 days", "24h", "500", "72h", "14 days", "24h retry horizon").forEach {
+            assertTrue(it in contract, "retention value $it is in the contract")
+        }
         assertTrue(DEDUPE_RETENTION_DAYS > REQUEST_EXPIRY_DAYS + MAX_RETRY_WINDOW_DAYS, "dedupe outlasts expiry plus retries (Q4)")
     }
 
