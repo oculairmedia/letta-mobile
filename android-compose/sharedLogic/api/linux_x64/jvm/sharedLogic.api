@@ -35937,6 +35937,467 @@ public final class com/letta/mobile/data/notify/StoredAttentionPrefs : com/letta
 public final class com/letta/mobile/data/notify/StoredAttentionPrefs$Companion {
 }
 
+public final class com/letta/mobile/data/objectverbs/ObjectFacets {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/ObjectFacets$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Boolean;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/Boolean;
+	public final fun component4 ()Ljava/lang/Boolean;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/ObjectFacets;Ljava/lang/Boolean;Ljava/lang/Integer;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKindTag ()Ljava/lang/String;
+	public final fun getNeedsAttention ()Ljava/lang/Boolean;
+	public final fun getPinOrder ()Ljava/lang/Integer;
+	public final fun getPinned ()Ljava/lang/Boolean;
+	public final fun getRunning ()Ljava/lang/Boolean;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/ObjectFacets$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/ObjectFacets$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/ObjectFacets;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectFacets$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectRef {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getKind ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/ObjectRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/ObjectRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/ObjectRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectRef$Companion {
+	public final fun agent-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun canvas (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun conversation-LfPRSJk (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun project-1YMDjXU (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun project-prkdxy8 (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public final fun shortcut (Lcom/letta/mobile/data/home/HomeShortcut;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectVerb {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/ObjectVerb$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbAvailability;Lcom/letta/mobile/data/objectverbs/VerbToggleState;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbAvailability;Lcom/letta/mobile/data/objectverbs/VerbToggleState;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/data/objectverbs/VerbAvailability;
+	public final fun component5 ()Lcom/letta/mobile/data/objectverbs/VerbToggleState;
+	public final fun component6 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbAvailability;Lcom/letta/mobile/data/objectverbs/VerbToggleState;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;I)Lcom/letta/mobile/data/objectverbs/ObjectVerb;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/ObjectVerb;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbAvailability;Lcom/letta/mobile/data/objectverbs/VerbToggleState;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/ObjectVerb;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailability ()Lcom/letta/mobile/data/objectverbs/VerbAvailability;
+	public final fun getGroup ()Ljava/lang/String;
+	public final fun getIcon ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getInputSchema ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getOrder ()I
+	public final fun getToggle ()Lcom/letta/mobile/data/objectverbs/VerbToggleState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/ObjectVerb$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/ObjectVerb$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/ObjectVerb;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/ObjectVerb;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectVerb$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectVerbSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot$Companion;
+	public fun <init> (ILcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;Lcom/letta/mobile/data/objectverbs/VerbContribution;Lcom/letta/mobile/data/objectverbs/ObjectFacets;Ljava/util/List;)V
+	public synthetic fun <init> (ILcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;Lcom/letta/mobile/data/objectverbs/VerbContribution;Lcom/letta/mobile/data/objectverbs/ObjectFacets;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun component3 ()Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public final fun component4 ()Lcom/letta/mobile/data/objectverbs/VerbContribution;
+	public final fun component5 ()Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public final fun component6 ()Ljava/util/List;
+	public final fun copy (ILcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;Lcom/letta/mobile/data/objectverbs/VerbContribution;Lcom/letta/mobile/data/objectverbs/ObjectFacets;Ljava/util/List;)Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;ILcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;Lcom/letta/mobile/data/objectverbs/VerbContribution;Lcom/letta/mobile/data/objectverbs/ObjectFacets;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun forRendering (Ljava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public final fun getContext ()Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public final fun getContractVersion ()I
+	public final fun getContribution ()Lcom/letta/mobile/data/objectverbs/VerbContribution;
+	public final fun getFacets ()Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public final fun getObjectRef ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun getVerbs ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/ObjectVerbSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/ObjectVerbSnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbAvailability {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbAvailability$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/VerbAvailability;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbAvailability;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbAvailability;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getState ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbAvailability$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbAvailability$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbAvailability;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbAvailability;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbAvailability$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbContext {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbContext$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbContext;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLens ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbContext$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbContext$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbContext;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbContext$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbContribution {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbContribution$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/util/Set;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()I
+	public final fun copy (Ljava/lang/String;Ljava/util/Set;I)Lcom/letta/mobile/data/objectverbs/VerbContribution;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbContribution;Ljava/lang/String;Ljava/util/Set;IILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbContribution;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContractVersion ()I
+	public final fun getKinds ()Ljava/util/Set;
+	public final fun getOwner ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbContribution$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbContribution$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbContribution;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbContribution;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbContribution$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbInvocation {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbInvocation$Companion;
+	public fun <init> (Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbContext;Lkotlinx/serialization/json/JsonObject;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbContext;Lkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public final fun component4 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun copy (Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbContext;Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/objectverbs/VerbInvocation;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbInvocation;Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/VerbContext;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbInvocation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContext ()Lcom/letta/mobile/data/objectverbs/VerbContext;
+	public final fun getInput ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getObjectRef ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun getVerbId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbInvocation$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbInvocation$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbInvocation;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbInvocation;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbInvocation$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbOutcome$Companion;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Cancelled : com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbOutcome$Cancelled;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Failed : com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed$Companion;
+	public fun <init> (Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/lang/String;Z)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getRetryable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbOutcome$Failed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbOutcome$Failed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Failed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput : com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput$Companion;
+	public fun <init> (Ljava/util/Map;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/Map;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getErrors ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$InvalidInput$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Open : com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open$Companion;
+	public fun <init> (Lcom/letta/mobile/data/objectverbs/ObjectRef;)V
+	public final fun component1 ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun copy (Lcom/letta/mobile/data/objectverbs/ObjectRef;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open;Lcom/letta/mobile/data/objectverbs/ObjectRef;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTarget ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbOutcome$Open$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbOutcome$Open;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Open$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Unavailable : com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbOutcome$Unavailable$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbOutcome$Unavailable;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Unavailable$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Updated : com/letta/mobile/data/objectverbs/VerbOutcome {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated$Companion;
+	public fun <init> (Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;)V
+	public final fun component1 ()Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public final fun copy (Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated;Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSnapshot ()Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbOutcome$Updated$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbOutcome$Updated;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbOutcome$Updated$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbToggleState {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/VerbToggleState$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Boolean;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (Ljava/lang/Boolean;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Boolean;
+	public final fun component2 ()Ljava/lang/Boolean;
+	public final fun copy (Ljava/lang/Boolean;Ljava/lang/Boolean;)Lcom/letta/mobile/data/objectverbs/VerbToggleState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/objectverbs/VerbToggleState;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/VerbToggleState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArchived ()Ljava/lang/Boolean;
+	public final fun getPinned ()Ljava/lang/Boolean;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/objectverbs/VerbToggleState$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/VerbToggleState$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/objectverbs/VerbToggleState;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/objectverbs/VerbToggleState;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/VerbToggleState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/letta/mobile/data/observability/KotzillaKmpMonitoringKt {
 	public static final fun startKotzillaMonitoring ()V
 }

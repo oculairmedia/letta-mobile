@@ -1,0 +1,45 @@
+[
+  {
+    "contractVersion": 1,
+    "objectRef": {"kind": "agent", "id": "scout"},
+    "context": {"lens": "rail"},
+    "contribution": {"owner": "core", "kinds": ["agent"]},
+    "facets": {"pinned": true, "pinOrder": 0, "running": true, "needsAttention": true, "kindTag": "utility"},
+    "verbs": [
+      {"id": "core.pin", "label": "Unpin", "icon": "pin-off", "availability": {"state": "enabled"}, "toggle": {"pinned": true}, "group": "organize", "order": 10}
+    ]
+  },
+  {
+    "contractVersion": 1,
+    "objectRef": {"kind": "agent", "id": "guide"},
+    "context": {"lens": "home-tile"},
+    "contribution": {"owner": "core", "kinds": ["agent"]},
+    "facets": {"pinned": false, "running": false, "needsAttention": false, "kindTag": "persistent"},
+    "verbs": [
+      {"id": "core.pin", "label": "Pin", "icon": "pin", "availability": {"state": "enabled"}, "toggle": {"pinned": false}, "group": "organize", "order": 10}
+    ]
+  },
+  {
+    "contractVersion": 1,
+    "objectRef": {"kind": "conversation", "id": "chat-scout-1"},
+    "context": {"lens": "context-menu"},
+    "contribution": {"owner": "core", "kinds": ["conversation"]},
+    "facets": {"pinned": false, "running": true, "needsAttention": true},
+    "futureFacet": {"colour": "amber"},
+    "verbs": [
+      {"id": "core.archive", "label": "Archive", "icon": "archive", "availability": {"state": "disabled", "reason": "Wait for the running turn to finish"}, "toggle": {"archived": false}, "group": "lifecycle", "order": 10},
+      {"id": "future.teleport", "toggle": {"futureMode": "beam"}, "futurePayload": {"transport": ["beam"]}},
+      {"id": "core.open", "label": "Open", "icon": "open", "availability": {"state": "hidden"}, "group": "primary"}
+    ]
+  },
+  {
+    "contractVersion": 1,
+    "objectRef": {"kind": "future.robot", "id": "robot-1"},
+    "context": {"lens": "list-row"},
+    "contribution": {"owner": "future", "kinds": ["future.robot"]},
+    "facets": {"pinned": true, "pinOrder": 1, "needsAttention": true, "kindTag": "utility"},
+    "verbs": [
+      {"id": "core.pin", "label": "Unpin", "icon": "pin-off", "availability": {"state": "enabled"}, "toggle": {"pinned": true}}
+    ]
+  }
+]

@@ -16,6 +16,8 @@ BASELINE = "scripts/ci/wire-contract-uncovered-baseline.txt"
 SPECS = "docs/reference/contracts"
 FIXTURES = "android-compose/sharedLogic/src/commonTest/resources/contracts"
 INDEX = SPECS + "/README.md"
+# Explicit semantic fixtures have their own common tests; all other JSON still needs RPC coverage.
+NON_RPC_FIXTURES = {"object-verbs/v1.json"}
 NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+")
 
 
@@ -59,7 +61,8 @@ def contracts(root):
     # Only <method>/<name>-vN.md files are RPC specs; prose contracts (for example
     # conversation-lanes-v1.md) and the generated README.md sit directly in SPECS.
     specs = {p.relative_to(root / SPECS).with_suffix("").as_posix(): p for p in (root / SPECS).rglob("*.md") if p.parent != root / SPECS}
-    fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")}
+    fixtures = {p.relative_to(root / FIXTURES).with_suffix("").as_posix(): p for p in (root / FIXTURES).rglob("*.json")
+                if p.relative_to(root / FIXTURES).as_posix() not in NON_RPC_FIXTURES}
     require_pairs(specs, fixtures)
     return [contract_row(root, key, path, specs[key]) for key, path in sorted(fixtures.items())]
 

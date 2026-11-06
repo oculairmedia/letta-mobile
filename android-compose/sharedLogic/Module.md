@@ -386,6 +386,14 @@ JVM-side Kotzilla monitoring bootstrap via reflective generated initialization. 
 
 First-run agent setup tasks and onboarding models. These describe work offered to an agent, not a separate backend or agent identity. Keep agent creation and task execution outside onboarding suggestions; hosts interpret [OnboardingTask](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.onboarding/-onboarding-task/index.html) values produced by [AgentOnboarding](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.onboarding/-agent-onboarding/index.html).
 
+# Package com.letta.mobile.data.objectverbs
+
+Proposed object-verbs v1 values for canonical references, descriptors, read-only facets,
+contribution metadata and typed invocation outcomes. The compatibility projection hides
+unsupported kinds, versions and verbs; it supplies no registry, provider execution, pin
+migration or UI wiring. Trusted hosts retain source resolution and permission checks.
+The review contract is `docs/reference/contracts/object-verbs-v1.md` (letta-mobile-i5jdm.9).
+
 # Package com.letta.mobile.data.pairing
 
 Pair-invite parsing, flow state, device access and paired-host storage ports. Scanned data moves through explicit invite/session states before becoming a stored connection. Keep scanners, QR drawing and platform storage outside pairing state; provide effects through [PairingRedeemer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.pairing/-pairing-redeemer/index.html), [PairedHostStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.pairing/-paired-host-store/index.html), [QrEncoder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) and [BackendConfigSink](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.pairing/-backend-config-sink/index.html).
