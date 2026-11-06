@@ -50,7 +50,9 @@ fun rememberShellWorkspaceHeader(binding: ShellWorkspaceHeaderBinding): ShellWor
             onOpen = { hit -> navigator.openSearchHit(hit) },
         ),
         tabs = ShellConversationTabs(
-            tabs = state.tabs.openConversationIds.mapNotNull(binding.tabFor),
+            tabs = state.tabs.openConversationIds.mapNotNull { id ->
+                binding.tabFor(id)?.copy(isTransient = id == state.tabs.transientConversationId)
+            },
             activeKey = state.selectedConversationId?.value,
             actions = navigator.tabStripActions(),
         ),
@@ -70,5 +72,7 @@ fun ShellWorkspaceNavigator.tabStripActions(): LettaTabStripActions = LettaTabSt
     onSelect = { openConversation(ConversationId(it)) },
     onClose = { closeConversationTab(ConversationId(it)) },
     onReorder = { id, index -> reorderConversationTab(ConversationId(id), index) },
+    onPin = { pinConversationTab(ConversationId(it)) },
+    onUnpin = { unpinConversationTab(ConversationId(it)) },
     onNew = { openNewChat(state.focusedAgentId) },
 )

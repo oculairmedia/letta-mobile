@@ -138,6 +138,8 @@ internal fun desktopTabActions(context: DesktopShellContext, frame: DesktopShell
         onSelect = { router.openConversation(ConversationId(it)) },
         onClose = { router.closeConversationTab(ConversationId(it)) },
         onReorder = { id, index -> router.reorderConversationTab(ConversationId(id), index) },
+        onPin = { router.pinConversationTab(ConversationId(it)) },
+        onUnpin = { router.unpinConversationTab(ConversationId(it)) },
         onNew = { context.openNewChatForFocusedAgent(frame.focus) },
     )
 }

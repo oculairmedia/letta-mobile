@@ -5,6 +5,40 @@ import kotlin.test.assertEquals
 
 class ConversationTabsReducerTest {
     @Test
+    fun `opening another conversation replaces the preview`() {
+        val first = ConversationTabsReducer.select(ConversationTabsState(), "a")
+        val second = ConversationTabsReducer.select(first, "b")
+        assertEquals(listOf("b"), second.openConversationIds)
+    }
+
+    @Test
+    fun `pinning keeps a tab while opening and revisiting others`() {
+        val a = ConversationTabsReducer.pin(ConversationTabsReducer.select(ConversationTabsState(), "a"), "a")
+        val b = ConversationTabsReducer.select(a, "b")
+        assertEquals(listOf("a"), b.pinnedConversationIds)
+        assertEquals("b", b.transientConversationId)
+        assertEquals(b, ConversationTabsReducer.select(b, "a"))
+        val closed = ConversationTabsReducer.close(b, "b")
+        assertEquals("a", closed.fallbackConversationId)
+        assertEquals(listOf("a"), closed.state.openConversationIds)
+    }
+
+    @Test
+    fun `retaining and unpinning preserve pinned order`() {
+        val state = ConversationTabsState(listOf("a", "b", "c"), "preview")
+        assertEquals(state, ConversationTabsReducer.reorder(state, "preview", 0))
+        assertEquals(listOf("b", "c", "a", "preview"), ConversationTabsReducer.reorder(state, "a", 3).openConversationIds)
+        val kept = ConversationTabsReducer.retainAvailable(state, setOf("a", "c", "preview"), null)
+        assertEquals(listOf("a", "c", "preview"), kept.openConversationIds)
+        val unpinned = ConversationTabsReducer.unpin(kept, "a", "preview")
+        assertEquals(listOf("c", "preview"), unpinned.openConversationIds)
+        val selected = ConversationTabsReducer.unpin(unpinned, "c", "c")
+        assertEquals(listOf("c"), selected.openConversationIds)
+        assertEquals("c", selected.transientConversationId)
+        assertEquals(selected, ConversationTabsReducer.reorder(selected, "c", 0))
+    }
+
+    @Test
     fun `selection opens each conversation once`() {
         val first = ConversationTabsReducer.select(ConversationTabsState(), "conversation-1")
         val duplicate = ConversationTabsReducer.select(first, "conversation-1")
@@ -22,7 +56,7 @@ class ConversationTabsReducerTest {
             selectedConversationId = "conversation-1",
         )
 
-        assertEquals(listOf("conversation-2", "conversation-1"), retained.openConversationIds)
+        assertEquals(listOf("conversation-1", "conversation-2"), retained.openConversationIds)
     }
 
     @Test

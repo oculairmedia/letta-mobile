@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.components.tabs
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +49,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -54,14 +59,14 @@ import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-/** One tab: its stable [key], its [title] and the quieter [subtitle] beside it (a conversation's agent). */
+/** One tab with its stable [key], [title], quieter [subtitle], and whether it is a replaceable [isTransient] preview. */
 @Immutable
-data class LettaTab(val key: String, val title: String, val subtitle: String? = null)
+data class LettaTab(val key: String, val title: String, val subtitle: String? = null, val isTransient: Boolean = false)
 
 /**
  * What the strip can do to a tab, grouped: they always travel together. [onReorder] hears a dragged
  * tab's key and new index once, when the drag ends. [onNew] null hides the trailing "+";
- * [newLabel] is its screen-reader label.
+ * [newLabel] is its screen-reader label. [onPin] keeps a preview and [onUnpin] releases a kept tab.
  */
 @Immutable
 data class LettaTabStripActions(
@@ -70,6 +75,8 @@ data class LettaTabStripActions(
     val onReorder: (key: String, targetIndex: Int) -> Unit = { _, _ -> },
     val onNew: (() -> Unit)? = null,
     val newLabel: String = "New tab",
+    val onPin: (key: String) -> Unit = {},
+    val onUnpin: (key: String) -> Unit = {},
 )
 
 /** Test tags of the strip. */
@@ -93,6 +100,7 @@ object LettaTabStripTags {
  *
  * [dragLaneWidth] keeps a blank lane after the strip (outside the `LazyRow`, so a tab can never be
  * dragged into it and cut off): a desktop title bar needs one for native window dragging.
+ * [tabMenu] wraps each tab in its host-provided context menu.
  */
 @Composable
 fun LettaTabStrip(
@@ -101,11 +109,15 @@ fun LettaTabStrip(
     actions: LettaTabStripActions,
     modifier: Modifier = Modifier,
     dragLaneWidth: Dp = 0.dp,
+    tabMenu: @Composable (LettaTab, @Composable () -> Unit) -> Unit = { _, content -> content() },
 ) {
     var currentList by remember(tabs) { mutableStateOf(tabs) }
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        currentList = currentList.toMutableList().apply { add(to.index, removeAt(from.index)) }
+        val pinnedCount = currentList.count { !it.isTransient }
+        if (from.index < pinnedCount && to.index < pinnedCount) {
+            currentList = currentList.toMutableList().apply { add(to.index, removeAt(from.index)) }
+        }
     }
     Row(modifier = modifier.padding(end = dragLaneWidth).testTag(LettaTabStripTags.STRIP), verticalAlignment = Alignment.CenterVertically) {
         LazyRow(
@@ -116,21 +128,21 @@ fun LettaTabStrip(
         ) {
             items(currentList, key = { it.key }) { tab ->
                 ReorderableItem(reorderableState, key = tab.key) { isDragging ->
-                    LettaTabItem(
+                    tabMenu(tab) { LettaTabItem(
                         tab = tab,
                         state = LettaTabItemState(active = tab.key == activeKey, dragging = isDragging),
                         actions = actions,
                         // onDragStopped, not an effect keyed on `isDragging`: the library flips its
                         // dragging flag from a launched coroutine, which a fast press-drag-release can
                         // outrun; onDragStopped runs synchronously when this tab's gesture ends.
-                        modifier = Modifier.draggableHandle(
+                        modifier = if (tab.isTransient) Modifier else Modifier.draggableHandle(
                             dragGestureDetector = EagerPressDragGestureDetector,
                             onDragStopped = {
                                 val targetIndex = currentList.indexOfFirst { it.key == tab.key }
                                 if (targetIndex >= 0) actions.onReorder(tab.key, targetIndex)
                             },
                         ),
-                    )
+                    ) }
                 }
             }
         }
@@ -156,10 +168,27 @@ private data class LettaTabItemState(val active: Boolean, val dragging: Boolean)
 private fun LettaTabItem(tab: LettaTab, state: LettaTabItemState, actions: LettaTabStripActions, modifier: Modifier = Modifier) {
     val interactionSource = remember(tab.key) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val togglePin = { if (tab.isTransient) actions.onPin(tab.key) else actions.onUnpin(tab.key) }
+    val pinLabel = if (tab.isTransient) "Pin" else "Unpin"
     Surface(
-        onClick = { actions.onSelect(tab.key) },
         modifier = modifier
             .fillMaxHeight()
+            .hoverable(interactionSource)
+            .then(
+                if (tab.isTransient) {
+                    Modifier.combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { actions.onSelect(tab.key) },
+                        onDoubleClick = {
+                            actions.onSelect(tab.key)
+                            actions.onPin(tab.key)
+                        },
+                    )
+                } else {
+                    Modifier.clickable(interactionSource = interactionSource, indication = null) { actions.onSelect(tab.key) }
+                },
+            )
             .widthIn(min = TabMinWidth, max = TabMaxWidth)
             .padding(top = LettaDimens.Space.xs)
             .then(if (state.dragging) Modifier.shadow(LettaDimens.Space.xs, TabShape) else Modifier)
@@ -172,11 +201,15 @@ private fun LettaTabItem(tab: LettaTab, state: LettaTabItemState, actions: Letta
             else -> Color.Transparent
         },
         contentColor = MaterialTheme.colorScheme.onSurface,
-        interactionSource = interactionSource,
     ) {
         Box {
             LettaTabLabel(tab, state.active, Modifier.align(Alignment.Center))
             if (hovered || state.active) {
+                IconButton(onClick = togglePin, modifier = Modifier.align(Alignment.CenterEnd)
+                    .padding(end = LettaDimens.Control.iconButtonSm).size(LettaDimens.Control.iconButtonSm)) {
+                    Icon(Icons.Outlined.PushPin, contentDescription = "$pinLabel ${tab.title} tab",
+                        modifier = Modifier.size(LettaDimens.Control.iconSm))
+                }
                 TabCloseButton(tab.title, onClose = { actions.onClose(tab.key) }, modifier = Modifier.align(Alignment.CenterEnd))
             }
         }
@@ -187,13 +220,14 @@ private fun LettaTabItem(tab: LettaTab, state: LettaTabItemState, actions: Letta
 private fun LettaTabLabel(tab: LettaTab, active: Boolean, modifier: Modifier = Modifier) {
     // One line, browser-thin: the title, then the subtitle in the quieter colour; the end clears the close button.
     Row(
-        modifier = modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xl),
+        modifier = modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xl + LettaDimens.Control.iconButtonSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = tab.title,
             style = MaterialTheme.typography.labelMedium,
+            fontStyle = if (tab.isTransient) FontStyle.Italic else FontStyle.Normal,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
             color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,

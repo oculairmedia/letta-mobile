@@ -36995,13 +36995,18 @@ final class com.letta.mobile.data.desktopshell/ConversationTabCloseResult { // c
 }
 
 final class com.letta.mobile.data.desktopshell/ConversationTabsState { // com.letta.mobile.data.desktopshell/ConversationTabsState|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String> = ...) // com.letta.mobile.data.desktopshell/ConversationTabsState.<init>|<init>(kotlin.collections.List<kotlin.String>){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...) // com.letta.mobile.data.desktopshell/ConversationTabsState.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
 
     final val openConversationIds // com.letta.mobile.data.desktopshell/ConversationTabsState.openConversationIds|{}openConversationIds[0]
         final fun <get-openConversationIds>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.desktopshell/ConversationTabsState.openConversationIds.<get-openConversationIds>|<get-openConversationIds>(){}[0]
+    final val pinnedConversationIds // com.letta.mobile.data.desktopshell/ConversationTabsState.pinnedConversationIds|{}pinnedConversationIds[0]
+        final fun <get-pinnedConversationIds>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.desktopshell/ConversationTabsState.pinnedConversationIds.<get-pinnedConversationIds>|<get-pinnedConversationIds>(){}[0]
+    final val transientConversationId // com.letta.mobile.data.desktopshell/ConversationTabsState.transientConversationId|{}transientConversationId[0]
+        final fun <get-transientConversationId>(): kotlin/String? // com.letta.mobile.data.desktopshell/ConversationTabsState.transientConversationId.<get-transientConversationId>|<get-transientConversationId>(){}[0]
 
     final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.desktopshell/ConversationTabsState.component1|component1(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsState.copy|copy(kotlin.collections.List<kotlin.String>){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.desktopshell/ConversationTabsState.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsState.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.desktopshell/ConversationTabsState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.desktopshell/ConversationTabsState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.desktopshell/ConversationTabsState.toString|toString(){}[0]
@@ -57904,9 +57909,11 @@ final class com.letta.mobile.data.shell/ShellWorkspaceNavigator { // com.letta.m
     final fun openAgent(com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.openAgent|openAgent(com.letta.mobile.data.model.AgentId){}[0]
     final fun openConversation(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.openConversation|openConversation(com.letta.mobile.data.model.ConversationId){}[0]
     final fun openNewChat(com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.openNewChat|openNewChat(com.letta.mobile.data.model.AgentId?){}[0]
+    final fun pinConversationTab(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.pinConversationTab|pinConversationTab(com.letta.mobile.data.model.ConversationId){}[0]
     final fun reorderConversationTab(com.letta.mobile.data.model/ConversationId, kotlin/Int) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.reorderConversationTab|reorderConversationTab(com.letta.mobile.data.model.ConversationId;kotlin.Int){}[0]
     final fun sendToSelectedConversation(kotlin/String) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.sendToSelectedConversation|sendToSelectedConversation(kotlin.String){}[0]
     final fun submitHomePrompt(com.letta.mobile.data.shell/ShellHomePrompt) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.submitHomePrompt|submitHomePrompt(com.letta.mobile.data.shell.ShellHomePrompt){}[0]
+    final fun unpinConversationTab(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.unpinConversationTab|unpinConversationTab(com.letta.mobile.data.model.ConversationId){}[0]
 }
 
 final class com.letta.mobile.data.shell/ShellWorkspaceState { // com.letta.mobile.data.shell/ShellWorkspaceState|null[0]
@@ -70396,9 +70403,11 @@ final object com.letta.mobile.data.controller/AppServerApprovalDecisions { // co
 
 final object com.letta.mobile.data.desktopshell/ConversationTabsReducer { // com.letta.mobile.data.desktopshell/ConversationTabsReducer|null[0]
     final fun close(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String): com.letta.mobile.data.desktopshell/ConversationTabCloseResult // com.letta.mobile.data.desktopshell/ConversationTabsReducer.close|close(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String){}[0]
+    final fun pin(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.pin|pin(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String){}[0]
     final fun reorder(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String, kotlin/Int): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.reorder|reorder(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String;kotlin.Int){}[0]
     final fun retainAvailable(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin.collections/Set<kotlin/String>, kotlin/String?): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.retainAvailable|retainAvailable(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.collections.Set<kotlin.String>;kotlin.String?){}[0]
     final fun select(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.select|select(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String){}[0]
+    final fun unpin(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String, kotlin/String?): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.unpin|unpin(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String;kotlin.String?){}[0]
 }
 
 final object com.letta.mobile.data.desktopshell/ShellLayoutReducer { // com.letta.mobile.data.desktopshell/ShellLayoutReducer|null[0]

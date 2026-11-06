@@ -3106,49 +3106,56 @@ public final class com/letta/mobile/ui/components/tabs/ComposableSingletons$Lett
 	public static final field INSTANCE Lcom/letta/mobile/ui/components/tabs/ComposableSingletons$LettaTabStripKt;
 	public fun <init> ()V
 	public final fun getLambda$1986772274$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$2060823804$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTab {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/ui/components/tabs/LettaTab;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/tabs/LettaTab;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/tabs/LettaTab;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/ui/components/tabs/LettaTab;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/tabs/LettaTab;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/ui/components/tabs/LettaTab;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getKey ()Ljava/lang/String;
 	public final fun getSubtitle ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
 	public fun hashCode ()I
+	public final fun isTransient ()Z
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTabStripActions {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function1;
 	public final fun component2 ()Lkotlin/jvm/functions/Function1;
 	public final fun component3 ()Lkotlin/jvm/functions/Function2;
 	public final fun component4 ()Lkotlin/jvm/functions/Function0;
 	public final fun component5 ()Ljava/lang/String;
-	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;)Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;
+	public final fun component6 ()Lkotlin/jvm/functions/Function1;
+	public final fun component7 ()Lkotlin/jvm/functions/Function1;
+	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getNewLabel ()Ljava/lang/String;
 	public final fun getOnClose ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnNew ()Lkotlin/jvm/functions/Function0;
+	public final fun getOnPin ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnReorder ()Lkotlin/jvm/functions/Function2;
 	public final fun getOnSelect ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnUnpin ()Lkotlin/jvm/functions/Function1;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTabStripKt {
-	public static final fun LettaTabStrip-FJfuzF0 (Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
+	public static final fun LettaTabStrip-WH-ejsw (Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;Landroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTabStripTags {
