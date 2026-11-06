@@ -151,13 +151,13 @@ fun ShellConversationRow(
 }
 
 /** The row's menu: rename, pin, fork, marker and settle when offered, then archive and delete. */
-internal fun shellConversationMenu(
-    model: ShellConversationRowModel,
+internal fun ShellConversationRowModel.shellConversationMenu(
     actions: ShellConversationRowActions,
     ui: ShellConversationListUi,
     row: RosterRowState,
     verbs: ObjectVerbMenus? = null,
 ): List<LettaMenuItem> {
+    val model = this
     val marks = actions.marks
     return ShellRowMenus.conversation(
         archived = model.archived,

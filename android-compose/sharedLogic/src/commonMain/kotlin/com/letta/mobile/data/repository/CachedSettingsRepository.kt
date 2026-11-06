@@ -246,25 +246,26 @@ open class CachedSettingsRepository(
         objectPins.store.tryImportLegacy(LegacyPinSources.settings(snapshot))
     }
 
-    private fun pinnedIds(kind: String): Flow<List<String>> = flow {
+    private fun pinnedIds(ids: StateFlow<List<String>>): Flow<List<String>> = flow {
         importPins()
-        emitAll(objectPins.ids(kind))
+        emitAll(ids)
     }
 
-    override fun getPinnedConversationIds(): Flow<Set<String>> = pinnedIds("conversation").map { it.toSet() }
+    override fun getPinnedConversationIds(): Flow<Set<String>> = pinnedIds(objectPins.ids("conversation")).map { it.toSet() }
     override fun getPinnedAgentIds(): Flow<Set<String>> = getPinnedAgentOrder().map { it.toSet() }
-    override fun getPinnedAgentOrder(): Flow<List<String>> = pinnedIds("agent")
-    override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedIds("project").map { it.toSet() }
+    override fun getPinnedAgentOrder(): Flow<List<String>> = pinnedIds(objectPins.ids("agent"))
+    override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedIds(objectPins.ids("project")).map { it.toSet() }
 
-    private suspend fun setPinned(kind: String, id: String, pinned: Boolean) {
+    private suspend fun setPinned(ref: ObjectRef, pinned: Boolean) {
         importPins()
-        val outcome = objectPins.setPinned(ObjectRef(kind, id), pinned)
+        val outcome = objectPins.setPinned(ref, pinned)
         check(outcome is VerbOutcome.Updated) { "Pin update failed" }
     }
 
-    override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) = setPinned("conversation", conversationId, pinned)
-    override suspend fun setAgentPinned(agentId: String, pinned: Boolean) = setPinned("agent", agentId, pinned)
-    override suspend fun setProjectPinned(projectId: String, pinned: Boolean) = setPinned("project", projectId, pinned)
+    override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) =
+        setPinned(ObjectRef("conversation", conversationId), pinned)
+    override suspend fun setAgentPinned(agentId: String, pinned: Boolean) = setPinned(ObjectRef("agent", agentId), pinned)
+    override suspend fun setProjectPinned(projectId: String, pinned: Boolean) = setPinned(ObjectRef("project", projectId), pinned)
 
     override suspend fun setChatBackgroundKey(key: String) {
         preferencesStore.edit { prefs ->

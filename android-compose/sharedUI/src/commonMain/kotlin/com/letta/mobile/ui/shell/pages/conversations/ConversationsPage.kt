@@ -129,7 +129,7 @@ private fun ConversationsRosterList(
             selection = RosterSelection(isSelected = ShellConversationRowModel::selected, onSelect = { panel.onConversationSelected(it.id) }),
             actions = RosterActions(
                 menu = { model, row ->
-                    shellConversationMenu(model, conversationRowActions(model, panel), ui, row, verbs) + actions.rowMenu(model)
+                    model.shellConversationMenu(conversationRowActions(model, panel), ui, row, verbs) + actions.rowMenu(model)
                 },
                 rename = panel.onRenameConversation?.let(::conversationRename),
             ),

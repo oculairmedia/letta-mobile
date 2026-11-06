@@ -22,20 +22,20 @@ class PinMigrationTest {
         val source = LegacyPinSource(actual.key, { reads++; actual.read() }, actual.decode)
         val first = DevicePinStore(backing)
         backing.failOnWrite = 2
-        assertFailsWith<IllegalStateException> { first.importLegacy(listOf(source), ::owner) }
+        assertFailsWith<IllegalStateException> { first.importLegacy(listOf(source), owner) }
         backing.putString("home.pinnedItems", "agent:a\nagent:b")
         backing.failOnWrite = null
         val resumed = DevicePinStore(backing)
-        resumed.importLegacy(listOf(source), ::owner)
-        assertEquals(listOf(ref("agent", "a"), ref("agent", "b")), resumed.journal.value.pins)
+        resumed.importLegacy(listOf(source), owner)
+        assertEquals(listOf(ref(ObjectRef("agent", "a")), ref(ObjectRef("agent", "b"))), resumed.journal.value.pins)
         assertEquals(2, reads)
         val imported = resumed.journal.value.imports.single { it.key == actual.key }
         assertEquals("agent:a\nagent:b", imported.raw)
         assertEquals(listOf("agent:a", "agent:a\nagent:b"), imported.snapshots.map { it.raw })
-        resumed.setPinned(ref("agent", "a"), false)
-        resumed.importLegacy(listOf(source), ::owner)
+        resumed.setPinned(ref(ObjectRef("agent", "a")), false)
+        resumed.importLegacy(listOf(source), owner)
         assertEquals(2, reads, "a completed source must not be reread after cutover")
-        assertEquals(listOf(ref("agent", "b")), resumed.journal.value.pins)
+        assertEquals(listOf(ref(ObjectRef("agent", "b"))), resumed.journal.value.pins)
     }
 
     @Test
@@ -122,7 +122,7 @@ class PinMigrationTest {
             InMemorySecureSettingsStore(raw),
             LegacyPinSources.keys.drop(1).toSet() - setOf("pinned_conversation_ids", "pinned_project_ids"),
         )
-        store.importLegacy(sources, ::owner)
+        store.importLegacy(sources, owner)
         assertEquals(listOf("agent:b", "agent:a", "agent:c", "shortcut:TOOLS", "agent:d", "conversation:c",
             "conversation:z", "project:p", "conversation:d", "conversation:e", "project:q", "project:r"),
             store.journal.value.pins.map { "${it.objectRef.kind}:${it.objectRef.id}" })
@@ -142,8 +142,10 @@ class PinMigrationTest {
         store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
         assertEquals(emptyList(), store.journal.value.pins)
         assertEquals(4, store.journal.value.imports.single { it.key == "home.pinnedItems" }.entries.size)
-        store.resolvePending { _, entry -> if (entry == "agent:missing") ref("agent", "missing", "returned") else null }
-        assertEquals(listOf(ref("agent", "missing", "returned")), store.journal.value.pins)
+        store.resolvePending { _, entry ->
+            if (entry == "agent:missing") ref(ObjectRef("agent", "missing")).copy(source = "returned") else null
+        }
+        assertEquals(listOf(ref(ObjectRef("agent", "missing")).copy(source = "returned")), store.journal.value.pins)
         assertEquals(listOf("missing"), PinBinding(store, MutableStateFlow("returned")).ids("agent").value)
         assertEquals(emptyList(), PinBinding(store, MutableStateFlow("other")).ids("agent").value)
     }
@@ -169,8 +171,8 @@ class PinMigrationTest {
         assertFalse(records.single { it.key == failed.key }.complete)
         assertFalse(records.single { it.key == corrupt.key }.complete)
         assertEquals("corrupt", records.single { it.key == corrupt.key }.raw)
-        store.importLegacy(listOf(home), ::owner)
-        assertEquals(listOf(ref("agent", "restored")), store.journal.value.pins)
+        store.importLegacy(listOf(home), owner)
+        assertEquals(listOf(ref(ObjectRef("agent", "restored"))), store.journal.value.pins)
         assertFalse(store.journal.value.imports.single { it.key == "desktop.conversations.pinned" }.complete)
     }
 
@@ -186,27 +188,27 @@ class PinMigrationTest {
         val sources = listOf(LegacyPinSources.settings(snapshot).first())
         val interrupted = DevicePinStore(backing)
         backing.failOnWrite = 3
-        assertFailsWith<IllegalStateException> { interrupted.importLegacy(sources, ::owner) }
+        assertFailsWith<IllegalStateException> { interrupted.importLegacy(sources, owner) }
         val resumed = DevicePinStore(backing)
-        assertEquals(listOf(ref("agent", "b"), ref("agent", "a")), resumed.journal.value.pins)
+        assertEquals(listOf(ref(ObjectRef("agent", "b")), ref(ObjectRef("agent", "a"))), resumed.journal.value.pins)
         assertFalse(resumed.journal.value.imports.first().complete)
         backing.failOnWrite = null
-        resumed.importLegacy(sources, ::owner)
-        resumed.setPinned(ref("agent", "b"), false)
+        resumed.importLegacy(sources, owner)
+        resumed.setPinned(ref(ObjectRef("agent", "b")), false)
         val reopened = DevicePinStore(backing)
-        reopened.importLegacy(sources, ::owner)
-        reopened.resolvePending(::owner)
-        assertEquals(listOf(ref("agent", "a")), reopened.journal.value.pins)
-        assertTrue(ref("agent", "b") in reopened.journal.value.tombstones)
+        reopened.importLegacy(sources, owner)
+        reopened.resolvePending(owner)
+        assertEquals(listOf(ref(ObjectRef("agent", "a"))), reopened.journal.value.pins)
+        assertTrue(ref(ObjectRef("agent", "b")) in reopened.journal.value.tombstones)
         assertTrue(reopened.journal.value.imports.first().complete)
     }
 
     @Test
     fun sameIdsOnDifferentBackendsStayDistinctAndReorderPreservesInvisibleSlots() {
         val store = DevicePinStore(InMemorySecureSettingsStore())
-        val a = ref("agent", "same", "one")
-        val other = ref("agent", "same", "two")
-        val b = ref("agent", "b", "one")
+        val a = ref(ObjectRef("agent", "same")).copy(source = "one")
+        val other = ref(ObjectRef("agent", "same")).copy(source = "two")
+        val b = ref(ObjectRef("agent", "b")).copy(source = "one")
         listOf(a, other, b).forEach { store.setPinned(it, true) }
         store.reorder(listOf(b, a))
         assertEquals(listOf(b, other, a), store.journal.value.pins)
@@ -225,10 +227,11 @@ class PinMigrationTest {
         assertEquals(emptyList(), SettingsStoreHomePinStore(absent, listOf("shortcut:TOOLS")).pinnedKeys.value)
     }
 
-    private fun owner(@Suppress("UNUSED_PARAMETER") key: String, entry: String): ScopedObjectRef? = LegacyPinSources.objectRef(entry)
-        ?.takeUnless { it.kind == "shortcut" }?.let { ScopedObjectRef("backend", it) }
+    private val owner: (String, String) -> ScopedObjectRef? = { _, entry ->
+        LegacyPinSources.objectRef(entry)?.takeUnless { it.kind == "shortcut" }?.let { ScopedObjectRef("backend", it) }
+    }
 
-    private fun ref(kind: String, id: String, source: String = "backend") = ScopedObjectRef(source, ObjectRef(kind, id))
+    private fun ref(objectRef: ObjectRef) = ScopedObjectRef("backend", objectRef)
 
     private class FailableSettings(var readFails: Boolean = false, var writeFails: Boolean = false) : SecureSettingsStore {
         val values = mutableMapOf("home.pinnedItems" to "shortcut:TOOLS")

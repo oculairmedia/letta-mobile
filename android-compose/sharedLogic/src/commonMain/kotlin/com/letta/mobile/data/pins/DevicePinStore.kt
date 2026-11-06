@@ -93,20 +93,14 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
 
     private fun resolveImports(resolve: (String, String) -> ScopedObjectRef?, completing: Set<String> = emptySet()) {
         val state = forWrite()
-        val records = state.imports.map { record ->
-            if (!record.captured || record.error != null) return@map record
-            val resolved = record.entries.filterNot { it in record.resolved }.mapNotNull { entry ->
-                (LegacyPinSources.shortcut(entry) ?: resolve(record.key, entry))?.let { entry to it }
-            }.toMap()
-            record.copy(resolved = record.resolved + resolved)
-        }
-        val checkpoints = records.any { it.key in completing && it.captured && it.error == null && !it.complete }
+        val records = state.imports.map { it.resolveWith(resolve) }
+        val checkpoints = records.any { it.canComplete(completing) }
         if (records == state.imports && !checkpoints) return
         val imported = records.flatMap { record -> record.entries.mapNotNull(record.resolved::get) }
         commit(state.copy(pins = (state.pins + imported).distinct().filterNot { it in state.tombstones }, imports = records))
         // commit reopens/verifies before a source can be marked complete. A crash here resumes union idempotently.
         commit(current.value.copy(imports = records.map {
-            it.copy(complete = it.complete || (it.key in completing && it.captured && it.error == null))
+            it.copy(complete = it.complete || it.canComplete(completing))
         }))
     }
 
@@ -179,4 +173,19 @@ private inline fun <T> storageAttempt(block: () -> T): Result<T> {
         if (error is kotlinx.coroutines.CancellationException || error !is Exception) throw error
     }
     return result
+}
+
+private fun PinImportRecord.resolveWith(resolve: (String, String) -> ScopedObjectRef?): PinImportRecord {
+    if (!captured || error != null) return this
+    val newlyResolved = entries.filterNot { it in resolved }.mapNotNull { entry ->
+        (LegacyPinSources.shortcut(entry) ?: resolve(key, entry))?.let { entry to it }
+    }.toMap()
+    return copy(resolved = resolved + newlyResolved)
+}
+
+private fun PinImportRecord.canComplete(available: Set<String>): Boolean = when {
+    complete -> false
+    !captured -> false
+    error != null -> false
+    else -> key in available
 }

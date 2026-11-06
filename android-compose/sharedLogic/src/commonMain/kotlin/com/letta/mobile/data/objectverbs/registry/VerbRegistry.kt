@@ -58,7 +58,8 @@ class CoreVerbProvider(
     }
 
     private fun scoped(ref: ObjectRef): ScopedObjectRef? {
-        if (ref.kind !in KINDS || ref.id.isBlank() || !resolves(ref)) return null
+        if (ref.kind !in KINDS || ref.id.isBlank()) return null
+        if (!resolves(ref)) return null
         val namespace = if (ref.kind == "shortcut") ScopedObjectRef.DEVICE_SOURCE else source() ?: return null
         return ScopedObjectRef(namespace, ref)
     }

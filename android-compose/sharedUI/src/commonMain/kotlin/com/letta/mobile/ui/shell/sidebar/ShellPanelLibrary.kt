@@ -75,7 +75,7 @@ internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions:
             key = ShellPanelItem::key,
             selection = RosterSelection(isSelected = ShellPanelItem::selected, onSelect = { openPanelItem(it, actions) }),
             actions = RosterActions(
-                menu = { item, row -> panelItemMenu(item, row, actions, ui, verbs) },
+                menu = { item, row -> item.panelItemMenu(row, actions, ui, verbs) },
                 rename = actions.onRenameConversation?.let(::chatRename),
             ),
             options = RosterOptions(testTag = RosterListTag(ShellAgentPanelTags.LIBRARY)),
@@ -100,15 +100,14 @@ private fun openPanelItem(item: ShellPanelItem, actions: ShellAgentPanelActions)
     }
 }
 
-private fun panelItemMenu(
-    item: ShellPanelItem,
+private fun ShellPanelItem.panelItemMenu(
     row: RosterRowState,
     actions: ShellAgentPanelActions,
     ui: ShellConversationListUi,
     verbs: ObjectVerbMenus?,
-): List<LettaMenuItem> = when (item) {
-    is ShellPanelItem.Chat -> shellConversationMenu(item.model, conversationRowActions(item.model, actions), ui, row, verbs)
-    is ShellPanelItem.Canvas -> ShellRowMenus.canvas(item.model.archived, canvasArchiveToggle(item.model, actions))
+): List<LettaMenuItem> = when (this) {
+    is ShellPanelItem.Chat -> model.shellConversationMenu(conversationRowActions(model, actions), ui, row, verbs)
+    is ShellPanelItem.Canvas -> ShellRowMenus.canvas(model.archived, canvasArchiveToggle(model, actions))
 }
 
 /** Rename in place: the chat's own menu entry ("Rename chat") opens it, as F2 does. */
