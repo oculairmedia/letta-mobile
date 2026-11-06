@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.agents.deriveAgentSpaces
@@ -91,17 +92,17 @@ fun ShellLibraryRail(state: ShellLibraryRailState, actions: ShellAgentRailAction
 
 /** The collapsed rail's bounded recents, in the same pinned/activity order as the full roster. */
 internal fun collapsedRailEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus): List<ShellRailEntry> {
-    val entries = railEntries(agents, focus, focus.selectedAgentId)
+    val entries = railEntries(agents, focus, focus.selectedAgentId?.let(::AgentId))
     return entries.filter { it.pinned } + entries.filterNot { it.pinned }.take(RecentAgentsPolicy.DEFAULT_MAX_AGENTS)
 }
 
-private fun railEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus, selectedAgentId: String?): List<ShellRailEntry> {
+private fun railEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus, selectedAgentId: AgentId?): List<ShellRailEntry> {
     val pinned = agents.filter { focus.facets(it.first).pinned == true }
         .sortedBy { focus.facets(it.first).pinOrder ?: Int.MAX_VALUE }
     val groups = pinned.map { (id, name) -> AgentRailGroup(name, listOf(id)) }
     val pinnedEntries = ShellRailMapping.entries(groups, focus).map { it.copy(key = "pinned-${it.agentId}") }
     val recent = agents.filterNot { focus.facets(it.first).pinned == true }
-    return pinnedEntries + ShellRailMapping.entries(ShellRailMapping.groups(recent, selectedAgentId), focus)
+    return pinnedEntries + ShellRailMapping.entries(ShellRailMapping.groups(recent, selectedAgentId?.value), focus)
 }
 
 /**
