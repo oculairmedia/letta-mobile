@@ -161,6 +161,7 @@ private fun headerTitle(state: ShellWorkspaceHeaderState, dragLaneWidth: Dp): He
                 tabs = tabs.tabs,
                 activeKey = tabs.activeKey,
                 actions = tabs.actions,
+                pinEnabled = true,
                 dragLaneWidth = dragLaneWidth,
                 modifier = Modifier.fillMaxHeight(),
                 tabMenu = { tab, content ->

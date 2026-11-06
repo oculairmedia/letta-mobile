@@ -75,6 +75,22 @@ class ShellWorkspaceStateTest {
     }
 
     @Test
+    fun unpinUsesTheConversationActuallyShownByTheChat() {
+        val chat = FakeChat(listOf(older, newer))
+        val state = ShellWorkspaceState(ShellDestination.Chat())
+        val navigator = ShellWorkspaceNavigator(state, chat)
+        state.conversationShown(cOld, a1)
+        navigator.pinConversationTab(cOld)
+        chat.selectedConversation = cOld
+        state.navigate(ShellDestination.Chat(conversationId = cNew.value))
+
+        navigator.unpinConversationTab(cOld)
+
+        assertEquals("c-old", state.tabs.transientConversationId)
+        assertEquals(listOf("c-old"), state.tabs.openConversationIds)
+    }
+
+    @Test
     fun partialCatalogPrunesOnlyCompletedAgentsAndKeepsOtherMemories() {
         val state = ShellWorkspaceState(ShellDestination.Chat())
         state.conversationShown(cOld, a1)

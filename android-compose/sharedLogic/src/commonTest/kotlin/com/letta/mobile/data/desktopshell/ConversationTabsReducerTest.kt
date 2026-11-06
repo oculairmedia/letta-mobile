@@ -39,6 +39,13 @@ class ConversationTabsReducerTest {
     }
 
     @Test
+    fun `catalog refresh does not replace an existing preview with an unrepresented selection`() {
+        val state = ConversationTabsState(listOf("pinned"), "preview")
+        val retained = ConversationTabsReducer.retainAvailable(state, setOf("pinned", "preview", "selected"), "selected")
+        assertEquals(state, retained)
+    }
+
+    @Test
     fun `selection opens each conversation once`() {
         val first = ConversationTabsReducer.select(ConversationTabsState(), "conversation-1")
         val duplicate = ConversationTabsReducer.select(first, "conversation-1")

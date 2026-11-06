@@ -40,8 +40,9 @@ object ConversationTabsReducer {
             pinnedConversationIds = state.pinnedConversationIds.filter { it in kept },
             transientConversationId = state.transientConversationId?.takeIf { it in kept },
         )
-        return if (selectedConversationId != null && selectedConversationId !in retained.openConversationIds) {
-            select(retained, selectedConversationId)
+        val missingSelection = selectedConversationId?.takeUnless { it in retained.openConversationIds }
+        return if (retained.transientConversationId == null) {
+            missingSelection?.let { select(retained, it) } ?: retained
         } else {
             retained
         }

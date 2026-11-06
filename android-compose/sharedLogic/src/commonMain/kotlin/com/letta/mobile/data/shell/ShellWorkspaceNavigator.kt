@@ -164,7 +164,8 @@ class ShellWorkspaceNavigator(
 
     /** Makes the active tab a preview, or removes an inactive tab. */
     fun unpinConversationTab(conversation: ConversationId) {
-        state.tabs = ConversationTabsReducer.unpin(state.tabs, conversation.value, state.selectedConversationId?.value)
+        val displayed = chat.selectedConversation ?: state.selectedConversationId
+        state.tabs = ConversationTabsReducer.unpin(state.tabs, conversation.value, displayed?.value)
     }
 
     /** Moves [conversation]'s tab to [targetIndex]. */

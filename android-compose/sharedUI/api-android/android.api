@@ -3101,8 +3101,8 @@ public final class com/letta/mobile/ui/components/picker/PickerTags {
 public final class com/letta/mobile/ui/components/tabs/ComposableSingletons$LettaTabStripKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/components/tabs/ComposableSingletons$LettaTabStripKt;
 	public fun <init> ()V
+	public final fun getLambda$-2105612000$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$1986772274$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$2060823804$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTab {
@@ -3151,7 +3151,7 @@ public final class com/letta/mobile/ui/components/tabs/LettaTabStripActions {
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTabStripKt {
-	public static final fun LettaTabStrip-WH-ejsw (Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;Landroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+	public static final fun LettaTabStrip-iHT-50w (Ljava/util/List;Ljava/lang/String;Lcom/letta/mobile/ui/components/tabs/LettaTabStripActions;Landroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function4;ZLandroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/components/tabs/LettaTabStripTags {
