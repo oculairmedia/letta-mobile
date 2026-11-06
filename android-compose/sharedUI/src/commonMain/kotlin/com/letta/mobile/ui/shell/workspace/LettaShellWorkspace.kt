@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.ui.shell.rail.rememberPinnedRailState
 import com.letta.mobile.ui.components.ProvideObjectVerbs
 import com.letta.mobile.data.objectverbs.VerbOutcome
 import com.letta.mobile.ui.host.Overlay
@@ -124,7 +125,9 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {
-                                        WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
+                                        val rail = rememberPinnedRailState(state.navigation.rail, host.objectPins)
+                                        val pinnedState = state.copy(navigation = state.navigation.copy(rail = rail))
+                                        WorkspaceColumn(WorkspaceFrame(pinnedState, host, drawer, fit))
                                         host.slots.overlays()
                                     }
                                 }

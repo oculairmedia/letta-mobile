@@ -15,7 +15,7 @@ import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
 import com.letta.mobile.ui.shell.rail.ShellAgentRailState
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
-import com.letta.mobile.ui.shell.rail.ShellRailMapping
+import com.letta.mobile.ui.shell.rail.collapsedRailEntries
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.data.lanes.ConversationLaneProjection
@@ -120,9 +120,8 @@ class ShellWorkspaceEvents(
 
 /** The drawer's view of the navigation: the rail's orbs (its library stays the wide rail's) and the panel. */
 internal fun ShellWorkspaceNavigation.drawerState(): ShellNavDrawerState {
-    val groups = ShellRailMapping.groups(rail.agents, rail.focus.selectedAgentId)
     return ShellNavDrawerState(
-        rail = ShellAgentRailState(entries = ShellRailMapping.entries(groups, rail.focus), homeSelected = rail.homeSelected),
+        rail = ShellAgentRailState(entries = collapsedRailEntries(rail.agents, rail.focus), homeSelected = rail.homeSelected),
         panel = panel,
     )
 }

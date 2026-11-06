@@ -178,7 +178,7 @@ private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: State<Des
 private fun desktopWorkspaceNavigation(context: DesktopShellContext, frame: DesktopShellFrame): ShellWorkspaceNavigation {
     val navigator = context.navigator
     val focus = frame.focus
-    val recents = rememberRecentRailAgents(frame.chatState.conversations, focus.railAgents, context.core.railPrefs, focus.selectedAgentId)
+    val recents = rememberRecentRailAgents(context, frame)
     return ShellWorkspaceNavigation(
         rail = ShellLibraryRailState(
             agents = recents.agents,

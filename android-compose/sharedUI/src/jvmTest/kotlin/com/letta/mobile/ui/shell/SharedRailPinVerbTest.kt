@@ -7,6 +7,7 @@ import com.letta.mobile.ui.components.ProvideObjectVerbs
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -37,17 +38,27 @@ class SharedRailPinVerbTest {
                 MaterialTheme {
                     val entries = ShellRailMapping.entries(
                         ShellRailMapping.groups(listOf("a1" to "Alpha", "a2" to "Beta"), null),
-                        ShellRailFocus(pinnedAgentIds = ids.toSet()),
+                        ShellRailFocus(objectFacetsByAgentId = remember(ids) {
+                            listOf("a1", "a2").associateWith { id ->
+                                checkNotNull(pins.registry.describe(
+                                    com.letta.mobile.data.objectverbs.ObjectRef("agent", id),
+                                    com.letta.mobile.data.objectverbs.VerbContext("rail"),
+                                )).facets
+                            }
+                        }),
                     )
                     ShellAgentRail(ShellAgentRailState(entries), ShellAgentRailActions())
                 }
             }
         }
+        onNodeWithTag(ShellAgentRailTags.PIN_DIVIDER).assertDoesNotExist()
         onNodeWithTag(ShellAgentRailTags.orb("Alpha")).performTouchInput { longClick() }
         onNodeWithText("Pin agent").performClick()
         assertEquals(listOf("agent:a1"), home.pinnedKeys.value)
+        onNodeWithTag(ShellAgentRailTags.PIN_DIVIDER).assertExists()
         onNodeWithTag(ShellAgentRailTags.orb("Alpha")).performTouchInput { longClick() }
         onNodeWithText("Unpin agent").performClick()
         assertEquals(emptyList(), home.pinnedKeys.value)
+        onNodeWithTag(ShellAgentRailTags.PIN_DIVIDER).assertDoesNotExist()
     }
 }

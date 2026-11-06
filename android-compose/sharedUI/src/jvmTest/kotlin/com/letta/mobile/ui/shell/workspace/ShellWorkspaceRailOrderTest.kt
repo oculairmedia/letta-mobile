@@ -98,7 +98,7 @@ class ShellWorkspaceRailOrderTest {
         )
 
         assertEquals(
-            listOf("agent-10", "agent-3", "agent-7", "agent-5", "agent-0", "agent-1", "agent-2", "agent-4"),
+            listOf("agent-10", "agent-3", "agent-7", "agent-5", "agent-0", "agent-1", "agent-2", "agent-4", "agent-6"),
             collapsedRailEntries(navigation.rail.agents, navigation.rail.focus).map { it.agentId },
         )
     }
