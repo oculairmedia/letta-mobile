@@ -4,16 +4,22 @@ import com.github.ajalt.clikt.core.parse
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.canvas.authority.FileNotebookGrantStore
+import com.letta.mobile.data.canvas.authority.NotebookAccessWire
 import com.letta.mobile.data.canvas.authority.RemoteNotebookAccess
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
+import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ModelControlException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -89,6 +95,37 @@ class RemoteNotebookAccessTest {
         assertIs<NotebookNoteLoad.Unavailable>(access.backend.load(id))
         assertIs<NotebookNoteSave.Unavailable>(access.backend.save(id, "", "x"))
         assertEquals(NotebookReferenceLoad.Unavailable, access.resolver.resolve(id))
+    }
+
+    @Test
+    fun aHostRefusingTheCallerIsDeniedNotUnavailable() = runBlocking {
+        for (refusal in listOf("unauthorized", "forbidden")) {
+            val access = RemoteNotebookAccess(AdminRpcInvoker { _, _ -> throw ModelControlException(refusal) })
+            val id = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+
+            assertEquals(DocumentWorkspaceOpen.Denied, access.opener.open(id))
+            assertEquals(NotebookNoteSave.Denied, access.backend.save(id, "", "x"))
+            assertEquals(NotebookReferenceLoad.Denied, access.resolver.resolve(id))
+        }
+    }
+
+    @Test
+    fun aConflictWithAnUnreadableDurableAcknowledgementIsUnavailable() {
+        val id = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+        val current = NotebookAccessWire.snapshot(NotebookNoteSnapshot(id, "T", "current"))
+        val absent = buildJsonObject { put("status", "conflict"); put("current", current) }
+        val broken = buildJsonObject { put("status", "conflict"); put("current", current); put("durable", JsonPrimitive("junk")) }
+
+        assertIs<NotebookNoteSave.Conflict>(NotebookAccessWire.readSave(id, absent))
+        assertIs<NotebookNoteSave.Unavailable>(NotebookAccessWire.readSave(id, broken))
+    }
+
+    @Test
+    fun aRequestAlwaysNamesItsOwnDocument() {
+        val id = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+        val body = NotebookAccessWire.request(id) { put("document_id", "ffffffffffffffffffffffffffffffff") }
+
+        assertEquals(id.value, (body["document_id"] as JsonPrimitive).content)
     }
 
     private class Host(root: Path) : AutoCloseable {

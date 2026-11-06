@@ -27,7 +27,10 @@ object NotebookAccessWire {
 
     /** The request body naming one document. */
     fun request(id: NotebookDocumentId, fields: JsonObjectBuilder.() -> Unit = {}): JsonObject =
-        buildJsonObject { put("document_id", id.value); fields() }
+        buildJsonObject { fields(); put("document_id", id.value) }
+
+    /** The result of a refused call, as every reader decodes it. */
+    fun denied(): JsonObject = response(DENIED)
 
     /** A snapshot as the routes send it. */
     fun snapshot(value: NotebookNoteSnapshot): JsonObject = buildJsonObject {
@@ -86,7 +89,7 @@ object NotebookAccessWire {
         val body = result as? JsonObject ?: return NotebookNoteSave.Unavailable(NO_RESULT)
         return when (body.status()) {
             SAVED -> body.snapshotAt("snapshot", id)?.let(NotebookNoteSave::Saved)
-            CONFLICT -> body.snapshotAt("current", id)?.let { NotebookNoteSave.Conflict(it, body.snapshotAt("durable", id)) }
+            CONFLICT -> body.conflict(id)
             PENDING_DURABILITY -> body.snapshotAt("applied", id)?.let { NotebookNoteSave.PendingDurability(it, body.reason()) }
             DENIED -> NotebookNoteSave.Denied
             else -> NotebookNoteSave.Unavailable(body.reason())
@@ -112,6 +115,13 @@ private fun JsonObject.status(): String? = text("status")
 private fun JsonObject.reason(): String = text("reason") ?: "The host could not complete the request"
 
 private fun JsonObject.text(key: String): String? = (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+/** A present but unreadable `durable` acknowledgement is malformed, not absent. */
+private fun JsonObject.conflict(id: NotebookDocumentId): NotebookNoteSave.Conflict? {
+    val current = snapshotAt("current", id) ?: return null
+    if (!containsKey("durable")) return NotebookNoteSave.Conflict(current)
+    return snapshotAt("durable", id)?.let { NotebookNoteSave.Conflict(current, it) }
+}
 
 private fun JsonObject.snapshotAt(key: String, id: NotebookDocumentId): NotebookNoteSnapshot? {
     val item = (get(key) as? JsonObject)?.takeIf { it.text("document_id") == id.value }

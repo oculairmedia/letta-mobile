@@ -84,7 +84,11 @@ private class RemoteNoteBackend(private val host: NotebookRpc) : NotebookNoteBac
     }
 }
 
-/** One `notebook.*` call; a failed call becomes [onFailure]'s result and cancellation propagates. */
+/**
+ * One `notebook.*` call. The host refusing the caller itself (no authenticated endpoint, or no
+ * capability for the method) is read as a denial, like a missing grant; any other failure becomes
+ * [onFailure]'s result. Cancellation propagates.
+ */
 private class NotebookRpc(private val rpc: AdminRpcInvoker) {
     suspend fun <T> call(method: String, body: JsonObject, onFailure: (String) -> T, read: (JsonElement?) -> T): T =
         try {
@@ -92,6 +96,10 @@ private class NotebookRpc(private val rpc: AdminRpcInvoker) {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (expectedFailure: Exception) {
-            onFailure(expectedFailure.message ?: "The host could not be reached")
+            val reason = expectedFailure.message
+            if (reason in HOST_REFUSALS) read(NotebookAccessWire.denied()) else onFailure(reason ?: "The host could not be reached")
         }
 }
+
+/** The admin_rpc errors a host returns when it refuses the caller rather than failing the call. */
+private val HOST_REFUSALS = setOf("unauthorized", "forbidden")
