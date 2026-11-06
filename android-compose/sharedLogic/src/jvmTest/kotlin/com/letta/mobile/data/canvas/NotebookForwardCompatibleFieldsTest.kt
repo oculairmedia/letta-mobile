@@ -42,6 +42,27 @@ class NotebookForwardCompatibleFieldsTest {
     }
 
     @Test
+    fun aNewerFieldInsideTheCanvasAclSurvivesThisBuildsWrite() = runBlocking {
+        val path = Files.createTempDirectory("notebook-newer-acl-")
+        NotebookLocalStore(path, "older-peer").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = CanvasSession.create(store)
+            val id = notebooks.listDocuments().single()
+            val owner = assertNotNull(stored(notebooks, id, "canvasMetadata")["acl"], "the session's canvas has an acl")
+                .jsonObject.getValue("ownerUserId").jsonPrimitive.content
+            rewrite(notebooks, id, "canvasMetadata") { stored ->
+                JsonObject(stored + ("acl" to stored.getValue("acl").jsonObject.withNewerField()))
+            }
+
+            session.applyLocalScene("""{"elements":[{"id":"after-upgrade"}]}""")
+
+            val acl = stored(notebooks, id, "canvasMetadata").getValue("acl").jsonObject
+            assertEquals(owner, acl.getValue("ownerUserId").jsonPrimitive.content)
+            assertEquals(2, acl.newerFieldValue())
+        }
+    }
+
+    @Test
     fun aNotebookItemWithANewerFieldStillReadsAndKeepsTheFieldWhenRewritten() {
         val path = Files.createTempDirectory("notebook-newer-item-")
         NotebookLocalStore(path, "older-peer").use { notebooks ->
