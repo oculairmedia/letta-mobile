@@ -22210,6 +22210,11 @@ public final class com/letta/mobile/data/lanes/LaneActivityAvailability : java/l
 
 public abstract interface class com/letta/mobile/data/lanes/LaneActivitySource {
 	public abstract fun arrivals ()Lkotlinx/coroutines/flow/Flow;
+	public fun getAvailable ()Z
+}
+
+public final class com/letta/mobile/data/lanes/LaneActivitySource$DefaultImpls {
+	public static fun getAvailable (Lcom/letta/mobile/data/lanes/LaneActivitySource;)Z
 }
 
 public final class com/letta/mobile/data/lanes/LaneArrival {

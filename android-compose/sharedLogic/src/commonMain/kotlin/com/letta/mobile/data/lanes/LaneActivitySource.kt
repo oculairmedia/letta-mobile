@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
  * `conversation_updated` invalidations and streaming deltas are never arrivals.
  */
 fun interface LaneActivitySource {
+    /** Whether the host currently advertises this producer. */
+    val available: Boolean get() = true
+
     fun arrivals(): Flow<LaneArrival>
 }
 
