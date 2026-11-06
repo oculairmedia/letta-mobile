@@ -6,6 +6,9 @@ import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.ServerFrame
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +17,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /** letta-mobile-by4vm.86: the one graph class Android and desktop both hand out. */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SharedSessionRepositoryGraphTest {
     @Test
     fun exposesTheHostAndTransportBoundRepositoriesItWasBuiltFrom() = runTest {
@@ -32,6 +36,36 @@ class SharedSessionRepositoryGraphTest {
         assertSame(transportBound.selfTodoRepository, graph.selfTodoRepository)
         assertSame(transportBound.subagentRepository, graph.subagentRepository)
         assertSame(transportBound.contextTokenReadings, (graph as SharedSessionRepositoryGraph).contextTokenReadings)
+    }
+
+    @Test
+    fun graphConsumesOnlyAdvertisedPersistedActivity() = runTest {
+        val transport = ActivityTransport()
+        val graph = graph(unavailableHost(), SharedSessionGraph.transportBound(transport, backgroundScope), transport)
+        runCurrent()
+        assertFalse(graph.conversationLanes.available)
+        transport.events.emit(activity("ignored"))
+        runCurrent()
+        assertTrue(graph.conversationLanes.activity.value.isEmpty())
+        transport.hostCapabilities = setOf(ServerFrame.ConversationActivity.CAPABILITY)
+        assertTrue(graph.conversationLanes.available)
+        transport.events.emit(activity("ignored", "accepted"))
+        transport.events.emit(activity("message-1"))
+        transport.events.emit(activity("message-1"))
+        runCurrent()
+        assertEquals(1, graph.conversationLanes.activity.value["inbox"]?.unreadCount)
+        graph.conversationLanes.displayed("inbox", "main", setOf("message-1"))
+        assertEquals(0, graph.conversationLanes.activity.value["inbox"]?.unreadCount)
+    }
+
+    private fun activity(source: String, milestone: String = "persisted") = ServerFrame.ConversationActivity(
+        id = "frame-$source", ts = "now", agentId = "main", conversationId = "inbox",
+        milestone = milestone, sourceMessageId = source, clientMessageId = "client", at = "now",
+    )
+
+    private class ActivityTransport : NoOpChannelTransport() {
+        override var hostCapabilities: Set<String> = emptySet()
+        override val events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 8)
     }
 
     @Test

@@ -3933,6 +3933,9 @@ abstract fun interface com.letta.mobile.data.home/HomeMessageSearch { // com.let
 }
 
 abstract fun interface com.letta.mobile.data.lanes/LaneActivitySource { // com.letta.mobile.data.lanes/LaneActivitySource|null[0]
+    open val available // com.letta.mobile.data.lanes/LaneActivitySource.available|{}available[0]
+        open fun <get-available>(): kotlin/Boolean // com.letta.mobile.data.lanes/LaneActivitySource.available.<get-available>|<get-available>(){}[0]
+
     abstract fun arrivals(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.lanes/LaneArrival> // com.letta.mobile.data.lanes/LaneActivitySource.arrivals|arrivals(){}[0]
 }
 
@@ -11691,6 +11694,156 @@ sealed interface com.letta.mobile.data.notify/AttentionEvent { // com.letta.mobi
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.notify/AttentionEvent.TurnDone.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.notify/AttentionEvent.TurnDone.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.notify/AttentionEvent.TurnDone.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.objectverbs/VerbOutcome { // com.letta.mobile.data.objectverbs/VerbOutcome|null[0]
+    final class Failed : com.letta.mobile.data.objectverbs/VerbOutcome { // com.letta.mobile.data.objectverbs/VerbOutcome.Failed|null[0]
+        constructor <init>(kotlin/String, kotlin/Boolean = ...) // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.<init>|<init>(kotlin.String;kotlin.Boolean){}[0]
+
+        final val reason // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.reason.<get-reason>|<get-reason>(){}[0]
+        final val retryable // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.retryable|{}retryable[0]
+            final fun <get-retryable>(): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.retryable.<get-retryable>|<get-retryable>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.component1|component1(){}[0]
+        final fun component2(): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.objectverbs/VerbOutcome.Failed // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.copy|copy(kotlin.String;kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Failed> { // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbOutcome.Failed // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbOutcome.Failed) // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbOutcome.Failed){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Failed> // com.letta.mobile.data.objectverbs/VerbOutcome.Failed.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class InvalidInput : com.letta.mobile.data.objectverbs/VerbOutcome { // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput|null[0]
+        constructor <init>(kotlin.collections/Map<kotlin/String, kotlin/String>) // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.<init>|<init>(kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+
+        final val errors // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.errors|{}errors[0]
+            final fun <get-errors>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.errors.<get-errors>|<get-errors>(){}[0]
+
+        final fun component1(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.component1|component1(){}[0]
+        final fun copy(kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.copy|copy(kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput> { // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput) // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbOutcome.InvalidInput){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput> // com.letta.mobile.data.objectverbs/VerbOutcome.InvalidInput.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Open : com.letta.mobile.data.objectverbs/VerbOutcome { // com.letta.mobile.data.objectverbs/VerbOutcome.Open|null[0]
+        constructor <init>(com.letta.mobile.data.objectverbs/ObjectRef) // com.letta.mobile.data.objectverbs/VerbOutcome.Open.<init>|<init>(com.letta.mobile.data.objectverbs.ObjectRef){}[0]
+
+        final val target // com.letta.mobile.data.objectverbs/VerbOutcome.Open.target|{}target[0]
+            final fun <get-target>(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/VerbOutcome.Open.target.<get-target>|<get-target>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/VerbOutcome.Open.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.objectverbs/ObjectRef = ...): com.letta.mobile.data.objectverbs/VerbOutcome.Open // com.letta.mobile.data.objectverbs/VerbOutcome.Open.copy|copy(com.letta.mobile.data.objectverbs.ObjectRef){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Open.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbOutcome.Open.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Open.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Open> { // com.letta.mobile.data.objectverbs/VerbOutcome.Open.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Open.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Open.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbOutcome.Open.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbOutcome.Open // com.letta.mobile.data.objectverbs/VerbOutcome.Open.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbOutcome.Open) // com.letta.mobile.data.objectverbs/VerbOutcome.Open.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbOutcome.Open){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.objectverbs/VerbOutcome.Open.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Open> // com.letta.mobile.data.objectverbs/VerbOutcome.Open.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Unavailable : com.letta.mobile.data.objectverbs/VerbOutcome { // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable> { // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable) // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbOutcome.Unavailable){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable> // com.letta.mobile.data.objectverbs/VerbOutcome.Unavailable.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Updated : com.letta.mobile.data.objectverbs/VerbOutcome { // com.letta.mobile.data.objectverbs/VerbOutcome.Updated|null[0]
+        constructor <init>(com.letta.mobile.data.objectverbs/ObjectVerbSnapshot) // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.<init>|<init>(com.letta.mobile.data.objectverbs.ObjectVerbSnapshot){}[0]
+
+        final val snapshot // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.snapshot|{}snapshot[0]
+            final fun <get-snapshot>(): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.objectverbs/ObjectVerbSnapshot = ...): com.letta.mobile.data.objectverbs/VerbOutcome.Updated // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.copy|copy(com.letta.mobile.data.objectverbs.ObjectVerbSnapshot){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Updated> { // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbOutcome.Updated // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbOutcome.Updated) // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbOutcome.Updated){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Updated> // com.letta.mobile.data.objectverbs/VerbOutcome.Updated.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Cancelled : com.letta.mobile.data.objectverbs/VerbOutcome, kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled> // com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbOutcome.Cancelled.toString|toString(){}[0]
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.objectverbs/VerbOutcome.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbOutcome> // com.letta.mobile.data.objectverbs/VerbOutcome.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.objectverbs/VerbOutcome.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
     }
 }
 
@@ -37003,13 +37156,18 @@ final class com.letta.mobile.data.desktopshell/ConversationTabCloseResult { // c
 }
 
 final class com.letta.mobile.data.desktopshell/ConversationTabsState { // com.letta.mobile.data.desktopshell/ConversationTabsState|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String> = ...) // com.letta.mobile.data.desktopshell/ConversationTabsState.<init>|<init>(kotlin.collections.List<kotlin.String>){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...) // com.letta.mobile.data.desktopshell/ConversationTabsState.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
 
     final val openConversationIds // com.letta.mobile.data.desktopshell/ConversationTabsState.openConversationIds|{}openConversationIds[0]
         final fun <get-openConversationIds>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.desktopshell/ConversationTabsState.openConversationIds.<get-openConversationIds>|<get-openConversationIds>(){}[0]
+    final val pinnedConversationIds // com.letta.mobile.data.desktopshell/ConversationTabsState.pinnedConversationIds|{}pinnedConversationIds[0]
+        final fun <get-pinnedConversationIds>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.desktopshell/ConversationTabsState.pinnedConversationIds.<get-pinnedConversationIds>|<get-pinnedConversationIds>(){}[0]
+    final val transientConversationId // com.letta.mobile.data.desktopshell/ConversationTabsState.transientConversationId|{}transientConversationId[0]
+        final fun <get-transientConversationId>(): kotlin/String? // com.letta.mobile.data.desktopshell/ConversationTabsState.transientConversationId.<get-transientConversationId>|<get-transientConversationId>(){}[0]
 
     final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.desktopshell/ConversationTabsState.component1|component1(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsState.copy|copy(kotlin.collections.List<kotlin.String>){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.desktopshell/ConversationTabsState.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsState.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.desktopshell/ConversationTabsState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.desktopshell/ConversationTabsState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.desktopshell/ConversationTabsState.toString|toString(){}[0]
@@ -50644,6 +50802,323 @@ final class com.letta.mobile.data.notify/StoredAttentionPrefs : com.letta.mobile
     }
 }
 
+final class com.letta.mobile.data.objectverbs/ObjectFacets { // com.letta.mobile.data.objectverbs/ObjectFacets|null[0]
+    constructor <init>(kotlin/Boolean? = ..., kotlin/Int? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ...) // com.letta.mobile.data.objectverbs/ObjectFacets.<init>|<init>(kotlin.Boolean?;kotlin.Int?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?){}[0]
+
+    final val kindTag // com.letta.mobile.data.objectverbs/ObjectFacets.kindTag|{}kindTag[0]
+        final fun <get-kindTag>(): kotlin/String? // com.letta.mobile.data.objectverbs/ObjectFacets.kindTag.<get-kindTag>|<get-kindTag>(){}[0]
+    final val needsAttention // com.letta.mobile.data.objectverbs/ObjectFacets.needsAttention|{}needsAttention[0]
+        final fun <get-needsAttention>(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/ObjectFacets.needsAttention.<get-needsAttention>|<get-needsAttention>(){}[0]
+    final val pinOrder // com.letta.mobile.data.objectverbs/ObjectFacets.pinOrder|{}pinOrder[0]
+        final fun <get-pinOrder>(): kotlin/Int? // com.letta.mobile.data.objectverbs/ObjectFacets.pinOrder.<get-pinOrder>|<get-pinOrder>(){}[0]
+    final val pinned // com.letta.mobile.data.objectverbs/ObjectFacets.pinned|{}pinned[0]
+        final fun <get-pinned>(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/ObjectFacets.pinned.<get-pinned>|<get-pinned>(){}[0]
+    final val running // com.letta.mobile.data.objectverbs/ObjectFacets.running|{}running[0]
+        final fun <get-running>(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/ObjectFacets.running.<get-running>|<get-running>(){}[0]
+
+    final fun component1(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/ObjectFacets.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.data.objectverbs/ObjectFacets.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/ObjectFacets.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/ObjectFacets.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.objectverbs/ObjectFacets.component5|component5(){}[0]
+    final fun copy(kotlin/Boolean? = ..., kotlin/Int? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ...): com.letta.mobile.data.objectverbs/ObjectFacets // com.letta.mobile.data.objectverbs/ObjectFacets.copy|copy(kotlin.Boolean?;kotlin.Int?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/ObjectFacets.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectFacets.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectFacets.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/ObjectFacets> { // com.letta.mobile.data.objectverbs/ObjectFacets.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/ObjectFacets.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/ObjectFacets.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/ObjectFacets.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/ObjectFacets // com.letta.mobile.data.objectverbs/ObjectFacets.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/ObjectFacets) // com.letta.mobile.data.objectverbs/ObjectFacets.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.ObjectFacets){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/ObjectFacets.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/ObjectFacets> // com.letta.mobile.data.objectverbs/ObjectFacets.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/ObjectRef { // com.letta.mobile.data.objectverbs/ObjectRef|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.objectverbs/ObjectRef.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val id // com.letta.mobile.data.objectverbs/ObjectRef.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectRef.id.<get-id>|<get-id>(){}[0]
+    final val kind // com.letta.mobile.data.objectverbs/ObjectRef.kind|{}kind[0]
+        final fun <get-kind>(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectRef.kind.<get-kind>|<get-kind>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectRef.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectRef.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/ObjectRef.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectRef.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectRef.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/ObjectRef> { // com.letta.mobile.data.objectverbs/ObjectRef.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/ObjectRef.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/ObjectRef.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/ObjectRef.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/ObjectRef) // com.letta.mobile.data.objectverbs/ObjectRef.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.ObjectRef){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/ObjectRef.Companion|null[0]
+        final fun agent(com.letta.mobile.data.model/AgentId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.agent|agent(com.letta.mobile.data.model.AgentId){}[0]
+        final fun canvas(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.canvas|canvas(com.letta.mobile.data.model.CanvasId){}[0]
+        final fun conversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.conversation|conversation(com.letta.mobile.data.model.ConversationId){}[0]
+        final fun project(com.letta.mobile.data.model/ProjectId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.project|project(com.letta.mobile.data.model.ProjectId){}[0]
+        final fun project(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.project|project(com.letta.mobile.data.projects.ProjectKey){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/ObjectRef> // com.letta.mobile.data.objectverbs/ObjectRef.Companion.serializer|serializer(){}[0]
+        final fun shortcut(com.letta.mobile.data.home/HomeShortcut): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.shortcut|shortcut(com.letta.mobile.data.home.HomeShortcut){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/ObjectVerb { // com.letta.mobile.data.objectverbs/ObjectVerb|null[0]
+    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.objectverbs/VerbAvailability = ..., com.letta.mobile.data.objectverbs/VerbToggleState? = ..., kotlinx.serialization.json/JsonObject? = ..., kotlin/String = ..., kotlin/Int = ...) // com.letta.mobile.data.objectverbs/ObjectVerb.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.objectverbs.VerbAvailability;com.letta.mobile.data.objectverbs.VerbToggleState?;kotlinx.serialization.json.JsonObject?;kotlin.String;kotlin.Int){}[0]
+
+    final val availability // com.letta.mobile.data.objectverbs/ObjectVerb.availability|{}availability[0]
+        final fun <get-availability>(): com.letta.mobile.data.objectverbs/VerbAvailability // com.letta.mobile.data.objectverbs/ObjectVerb.availability.<get-availability>|<get-availability>(){}[0]
+    final val group // com.letta.mobile.data.objectverbs/ObjectVerb.group|{}group[0]
+        final fun <get-group>(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.group.<get-group>|<get-group>(){}[0]
+    final val icon // com.letta.mobile.data.objectverbs/ObjectVerb.icon|{}icon[0]
+        final fun <get-icon>(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.icon.<get-icon>|<get-icon>(){}[0]
+    final val id // com.letta.mobile.data.objectverbs/ObjectVerb.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.id.<get-id>|<get-id>(){}[0]
+    final val inputSchema // com.letta.mobile.data.objectverbs/ObjectVerb.inputSchema|{}inputSchema[0]
+        final fun <get-inputSchema>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.objectverbs/ObjectVerb.inputSchema.<get-inputSchema>|<get-inputSchema>(){}[0]
+    final val label // com.letta.mobile.data.objectverbs/ObjectVerb.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.label.<get-label>|<get-label>(){}[0]
+    final val order // com.letta.mobile.data.objectverbs/ObjectVerb.order|{}order[0]
+        final fun <get-order>(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectVerb.order.<get-order>|<get-order>(){}[0]
+    final val toggle // com.letta.mobile.data.objectverbs/ObjectVerb.toggle|{}toggle[0]
+        final fun <get-toggle>(): com.letta.mobile.data.objectverbs/VerbToggleState? // com.letta.mobile.data.objectverbs/ObjectVerb.toggle.<get-toggle>|<get-toggle>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.objectverbs/VerbAvailability // com.letta.mobile.data.objectverbs/ObjectVerb.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.objectverbs/VerbToggleState? // com.letta.mobile.data.objectverbs/ObjectVerb.component5|component5(){}[0]
+    final fun component6(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.objectverbs/ObjectVerb.component6|component6(){}[0]
+    final fun component7(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.component7|component7(){}[0]
+    final fun component8(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectVerb.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., com.letta.mobile.data.objectverbs/VerbAvailability = ..., com.letta.mobile.data.objectverbs/VerbToggleState? = ..., kotlinx.serialization.json/JsonObject? = ..., kotlin/String = ..., kotlin/Int = ...): com.letta.mobile.data.objectverbs/ObjectVerb // com.letta.mobile.data.objectverbs/ObjectVerb.copy|copy(kotlin.String;kotlin.String;kotlin.String;com.letta.mobile.data.objectverbs.VerbAvailability;com.letta.mobile.data.objectverbs.VerbToggleState?;kotlinx.serialization.json.JsonObject?;kotlin.String;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/ObjectVerb.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectVerb.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerb.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/ObjectVerb> { // com.letta.mobile.data.objectverbs/ObjectVerb.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/ObjectVerb.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/ObjectVerb.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/ObjectVerb.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/ObjectVerb // com.letta.mobile.data.objectverbs/ObjectVerb.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/ObjectVerb) // com.letta.mobile.data.objectverbs/ObjectVerb.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.ObjectVerb){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/ObjectVerb.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/ObjectVerb> // com.letta.mobile.data.objectverbs/ObjectVerb.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/ObjectVerbSnapshot { // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot|null[0]
+    constructor <init>(kotlin/Int, com.letta.mobile.data.objectverbs/ObjectRef, com.letta.mobile.data.objectverbs/VerbContext, com.letta.mobile.data.objectverbs/VerbContribution, com.letta.mobile.data.objectverbs/ObjectFacets = ..., kotlin.collections/List<com.letta.mobile.data.objectverbs/ObjectVerb> = ...) // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.<init>|<init>(kotlin.Int;com.letta.mobile.data.objectverbs.ObjectRef;com.letta.mobile.data.objectverbs.VerbContext;com.letta.mobile.data.objectverbs.VerbContribution;com.letta.mobile.data.objectverbs.ObjectFacets;kotlin.collections.List<com.letta.mobile.data.objectverbs.ObjectVerb>){}[0]
+
+    final val context // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.context|{}context[0]
+        final fun <get-context>(): com.letta.mobile.data.objectverbs/VerbContext // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.context.<get-context>|<get-context>(){}[0]
+    final val contractVersion // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val contribution // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.contribution|{}contribution[0]
+        final fun <get-contribution>(): com.letta.mobile.data.objectverbs/VerbContribution // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.contribution.<get-contribution>|<get-contribution>(){}[0]
+    final val facets // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.facets|{}facets[0]
+        final fun <get-facets>(): com.letta.mobile.data.objectverbs/ObjectFacets // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.facets.<get-facets>|<get-facets>(){}[0]
+    final val objectRef // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.objectRef|{}objectRef[0]
+        final fun <get-objectRef>(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.objectRef.<get-objectRef>|<get-objectRef>(){}[0]
+    final val verbs // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.verbs|{}verbs[0]
+        final fun <get-verbs>(): kotlin.collections/List<com.letta.mobile.data.objectverbs/ObjectVerb> // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.verbs.<get-verbs>|<get-verbs>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.objectverbs/VerbContext // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.objectverbs/VerbContribution // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.objectverbs/ObjectFacets // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/List<com.letta.mobile.data.objectverbs/ObjectVerb> // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.component6|component6(){}[0]
+    final fun copy(kotlin/Int = ..., com.letta.mobile.data.objectverbs/ObjectRef = ..., com.letta.mobile.data.objectverbs/VerbContext = ..., com.letta.mobile.data.objectverbs/VerbContribution = ..., com.letta.mobile.data.objectverbs/ObjectFacets = ..., kotlin.collections/List<com.letta.mobile.data.objectverbs/ObjectVerb> = ...): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.copy|copy(kotlin.Int;com.letta.mobile.data.objectverbs.ObjectRef;com.letta.mobile.data.objectverbs.VerbContext;com.letta.mobile.data.objectverbs.VerbContribution;com.letta.mobile.data.objectverbs.ObjectFacets;kotlin.collections.List<com.letta.mobile.data.objectverbs.ObjectVerb>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun forRendering(kotlin.collections/Set<kotlin/String>, kotlin.collections/Set<kotlin/String>): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot? // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.forRendering|forRendering(kotlin.collections.Set<kotlin.String>;kotlin.collections.Set<kotlin.String>){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/ObjectVerbSnapshot> { // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/ObjectVerbSnapshot) // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.ObjectVerbSnapshot){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/ObjectVerbSnapshot> // com.letta.mobile.data.objectverbs/ObjectVerbSnapshot.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/VerbAvailability { // com.letta.mobile.data.objectverbs/VerbAvailability|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ...) // com.letta.mobile.data.objectverbs/VerbAvailability.<init>|<init>(kotlin.String;kotlin.String?){}[0]
+
+    final val reason // com.letta.mobile.data.objectverbs/VerbAvailability.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String? // com.letta.mobile.data.objectverbs/VerbAvailability.reason.<get-reason>|<get-reason>(){}[0]
+    final val state // com.letta.mobile.data.objectverbs/VerbAvailability.state|{}state[0]
+        final fun <get-state>(): kotlin/String // com.letta.mobile.data.objectverbs/VerbAvailability.state.<get-state>|<get-state>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/VerbAvailability.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.objectverbs/VerbAvailability.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ...): com.letta.mobile.data.objectverbs/VerbAvailability // com.letta.mobile.data.objectverbs/VerbAvailability.copy|copy(kotlin.String;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbAvailability.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbAvailability.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbAvailability.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbAvailability> { // com.letta.mobile.data.objectverbs/VerbAvailability.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/VerbAvailability.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbAvailability.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbAvailability.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbAvailability // com.letta.mobile.data.objectverbs/VerbAvailability.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbAvailability) // com.letta.mobile.data.objectverbs/VerbAvailability.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbAvailability){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/VerbAvailability.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbAvailability> // com.letta.mobile.data.objectverbs/VerbAvailability.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/VerbContext { // com.letta.mobile.data.objectverbs/VerbContext|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.objectverbs/VerbContext.<init>|<init>(kotlin.String){}[0]
+
+    final val lens // com.letta.mobile.data.objectverbs/VerbContext.lens|{}lens[0]
+        final fun <get-lens>(): kotlin/String // com.letta.mobile.data.objectverbs/VerbContext.lens.<get-lens>|<get-lens>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/VerbContext.component1|component1(){}[0]
+    final fun copy(kotlin/String = ...): com.letta.mobile.data.objectverbs/VerbContext // com.letta.mobile.data.objectverbs/VerbContext.copy|copy(kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbContext.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbContext.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbContext.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbContext> { // com.letta.mobile.data.objectverbs/VerbContext.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/VerbContext.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbContext.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbContext.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbContext // com.letta.mobile.data.objectverbs/VerbContext.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbContext) // com.letta.mobile.data.objectverbs/VerbContext.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbContext){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/VerbContext.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbContext> // com.letta.mobile.data.objectverbs/VerbContext.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/VerbContribution { // com.letta.mobile.data.objectverbs/VerbContribution|null[0]
+    constructor <init>(kotlin/String, kotlin.collections/Set<kotlin/String>, kotlin/Int = ...) // com.letta.mobile.data.objectverbs/VerbContribution.<init>|<init>(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.Int){}[0]
+
+    final val contractVersion // com.letta.mobile.data.objectverbs/VerbContribution.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbContribution.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val kinds // com.letta.mobile.data.objectverbs/VerbContribution.kinds|{}kinds[0]
+        final fun <get-kinds>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.objectverbs/VerbContribution.kinds.<get-kinds>|<get-kinds>(){}[0]
+    final val owner // com.letta.mobile.data.objectverbs/VerbContribution.owner|{}owner[0]
+        final fun <get-owner>(): kotlin/String // com.letta.mobile.data.objectverbs/VerbContribution.owner.<get-owner>|<get-owner>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.objectverbs/VerbContribution.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.objectverbs/VerbContribution.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbContribution.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin/Int = ...): com.letta.mobile.data.objectverbs/VerbContribution // com.letta.mobile.data.objectverbs/VerbContribution.copy|copy(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbContribution.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbContribution.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbContribution.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbContribution> { // com.letta.mobile.data.objectverbs/VerbContribution.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/VerbContribution.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbContribution.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbContribution.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbContribution // com.letta.mobile.data.objectverbs/VerbContribution.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbContribution) // com.letta.mobile.data.objectverbs/VerbContribution.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbContribution){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/VerbContribution.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.objectverbs/VerbContribution.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbContribution> // com.letta.mobile.data.objectverbs/VerbContribution.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/VerbInvocation { // com.letta.mobile.data.objectverbs/VerbInvocation|null[0]
+    constructor <init>(com.letta.mobile.data.objectverbs/ObjectRef, kotlin/String, com.letta.mobile.data.objectverbs/VerbContext, kotlinx.serialization.json/JsonObject? = ...) // com.letta.mobile.data.objectverbs/VerbInvocation.<init>|<init>(com.letta.mobile.data.objectverbs.ObjectRef;kotlin.String;com.letta.mobile.data.objectverbs.VerbContext;kotlinx.serialization.json.JsonObject?){}[0]
+
+    final val context // com.letta.mobile.data.objectverbs/VerbInvocation.context|{}context[0]
+        final fun <get-context>(): com.letta.mobile.data.objectverbs/VerbContext // com.letta.mobile.data.objectverbs/VerbInvocation.context.<get-context>|<get-context>(){}[0]
+    final val input // com.letta.mobile.data.objectverbs/VerbInvocation.input|{}input[0]
+        final fun <get-input>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.objectverbs/VerbInvocation.input.<get-input>|<get-input>(){}[0]
+    final val objectRef // com.letta.mobile.data.objectverbs/VerbInvocation.objectRef|{}objectRef[0]
+        final fun <get-objectRef>(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/VerbInvocation.objectRef.<get-objectRef>|<get-objectRef>(){}[0]
+    final val verbId // com.letta.mobile.data.objectverbs/VerbInvocation.verbId|{}verbId[0]
+        final fun <get-verbId>(): kotlin/String // com.letta.mobile.data.objectverbs/VerbInvocation.verbId.<get-verbId>|<get-verbId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/VerbInvocation.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.objectverbs/VerbInvocation.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.objectverbs/VerbContext // com.letta.mobile.data.objectverbs/VerbInvocation.component3|component3(){}[0]
+    final fun component4(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.objectverbs/VerbInvocation.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.objectverbs/ObjectRef = ..., kotlin/String = ..., com.letta.mobile.data.objectverbs/VerbContext = ..., kotlinx.serialization.json/JsonObject? = ...): com.letta.mobile.data.objectverbs/VerbInvocation // com.letta.mobile.data.objectverbs/VerbInvocation.copy|copy(com.letta.mobile.data.objectverbs.ObjectRef;kotlin.String;com.letta.mobile.data.objectverbs.VerbContext;kotlinx.serialization.json.JsonObject?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbInvocation.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbInvocation.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbInvocation.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbInvocation> { // com.letta.mobile.data.objectverbs/VerbInvocation.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/VerbInvocation.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbInvocation.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbInvocation.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbInvocation // com.letta.mobile.data.objectverbs/VerbInvocation.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbInvocation) // com.letta.mobile.data.objectverbs/VerbInvocation.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbInvocation){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/VerbInvocation.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbInvocation> // com.letta.mobile.data.objectverbs/VerbInvocation.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs/VerbToggleState { // com.letta.mobile.data.objectverbs/VerbToggleState|null[0]
+    constructor <init>(kotlin/Boolean? = ..., kotlin/Boolean? = ...) // com.letta.mobile.data.objectverbs/VerbToggleState.<init>|<init>(kotlin.Boolean?;kotlin.Boolean?){}[0]
+
+    final val archived // com.letta.mobile.data.objectverbs/VerbToggleState.archived|{}archived[0]
+        final fun <get-archived>(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/VerbToggleState.archived.<get-archived>|<get-archived>(){}[0]
+    final val pinned // com.letta.mobile.data.objectverbs/VerbToggleState.pinned|{}pinned[0]
+        final fun <get-pinned>(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/VerbToggleState.pinned.<get-pinned>|<get-pinned>(){}[0]
+
+    final fun component1(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/VerbToggleState.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean? // com.letta.mobile.data.objectverbs/VerbToggleState.component2|component2(){}[0]
+    final fun copy(kotlin/Boolean? = ..., kotlin/Boolean? = ...): com.letta.mobile.data.objectverbs/VerbToggleState // com.letta.mobile.data.objectverbs/VerbToggleState.copy|copy(kotlin.Boolean?;kotlin.Boolean?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.objectverbs/VerbToggleState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.objectverbs/VerbToggleState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.objectverbs/VerbToggleState.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.objectverbs/VerbToggleState> { // com.letta.mobile.data.objectverbs/VerbToggleState.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.objectverbs/VerbToggleState.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.objectverbs/VerbToggleState.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.objectverbs/VerbToggleState.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.objectverbs/VerbToggleState // com.letta.mobile.data.objectverbs/VerbToggleState.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.objectverbs/VerbToggleState) // com.letta.mobile.data.objectverbs/VerbToggleState.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.objectverbs.VerbToggleState){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.objectverbs/VerbToggleState.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/VerbToggleState> // com.letta.mobile.data.objectverbs/VerbToggleState.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.onboarding/OnboardingTask { // com.letta.mobile.data.onboarding/OnboardingTask|null[0]
     constructor <init>(com.letta.mobile.data.onboarding/OnboardingTaskKind, kotlin/String, kotlin/String) // com.letta.mobile.data.onboarding/OnboardingTask.<init>|<init>(com.letta.mobile.data.onboarding.OnboardingTaskKind;kotlin.String;kotlin.String){}[0]
 
@@ -57912,9 +58387,11 @@ final class com.letta.mobile.data.shell/ShellWorkspaceNavigator { // com.letta.m
     final fun openAgent(com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.openAgent|openAgent(com.letta.mobile.data.model.AgentId){}[0]
     final fun openConversation(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.openConversation|openConversation(com.letta.mobile.data.model.ConversationId){}[0]
     final fun openNewChat(com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.openNewChat|openNewChat(com.letta.mobile.data.model.AgentId?){}[0]
+    final fun pinConversationTab(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.pinConversationTab|pinConversationTab(com.letta.mobile.data.model.ConversationId){}[0]
     final fun reorderConversationTab(com.letta.mobile.data.model/ConversationId, kotlin/Int) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.reorderConversationTab|reorderConversationTab(com.letta.mobile.data.model.ConversationId;kotlin.Int){}[0]
     final fun sendToSelectedConversation(kotlin/String) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.sendToSelectedConversation|sendToSelectedConversation(kotlin.String){}[0]
     final fun submitHomePrompt(com.letta.mobile.data.shell/ShellHomePrompt) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.submitHomePrompt|submitHomePrompt(com.letta.mobile.data.shell.ShellHomePrompt){}[0]
+    final fun unpinConversationTab(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.shell/ShellWorkspaceNavigator.unpinConversationTab|unpinConversationTab(com.letta.mobile.data.model.ConversationId){}[0]
 }
 
 final class com.letta.mobile.data.shell/ShellWorkspaceState { // com.letta.mobile.data.shell/ShellWorkspaceState|null[0]
@@ -70424,9 +70901,11 @@ final object com.letta.mobile.data.controller/AppServerApprovalDecisions { // co
 
 final object com.letta.mobile.data.desktopshell/ConversationTabsReducer { // com.letta.mobile.data.desktopshell/ConversationTabsReducer|null[0]
     final fun close(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String): com.letta.mobile.data.desktopshell/ConversationTabCloseResult // com.letta.mobile.data.desktopshell/ConversationTabsReducer.close|close(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String){}[0]
+    final fun pin(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/Int): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.pin|pin(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.Int){}[0]
     final fun reorder(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String, kotlin/Int): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.reorder|reorder(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String;kotlin.Int){}[0]
     final fun retainAvailable(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin.collections/Set<kotlin/String>, kotlin/String?): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.retainAvailable|retainAvailable(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.collections.Set<kotlin.String>;kotlin.String?){}[0]
     final fun select(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/String): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.select|select(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.String){}[0]
+    final fun unpin(com.letta.mobile.data.desktopshell/ConversationTabsState, kotlin/Int, kotlin/Boolean): com.letta.mobile.data.desktopshell/ConversationTabsState // com.letta.mobile.data.desktopshell/ConversationTabsReducer.unpin|unpin(com.letta.mobile.data.desktopshell.ConversationTabsState;kotlin.Int;kotlin.Boolean){}[0]
 }
 
 final object com.letta.mobile.data.desktopshell/ShellLayoutReducer { // com.letta.mobile.data.desktopshell/ShellLayoutReducer|null[0]

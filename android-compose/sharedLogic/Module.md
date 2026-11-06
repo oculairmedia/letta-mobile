@@ -301,7 +301,7 @@ The session source reloads backend figures on graph changes and transport reconn
 
 # Package com.letta.mobile.data.lanes
 
-`ConversationLane` derives exact home/inbox/work purposes and bead/run references from existing conversation tags; references grant no read or send rights, work conversations are viewable but never message targets, and automatic selection anchors on home and never falls back to inbox or work. `ConversationLaneProjection` is session-graph-owned unread/activity state that shell rows render and the shared transcript acknowledges when it displays an arrival; opening, swapping or closing a view never changes it. `LaneActivitySource` is the one input: committed inbox arrivals from the capability-gated `conversation_activity` producer (mr49w), deduplicated by agent/conversation/source identity. Without a bound source unread is unknown, never zero, and metadata `conversation_updated` invalidations never count as arrivals. No history fetch or per-agent subscription is issued. Verified forwarding provenance (os2pc) is not derived here.
+`ConversationLane` derives exact home/inbox/work purposes and bead/run references from existing conversation tags; references grant no read or send rights, work conversations are viewable but never message targets, and automatic selection anchors on home and never falls back to inbox or work. `ConversationLaneProjection` is session-graph-owned unread/activity state that shell rows render and the shared transcript acknowledges when it displays an arrival; opening, swapping or closing a view never changes it. `LaneActivitySource` is the one input: committed inbox arrivals from the capability-gated `conversation_activity` producer (mr49w), deduplicated by agent/conversation/source identity. Without the host capability unread is unknown, never zero, and metadata `conversation_updated` invalidations never count as arrivals. No history fetch or per-agent subscription is issued. Verified forwarding provenance (os2pc) is not derived here.
 
 # Package com.letta.mobile.data.lens
 
@@ -385,6 +385,14 @@ JVM-side Kotzilla monitoring bootstrap via reflective generated initialization. 
 # Package com.letta.mobile.data.onboarding
 
 First-run agent setup tasks and onboarding models. These describe work offered to an agent, not a separate backend or agent identity. Keep agent creation and task execution outside onboarding suggestions; hosts interpret [OnboardingTask](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.onboarding/-onboarding-task/index.html) values produced by [AgentOnboarding](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.onboarding/-agent-onboarding/index.html).
+
+# Package com.letta.mobile.data.objectverbs
+
+Proposed object-verbs v1 values for canonical references, descriptors, read-only facets,
+contribution metadata and typed invocation outcomes. The compatibility projection hides
+unsupported kinds, versions and verbs; it supplies no registry, provider execution, pin
+migration or UI wiring. Trusted hosts retain source resolution and permission checks.
+The review contract is `docs/reference/contracts/object-verbs-v1.md` (letta-mobile-i5jdm.9).
 
 # Package com.letta.mobile.data.pairing
 

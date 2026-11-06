@@ -1,0 +1,42 @@
+{
+  "_contract": "lane-inbox-v1 \u00a77",
+  "client_message_id": "msg-cb0ac4c8-b4ae-4fa2-be82-e677e7710361",
+  "sequence": [
+    {
+      "state": "accepted"
+    },
+    {
+      "state": "delivered"
+    },
+    {
+      "state": "handled",
+      "digest_entry_id": "dig-0001"
+    },
+    {
+      "state": "answered",
+      "correlation_id": "0193f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f"
+    }
+  ],
+  "terminal_examples": [
+    {
+      "state": "rejected",
+      "reason": "correlation_mismatch"
+    },
+    {
+      "state": "rejected",
+      "reason": "too_old"
+    },
+    {
+      "state": "failed",
+      "reason": "interrupted"
+    },
+    {
+      "state": "expired"
+    }
+  ],
+  "minimal_states": [
+    "accepted",
+    "rejected",
+    "failed"
+  ]
+}

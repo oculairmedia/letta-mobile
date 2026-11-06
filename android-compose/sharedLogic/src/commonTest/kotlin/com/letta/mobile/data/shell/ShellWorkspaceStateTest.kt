@@ -50,7 +50,10 @@ class ShellWorkspaceStateTest {
         val chat = FakeChat(listOf(older, newer, other))
         val navigator = ShellWorkspaceNavigator(ShellWorkspaceState(ShellDestination.Chat()), chat)
         val state = navigator.state
-        for (id in listOf(cOld, cNew, cOther)) state.conversationShown(id, null)
+        for (id in listOf(cOld, cNew, cOther)) {
+            state.conversationShown(id, null)
+            navigator.pinConversationTab(id)
+        }
         assertEquals(listOf("c-old", "c-new", "c-other"), state.tabs.openConversationIds)
 
         navigator.reorderConversationTab(cOther, 0)
@@ -72,9 +75,26 @@ class ShellWorkspaceStateTest {
     }
 
     @Test
+    fun unpinUsesTheConversationActuallyShownByTheChat() {
+        val chat = FakeChat(listOf(older, newer))
+        val state = ShellWorkspaceState(ShellDestination.Chat())
+        val navigator = ShellWorkspaceNavigator(state, chat)
+        state.conversationShown(cOld, a1)
+        navigator.pinConversationTab(cOld)
+        chat.selectedConversation = cOld
+        state.navigate(ShellDestination.Chat(conversationId = cNew.value))
+
+        navigator.unpinConversationTab(cOld)
+
+        assertEquals("c-old", state.tabs.transientConversationId)
+        assertEquals(listOf("c-old"), state.tabs.openConversationIds)
+    }
+
+    @Test
     fun partialCatalogPrunesOnlyCompletedAgentsAndKeepsOtherMemories() {
         val state = ShellWorkspaceState(ShellDestination.Chat())
         state.conversationShown(cOld, a1)
+        state.tabs = com.letta.mobile.data.desktopshell.ConversationTabsReducer.pin(state.tabs, 0)
         state.conversationShown(cOther, a2)
         state.conversationShown(null, null)
         state.conversationsReported(mapOf(cNew to a1), emptySet())

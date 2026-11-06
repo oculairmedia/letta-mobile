@@ -31,6 +31,8 @@ class WireContractsTest {
 
     private fun fixtures(): List<WireContractFixture> = fixtureRoot.walkTopDown()
         .filter { it.isFile && it.extension == "json" }.sortedBy { it.path }
+        // This semantic fixture is covered by ObjectVerbsContractTest, not an Admin RPC method.
+        .filterNot { it.relativeTo(fixtureRoot).invariantSeparatorsPath == "object-verbs/v1.json" }
         .map { WireContractFixture(it.readText()) }.toList().also {
             assertTrue(it.isNotEmpty(), "Expected at least one contract fixture")
         }

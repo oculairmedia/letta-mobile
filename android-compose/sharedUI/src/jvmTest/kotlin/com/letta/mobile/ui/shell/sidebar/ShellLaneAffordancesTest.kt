@@ -24,9 +24,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.lanes.ConversationLaneProjection
-import com.letta.mobile.data.lanes.LaneActivitySource
-import com.letta.mobile.data.lanes.LaneArrival
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
+import com.letta.mobile.data.session.remoteLettaBackendDescriptor
+import com.letta.mobile.data.session.graph.HostSessionRepositories
+import com.letta.mobile.data.session.graph.SessionGraphIdentity
+import com.letta.mobile.data.session.graph.SharedSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.lanes.ConversationLane
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.toChatConversationSummary
@@ -69,6 +76,21 @@ class ShellLaneAffordancesTest {
     }
 
     @Test
+    fun inboxWithoutActivityCapabilityShowsNoUnreadLabel() = runComposeUiTest {
+        val rig = RenderRig(withSource = false)
+        try {
+            setContent { rig.Content() }
+            rig.source.persisted("ignored")
+            assertEquals(emptyMap(), rig.owner.activity.value)
+            onNodeWithText("Agent messages").assertExists()
+            onNodeWithText("Unread unavailable").assertDoesNotExist()
+            onNodeWithText("0 unread").assertDoesNotExist()
+        } finally {
+            rig.session.cancel()
+        }
+    }
+
+    @Test
     fun renderedActivitySurvivesViewReplacementAndReadAcknowledgesOnlyDisplayedIds() = runComposeUiTest {
         val rig = RenderRig()
         try {
@@ -105,10 +127,11 @@ class ShellLaneAffordancesTest {
         }
     }
 
-    private inner class RenderRig {
-        val source = TestActivitySource()
+    private inner class RenderRig(withSource: Boolean = true) {
+        val source = TestActivityTransport(withSource)
         val session = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val owner = ConversationLaneProjection(session, source)
+        val graph = activityGraph(source, session)
+        val owner = graph.conversationLanes
         val mounted = mutableStateOf(true)
         val home = FixtureChatSessionPort(
         ChatUiState(
@@ -176,15 +199,35 @@ class ShellLaneAffordancesTest {
         )
     }
 
-    /**
-     * Consumer-contract fixture standing in for the mr49w adapter (PR #2358 is unmerged): it emits
-     * committed arrivals in that frame's shape. No count is assigned by the test; the projection counts.
-     */
-    private class TestActivitySource : LaneActivitySource {
-        private val frames = MutableSharedFlow<LaneArrival>(extraBufferCapacity = 8)
-        override fun arrivals() = frames
+    private fun activityGraph(transport: TestActivityTransport, scope: CoroutineScope) = SharedSessionRepositoryGraph(
+        identity = SessionGraphIdentity(
+            id = 1, backendDescriptor = remoteLettaBackendDescriptor(config = null, idPrefix = "test"),
+            channelTransport = transport, capabilities = SessionCapabilities.None,
+        ),
+        host = HostSessionRepositories(
+            agentRepository = unavailable(SessionRoute.AGENTS), blockRepository = null,
+            conversationRepository = unavailable(SessionRoute.CONVERSATIONS),
+            mcpServerRepository = unavailable(SessionRoute.MCP_SERVERS), modelRepository = unavailable(SessionRoute.MODELS),
+            passageRepository = unavailable(SessionRoute.PASSAGES), projectRepository = unavailable(SessionRoute.PROJECTS),
+            projectWorkRepository = unavailable(SessionRoute.PROJECT_WORK), runRepository = unavailable(SessionRoute.RUNS),
+            providerRepository = unavailable(SessionRoute.PROVIDERS), scheduleRepository = unavailable(SessionRoute.SCHEDULES),
+            stepRepository = unavailable(SessionRoute.STEPS), toolRepository = unavailable(SessionRoute.TOOLS),
+            vibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC),
+        ),
+        transportBound = SharedSessionGraph.transportBound(transport, scope),
+    )
+
+    private class TestActivityTransport(supported: Boolean) : NoOpChannelTransport() {
+        override val hostCapabilities = if (supported) setOf(ServerFrame.ConversationActivity.CAPABILITY) else emptySet()
+        override val events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 8)
+        private var sequence = 0
         fun persisted(vararg ids: String) = runBlocking {
-            ids.forEach { frames.emit(LaneArrival("main", "inbox", it)) }
+            ids.forEach { id ->
+                events.emit(ServerFrame.ConversationActivity(
+                    id = "frame-${sequence++}", ts = "now", agentId = "main", conversationId = "inbox",
+                    milestone = "persisted", sourceMessageId = id, clientMessageId = "client-$id", at = "now",
+                ))
+            }
         }
     }
 

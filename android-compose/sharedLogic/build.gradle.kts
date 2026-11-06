@@ -198,25 +198,30 @@ kotlin {
     }
 }
 
-// Embed the canonical fixture for common tests, including targets without a filesystem resource API.
-val generateVisibleRecentsTestData = tasks.register("generateVisibleRecentsTestData") {
-    inputs.file(layout.projectDirectory.file("src/commonTest/resources/contracts/conversation.list/visible-recents-v1.json"))
-    outputs.file(layout.buildDirectory.file("generated/wireContractTests/VisibleRecentsContractText.kt"))
-    doLast {
-        val escaped = inputs.files.singleFile.readText()
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("$", "\\$")
-            .replace("\r", "\\r")
-            .replace("\n", "\\n")
-        val output = outputs.files.singleFile
-        output.parentFile.mkdirs()
-        output.writeText(
-            "package com.letta.mobile.data.transport.iroh\n\ninternal val visibleRecentsContractText: String = \"$escaped\"\n",
-        )
+// Embed canonical fixtures for common tests, including targets without a filesystem resource API.
+val contractTestFixtures = listOf(
+    Triple("VisibleRecents", "conversation.list/visible-recents-v1.json", "com.letta.mobile.data.transport.iroh"),
+    Triple("ObjectVerbs", "object-verbs/v1.json", "com.letta.mobile.data.objectverbs"),
+)
+contractTestFixtures.forEach { (name, fixture, packageName) ->
+    val generate = tasks.register("generate${name}TestData") {
+        inputs.file(layout.projectDirectory.file("src/commonTest/resources/contracts/$fixture"))
+        outputs.file(layout.buildDirectory.file("generated/contractTests/$name/${name}ContractText.kt"))
+        doLast {
+            val escaped = inputs.files.singleFile.readText()
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("$", "\\$")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n")
+            val output = outputs.files.singleFile
+            output.parentFile.mkdirs()
+            val property = name.replaceFirstChar { it.lowercase() } + "ContractText"
+            output.writeText("package $packageName\n\ninternal val $property: String = \"$escaped\"\n")
+        }
     }
+    kotlin.sourceSets.getByName("commonTest").kotlin.srcDir(generate.map { it.outputs.files.singleFile.parentFile })
 }
-kotlin.sourceSets.getByName("commonTest").kotlin.srcDir(generateVisibleRecentsTestData.map { it.outputs.files.singleFile.parentFile })
 
 // Offline reference tooling reuses the two parity tests and their authoritative renderers.
 // Normal jvmTest keeps check mode; only the explicit write task changes Markdown bodies.

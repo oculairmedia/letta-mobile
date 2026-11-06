@@ -348,12 +348,12 @@ private fun laneDescription(lane: ConversationLane?): String {
     return (listOf(purpose) + lane?.beads.orEmpty()).filter(String::isNotBlank).joinToString(" · ")
 }
 
-/** A live count when a producer is bound; the row's own count otherwise; unknown, never zero, for an unbound inbox. */
+/** A live count when available; an unsupported inbox keeps its unread state unknown. */
 private fun laneActivityLabel(model: ShellConversationRowModel, activity: LaneActivity?, producerBound: Boolean): String? {
+    if (model.lane?.purpose == ConversationPurpose.INBOX && !producerBound) return null
     val unread = activity?.unreadCount ?: model.unreadCount
     return when {
         unread > 0 -> "$unread${if (activity?.incomplete == true) "+" else ""} unread"
-        model.lane?.purpose == ConversationPurpose.INBOX && !producerBound -> "Unread unavailable"
         else -> null
     }
 }

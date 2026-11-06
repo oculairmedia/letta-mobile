@@ -165,7 +165,7 @@ class WasmAppServerSessionTest {
     @Test
     fun `iroh auth asks the server to split replies larger than one frame`() {
         assertEquals(
-            listOf("frame_part"),
+            listOf("frame_part", "conversation_activity_v1"),
             authCapabilitiesFor("iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f"),
         )
         assertNull(authCapabilitiesFor("http://localhost:4500"))

@@ -1,0 +1,10 @@
+{
+  "_contract": "lane-inbox-v1 \u00a74 default for an unknown authenticated sender",
+  "sender_endpoint": "*",
+  "trackers": [],
+  "proposal_kinds": [],
+  "max_messages_per_hour": 10,
+  "max_open_proposals": 0,
+  "receipts": "minimal",
+  "memory_view": []
+}
