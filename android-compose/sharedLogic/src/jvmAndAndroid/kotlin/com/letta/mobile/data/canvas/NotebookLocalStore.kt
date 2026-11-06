@@ -468,25 +468,31 @@ class NotebookLocalStore(
         health.awaitPrepared()
         val key = id.stableKey()
         if (!health.isRetired(key)) return id
-        // Each successor carries all earlier archive entries. Reading that existing metadata also
-        // resolves repositories written before this behavior, without changing their disk format.
-        return listDocuments().filter { candidate ->
-            runCatching {
-                open(candidate)?.withDocument { document ->
-                    val previous = (document.get(ObjectId.ROOT, NotebookHistoryArchive.PREVIOUS_DOCUMENT)
-                        .orElse(null) as? AmValue.Str)?.value
-                    if (previous == key) return@withDocument true
-                    val archives = (document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE)
-                        .orElse(null) as? AmValue.List)?.id ?: return@withDocument false
-                    document.listItems(archives).orElse(null)?.any { item ->
-                        val raw = (item as? AmValue.Str)?.value ?: return@any false
-                        runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
-                            .getOrDefault(false)
-                    } == true
-                }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
-            }.getOrDefault(false)
-        }.singleOrNull()
+        val recorded = documents.successorOf(key)?.let { successor -> listDocuments().singleOrNull { it.stableKey() == successor } }
+        return recorded ?: scanForSuccessor(key)
     }
+
+    /**
+     * Stores retired before the successor map existed: each successor carries all earlier archive
+     * entries, so reading that existing metadata resolves them without changing their disk format.
+     * This opens every indexed document, so it runs only when the map has no usable entry.
+     */
+    private fun scanForSuccessor(key: String): DocumentId? = listDocuments().filter { candidate ->
+        runCatching {
+            open(candidate)?.withDocument { document ->
+                val previous = (document.get(ObjectId.ROOT, NotebookHistoryArchive.PREVIOUS_DOCUMENT)
+                    .orElse(null) as? AmValue.Str)?.value
+                if (previous == key) return@withDocument true
+                val archives = (document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE)
+                    .orElse(null) as? AmValue.List)?.id ?: return@withDocument false
+                document.listItems(archives).orElse(null)?.any { item ->
+                    val raw = (item as? AmValue.Str)?.value ?: return@any false
+                    runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
+                        .getOrDefault(false)
+                } == true
+            }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
+        }.getOrDefault(false)
+    }.singleOrNull()
 
     fun insertMarkdown(id: DocumentId, index: Int, text: String) {
         require(index >= 0)
