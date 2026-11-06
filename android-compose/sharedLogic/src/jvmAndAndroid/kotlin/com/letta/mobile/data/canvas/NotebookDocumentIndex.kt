@@ -62,7 +62,7 @@ internal class NotebookDocumentIndex(directory: Path) {
      * move rather than blocking it, and lookups fall back to scanning archive metadata.
      */
     fun successors(): Map<String, String> = runCatching {
-        readFile(successorsFile, SUCCESSORS) { map -> map.all { (from, to) -> isKey(from) && isKey(to) && from != to } }
+        readFile(successorsFile, SUCCESSORS) { map -> map.all { (from, to) -> from.isNotebookKey() && to.isNotebookKey() && from != to } }
     }.getOrNull().orEmpty()
 
     /** Record that [key] was retired; no-op if it already was. */
@@ -73,7 +73,7 @@ internal class NotebookDocumentIndex(directory: Path) {
     }
 
     private fun readIds(file: Path): List<String> =
-        readFile(file, IDS) { (ids) -> ids.all(::isKey) && ids.distinct().size == ids.size }?.ids.orEmpty()
+        readFile(file, IDS) { (ids) -> ids.all { it.isNotebookKey() } && ids.distinct().size == ids.size }?.ids.orEmpty()
 
     /** The decoded [file], or null if it does not exist; a malformed or [valid]-rejected file throws. */
     private fun <T> readFile(file: Path, serializer: KSerializer<T>, valid: (T) -> Boolean): T? {
@@ -100,7 +100,8 @@ internal class NotebookDocumentIndex(directory: Path) {
         const val SUCCESSORS_FILE = "notebook-successors.json"
         private val IDS = Ids.serializer()
         private val SUCCESSORS = MapSerializer(String.serializer(), String.serializer())
-
-        fun isKey(key: String): Boolean = key.length == 32 && key.all { it in '0'..'9' || it in 'a'..'f' }
     }
 }
+
+/** A notebook document key: 32 lowercase hex characters. */
+internal fun String.isNotebookKey(): Boolean = length == 32 && all { it in '0'..'9' || it in 'a'..'f' }
