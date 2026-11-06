@@ -4,24 +4,27 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.chat.conversations.ConversationManagementPrefs
+import com.letta.mobile.data.chat.conversations.TimelineConversationChat
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.session.pins.pinSource
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.shell.SessionShellChatPort
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.settings.SettingsPageServices
-import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
-import com.letta.mobile.ui.shell.workspace.ShellLayoutController
-import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
-import com.letta.mobile.data.chat.conversations.ConversationManagementPrefs
-import com.letta.mobile.data.chat.conversations.TimelineConversationChat
-import com.letta.mobile.data.shell.SessionShellChatPort
+import com.letta.mobile.ui.shell.conversations.ShellTimelineChat
 import com.letta.mobile.ui.shell.conversations.ShellTimelineChatBinding
 import com.letta.mobile.ui.shell.conversations.shellComposerCommands
-import com.letta.mobile.ui.shell.conversations.ShellTimelineChat
+import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
+import com.letta.mobile.ui.shell.pages.ShellLibrarySources
+import com.letta.mobile.ui.shell.workspace.ShellLayoutController
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 import com.letta.mobile.web.chat.WebChatSessionPort
 import com.letta.mobile.web.data.WasmAppServerClientGateway
 import com.letta.mobile.web.data.WebSettingsStore
@@ -30,8 +33,6 @@ import com.letta.mobile.web.storage.WebStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import com.letta.mobile.data.storage.SecureSettingsStore
-import com.letta.mobile.ui.shell.pages.ShellLibrarySources
 
 /**
  * letta-mobile-ckmub.17.5: what the web adds to the shared shell pages - its Settings services and
@@ -52,7 +53,7 @@ internal class WebApp(scope: CoroutineScope) {
     val canvas: WebChatCanvas = storage.chatCanvas()
 
     /** The conversation list's pins and fork lineage, in the browser's settings store. */
-    val conversationPrefs = ConversationManagementPrefs.from(storage.settings)
+    val conversationPrefs = ConversationManagementPrefs.from(storage.settings, gateway.sessionGraphProvider.pinSource())
 }
 
 /**

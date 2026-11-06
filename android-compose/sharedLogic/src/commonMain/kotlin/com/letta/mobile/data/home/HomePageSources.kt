@@ -5,6 +5,10 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.Step
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.search.MessageSearchQuery
@@ -16,6 +20,7 @@ import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.session.isUnsupportedHomeStatistic
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.runtime.RunId
+import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlin.time.Clock
@@ -33,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -254,34 +260,30 @@ private suspend fun <T> attempt(block: suspend () -> T): Result<T> {
  * user changes anything the grid shows [defaults].
  */
 class SettingsStoreHomePinStore(
-    private val store: SecureSettingsStore,
+    store: SecureSettingsStore,
     defaults: List<String>,
-    private val storageKey: String = DEFAULT_STORAGE_KEY,
+    storageKey: String = DEFAULT_STORAGE_KEY,
+    source: StateFlow<String?> = MutableStateFlow(null),
 ) : HomePinStore {
-    private val keys = MutableStateFlow(store.getString(storageKey)?.let(::decode) ?: defaults)
-    override val pinnedKeys: StateFlow<List<String>> = keys.asStateFlow()
-
-    override fun setOrder(keys: List<String>) {
-        save(keys.distinct())
+    val binding = DevicePins.bind(store, source)
+    init {
+        val keys = setOf(DEFAULT_STORAGE_KEY, "desktop.home.pinnedItems", storageKey)
+        binding.store.importLegacy(LegacyPinSources.secure(store, keys))
+        binding.store.seedHomeDefaults(defaults)
     }
+    override val pinnedKeys: StateFlow<List<String>> = DerivedStateFlow(
+        binding.references.map { refs -> homeKeys(refs) }, { homeKeys(binding.references.value) },
+    )
+
+    override fun setOrder(keys: List<String>) = binding.reorder(keys.mapNotNull(LegacyPinSources::objectRef))
 
     override fun setPinned(key: String, pinned: Boolean) {
-        val current = keys.value
-        when {
-            pinned && key !in current -> save(current + key)
-            !pinned && key in current -> save(current - key)
-        }
+        val ref = LegacyPinSources.objectRef(key) ?: return
+        check(binding.setPinned(ref, pinned) is VerbOutcome.Updated) { "Pin update failed" }
     }
 
-    private fun save(next: List<String>) {
-        keys.value = next
-        store.putString(storageKey, next.joinToString(SEPARATOR))
-    }
+    private fun homeKeys(refs: List<ObjectRef>): List<String> = refs
+        .filter { it.kind == "agent" || it.kind == "shortcut" }.map { "${it.kind}:${it.id}" }
 
-    private fun decode(raw: String): List<String> = raw.split(SEPARATOR).filter { it.isNotBlank() }
-
-    companion object {
-        const val DEFAULT_STORAGE_KEY = "home.pinnedItems"
-        private const val SEPARATOR = "\n"
-    }
+    companion object { const val DEFAULT_STORAGE_KEY = "home.pinnedItems" }
 }

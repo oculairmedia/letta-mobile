@@ -15,14 +15,15 @@ import com.letta.mobile.data.memory.graph.MemoryPageController
 import com.letta.mobile.data.memory.memfs.MemfsPageController
 import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.session.pins.pinSource
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohSkillsApi
 import com.letta.mobile.data.schedules.ScheduleLibraryController
-import com.letta.mobile.data.schedules.runs.LeaseHistory
-import com.letta.mobile.data.schedules.runs.CronRunHistory
 import com.letta.mobile.data.schedules.ScheduleRecordSources
-import com.letta.mobile.data.session.SessionRepositoryGraphProvider
+import com.letta.mobile.data.schedules.runs.CronRunHistory
+import com.letta.mobile.data.schedules.runs.LeaseHistory
 import com.letta.mobile.data.session.SessionRepositoryGraph
+import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellHomeShortcuts
 import com.letta.mobile.data.shell.ShellPageErrors
@@ -94,7 +95,7 @@ object ShellLibraryFactory {
     fun home(provider: ShellGraphProvider, settings: SecureSettingsStore, scope: CoroutineScope): HomePageController =
         HomePageController(
             source = SessionHomePageSource(sessionGraphProvider = provider, scope = scope),
-            pins = SettingsStoreHomePinStore(settings, ShellHomeShortcuts.defaultPins, ShellHomeShortcuts.PIN_STORAGE_KEY),
+            pins = SettingsStoreHomePinStore(settings, ShellHomeShortcuts.defaultPins, ShellHomeShortcuts.PIN_STORAGE_KEY, provider.pinSource()),
             scope = scope,
             config = ShellHomeShortcuts.config,
         )

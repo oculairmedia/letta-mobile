@@ -3,15 +3,18 @@ package com.letta.mobile.data.projects
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectSummary
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
-import kotlin.jvm.JvmInline
 
 /** A project's identifier on the host (`project.*`'s `identifier`). */
 @JvmInline
@@ -103,23 +106,20 @@ class SettingsProjectPinStore(private val settings: ISettingsRepository) : Proje
  * which has no Android settings repository, keeps them beside its other preferences.
  */
 class SettingsStoreProjectPinStore(
-    private val store: SecureSettingsStore,
-    private val storageKey: String = DEFAULT_STORAGE_KEY,
+    store: SecureSettingsStore,
+    storageKey: String = DEFAULT_STORAGE_KEY,
+    source: StateFlow<String?> = MutableStateFlow(null),
 ) : ProjectPinStore {
-    private val keys = MutableStateFlow(store.getString(storageKey)?.let(::decode).orEmpty())
-    override val pinned: Flow<Set<ProjectKey>> = keys.asStateFlow()
+    val binding = DevicePins.bind(store, source)
+    init {
+        binding.store.importLegacy(LegacyPinSources.secure(store, setOf(DEFAULT_STORAGE_KEY, storageKey)))
+    }
+    override val pinned: Flow<Set<ProjectKey>> = binding.ids("project").map { ids -> ids.mapTo(mutableSetOf(), ::ProjectKey) }
 
     override suspend fun set(key: ProjectKey, pin: ProjectPin) {
-        val next = if (pin == ProjectPin.Pinned) keys.value + key else keys.value - key
-        keys.value = next
-        store.putString(storageKey, next.joinToString(SEPARATOR) { it.value })
+        val result = binding.setPinned(ObjectRef("project", key.value), pin == ProjectPin.Pinned)
+        check(result is VerbOutcome.Updated) { "Pin update failed" }
     }
 
-    private fun decode(raw: String): Set<ProjectKey> =
-        raw.split(SEPARATOR).filter { it.isNotBlank() }.mapTo(mutableSetOf(), ::ProjectKey)
-
-    companion object {
-        const val DEFAULT_STORAGE_KEY = "projects.pinned"
-        private const val SEPARATOR = "\n"
-    }
+    companion object { const val DEFAULT_STORAGE_KEY = "projects.pinned" }
 }

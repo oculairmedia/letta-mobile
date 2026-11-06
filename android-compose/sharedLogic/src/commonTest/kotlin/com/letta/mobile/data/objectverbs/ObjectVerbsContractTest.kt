@@ -1,5 +1,10 @@
 package com.letta.mobile.data.objectverbs
 
+import com.letta.mobile.data.objectverbs.refs.agent
+import com.letta.mobile.data.objectverbs.refs.conversation
+import com.letta.mobile.data.objectverbs.refs.project
+import com.letta.mobile.data.objectverbs.refs.canvas
+import com.letta.mobile.data.objectverbs.refs.shortcut
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
@@ -20,6 +25,22 @@ class ObjectVerbsContractTest {
     private val fixture = LettaJson.wire.decodeFromString<List<ObjectVerbSnapshot>>(objectVerbsContractText)
     private val kinds = setOf("agent", "conversation", "project", "canvas", "shortcut")
     private val verbs = setOf("core.pin", "core.archive", "core.rename", "core.open")
+
+    @Test
+    fun installedRegistryAgreesWithTheSharedFixturePinState() {
+        val pins = com.letta.mobile.data.pins.DevicePinStore(com.letta.mobile.data.storage.InMemorySecureSettingsStore())
+        val registry = com.letta.mobile.data.objectverbs.registry.VerbRegistry(
+            com.letta.mobile.data.objectverbs.registry.CoreVerbProvider(pins, { "fixture" }) { ref -> fixture.any { it.objectRef == ref } },
+        )
+        for (expected in fixture.take(2)) {
+            pins.setPinned(com.letta.mobile.data.pins.ScopedObjectRef("fixture", expected.objectRef), expected.facets.pinned == true)
+            val actual = assertNotNull(registry.describe(expected.objectRef, expected.context))
+            assertEquals(expected.facets.pinned, actual.facets.pinned)
+            assertEquals(expected.facets.pinOrder, actual.facets.pinOrder)
+            assertEquals(expected.verbs.single().toggle, actual.verbs.single().toggle)
+            assertEquals(expected.verbs.single().icon, actual.verbs.single().icon)
+        }
+    }
 
     @Test
     fun pinIsOneVerbWithCurrentStateAndIndependentFacets() {

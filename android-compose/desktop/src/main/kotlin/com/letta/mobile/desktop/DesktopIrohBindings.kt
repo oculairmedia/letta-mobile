@@ -1,32 +1,33 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.data.session.ifSupported
-import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.chat.runtime.ArchivedConversations
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.repository.api.rosterForLists
+import com.letta.mobile.data.session.pins.pinSource
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.data.repository.api.rosterForLists
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.data.transport.iroh.NotebookPeerProvisioning
-import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
-import java.nio.file.Path
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
+import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
 import com.letta.mobile.desktop.data.DesktopCanonicalSendInstall
 import com.letta.mobile.desktop.data.DesktopCanonicalTimelineHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
+import java.nio.file.Path
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancelAndJoin
@@ -310,7 +311,7 @@ private fun buildDesktopChatController(
         persistArchivedConversationIds = { ids -> archived.save(ids.mapTo(mutableSetOf(), ::ConversationId)) },
         // Conversations created or changed on another device arrive as Meridian pushes.
         conversationChanges = bindings.irohTransport,
-        conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(bindings.secureSettingsStore),
+        conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(bindings.secureSettingsStore, runtime.dataBindings.sessionGraphProvider.pinSource()),
     )
 }
 

@@ -1389,6 +1389,51 @@ final enum class com.letta.mobile.data.health/ServerHealthState : kotlin/Enum<co
     final fun values(): kotlin/Array<com.letta.mobile.data.health/ServerHealthState> // com.letta.mobile.data.health/ServerHealthState.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.home.shortcut/HomeShortcut : kotlin/Enum<com.letta.mobile.data.home.shortcut/HomeShortcut> { // com.letta.mobile.data.home.shortcut/HomeShortcut|null[0]
+    enum entry ABOUT // com.letta.mobile.data.home.shortcut/HomeShortcut.ABOUT|null[0]
+    enum entry AGENTS // com.letta.mobile.data.home.shortcut/HomeShortcut.AGENTS|null[0]
+    enum entry BLOCKS // com.letta.mobile.data.home.shortcut/HomeShortcut.BLOCKS|null[0]
+    enum entry BOT_SETTINGS // com.letta.mobile.data.home.shortcut/HomeShortcut.BOT_SETTINGS|null[0]
+    enum entry CONVERSATIONS // com.letta.mobile.data.home.shortcut/HomeShortcut.CONVERSATIONS|null[0]
+    enum entry FAVORITE_AGENT // com.letta.mobile.data.home.shortcut/HomeShortcut.FAVORITE_AGENT|null[0]
+    enum entry MCP_SERVERS // com.letta.mobile.data.home.shortcut/HomeShortcut.MCP_SERVERS|null[0]
+    enum entry MODELS // com.letta.mobile.data.home.shortcut/HomeShortcut.MODELS|null[0]
+    enum entry PROJECTS // com.letta.mobile.data.home.shortcut/HomeShortcut.PROJECTS|null[0]
+    enum entry PROVIDERS // com.letta.mobile.data.home.shortcut/HomeShortcut.PROVIDERS|null[0]
+    enum entry RUNS // com.letta.mobile.data.home.shortcut/HomeShortcut.RUNS|null[0]
+    enum entry SCHEDULES // com.letta.mobile.data.home.shortcut/HomeShortcut.SCHEDULES|null[0]
+    enum entry SETTINGS // com.letta.mobile.data.home.shortcut/HomeShortcut.SETTINGS|null[0]
+    enum entry SYSTEM_ACCESS // com.letta.mobile.data.home.shortcut/HomeShortcut.SYSTEM_ACCESS|null[0]
+    enum entry TELEMETRY // com.letta.mobile.data.home.shortcut/HomeShortcut.TELEMETRY|null[0]
+    enum entry TEMPLATES // com.letta.mobile.data.home.shortcut/HomeShortcut.TEMPLATES|null[0]
+    enum entry TOOLS // com.letta.mobile.data.home.shortcut/HomeShortcut.TOOLS|null[0]
+    enum entry USAGE // com.letta.mobile.data.home.shortcut/HomeShortcut.USAGE|null[0]
+
+    final val description // com.letta.mobile.data.home.shortcut/HomeShortcut.description|{}description[0]
+        final fun <get-description>(): kotlin/String? // com.letta.mobile.data.home.shortcut/HomeShortcut.description.<get-description>|<get-description>(){}[0]
+    final val entries // com.letta.mobile.data.home.shortcut/HomeShortcut.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home.shortcut/HomeShortcut.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val group // com.letta.mobile.data.home.shortcut/HomeShortcut.group|{}group[0]
+        final fun <get-group>(): com.letta.mobile.data.home.shortcut/HomeShortcut.Group // com.letta.mobile.data.home.shortcut/HomeShortcut.group.<get-group>|<get-group>(){}[0]
+    final val label // com.letta.mobile.data.home.shortcut/HomeShortcut.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.home.shortcut/HomeShortcut.label.<get-label>|<get-label>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.home.shortcut/HomeShortcut // com.letta.mobile.data.home.shortcut/HomeShortcut.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home.shortcut/HomeShortcut.values|values#static(){}[0]
+
+    final enum class Group : kotlin/Enum<com.letta.mobile.data.home.shortcut/HomeShortcut.Group> { // com.letta.mobile.data.home.shortcut/HomeShortcut.Group|null[0]
+        enum entry PRIMARY // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.PRIMARY|null[0]
+        enum entry SECONDARY // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.SECONDARY|null[0]
+        enum entry UTILITY // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.UTILITY|null[0]
+
+        final val entries // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.home.shortcut/HomeShortcut.Group> // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.entries.<get-entries>|<get-entries>#static(){}[0]
+
+        final fun valueOf(kotlin/String): com.letta.mobile.data.home.shortcut/HomeShortcut.Group // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.letta.mobile.data.home.shortcut/HomeShortcut.Group> // com.letta.mobile.data.home.shortcut/HomeShortcut.Group.values|values#static(){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.home/FleetSortKey : kotlin/Enum<com.letta.mobile.data.home/FleetSortKey> { // com.letta.mobile.data.home/FleetSortKey|null[0]
     enum entry Agent // com.letta.mobile.data.home/FleetSortKey.Agent|null[0]
     enum entry Conversations // com.letta.mobile.data.home/FleetSortKey.Conversations|null[0]
@@ -1402,51 +1447,6 @@ final enum class com.letta.mobile.data.home/FleetSortKey : kotlin/Enum<com.letta
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.home/FleetSortKey // com.letta.mobile.data.home/FleetSortKey.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.home/FleetSortKey> // com.letta.mobile.data.home/FleetSortKey.values|values#static(){}[0]
-}
-
-final enum class com.letta.mobile.data.home/HomeShortcut : kotlin/Enum<com.letta.mobile.data.home/HomeShortcut> { // com.letta.mobile.data.home/HomeShortcut|null[0]
-    enum entry ABOUT // com.letta.mobile.data.home/HomeShortcut.ABOUT|null[0]
-    enum entry AGENTS // com.letta.mobile.data.home/HomeShortcut.AGENTS|null[0]
-    enum entry BLOCKS // com.letta.mobile.data.home/HomeShortcut.BLOCKS|null[0]
-    enum entry BOT_SETTINGS // com.letta.mobile.data.home/HomeShortcut.BOT_SETTINGS|null[0]
-    enum entry CONVERSATIONS // com.letta.mobile.data.home/HomeShortcut.CONVERSATIONS|null[0]
-    enum entry FAVORITE_AGENT // com.letta.mobile.data.home/HomeShortcut.FAVORITE_AGENT|null[0]
-    enum entry MCP_SERVERS // com.letta.mobile.data.home/HomeShortcut.MCP_SERVERS|null[0]
-    enum entry MODELS // com.letta.mobile.data.home/HomeShortcut.MODELS|null[0]
-    enum entry PROJECTS // com.letta.mobile.data.home/HomeShortcut.PROJECTS|null[0]
-    enum entry PROVIDERS // com.letta.mobile.data.home/HomeShortcut.PROVIDERS|null[0]
-    enum entry RUNS // com.letta.mobile.data.home/HomeShortcut.RUNS|null[0]
-    enum entry SCHEDULES // com.letta.mobile.data.home/HomeShortcut.SCHEDULES|null[0]
-    enum entry SETTINGS // com.letta.mobile.data.home/HomeShortcut.SETTINGS|null[0]
-    enum entry SYSTEM_ACCESS // com.letta.mobile.data.home/HomeShortcut.SYSTEM_ACCESS|null[0]
-    enum entry TELEMETRY // com.letta.mobile.data.home/HomeShortcut.TELEMETRY|null[0]
-    enum entry TEMPLATES // com.letta.mobile.data.home/HomeShortcut.TEMPLATES|null[0]
-    enum entry TOOLS // com.letta.mobile.data.home/HomeShortcut.TOOLS|null[0]
-    enum entry USAGE // com.letta.mobile.data.home/HomeShortcut.USAGE|null[0]
-
-    final val description // com.letta.mobile.data.home/HomeShortcut.description|{}description[0]
-        final fun <get-description>(): kotlin/String? // com.letta.mobile.data.home/HomeShortcut.description.<get-description>|<get-description>(){}[0]
-    final val entries // com.letta.mobile.data.home/HomeShortcut.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomeShortcut.entries.<get-entries>|<get-entries>#static(){}[0]
-    final val group // com.letta.mobile.data.home/HomeShortcut.group|{}group[0]
-        final fun <get-group>(): com.letta.mobile.data.home/HomeShortcut.Group // com.letta.mobile.data.home/HomeShortcut.group.<get-group>|<get-group>(){}[0]
-    final val label // com.letta.mobile.data.home/HomeShortcut.label|{}label[0]
-        final fun <get-label>(): kotlin/String // com.letta.mobile.data.home/HomeShortcut.label.<get-label>|<get-label>(){}[0]
-
-    final fun valueOf(kotlin/String): com.letta.mobile.data.home/HomeShortcut // com.letta.mobile.data.home/HomeShortcut.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomeShortcut.values|values#static(){}[0]
-
-    final enum class Group : kotlin/Enum<com.letta.mobile.data.home/HomeShortcut.Group> { // com.letta.mobile.data.home/HomeShortcut.Group|null[0]
-        enum entry PRIMARY // com.letta.mobile.data.home/HomeShortcut.Group.PRIMARY|null[0]
-        enum entry SECONDARY // com.letta.mobile.data.home/HomeShortcut.Group.SECONDARY|null[0]
-        enum entry UTILITY // com.letta.mobile.data.home/HomeShortcut.Group.UTILITY|null[0]
-
-        final val entries // com.letta.mobile.data.home/HomeShortcut.Group.entries|#static{}entries[0]
-            final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.home/HomeShortcut.Group> // com.letta.mobile.data.home/HomeShortcut.Group.entries.<get-entries>|<get-entries>#static(){}[0]
-
-        final fun valueOf(kotlin/String): com.letta.mobile.data.home/HomeShortcut.Group // com.letta.mobile.data.home/HomeShortcut.Group.valueOf|valueOf#static(kotlin.String){}[0]
-        final fun values(): kotlin/Array<com.letta.mobile.data.home/HomeShortcut.Group> // com.letta.mobile.data.home/HomeShortcut.Group.values|values#static(){}[0]
-    }
 }
 
 final enum class com.letta.mobile.data.lanes/ConversationPurpose : kotlin/Enum<com.letta.mobile.data.lanes/ConversationPurpose> { // com.letta.mobile.data.lanes/ConversationPurpose|null[0]
@@ -4776,7 +4776,7 @@ abstract interface com.letta.mobile.data.home/HomePageActions { // com.letta.mob
     abstract fun reorderPins(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.home/HomePageActions.reorderPins|reorderPins(kotlin.collections.List<kotlin.String>){}[0]
     abstract fun selectSort(com.letta.mobile.data.home/FleetSortKey) // com.letta.mobile.data.home/HomePageActions.selectSort|selectSort(com.letta.mobile.data.home.FleetSortKey){}[0]
     abstract fun setAgentPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.home/HomePageActions.setAgentPinned|setAgentPinned(kotlin.String;kotlin.Boolean){}[0]
-    abstract fun setShortcutPinned(com.letta.mobile.data.home/HomeShortcut, kotlin/Boolean) // com.letta.mobile.data.home/HomePageActions.setShortcutPinned|setShortcutPinned(com.letta.mobile.data.home.HomeShortcut;kotlin.Boolean){}[0]
+    abstract fun setShortcutPinned(com.letta.mobile.data.home.shortcut/HomeShortcut, kotlin/Boolean) // com.letta.mobile.data.home/HomePageActions.setShortcutPinned|setShortcutPinned(com.letta.mobile.data.home.shortcut.HomeShortcut;kotlin.Boolean){}[0]
     abstract fun updateSearchQuery(kotlin/String) // com.letta.mobile.data.home/HomePageActions.updateSearchQuery|updateSearchQuery(kotlin.String){}[0]
     open fun loadIfStale() // com.letta.mobile.data.home/HomePageActions.loadIfStale|loadIfStale(){}[0]
 }
@@ -5854,6 +5854,7 @@ abstract interface com.letta.mobile.data.storage/SecureSettingsStore { // com.le
     abstract fun getString(kotlin/String, kotlin/String? = ...): kotlin/String? // com.letta.mobile.data.storage/SecureSettingsStore.getString|getString(kotlin.String;kotlin.String?){}[0]
     abstract fun putString(kotlin/String, kotlin/String) // com.letta.mobile.data.storage/SecureSettingsStore.putString|putString(kotlin.String;kotlin.String){}[0]
     abstract fun remove(kotlin/String) // com.letta.mobile.data.storage/SecureSettingsStore.remove|remove(kotlin.String){}[0]
+    open fun putDurableString(kotlin/String, kotlin/String) // com.letta.mobile.data.storage/SecureSettingsStore.putDurableString|putDurableString(kotlin.String;kotlin.String){}[0]
 }
 
 abstract interface com.letta.mobile.data.storage/SettingsPreferencesSnapshot { // com.letta.mobile.data.storage/SettingsPreferencesSnapshot|null[0]
@@ -10194,15 +10195,15 @@ sealed interface com.letta.mobile.data.home/HomePinnedItem { // com.letta.mobile
     }
 
     final class Shortcut : com.letta.mobile.data.home/HomePinnedItem { // com.letta.mobile.data.home/HomePinnedItem.Shortcut|null[0]
-        constructor <init>(com.letta.mobile.data.home/HomeShortcut) // com.letta.mobile.data.home/HomePinnedItem.Shortcut.<init>|<init>(com.letta.mobile.data.home.HomeShortcut){}[0]
+        constructor <init>(com.letta.mobile.data.home.shortcut/HomeShortcut) // com.letta.mobile.data.home/HomePinnedItem.Shortcut.<init>|<init>(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
 
         final val key // com.letta.mobile.data.home/HomePinnedItem.Shortcut.key|{}key[0]
             final fun <get-key>(): kotlin/String // com.letta.mobile.data.home/HomePinnedItem.Shortcut.key.<get-key>|<get-key>(){}[0]
         final val shortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.shortcut|{}shortcut[0]
-            final fun <get-shortcut>(): com.letta.mobile.data.home/HomeShortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.shortcut.<get-shortcut>|<get-shortcut>(){}[0]
+            final fun <get-shortcut>(): com.letta.mobile.data.home.shortcut/HomeShortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.shortcut.<get-shortcut>|<get-shortcut>(){}[0]
 
-        final fun component1(): com.letta.mobile.data.home/HomeShortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.component1|component1(){}[0]
-        final fun copy(com.letta.mobile.data.home/HomeShortcut = ...): com.letta.mobile.data.home/HomePinnedItem.Shortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.copy|copy(com.letta.mobile.data.home.HomeShortcut){}[0]
+        final fun component1(): com.letta.mobile.data.home.shortcut/HomeShortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.home.shortcut/HomeShortcut = ...): com.letta.mobile.data.home/HomePinnedItem.Shortcut // com.letta.mobile.data.home/HomePinnedItem.Shortcut.copy|copy(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home/HomePinnedItem.Shortcut.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.home/HomePinnedItem.Shortcut.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.home/HomePinnedItem.Shortcut.toString|toString(){}[0]
@@ -10211,8 +10212,8 @@ sealed interface com.letta.mobile.data.home/HomePinnedItem { // com.letta.mobile
     final object Companion { // com.letta.mobile.data.home/HomePinnedItem.Companion|null[0]
         final fun agentKey(kotlin/String): kotlin/String // com.letta.mobile.data.home/HomePinnedItem.Companion.agentKey|agentKey(kotlin.String){}[0]
         final fun parseAgentKey(kotlin/String): kotlin/String? // com.letta.mobile.data.home/HomePinnedItem.Companion.parseAgentKey|parseAgentKey(kotlin.String){}[0]
-        final fun parseShortcutKey(kotlin/String): com.letta.mobile.data.home/HomeShortcut? // com.letta.mobile.data.home/HomePinnedItem.Companion.parseShortcutKey|parseShortcutKey(kotlin.String){}[0]
-        final fun shortcutKey(com.letta.mobile.data.home/HomeShortcut): kotlin/String // com.letta.mobile.data.home/HomePinnedItem.Companion.shortcutKey|shortcutKey(com.letta.mobile.data.home.HomeShortcut){}[0]
+        final fun parseShortcutKey(kotlin/String): com.letta.mobile.data.home.shortcut/HomeShortcut? // com.letta.mobile.data.home/HomePinnedItem.Companion.parseShortcutKey|parseShortcutKey(kotlin.String){}[0]
+        final fun shortcutKey(com.letta.mobile.data.home.shortcut/HomeShortcut): kotlin/String // com.letta.mobile.data.home/HomePinnedItem.Companion.shortcutKey|shortcutKey(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
     }
 }
 
@@ -24192,6 +24193,17 @@ final class <#A: kotlin/Any?, #B: kotlin/Any?> com.letta.mobile.data.model.provi
     constructor <init>(kotlinx.serialization/KSerializer<#A>, kotlinx.serialization/KSerializer<#B>, kotlin/Function1<#A, kotlin/Boolean>, kotlin/Function1<#B, kotlin/Int>) // com.letta.mobile.data.model.provider.rpc/ProviderRpcCodec.<init>|<init>(kotlinx.serialization.KSerializer<1:0>;kotlinx.serialization.KSerializer<1:1>;kotlin.Function1<1:0,kotlin.Boolean>;kotlin.Function1<1:1,kotlin.Int>){}[0]
 }
 
+final class <#A: kotlin/Any?> com.letta.mobile.data.flow/DerivedStateFlow : kotlinx.coroutines.flow/StateFlow<#A> { // com.letta.mobile.data.flow/DerivedStateFlow|null[0]
+    constructor <init>(kotlinx.coroutines.flow/Flow<#A>, kotlin/Function0<#A>) // com.letta.mobile.data.flow/DerivedStateFlow.<init>|<init>(kotlinx.coroutines.flow.Flow<1:0>;kotlin.Function0<1:0>){}[0]
+
+    final val replayCache // com.letta.mobile.data.flow/DerivedStateFlow.replayCache|{}replayCache[0]
+        final fun <get-replayCache>(): kotlin.collections/List<#A> // com.letta.mobile.data.flow/DerivedStateFlow.replayCache.<get-replayCache>|<get-replayCache>(){}[0]
+    final val value // com.letta.mobile.data.flow/DerivedStateFlow.value|{}value[0]
+        final fun <get-value>(): #A // com.letta.mobile.data.flow/DerivedStateFlow.value.<get-value>|<get-value>(){}[0]
+
+    final suspend fun collect(kotlinx.coroutines.flow/FlowCollector<#A>): kotlin/Nothing // com.letta.mobile.data.flow/DerivedStateFlow.collect|collect(kotlinx.coroutines.flow.FlowCollector<1:0>){}[0]
+}
+
 final class <#A: kotlin/Any?> com.letta.mobile.data.model/ImmutableListSerializer : kotlinx.serialization/KSerializer<kotlinx.collections.immutable/ImmutableList<#A>> { // com.letta.mobile.data.model/ImmutableListSerializer|null[0]
     constructor <init>(kotlinx.serialization/KSerializer<#A>) // com.letta.mobile.data.model/ImmutableListSerializer.<init>|<init>(kotlinx.serialization.KSerializer<1:0>){}[0]
 
@@ -24217,17 +24229,6 @@ final class <#A: kotlin/Any?> com.letta.mobile.data.settings/SettingValue { // c
         final fun <get-current>(): kotlinx.coroutines.flow/StateFlow<#A> // com.letta.mobile.data.settings/SettingValue.current.<get-current>|<get-current>(){}[0]
 
     final fun set(#A) // com.letta.mobile.data.settings/SettingValue.set|set(1:0){}[0]
-}
-
-final class <#A: kotlin/Any?> com.letta.mobile.ui.chat.session/DerivedStateFlow : kotlinx.coroutines.flow/StateFlow<#A> { // com.letta.mobile.ui.chat.session/DerivedStateFlow|null[0]
-    constructor <init>(kotlinx.coroutines.flow/Flow<#A>, kotlin/Function0<#A>) // com.letta.mobile.ui.chat.session/DerivedStateFlow.<init>|<init>(kotlinx.coroutines.flow.Flow<1:0>;kotlin.Function0<1:0>){}[0]
-
-    final val replayCache // com.letta.mobile.ui.chat.session/DerivedStateFlow.replayCache|{}replayCache[0]
-        final fun <get-replayCache>(): kotlin.collections/List<#A> // com.letta.mobile.ui.chat.session/DerivedStateFlow.replayCache.<get-replayCache>|<get-replayCache>(){}[0]
-    final val value // com.letta.mobile.ui.chat.session/DerivedStateFlow.value|{}value[0]
-        final fun <get-value>(): #A // com.letta.mobile.ui.chat.session/DerivedStateFlow.value.<get-value>|<get-value>(){}[0]
-
-    final suspend fun collect(kotlinx.coroutines.flow/FlowCollector<#A>): kotlin/Nothing // com.letta.mobile.ui.chat.session/DerivedStateFlow.collect|collect(kotlinx.coroutines.flow.FlowCollector<1:0>){}[0]
 }
 
 final class <#A: kotlin/Any?> com.letta.mobile.util/ReadThroughConversationFleets { // com.letta.mobile.util/ReadThroughConversationFleets|null[0]
@@ -32837,7 +32838,7 @@ final class com.letta.mobile.data.chat.conversations/ConversationManagementPrefs
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.conversations/ConversationManagementPrefs.toString|toString(){}[0]
 
     final object Companion { // com.letta.mobile.data.chat.conversations/ConversationManagementPrefs.Companion|null[0]
-        final fun from(com.letta.mobile.data.storage/SecureSettingsStore): com.letta.mobile.data.chat.conversations/ConversationManagementPrefs // com.letta.mobile.data.chat.conversations/ConversationManagementPrefs.Companion.from|from(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
+        final fun from(com.letta.mobile.data.storage/SecureSettingsStore, kotlinx.coroutines.flow/StateFlow<kotlin/String?> = ...): com.letta.mobile.data.chat.conversations/ConversationManagementPrefs // com.letta.mobile.data.chat.conversations/ConversationManagementPrefs.Companion.from|from(com.letta.mobile.data.storage.SecureSettingsStore;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
     }
 }
 
@@ -33875,8 +33876,10 @@ final class com.letta.mobile.data.chat.runtime/EnginePermissionModes : com.letta
 }
 
 final class com.letta.mobile.data.chat.runtime/PinnedConversations { // com.letta.mobile.data.chat.runtime/PinnedConversations|null[0]
-    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String = ...) // com.letta.mobile.data.chat.runtime/PinnedConversations.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String = ..., kotlinx.coroutines.flow/StateFlow<kotlin/String?> = ...) // com.letta.mobile.data.chat.runtime/PinnedConversations.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
 
+    final val binding // com.letta.mobile.data.chat.runtime/PinnedConversations.binding|{}binding[0]
+        final fun <get-binding>(): com.letta.mobile.data.objectverbs.binding/PinBinding // com.letta.mobile.data.chat.runtime/PinnedConversations.binding.<get-binding>|<get-binding>(){}[0]
     final val pinned // com.letta.mobile.data.chat.runtime/PinnedConversations.pinned|{}pinned[0]
         final fun <get-pinned>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Set<kotlin/String>> // com.letta.mobile.data.chat.runtime/PinnedConversations.pinned.<get-pinned>|<get-pinned>(){}[0]
 
@@ -38092,13 +38095,13 @@ final class com.letta.mobile.data.home/HomeAgentRef { // com.letta.mobile.data.h
 }
 
 final class com.letta.mobile.data.home/HomePageConfig { // com.letta.mobile.data.home/HomePageConfig|null[0]
-    constructor <init>(kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> = ...) // com.letta.mobile.data.home/HomePageConfig.<init>|<init>(kotlin.collections.Set<com.letta.mobile.data.home.HomeShortcut>){}[0]
+    constructor <init>(kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> = ...) // com.letta.mobile.data.home/HomePageConfig.<init>|<init>(kotlin.collections.Set<com.letta.mobile.data.home.shortcut.HomeShortcut>){}[0]
 
     final val availableShortcuts // com.letta.mobile.data.home/HomePageConfig.availableShortcuts|{}availableShortcuts[0]
-        final fun <get-availableShortcuts>(): kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomePageConfig.availableShortcuts.<get-availableShortcuts>|<get-availableShortcuts>(){}[0]
+        final fun <get-availableShortcuts>(): kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home/HomePageConfig.availableShortcuts.<get-availableShortcuts>|<get-availableShortcuts>(){}[0]
 
-    final fun component1(): kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomePageConfig.component1|component1(){}[0]
-    final fun copy(kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> = ...): com.letta.mobile.data.home/HomePageConfig // com.letta.mobile.data.home/HomePageConfig.copy|copy(kotlin.collections.Set<com.letta.mobile.data.home.HomeShortcut>){}[0]
+    final fun component1(): kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home/HomePageConfig.component1|component1(){}[0]
+    final fun copy(kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> = ...): com.letta.mobile.data.home/HomePageConfig // com.letta.mobile.data.home/HomePageConfig.copy|copy(kotlin.collections.Set<com.letta.mobile.data.home.shortcut.HomeShortcut>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home/HomePageConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.home/HomePageConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.home/HomePageConfig.toString|toString(){}[0]
@@ -38107,6 +38110,8 @@ final class com.letta.mobile.data.home/HomePageConfig { // com.letta.mobile.data
 final class com.letta.mobile.data.home/HomePageController : com.letta.mobile.data.home/HomePageActions, kotlin/AutoCloseable { // com.letta.mobile.data.home/HomePageController|null[0]
     constructor <init>(com.letta.mobile.data.home/HomePageSource, com.letta.mobile.data.home/HomePinStore, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.home/HomePageConfig = ...) // com.letta.mobile.data.home/HomePageController.<init>|<init>(com.letta.mobile.data.home.HomePageSource;com.letta.mobile.data.home.HomePinStore;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.home.HomePageConfig){}[0]
 
+    final val objectPins // com.letta.mobile.data.home/HomePageController.objectPins|{}objectPins[0]
+        final fun <get-objectPins>(): com.letta.mobile.data.objectverbs.binding/PinBinding? // com.letta.mobile.data.home/HomePageController.objectPins.<get-objectPins>|<get-objectPins>(){}[0]
     final val state // com.letta.mobile.data.home/HomePageController.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.home/HomePageState> // com.letta.mobile.data.home/HomePageController.state.<get-state>|<get-state>(){}[0]
 
@@ -38117,7 +38122,7 @@ final class com.letta.mobile.data.home/HomePageController : com.letta.mobile.dat
     final fun reorderPins(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.home/HomePageController.reorderPins|reorderPins(kotlin.collections.List<kotlin.String>){}[0]
     final fun selectSort(com.letta.mobile.data.home/FleetSortKey) // com.letta.mobile.data.home/HomePageController.selectSort|selectSort(com.letta.mobile.data.home.FleetSortKey){}[0]
     final fun setAgentPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.home/HomePageController.setAgentPinned|setAgentPinned(kotlin.String;kotlin.Boolean){}[0]
-    final fun setShortcutPinned(com.letta.mobile.data.home/HomeShortcut, kotlin/Boolean) // com.letta.mobile.data.home/HomePageController.setShortcutPinned|setShortcutPinned(com.letta.mobile.data.home.HomeShortcut;kotlin.Boolean){}[0]
+    final fun setShortcutPinned(com.letta.mobile.data.home.shortcut/HomeShortcut, kotlin/Boolean) // com.letta.mobile.data.home/HomePageController.setShortcutPinned|setShortcutPinned(com.letta.mobile.data.home.shortcut.HomeShortcut;kotlin.Boolean){}[0]
     final fun start() // com.letta.mobile.data.home/HomePageController.start|start(){}[0]
     final fun updateFavorite(com.letta.mobile.data.home/HomeAgentRef?) // com.letta.mobile.data.home/HomePageController.updateFavorite|updateFavorite(com.letta.mobile.data.home.HomeAgentRef?){}[0]
     final fun updateFleet(com.letta.mobile.data.home/FleetOverview) // com.letta.mobile.data.home/HomePageController.updateFleet|updateFleet(com.letta.mobile.data.home.FleetOverview){}[0]
@@ -38125,10 +38130,10 @@ final class com.letta.mobile.data.home/HomePageController : com.letta.mobile.dat
 }
 
 final class com.letta.mobile.data.home/HomePageState { // com.letta.mobile.data.home/HomePageState|null[0]
-    constructor <init>(com.letta.mobile.data.home/FleetOverview = ..., com.letta.mobile.data.home/FleetSort = ..., com.letta.mobile.data.home/HomeStats = ..., com.letta.mobile.data.home/HomeSearchCatalog = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> = ..., com.letta.mobile.data.home/HomeAgentRef? = ..., com.letta.mobile.data.home/HomeSearchState = ..., kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> = ..., kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat> = ...) // com.letta.mobile.data.home/HomePageState.<init>|<init>(com.letta.mobile.data.home.FleetOverview;com.letta.mobile.data.home.FleetSort;com.letta.mobile.data.home.HomeStats;com.letta.mobile.data.home.HomeSearchCatalog;kotlin.collections.List<kotlin.String>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Set<com.letta.mobile.data.home.HomeShortcut>;com.letta.mobile.data.home.HomeAgentRef?;com.letta.mobile.data.home.HomeSearchState;kotlin.collections.List<com.letta.mobile.data.home.HomePinnedItem>;kotlin.collections.List<com.letta.mobile.data.home.FleetAgentStat>){}[0]
+    constructor <init>(com.letta.mobile.data.home/FleetOverview = ..., com.letta.mobile.data.home/FleetSort = ..., com.letta.mobile.data.home/HomeStats = ..., com.letta.mobile.data.home/HomeSearchCatalog = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> = ..., com.letta.mobile.data.home/HomeAgentRef? = ..., com.letta.mobile.data.home/HomeSearchState = ..., kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> = ..., kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat> = ...) // com.letta.mobile.data.home/HomePageState.<init>|<init>(com.letta.mobile.data.home.FleetOverview;com.letta.mobile.data.home.FleetSort;com.letta.mobile.data.home.HomeStats;com.letta.mobile.data.home.HomeSearchCatalog;kotlin.collections.List<kotlin.String>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Set<com.letta.mobile.data.home.shortcut.HomeShortcut>;com.letta.mobile.data.home.HomeAgentRef?;com.letta.mobile.data.home.HomeSearchState;kotlin.collections.List<com.letta.mobile.data.home.HomePinnedItem>;kotlin.collections.List<com.letta.mobile.data.home.FleetAgentStat>){}[0]
 
     final val availableShortcuts // com.letta.mobile.data.home/HomePageState.availableShortcuts|{}availableShortcuts[0]
-        final fun <get-availableShortcuts>(): kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomePageState.availableShortcuts.<get-availableShortcuts>|<get-availableShortcuts>(){}[0]
+        final fun <get-availableShortcuts>(): kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home/HomePageState.availableShortcuts.<get-availableShortcuts>|<get-availableShortcuts>(){}[0]
     final val catalog // com.letta.mobile.data.home/HomePageState.catalog|{}catalog[0]
         final fun <get-catalog>(): com.letta.mobile.data.home/HomeSearchCatalog // com.letta.mobile.data.home/HomePageState.catalog.<get-catalog>|<get-catalog>(){}[0]
     final val favorite // com.letta.mobile.data.home/HomePageState.favorite|{}favorite[0]
@@ -38152,7 +38157,7 @@ final class com.letta.mobile.data.home/HomePageState { // com.letta.mobile.data.
     final val stats // com.letta.mobile.data.home/HomePageState.stats|{}stats[0]
         final fun <get-stats>(): com.letta.mobile.data.home/HomeStats // com.letta.mobile.data.home/HomePageState.stats.<get-stats>|<get-stats>(){}[0]
     final val unpinnedShortcuts // com.letta.mobile.data.home/HomePageState.unpinnedShortcuts|{}unpinnedShortcuts[0]
-        final fun <get-unpinnedShortcuts>(): kotlin.collections/List<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomePageState.unpinnedShortcuts.<get-unpinnedShortcuts>|<get-unpinnedShortcuts>(){}[0]
+        final fun <get-unpinnedShortcuts>(): kotlin.collections/List<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home/HomePageState.unpinnedShortcuts.<get-unpinnedShortcuts>|<get-unpinnedShortcuts>(){}[0]
 
     final fun component1(): com.letta.mobile.data.home/FleetOverview // com.letta.mobile.data.home/HomePageState.component1|component1(){}[0]
     final fun component10(): com.letta.mobile.data.home/HomeSearchState // com.letta.mobile.data.home/HomePageState.component10|component10(){}[0]
@@ -38164,13 +38169,13 @@ final class com.letta.mobile.data.home/HomePageState { // com.letta.mobile.data.
     final fun component5(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.home/HomePageState.component5|component5(){}[0]
     final fun component6(): kotlin/Boolean // com.letta.mobile.data.home/HomePageState.component6|component6(){}[0]
     final fun component7(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.home/HomePageState.component7|component7(){}[0]
-    final fun component8(): kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> // com.letta.mobile.data.home/HomePageState.component8|component8(){}[0]
+    final fun component8(): kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> // com.letta.mobile.data.home/HomePageState.component8|component8(){}[0]
     final fun component9(): com.letta.mobile.data.home/HomeAgentRef? // com.letta.mobile.data.home/HomePageState.component9|component9(){}[0]
-    final fun copy(com.letta.mobile.data.home/FleetOverview = ..., com.letta.mobile.data.home/FleetSort = ..., com.letta.mobile.data.home/HomeStats = ..., com.letta.mobile.data.home/HomeSearchCatalog = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> = ..., com.letta.mobile.data.home/HomeAgentRef? = ..., com.letta.mobile.data.home/HomeSearchState = ..., kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> = ..., kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat> = ...): com.letta.mobile.data.home/HomePageState // com.letta.mobile.data.home/HomePageState.copy|copy(com.letta.mobile.data.home.FleetOverview;com.letta.mobile.data.home.FleetSort;com.letta.mobile.data.home.HomeStats;com.letta.mobile.data.home.HomeSearchCatalog;kotlin.collections.List<kotlin.String>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Set<com.letta.mobile.data.home.HomeShortcut>;com.letta.mobile.data.home.HomeAgentRef?;com.letta.mobile.data.home.HomeSearchState;kotlin.collections.List<com.letta.mobile.data.home.HomePinnedItem>;kotlin.collections.List<com.letta.mobile.data.home.FleetAgentStat>){}[0]
+    final fun copy(com.letta.mobile.data.home/FleetOverview = ..., com.letta.mobile.data.home/FleetSort = ..., com.letta.mobile.data.home/HomeStats = ..., com.letta.mobile.data.home/HomeSearchCatalog = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> = ..., com.letta.mobile.data.home/HomeAgentRef? = ..., com.letta.mobile.data.home/HomeSearchState = ..., kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> = ..., kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat> = ...): com.letta.mobile.data.home/HomePageState // com.letta.mobile.data.home/HomePageState.copy|copy(com.letta.mobile.data.home.FleetOverview;com.letta.mobile.data.home.FleetSort;com.letta.mobile.data.home.HomeStats;com.letta.mobile.data.home.HomeSearchCatalog;kotlin.collections.List<kotlin.String>;kotlin.Boolean;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Set<com.letta.mobile.data.home.shortcut.HomeShortcut>;com.letta.mobile.data.home.HomeAgentRef?;com.letta.mobile.data.home.HomeSearchState;kotlin.collections.List<com.letta.mobile.data.home.HomePinnedItem>;kotlin.collections.List<com.letta.mobile.data.home.FleetAgentStat>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home/HomePageState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.home/HomePageState.hashCode|hashCode(){}[0]
     final fun isAgentPinned(kotlin/String): kotlin/Boolean // com.letta.mobile.data.home/HomePageState.isAgentPinned|isAgentPinned(kotlin.String){}[0]
-    final fun shortcutInfo(com.letta.mobile.data.home/HomeShortcut): kotlin/String? // com.letta.mobile.data.home/HomePageState.shortcutInfo|shortcutInfo(com.letta.mobile.data.home.HomeShortcut){}[0]
+    final fun shortcutInfo(com.letta.mobile.data.home.shortcut/HomeShortcut): kotlin/String? // com.letta.mobile.data.home/HomePageState.shortcutInfo|shortcutInfo(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.home/HomePageState.toString|toString(){}[0]
 }
 
@@ -38259,7 +38264,7 @@ final class com.letta.mobile.data.home/HomeShellSearchState { // com.letta.mobil
 }
 
 final class com.letta.mobile.data.home/HomeStatTile { // com.letta.mobile.data.home/HomeStatTile|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String? = ..., kotlin.collections/List<kotlin/Int>? = ..., com.letta.mobile.data.home/HomeShortcut? = ...) // com.letta.mobile.data.home/HomeStatTile.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.Int>?;com.letta.mobile.data.home.HomeShortcut?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String? = ..., kotlin.collections/List<kotlin/Int>? = ..., com.letta.mobile.data.home.shortcut/HomeShortcut? = ...) // com.letta.mobile.data.home/HomeStatTile.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.Int>?;com.letta.mobile.data.home.shortcut.HomeShortcut?){}[0]
 
     final val caption // com.letta.mobile.data.home/HomeStatTile.caption|{}caption[0]
         final fun <get-caption>(): kotlin/String? // com.letta.mobile.data.home/HomeStatTile.caption.<get-caption>|<get-caption>(){}[0]
@@ -38268,7 +38273,7 @@ final class com.letta.mobile.data.home/HomeStatTile { // com.letta.mobile.data.h
     final val series // com.letta.mobile.data.home/HomeStatTile.series|{}series[0]
         final fun <get-series>(): kotlin.collections/List<kotlin/Int>? // com.letta.mobile.data.home/HomeStatTile.series.<get-series>|<get-series>(){}[0]
     final val shortcut // com.letta.mobile.data.home/HomeStatTile.shortcut|{}shortcut[0]
-        final fun <get-shortcut>(): com.letta.mobile.data.home/HomeShortcut? // com.letta.mobile.data.home/HomeStatTile.shortcut.<get-shortcut>|<get-shortcut>(){}[0]
+        final fun <get-shortcut>(): com.letta.mobile.data.home.shortcut/HomeShortcut? // com.letta.mobile.data.home/HomeStatTile.shortcut.<get-shortcut>|<get-shortcut>(){}[0]
     final val value // com.letta.mobile.data.home/HomeStatTile.value|{}value[0]
         final fun <get-value>(): kotlin/String // com.letta.mobile.data.home/HomeStatTile.value.<get-value>|<get-value>(){}[0]
 
@@ -38276,8 +38281,8 @@ final class com.letta.mobile.data.home/HomeStatTile { // com.letta.mobile.data.h
     final fun component2(): kotlin/String // com.letta.mobile.data.home/HomeStatTile.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.home/HomeStatTile.component3|component3(){}[0]
     final fun component4(): kotlin.collections/List<kotlin/Int>? // com.letta.mobile.data.home/HomeStatTile.component4|component4(){}[0]
-    final fun component5(): com.letta.mobile.data.home/HomeShortcut? // com.letta.mobile.data.home/HomeStatTile.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/Int>? = ..., com.letta.mobile.data.home/HomeShortcut? = ...): com.letta.mobile.data.home/HomeStatTile // com.letta.mobile.data.home/HomeStatTile.copy|copy(kotlin.String;kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.Int>?;com.letta.mobile.data.home.HomeShortcut?){}[0]
+    final fun component5(): com.letta.mobile.data.home.shortcut/HomeShortcut? // com.letta.mobile.data.home/HomeStatTile.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/Int>? = ..., com.letta.mobile.data.home.shortcut/HomeShortcut? = ...): com.letta.mobile.data.home/HomeStatTile // com.letta.mobile.data.home/HomeStatTile.copy|copy(kotlin.String;kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.Int>?;com.letta.mobile.data.home.shortcut.HomeShortcut?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.home/HomeStatTile.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.home/HomeStatTile.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.home/HomeStatTile.toString|toString(){}[0]
@@ -38370,8 +38375,10 @@ final class com.letta.mobile.data.home/PinnedAgentNames { // com.letta.mobile.da
 }
 
 final class com.letta.mobile.data.home/SettingsStoreHomePinStore : com.letta.mobile.data.home/HomePinStore { // com.letta.mobile.data.home/SettingsStoreHomePinStore|null[0]
-    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin.collections/List<kotlin/String>, kotlin/String = ...) // com.letta.mobile.data.home/SettingsStoreHomePinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.collections.List<kotlin.String>;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin.collections/List<kotlin/String>, kotlin/String = ..., kotlinx.coroutines.flow/StateFlow<kotlin/String?> = ...) // com.letta.mobile.data.home/SettingsStoreHomePinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.collections.List<kotlin.String>;kotlin.String;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
 
+    final val binding // com.letta.mobile.data.home/SettingsStoreHomePinStore.binding|{}binding[0]
+        final fun <get-binding>(): com.letta.mobile.data.objectverbs.binding/PinBinding // com.letta.mobile.data.home/SettingsStoreHomePinStore.binding.<get-binding>|<get-binding>(){}[0]
     final val pinnedKeys // com.letta.mobile.data.home/SettingsStoreHomePinStore.pinnedKeys|{}pinnedKeys[0]
         final fun <get-pinnedKeys>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.home/SettingsStoreHomePinStore.pinnedKeys.<get-pinnedKeys>|<get-pinnedKeys>(){}[0]
 
@@ -50802,6 +50809,47 @@ final class com.letta.mobile.data.notify/StoredAttentionPrefs : com.letta.mobile
     }
 }
 
+final class com.letta.mobile.data.objectverbs.binding/PinBinding { // com.letta.mobile.data.objectverbs.binding/PinBinding|null[0]
+    constructor <init>(com.letta.mobile.data.pins/DevicePinStore, kotlinx.coroutines.flow/StateFlow<kotlin/String?>) // com.letta.mobile.data.objectverbs.binding/PinBinding.<init>|<init>(com.letta.mobile.data.pins.DevicePinStore;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
+
+    final val references // com.letta.mobile.data.objectverbs.binding/PinBinding.references|{}references[0]
+        final fun <get-references>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.objectverbs/ObjectRef>> // com.letta.mobile.data.objectverbs.binding/PinBinding.references.<get-references>|<get-references>(){}[0]
+    final val registry // com.letta.mobile.data.objectverbs.binding/PinBinding.registry|{}registry[0]
+        final fun <get-registry>(): com.letta.mobile.data.objectverbs.registry/VerbRegistry // com.letta.mobile.data.objectverbs.binding/PinBinding.registry.<get-registry>|<get-registry>(){}[0]
+    final val source // com.letta.mobile.data.objectverbs.binding/PinBinding.source|{}source[0]
+        final fun <get-source>(): kotlinx.coroutines.flow/StateFlow<kotlin/String?> // com.letta.mobile.data.objectverbs.binding/PinBinding.source.<get-source>|<get-source>(){}[0]
+    final val store // com.letta.mobile.data.objectverbs.binding/PinBinding.store|{}store[0]
+        final fun <get-store>(): com.letta.mobile.data.pins/DevicePinStore // com.letta.mobile.data.objectverbs.binding/PinBinding.store.<get-store>|<get-store>(){}[0]
+
+    final fun ids(kotlin/String): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.objectverbs.binding/PinBinding.ids|ids(kotlin.String){}[0]
+    final fun reorder(kotlin.collections/List<com.letta.mobile.data.objectverbs/ObjectRef>) // com.letta.mobile.data.objectverbs.binding/PinBinding.reorder|reorder(kotlin.collections.List<com.letta.mobile.data.objectverbs.ObjectRef>){}[0]
+    final fun scoped(com.letta.mobile.data.objectverbs/ObjectRef): com.letta.mobile.data.pins/ScopedObjectRef? // com.letta.mobile.data.objectverbs.binding/PinBinding.scoped|scoped(com.letta.mobile.data.objectverbs.ObjectRef){}[0]
+    final fun setPinned(com.letta.mobile.data.objectverbs/ObjectRef, kotlin/Boolean): com.letta.mobile.data.objectverbs/VerbOutcome // com.letta.mobile.data.objectverbs.binding/PinBinding.setPinned|setPinned(com.letta.mobile.data.objectverbs.ObjectRef;kotlin.Boolean){}[0]
+}
+
+final class com.letta.mobile.data.objectverbs.registry/CoreVerbProvider { // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider|null[0]
+    constructor <init>(com.letta.mobile.data.pins/DevicePinStore, kotlin/Function0<kotlin/String?>, kotlin/Function1<com.letta.mobile.data.objectverbs/ObjectRef, kotlin/Boolean>) // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.<init>|<init>(com.letta.mobile.data.pins.DevicePinStore;kotlin.Function0<kotlin.String?>;kotlin.Function1<com.letta.mobile.data.objectverbs.ObjectRef,kotlin.Boolean>){}[0]
+
+    final fun describe(com.letta.mobile.data.objectverbs/ObjectRef, com.letta.mobile.data.objectverbs/VerbContext): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot? // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.describe|describe(com.letta.mobile.data.objectverbs.ObjectRef;com.letta.mobile.data.objectverbs.VerbContext){}[0]
+    final fun invoke(com.letta.mobile.data.objectverbs/VerbInvocation): com.letta.mobile.data.objectverbs/VerbOutcome // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.invoke|invoke(com.letta.mobile.data.objectverbs.VerbInvocation){}[0]
+    final fun observe(com.letta.mobile.data.objectverbs/ObjectRef, com.letta.mobile.data.objectverbs/VerbContext): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.objectverbs/ObjectVerbSnapshot?> // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.observe|observe(com.letta.mobile.data.objectverbs.ObjectRef;com.letta.mobile.data.objectverbs.VerbContext){}[0]
+
+    final object Companion { // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.Companion|null[0]
+        final const val PIN // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.Companion.PIN|{}PIN[0]
+            final fun <get-PIN>(): kotlin/String // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.Companion.PIN.<get-PIN>|<get-PIN>(){}[0]
+
+        final val KINDS // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.Companion.KINDS|{}KINDS[0]
+            final fun <get-KINDS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.objectverbs.registry/CoreVerbProvider.Companion.KINDS.<get-KINDS>|<get-KINDS>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.objectverbs.registry/VerbRegistry { // com.letta.mobile.data.objectverbs.registry/VerbRegistry|null[0]
+    constructor <init>(com.letta.mobile.data.objectverbs.registry/CoreVerbProvider?) // com.letta.mobile.data.objectverbs.registry/VerbRegistry.<init>|<init>(com.letta.mobile.data.objectverbs.registry.CoreVerbProvider?){}[0]
+
+    final fun describe(com.letta.mobile.data.objectverbs/ObjectRef, com.letta.mobile.data.objectverbs/VerbContext): com.letta.mobile.data.objectverbs/ObjectVerbSnapshot? // com.letta.mobile.data.objectverbs.registry/VerbRegistry.describe|describe(com.letta.mobile.data.objectverbs.ObjectRef;com.letta.mobile.data.objectverbs.VerbContext){}[0]
+    final fun invoke(com.letta.mobile.data.objectverbs/VerbInvocation): com.letta.mobile.data.objectverbs/VerbOutcome // com.letta.mobile.data.objectverbs.registry/VerbRegistry.invoke|invoke(com.letta.mobile.data.objectverbs.VerbInvocation){}[0]
+}
+
 final class com.letta.mobile.data.objectverbs/ObjectFacets { // com.letta.mobile.data.objectverbs/ObjectFacets|null[0]
     constructor <init>(kotlin/Boolean? = ..., kotlin/Int? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ...) // com.letta.mobile.data.objectverbs/ObjectFacets.<init>|<init>(kotlin.Boolean?;kotlin.Int?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?){}[0]
 
@@ -50865,13 +50913,7 @@ final class com.letta.mobile.data.objectverbs/ObjectRef { // com.letta.mobile.da
     }
 
     final object Companion { // com.letta.mobile.data.objectverbs/ObjectRef.Companion|null[0]
-        final fun agent(com.letta.mobile.data.model/AgentId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.agent|agent(com.letta.mobile.data.model.AgentId){}[0]
-        final fun canvas(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.canvas|canvas(com.letta.mobile.data.model.CanvasId){}[0]
-        final fun conversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.conversation|conversation(com.letta.mobile.data.model.ConversationId){}[0]
-        final fun project(com.letta.mobile.data.model/ProjectId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.project|project(com.letta.mobile.data.model.ProjectId){}[0]
-        final fun project(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.project|project(com.letta.mobile.data.projects.ProjectKey){}[0]
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.objectverbs/ObjectRef> // com.letta.mobile.data.objectverbs/ObjectRef.Companion.serializer|serializer(){}[0]
-        final fun shortcut(com.letta.mobile.data.home/HomeShortcut): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs/ObjectRef.Companion.shortcut|shortcut(com.letta.mobile.data.home.HomeShortcut){}[0]
     }
 }
 
@@ -51465,6 +51507,155 @@ final class com.letta.mobile.data.pairing/SettingsPairedHostStore : com.letta.mo
     constructor <init>(com.letta.mobile.data.repository.api/ISettingsRepository) // com.letta.mobile.data.pairing/SettingsPairedHostStore.<init>|<init>(com.letta.mobile.data.repository.api.ISettingsRepository){}[0]
 
     final suspend fun saveAndActivate(com.letta.mobile.data.pairing/PairedHost) // com.letta.mobile.data.pairing/SettingsPairedHostStore.saveAndActivate|saveAndActivate(com.letta.mobile.data.pairing.PairedHost){}[0]
+}
+
+final class com.letta.mobile.data.pins/DevicePinStore { // com.letta.mobile.data.pins/DevicePinStore|null[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore) // com.letta.mobile.data.pins/DevicePinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
+
+    final val journal // com.letta.mobile.data.pins/DevicePinStore.journal|{}journal[0]
+        final fun <get-journal>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.pins/PinJournal> // com.letta.mobile.data.pins/DevicePinStore.journal.<get-journal>|<get-journal>(){}[0]
+
+    final fun facets(com.letta.mobile.data.pins/ScopedObjectRef): com.letta.mobile.data.objectverbs/ObjectFacets // com.letta.mobile.data.pins/DevicePinStore.facets|facets(com.letta.mobile.data.pins.ScopedObjectRef){}[0]
+    final fun importLegacy(kotlin.collections/List<com.letta.mobile.data.pins/LegacyPinSource>, kotlin/Function2<kotlin/String, kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef?> = ...) // com.letta.mobile.data.pins/DevicePinStore.importLegacy|importLegacy(kotlin.collections.List<com.letta.mobile.data.pins.LegacyPinSource>;kotlin.Function2<kotlin.String,kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef?>){}[0]
+    final fun reload() // com.letta.mobile.data.pins/DevicePinStore.reload|reload(){}[0]
+    final fun reorder(kotlin.collections/List<com.letta.mobile.data.pins/ScopedObjectRef>) // com.letta.mobile.data.pins/DevicePinStore.reorder|reorder(kotlin.collections.List<com.letta.mobile.data.pins.ScopedObjectRef>){}[0]
+    final fun resolvePending(kotlin/Function2<kotlin/String, kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef?>) // com.letta.mobile.data.pins/DevicePinStore.resolvePending|resolvePending(kotlin.Function2<kotlin.String,kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef?>){}[0]
+    final fun seedHomeDefaults(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.pins/DevicePinStore.seedHomeDefaults|seedHomeDefaults(kotlin.collections.List<kotlin.String>){}[0]
+    final fun setPinned(com.letta.mobile.data.pins/ScopedObjectRef, kotlin/Boolean) // com.letta.mobile.data.pins/DevicePinStore.setPinned|setPinned(com.letta.mobile.data.pins.ScopedObjectRef;kotlin.Boolean){}[0]
+
+    final object Companion { // com.letta.mobile.data.pins/DevicePinStore.Companion|null[0]
+        final const val STORAGE_KEY // com.letta.mobile.data.pins/DevicePinStore.Companion.STORAGE_KEY|{}STORAGE_KEY[0]
+            final fun <get-STORAGE_KEY>(): kotlin/String // com.letta.mobile.data.pins/DevicePinStore.Companion.STORAGE_KEY.<get-STORAGE_KEY>|<get-STORAGE_KEY>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.pins/LegacyPinSource { // com.letta.mobile.data.pins/LegacyPinSource|null[0]
+    constructor <init>(kotlin/String, kotlin/Function0<kotlin/String?>, kotlin/Function1<kotlin/String, kotlin.collections/List<kotlin/String>>) // com.letta.mobile.data.pins/LegacyPinSource.<init>|<init>(kotlin.String;kotlin.Function0<kotlin.String?>;kotlin.Function1<kotlin.String,kotlin.collections.List<kotlin.String>>){}[0]
+
+    final val decode // com.letta.mobile.data.pins/LegacyPinSource.decode|{}decode[0]
+        final fun <get-decode>(): kotlin/Function1<kotlin/String, kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.pins/LegacyPinSource.decode.<get-decode>|<get-decode>(){}[0]
+    final val key // com.letta.mobile.data.pins/LegacyPinSource.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSource.key.<get-key>|<get-key>(){}[0]
+    final val read // com.letta.mobile.data.pins/LegacyPinSource.read|{}read[0]
+        final fun <get-read>(): kotlin/Function0<kotlin/String?> // com.letta.mobile.data.pins/LegacyPinSource.read.<get-read>|<get-read>(){}[0]
+}
+
+final class com.letta.mobile.data.pins/PinImportRecord { // com.letta.mobile.data.pins/PinImportRecord|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> = ...) // com.letta.mobile.data.pins/PinImportRecord.<init>|<init>(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef>){}[0]
+
+    final val captured // com.letta.mobile.data.pins/PinImportRecord.captured|{}captured[0]
+        final fun <get-captured>(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.captured.<get-captured>|<get-captured>(){}[0]
+    final val complete // com.letta.mobile.data.pins/PinImportRecord.complete|{}complete[0]
+        final fun <get-complete>(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.complete.<get-complete>|<get-complete>(){}[0]
+    final val entries // com.letta.mobile.data.pins/PinImportRecord.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.pins/PinImportRecord.entries.<get-entries>|<get-entries>(){}[0]
+    final val error // com.letta.mobile.data.pins/PinImportRecord.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.pins/PinImportRecord.error.<get-error>|<get-error>(){}[0]
+    final val key // com.letta.mobile.data.pins/PinImportRecord.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.letta.mobile.data.pins/PinImportRecord.key.<get-key>|<get-key>(){}[0]
+    final val raw // com.letta.mobile.data.pins/PinImportRecord.raw|{}raw[0]
+        final fun <get-raw>(): kotlin/String? // com.letta.mobile.data.pins/PinImportRecord.raw.<get-raw>|<get-raw>(){}[0]
+    final val resolved // com.letta.mobile.data.pins/PinImportRecord.resolved|{}resolved[0]
+        final fun <get-resolved>(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinImportRecord.resolved.<get-resolved>|<get-resolved>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.pins/PinImportRecord.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.pins/PinImportRecord.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.pins/PinImportRecord.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.pins/PinImportRecord.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.component5|component5(){}[0]
+    final fun component6(): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.component6|component6(){}[0]
+    final fun component7(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinImportRecord.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.data.pins/ScopedObjectRef> = ...): com.letta.mobile.data.pins/PinImportRecord // com.letta.mobile.data.pins/PinImportRecord.copy|copy(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.pins.ScopedObjectRef>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins/PinImportRecord.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins/PinImportRecord.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.pins/PinImportRecord.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.pins/PinImportRecord> { // com.letta.mobile.data.pins/PinImportRecord.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.pins/PinImportRecord.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.pins/PinImportRecord.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.pins/PinImportRecord.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.pins/PinImportRecord // com.letta.mobile.data.pins/PinImportRecord.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.pins/PinImportRecord) // com.letta.mobile.data.pins/PinImportRecord.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.pins.PinImportRecord){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.pins/PinImportRecord.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.pins/PinImportRecord.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.pins/PinImportRecord> // com.letta.mobile.data.pins/PinImportRecord.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.pins/PinJournal { // com.letta.mobile.data.pins/PinJournal|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin.collections/List<com.letta.mobile.data.pins/ScopedObjectRef> = ..., kotlin.collections/Set<com.letta.mobile.data.pins/ScopedObjectRef> = ..., kotlin.collections/List<com.letta.mobile.data.pins/PinImportRecord> = ..., kotlin/Boolean = ...) // com.letta.mobile.data.pins/PinJournal.<init>|<init>(kotlin.Int;kotlin.collections.List<com.letta.mobile.data.pins.ScopedObjectRef>;kotlin.collections.Set<com.letta.mobile.data.pins.ScopedObjectRef>;kotlin.collections.List<com.letta.mobile.data.pins.PinImportRecord>;kotlin.Boolean){}[0]
+
+    final val homeDefaultsConsidered // com.letta.mobile.data.pins/PinJournal.homeDefaultsConsidered|{}homeDefaultsConsidered[0]
+        final fun <get-homeDefaultsConsidered>(): kotlin/Boolean // com.letta.mobile.data.pins/PinJournal.homeDefaultsConsidered.<get-homeDefaultsConsidered>|<get-homeDefaultsConsidered>(){}[0]
+    final val imports // com.letta.mobile.data.pins/PinJournal.imports|{}imports[0]
+        final fun <get-imports>(): kotlin.collections/List<com.letta.mobile.data.pins/PinImportRecord> // com.letta.mobile.data.pins/PinJournal.imports.<get-imports>|<get-imports>(){}[0]
+    final val pins // com.letta.mobile.data.pins/PinJournal.pins|{}pins[0]
+        final fun <get-pins>(): kotlin.collections/List<com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinJournal.pins.<get-pins>|<get-pins>(){}[0]
+    final val tombstones // com.letta.mobile.data.pins/PinJournal.tombstones|{}tombstones[0]
+        final fun <get-tombstones>(): kotlin.collections/Set<com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinJournal.tombstones.<get-tombstones>|<get-tombstones>(){}[0]
+    final val version // com.letta.mobile.data.pins/PinJournal.version|{}version[0]
+        final fun <get-version>(): kotlin/Int // com.letta.mobile.data.pins/PinJournal.version.<get-version>|<get-version>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.pins/PinJournal.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinJournal.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/Set<com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/PinJournal.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.letta.mobile.data.pins/PinImportRecord> // com.letta.mobile.data.pins/PinJournal.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.letta.mobile.data.pins/PinJournal.component5|component5(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.collections/List<com.letta.mobile.data.pins/ScopedObjectRef> = ..., kotlin.collections/Set<com.letta.mobile.data.pins/ScopedObjectRef> = ..., kotlin.collections/List<com.letta.mobile.data.pins/PinImportRecord> = ..., kotlin/Boolean = ...): com.letta.mobile.data.pins/PinJournal // com.letta.mobile.data.pins/PinJournal.copy|copy(kotlin.Int;kotlin.collections.List<com.letta.mobile.data.pins.ScopedObjectRef>;kotlin.collections.Set<com.letta.mobile.data.pins.ScopedObjectRef>;kotlin.collections.List<com.letta.mobile.data.pins.PinImportRecord>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins/PinJournal.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins/PinJournal.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.pins/PinJournal.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.pins/PinJournal> { // com.letta.mobile.data.pins/PinJournal.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.pins/PinJournal.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.pins/PinJournal.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.pins/PinJournal.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.pins/PinJournal // com.letta.mobile.data.pins/PinJournal.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.pins/PinJournal) // com.letta.mobile.data.pins/PinJournal.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.pins.PinJournal){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.pins/PinJournal.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.pins/PinJournal.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.pins/PinJournal> // com.letta.mobile.data.pins/PinJournal.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.pins/ScopedObjectRef { // com.letta.mobile.data.pins/ScopedObjectRef|null[0]
+    constructor <init>(kotlin/String, com.letta.mobile.data.objectverbs/ObjectRef) // com.letta.mobile.data.pins/ScopedObjectRef.<init>|<init>(kotlin.String;com.letta.mobile.data.objectverbs.ObjectRef){}[0]
+
+    final val objectRef // com.letta.mobile.data.pins/ScopedObjectRef.objectRef|{}objectRef[0]
+        final fun <get-objectRef>(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.pins/ScopedObjectRef.objectRef.<get-objectRef>|<get-objectRef>(){}[0]
+    final val source // com.letta.mobile.data.pins/ScopedObjectRef.source|{}source[0]
+        final fun <get-source>(): kotlin/String // com.letta.mobile.data.pins/ScopedObjectRef.source.<get-source>|<get-source>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.pins/ScopedObjectRef.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.pins/ScopedObjectRef.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., com.letta.mobile.data.objectverbs/ObjectRef = ...): com.letta.mobile.data.pins/ScopedObjectRef // com.letta.mobile.data.pins/ScopedObjectRef.copy|copy(kotlin.String;com.letta.mobile.data.objectverbs.ObjectRef){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.pins/ScopedObjectRef.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.pins/ScopedObjectRef.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.pins/ScopedObjectRef.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.pins/ScopedObjectRef> { // com.letta.mobile.data.pins/ScopedObjectRef.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.pins/ScopedObjectRef.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.pins/ScopedObjectRef.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.pins/ScopedObjectRef.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.pins/ScopedObjectRef // com.letta.mobile.data.pins/ScopedObjectRef.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.pins/ScopedObjectRef) // com.letta.mobile.data.pins/ScopedObjectRef.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.pins.ScopedObjectRef){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.pins/ScopedObjectRef.Companion|null[0]
+        final const val DEVICE_SOURCE // com.letta.mobile.data.pins/ScopedObjectRef.Companion.DEVICE_SOURCE|{}DEVICE_SOURCE[0]
+            final fun <get-DEVICE_SOURCE>(): kotlin/String // com.letta.mobile.data.pins/ScopedObjectRef.Companion.DEVICE_SOURCE.<get-DEVICE_SOURCE>|<get-DEVICE_SOURCE>(){}[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.pins/ScopedObjectRef> // com.letta.mobile.data.pins/ScopedObjectRef.Companion.serializer|serializer(){}[0]
+    }
 }
 
 final class com.letta.mobile.data.platform/HeapPressureGate { // com.letta.mobile.data.platform/HeapPressureGate|null[0]
@@ -53900,8 +54091,10 @@ final class com.letta.mobile.data.projects/SettingsProjectPinStore : com.letta.m
 }
 
 final class com.letta.mobile.data.projects/SettingsStoreProjectPinStore : com.letta.mobile.data.projects/ProjectPinStore { // com.letta.mobile.data.projects/SettingsStoreProjectPinStore|null[0]
-    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String = ...) // com.letta.mobile.data.projects/SettingsStoreProjectPinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String){}[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String = ..., kotlinx.coroutines.flow/StateFlow<kotlin/String?> = ...) // com.letta.mobile.data.projects/SettingsStoreProjectPinStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
 
+    final val binding // com.letta.mobile.data.projects/SettingsStoreProjectPinStore.binding|{}binding[0]
+        final fun <get-binding>(): com.letta.mobile.data.objectverbs.binding/PinBinding // com.letta.mobile.data.projects/SettingsStoreProjectPinStore.binding.<get-binding>|<get-binding>(){}[0]
     final val pinned // com.letta.mobile.data.projects/SettingsStoreProjectPinStore.pinned|{}pinned[0]
         final fun <get-pinned>(): kotlinx.coroutines.flow/Flow<kotlin.collections/Set<com.letta.mobile.data.projects/ProjectKey>> // com.letta.mobile.data.projects/SettingsStoreProjectPinStore.pinned.<get-pinned>|<get-pinned>(){}[0]
 
@@ -68519,6 +68712,8 @@ open class com.letta.mobile.data.repository/CachedRunRepository : com.letta.mobi
 open class com.letta.mobile.data.repository/CachedSettingsRepository : com.letta.mobile.data.repository.api/ISettingsRepository { // com.letta.mobile.data.repository/CachedSettingsRepository|null[0]
     constructor <init>(com.letta.mobile.data.storage/SettingsPreferencesStore, com.letta.mobile.data.storage/SecureSettingsStore, com.letta.mobile.data.storage/SettingsPlatformDefaults = ..., com.letta.mobile.data.repository/SettingsBackendCacheClearer = ...) // com.letta.mobile.data.repository/CachedSettingsRepository.<init>|<init>(com.letta.mobile.data.storage.SettingsPreferencesStore;com.letta.mobile.data.storage.SecureSettingsStore;com.letta.mobile.data.storage.SettingsPlatformDefaults;com.letta.mobile.data.repository.SettingsBackendCacheClearer){}[0]
 
+    final val objectPins // com.letta.mobile.data.repository/CachedSettingsRepository.objectPins|{}objectPins[0]
+        final fun <get-objectPins>(): com.letta.mobile.data.objectverbs.binding/PinBinding // com.letta.mobile.data.repository/CachedSettingsRepository.objectPins.<get-objectPins>|<get-objectPins>(){}[0]
     open val activeConfig // com.letta.mobile.data.repository/CachedSettingsRepository.activeConfig|{}activeConfig[0]
         open fun <get-activeConfig>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.model/LettaConfig?> // com.letta.mobile.data.repository/CachedSettingsRepository.activeConfig.<get-activeConfig>|<get-activeConfig>(){}[0]
     open val activeConfigChanges // com.letta.mobile.data.repository/CachedSettingsRepository.activeConfigChanges|{}activeConfigChanges[0]
@@ -71636,6 +71831,11 @@ final object com.letta.mobile.data.notify/AttentionEvents { // com.letta.mobile.
     final fun approvalsRaised(kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/ConversationRunState>, kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/ConversationRunState>): kotlin.collections/List<com.letta.mobile.data.notify/AttentionEvent.ApprovalNeeded> // com.letta.mobile.data.notify/AttentionEvents.approvalsRaised|approvalsRaised(kotlin.collections.Map<kotlin.String,com.letta.mobile.data.presence.ConversationRunState>;kotlin.collections.Map<kotlin.String,com.letta.mobile.data.presence.ConversationRunState>){}[0]
 }
 
+final object com.letta.mobile.data.objectverbs.binding/DevicePins { // com.letta.mobile.data.objectverbs.binding/DevicePins|null[0]
+    final fun bind(com.letta.mobile.data.storage/SecureSettingsStore, kotlinx.coroutines.flow/StateFlow<kotlin/String?> = ...): com.letta.mobile.data.objectverbs.binding/PinBinding // com.letta.mobile.data.objectverbs.binding/DevicePins.bind|bind(com.letta.mobile.data.storage.SecureSettingsStore;kotlinx.coroutines.flow.StateFlow<kotlin.String?>){}[0]
+    final fun store(com.letta.mobile.data.storage/SecureSettingsStore): com.letta.mobile.data.pins/DevicePinStore // com.letta.mobile.data.objectverbs.binding/DevicePins.store|store(com.letta.mobile.data.storage.SecureSettingsStore){}[0]
+}
+
 final object com.letta.mobile.data.onboarding/AgentOnboarding { // com.letta.mobile.data.onboarding/AgentOnboarding|null[0]
     final const val STARTER_HEADER // com.letta.mobile.data.onboarding/AgentOnboarding.STARTER_HEADER|{}STARTER_HEADER[0]
         final fun <get-STARTER_HEADER>(): kotlin/String // com.letta.mobile.data.onboarding/AgentOnboarding.STARTER_HEADER.<get-STARTER_HEADER>|<get-STARTER_HEADER>(){}[0]
@@ -71671,6 +71871,27 @@ final object com.letta.mobile.data.pairing/InvitePhases { // com.letta.mobile.da
 
 final object com.letta.mobile.data.pairing/ScannedInviteParser { // com.letta.mobile.data.pairing/ScannedInviteParser|null[0]
     final fun parse(kotlin/String): com.letta.mobile.data.pairing/ParsedInvite // com.letta.mobile.data.pairing/ScannedInviteParser.parse|parse(kotlin.String){}[0]
+}
+
+final object com.letta.mobile.data.pins/LegacyPinSources { // com.letta.mobile.data.pins/LegacyPinSources|null[0]
+    final const val HOME_DEFAULT // com.letta.mobile.data.pins/LegacyPinSources.HOME_DEFAULT|{}HOME_DEFAULT[0]
+        final fun <get-HOME_DEFAULT>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSources.HOME_DEFAULT.<get-HOME_DEFAULT>|<get-HOME_DEFAULT>(){}[0]
+    final const val HOME_PRODUCTION // com.letta.mobile.data.pins/LegacyPinSources.HOME_PRODUCTION|{}HOME_PRODUCTION[0]
+        final fun <get-HOME_PRODUCTION>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSources.HOME_PRODUCTION.<get-HOME_PRODUCTION>|<get-HOME_PRODUCTION>(){}[0]
+    final const val SETTINGS_CONVERSATIONS // com.letta.mobile.data.pins/LegacyPinSources.SETTINGS_CONVERSATIONS|{}SETTINGS_CONVERSATIONS[0]
+        final fun <get-SETTINGS_CONVERSATIONS>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSources.SETTINGS_CONVERSATIONS.<get-SETTINGS_CONVERSATIONS>|<get-SETTINGS_CONVERSATIONS>(){}[0]
+    final const val SETTINGS_ORDER // com.letta.mobile.data.pins/LegacyPinSources.SETTINGS_ORDER|{}SETTINGS_ORDER[0]
+        final fun <get-SETTINGS_ORDER>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSources.SETTINGS_ORDER.<get-SETTINGS_ORDER>|<get-SETTINGS_ORDER>(){}[0]
+    final const val SETTINGS_PROJECTS // com.letta.mobile.data.pins/LegacyPinSources.SETTINGS_PROJECTS|{}SETTINGS_PROJECTS[0]
+        final fun <get-SETTINGS_PROJECTS>(): kotlin/String // com.letta.mobile.data.pins/LegacyPinSources.SETTINGS_PROJECTS.<get-SETTINGS_PROJECTS>|<get-SETTINGS_PROJECTS>(){}[0]
+
+    final val keys // com.letta.mobile.data.pins/LegacyPinSources.keys|{}keys[0]
+        final fun <get-keys>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.pins/LegacyPinSources.keys.<get-keys>|<get-keys>(){}[0]
+
+    final fun objectRef(kotlin/String): com.letta.mobile.data.objectverbs/ObjectRef? // com.letta.mobile.data.pins/LegacyPinSources.objectRef|objectRef(kotlin.String){}[0]
+    final fun secure(com.letta.mobile.data.storage/SecureSettingsStore, kotlin.collections/Set<kotlin/String>): kotlin.collections/List<com.letta.mobile.data.pins/LegacyPinSource> // com.letta.mobile.data.pins/LegacyPinSources.secure|secure(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.collections.Set<kotlin.String>){}[0]
+    final fun settings(com.letta.mobile.data.storage/SettingsPreferencesSnapshot): kotlin.collections/List<com.letta.mobile.data.pins/LegacyPinSource> // com.letta.mobile.data.pins/LegacyPinSources.settings|settings(com.letta.mobile.data.storage.SettingsPreferencesSnapshot){}[0]
+    final fun shortcut(kotlin/String): com.letta.mobile.data.pins/ScopedObjectRef? // com.letta.mobile.data.pins/LegacyPinSources.shortcut|shortcut(kotlin.String){}[0]
 }
 
 final object com.letta.mobile.data.platform/HeapPressure { // com.letta.mobile.data.platform/HeapPressure|null[0]
@@ -72399,7 +72620,7 @@ final object com.letta.mobile.data.shell/ShellHomeShortcuts { // com.letta.mobil
     final val defaultPins // com.letta.mobile.data.shell/ShellHomeShortcuts.defaultPins|{}defaultPins[0]
         final fun <get-defaultPins>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.shell/ShellHomeShortcuts.defaultPins.<get-defaultPins>|<get-defaultPins>(){}[0]
 
-    final fun destinationFor(com.letta.mobile.data.home/HomeShortcut): com.letta.mobile.data.shell/ShellDestination? // com.letta.mobile.data.shell/ShellHomeShortcuts.destinationFor|destinationFor(com.letta.mobile.data.home.HomeShortcut){}[0]
+    final fun destinationFor(com.letta.mobile.data.home.shortcut/HomeShortcut): com.letta.mobile.data.shell/ShellDestination? // com.letta.mobile.data.shell/ShellHomeShortcuts.destinationFor|destinationFor(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
 }
 
 final object com.letta.mobile.data.shell/ShellPageErrors { // com.letta.mobile.data.shell/ShellPageErrors|null[0]
@@ -73502,6 +73723,12 @@ final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/isMonitorWatcher(): kotlin/Boolean // com.letta.mobile.data.chat.projection/isMonitorWatcher|isMonitorWatcher@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/monitorEvent(): kotlin/String? // com.letta.mobile.data.chat.projection/monitorEvent|monitorEvent@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/monitorEventCount(): kotlin/Int // com.letta.mobile.data.chat.projection/monitorEventCount|monitorEventCount@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
+final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/agent(com.letta.mobile.data.model/AgentId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/agent|agent@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.AgentId){}[0]
+final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/canvas(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/canvas|canvas@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.CanvasId){}[0]
+final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/conversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/conversation|conversation@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.ConversationId){}[0]
+final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/project(com.letta.mobile.data.model/ProjectId): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/project|project@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.model.ProjectId){}[0]
+final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/project(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/project|project@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.projects.ProjectKey){}[0]
+final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/shortcut(com.letta.mobile.data.home.shortcut/HomeShortcut): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/shortcut|shortcut@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
 final fun (com.letta.mobile.data.plugin/PluginOrigin).com.letta.mobile.data.plugin.view/covers(com.letta.mobile.data.plugin.view/ViewLink): kotlin/Boolean // com.letta.mobile.data.plugin.view/covers|covers@com.letta.mobile.data.plugin.PluginOrigin(com.letta.mobile.data.plugin.view.ViewLink){}[0]
 final fun (com.letta.mobile.data.repository.api/ISettingsRepository).com.letta.mobile.data.repository/activeBackendUsesChannel(): kotlin/Boolean // com.letta.mobile.data.repository/activeBackendUsesChannel|activeBackendUsesChannel@com.letta.mobile.data.repository.api.ISettingsRepository(){}[0]
 final fun (com.letta.mobile.data.repository.api/ISubagentRepository).com.letta.mobile.data.repository.api/dismissAction(com.letta.mobile.data.repository.api/SubagentParentScope?): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/SubagentEntry, kotlin/Result<kotlin/Unit>>? // com.letta.mobile.data.repository.api/dismissAction|dismissAction@com.letta.mobile.data.repository.api.ISubagentRepository(com.letta.mobile.data.repository.api.SubagentParentScope?){}[0]
@@ -73516,6 +73743,7 @@ final fun (com.letta.mobile.data.search/MessageSearchQuery).com.letta.mobile.dat
 final fun (com.letta.mobile.data.session.graph/SharedSessionGraph).com.letta.mobile.data.session.graph/adminRepositories(com.letta.mobile.data.transport.api/IChannelTransport, com.letta.mobile.data.repository.api/ISettingsRepository?, com.letta.mobile.data.session.graph/AdminRemoteRoutes = ...): com.letta.mobile.data.session.graph/SessionAdminRepositories // com.letta.mobile.data.session.graph/adminRepositories|adminRepositories@com.letta.mobile.data.session.graph.SharedSessionGraph(com.letta.mobile.data.transport.api.IChannelTransport;com.letta.mobile.data.repository.api.ISettingsRepository?;com.letta.mobile.data.session.graph.AdminRemoteRoutes){}[0]
 final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobile.data.session/agentRosterOrEmpty(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/Agent>> // com.letta.mobile.data.session/agentRosterOrEmpty|agentRosterOrEmpty@com.letta.mobile.data.session.SessionRepositoryGraph(){}[0]
 final fun (com.letta.mobile.data.session/SessionRepositoryGraph).com.letta.mobile.data.session/llmModelsOrEmpty(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/LlmModel>> // com.letta.mobile.data.session/llmModelsOrEmpty|llmModelsOrEmpty@com.letta.mobile.data.session.SessionRepositoryGraph(){}[0]
+final fun (com.letta.mobile.data.session/SessionRepositoryGraphProvider<out com.letta.mobile.data.session/SessionRepositoryGraph>).com.letta.mobile.data.session.pins/pinSource(): kotlinx.coroutines.flow/StateFlow<kotlin/String?> // com.letta.mobile.data.session.pins/pinSource|pinSource@com.letta.mobile.data.session.SessionRepositoryGraphProvider<out|com.letta.mobile.data.session.SessionRepositoryGraph>(){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentChipObservation).com.letta.mobile.data.subagents/withNativeTodos(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.subagents/SubagentChipObservation // com.letta.mobile.data.subagents/withNativeTodos|withNativeTodos@com.letta.mobile.data.subagents.SubagentChipObservation(kotlinx.serialization.json.JsonObject){}[0]
 final fun (com.letta.mobile.data.subagents/SubagentRosterItem).com.letta.mobile.data.subagents/toSubagentView(): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/toSubagentView|toSubagentView@com.letta.mobile.data.subagents.SubagentRosterItem(){}[0]
 final fun (com.letta.mobile.data.system1/System1Assessment).com.letta.mobile.data.system1/toMetadata(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.system1/toMetadata|toMetadata@com.letta.mobile.data.system1.System1Assessment(){}[0]
@@ -73670,7 +73898,7 @@ final fun com.letta.mobile.data.home/conversationRecency(kotlin/String): kotlin.
 final fun com.letta.mobile.data.home/formatGroupedNumber(kotlin/Int): kotlin/String // com.letta.mobile.data.home/formatGroupedNumber|formatGroupedNumber(kotlin.Int){}[0]
 final fun com.letta.mobile.data.home/parseConversationInstant(kotlin/String): kotlin.time/Instant? // com.letta.mobile.data.home/parseConversationInstant|parseConversationInstant(kotlin.String){}[0]
 final fun com.letta.mobile.data.home/preferredComposerConversationId(kotlin.collections/List<com.letta.mobile.data.home/FleetConversation>, kotlin/String?): kotlin/String? // com.letta.mobile.data.home/preferredComposerConversationId|preferredComposerConversationId(kotlin.collections.List<com.letta.mobile.data.home.FleetConversation>;kotlin.String?){}[0]
-final fun com.letta.mobile.data.home/resolvePinnedItems(kotlin.collections/List<kotlin/String>, com.letta.mobile.data.home/PinnedAgentNames, kotlin.collections/Set<com.letta.mobile.data.home/HomeShortcut> = ...): kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> // com.letta.mobile.data.home/resolvePinnedItems|resolvePinnedItems(kotlin.collections.List<kotlin.String>;com.letta.mobile.data.home.PinnedAgentNames;kotlin.collections.Set<com.letta.mobile.data.home.HomeShortcut>){}[0]
+final fun com.letta.mobile.data.home/resolvePinnedItems(kotlin.collections/List<kotlin/String>, com.letta.mobile.data.home/PinnedAgentNames, kotlin.collections/Set<com.letta.mobile.data.home.shortcut/HomeShortcut> = ...): kotlin.collections/List<com.letta.mobile.data.home/HomePinnedItem> // com.letta.mobile.data.home/resolvePinnedItems|resolvePinnedItems(kotlin.collections.List<kotlin.String>;com.letta.mobile.data.home.PinnedAgentNames;kotlin.collections.Set<com.letta.mobile.data.home.shortcut.HomeShortcut>){}[0]
 final fun com.letta.mobile.data.home/searchHomeCatalog(com.letta.mobile.data.home/HomeSearchCatalog, kotlin/String): com.letta.mobile.data.home/HomeSearchState // com.letta.mobile.data.home/searchHomeCatalog|searchHomeCatalog(com.letta.mobile.data.home.HomeSearchCatalog;kotlin.String){}[0]
 final fun com.letta.mobile.data.home/sortFleet(kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat>, com.letta.mobile.data.home/FleetSort): kotlin.collections/List<com.letta.mobile.data.home/FleetAgentStat> // com.letta.mobile.data.home/sortFleet|sortFleet(kotlin.collections.List<com.letta.mobile.data.home.FleetAgentStat>;com.letta.mobile.data.home.FleetSort){}[0]
 final fun com.letta.mobile.data.messaging/agentMessageDisplayLabel(kotlin/String, kotlin/String?): kotlin/String // com.letta.mobile.data.messaging/agentMessageDisplayLabel|agentMessageDisplayLabel(kotlin.String;kotlin.String?){}[0]

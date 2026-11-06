@@ -6,18 +6,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** letta-mobile-bzvro.17 (F17): pins survive a restart, sort first, and follow a fork. */
 class PinnedConversationsTest {
     @Test
     fun pinsSurviveARestart() {
         val store = MapSettingsStore()
-        PinnedConversations(store).apply {
+        PinnedConversations(store, source = MutableStateFlow("fixture")).apply {
             setPinned("conv-b", true)
             setPinned("conv-a", true)
         }
 
-        val restarted = PinnedConversations(store)
+        val restarted = PinnedConversations(store, source = MutableStateFlow("fixture"))
 
         assertEquals(setOf("conv-a", "conv-b"), restarted.pinned.value)
     }
@@ -25,7 +26,7 @@ class PinnedConversationsTest {
     @Test
     fun unpinningTheLastPinClearsTheKey() {
         val store = MapSettingsStore()
-        val pins = PinnedConversations(store)
+        val pins = PinnedConversations(store, source = MutableStateFlow("fixture"))
         pins.toggle("conv-a")
         assertTrue(pins.isPinned("conv-a"))
         pins.toggle("conv-a")
@@ -43,7 +44,7 @@ class PinnedConversationsTest {
 
     @Test
     fun aForkOfAPinnedConversationIsPinned() {
-        val pins = PinnedConversations(MapSettingsStore())
+        val pins = PinnedConversations(MapSettingsStore(), source = MutableStateFlow("fixture"))
         pins.setPinned("source", true)
 
         pins.inherit("source", "fork")
@@ -54,7 +55,7 @@ class PinnedConversationsTest {
 
     @Test
     fun aBlankIdIsNeverPinned() {
-        val pins = PinnedConversations(MapSettingsStore())
+        val pins = PinnedConversations(MapSettingsStore(), source = MutableStateFlow("fixture"))
         pins.setPinned(" ", true)
         assertEquals(emptySet(), pins.pinned.value)
     }
