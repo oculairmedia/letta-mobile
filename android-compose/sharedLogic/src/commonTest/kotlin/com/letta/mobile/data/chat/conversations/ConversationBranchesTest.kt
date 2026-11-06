@@ -13,10 +13,15 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.pins.DevicePinStore
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.ui.chat.session.ChatBranchView
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryRecorder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
@@ -53,6 +58,29 @@ class ConversationBranchesTest {
         assertTrue(host.prefs.pins?.isPinned("fork-1") == true)
         assertEquals(emptyList(), host.errors)
         assertEquals("agent-0", iroh.stored("conv-1")?.agent, "the original is untouched")
+    }
+
+    @Test
+    fun aForkOpensWhenPinInheritanceCannotBeSaved() = runTest(UnconfinedTestDispatcher()) {
+        val store = FailingJournalStore(MapSettingsStore())
+        val iroh = IrohHost(HostConversation("conv-1", "agent-0"))
+        val host = RecordingHost(iroh.chatGateway(backgroundScope), store)
+        val pins = requireNotNull(host.prefs.pins)
+        pins.setPinned("conv-1", true)
+        pins.setPinned("other", true)
+        store.failWrites = true
+
+        Telemetry.installRecorder(TelemetryRecorder()).use {
+            ConversationManagement(this, host, host.prefs).branches.forkFrom(timeline[0], view)
+
+            assertEquals(listOf(Triple("conv-1", "agent-0", "m2")), iroh.forks())
+            assertEquals(listOf("fork-1"), host.opened.map { it.conversation.id.value })
+            assertEquals(emptyList(), host.errors)
+            assertEquals(setOf("conv-1", "other"), pins.pinned.value)
+            assertTrue(Telemetry.events.value.any { it.tag == "PinnedConversations" && it.name == "inherit_failed" })
+            assertFailsWith<IllegalStateException> { pins.setPinned("another", true) }
+            assertEquals(setOf("conv-1", "other"), pins.pinned.value)
+        }
     }
 
     @Test
@@ -99,8 +127,11 @@ class ConversationBranchesTest {
     private fun IrohHost.forks() = calls.filter { it.first == "conversation.fork" }
         .map { (_, params) -> Triple(params.text("conversation_id"), params.text("agent_id"), params.text("message_id")) }
 
-    private class RecordingHost(override val gateway: ChatGateway?) : ConversationListHost {
-        val prefs = ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
+    private class RecordingHost(
+        override val gateway: ChatGateway?,
+        store: SecureSettingsStore = MapSettingsStore(),
+    ) : ConversationListHost {
+        val prefs = ConversationManagementPrefs.from(store.withDevicePins(), MutableStateFlow("fixture"))
         val opened = mutableListOf<OpenedBranch>()
         val errors = mutableListOf<String>()
 
@@ -125,6 +156,15 @@ class ConversationBranchesTest {
 
         override fun showError(message: String) {
             errors += message
+        }
+    }
+
+    private class FailingJournalStore(private val backing: SecureSettingsStore) : SecureSettingsStore by backing {
+        var failWrites = false
+
+        override fun putDurableString(key: String, value: String) {
+            if (failWrites && key == DevicePinStore.STORAGE_KEY) error("Journal write failed")
+            backing.putDurableString(key, value)
         }
     }
 

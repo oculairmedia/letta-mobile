@@ -18,12 +18,77 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.RecentAgentsPolicy
+import com.letta.mobile.data.model.DisplayNames
+import com.letta.mobile.data.objectverbs.ObjectFacets
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** letta-mobile-ckmub.3.10: the expanded rail's agent library is a roster of spaces, pinned agents first. */
 class ShellAgentLibraryTest {
     private val agents = listOf("a1" to "PM - letta-mobile", "a2" to "PM - letta-web", "a3" to "Scout", "a4" to "Meridian")
+
+    @Test
+    fun missingScopedPinsStayVisibleInOrderUntilRosterLoads() = runComposeUiTest {
+        val source = MutableStateFlow<String?>("backend-a")
+        val pins = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), source)
+        val missing = ObjectRef("agent", "missing")
+        val loaded = ObjectRef("agent", "loaded")
+        pins.setPinned(missing, true)
+        pins.setPinned(loaded, true)
+        pins.setPinned(ObjectRef("conversation", "other"), true)
+        val utilities = (1..10).map { "utility-$it" to "Utility $it" }
+        var state by mutableStateOf(ShellLibraryRailState(agents = utilities + ("loaded" to "Loaded"), focus = ShellRailFocus()))
+        fun bound() = pinnedRailState(state, pins, pins.references.value)
+
+        val entries = collapsedRailEntries(bound().agents, bound().focus)
+        assertEquals(listOf("missing", "loaded"), entries.take(2).map { it.agentId })
+        assertEquals(DisplayNames.agent(null, "missing"), entries.first().name)
+        assertEquals(2 + RecentAgentsPolicy.DEFAULT_MAX_AGENTS, entries.size)
+        assertEquals(false, bound().agents.any { it.first == "other" })
+        val utilityFacets = utilities.associate { it.first to ObjectFacets(pinned = false, kindTag = "utility") }
+        val utilityFocus = bound().focus.copy(objectFacetsByAgentId = bound().focus.objectFacetsByAgentId.orEmpty() + utilityFacets)
+        assertEquals(listOf("missing", "loaded"), collapsedRailEntries(bound().agents, utilityFocus).take(2).map { it.agentId })
+
+        setContent {
+            MaterialTheme {
+                ShellLibraryRail(rememberPinnedRailState(state, pins), ShellAgentRailActions())
+            }
+        }
+        onNodeWithTag(ShellAgentRailTags.orb("pinned-missing")).assertExists()
+        onNodeWithTag(ShellAgentRailTags.PIN_DIVIDER).assertExists()
+
+        state = state.copy(agents = state.agents + ("missing" to "Resolved name"))
+        waitForIdle()
+        assertEquals(listOf("missing", "loaded"), collapsedRailEntries(bound().agents, bound().focus).take(2).map { it.agentId })
+        assertEquals("Resolved name", collapsedRailEntries(bound().agents, bound().focus).first().name)
+        assertEquals(1, bound().agents.count { it.first == "missing" })
+
+        source.value = "backend-b"
+        waitForIdle()
+        assertEquals(false, collapsedRailEntries(bound().agents, bound().focus).any { it.pinned })
+        onNodeWithTag(ShellAgentRailTags.orb("pinned-missing")).assertDoesNotExist()
+        source.value = "backend-a"
+        waitForIdle()
+        onNodeWithTag(ShellAgentRailTags.orb("pinned-missing")).assertExists()
+        pins.setPinned(missing, false)
+        waitForIdle()
+        onNodeWithTag(ShellAgentRailTags.orb("pinned-missing")).assertDoesNotExist()
+    }
+
+    @Test
+    fun scopedFacetMapsNeverFallBackToLegacyMembership() {
+        val roster = listOf("legacy" to "Legacy", "scoped" to "Scoped")
+        val legacyOnly = ShellRailFocus(pinnedAgentIds = setOf("legacy"))
+        assertEquals(listOf("legacy"), collapsedRailEntries(roster, legacyOnly).filter { it.pinned }.map { it.agentId })
+        val partial = legacyOnly.copy(objectFacetsByAgentId = mapOf("scoped" to ObjectFacets(pinned = true, pinOrder = 0)))
+        assertEquals(listOf("scoped"), collapsedRailEntries(roster, partial).filter { it.pinned }.map { it.agentId })
+        assertEquals(null, partial.facets("legacy").pinned)
+        assertEquals(null, legacyOnly.copy(objectFacetsByAgentId = emptyMap()).facets("legacy").pinned)
+    }
 
     @Test
     fun pinOrderFacetsWinOverRecencyAndSharedNamesAndFollowReorder() {

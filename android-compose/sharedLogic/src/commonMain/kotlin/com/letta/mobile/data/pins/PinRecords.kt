@@ -38,6 +38,8 @@ data class PinJournal(
     val tombstones: Set<ScopedObjectRef> = emptySet(),
     val imports: List<PinImportRecord> = emptyList(),
     val homeDefaultsConsidered: Boolean = false,
+    // Pins introduced by migration and not subsequently ordered or explicitly edited by the user.
+    val legacyOrderedPins: List<ScopedObjectRef> = emptyList(),
 )
 
 /** Raw access is separate from parsing so even decode failures retain a recoverable snapshot. */

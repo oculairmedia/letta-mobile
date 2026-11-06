@@ -135,6 +135,52 @@ class PinMigrationTest {
     }
 
     @Test
+    fun settingsOrderWinsWhenImportedAfterHomeWithoutMovingExistingCanonicalPins() {
+        val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to "shortcut:TOOLS"))
+        val store = DevicePinStore(backing)
+        val existing = ref(ObjectRef("agent", "existing"))
+        store.setPinned(existing, true)
+        store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+        val settings = LegacyPinSource(LegacyPinSources.SETTINGS_ORDER,
+            { "[\"shortcut:AGENTS\",\"shortcut:TOOLS\"]" },
+            { com.letta.mobile.data.serialization.LettaJson.wire.decodeFromString<List<String>>(it) })
+        store.importLegacy(listOf(settings))
+        assertEquals(listOf(existing, LegacyPinSources.shortcut("shortcut:AGENTS"),
+            LegacyPinSources.shortcut("shortcut:TOOLS")), store.journal.value.pins)
+        assertEquals(store.journal.value, DevicePinStore(backing).journal.value)
+    }
+
+    @Test
+    fun userReorderSurvivesALaterHigherPriorityImport() {
+        val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to "shortcut:TOOLS\nshortcut:AGENTS"))
+        val store = DevicePinStore(backing)
+        store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+        val tools = checkNotNull(LegacyPinSources.shortcut("shortcut:TOOLS"))
+        val agents = checkNotNull(LegacyPinSources.shortcut("shortcut:AGENTS"))
+        store.reorder(listOf(agents, tools))
+        val settings = LegacyPinSource(LegacyPinSources.SETTINGS_ORDER,
+            { "[\"shortcut:TOOLS\",\"shortcut:AGENTS\"]" },
+            { com.letta.mobile.data.serialization.LettaJson.wire.decodeFromString<List<String>>(it) })
+        store.importLegacy(listOf(settings))
+        assertEquals(listOf(agents, tools), store.journal.value.pins)
+    }
+
+    @Test
+    fun separateStoreInstancesReadLatestBeforeEachMutation() {
+        val backing = InMemorySecureSettingsStore()
+        val first = DevicePinStore(backing)
+        val second = DevicePinStore(backing)
+        val a = ref(ObjectRef("agent", "a"))
+        val b = ref(ObjectRef("agent", "b"))
+        first.setPinned(a, true)
+        second.setPinned(b, true)
+        first.setPinned(a, false)
+        second.setPinned(b, true)
+        assertEquals(listOf(b), DevicePinStore(backing).journal.value.pins)
+        assertTrue(a in DevicePinStore(backing).journal.value.tombstones)
+    }
+
+    @Test
     fun unknownBackendAndKindsStayHiddenUntilTrustedOwnershipReturns() {
         val backing = InMemorySecureSettingsStore(mapOf(
             "home.pinnedItems" to "agent:missing\nshortcut:FUTURE\nwidget:x\nconversation:default",
