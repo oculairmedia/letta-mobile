@@ -468,7 +468,10 @@ class NotebookLocalStore(
         health.awaitPrepared()
         val key = id.stableKey()
         if (!health.isRetired(key)) return id
-        val recorded = documents.successors()[key]?.let { successor -> listDocuments().singleOrNull { it.stableKey() == successor } }
+        // The map is a hint: its document must still confirm, in its own archive metadata, that it replaced [key].
+        val recorded = documents.successors()[key]
+            ?.let { successor -> listDocuments().singleOrNull { it.stableKey() == successor } }
+            ?.takeIf { candidate -> confirmsSuccession(candidate, key) }
         return recorded ?: scanForSuccessor(id)
     }
 
@@ -479,14 +482,12 @@ class NotebookLocalStore(
      */
     private fun scanForSuccessor(retired: DocumentId): DocumentId? {
         val key = retired.stableKey()
-        val matches = listDocuments().filter { candidate ->
-            runCatching {
-                open(candidate)?.withDocument { document -> document.succeeds(key) }
-                    ?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
-            }.getOrDefault(false)
-        }
-        return matches.singleOrNull()
+        return listDocuments().filter { candidate -> confirmsSuccession(candidate, key) }.singleOrNull()
     }
+
+    private fun confirmsSuccession(candidate: DocumentId, key: String): Boolean = runCatching {
+        open(candidate)?.withDocument { document -> document.succeeds(key) }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
+    }.getOrDefault(false)
 
     fun insertMarkdown(id: DocumentId, index: Int, text: String) {
         require(index >= 0)

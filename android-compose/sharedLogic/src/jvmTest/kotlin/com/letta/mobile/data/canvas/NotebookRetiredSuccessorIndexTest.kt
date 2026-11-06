@@ -40,6 +40,12 @@ class NotebookRetiredSuccessorIndexTest {
         assertScanResolves { map, retired -> Files.writeString(map, """{"$retired":"${"f".repeat(32)}"}""") }
 
     @Test
+    fun aRecordedSuccessorThatDidNotReplaceTheIdFallsBackToTheScan() = assertScanResolves { map, retired ->
+        val unrelated = NotebookDocumentIndex(map.parent).read().first { it != NotebookDocumentIndex(map.parent).successors()[retired] }
+        Files.writeString(map, """{"$retired":"$unrelated"}""")
+    }
+
+    @Test
     fun anUnreadableSuccessorMapFallsBackToTheScan() = assertScanResolves { map, _ -> Files.writeString(map, "not json") }
 
     /** Retire one document, damage its map entry with [damage], and expect the scan to find the successor. */
