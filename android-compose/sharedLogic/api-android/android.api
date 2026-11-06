@@ -8977,6 +8977,7 @@ public final class com/letta/mobile/data/canvas/authority/NotebookAccessWire {
 	public static final field OPEN Ljava/lang/String;
 	public static final field RESOLVE Ljava/lang/String;
 	public static final field SAVE Ljava/lang/String;
+	public final fun denied ()Lkotlinx/serialization/json/JsonObject;
 	public final fun load (Lcom/letta/mobile/data/canvas/notes/NotebookNoteLoad;)Lkotlinx/serialization/json/JsonObject;
 	public final fun readLoad (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteLoad;
 	public final fun readReference (Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/references/NotebookReferenceLoad;
