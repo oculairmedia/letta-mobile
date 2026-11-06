@@ -24,8 +24,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -84,6 +86,34 @@ class ConversationBranchesTest {
     }
 
     @Test
+    fun pinInheritancePropagatesCancellation() {
+        val store = FailingJournalStore(MapSettingsStore())
+        val host = RecordingHost(null, store)
+        val pins = requireNotNull(host.prefs.pins)
+        pins.setPinned("conv-1", true)
+        store.cancelWrites = true
+        assertFailsWith<CancellationException> { pins.inherit("conv-1", "fork-1") }
+    }
+
+    @Test
+    fun aForkOpensWhenPinSourceBecomesBlankDuringInheritance() = runTest(UnconfinedTestDispatcher()) {
+        val source = ChangingSource()
+        val iroh = IrohHost(HostConversation("conv-1", "agent-0"))
+        val host = RecordingHost(iroh.chatGateway(backgroundScope), source = source)
+        val pins = requireNotNull(host.prefs.pins)
+        pins.setPinned("conv-1", true)
+        source.changeAfterNextRead = true
+
+        Telemetry.installRecorder(TelemetryRecorder()).use {
+            ConversationManagement(this, host, host.prefs).branches.forkFrom(timeline[0], view)
+            assertEquals(listOf("fork-1"), host.opened.map { it.conversation.id.value })
+            assertEquals(emptyList(), host.errors)
+            assertTrue(Telemetry.events.value.any { it.tag == "PinnedConversations" && it.name == "inherit_failed" })
+            assertFailsWith<IllegalArgumentException> { pins.setPinned("another", true) }
+        }
+    }
+
+    @Test
     fun anEditForksBeforeThePromptAndRefillsTheComposer() = runTest(UnconfinedTestDispatcher()) {
         val iroh = IrohHost(HostConversation("conv-1", "agent-0"))
         val host = RecordingHost(iroh.chatGateway(backgroundScope))
@@ -130,8 +160,9 @@ class ConversationBranchesTest {
     private class RecordingHost(
         override val gateway: ChatGateway?,
         store: SecureSettingsStore = MapSettingsStore(),
+        source: StateFlow<String?> = MutableStateFlow("fixture"),
     ) : ConversationListHost {
-        val prefs = ConversationManagementPrefs.from(store.withDevicePins(), MutableStateFlow("fixture"))
+        val prefs = ConversationManagementPrefs.from(store.withDevicePins(), source)
         val opened = mutableListOf<OpenedBranch>()
         val errors = mutableListOf<String>()
 
@@ -159,10 +190,24 @@ class ConversationBranchesTest {
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi::class)
+    private class ChangingSource : StateFlow<String?> by MutableStateFlow<String?>("fixture") {
+        var changeAfterNextRead = false
+        private var blank = false
+        override val value: String?
+            get() {
+                if (blank) return ""
+                if (changeAfterNextRead) blank = true
+                return "fixture"
+            }
+    }
+
     private class FailingJournalStore(private val backing: SecureSettingsStore) : SecureSettingsStore by backing {
         var failWrites = false
+        var cancelWrites = false
 
         override fun putDurableString(key: String, value: String) {
+            if (cancelWrites && key == DevicePinStore.STORAGE_KEY) throw CancellationException("cancelled")
             if (failWrites && key == DevicePinStore.STORAGE_KEY) error("Journal write failed")
             backing.putDurableString(key, value)
         }

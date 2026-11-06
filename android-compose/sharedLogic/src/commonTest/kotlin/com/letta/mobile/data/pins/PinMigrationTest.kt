@@ -12,6 +12,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.encodeToString
+import com.letta.mobile.data.serialization.LettaJson
 
 class PinMigrationTest {
     @Test
@@ -149,6 +151,59 @@ class PinMigrationTest {
             LegacyPinSources.shortcut("shortcut:TOOLS")), store.journal.value.pins)
         assertEquals(store.journal.value, DevicePinStore(backing).journal.value)
     }
+
+    @Test
+    fun stagedImportKeepsUserAddedPinsInTheirSlots() {
+        val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to "shortcut:TOOLS\nshortcut:AGENTS"))
+        val store = DevicePinStore(backing)
+        store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+        val tools = checkNotNull(LegacyPinSources.shortcut("shortcut:TOOLS"))
+        val agents = checkNotNull(LegacyPinSources.shortcut("shortcut:AGENTS"))
+        val added = ref(ObjectRef("agent", "user-added"))
+        store.setPinned(added, true)
+        store.importLegacy(listOf(settingsOrder("shortcut:AGENTS", "shortcut:TOOLS")))
+        assertEquals(listOf(agents, tools, added), store.journal.value.pins)
+        assertEquals(store.journal.value, DevicePinStore(backing).journal.value)
+
+        val stagedBacking = InMemorySecureSettingsStore(mapOf(
+            "desktop.home.pinnedItems" to "shortcut:TOOLS", "home.pinnedItems" to "shortcut:AGENTS",
+        ))
+        val staged = DevicePinStore(stagedBacking)
+        staged.importLegacy(LegacyPinSources.secure(stagedBacking, setOf("desktop.home.pinnedItems")))
+        staged.setPinned(added, true)
+        staged.importLegacy(LegacyPinSources.secure(stagedBacking, setOf("home.pinnedItems")))
+        staged.importLegacy(listOf(settingsOrder("shortcut:AGENTS", "shortcut:TOOLS")))
+        assertEquals(listOf(agents, added, tools), staged.journal.value.pins)
+    }
+
+    @Test
+    fun olderJournalRecoversStagedOrderButKeepsUserEditedOrder() {
+        val tools = checkNotNull(LegacyPinSources.shortcut("shortcut:TOOLS"))
+        val agents = checkNotNull(LegacyPinSources.shortcut("shortcut:AGENTS"))
+        val home = "shortcut:TOOLS\nshortcut:AGENTS"
+        for (edited in listOf(false, true)) {
+            val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to home))
+            val original = DevicePinStore(backing)
+            original.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+            val old = original.journal.value.copy(
+                pins = if (edited) listOf(agents, tools) else listOf(tools, agents),
+                legacyOrderedPins = null,
+            )
+            backing.putString(DevicePinStore.STORAGE_KEY, LettaJson.wire.encodeToString(old))
+            val reopened = DevicePinStore(backing)
+            val settings = if (edited) settingsOrder("shortcut:TOOLS", "shortcut:AGENTS")
+                else settingsOrder("shortcut:AGENTS", "shortcut:TOOLS")
+            reopened.importLegacy(listOf(settings))
+            assertEquals(listOf(agents, tools), reopened.journal.value.pins, "edited=$edited")
+            assertEquals(reopened.journal.value, DevicePinStore(backing).journal.value)
+        }
+    }
+
+    private fun settingsOrder(vararg entries: String) = LegacyPinSource(
+        LegacyPinSources.SETTINGS_ORDER,
+        { LettaJson.wire.encodeToString(entries.toList()) },
+        { LettaJson.wire.decodeFromString<List<String>>(it) },
+    )
 
     @Test
     fun userReorderSurvivesALaterHigherPriorityImport() {

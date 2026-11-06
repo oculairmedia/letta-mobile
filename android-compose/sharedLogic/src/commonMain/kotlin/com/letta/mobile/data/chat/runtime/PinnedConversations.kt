@@ -45,10 +45,11 @@ class PinnedConversations(
 
     /** A failed inherited pin must not prevent an already-created fork from opening. */
     fun inherit(sourceId: String, forkId: String) {
-        // setPinned reports a refused or unverifiable pin write as IllegalStateException (check()).
         try {
             if (isPinned(sourceId)) setPinned(forkId, true)
         } catch (error: IllegalStateException) {
+            Telemetry.error("PinnedConversations", "inherit_failed", error)
+        } catch (error: IllegalArgumentException) {
             Telemetry.error("PinnedConversations", "inherit_failed", error)
         }
     }

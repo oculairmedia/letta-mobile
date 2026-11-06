@@ -15,10 +15,16 @@ import kotlinx.serialization.encodeToString
  * backings are never removed. Snapshots precede import; union and checkpoints survive interruption.
  */
 class DevicePinStore(private val backing: SecureSettingsStore) {
-    private val initial = storageAttempt { read() }
-    private val current = MutableStateFlow(initial.getOrDefault(PinJournal()))
-    private val ready = MutableStateFlow(initial.isSuccess)
-    private val readable = MutableStateFlow(initial.isSuccess)
+    private val current: MutableStateFlow<PinJournal>
+    private val ready: MutableStateFlow<Boolean>
+    private val readable: MutableStateFlow<Boolean>
+
+    init {
+        val initial = storageAttempt { read() }
+        current = MutableStateFlow(initial.getOrDefault(PinJournal(legacyOrderedPins = emptyList())))
+        ready = MutableStateFlow(initial.isSuccess)
+        readable = MutableStateFlow(initial.isSuccess)
+    }
     val journal: StateFlow<PinJournal> = current.asStateFlow()
     val availability: StateFlow<Boolean> = ready.asStateFlow()
     val hasReadableState: Boolean get() = readable.value
@@ -50,7 +56,7 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
             else -> state.pins + ref
         }
         commit(state.copy(pins = pins, tombstones = if (pinned) state.tombstones - ref else state.tombstones + ref,
-            legacyOrderedPins = if ((ref in state.pins) == pinned) state.legacyOrderedPins else state.legacyOrderedPins - ref))
+            legacyOrderedPins = if ((ref in state.pins) == pinned) state.legacyOrderedPins else state.legacyOrderedPins.orEmpty() - ref))
     }
 
     /** Reorder a visible subset in its existing slots, preserving all other sources and kinds. */
@@ -101,11 +107,15 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
         val checkpoints = records.any { it.canComplete(completing) }
         if (records == state.imports && !checkpoints) return
         val imported = records.flatMap { record -> record.entries.mapNotNull(record.resolved::get) }
-        // Only pins added by earlier imports may be reordered when a higher-priority source arrives.
-        // Existing canonical pins and any user-edited order remain ahead of newly imported pins.
-        val canonical = state.pins.filterNot { it in state.legacyOrderedPins }
-        val pins = (canonical + imported + state.legacyOrderedPins).distinct().filterNot { it in state.tombstones }
-        commit(state.copy(pins = pins, imports = records, legacyOrderedPins = pins.filterNot { it in canonical }))
+        // Refill only migration slots; user-added pins retain their exact positions.
+        val legacy = state.legacyOrderedPins.orEmpty()
+        val canonical = state.pins.filterNot { it in legacy }
+        val migrated = (imported + legacy).distinct().filterNot { it in canonical || it in state.tombstones }
+        val remaining = migrated.iterator()
+        val pins = state.pins.mapNotNull { pin ->
+            if (pin in legacy) if (remaining.hasNext()) remaining.next() else null else pin
+        } + remaining.asSequence().toList()
+        commit(state.copy(pins = pins, imports = records, legacyOrderedPins = migrated))
         // commit reopens/verifies before a source can be marked complete. A crash here resumes union idempotently.
         commit(current.value.copy(imports = records.map {
             it.copy(complete = it.complete || it.canComplete(completing))
@@ -146,8 +156,18 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
         )
     }
 
-    private fun read(): PinJournal = backing.getString(STORAGE_KEY)?.let { LettaJson.wire.decodeFromString<PinJournal>(it) }
-        ?.also { require(it.version == 1) { "Unsupported pin journal" } } ?: PinJournal()
+    private fun read(): PinJournal {
+        val state = backing.getString(STORAGE_KEY)?.let { LettaJson.wire.decodeFromString<PinJournal>(it) }
+            ?: PinJournal(legacyOrderedPins = emptyList())
+        require(state.version == 1) { "Unsupported pin journal" }
+        if (state.legacyOrderedPins != null) return state
+        // Older journals omitted provenance. Recover it only when the saved order agrees with
+        // the recorded imports; a different order may have been explicitly edited by the user.
+        val imported = state.imports.flatMap { record -> record.entries.mapNotNull(record.resolved::get) }.distinct()
+        val candidates = state.pins.filter { it in imported }
+        val recordedOrder = imported.filter { it in candidates }
+        return state.copy(legacyOrderedPins = if (candidates == recordedOrder) candidates else emptyList())
+    }
 
     private fun commit(next: PinJournal) {
         val result = storageAttempt {
