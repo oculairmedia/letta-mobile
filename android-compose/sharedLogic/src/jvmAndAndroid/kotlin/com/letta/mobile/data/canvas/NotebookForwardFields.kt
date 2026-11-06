@@ -5,6 +5,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -38,9 +39,12 @@ private fun keepUnknown(known: JsonObject, previous: JsonObject, descriptor: Ser
     val declared = (0 until descriptor.elementsCount).associateBy(descriptor::getElementName)
     val merged = known.mapValues { (name, value) ->
         val nested = declared[name]?.let(descriptor::getElementDescriptor)?.takeIf { it.kind == StructureKind.CLASS }
-        val before = previous[name]
-        if (nested != null && value is JsonObject && before is JsonObject) keepUnknown(value, before, nested) else value
+        nested?.let { mergeNested(value, previous[name], it) } ?: value
     }
     val unknown = previous.filterKeys { it !in declared }
     return if (unknown.isEmpty()) JsonObject(merged) else JsonObject(merged + unknown)
 }
+
+/** Both sides objects: merge them under [nested]; otherwise null, and this build's value stands. */
+private fun mergeNested(value: JsonElement, before: JsonElement?, nested: SerialDescriptor): JsonObject? =
+    (value as? JsonObject)?.let { current -> (before as? JsonObject)?.let { keepUnknown(current, it, nested) } }
