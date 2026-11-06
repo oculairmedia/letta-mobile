@@ -7,6 +7,7 @@ import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -47,6 +48,9 @@ class PinnedConversations(
     fun inherit(sourceId: String, forkId: String) {
         try {
             if (isPinned(sourceId)) setPinned(forkId, true)
+        } catch (error: CancellationException) {
+            // CancellationException is an IllegalStateException on the JVM: never let the catch below swallow it.
+            throw error
         } catch (error: IllegalStateException) {
             Telemetry.error("PinnedConversations", "inherit_failed", error)
         } catch (error: IllegalArgumentException) {
