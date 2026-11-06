@@ -168,9 +168,9 @@ internal class NotebookHistoryArchive(
         restoreListBytes: Long,
     ): Compaction = Move(documentKey, nowEpochMs, index).run(restoreListBytes)
 
-    /** After the commit point: retire [key] in favor of [successor], delete its storage, then the journal. */
-    private fun retire(key: String, successor: String, journal: Path, index: NotebookDocumentIndex) {
-        index.retire(key, successor)
+    /** After the commit point: retire [key], delete its storage, then the journal. */
+    private fun retire(key: String, journal: Path, index: NotebookDocumentIndex) {
+        index.retire(key)
         afterStep(Step.RETIRED)
         deleteTree(documentDirectory(key))
         afterStep(Step.OLD_DELETED)
@@ -195,11 +195,11 @@ internal class NotebookHistoryArchive(
             val indexed = index.read()
             when {
                 !NotebookDocumentIndex.isKey(successor) -> Files.delete(journal)
-                successor in indexed -> retire(key, successor, journal, index)
+                successor in indexed -> retire(key, journal, index)
                 key in indexed && chunks(documentDirectory(successor)).isNotEmpty() -> {
                     // The new document is whole: finish the move rather than discard it.
                     index.replace(key, successor)
-                    retire(key, successor, journal, index)
+                    retire(key, journal, index)
                 }
                 else -> {
                     // Never committed: the new document, if any of it exists, is referenced by
@@ -242,7 +242,7 @@ internal class NotebookHistoryArchive(
             afterStep(Step.SUCCESSOR_READY)
             check(index.replace(documentKey, newKey)) { "$documentKey left the index during its move" }
             afterStep(Step.INDEXED)
-            retire(documentKey, newKey, journal, index)
+            retire(documentKey, journal, index)
             return Compaction(
                 archive = archive,
                 newKey = newKey,
