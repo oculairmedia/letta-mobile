@@ -468,25 +468,26 @@ class NotebookLocalStore(
         health.awaitPrepared()
         val key = id.stableKey()
         if (!health.isRetired(key)) return id
-        // Each successor carries all earlier archive entries. Reading that existing metadata also
-        // resolves repositories written before this behavior, without changing their disk format.
-        return listDocuments().filter { candidate ->
-            runCatching {
-                open(candidate)?.withDocument { document ->
-                    val previous = (document.get(ObjectId.ROOT, NotebookHistoryArchive.PREVIOUS_DOCUMENT)
-                        .orElse(null) as? AmValue.Str)?.value
-                    if (previous == key) return@withDocument true
-                    val archives = (document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE)
-                        .orElse(null) as? AmValue.List)?.id ?: return@withDocument false
-                    document.listItems(archives).orElse(null)?.any { item ->
-                        val raw = (item as? AmValue.Str)?.value ?: return@any false
-                        runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
-                            .getOrDefault(false)
-                    } == true
-                }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
-            }.getOrDefault(false)
-        }.singleOrNull()
+        // The map is a hint: its document must still confirm, in its own archive metadata, that it replaced [key].
+        val recorded = documents.successors()[key]
+            ?.let { successor -> listDocuments().singleOrNull { it.stableKey() == successor } }
+            ?.takeIf { candidate -> confirmsSuccession(candidate, key) }
+        return recorded ?: scanForSuccessor(id)
     }
+
+    /**
+     * Stores retired before the successor map existed: each successor carries all earlier archive
+     * entries, so reading that existing metadata resolves them without changing their disk format.
+     * This opens every indexed document, so it runs only when the map has no usable entry.
+     */
+    private fun scanForSuccessor(retired: DocumentId): DocumentId? {
+        val key = retired.stableKey()
+        return listDocuments().filter { candidate -> confirmsSuccession(candidate, key) }.singleOrNull()
+    }
+
+    private fun confirmsSuccession(candidate: DocumentId, key: String): Boolean = runCatching {
+        open(candidate)?.withDocument { document -> document.succeeds(key) }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
+    }.getOrDefault(false)
 
     fun insertMarkdown(id: DocumentId, index: Int, text: String) {
         require(index >= 0)
@@ -586,4 +587,17 @@ class NotebookLocalStore(
     private companion object {
         const val TIMEOUT_SECONDS = 10L
     }
+}
+
+/** Whether this document replaced [key], directly or through an earlier archived move. */
+private fun Read.succeeds(key: String): Boolean {
+    val previous = (get(ObjectId.ROOT, NotebookHistoryArchive.PREVIOUS_DOCUMENT).orElse(null) as? AmValue.Str)?.value
+    if (previous == key) return true
+    val archives = (get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE).orElse(null) as? AmValue.List)?.id
+        ?: return false
+    return listItems(archives).orElse(null)?.any { item ->
+        val raw = (item as? AmValue.Str)?.value
+        raw != null && runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
+            .getOrDefault(false)
+    } == true
 }
