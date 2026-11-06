@@ -1,6 +1,6 @@
 # Object verbs v1: contract proposal
 
-Status: **Proposed; deliverable 1 of letta-mobile-i5jdm.9. Emmanuel's review precedes implementation.**
+Status: **Accepted (Emmanuel, 2026-11-06); deliverable 1 of letta-mobile-i5jdm.9. Decisions recorded below; implementation is deliverable 2.**
 
 This is the action and menu half of letta-mobile-i5jdm.3. It specifies portable
 semantics shared by Android, desktop and web. This change supplies serializable
@@ -266,7 +266,8 @@ Migration requirements before any old writer is removed:
    Home production order, Home default-key order, and remaining sources in the
    inventory's deterministic order. Preserve each ordered source's first occurrence;
    append unordered memberships by ordinal `(kind,id)`. Conflicting orders cannot
-   both win: this precedence is a review decision, while membership must be lossless.
+   both win: the settings `pinned_items_order` (rail) order takes precedence over Home
+   order (decided 2026-11-06), while membership must be lossless.
    Absent defaults seed Home shortcuts only when no explicit Home setting exists;
    an explicit empty Home list remains empty, except positive pins from other sources.
 4. Persist the union, pending raw entries, import provenance and per-source completion
@@ -285,12 +286,15 @@ Migration requirements before any old writer is removed:
    orders; interrupt migration, reopen, unpin and repeat import. Assert no lost user
    pin, no resurrection, stable order and equal facets in Android/desktop/web lenses.
 
-## Review decisions for Emmanuel
+## Decisions (Emmanuel, 2026-11-06)
 
-The proposal chooses device-local preferences scoped by trusted source, union
-membership during import, deterministic order precedence and core-owned facets.
-Please review the precedence when Home and rail orders conflict, how users resolve
-legacy pins whose backend is unknowable, and whether utility is one `kindTag` or
-will need multiple classification tags. Invocation and migration acceptance,
-plugin-supplied verbs and command palette UI remain deliverable 2 or later; this
-contract does not claim those paths already exist.
+1. **Pin-order precedence on import:** the settings `pinned_items_order` (rail) order wins over
+   Home order. After import there is one order, which the user changes by dragging.
+2. **Legacy pins with an unknowable backend:** kept as hidden pending imports, never assigned by
+   guess, and restored automatically when their source reconnects. There is no sort-out UI.
+3. **Classification:** exactly one `kindTag` per object in v1 (for example `utility`,
+   `persistent`). Multiple tags are deferred to a later contract version; unknown tags render
+   nothing.
+
+Invocation and migration acceptance, plugin-supplied verbs and command palette UI remain
+deliverable 2 or later; this contract does not claim those paths already exist.
