@@ -1,7 +1,8 @@
 package com.letta.mobile.ui.components.tabs
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,36 +34,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.AwaitPointerEventScope
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerId
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
-import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-/** One tab: its stable [key], its [title] and the quieter [subtitle] beside it (a conversation's agent). */
+/** One tab with its stable [key], [title], quieter [subtitle], and whether it is a replaceable [isTransient] preview. */
 @Immutable
-data class LettaTab(val key: String, val title: String, val subtitle: String? = null)
+data class LettaTab(val key: String, val title: String, val subtitle: String? = null, val isTransient: Boolean = false)
 
 /**
  * What the strip can do to a tab, grouped: they always travel together. [onReorder] hears a dragged
  * tab's key and new index once, when the drag ends. [onNew] null hides the trailing "+";
- * [newLabel] is its screen-reader label.
+ * [newLabel] is its screen-reader label. [onPin] keeps a preview and [onUnpin] releases a kept tab.
  */
 @Immutable
 data class LettaTabStripActions(
@@ -70,6 +65,8 @@ data class LettaTabStripActions(
     val onReorder: (key: String, targetIndex: Int) -> Unit = { _, _ -> },
     val onNew: (() -> Unit)? = null,
     val newLabel: String = "New tab",
+    val onPin: (key: String) -> Unit = {},
+    val onUnpin: (key: String) -> Unit = {},
 )
 
 /** Test tags of the strip. */
@@ -93,6 +90,7 @@ object LettaTabStripTags {
  *
  * [dragLaneWidth] keeps a blank lane after the strip (outside the `LazyRow`, so a tab can never be
  * dragged into it and cut off): a desktop title bar needs one for native window dragging.
+ * [tabMenu] wraps each tab in its host-provided context menu; [pinEnabled] enables pin actions.
  */
 @Composable
 fun LettaTabStrip(
@@ -101,11 +99,15 @@ fun LettaTabStrip(
     actions: LettaTabStripActions,
     modifier: Modifier = Modifier,
     dragLaneWidth: Dp = 0.dp,
+    tabMenu: @Composable (LettaTab, @Composable () -> Unit) -> Unit = { _, content -> content() },
+    pinEnabled: Boolean = false,
 ) {
     var currentList by remember(tabs) { mutableStateOf(tabs) }
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        currentList = currentList.toMutableList().apply { add(to.index, removeAt(from.index)) }
+        if (currentList.getOrNull(from.index)?.isTransient == false) {
+            currentList = currentList.toMutableList().apply { add(to.index, removeAt(from.index)) }
+        }
     }
     Row(modifier = modifier.padding(end = dragLaneWidth).testTag(LettaTabStripTags.STRIP), verticalAlignment = Alignment.CenterVertically) {
         LazyRow(
@@ -116,21 +118,24 @@ fun LettaTabStrip(
         ) {
             items(currentList, key = { it.key }) { tab ->
                 ReorderableItem(reorderableState, key = tab.key) { isDragging ->
-                    LettaTabItem(
+                    tabMenu(tab) { LettaTabItem(
                         tab = tab,
-                        state = LettaTabItemState(active = tab.key == activeKey, dragging = isDragging),
+                        state = LettaTabItemState(active = tab.key == activeKey, dragging = isDragging, pinEnabled = pinEnabled),
                         actions = actions,
                         // onDragStopped, not an effect keyed on `isDragging`: the library flips its
                         // dragging flag from a launched coroutine, which a fast press-drag-release can
                         // outrun; onDragStopped runs synchronously when this tab's gesture ends.
-                        modifier = Modifier.draggableHandle(
+                        modifier = if (tab.isTransient) Modifier else Modifier.draggableHandle(
                             dragGestureDetector = EagerPressDragGestureDetector,
                             onDragStopped = {
+                                val pinned = currentList.filterNot { it.isTransient }
+                                var nextPinned = 0
+                                currentList = tabs.map { if (it.isTransient) it else pinned[nextPinned++] }
                                 val targetIndex = currentList.indexOfFirst { it.key == tab.key }
                                 if (targetIndex >= 0) actions.onReorder(tab.key, targetIndex)
                             },
                         ),
-                    )
+                    ) }
                 }
             }
         }
@@ -150,16 +155,24 @@ private fun NewTabButton(label: String, onNew: () -> Unit) {
 }
 
 /** Whether a tab is the open one and whether it is being dragged. */
-private data class LettaTabItemState(val active: Boolean, val dragging: Boolean)
+private data class LettaTabItemState(val active: Boolean, val dragging: Boolean, val pinEnabled: Boolean)
 
 @Composable
-private fun LettaTabItem(tab: LettaTab, state: LettaTabItemState, actions: LettaTabStripActions, modifier: Modifier = Modifier) {
+private fun LettaTabItem(
+    tab: LettaTab,
+    state: LettaTabItemState,
+    actions: LettaTabStripActions,
+    modifier: Modifier = Modifier,
+) {
     val interactionSource = remember(tab.key) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val togglePin = { if (tab.isTransient) actions.onPin(tab.key) else actions.onUnpin(tab.key) }
+    val pinLabel = if (tab.isTransient) "Pin" else "Unpin"
     Surface(
-        onClick = { actions.onSelect(tab.key) },
         modifier = modifier
             .fillMaxHeight()
+            .hoverable(interactionSource)
+            .tabClick(tab, actions, interactionSource, state.pinEnabled)
             .widthIn(min = TabMinWidth, max = TabMaxWidth)
             .padding(top = LettaDimens.Space.xs)
             .then(if (state.dragging) Modifier.shadow(LettaDimens.Space.xs, TabShape) else Modifier)
@@ -172,28 +185,57 @@ private fun LettaTabItem(tab: LettaTab, state: LettaTabItemState, actions: Letta
             else -> Color.Transparent
         },
         contentColor = MaterialTheme.colorScheme.onSurface,
-        interactionSource = interactionSource,
     ) {
         Box {
-            LettaTabLabel(tab, state.active, Modifier.align(Alignment.Center))
+            LettaTabLabel(tab, state.active, state.pinEnabled, Modifier.align(Alignment.Center))
             if (hovered || state.active) {
+                if (state.pinEnabled) {
+                    IconButton(onClick = togglePin, modifier = Modifier.align(Alignment.CenterEnd)
+                        .padding(end = LettaDimens.Control.iconButtonSm).size(LettaDimens.Control.iconButtonSm)) {
+                        Icon(Icons.Outlined.PushPin, contentDescription = "$pinLabel ${tab.title} tab",
+                            modifier = Modifier.size(LettaDimens.Control.iconSm))
+                    }
+                }
                 TabCloseButton(tab.title, onClose = { actions.onClose(tab.key) }, modifier = Modifier.align(Alignment.CenterEnd))
             }
         }
     }
 }
 
+private fun Modifier.tabClick(
+    tab: LettaTab,
+    actions: LettaTabStripActions,
+    interactionSource: MutableInteractionSource,
+    pinEnabled: Boolean,
+): Modifier = if (tab.isTransient && pinEnabled) {
+    combinedClickable(
+        interactionSource = interactionSource,
+        indication = null,
+        onClick = { actions.onSelect(tab.key) },
+        onDoubleClick = {
+            actions.onSelect(tab.key)
+            actions.onPin(tab.key)
+        },
+    )
+} else {
+    clickable(interactionSource = interactionSource, indication = null) { actions.onSelect(tab.key) }
+}
+
 @Composable
-private fun LettaTabLabel(tab: LettaTab, active: Boolean, modifier: Modifier = Modifier) {
+private fun LettaTabLabel(tab: LettaTab, active: Boolean, pinEnabled: Boolean, modifier: Modifier = Modifier) {
     // One line, browser-thin: the title, then the subtitle in the quieter colour; the end clears the close button.
     Row(
-        modifier = modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xl),
+        modifier = modifier.padding(
+            start = LettaDimens.Space.md,
+            end = LettaDimens.Space.xl + if (pinEnabled) LettaDimens.Control.iconButtonSm else 0.dp,
+        ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = tab.title,
             style = MaterialTheme.typography.labelMedium,
+            fontStyle = if (tab.isTransient) FontStyle.Italic else FontStyle.Normal,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
             color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -229,57 +271,3 @@ private fun TabCloseButton(title: String, onClose: () -> Unit, modifier: Modifie
 private val TabShape = RoundedCornerShape(topStart = LettaDimens.Space.sm, topEnd = LettaDimens.Space.sm)
 private val TabMinWidth = LettaDimens.Orb.hero + LettaDimens.Space.sm
 private val TabMaxWidth = LettaDimens.Pane.navWidth
-
-/**
- * A [DragGestureDetector] that claims the initiating press the instant it lands, instead of the
- * library's default, which defers consuming it until the touch slop is crossed. A strip inside a
- * desktop title bar shares the press with the window's native drag-to-move, which only stands back
- * for a press something already claimed; a deferred claim left a window where a press that was
- * about to become a tab drag looked unclaimed to it. A plain click still selects (the tab's own
- * click does not gate on the down's consumption); only movement past the slop also consumes the
- * moves, which cancels the click.
- */
-private val EagerPressDragGestureDetector = DragGestureDetector { onDragStart, onDragEnd, onDragCancel, onDrag ->
-    detectEagerDrag(EagerDragCallbacks(onDragStart, onDragEnd, onDragCancel, onDrag))
-}
-
-/** The four [DragGestureDetector] callbacks, grouped so the drag loop threads one value. */
-private class EagerDragCallbacks(
-    val onDragStart: (Offset) -> Unit,
-    val onDragEnd: () -> Unit,
-    val onDragCancel: () -> Unit,
-    val onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit,
-)
-
-private suspend fun PointerInputScope.detectEagerDrag(callbacks: EagerDragCallbacks) {
-    val touchSlop = viewConfiguration.touchSlop
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        down.consume()
-        var dragging = false
-        var accumulated = Offset.Zero
-        while (true) {
-            val change = nextPressedChange(down.id) ?: break
-            val delta = change.positionChange()
-            if (dragging) {
-                change.consume()
-                callbacks.onDrag(change, delta)
-                continue
-            }
-            accumulated += delta
-            if (accumulated.getDistance() > touchSlop) {
-                dragging = true
-                change.consume()
-                callbacks.onDragStart(change.position)
-                callbacks.onDrag(change, accumulated)
-            }
-        }
-        if (dragging) callbacks.onDragEnd() else callbacks.onDragCancel()
-    }
-}
-
-/** [pointerId]'s next change while it stays pressed; null once it lifts (or leaves the event). */
-private suspend fun AwaitPointerEventScope.nextPressedChange(pointerId: PointerId): PointerInputChange? {
-    val change = awaitPointerEvent(PointerEventPass.Main).changes.firstOrNull { it.id == pointerId } ?: return null
-    return change.takeIf { it.pressed }
-}

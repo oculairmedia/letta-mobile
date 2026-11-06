@@ -157,6 +157,19 @@ class ShellWorkspaceNavigator(
         if (fallback != null) openConversation(ConversationId(fallback)) else state.showPage(ShellDestination.Home)
     }
 
+    /** Keeps the preview tab until explicitly closed or unpinned. */
+    fun pinConversationTab(conversation: ConversationId) {
+        state.tabs = ConversationTabsReducer.pin(state.tabs, state.tabs.openConversationIds.indexOf(conversation.value))
+    }
+
+    /** Makes the active tab a preview, or removes an inactive tab. */
+    fun unpinConversationTab(conversation: ConversationId) {
+        val displayed = chat.selectedConversation ?: state.selectedConversationId
+        state.tabs = ConversationTabsReducer.unpin(
+            state.tabs, state.tabs.pinnedConversationIds.indexOf(conversation.value), conversation == displayed,
+        )
+    }
+
     /** Moves [conversation]'s tab to [targetIndex]. */
     fun reorderConversationTab(conversation: ConversationId, targetIndex: Int) {
         state.tabs = ConversationTabsReducer.reorder(state.tabs, conversation.value, targetIndex)

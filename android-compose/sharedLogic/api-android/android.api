@@ -20240,20 +20240,25 @@ public final class com/letta/mobile/data/desktopshell/ConversationTabCloseResult
 public final class com/letta/mobile/data/desktopshell/ConversationTabsReducer {
 	public static final field INSTANCE Lcom/letta/mobile/data/desktopshell/ConversationTabsReducer;
 	public final fun close (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabCloseResult;
+	public final fun pin (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;I)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun reorder (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;I)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun retainAvailable (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/util/Set;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun select (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
+	public final fun unpin (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;IZ)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 }
 
 public final class com/letta/mobile/data/desktopshell/ConversationTabsState {
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
-	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/desktopshell/ConversationTabsState;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getOpenConversationIds ()Ljava/util/List;
+	public final fun getPinnedConversationIds ()Ljava/util/List;
+	public final fun getTransientConversationId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -48105,9 +48110,11 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceNavigator {
 	public final fun openAgent-qkT7gGE (Ljava/lang/String;)V
 	public final fun openConversation-LfPRSJk (Ljava/lang/String;)V
 	public final fun openNewChat-XmxTwY8 (Ljava/lang/String;)V
+	public final fun pinConversationTab-LfPRSJk (Ljava/lang/String;)V
 	public final fun reorderConversationTab-1iDlvEA (Ljava/lang/String;I)V
 	public final fun sendToSelectedConversation (Ljava/lang/String;)V
 	public final fun submitHomePrompt (Lcom/letta/mobile/data/shell/ShellHomePrompt;)V
+	public final fun unpinConversationTab-LfPRSJk (Ljava/lang/String;)V
 }
 
 public final class com/letta/mobile/data/shell/ShellWorkspaceState {

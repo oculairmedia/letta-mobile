@@ -147,7 +147,7 @@ private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<De
     val byId = remember(conversations) { conversations.associateBy { it.id } }
     return remember(tabs, byId) {
         tabs.openConversationIds.mapNotNull { id ->
-            byId[id]?.let { LettaTab(key = it.id, title = it.displayTitle(), subtitle = it.agentName) }
+            byId[id]?.let { LettaTab(it.id, it.displayTitle(), it.agentName, id == tabs.transientConversationId) }
         }
     }
 }

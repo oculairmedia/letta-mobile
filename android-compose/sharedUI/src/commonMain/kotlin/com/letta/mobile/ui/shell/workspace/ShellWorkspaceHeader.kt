@@ -25,6 +25,7 @@ import com.letta.mobile.sharedui.resources.shell_new_conversation_tab
 import com.letta.mobile.sharedui.resources.shell_sidebar_hide
 import com.letta.mobile.sharedui.resources.shell_sidebar_show
 import com.letta.mobile.sharedui.resources.shell_workspace_title
+import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.components.tabs.LettaTabStrip
 import com.letta.mobile.ui.components.tabs.LettaTabStripActions
@@ -160,8 +161,15 @@ private fun headerTitle(state: ShellWorkspaceHeaderState, dragLaneWidth: Dp): He
                 tabs = tabs.tabs,
                 activeKey = tabs.activeKey,
                 actions = tabs.actions,
+                pinEnabled = true,
                 dragLaneWidth = dragLaneWidth,
                 modifier = Modifier.fillMaxHeight(),
+                tabMenu = { tab, content ->
+                    val label = if (tab.isTransient) "Pin tab" else "Unpin tab"
+                    LocalLettaHost.current.rowMenu(listOf(LettaMenuItem(label, onClick = {
+                        if (tab.isTransient) tabs.actions.onPin(tab.key) else tabs.actions.onUnpin(tab.key)
+                    })), content)
+                },
             )
         }
         identity != null -> HeaderTitle.Custom {

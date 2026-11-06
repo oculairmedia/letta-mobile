@@ -57,7 +57,6 @@
     <ID>LongParameterList:SendLiftFrameInvariantsTest.kt$SendLiftFrameInvariantsTest$( t: Int, bubble: Rect? = null, ghost: Rect? = null, older: Rect? = null, edge: Boolean = true, composed: Int = 0, chevrons: Int = 0, companion: Float = 0f, departing: Int = 0, )</ID>
     <ID>LongParameterList:ShellPage.kt$ShellPageDeps$( home: ShellPageContent&lt;ShellDestination.Home&gt;? = null, chat: ShellPageContent&lt;ShellDestination.Chat&gt;? = null, canvas: ShellPageContent&lt;ShellDestination.Canvas&gt;? = null, memory: ShellPageContent&lt;ShellDestination.Memory&gt;? = null, schedules: ShellPageContent&lt;ShellDestination.Schedules&gt;? = null, channels: ShellPageContent&lt;ShellDestination.Channels&gt;? = null, skills: ShellPageContent&lt;ShellDestination.Skills&gt;? = null, settings: ShellPageContent&lt;ShellDestination.Settings&gt;? = null, agentEditor: ShellPageContent&lt;ShellDestination.AgentEditor&gt;? = null, providers: ShellPageContent&lt;ShellDestination.Providers&gt;? = null, admin: ShellAdminPages = ShellAdminPages(), val fallback: ShellPageContent&lt;ShellDestination&gt; = EmptyShellPage, )</ID>
     <ID>LoopWithTooManyJumpStatements:CanvasBubbleLayoutControls.kt$while</ID>
-    <ID>LoopWithTooManyJumpStatements:LettaTabStrip.kt$while</ID>
     <ID>LoopWithTooManyJumpStatements:MemoryGraphCanvas.kt$while</ID>
     <ID>LoopWithTooManyJumpStatements:ShellAgentLibrary.kt$while</ID>
     <ID>LoopWithTooManyJumpStatements:StreamingMarkdownDocumentParser.kt$StreamingMarkdownDocumentParser$while</ID>
