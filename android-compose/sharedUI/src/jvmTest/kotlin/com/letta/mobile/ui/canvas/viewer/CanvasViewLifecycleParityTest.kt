@@ -69,7 +69,8 @@ class CanvasViewLifecycleParityTest {
         val session = session(CANVAS_A)
         val sessions = CanvasSessionRegistry()
         val probe = ProbeViewer()
-        val viewers = notebookCanvasViewers(Notebooks, NoteStore()).also { it.register(probe.viewer) }
+        val store = NoteStore()
+        val viewers = notebookCanvasViewers(Notebooks, store).also { it.register(probe.viewer) }
         val shown = mutableStateOf(true)
         setContent {
             MaterialTheme {
@@ -91,6 +92,12 @@ class CanvasViewLifecycleParityTest {
             }
         }
         runOnIdle { assertEquals(0, probe.active.get()) }
+
+        // The cycle ends off the note, so its clean session is gone: an edit made elsewhere shows on return.
+        runOnIdle { store.replace(NOTE_A, "note of A, edited elsewhere") }
+        onNodeWithTag(canvasViewerOptionTag(note)).performScrollTo().performClick()
+        onNodeWithTag(MARKDOWN).assertTextContains("edited elsewhere", substring = true)
+        onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.CANVAS)).performScrollTo().performClick()
 
         runOnIdle { shown.value = false }
         waitUntil(timeoutMillis = TIMEOUT_MILLIS) { sessions.get(CANVAS_A) == null && presence.active.get() == 0 }
@@ -169,6 +176,10 @@ class CanvasViewLifecycleParityTest {
             NOTE_A to NotebookNoteSnapshot(NOTE_A, "A", "note of A"),
             NOTE_B to NotebookNoteSnapshot(NOTE_B, "B", "note of B"),
         )
+
+        fun replace(id: NotebookDocumentId, markdown: String) {
+            notes[id] = notes.getValue(id).copy(markdown = markdown)
+        }
 
         override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad =
             notes[id]?.let(NotebookNoteLoad::Found) ?: NotebookNoteLoad.NotFound
