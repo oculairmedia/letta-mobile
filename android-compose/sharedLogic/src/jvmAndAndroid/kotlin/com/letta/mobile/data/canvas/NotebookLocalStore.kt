@@ -468,8 +468,8 @@ class NotebookLocalStore(
         health.awaitPrepared()
         val key = id.stableKey()
         if (!health.isRetired(key)) return id
-        val recorded = documents.successorOf(key)?.let { successor -> listDocuments().singleOrNull { it.stableKey() == successor } }
-        return recorded ?: scanForSuccessor(key)
+        val recorded = documents.successors()[key]?.let { successor -> listDocuments().singleOrNull { it.stableKey() == successor } }
+        return recorded ?: scanForSuccessor(id)
     }
 
     /**
@@ -477,7 +477,8 @@ class NotebookLocalStore(
      * entries, so reading that existing metadata resolves them without changing their disk format.
      * This opens every indexed document, so it runs only when the map has no usable entry.
      */
-    private fun scanForSuccessor(key: String): DocumentId? {
+    private fun scanForSuccessor(retired: DocumentId): DocumentId? {
+        val key = retired.stableKey()
         val matches = listDocuments().filter { candidate ->
             runCatching {
                 open(candidate)?.withDocument { document -> document.succeeds(key) }
@@ -593,11 +594,9 @@ private fun Read.succeeds(key: String): Boolean {
     if (previous == key) return true
     val archives = (get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE).orElse(null) as? AmValue.List)?.id
         ?: return false
-    return listItems(archives).orElse(null)?.any { item -> archiveNames(item, key) } == true
-}
-
-private fun archiveNames(item: AmValue, key: String): Boolean {
-    val raw = (item as? AmValue.Str)?.value ?: return false
-    return runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
-        .getOrDefault(false)
+    return listItems(archives).orElse(null)?.any { item ->
+        val raw = (item as? AmValue.Str)?.value
+        raw != null && runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
+            .getOrDefault(false)
+    } == true
 }

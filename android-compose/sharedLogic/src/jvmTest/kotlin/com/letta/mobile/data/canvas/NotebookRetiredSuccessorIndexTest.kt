@@ -20,10 +20,10 @@ class NotebookRetiredSuccessorIndexTest {
         val first = compact(directory, target.stableKey(), 1_000L)
         val second = compact(directory, first, 2_000L)
 
-        val index = NotebookDocumentIndex(directory)
-        assertEquals(second, index.successorOf(target.stableKey()))
-        assertEquals(second, index.successorOf(first))
-        assertNull(index.successorOf(second))
+        val successors = NotebookDocumentIndex(directory).successors()
+        assertEquals(second, successors[target.stableKey()])
+        assertEquals(second, successors[first])
+        assertNull(successors[second])
         NotebookLocalStore(directory, PEER).use { store ->
             assertNull(store.open(target), "retired storage stays closed")
             assertEquals(second, store.resolveStorageId(target)?.stableKey())
@@ -33,43 +33,25 @@ class NotebookRetiredSuccessorIndexTest {
     }
 
     @Test
-    fun aStoreRetiredBeforeTheMapExistedStillResolvesByScan() {
-        val directory = Files.createTempDirectory("notebook-successor-legacy-")
+    fun aStoreRetiredBeforeTheMapExistedStillResolvesByScan() = assertScanResolves { map, _ -> Files.delete(map) }
+
+    @Test
+    fun aRecordedSuccessorThatIsNoLongerIndexedFallsBackToTheScan() =
+        assertScanResolves { map, retired -> Files.writeString(map, """{"$retired":"${"f".repeat(32)}"}""") }
+
+    @Test
+    fun anUnreadableSuccessorMapFallsBackToTheScan() = assertScanResolves { map, _ -> Files.writeString(map, "not json") }
+
+    /** Retire one document, damage its map entry with [damage], and expect the scan to find the successor. */
+    private fun assertScanResolves(damage: (map: Path, retired: String) -> Unit) {
+        val directory = Files.createTempDirectory("notebook-successor-fallback-")
         val target = seed(directory, others = 2)
         val successor = compact(directory, target.stableKey(), 1_000L)
-        Files.delete(directory.resolve(NotebookDocumentIndex.SUCCESSORS_FILE))
+        damage(directory.resolve(NotebookDocumentIndex.SUCCESSORS_FILE), target.stableKey())
 
         NotebookLocalStore(directory, PEER).use { store ->
             assertEquals(successor, store.resolveStorageId(target)?.stableKey())
             assertEquals("Target body", store.read(target)?.markdown)
-        }
-    }
-
-    @Test
-    fun aRecordedSuccessorThatIsNoLongerIndexedFallsBackToTheScan() {
-        val directory = Files.createTempDirectory("notebook-successor-stale-")
-        val target = seed(directory, others = 1)
-        val successor = compact(directory, target.stableKey(), 1_000L)
-        val stray = "f".repeat(32)
-        Files.writeString(
-            directory.resolve(NotebookDocumentIndex.SUCCESSORS_FILE),
-            """{"${target.stableKey()}":"$stray"}""",
-        )
-
-        NotebookLocalStore(directory, PEER).use { store ->
-            assertEquals(successor, store.resolveStorageId(target)?.stableKey())
-        }
-    }
-
-    @Test
-    fun anUnreadableSuccessorMapFallsBackToTheScan() {
-        val directory = Files.createTempDirectory("notebook-successor-corrupt-")
-        val target = seed(directory, others = 1)
-        val successor = compact(directory, target.stableKey(), 1_000L)
-        Files.writeString(directory.resolve(NotebookDocumentIndex.SUCCESSORS_FILE), "not json")
-
-        NotebookLocalStore(directory, PEER).use { store ->
-            assertEquals(successor, store.resolveStorageId(target)?.stableKey())
         }
     }
 

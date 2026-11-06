@@ -50,20 +50,20 @@ internal class NotebookDocumentIndex(directory: Path) {
     fun replace(key: String, replacement: String): Boolean {
         val previous = read()
         if (key !in previous) return false
-        val successors = readableSuccessors().mapValues { (_, to) -> if (to == key) replacement else to }
+        val successors = successors().mapValues { (_, to) -> if (to == key) replacement else to }
         write(successorsFile, SUCCESSORS, successors + (key to replacement))
         write(indexFile, IDS, Ids(previous.map { if (it == key) replacement else it }.distinct()))
         return true
     }
 
     /**
-     * The document that replaced moved [key], or null for a move recorded before this map existed
-     * or an unreadable map; callers then fall back to scanning archive metadata.
+     * Each moved document key and the document that replaced it. Empty for moves recorded before
+     * this map existed, or when the map is unreadable; an unreadable map is replaced by the next
+     * move rather than blocking it, and lookups fall back to scanning archive metadata.
      */
-    fun successorOf(key: String): String? = readableSuccessors()[key]
-
-    // An unreadable map is replaced rather than blocking a move; lookups then scan, as for old stores.
-    private fun readableSuccessors(): Map<String, String> = runCatching { readSuccessors() }.getOrDefault(emptyMap())
+    fun successors(): Map<String, String> = runCatching {
+        readFile(successorsFile, SUCCESSORS) { map -> map.all { (from, to) -> isKey(from) && isKey(to) && from != to } }
+    }.getOrNull().orEmpty()
 
     /** Record that [key] was retired; no-op if it already was. */
     fun retire(key: String) {
@@ -72,24 +72,16 @@ internal class NotebookDocumentIndex(directory: Path) {
         write(retiredFile, IDS, Ids(previous + key))
     }
 
-    private fun readIds(file: Path): List<String> {
-        val ids = readFile(file, IDS)?.ids ?: return emptyList()
-        require(ids.all(::isKey) && ids.distinct().size == ids.size) { "Invalid notebook document index: $file" }
-        return ids
-    }
+    private fun readIds(file: Path): List<String> =
+        readFile(file, IDS) { (ids) -> ids.all(::isKey) && ids.distinct().size == ids.size }?.ids.orEmpty()
 
-    private fun readSuccessors(): Map<String, String> {
-        val successors = readFile(successorsFile, SUCCESSORS) ?: return emptyMap()
-        require(successors.all { (from, to) -> isKey(from) && isKey(to) && from != to }) {
-            "Invalid notebook successor index: $successorsFile"
-        }
-        return successors
-    }
-
-    private fun <T> readFile(file: Path, serializer: KSerializer<T>): T? {
+    /** The decoded [file], or null if it does not exist; a malformed or [valid]-rejected file throws. */
+    private fun <T> readFile(file: Path, serializer: KSerializer<T>, valid: (T) -> Boolean): T? {
         if (!Files.exists(file, NOFOLLOW_LINKS)) return null
         require(Files.isRegularFile(file, NOFOLLOW_LINKS)) { "Not a regular notebook index: $file" }
-        return Json.decodeFromString(serializer, Files.readString(file, UTF_8))
+        return Json.decodeFromString(serializer, Files.readString(file, UTF_8)).also {
+            require(valid(it)) { "Invalid notebook index: $file" }
+        }
     }
 
     private fun <T> write(file: Path, serializer: KSerializer<T>, value: T) {
