@@ -44,6 +44,17 @@ class WireContractsTest(unittest.TestCase):
         (self.root / self.module.SPECS / "conversation-lanes-v1.md").write_text("# prose contract\n")
         self.assertEqual(1, len(self.module.contracts(self.root)))
 
+    def test_object_verbs_fixture_is_not_admin_rpc_coverage(self):
+        self.pair()
+        fixture = self.root / self.module.FIXTURES / "object-verbs/v1.json"
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('[{"contractVersion":1,"objectRef":{"kind":"agent","id":"scout"}}]')
+        self.assertEqual(1, len(self.module.contracts(self.root)))
+        # The exemption cannot silently swallow additional untested fixture files.
+        fixture.with_name("v2.json").write_text("[]")
+        with self.assertRaisesRegex(ValueError, "without spec"):
+            self.module.contracts(self.root)
+
     def test_orphans_fail(self):
         spec, fixture = self.pair()
         spec.unlink()
