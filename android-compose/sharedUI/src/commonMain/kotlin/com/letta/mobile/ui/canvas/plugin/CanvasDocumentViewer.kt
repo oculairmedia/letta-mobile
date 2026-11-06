@@ -33,10 +33,14 @@ typealias CanvasDocumentViewerRenderer = @Composable (
     modifier: Modifier,
 ) -> Unit
 
-/** A native sharedUI renderer for a canvas document. */
+/**
+ * A native sharedUI renderer for a canvas document. [prepareClose] saves work the viewer keeps beyond
+ * its composition (a note's draft) before the app quits, and says whether all of it is safe.
+ */
 @Immutable
 class CanvasDocumentViewer(
     val id: CanvasDocumentViewerId,
     val label: @Composable () -> String,
     val render: CanvasDocumentViewerRenderer,
+    val prepareClose: (suspend () -> Boolean)? = null,
 )

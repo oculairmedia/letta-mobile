@@ -36,6 +36,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -138,6 +139,35 @@ class NotebookNoteViewerTest {
     }
 
     @Test
+    fun quittingSavesADraftThatIsNoLongerOnShow() = runComposeUiTest {
+        val backend = ViewerTestBackend()
+        val shown = mutableStateOf(true)
+        val registry = mount(backend, identity = FixedIdentity(NOTEBOOK), shown = shown)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        onNodeWithTag(MARKDOWN).performTextReplacement("written, then the pane closed")
+        runOnIdle { shown.value = false }
+        onNodeWithTag(MARKDOWN).assertDoesNotExist()
+
+        assertTrue(runBlocking { registry.prepareClose() })
+        assertEquals("written, then the pane closed", backend.source.markdown)
+    }
+
+    @Test
+    fun aRetainedDraftThatCannotSaveHoldsTheQuit() = runComposeUiTest {
+        val backend = ViewerTestBackend()
+        val shown = mutableStateOf(true)
+        val registry = mount(backend, identity = FixedIdentity(NOTEBOOK), shown = shown)
+        onNodeWithTag(canvasViewerOptionTag(NOTEBOOK_NOTE_VIEWER_ID)).performClick()
+        onNodeWithTag(MARKDOWN).assertTextContains("original")
+        onNodeWithTag(MARKDOWN).performTextReplacement("mine")
+        runOnIdle { shown.value = false }
+        runOnIdle { backend.source = backend.source.copy(markdown = "changed elsewhere") }
+
+        assertFalse(runBlocking { registry.prepareClose() })
+        assertEquals("changed elsewhere", backend.source.markdown)
+    }
+
+    @Test
     fun aCleanNoteIsReleasedWithItsView() = runComposeUiTest {
         val backend = ViewerTestBackend()
         val shown = mutableStateOf(true)
@@ -159,7 +189,7 @@ class NotebookNoteViewerTest {
         backend: ViewerTestBackend,
         identity: CanvasNotebookIdentity,
         shown: MutableState<Boolean> = mutableStateOf(true),
-    ) {
+    ): CanvasDocumentViewerRegistry {
         val session = runBlocking {
             CanvasSession.create(
                 store = InMemoryCanvasDocumentStore(),
@@ -174,6 +204,7 @@ class NotebookNoteViewerTest {
                 }
             }
         }
+        return registry
     }
 
     private class FixedIdentity(private val notebook: NotebookDocumentId?) : CanvasNotebookIdentity {

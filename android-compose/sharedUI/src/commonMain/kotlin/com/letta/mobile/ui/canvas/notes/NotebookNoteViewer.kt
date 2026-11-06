@@ -48,7 +48,7 @@ internal const val NOTEBOOK_NOTE_FAILED_TAG = "notebook-note-viewer-failed"
  * leaves. A canvas's note session with unsaved work lives as long as this viewer, keyed by the
  * canvas, so the draft survives its view being unmounted (the pane closing, another canvas opening)
  * and a compaction that gives the notebook a new ID; a clean session is released with its view.
- * A host registers it only where its canvases are notebooks.
+ * Quitting saves every retained draft first. A host registers it only where its canvases are notebooks.
  */
 fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer {
     val sessions = NoteSessions(backend)
@@ -56,6 +56,8 @@ fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBa
         id = NOTEBOOK_NOTE_VIEWER_ID,
         label = { stringResource(Res.string.notebook_note_title) },
         render = { context, modifier -> NotebookNoteView(context.canvasId, identity, sessions, modifier) },
+        // Every retained note, shown or not: each dirty one saves; any that cannot holds the quit.
+        prepareClose = sessions::prepareClose,
     )
 }
 
@@ -68,6 +70,15 @@ private class NoteSessions(private val backend: NotebookNoteBackend) {
 
     fun release(canvasId: CanvasId, session: NotebookNoteSession) {
         if (!session.state.value.dirty && byCanvas[canvasId] === session) byCanvas.remove(canvasId)
+    }
+
+    /**
+     * Saves every retained dirty note, then checks them all again: a note edited while another was
+     * saving, or opened meanwhile, is still unsaved. True when none is.
+     */
+    suspend fun prepareClose(): Boolean {
+        val saved = byCanvas.values.toList().map { !it.state.value.dirty || it.prepareClose() }.all { it }
+        return saved && byCanvas.values.none { it.state.value.dirty }
     }
 }
 

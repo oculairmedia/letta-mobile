@@ -39,6 +39,7 @@ import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
+import com.letta.mobile.ui.shell.rememberShellQuit
 
 /**
  * Owns the Nucleus controller for the composition, closing the superseded
@@ -122,6 +123,7 @@ internal data class DesktopNucleusEffectActions(
     val onOpenSettings: () -> Unit,
     /** Summon the floating quick-query bar (global hotkey), without raising the main window. */
     val onQuickQuery: () -> Unit,
+    val prepareQuit: suspend () -> Boolean = { true },
 )
 
 internal data class DesktopNucleusRuntimeState(
@@ -167,6 +169,7 @@ private data class DesktopTrayActions(
     val onShow: () -> Unit,
     val onOpenSettings: () -> Unit,
     val onCheckForUpdates: () -> Unit,
+    val onQuit: () -> Unit,
 )
 
 internal fun destinationNucleusActions(
@@ -211,6 +214,10 @@ internal fun DesktopNucleusEffects(
                 actions.onOpenSettings()
             },
             onCheckForUpdates = bindings.controller::checkForUpdates,
+            onQuit = rememberShellQuit(actions.prepareQuit, exit = { exitProcess(0) }) {
+                bindings.controller.notifyFailure("A note could not be saved. Save or copy it, or Quit again to discard it.", activate)
+                activate()
+            },
         ),
     )
 
@@ -453,7 +460,7 @@ private fun DesktopTray(
         Item(label = "Settings", onClick = actions.onOpenSettings)
         Item(label = "Check for updates", onClick = actions.onCheckForUpdates)
         Divider()
-        Item(label = "Quit", onClick = { exitProcess(0) })
+        Item(label = "Quit", onClick = actions.onQuit)
     }
 }
 

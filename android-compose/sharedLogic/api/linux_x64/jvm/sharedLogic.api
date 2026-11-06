@@ -49670,6 +49670,12 @@ public final class com/letta/mobile/data/shell/ShellPageKind : java/lang/Enum {
 	public static fun values ()[Lcom/letta/mobile/data/shell/ShellPageKind;
 }
 
+public final class com/letta/mobile/data/shell/ShellQuitGuard {
+	public synthetic fun <init> (JLkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLkotlin/jvm/functions/Function1;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun requestQuit (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/shell/ShellRoute {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/ShellRoute;
 	public final fun decode (Ljava/lang/String;)Lcom/letta/mobile/data/shell/ShellDestination;
