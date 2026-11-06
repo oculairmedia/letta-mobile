@@ -24,10 +24,11 @@ data class ShellRailFocus(
     /** Agents the user pinned; an orb's menu offers to unpin them. */
     val pinnedAgentIds: Set<String> = emptySet(),
     /** Authoritative core facets, scoped to the workspace's trusted session. */
-    val objectFacetsByAgentId: Map<String, ObjectFacets> = emptyMap(),
+    val objectFacetsByAgentId: Map<String, ObjectFacets>? = null,
 ) {
-    /** Legacy membership inputs are a read adapter while hosts supply core facets. */
-    internal fun facets(id: String): ObjectFacets = objectFacetsByAgentId[id] ?: ObjectFacets(pinned = id in pinnedAgentIds)
+    /** Legacy membership is used only when no scoped facet map was supplied. */
+    internal fun facets(id: String): ObjectFacets = objectFacetsByAgentId?.let { it[id] ?: ObjectFacets() }
+        ?: ObjectFacets(pinned = id in pinnedAgentIds)
 }
 
 /** One orb on the rail: a stack of agents that share a name, resolved for display. */

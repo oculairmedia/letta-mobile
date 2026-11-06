@@ -175,8 +175,9 @@ private fun TileBody(tile: TileContent) {
 
 @Composable
 private fun TileEditActions(item: HomePinnedItem, page: HomePageScope, modifier: Modifier) {
-    val ref = LegacyPinSources.objectRef(item.key) ?: return
-    val unpin = LocalObjectVerbs.current?.items(ref, "home-tile", desiredPinState = false)?.singleOrNull()
+    val ref = LegacyPinSources.objectRef(item.key)
+    val verbs = LocalObjectVerbs.current
+    val unpin = ref?.let { verbs?.items(it, "home-tile", desiredPinState = false)?.singleOrNull() }
     Row(modifier) {
         val configure = page.navigation.onConfigureAgent
         if (item is HomePinnedItem.Agent && configure != null) {

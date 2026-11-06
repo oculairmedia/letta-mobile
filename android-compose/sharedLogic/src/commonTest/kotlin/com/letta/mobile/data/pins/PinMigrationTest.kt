@@ -12,6 +12,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.encodeToString
+import com.letta.mobile.data.serialization.LettaJson
 
 class PinMigrationTest {
     @Test
@@ -132,6 +134,105 @@ class PinMigrationTest {
         assertEquals(raw, store.journal.value.imports.associate { it.key to it.raw })
         assertEquals(listOf("shortcut:FUTURE"), store.journal.value.imports.flatMap { it.entries - it.resolved.keys })
         assertEquals(store.journal.value, DevicePinStore(backing).journal.value)
+    }
+
+    @Test
+    fun settingsOrderWinsWhenImportedAfterHomeWithoutMovingExistingCanonicalPins() {
+        val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to "shortcut:TOOLS"))
+        val store = DevicePinStore(backing)
+        val existing = ref(ObjectRef("agent", "existing"))
+        store.setPinned(existing, true)
+        store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+        val settings = LegacyPinSource(LegacyPinSources.SETTINGS_ORDER,
+            { "[\"shortcut:AGENTS\",\"shortcut:TOOLS\"]" },
+            { com.letta.mobile.data.serialization.LettaJson.wire.decodeFromString<List<String>>(it) })
+        store.importLegacy(listOf(settings))
+        assertEquals(listOf(existing, LegacyPinSources.shortcut("shortcut:AGENTS"),
+            LegacyPinSources.shortcut("shortcut:TOOLS")), store.journal.value.pins)
+        assertEquals(store.journal.value, DevicePinStore(backing).journal.value)
+    }
+
+    @Test
+    fun stagedImportKeepsUserAddedPinsInTheirSlots() {
+        val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to "shortcut:TOOLS\nshortcut:AGENTS"))
+        val store = DevicePinStore(backing)
+        store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+        val tools = checkNotNull(LegacyPinSources.shortcut("shortcut:TOOLS"))
+        val agents = checkNotNull(LegacyPinSources.shortcut("shortcut:AGENTS"))
+        val added = ref(ObjectRef("agent", "user-added"))
+        store.setPinned(added, true)
+        store.importLegacy(listOf(settingsOrder("shortcut:AGENTS", "shortcut:TOOLS")))
+        assertEquals(listOf(agents, tools, added), store.journal.value.pins)
+        assertEquals(store.journal.value, DevicePinStore(backing).journal.value)
+
+        val stagedBacking = InMemorySecureSettingsStore(mapOf(
+            "desktop.home.pinnedItems" to "shortcut:TOOLS", "home.pinnedItems" to "shortcut:AGENTS",
+        ))
+        val staged = DevicePinStore(stagedBacking)
+        staged.importLegacy(LegacyPinSources.secure(stagedBacking, setOf("desktop.home.pinnedItems")))
+        staged.setPinned(added, true)
+        staged.importLegacy(LegacyPinSources.secure(stagedBacking, setOf("home.pinnedItems")))
+        staged.importLegacy(listOf(settingsOrder("shortcut:AGENTS", "shortcut:TOOLS")))
+        assertEquals(listOf(agents, added, tools), staged.journal.value.pins)
+    }
+
+    @Test
+    fun olderJournalRecoversStagedOrderButKeepsUserEditedOrder() {
+        val tools = checkNotNull(LegacyPinSources.shortcut("shortcut:TOOLS"))
+        val agents = checkNotNull(LegacyPinSources.shortcut("shortcut:AGENTS"))
+        val home = "shortcut:TOOLS\nshortcut:AGENTS"
+        for (edited in listOf(false, true)) {
+            val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to home))
+            val original = DevicePinStore(backing)
+            original.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+            val old = original.journal.value.copy(
+                pins = if (edited) listOf(agents, tools) else listOf(tools, agents),
+                legacyOrderedPins = null,
+            )
+            backing.putString(DevicePinStore.STORAGE_KEY, LettaJson.wire.encodeToString(old))
+            val reopened = DevicePinStore(backing)
+            val settings = if (edited) settingsOrder("shortcut:TOOLS", "shortcut:AGENTS")
+                else settingsOrder("shortcut:AGENTS", "shortcut:TOOLS")
+            reopened.importLegacy(listOf(settings))
+            assertEquals(listOf(agents, tools), reopened.journal.value.pins, "edited=$edited")
+            assertEquals(reopened.journal.value, DevicePinStore(backing).journal.value)
+        }
+    }
+
+    private fun settingsOrder(vararg entries: String) = LegacyPinSource(
+        LegacyPinSources.SETTINGS_ORDER,
+        { LettaJson.wire.encodeToString(entries.toList()) },
+        { LettaJson.wire.decodeFromString<List<String>>(it) },
+    )
+
+    @Test
+    fun userReorderSurvivesALaterHigherPriorityImport() {
+        val backing = InMemorySecureSettingsStore(mapOf("home.pinnedItems" to "shortcut:TOOLS\nshortcut:AGENTS"))
+        val store = DevicePinStore(backing)
+        store.importLegacy(LegacyPinSources.secure(backing, setOf("home.pinnedItems")))
+        val tools = checkNotNull(LegacyPinSources.shortcut("shortcut:TOOLS"))
+        val agents = checkNotNull(LegacyPinSources.shortcut("shortcut:AGENTS"))
+        store.reorder(listOf(agents, tools))
+        val settings = LegacyPinSource(LegacyPinSources.SETTINGS_ORDER,
+            { "[\"shortcut:TOOLS\",\"shortcut:AGENTS\"]" },
+            { com.letta.mobile.data.serialization.LettaJson.wire.decodeFromString<List<String>>(it) })
+        store.importLegacy(listOf(settings))
+        assertEquals(listOf(agents, tools), store.journal.value.pins)
+    }
+
+    @Test
+    fun separateStoreInstancesReadLatestBeforeEachMutation() {
+        val backing = InMemorySecureSettingsStore()
+        val first = DevicePinStore(backing)
+        val second = DevicePinStore(backing)
+        val a = ref(ObjectRef("agent", "a"))
+        val b = ref(ObjectRef("agent", "b"))
+        first.setPinned(a, true)
+        second.setPinned(b, true)
+        first.setPinned(a, false)
+        second.setPinned(b, true)
+        assertEquals(listOf(b), DevicePinStore(backing).journal.value.pins)
+        assertTrue(a in DevicePinStore(backing).journal.value.tombstones)
     }
 
     @Test

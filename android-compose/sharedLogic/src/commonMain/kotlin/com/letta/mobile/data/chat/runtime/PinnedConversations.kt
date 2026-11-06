@@ -6,6 +6,8 @@ import com.letta.mobile.data.objectverbs.binding.DevicePins
 import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.flow.DerivedStateFlow
+import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -42,9 +44,18 @@ class PinnedConversations(
 
     fun toggle(conversationId: String) = setPinned(conversationId, !isPinned(conversationId))
 
-    /** Fork inheritance uses the same provider as a row's explicit pin. */
+    /** A failed inherited pin must not prevent an already-created fork from opening. */
     fun inherit(sourceId: String, forkId: String) {
-        if (isPinned(sourceId)) setPinned(forkId, true)
+        try {
+            if (isPinned(sourceId)) setPinned(forkId, true)
+        } catch (error: CancellationException) {
+            // CancellationException is an IllegalStateException on the JVM: never let the catch below swallow it.
+            throw error
+        } catch (error: IllegalStateException) {
+            Telemetry.error("PinnedConversations", "inherit_failed", error)
+        } catch (error: IllegalArgumentException) {
+            Telemetry.error("PinnedConversations", "inherit_failed", error)
+        }
     }
 
     companion object {

@@ -4,8 +4,11 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbContext
+import com.letta.mobile.data.objectverbs.VerbInvocation
 import com.letta.mobile.data.objectverbs.VerbOutcome
 import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.objectverbs.registry.CoreVerbProvider
 import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -14,6 +17,8 @@ import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.storage.SettingsPlatformDefaults
 import com.letta.mobile.data.storage.SettingsPreferencesStore
+import com.letta.mobile.data.session.ANDROID_REMOTE_LETTA_ID_PREFIX
+import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
@@ -31,6 +36,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 private const val DEFAULT_CHAT_BACKGROUND_KEY = "default"
 
@@ -236,8 +243,8 @@ open class CachedSettingsRepository(
     }
 
     private val pinSource = DerivedStateFlow(
-        activeConfig.map { it?.let { config -> "remote-letta:${config.id}" } },
-        { activeConfig.value?.let { "remote-letta:${it.id}" } },
+        activeConfig.map { it?.let { config -> remoteLettaBackendDescriptor(config, ANDROID_REMOTE_LETTA_ID_PREFIX).backendId.value } },
+        { activeConfig.value?.let { remoteLettaBackendDescriptor(it, ANDROID_REMOTE_LETTA_ID_PREFIX).backendId.value } },
     )
     val objectPins = DevicePins.bind(secureSettingsStore, pinSource)
 
@@ -257,8 +264,11 @@ open class CachedSettingsRepository(
     override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedIds(objectPins.ids("project")).map { it.toSet() }
 
     private suspend fun setPinned(ref: ObjectRef, pinned: Boolean) {
+        val registry = objectPins.registry
         importPins()
-        val outcome = objectPins.setPinned(ref, pinned)
+        val outcome = registry.invoke(VerbInvocation(
+            ref, CoreVerbProvider.PIN, VerbContext("adapter"), buildJsonObject { put("pinned", pinned) },
+        ))
         check(outcome is VerbOutcome.Updated) { "Pin update failed" }
     }
 

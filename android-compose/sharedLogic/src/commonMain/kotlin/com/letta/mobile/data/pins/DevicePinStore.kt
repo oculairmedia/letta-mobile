@@ -15,11 +15,16 @@ import kotlinx.serialization.encodeToString
  * backings are never removed. Snapshots precede import; union and checkpoints survive interruption.
  */
 class DevicePinStore(private val backing: SecureSettingsStore) {
-    private val lock = SynchronizedObject()
-    private val initial = storageAttempt { read() }
-    private val current = MutableStateFlow(initial.getOrDefault(PinJournal()))
-    private val ready = MutableStateFlow(initial.isSuccess)
-    private val readable = MutableStateFlow(initial.isSuccess)
+    private val current: MutableStateFlow<PinJournal>
+    private val ready: MutableStateFlow<Boolean>
+    private val readable: MutableStateFlow<Boolean>
+
+    init {
+        val initial = storageAttempt { read() }
+        current = MutableStateFlow(initial.getOrDefault(PinJournal(legacyOrderedPins = emptyList())))
+        ready = MutableStateFlow(initial.isSuccess)
+        readable = MutableStateFlow(initial.isSuccess)
+    }
     val journal: StateFlow<PinJournal> = current.asStateFlow()
     val availability: StateFlow<Boolean> = ready.asStateFlow()
     val hasReadableState: Boolean get() = readable.value
@@ -32,7 +37,11 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
     /** Hosts can open without a pin provider while a backing is temporarily unavailable. */
     fun tryImportLegacy(sources: List<LegacyPinSource>): Boolean = storageAttempt { importLegacy(sources) }.isSuccess
 
-    private fun forWrite(): PinJournal = if (ready.value) current.value else read()
+    // Always reread under the process-local lock so another store instance cannot leave us stale.
+    private fun forWrite(): PinJournal = storageAttempt { read() }.getOrElse {
+        ready.value = false
+        throw it
+    }
 
     fun facets(ref: ScopedObjectRef): ObjectFacets {
         val index = current.value.pins.indexOf(ref)
@@ -46,7 +55,8 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
             ref in state.pins -> state.pins
             else -> state.pins + ref
         }
-        commit(state.copy(pins = pins, tombstones = if (pinned) state.tombstones - ref else state.tombstones + ref))
+        commit(state.copy(pins = pins, tombstones = if (pinned) state.tombstones - ref else state.tombstones + ref,
+            legacyOrderedPins = if ((ref in state.pins) == pinned) state.legacyOrderedPins else state.legacyOrderedPins.orEmpty() - ref))
     }
 
     /** Reorder a visible subset in its existing slots, preserving all other sources and kinds. */
@@ -56,7 +66,7 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
         val positions = state.pins.indices.filter { state.pins[it] in ordered }
         val pins = state.pins.toMutableList()
         positions.zip(ordered).forEach { (index, ref) -> pins[index] = ref }
-        commit(state.copy(pins = pins))
+        commit(state.copy(pins = pins, legacyOrderedPins = if (pins == state.pins) state.legacyOrderedPins else emptyList()))
     }
 
     /**
@@ -97,7 +107,15 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
         val checkpoints = records.any { it.canComplete(completing) }
         if (records == state.imports && !checkpoints) return
         val imported = records.flatMap { record -> record.entries.mapNotNull(record.resolved::get) }
-        commit(state.copy(pins = (state.pins + imported).distinct().filterNot { it in state.tombstones }, imports = records))
+        // Refill only migration slots; user-added pins retain their exact positions.
+        val legacy = state.legacyOrderedPins.orEmpty()
+        val canonical = state.pins.filterNot { it in legacy }
+        val migrated = (imported + legacy).distinct().filterNot { it in canonical || it in state.tombstones }
+        val remaining = migrated.iterator()
+        val pins = state.pins.mapNotNull { pin ->
+            if (pin in legacy) if (remaining.hasNext()) remaining.next() else null else pin
+        } + remaining.asSequence().toList()
+        commit(state.copy(pins = pins, imports = records, legacyOrderedPins = migrated))
         // commit reopens/verifies before a source can be marked complete. A crash here resumes union idempotently.
         commit(current.value.copy(imports = records.map {
             it.copy(complete = it.complete || it.canComplete(completing))
@@ -138,8 +156,18 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
         )
     }
 
-    private fun read(): PinJournal = backing.getString(STORAGE_KEY)?.let { LettaJson.wire.decodeFromString<PinJournal>(it) }
-        ?.also { require(it.version == 1) { "Unsupported pin journal" } } ?: PinJournal()
+    private fun read(): PinJournal {
+        val state = backing.getString(STORAGE_KEY)?.let { LettaJson.wire.decodeFromString<PinJournal>(it) }
+            ?: PinJournal(legacyOrderedPins = emptyList())
+        require(state.version == 1) { "Unsupported pin journal" }
+        if (state.legacyOrderedPins != null) return state
+        // Older journals omitted provenance. Recover it only when the saved order agrees with
+        // the recorded imports; a different order may have been explicitly edited by the user.
+        val imported = state.imports.flatMap { record -> record.entries.mapNotNull(record.resolved::get) }.distinct()
+        val candidates = state.pins.filter { it in imported }
+        val recordedOrder = imported.filter { it in candidates }
+        return state.copy(legacyOrderedPins = if (candidates == recordedOrder) candidates else emptyList())
+    }
 
     private fun commit(next: PinJournal) {
         val result = storageAttempt {
@@ -163,6 +191,9 @@ class DevicePinStore(private val backing: SecureSettingsStore) {
     }
 
     companion object {
+        // This lock coordinates store instances in one runtime only. Cross-process/tab writes need
+        // host-provided locking or atomic compare-and-set; readback cannot supply that guarantee.
+        private val lock = SynchronizedObject()
         const val STORAGE_KEY = "core.objectPins.v1"
     }
 }
