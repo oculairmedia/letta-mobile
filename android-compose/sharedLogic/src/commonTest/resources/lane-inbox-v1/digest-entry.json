@@ -1,0 +1,23 @@
+{
+  "_contract": "lane-inbox-v1 \u00a76",
+  "entry_id": "dig-0001",
+  "message_key": "5debcec3bdfb9866e318974673ce8bf8bc3400e05ee0866902c6cf12747774fe/msg-cb0ac4c8-b4ae-4fa2-be82-e677e7710361",
+  "sender": {
+    "endpoint": "5debcec3bdfb9866e318974673ce8bf8bc3400e05ee0866902c6cf12747774fe",
+    "agent_id": "agent-a9db7a7a-0ca7-4a3a-b124-11e8ab7fd7e1"
+  },
+  "received_at": "2026-11-05T03:39:36Z",
+  "finished_at": "2026-11-05T03:40:36Z",
+  "outcome": "handled",
+  "refs": {
+    "beads_created": [
+      "letta-mobile-4ih8r"
+    ],
+    "beads_commented": [],
+    "proposals": [],
+    "reply_sent": true
+  },
+  "denied_tools": [],
+  "summary_quote": "I filed the shared-memory request as letta-mobile-4ih8r.",
+  "pinned": false
+}

@@ -1,0 +1,12 @@
+{
+  "_contract": "lane-inbox-v1 \u00a71",
+  "to": {
+    "endpoint": "5debcec3bdfb9866e318974673ce8bf8bc3400e05ee0866902c6cf12747774fe",
+    "agent_id": "agent-a9db7a7a-0ca7-4a3a-b124-11e8ab7fd7e1"
+  },
+  "body": "Is anything in vibesync walking /mnt/edrive?",
+  "reply_to": {
+    "correlation_id": "0193f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f",
+    "expires_at": "2026-11-12T03:48:00Z"
+  }
+}
