@@ -250,7 +250,11 @@ internal const val FRAME_PART_CAPABILITY = "frame_part"
  * parts, which the browser binding reassembles. The WebSocket transport has no such framing.
  */
 internal fun authCapabilitiesFor(serverUrl: String): List<String>? =
-    if (isIrohBackendUrl(serverUrl)) listOf(FRAME_PART_CAPABILITY) else null
+    if (isIrohBackendUrl(serverUrl)) {
+        listOf(FRAME_PART_CAPABILITY, com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY)
+    } else {
+        null
+    }
 
 internal fun resolveWebSocketUrl(serverUrl: String): String {
     val trimmed = serverUrl.trim().removeSuffix("/")

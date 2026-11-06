@@ -3933,6 +3933,9 @@ abstract fun interface com.letta.mobile.data.home/HomeMessageSearch { // com.let
 }
 
 abstract fun interface com.letta.mobile.data.lanes/LaneActivitySource { // com.letta.mobile.data.lanes/LaneActivitySource|null[0]
+    open val available // com.letta.mobile.data.lanes/LaneActivitySource.available|{}available[0]
+        open fun <get-available>(): kotlin/Boolean // com.letta.mobile.data.lanes/LaneActivitySource.available.<get-available>|<get-available>(){}[0]
+
     abstract fun arrivals(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.lanes/LaneArrival> // com.letta.mobile.data.lanes/LaneActivitySource.arrivals|arrivals(){}[0]
 }
 

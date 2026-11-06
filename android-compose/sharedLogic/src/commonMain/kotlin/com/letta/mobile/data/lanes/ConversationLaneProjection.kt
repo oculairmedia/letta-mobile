@@ -1,6 +1,7 @@
 package com.letta.mobile.data.lanes
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,24 +13,24 @@ import kotlinx.coroutines.sync.withLock
  * Session-owned, bounded unread/activity state shared by shell rows and transcript views. It holds
  * no conversation objects, navigation or canvas state, so opening, swapping or closing a view never
  * changes it; a new backend/session graph builds a new owner. It issues no history fetch and no
- * per-agent subscription. With no [source] bound, [available] is false and rows show unknown unread,
+ * per-agent subscription. When [source] is absent or unavailable, [available] is false and rows show unknown unread,
  * never zero. Forwarded provenance stays with its verified durable owner (os2pc).
  */
-class ConversationLaneProjection(scope: CoroutineScope, source: LaneActivitySource?) {
+class ConversationLaneProjection(scope: CoroutineScope, private val source: LaneActivitySource?) {
     private data class Entry(val agent: String, val unread: Set<String>, val read: Set<String>, val overflowed: Boolean)
 
     private val mutex = Mutex()
     private var entries: Map<String, Entry> = emptyMap()
     private val mutableActivity = MutableStateFlow<Map<String, LaneActivity>>(emptyMap())
 
-    /** Whether a live arrival producer is bound to this session. */
-    val available: Boolean = source != null
+    /** Whether the session currently supports activity arrivals. */
+    val available: Boolean get() = source?.available == true
 
     /** Per conversation id; an absent key is no arrival seen this session (or no producer). */
     val activity: StateFlow<Map<String, LaneActivity>> = mutableActivity.asStateFlow()
 
     init {
-        source?.let { input -> scope.launch { input.arrivals().collect(::accept) } }
+        source?.let { input -> scope.launch(start = CoroutineStart.UNDISPATCHED) { input.arrivals().collect(::accept) } }
     }
 
     /** Counts [arrival] once: a replay of an unread or already-read identity is not new activity. */
