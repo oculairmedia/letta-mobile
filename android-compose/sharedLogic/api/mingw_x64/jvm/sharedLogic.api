@@ -9010,6 +9010,24 @@ public final class com/letta/mobile/data/canvas/authority/HostNotebookAccess {
 	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
 }
 
+public final class com/letta/mobile/data/canvas/authority/NotebookAccessWire {
+	public static final field FLUSH Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/authority/NotebookAccessWire;
+	public static final field OPEN Ljava/lang/String;
+	public static final field RESOLVE Ljava/lang/String;
+	public static final field SAVE Ljava/lang/String;
+	public final fun denied ()Lkotlinx/serialization/json/JsonObject;
+	public final fun load (Lcom/letta/mobile/data/canvas/notes/NotebookNoteLoad;)Lkotlinx/serialization/json/JsonObject;
+	public final fun readLoad (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteLoad;
+	public final fun readReference (Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/references/NotebookReferenceLoad;
+	public final fun readSave (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/notes/NotebookNoteSave;
+	public final fun reference (Lcom/letta/mobile/data/canvas/references/NotebookReferenceLoad;)Lkotlinx/serialization/json/JsonObject;
+	public final fun request (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function1;)Lkotlinx/serialization/json/JsonObject;
+	public static synthetic fun request$default (Lcom/letta/mobile/data/canvas/authority/NotebookAccessWire;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lkotlinx/serialization/json/JsonObject;
+	public final fun save (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSave;)Lkotlinx/serialization/json/JsonObject;
+	public final fun snapshot (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSnapshot;)Lkotlinx/serialization/json/JsonObject;
+}
+
 public abstract interface class com/letta/mobile/data/canvas/authority/NotebookGrantStore {
 	public abstract fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -9017,6 +9035,13 @@ public abstract interface class com/letta/mobile/data/canvas/authority/NotebookG
 public final class com/letta/mobile/data/canvas/authority/NotebookGrantStoreKt {
 	public static final fun mayEditNotebookContent (Lcom/letta/mobile/data/canvas/NotebookPeerGrant;)Z
 	public static final fun mayResolveNotebookReference (Lcom/letta/mobile/data/canvas/NotebookPeerGrant;)Z
+}
+
+public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccess {
+	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;)V
+	public final fun getBackend ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;
+	public final fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
+	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
 }
 
 public final class com/letta/mobile/data/canvas/bubble/CanvasBubbleLayout {

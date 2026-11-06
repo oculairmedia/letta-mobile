@@ -3,26 +3,11 @@ package com.letta.mobile.wrapper.notebook
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.github.ajalt.clikt.core.parse
 import com.letta.mobile.data.canvas.authority.FileNotebookGrantStore
-import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
-import com.letta.mobile.data.controller.node.iroh.InMemoryPairedPeerStore
-import com.letta.mobile.data.controller.node.iroh.IrohConnectionAuthentication
 import com.letta.mobile.data.controller.node.iroh.IrohNodeConnection
-import com.letta.mobile.data.controller.node.iroh.IrohPairingService
-import com.letta.mobile.data.controller.node.iroh.PairedPeer
-import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
-import computer.iroh.Connection
-import computer.iroh.NoHandle
-import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Proxy
 import java.nio.file.Files
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -122,36 +107,11 @@ class NotebookAdminRoutesTest {
         }
     }
 
-    private fun connection(router: AdminRpcRouter, peer: String): IrohNodeConnection {
-        val peers = InMemoryPairedPeerStore()
-        peers.save(PairedPeer(nodeId = peer, name = peer, pairedAtMs = 0L, capabilities = emptySet()))
-        val controller = AppServerController::class.java.cast(Proxy.newProxyInstance(
-            AppServerController::class.java.classLoader, arrayOf(AppServerController::class.java),
-        ) { _, method, _ -> error("Unexpected controller call ${method.name}") })
-        return IrohNodeConnection(
-            connection = Connection(NoHandle), controller = controller, adminRpcRouter = router,
-            authentication = IrohConnectionAuthentication(
-                authPolicy = IrohAuthPolicy.PairedPeersOnly,
-                pairingService = IrohPairingService(peers), remoteEndpointId = peer,
-            ),
-        )
-    }
+    private fun connection(router: AdminRpcRouter, peer: String): IrohNodeConnection = notebookPeer(router, peer)
 
     private suspend fun IrohNodeConnection.call(method: String, params: JsonObject): JsonObject {
-        val frame = buildJsonObject { put("request_id", "test"); put("method", method); put("params", params) }
-        val raw = suspendCoroutine<String> { continuation ->
-            val handler = IrohNodeConnection::class.java.getDeclaredMethod(
-                "handleControlAdminRpc", JsonObject::class.java, Continuation::class.java,
-            ).apply { isAccessible = true }
-            try {
-                val result = handler.invoke(this, frame, continuation)
-                if (result !== COROUTINE_SUSPENDED) continuation.resume(result as String)
-            } catch (error: InvocationTargetException) {
-                continuation.resumeWithException(error.targetException)
-            }
-        }
-        val parsed = Json.parseToJsonElement(raw).jsonObject
-        assertTrue(parsed["success"]?.jsonPrimitive?.content == "true", raw)
+        val parsed = adminFrame(method, params)
+        assertTrue(parsed["success"]?.jsonPrimitive?.content == "true", parsed.toString())
         return requireNotNull(parsed["result"]).jsonObject
     }
 

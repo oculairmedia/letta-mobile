@@ -28367,6 +28367,17 @@ final class com.letta.mobile.data.beads/KtorBeadsBackend : com.letta.mobile.data
     }
 }
 
+final class com.letta.mobile.data.canvas.authority/RemoteNotebookAccess { // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess|null[0]
+    constructor <init>(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker) // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker){}[0]
+
+    final val backend // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.backend|{}backend[0]
+        final fun <get-backend>(): com.letta.mobile.data.canvas.notes/NotebookNoteBackend // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.backend.<get-backend>|<get-backend>(){}[0]
+    final val opener // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.opener|{}opener[0]
+        final fun <get-opener>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.opener.<get-opener>|<get-opener>(){}[0]
+    final val resolver // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.resolver|{}resolver[0]
+        final fun <get-resolver>(): com.letta.mobile.data.canvas.references/NotebookReferenceResolver // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.resolver.<get-resolver>|<get-resolver>(){}[0]
+}
+
 final class com.letta.mobile.data.canvas.bubble/CanvasBubbleLayout { // com.letta.mobile.data.canvas.bubble/CanvasBubbleLayout|null[0]
     constructor <init>(kotlin/Float, kotlin/Float?, kotlin/Float? = ..., kotlin/Float? = ...) // com.letta.mobile.data.canvas.bubble/CanvasBubbleLayout.<init>|<init>(kotlin.Float;kotlin.Float?;kotlin.Float?;kotlin.Float?){}[0]
 
@@ -69630,6 +69641,27 @@ final object com.letta.mobile.data.backend/SessionRouteMatrix { // com.letta.mob
 
     final fun bound(com.letta.mobile.data.backend/SessionPlatform, com.letta.mobile.data.model/BackendKind?): kotlin.collections/Set<com.letta.mobile.data.backend/SessionRoute> // com.letta.mobile.data.backend/SessionRouteMatrix.bound|bound(com.letta.mobile.data.backend.SessionPlatform;com.letta.mobile.data.model.BackendKind?){}[0]
     final fun disagreements(): kotlin.collections/Set<kotlin/Pair<com.letta.mobile.data.model/BackendKind?, com.letta.mobile.data.backend/SessionRoute>> // com.letta.mobile.data.backend/SessionRouteMatrix.disagreements|disagreements(){}[0]
+}
+
+final object com.letta.mobile.data.canvas.authority/NotebookAccessWire { // com.letta.mobile.data.canvas.authority/NotebookAccessWire|null[0]
+    final const val FLUSH // com.letta.mobile.data.canvas.authority/NotebookAccessWire.FLUSH|{}FLUSH[0]
+        final fun <get-FLUSH>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.FLUSH.<get-FLUSH>|<get-FLUSH>(){}[0]
+    final const val OPEN // com.letta.mobile.data.canvas.authority/NotebookAccessWire.OPEN|{}OPEN[0]
+        final fun <get-OPEN>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.OPEN.<get-OPEN>|<get-OPEN>(){}[0]
+    final const val RESOLVE // com.letta.mobile.data.canvas.authority/NotebookAccessWire.RESOLVE|{}RESOLVE[0]
+        final fun <get-RESOLVE>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.RESOLVE.<get-RESOLVE>|<get-RESOLVE>(){}[0]
+    final const val SAVE // com.letta.mobile.data.canvas.authority/NotebookAccessWire.SAVE|{}SAVE[0]
+        final fun <get-SAVE>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.SAVE.<get-SAVE>|<get-SAVE>(){}[0]
+
+    final fun denied(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.denied|denied(){}[0]
+    final fun load(com.letta.mobile.data.canvas.notes/NotebookNoteLoad): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.load|load(com.letta.mobile.data.canvas.notes.NotebookNoteLoad){}[0]
+    final fun readLoad(com.letta.mobile.data.canvas/NotebookDocumentId, kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.notes/NotebookNoteLoad // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readLoad|readLoad(com.letta.mobile.data.canvas.NotebookDocumentId;kotlinx.serialization.json.JsonElement?){}[0]
+    final fun readReference(kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.references/NotebookReferenceLoad // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readReference|readReference(kotlinx.serialization.json.JsonElement?){}[0]
+    final fun readSave(com.letta.mobile.data.canvas/NotebookDocumentId, kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.notes/NotebookNoteSave // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readSave|readSave(com.letta.mobile.data.canvas.NotebookDocumentId;kotlinx.serialization.json.JsonElement?){}[0]
+    final fun reference(com.letta.mobile.data.canvas.references/NotebookReferenceLoad): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.reference|reference(com.letta.mobile.data.canvas.references.NotebookReferenceLoad){}[0]
+    final fun request(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/Function1<kotlinx.serialization.json/JsonObjectBuilder, kotlin/Unit> = ...): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.request|request(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.Function1<kotlinx.serialization.json.JsonObjectBuilder,kotlin.Unit>){}[0]
+    final fun save(com.letta.mobile.data.canvas.notes/NotebookNoteSave): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.save|save(com.letta.mobile.data.canvas.notes.NotebookNoteSave){}[0]
+    final fun snapshot(com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.snapshot|snapshot(com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot){}[0]
 }
 
 final object com.letta.mobile.data.canvas.bubble/CanvasBubbleLayoutCodec { // com.letta.mobile.data.canvas.bubble/CanvasBubbleLayoutCodec|null[0]
