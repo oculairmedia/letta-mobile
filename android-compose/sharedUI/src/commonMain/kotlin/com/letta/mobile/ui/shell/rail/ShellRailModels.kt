@@ -3,6 +3,7 @@ package com.letta.mobile.ui.shell.rail
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.agents.AgentRailGroup
+import com.letta.mobile.data.objectverbs.ObjectFacets
 import com.letta.mobile.data.model.DisplayNames
 import kotlin.time.Instant
 
@@ -22,7 +23,12 @@ data class ShellRailFocus(
     val activityByAgentId: Map<String, ShellRailActivity> = emptyMap(),
     /** Agents the user pinned; an orb's menu offers to unpin them. */
     val pinnedAgentIds: Set<String> = emptySet(),
-)
+    /** Authoritative core facets, scoped to the workspace's trusted session. */
+    val objectFacetsByAgentId: Map<String, ObjectFacets> = emptyMap(),
+) {
+    /** Legacy membership inputs are a read adapter while hosts supply core facets. */
+    internal fun facets(id: String): ObjectFacets = objectFacetsByAgentId[id] ?: ObjectFacets(pinned = id in pinnedAgentIds)
+}
 
 /** One orb on the rail: a stack of agents that share a name, resolved for display. */
 @Immutable
@@ -40,6 +46,7 @@ data class ShellRailEntry(
     val activity: ShellRailActivity? = null,
     /** Whether [agentId] is pinned. */
     val pinned: Boolean = false,
+    val pinOrder: Int? = null,
 ) {
     /** The letter a gradient orb shows. */
     val initial: String get() = name.firstOrNull()?.uppercase() ?: "?"
@@ -95,6 +102,7 @@ object ShellRailMapping {
     fun entry(group: AgentRailGroup, index: Int, focus: ShellRailFocus): ShellRailEntry {
         val ids = group.agentIds
         val agentId = ids.firstOrNull { it == focus.selectedAgentId } ?: ids.first()
+        val facets = focus.facets(agentId)
         return ShellRailEntry(
             key = group.name,
             name = group.name,
@@ -105,7 +113,8 @@ object ShellRailMapping {
             thinking = focus.thinkingAgentId != null && focus.thinkingAgentId in ids,
             identity = ids.firstNotNullOfOrNull { focus.identityByAgentId[it] },
             activity = ids.mapNotNull { focus.activityByAgentId[it] }.maxByOrNull { recency(it.updatedAtLabel) },
-            pinned = agentId in focus.pinnedAgentIds,
+            pinned = facets.pinned == true,
+            pinOrder = facets.pinOrder,
         )
     }
 

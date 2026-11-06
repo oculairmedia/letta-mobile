@@ -1,19 +1,22 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.util.attr
-import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.pins.LegacyPinSources
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.backendIdentity
+import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.storage.SettingsPlatformDefaults
-import com.letta.mobile.data.storage.SettingsPreferencesSnapshot
 import com.letta.mobile.data.storage.SettingsPreferencesStore
-import com.letta.mobile.data.storage.MutableSettingsPreferencesEditor
+import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +24,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 
 private const val DEFAULT_CHAT_BACKGROUND_KEY = "default"
 
@@ -38,7 +43,6 @@ open class CachedSettingsRepository(
         SettingsBackendCacheClearResult(successes = 0, failedCacheNames = emptyList())
     },
 ) : ISettingsRepository {
-    private val json = Json { ignoreUnknownKeys = true }
 
     private val _configs = MutableStateFlow<List<LettaConfig>>(emptyList())
     override val configs: StateFlow<List<LettaConfig>> = _configs.asStateFlow()
@@ -187,6 +191,7 @@ open class CachedSettingsRepository(
     override suspend fun clearAllData() = withContext(Dispatchers.Default) {
         clearCachesBeforeActiveConfigChange(null)
         secureSettingsStore.clear()
+        objectPins.store.reload()
         preferencesStore.clearAll()
         _configs.update { emptyList() }
         _activeConfig.update { null }
@@ -230,53 +235,37 @@ open class CachedSettingsRepository(
         prefs.getString(SettingsPreferenceKeys.CHAT_BACKGROUND) ?: DEFAULT_CHAT_BACKGROUND_KEY
     }
 
-    override fun getPinnedConversationIds(): Flow<Set<String>> = preferencesStore.snapshots.map { prefs ->
-        prefs.getStringSet(SettingsPreferenceKeys.PINNED_CONVERSATION_IDS) ?: emptySet()
+    private val pinSource = DerivedStateFlow(
+        activeConfig.map { it?.let { config -> "remote-letta:${config.id}" } },
+        { activeConfig.value?.let { "remote-letta:${it.id}" } },
+    )
+    val objectPins = DevicePins.bind(secureSettingsStore, pinSource)
+
+    private suspend fun importPins() {
+        val snapshot = preferencesStore.snapshots.first()
+        objectPins.store.tryImportLegacy(LegacyPinSources.settings(snapshot))
     }
 
-    override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) {
-        preferencesStore.edit { prefs ->
-            val current = prefs.getStringSet(SettingsPreferenceKeys.PINNED_CONVERSATION_IDS) ?: emptySet()
-            prefs.putStringSet(
-                SettingsPreferenceKeys.PINNED_CONVERSATION_IDS,
-                if (pinned) current + conversationId else current - conversationId,
-            )
-        }
+    private fun pinnedIds(ids: StateFlow<List<String>>): Flow<List<String>> = flow {
+        importPins()
+        emitAll(ids)
     }
 
-    override fun getPinnedAgentIds(): Flow<Set<String>> =
-        getPinnedAgentOrder().map { it.toSet() }
+    override fun getPinnedConversationIds(): Flow<Set<String>> = pinnedIds(objectPins.ids("conversation")).map { it.toSet() }
+    override fun getPinnedAgentIds(): Flow<Set<String>> = getPinnedAgentOrder().map { it.toSet() }
+    override fun getPinnedAgentOrder(): Flow<List<String>> = pinnedIds(objectPins.ids("agent"))
+    override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedIds(objectPins.ids("project")).map { it.toSet() }
 
-    override fun getPinnedAgentOrder(): Flow<List<String>> = preferencesStore.snapshots.map { prefs ->
-        readUnifiedPinnedItems(prefs).mapNotNull(::parseAgentKeyPart)
+    private suspend fun setPinned(ref: ObjectRef, pinned: Boolean) {
+        importPins()
+        val outcome = objectPins.setPinned(ref, pinned)
+        check(outcome is VerbOutcome.Updated) { "Pin update failed" }
     }
 
-    override suspend fun setAgentPinned(agentId: String, pinned: Boolean) {
-        preferencesStore.edit { prefs ->
-            val current = readUnifiedPinnedItems(prefs)
-            val key = agentKeyPart(agentId)
-            val updated = if (pinned) {
-                if (key in current) current else current + key
-            } else {
-                current - key
-            }
-            writeUnifiedPinnedItems(prefs, updated)
-        }
-    }
-
-    override fun getPinnedProjectIds(): Flow<Set<String>> = preferencesStore.snapshots.map { prefs ->
-        prefs.getStringSet(SettingsPreferenceKeys.PINNED_PROJECT_IDS) ?: emptySet()
-    }
-
-    override suspend fun setProjectPinned(projectId: String, pinned: Boolean) {
-        preferencesStore.edit { prefs ->
-            val current = prefs.getStringSet(SettingsPreferenceKeys.PINNED_PROJECT_IDS) ?: emptySet()
-            prefs.putStringSet(
-                SettingsPreferenceKeys.PINNED_PROJECT_IDS,
-                if (pinned) current + projectId else current - projectId,
-            )
-        }
-    }
+    override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) =
+        setPinned(ObjectRef("conversation", conversationId), pinned)
+    override suspend fun setAgentPinned(agentId: String, pinned: Boolean) = setPinned(ObjectRef("agent", agentId), pinned)
+    override suspend fun setProjectPinned(projectId: String, pinned: Boolean) = setPinned(ObjectRef("project", projectId), pinned)
 
     override suspend fun setChatBackgroundKey(key: String) {
         preferencesStore.edit { prefs ->
@@ -361,22 +350,6 @@ open class CachedSettingsRepository(
                 )
             }
         }
-    }
-
-    private fun readUnifiedPinnedItems(prefs: SettingsPreferencesSnapshot): List<String> {
-        prefs.getString(SettingsPreferenceKeys.PINNED_ITEMS_ORDER)?.let { raw ->
-            return try {
-                json.decodeFromString<List<String>>(raw)
-            } catch (_: Exception) {
-                emptyList()
-            }
-        }
-        return emptyList()
-    }
-
-    private fun writeUnifiedPinnedItems(prefs: MutableSettingsPreferencesEditor, items: List<String>) {
-        val deduped = items.distinct()
-        prefs.putString(SettingsPreferenceKeys.PINNED_ITEMS_ORDER, json.encodeToString(deduped))
     }
 
 }

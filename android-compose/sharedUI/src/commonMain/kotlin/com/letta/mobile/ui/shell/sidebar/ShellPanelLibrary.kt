@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.ObjectVerbMenus
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -63,6 +66,7 @@ internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions:
             LettaChipTab(text = filter.label, active = state.archiveFilter == filter, onClick = { actions.onArchiveFilterChange(filter) })
         }
     }
+    val verbs = LocalObjectVerbs.current
     val ui = remember { ShellConversationListUi() }
     val sections = remember(state.conversations, state.canvases) { shellPanelSections(state) }
     RosterList(
@@ -71,7 +75,7 @@ internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions:
             key = ShellPanelItem::key,
             selection = RosterSelection(isSelected = ShellPanelItem::selected, onSelect = { openPanelItem(it, actions) }),
             actions = RosterActions(
-                menu = { item, row -> panelItemMenu(item, row, actions, ui) },
+                menu = { item, row -> item.panelItemMenu(row, actions, ui, verbs) },
                 rename = actions.onRenameConversation?.let(::chatRename),
             ),
             options = RosterOptions(testTag = RosterListTag(ShellAgentPanelTags.LIBRARY)),
@@ -96,14 +100,14 @@ private fun openPanelItem(item: ShellPanelItem, actions: ShellAgentPanelActions)
     }
 }
 
-private fun panelItemMenu(
-    item: ShellPanelItem,
+private fun ShellPanelItem.panelItemMenu(
     row: RosterRowState,
     actions: ShellAgentPanelActions,
     ui: ShellConversationListUi,
-): List<LettaMenuItem> = when (item) {
-    is ShellPanelItem.Chat -> shellConversationMenu(item.model, conversationRowActions(item.model, actions), ui, row)
-    is ShellPanelItem.Canvas -> ShellRowMenus.canvas(item.model.archived, canvasArchiveToggle(item.model, actions))
+    verbs: ObjectVerbMenus?,
+): List<LettaMenuItem> = when (this) {
+    is ShellPanelItem.Chat -> model.shellConversationMenu(conversationRowActions(model, actions), ui, row, verbs)
+    is ShellPanelItem.Canvas -> ShellRowMenus.canvas(model.archived, canvasArchiveToggle(model, actions))
 }
 
 /** Rename in place: the chat's own menu entry ("Rename chat") opens it, as F2 does. */
@@ -126,7 +130,6 @@ internal fun conversationRowActions(conversation: ShellConversationRowModel, act
         onDelete = { actions.onDeleteConversation(conversation.id) },
         deleteBehavior = actions.deleteBehavior,
         onRename = actions.onRenameConversation?.let { rename -> { title -> rename(conversation.id, title) } },
-        onPinToggle = actions.onPinConversation?.let { pin -> { pin(conversation.id, !conversation.pinned) } },
         marks = actions.conversationMarks,
         onFork = actions.onForkConversation?.let { fork -> { name -> fork(conversation.id, name) } },
     )

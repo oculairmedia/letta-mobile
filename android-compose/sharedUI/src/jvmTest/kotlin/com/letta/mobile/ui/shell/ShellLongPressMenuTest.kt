@@ -2,6 +2,10 @@
 
 package com.letta.mobile.ui.shell
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
+import com.letta.mobile.ui.components.ProvideObjectVerbs
+
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +19,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.shell.rail.ShellAgentRail
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
@@ -100,22 +109,27 @@ class ShellLongPressMenuTest {
     @Test
     fun longPressingAnAgentOrbOffersItsMenu() = runComposeUiTest {
         val events = mutableListOf<String>()
+        val pins = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
+        pins.setPinned(ObjectRef("agent", "a1"), true)
         val entries = ShellRailMapping.entries(
             ShellRailMapping.groups(listOf("a1" to "Alpha"), selectedAgentId = null),
             ShellRailFocus(pinnedAgentIds = setOf("a1")),
         )
         setContent {
+            ProvideObjectVerbs(pins, onOutcome = { outcome, _ ->
+                if (outcome is VerbOutcome.Updated) events += "pin:${outcome.snapshot.objectRef.id}:${outcome.snapshot.facets.pinned}"
+            }) {
             MaterialTheme {
                 ShellAgentRail(
                     state = ShellAgentRailState(entries = entries),
                     actions = ShellAgentRailActions(
                         onAgentSelected = { events += "open:$it" },
-                        onAgentPinnedChange = { id, pinned -> events += "pin:$id:$pinned" },
                         onAgentSettings = { events += "settings:$it" },
                     ),
                 )
             }
         }
+            }
         onNodeWithTag(ShellAgentRailTags.orb("Alpha")).performTouchInput { longClick() }
         onNodeWithText("Open").assertExists()
         onNodeWithText("Agent settings").assertExists()

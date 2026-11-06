@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.ui.components.ObjectVerbMenus
+import com.letta.mobile.ui.components.items
+import com.letta.mobile.data.objectverbs.ObjectRef
+
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -64,7 +68,6 @@ data class ShellConversationRowActions(
     val onArchiveToggle: () -> Unit,
     val onDelete: () -> Unit,
     val onRename: ((String) -> Unit)? = null,
-    val onPinToggle: (() -> Unit)? = null,
     /** What [onDelete] really does on this backend; the confirm dialog and the row menu follow it. */
     val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
     /** Settle and marker; null leaves both out of the menu. */
@@ -148,12 +151,13 @@ fun ShellConversationRow(
 }
 
 /** The row's menu: rename, pin, fork, marker and settle when offered, then archive and delete. */
-internal fun shellConversationMenu(
-    model: ShellConversationRowModel,
+internal fun ShellConversationRowModel.shellConversationMenu(
     actions: ShellConversationRowActions,
     ui: ShellConversationListUi,
     row: RosterRowState,
+    verbs: ObjectVerbMenus? = null,
 ): List<LettaMenuItem> {
+    val model = this
     val marks = actions.marks
     return ShellRowMenus.conversation(
         archived = model.archived,
@@ -163,9 +167,8 @@ internal fun shellConversationMenu(
             onArchiveToggle = actions.onArchiveToggle,
             onRequestDelete = { ui.confirmDeleteId = model.id },
             manage = ShellConversationManageMenu(
-                pinned = model.pinned,
+                pinItems = verbs?.items(ObjectRef("conversation", model.id), "context-menu").orEmpty(),
                 onRenameRequest = row.startRename.takeIf { actions.onRename != null },
-                onPinToggle = actions.onPinToggle,
                 settled = model.settled,
                 onSettleToggle = marks?.let { { it.onSettle(model.id, !model.settled) } },
                 onMarkerRequest = marks?.let { { ui.markerId = model.id } },

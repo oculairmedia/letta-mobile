@@ -388,10 +388,9 @@ First-run agent setup tasks and onboarding models. These describe work offered t
 
 # Package com.letta.mobile.data.objectverbs
 
-Proposed object-verbs v1 values for canonical references, descriptors, read-only facets,
+Accepted object-verbs v1 values for canonical references, descriptors, read-only facets,
 contribution metadata and typed invocation outcomes. The compatibility projection hides
-unsupported kinds, versions and verbs; it supplies no registry, provider execution, pin
-migration or UI wiring. Trusted hosts retain source resolution and permission checks.
+unsupported kinds, versions and verbs. The core provider and session binding live in child packages; trusted hosts retain source resolution and permission checks.
 The review contract is `docs/reference/contracts/object-verbs-v1.md` (letta-mobile-i5jdm.9).
 
 # Package com.letta.mobile.data.pairing
@@ -699,3 +698,31 @@ Maps merged wrapper cron-run and lease pages into shared schedule history record
 # Package com.letta.mobile.data.controller.extras.messaging
 
 Optional recipient addressing, task correlation, and a caller-supplied retry idempotency ID for agent-message CLI invocations.
+
+# Package com.letta.mobile.data.objectverbs.registry
+
+The shared VerbRegistry and trusted core provider implement core.pin once over DevicePinStore. Providers recheck source/object resolution and validate desired boolean state before committing; unavailable providers expose no state or actions.
+
+# Package com.letta.mobile.data.objectverbs.binding
+
+The device settings facade owns one pin journal for its lifecycle, with no process-global owner map. Session bindings project that journal into canonical references, facets and legacy adapter reads. A binding follows the trusted session graph's backend namespace; bindings share a device store and retain separate session scopes.
+
+# Package com.letta.mobile.data.pins
+
+Device-local scoped pin membership/order, explicit-unpin tombstones and recoverable legacy import journal. Snapshot every available backing before union, retain raw/opaque entries and read/decode failures, verify persisted state before per-source checkpoints, and resume idempotently. Unfinished sources are reread with every distinct raw/parse snapshot retained; completed sources are never reread. Initialization failures preserve legacy data and expose unavailable or disabled pin actions while allowing the host to open. Only trusted ownership evidence may resolve pending domain entries; active backend alone is never evidence.
+
+# Package com.letta.mobile.data.objectverbs.refs
+
+Typed ObjectRef factories over the existing agent, conversation, project, canvas and shortcut identities. Import these companion extensions at reference-construction boundaries; descriptor values do not depend on repositories or Home controllers.
+
+# Package com.letta.mobile.data.flow
+
+Dependency-free projections of read-only StateFlow values. DerivedStateFlow observes upstream state without creating a coroutine, cache or independent lifetime.
+
+# Package com.letta.mobile.data.session.pins
+
+Projects the trusted session graph's backend namespace for a pin binding. Session identity comes from the host graph, never the active row or a legacy pin string.
+
+# Package com.letta.mobile.data.home.shortcut
+
+Existing Home shortcut identities, separated from Home controllers and storage. The original HomeShortcut source alias remains available; persistence names are unchanged.

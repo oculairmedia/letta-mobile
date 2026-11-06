@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.items
+import com.letta.mobile.data.pins.LegacyPinSources
+import com.letta.mobile.data.objectverbs.ObjectRef
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -170,6 +175,8 @@ private fun TileBody(tile: TileContent) {
 
 @Composable
 private fun TileEditActions(item: HomePinnedItem, page: HomePageScope, modifier: Modifier) {
+    val ref = LegacyPinSources.objectRef(item.key) ?: return
+    val unpin = LocalObjectVerbs.current?.items(ref, "home-tile", desiredPinState = false)?.singleOrNull()
     Row(modifier) {
         val configure = page.navigation.onConfigureAgent
         if (item is HomePinnedItem.Agent && configure != null) {
@@ -177,20 +184,18 @@ private fun TileEditActions(item: HomePinnedItem, page: HomePageScope, modifier:
                 Icon(LettaIcons.Edit, contentDescription = CONFIGURE_LABEL, modifier = Modifier.size(LettaDimens.Control.iconSm))
             }
         }
-        IconButton(onClick = { item.unpin(page) }, modifier = Modifier.testTag(HomePageTags.unpin(item))) {
-            Icon(LettaIcons.PinOff, contentDescription = UNPIN_LABEL, modifier = Modifier.size(LettaDimens.Control.iconSm))
+        if (unpin != null) IconButton(
+            onClick = unpin.onClick, enabled = unpin.enabled, modifier = Modifier.testTag(HomePageTags.unpin(item)),
+        ) {
+            Icon(unpin.icon ?: LettaIcons.PinOff, contentDescription = unpin.label, modifier = Modifier.size(LettaDimens.Control.iconSm))
         }
     }
-}
-
-private fun HomePinnedItem.unpin(page: HomePageScope) = when (this) {
-    is HomePinnedItem.Shortcut -> page.actions.setShortcutPinned(shortcut, pinned = false)
-    is HomePinnedItem.Agent -> page.actions.setAgentPinned(agent.id, pinned = false)
 }
 
 @Composable
 private fun AddPinTile(page: HomePageScope) {
     var open by remember { mutableStateOf(false) }
+    val verbs = LocalObjectVerbs.current
     Box(Modifier.fillMaxWidth().height(TileHeight)) {
         Surface(
             onClick = { open = true },
@@ -202,12 +207,14 @@ private fun AddPinTile(page: HomePageScope) {
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             page.state.unpinnedShortcuts.forEach { shortcut ->
+                val pin = verbs?.items(ObjectRef("shortcut", shortcut.name), "home-tile", desiredPinState = true)?.singleOrNull()
                 DropdownMenuItem(
+                    enabled = pin?.enabled == true,
                     text = { Text(shortcut.label) },
                     leadingIcon = { Icon(shortcut.icon, contentDescription = null) },
                     onClick = {
                         open = false
-                        page.actions.setShortcutPinned(shortcut, pinned = true)
+                        pin?.onClick?.invoke()
                     },
                     modifier = Modifier.testTag(HomePageTags.addShortcut(shortcut)),
                 )
@@ -242,7 +249,6 @@ private const val EDIT_LABEL = "Edit"
 private const val DONE_LABEL = "Done"
 private const val ADD_LABEL = "Add shortcut"
 private const val PINNED_AGENT_LABEL = "Pinned agent"
-private const val UNPIN_LABEL = "Unpin from Home"
 private const val CONFIGURE_LABEL = "Configure agent"
 private const val ADD_KEY = "add-pin"
 private const val WIDE_PIN_COLUMNS = 6

@@ -18,8 +18,8 @@ import com.letta.mobile.data.projects.RepositoryProjectsBackend
 import com.letta.mobile.data.projects.SettingsStoreProjectPinStore
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.runs.RunMonitorController
-import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.session.SessionRepositoryGraph
+import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageErrors
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -37,6 +37,7 @@ import com.letta.mobile.ui.shell.shellProjectsPage
 import com.letta.mobile.ui.shell.shellProjectsUnavailablePage
 import com.letta.mobile.ui.shell.shellRunsPage
 import com.letta.mobile.ui.shell.shellTemplatesPage
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Where project pins are kept in the host's settings store (the key desktop has always used). */
 private const val PROJECT_PINS_KEY = "desktop.projects.pinned"
@@ -105,7 +106,7 @@ private fun templatesPage(graph: SessionRepositoryGraph, host: ShellPageHost) =
 private fun projectsPage(graph: SessionRepositoryGraph, host: ShellPageHost, slots: ChannelsPageSlots) =
     ShellPageContent<ShellDestination.Projects> { destination, modifier ->
         val scope = rememberCoroutineScope()
-        val pins = rememberProjectPins(host.settings)
+        val pins = rememberProjectPins(host.settings, graph.backendDescriptor.backendId.value)
         val controller = remember(graph, pins) {
             ProjectsPageController(
                 sources = ProjectsPageSources(backend = RepositoryProjectsBackend(graph.projectRepository), pins = pins),
@@ -124,8 +125,8 @@ private fun projectsPage(graph: SessionRepositoryGraph, host: ShellPageHost, slo
     }
 
 @Composable
-private fun rememberProjectPins(settings: SecureSettingsStore): ProjectPinStore =
-    remember(settings) { SettingsStoreProjectPinStore(settings, PROJECT_PINS_KEY) }
+private fun rememberProjectPins(settings: SecureSettingsStore, source: String): ProjectPinStore =
+    remember(settings, source) { SettingsStoreProjectPinStore(settings, PROJECT_PINS_KEY, MutableStateFlow(source)) }
 
 private fun ProjectSummary.agentIdOrNull(): AgentId? = lettaAgentId?.value?.takeIf { it.isNotBlank() }?.let(::AgentId)
 

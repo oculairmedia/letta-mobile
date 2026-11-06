@@ -152,7 +152,7 @@ internal class NotebookHistoryArchive(
     fun recoverInterrupted(index: NotebookDocumentIndex) {
         if (!Files.isDirectory(archiveRoot, NOFOLLOW_LINKS)) return
         entries(archiveRoot)
-            .filter { NotebookDocumentIndex.isKey(it.name) && Files.isDirectory(it, NOFOLLOW_LINKS) }
+            .filter { it.name.isNotebookKey() && Files.isDirectory(it, NOFOLLOW_LINKS) }
             .forEach { Recovery(it, index).run() }
     }
 
@@ -194,7 +194,7 @@ internal class NotebookHistoryArchive(
             val successor = Files.readString(journal, UTF_8).trim()
             val indexed = index.read()
             when {
-                !NotebookDocumentIndex.isKey(successor) -> Files.delete(journal)
+                !successor.isNotebookKey() -> Files.delete(journal)
                 successor in indexed -> retire(key, journal, index)
                 key in indexed && chunks(documentDirectory(successor)).isNotEmpty() -> {
                     // The new document is whole: finish the move rather than discard it.

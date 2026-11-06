@@ -2500,6 +2500,15 @@ public final class com/letta/mobile/ui/components/LettaSidePaneKt {
 	public static final fun LettaSidePaneHeader (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class com/letta/mobile/ui/components/ObjectVerbMenusKt {
+	public static final fun ProvideObjectVerbs (Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun getLocalObjectVerbs ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun items (Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Ljava/lang/Boolean;)Ljava/util/List;
+	public static synthetic fun items$default (Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/objectverbs/ObjectRef;Ljava/lang/String;Ljava/lang/Boolean;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun objectVerbMenus (Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lkotlin/jvm/functions/Function2;)Lkotlin/jvm/functions/Function3;
+	public static synthetic fun objectVerbMenus$default (Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/components/ResizeDirection : java/lang/Enum {
 	public static final field DiagonalDown Lcom/letta/mobile/ui/components/ResizeDirection;
 	public static final field DiagonalUp Lcom/letta/mobile/ui/components/ResizeDirection;
@@ -7132,24 +7141,22 @@ public final class com/letta/mobile/ui/shell/ShellConversationManageMenu {
 	public static final field $stable I
 	public static final field Companion Lcom/letta/mobile/ui/shell/ShellConversationManageMenu$Companion;
 	public fun <init> ()V
-	public fun <init> (ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
-	public synthetic fun <init> (ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Z
+	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Lkotlin/jvm/functions/Function0;
 	public final fun component3 ()Lkotlin/jvm/functions/Function0;
-	public final fun component4 ()Lkotlin/jvm/functions/Function0;
-	public final fun component5 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Lkotlin/jvm/functions/Function0;
 	public final fun component6 ()Lkotlin/jvm/functions/Function0;
-	public final fun component7 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/shell/ShellConversationManageMenu;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/ShellConversationManageMenu;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellConversationManageMenu;
+	public final fun copy (Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/shell/ShellConversationManageMenu;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/ShellConversationManageMenu;Ljava/util/List;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellConversationManageMenu;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getOnForkRequest ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnMarkerRequest ()Lkotlin/jvm/functions/Function0;
-	public final fun getOnPinToggle ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnRenameRequest ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnSettleToggle ()Lkotlin/jvm/functions/Function0;
-	public final fun getPinned ()Z
+	public final fun getPinItems ()Ljava/util/List;
 	public final fun getSettled ()Z
 	public fun hashCode ()I
 	public final fun items ()Ljava/util/List;
@@ -7405,7 +7412,8 @@ public final class com/letta/mobile/ui/shell/ShellRowMenuTags {
 public final class com/letta/mobile/ui/shell/ShellRowMenus {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/ShellRowMenus;
-	public final fun agent (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;)Ljava/util/List;
+	public final fun agent (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Lkotlin/jvm/functions/Function3;)Ljava/util/List;
+	public static synthetic fun agent$default (Lcom/letta/mobile/ui/shell/ShellRowMenus;Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Lkotlin/jvm/functions/Function3;ILjava/lang/Object;)Ljava/util/List;
 	public final fun canvas (ZLkotlin/jvm/functions/Function0;)Ljava/util/List;
 	public final fun conversation (ZZLcom/letta/mobile/ui/shell/ShellConversationMenuActions;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;)Ljava/util/List;
 	public static synthetic fun conversation$default (Lcom/letta/mobile/ui/shell/ShellRowMenus;ZZLcom/letta/mobile/ui/shell/ShellConversationMenuActions;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;ILjava/lang/Object;)Ljava/util/List;
@@ -8290,7 +8298,6 @@ public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$Hom
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePinnedGridKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePinnedGridKt;
 	public fun <init> ()V
-	public final fun getLambda$-1630748579$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-2053074142$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
@@ -8445,7 +8452,7 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageTags {
 	public static final field STATS_MENU Ljava/lang/String;
 	public static final field STATS_STRIP Ljava/lang/String;
 	public static final field STATS_TREND Ljava/lang/String;
-	public final fun addShortcut (Lcom/letta/mobile/data/home/HomeShortcut;)Ljava/lang/String;
+	public final fun addShortcut (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Ljava/lang/String;
 	public final fun agentAvatar (Ljava/lang/String;)Ljava/lang/String;
 	public final fun agentRow (Lcom/letta/mobile/data/home/FleetAgentStat;)Ljava/lang/String;
 	public final fun configure (Ljava/lang/String;)Ljava/lang/String;
@@ -8454,7 +8461,7 @@ public final class com/letta/mobile/ui/shell/pages/home/HomePageTags {
 	public final fun recent (Lcom/letta/mobile/data/home/FleetRecentConversation;)Ljava/lang/String;
 	public final fun recentDay (Ljava/lang/String;)Ljava/lang/String;
 	public final fun searchHit (Ljava/lang/String;)Ljava/lang/String;
-	public final fun seeAll (Lcom/letta/mobile/data/home/HomeShortcut;)Ljava/lang/String;
+	public final fun seeAll (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Ljava/lang/String;
 	public final fun sort (Lcom/letta/mobile/data/home/FleetSortKey;)Ljava/lang/String;
 	public final fun stat (Ljava/lang/String;)Ljava/lang/String;
 	public final fun unpin (Lcom/letta/mobile/data/home/HomePinnedItem;)Ljava/lang/String;
@@ -9488,6 +9495,12 @@ public final class com/letta/mobile/ui/shell/rail/ComposableSingletons$ShellAgen
 	public final fun getLambda$1015810862$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
+public final class com/letta/mobile/ui/shell/rail/ComposableSingletons$ShellAgentRailKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/rail/ComposableSingletons$ShellAgentRailKt;
+	public fun <init> ()V
+	public final fun getLambda$68650483$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/shell/rail/ShellAgentLibraryKt {
 	public static final fun ShellAgentLibrary (Landroidx/compose/foundation/layout/ColumnScope;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ShellLibraryRail (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
@@ -9549,6 +9562,7 @@ public final class com/letta/mobile/ui/shell/rail/ShellAgentRailState {
 public final class com/letta/mobile/ui/shell/rail/ShellAgentRailTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/rail/ShellAgentRailTags;
+	public static final field PIN_DIVIDER Ljava/lang/String;
 	public static final field RAIL Ljava/lang/String;
 	public final fun orb (Ljava/lang/String;)Ljava/lang/String;
 }
@@ -9588,10 +9602,11 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailActivity {
 
 public final class com/letta/mobile/ui/shell/rail/ShellRailEntry {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;Z)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZLjava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZLjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Z
+	public final fun component11 ()Ljava/lang/Integer;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()I
@@ -9600,8 +9615,8 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailEntry {
 	public final fun component7 ()Z
 	public final fun component8 ()Lcom/letta/mobile/avatar/core/model/MascotIdentity;
 	public final fun component9 ()Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;Z)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZLjava/lang/Integer;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZZLcom/letta/mobile/avatar/core/model/MascotIdentity;Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;ZLjava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActivity ()Lcom/letta/mobile/ui/shell/rail/ShellRailActivity;
 	public final fun getAgentId ()Ljava/lang/String;
@@ -9611,6 +9626,7 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailEntry {
 	public final fun getMemberCount ()I
 	public final fun getName ()Ljava/lang/String;
 	public final fun getOrbStyle ()I
+	public final fun getPinOrder ()Ljava/lang/Integer;
 	public final fun getPinned ()Z
 	public final fun getSelected ()Z
 	public final fun getThinking ()Z
@@ -9622,20 +9638,22 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailEntry {
 public final class com/letta/mobile/ui/shell/rail/ShellRailFocus {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Ljava/util/Map;
 	public final fun component5 ()Ljava/util/Map;
 	public final fun component6 ()Ljava/util/Set;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;)Lcom/letta/mobile/ui/shell/rail/ShellRailFocus;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/rail/ShellRailFocus;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/rail/ShellRailFocus;
+	public final fun component7 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;)Lcom/letta/mobile/ui/shell/rail/ShellRailFocus;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/rail/ShellRailFocus;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/rail/ShellRailFocus;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActivityByAgentId ()Ljava/util/Map;
 	public final fun getAvatarStyleByAgentId ()Ljava/util/Map;
 	public final fun getIdentityByAgentId ()Ljava/util/Map;
+	public final fun getObjectFacetsByAgentId ()Ljava/util/Map;
 	public final fun getPinnedAgentIds ()Ljava/util/Set;
 	public final fun getSelectedAgentId ()Ljava/lang/String;
 	public final fun getThinkingAgentId ()Ljava/lang/String;
@@ -9650,6 +9668,10 @@ public final class com/letta/mobile/ui/shell/rail/ShellRailMapping {
 	public final fun entry (Lcom/letta/mobile/data/agents/AgentRailGroup;ILcom/letta/mobile/ui/shell/rail/ShellRailFocus;)Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;
 	public final fun groups (Ljava/util/List;Ljava/lang/String;)Ljava/util/List;
 	public final fun recency (Ljava/lang/String;)Lkotlin/time/Instant;
+}
+
+public final class com/letta/mobile/ui/shell/rail/ShellRailPinBindingKt {
+	public static final fun rememberPinnedRailState (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;
 }
 
 public final class com/letta/mobile/ui/shell/rail/ShellThinkingAuraKt {
@@ -10200,24 +10222,22 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellConversationRenameKt {
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellConversationRowActions {
 	public static final field $stable I
-	public fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function0;
 	public final fun component2 ()Lkotlin/jvm/functions/Function0;
 	public final fun component3 ()Lkotlin/jvm/functions/Function1;
-	public final fun component4 ()Lkotlin/jvm/functions/Function0;
-	public final fun component5 ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
-	public final fun component6 ()Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;
-	public final fun component7 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/shell/sidebar/ShellConversationRowActions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellConversationRowActions;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellConversationRowActions;
+	public final fun component4 ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
+	public final fun component5 ()Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;
+	public final fun component6 ()Lkotlin/jvm/functions/Function1;
+	public final fun copy (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/ui/shell/sidebar/ShellConversationRowActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellConversationRowActions;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellConversationRowActions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDeleteBehavior ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
 	public final fun getMarks ()Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;
 	public final fun getOnArchiveToggle ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnDelete ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnFork ()Lkotlin/jvm/functions/Function1;
-	public final fun getOnPinToggle ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnRename ()Lkotlin/jvm/functions/Function1;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -10386,13 +10406,14 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getActions ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;
 	public final fun getChrome ()Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;
 	public final fun getConversationLanes ()Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 	public final fun getDrawer ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;
 	public final fun getEvents ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;
+	public final fun getObjectPins ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public final fun getSlots ()Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;
 }
 

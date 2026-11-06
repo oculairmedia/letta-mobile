@@ -106,23 +106,20 @@ internal fun railAgentActivity(conversations: List<DesktopConversationSummary>):
         },
     )
 
-/**
- * The rail is a recents strip, not the whole roster (Grok Bot's layout): the shared
- * [RecentAgents.cut] over [railAgentActivity] — the same rule the phone's drawer applies
- * (letta-mobile-c3np7.5.8). The desktop keeps no agent pins. Recomputed only when its inputs change.
- */
+/** The desktop's recency preference over the shared cut, including every scoped pin before capping. */
 @Composable
-internal fun rememberRecentRailAgents(
-    conversations: List<DesktopConversationSummary>,
-    directory: List<Pair<String, String>>,
-    prefs: DesktopRailPrefs,
-    selectedAgentId: String?,
-): RecentAgentsCut = remember(conversations, directory, selectedAgentId, prefs.recencyDays) {
-    RecentAgents.cut(
-        RecentAgentsInput(directory = directory, lastActiveAt = railAgentActivity(conversations), selectedAgentId = selectedAgentId),
-        kotlin.time.Clock.System.now(),
-        prefs.recencyPolicy,
-    )
+internal fun rememberRecentRailAgents(context: DesktopShellContext, frame: DesktopShellFrame): RecentAgentsCut {
+    val pins = context.panels.libraries.home.objectPins?.ids("agent")?.collectAsState()?.value.orEmpty().toSet()
+    val prefs = context.core.railPrefs
+    val conversations = frame.chatState.conversations
+    val directory = frame.focus.railAgents
+    val selected = frame.focus.selectedAgentId
+    return remember(conversations, directory, selected, prefs.recencyDays, pins) {
+        RecentAgents.cut(
+            RecentAgentsInput(directory, railAgentActivity(conversations), selected, pins),
+            kotlin.time.Clock.System.now(), prefs.recencyPolicy,
+        )
+    }
 }
 
 /** Each agent's newest conversation, for the rail's hover card. */

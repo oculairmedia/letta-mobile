@@ -218,7 +218,7 @@ Settings sections, search, rows and backend-connection presentation. Extend thro
 
 # Package com.letta.mobile.ui.shell
 
-Navigation drawer, page selection and contextual row/undo controls. [ShellPageDeps](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell/-shell-page-deps/index.html), workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
+Navigation drawer, page selection and contextual row/undo controls. ObjectVerbMenus renders core.pin descriptors for rows, the rail, Home and projects; workspace hosts supply one PinBinding and never supply pin policy. [ShellPageDeps](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell/-shell-page-deps/index.html), workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
 
 # Package com.letta.mobile.ui.shell.conversations
 

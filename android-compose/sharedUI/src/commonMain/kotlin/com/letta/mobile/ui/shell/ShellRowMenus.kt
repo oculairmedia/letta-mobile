@@ -17,7 +17,10 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.objectverbs.ObjectRef
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
+import com.letta.mobile.ui.components.ObjectVerbMenus
+import com.letta.mobile.ui.components.items
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.host.LocalRowHoldDrag
@@ -60,14 +63,12 @@ object ShellRowMenus {
         )
 
     /** A rail agent: open it, pin or unpin it, open its settings (each when the host offers it). */
-    fun agent(entry: ShellRailEntry, actions: ShellAgentRailActions): List<LettaMenuItem> =
-        listOfNotNull(
-            LettaMenuItem("Open") { actions.onAgentSelected(entry.agentId) },
-            actions.onAgentPinnedChange?.let { onPinned ->
-                LettaMenuItem(if (entry.pinned) "Unpin agent" else "Pin agent") { onPinned(entry.agentId, !entry.pinned) }
-            },
-            actions.onAgentSettings?.let { onSettings -> LettaMenuItem("Agent settings") { onSettings(entry.agentId) } },
-        )
+    fun agent(entry: ShellRailEntry, actions: ShellAgentRailActions, verbs: ObjectVerbMenus? = null): List<LettaMenuItem> =
+        listOf(LettaMenuItem("Open") { actions.onAgentSelected(entry.agentId) }) +
+            verbs?.items(ObjectRef("agent", entry.agentId), "rail").orEmpty() +
+            listOfNotNull(actions.onAgentSettings?.let { settings -> LettaMenuItem("Agent settings") { settings(entry.agentId) } })
+
+
 }
 
 /** A conversation row's secondary actions (archive, delete, optional rename/pin manage menu). */
@@ -82,9 +83,8 @@ data class ShellConversationMenuActions(
  * active and the marker. A null action is one the host does not offer.
  */
 data class ShellConversationManageMenu(
-    val pinned: Boolean = false,
+    val pinItems: List<LettaMenuItem> = emptyList(),
     val onRenameRequest: (() -> Unit)? = null,
-    val onPinToggle: (() -> Unit)? = null,
     /**  (G37): fork the chat, asking for the fork's name first. */
     val onForkRequest: (() -> Unit)? = null,
     val settled: Boolean = false,
@@ -93,7 +93,7 @@ data class ShellConversationManageMenu(
 ) {
     fun items(): List<LettaMenuItem> = listOfNotNull(
         onRenameRequest?.let { LettaMenuItem("Rename chat", onClick = it) },
-        onPinToggle?.let { LettaMenuItem(if (pinned) "Unpin chat" else "Pin chat", onClick = it) },
+    ) + pinItems + listOfNotNull(
         onForkRequest?.let { LettaMenuItem("Fork chat…", onClick = it) },
         onMarkerRequest?.let { LettaMenuItem("Set marker…", onClick = it) },
         onSettleToggle?.let { LettaMenuItem(if (settled) "Move to active" else "Settle chat", onClick = it) },

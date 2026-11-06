@@ -7,6 +7,7 @@ import com.letta.mobile.core.BuildConfig
 import com.letta.mobile.data.session.BackendSwitchClearResult
 import com.letta.mobile.data.session.BackendSwitchInvalidator
 import com.letta.mobile.data.storage.DataStoreSettingsPreferencesStore
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.storage.SettingsPlatformDefaults
 import javax.inject.Inject
@@ -27,7 +28,7 @@ class SettingsRepository @Inject constructor(
     backendSwitchInvalidator: Provider<BackendSwitchInvalidator>,
 ) : CachedSettingsRepository(
     preferencesStore = DataStoreSettingsPreferencesStore(dataStore),
-    secureSettingsStore = secureSettingsStore,
+    secureSettingsStore = secureSettingsStore.withDevicePins(),
     platformDefaults = SettingsPlatformDefaults(
         defaultResumeRecentConversation = BuildConfig.DEBUG,
         defaultDynamicColorWhenPresetUnset = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
@@ -41,7 +42,7 @@ class SettingsRepository @Inject constructor(
         secureSettingsStore: SecureSettingsStore,
     ) : this(
         dataStore = dataStore,
-        secureSettingsStore = secureSettingsStore,
+        secureSettingsStore = secureSettingsStore.withDevicePins(),
         backendSwitchInvalidator = Provider { BackendSwitchInvalidator(emptySet()) },
     )
 
@@ -52,7 +53,7 @@ class SettingsRepository @Inject constructor(
             clearBackendScopedCaches: suspend () -> BackendSwitchClearResult,
         ): CachedSettingsRepository = CachedSettingsRepository(
             preferencesStore = DataStoreSettingsPreferencesStore(dataStore),
-            secureSettingsStore = secureSettingsStore,
+            secureSettingsStore = secureSettingsStore.withDevicePins(),
             clearBackendScopedCaches = SettingsBackendCacheClearer {
                 clearBackendScopedCaches().toSettingsResult()
             },

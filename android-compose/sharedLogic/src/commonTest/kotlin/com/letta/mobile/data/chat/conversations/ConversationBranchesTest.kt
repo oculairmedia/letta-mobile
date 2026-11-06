@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -13,15 +15,16 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.ui.chat.session.ChatBranchView
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 
 /**
  * Fork, edit-and-resend and rerun as every host runs them (desktop's chat controller and the web
@@ -97,7 +100,7 @@ class ConversationBranchesTest {
         .map { (_, params) -> Triple(params.text("conversation_id"), params.text("agent_id"), params.text("message_id")) }
 
     private class RecordingHost(override val gateway: ChatGateway?) : ConversationListHost {
-        val prefs = ConversationManagementPrefs.from(MapSettingsStore())
+        val prefs = ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture"))
         val opened = mutableListOf<OpenedBranch>()
         val errors = mutableListOf<String>()
 

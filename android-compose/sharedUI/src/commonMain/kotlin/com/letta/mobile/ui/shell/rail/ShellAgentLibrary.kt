@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.rail
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.agents.deriveAgentSpaces
@@ -68,8 +71,10 @@ data class ShellLibraryRailState(
 fun ShellLibraryRail(state: ShellLibraryRailState, actions: ShellAgentRailActions, modifier: Modifier = Modifier) {
     // The expanded library is the complete roster, including the focused agent, and marks the
     // focused row. In the collapsed rail the focused agent is already represented by its panel.
-    val groups = remember(state.agents) { ShellRailMapping.groups(state.agents, selectedAgentId = null) }
-    val entries = remember(groups, state.focus) { ShellRailMapping.entries(groups, state.focus) }
+    val groups = remember(state.agents, state.focus) {
+        ShellRailMapping.groups(state.agents.filterNot { state.focus.facets(it.first).pinned == true }, selectedAgentId = null)
+    }
+    val entries = remember(state.agents, state.focus) { railEntries(state.agents, state.focus, selectedAgentId = null) }
     val collapsedEntries = remember(state.agents, state.focus) {
         collapsedRailEntries(state.agents, state.focus)
     }
@@ -86,9 +91,19 @@ fun ShellLibraryRail(state: ShellLibraryRailState, actions: ShellAgentRailAction
 }
 
 /** The collapsed rail's bounded recents, in the same pinned/activity order as the full roster. */
-internal fun collapsedRailEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus): List<ShellRailEntry> =
-    ShellRailMapping.entries(ShellRailMapping.groups(agents, focus.selectedAgentId), focus)
-        .take(RecentAgentsPolicy.DEFAULT_MAX_AGENTS)
+internal fun collapsedRailEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus): List<ShellRailEntry> {
+    val entries = railEntries(agents, focus, focus.selectedAgentId?.let(::AgentId))
+    return entries.filter { it.pinned } + entries.filterNot { it.pinned }.take(RecentAgentsPolicy.DEFAULT_MAX_AGENTS)
+}
+
+private fun railEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus, selectedAgentId: AgentId?): List<ShellRailEntry> {
+    val pinned = agents.filter { focus.facets(it.first).pinned == true }
+        .sortedBy { focus.facets(it.first).pinOrder ?: Int.MAX_VALUE }
+    val groups = pinned.map { (id, name) -> AgentRailGroup(name, listOf(id)) }
+    val pinnedEntries = ShellRailMapping.entries(groups, focus).map { it.copy(key = "pinned-${it.agentId}") }
+    val recent = agents.filterNot { focus.facets(it.first).pinned == true }
+    return pinnedEntries + ShellRailMapping.entries(ShellRailMapping.groups(recent, selectedAgentId?.value), focus)
+}
 
 /**
  * The expanded rail ("Your Library"): agents grouped into spaces derived from their names, each
@@ -108,13 +123,14 @@ fun ColumnScope.ShellAgentLibrary(groups: List<AgentRailGroup>, entries: List<Sh
         search = PickerSearch(placeholder = "Search agents", autoFocus = false),
         fieldModifier = Modifier,
     )
+    val verbs = LocalObjectVerbs.current
     val roster = rememberRosterListState()
     RosterList(
         RosterSpec(
             sections = sections,
             key = ShellRailEntry::key,
             selection = RosterSelection(isSelected = ShellRailEntry::selected, onSelect = { actions.onAgentSelected(it.agentId) }),
-            actions = RosterActions(menu = { entry, _ -> ShellRowMenus.agent(entry, actions) }),
+            actions = RosterActions(menu = { entry, _ -> ShellRowMenus.agent(entry, actions, verbs) }),
             options = RosterOptions(testTag = RosterListTag(ShellAgentLibraryTags.LIST)),
             empty = { LettaEmptyHint("No agents match \"$needle\"", Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) },
         ),
@@ -133,7 +149,7 @@ fun ColumnScope.ShellAgentLibrary(groups: List<AgentRailGroup>, entries: List<Sh
 internal fun librarySections(groups: List<AgentRailGroup>, entries: List<ShellRailEntry>, needle: String): List<RosterSection<ShellRailEntry>> {
     val filtered = if (needle.isEmpty()) groups else groups.filter { TextMatch.matches(needle, it.name) }
     val entryByName = entries.associateBy { it.key }
-    val pinned = filtered.mapNotNull { entryByName[it.name] }.filter { it.pinned }
+    val pinned = entries.filter { it.pinned && (needle.isEmpty() || TextMatch.matches(needle, it.name)) }
     val pinnedSection = RosterSection("pinned", pinned, title = RosterSections.PINNED_TITLE).takeIf { pinned.isNotEmpty() }
     val spaces = deriveAgentSpaces(filtered).map { space ->
         val members = space.groups.mapNotNull { entryByName[it.name] }.filterNot { it.pinned }

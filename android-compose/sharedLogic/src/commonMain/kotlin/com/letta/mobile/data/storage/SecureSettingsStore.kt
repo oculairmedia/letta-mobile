@@ -15,6 +15,11 @@ import kotlinx.coroutines.flow.update
 interface SecureSettingsStore {
     fun getString(key: String, defaultValue: String? = null): String?
     fun putString(key: String, value: String)
+    /** Confirm a durable small-value write; production bindings must report persistence failure. */
+    fun putDurableString(key: String, value: String) {
+        putString(key, value)
+        check(getString(key) == value) { "Settings write was not confirmed" }
+    }
     fun remove(key: String)
     fun clear()
 }

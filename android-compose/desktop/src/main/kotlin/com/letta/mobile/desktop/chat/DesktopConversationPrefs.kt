@@ -7,6 +7,8 @@ import com.letta.mobile.data.chat.runtime.PinnedConversations
 import com.letta.mobile.data.model.RecentModelsStore
 import com.letta.mobile.data.model.SettingsStoreRecentModels
 import com.letta.mobile.data.storage.SecureSettingsStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-bzvro.17 / .18: the client-side conversation preferences the desktop chat keeps:
@@ -24,9 +26,9 @@ data class DesktopConversationPrefs(
 ) {
     companion object {
         /** Every preference, kept in the app's own settings store. */
-        fun from(store: SecureSettingsStore): DesktopConversationPrefs =
+        fun from(store: SecureSettingsStore, source: StateFlow<String?> = MutableStateFlow(null)): DesktopConversationPrefs =
             DesktopConversationPrefs(
-                pins = PinnedConversations(store, key = PINNED_KEY),
+                pins = PinnedConversations(store, key = PINNED_KEY, source = source),
                 recentModels = RecentModelsStore(SettingsStoreRecentModels(store)),
                 lineage = ConversationLineage(store, key = LINEAGE_KEY),
                 listMarks = ConversationListPrefs(store, keyPrefix = LIST_PREFIX),
