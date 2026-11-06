@@ -52,7 +52,6 @@ internal class WebApp(scope: CoroutineScope) {
     val services = WebPageServices(gateway, storage.settings)
     val canvas: WebChatCanvas = storage.chatCanvas()
 
-    /** The conversation list's pins and fork lineage, in the browser's settings store. */
     val conversationPrefs = ConversationManagementPrefs.from(storage.settings, gateway.sessionGraphProvider.pinSource())
 }
 
