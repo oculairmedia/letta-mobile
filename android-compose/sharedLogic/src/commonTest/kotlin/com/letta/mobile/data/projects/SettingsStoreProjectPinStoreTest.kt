@@ -1,8 +1,11 @@
 package com.letta.mobile.data.projects
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
@@ -10,14 +13,14 @@ import kotlinx.coroutines.test.runTest
 class SettingsStoreProjectPinStoreTest {
     @Test
     fun pinsPersistAndUnpinsDrop() = runTest {
-        val store = MapSettingsStore()
-        val pins = SettingsStoreProjectPinStore(store)
+        val store = MapSettingsStore().withDevicePins()
+        val pins = SettingsStoreProjectPinStore(store, source = MutableStateFlow("fixture"))
         pins.set(ProjectKey("alpha"), ProjectPin.Pinned)
         pins.set(ProjectKey("beta"), ProjectPin.Pinned)
         pins.set(ProjectKey("alpha"), ProjectPin.Unpinned)
         assertEquals(setOf(ProjectKey("beta")), pins.pinned.first())
 
-        val reopened = SettingsStoreProjectPinStore(store)
+        val reopened = SettingsStoreProjectPinStore(store, source = MutableStateFlow("fixture"))
         assertEquals(setOf(ProjectKey("beta")), reopened.pinned.first())
     }
 }

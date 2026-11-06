@@ -80,7 +80,8 @@ data class ConversationManagementPrefs(
 ) {
     companion object {
         /** Both, kept in [store] under their default keys. */
-        fun from(store: SecureSettingsStore) = ConversationManagementPrefs(PinnedConversations(store), ConversationLineage(store))
+        fun from(store: SecureSettingsStore, source: StateFlow<String?> = MutableStateFlow(null)) =
+            ConversationManagementPrefs(PinnedConversations(store, source = source), ConversationLineage(store))
     }
 }
 

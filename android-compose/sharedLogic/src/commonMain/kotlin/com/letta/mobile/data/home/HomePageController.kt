@@ -184,6 +184,10 @@ class HomePageController(
     private val scope: CoroutineScope,
     config: HomePageConfig = HomePageConfig(),
 ) : HomePageActions, AutoCloseable {
+    /** The hosted shell's binding; fake/custom Home stores may have no object-verb provider. */
+    val objectPins: com.letta.mobile.data.objectverbs.binding.PinBinding?
+        get() = (pins as? SettingsStoreHomePinStore)?.binding
+
     private val stateFlow = MutableStateFlow(HomePageState(availableShortcuts = config.availableShortcuts))
     val state: StateFlow<HomePageState> = stateFlow.asStateFlow()
 

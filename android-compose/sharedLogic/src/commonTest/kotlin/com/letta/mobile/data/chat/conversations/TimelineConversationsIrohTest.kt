@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
@@ -9,15 +11,16 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * The web's conversation owner over an Iroh host, end to end below the owner: the shared
@@ -133,6 +136,6 @@ class TimelineConversationsIrohTest {
         backgroundScope,
         host.chatGateway(backgroundScope),
         roster.map { Agent(id = AgentId(it), name = it) },
-        ConversationManagementPrefs.from(MapSettingsStore()),
+        ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture")),
     )
 }

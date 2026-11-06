@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.rail
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +53,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 /** Test tags for the rail's parts. */
 object ShellAgentRailTags {
     const val RAIL = "shell-agent-rail"
+    const val PIN_DIVIDER = "shell-agent-rail-pin-divider"
     fun orb(key: String) = "shell-agent-rail-orb-$key"
 }
 
@@ -140,7 +144,20 @@ private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, actions:
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         // Keyed by name so each orb's thinking ring follows its agent across recency reordering.
-        items(entries, key = { "orb-${it.key}" }) { entry ->
+        val pinned = entries.filter { it.pinned }
+        val recent = entries.filterNot { it.pinned }
+        items(pinned, key = { "orb-${it.key}" }) { entry ->
+            ShellRailOrb(entry = entry, actions = actions)
+        }
+        if (pinned.isNotEmpty() && recent.isNotEmpty()) {
+            item(key = "pin-divider") {
+                HorizontalDivider(
+                    modifier = Modifier.width(LettaDimens.Control.iconButton).testTag(ShellAgentRailTags.PIN_DIVIDER),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            }
+        }
+        items(recent, key = { "orb-${it.key}" }) { entry ->
             ShellRailOrb(entry = entry, actions = actions)
         }
     }
@@ -163,7 +180,7 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
         body = entry.activity?.preview?.trim()?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) },
     )
     val host = LocalLettaHost.current
-    host.rowMenu(ShellRowMenus.agent(entry, actions)) {
+    host.rowMenu(ShellRowMenus.agent(entry, actions, LocalObjectVerbs.current)) {
         host.hoverCard(card) {
             Box(
                 modifier = Modifier

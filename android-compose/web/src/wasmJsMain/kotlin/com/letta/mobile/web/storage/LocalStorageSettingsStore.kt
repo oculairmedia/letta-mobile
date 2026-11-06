@@ -1,11 +1,11 @@
 package com.letta.mobile.web.storage
 
-import com.letta.mobile.util.attr
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.util.Telemetry
-import kotlinx.browser.localStorage
+import com.letta.mobile.util.attr
 import kotlin.js.JsException
+import kotlinx.browser.localStorage
 
 /**
  * The web's [SecureSettingsStore]: the browser's localStorage, every key under [prefix].
@@ -27,6 +27,11 @@ class LocalStorageSettingsStore(private val prefix: String = DEFAULT_PREFIX) : S
     override fun putString(key: String, value: String) {
         memory.putString(key, value)
         if (!isSecretKey(key)) browser("write") { localStorage.setItem(prefix + key, value) }
+    }
+
+    override fun putDurableString(key: String, value: String) {
+        check(available && browser("write") { localStorage.setItem(prefix + key, value) } != null) { "Settings persistence unavailable" }
+        memory.putString(key, value)
     }
 
     override fun remove(key: String) {

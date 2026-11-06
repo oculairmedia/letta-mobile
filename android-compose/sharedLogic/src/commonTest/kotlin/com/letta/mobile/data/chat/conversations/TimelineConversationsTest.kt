@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.chat.branch.BranchKind
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
@@ -18,23 +20,24 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.FakeChatSessionPort
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.currentTime
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.currentTime
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 
 /** The web's conversation owner over an Iroh host's `admin_rpc`; its row actions are the shared [ConversationManagement]. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -193,7 +196,7 @@ class TimelineConversationsTest {
             backgroundScope,
             host.chatGateway(backgroundScope),
             emptyList(),
-            ConversationManagementPrefs.from(MapSettingsStore()),
+            ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture")),
         )
         runCurrent()
 
@@ -440,7 +443,7 @@ class TimelineConversationsTest {
         backgroundScope,
         gateway,
         listOf(Agent(id = nora, name = "Nora"), Agent(id = ivo, name = "Ivo")),
-        ConversationManagementPrefs.from(MapSettingsStore()),
+        ConversationManagementPrefs.from(MapSettingsStore().withDevicePins(), MutableStateFlow("fixture")),
     )
 
     /** A gateway whose agents' lists cannot be read right now. */

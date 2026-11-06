@@ -154,6 +154,7 @@ private fun androidHost(shell: WorkspaceShell, agents: List<Agent>, lanes: Conve
     chrome = ShellWindowChrome.Inline,
     drawer = shell.drawer,
     conversationLanes = lanes,
+    objectPins = shell.controllers.home.objectPins,
     events = ShellWorkspaceEvents(
         onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
         shortcuts = rememberAndroidShortcuts(shell, agents),
@@ -202,7 +203,6 @@ private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavig
     // The panel lists a focused agent's conversations only, so its rows always have one.
     val agent = { checkNotNull(shell.workspace.focusedAgentId) }
     return base.copy(
-        rail = base.rail.copy(onAgentPinnedChange = { id, pinned -> model.setAgentPinned(AgentId(id), pinned) }),
         panel = base.panel.copy(
             onArchiveFilterChange = model::setArchiveFilter,
             onArchiveConversation = { id, archived -> model.setConversationArchived(ConversationId(id), agent(), archived) },

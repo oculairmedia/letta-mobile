@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.shell.pages.projects
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.ObjectVerbMenus
+import com.letta.mobile.ui.components.items
+import com.letta.mobile.data.objectverbs.ObjectRef
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +51,7 @@ object ProjectDetailKeys {
 /** The open project: its facts, then what can be done with it. */
 @Composable
 internal fun ProjectDetailPane(project: ProjectSummary, state: ProjectsPageState, actions: ProjectsPageActions) {
+    val verbs = LocalObjectVerbs.current
     InspectorPane(title = project.name, onClose = { actions.list.onSelect(null) }, testTag = ProjectsPageTags.DETAIL) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg),
@@ -55,7 +61,7 @@ internal fun ProjectDetailPane(project: ProjectSummary, state: ProjectsPageState
                 projectFacts(project, state).forEach { InfoRow(it) }
             }
             SettingsSection(SettingsHeader("project-actions", "Actions")) {
-                projectActions(project, state, actions).forEach { LinkRow(it) }
+                projectActions(project, state, actions, verbs).forEach { LinkRow(it) }
             }
         }
     }
@@ -75,9 +81,10 @@ internal fun projectFacts(project: ProjectSummary, state: ProjectsPageState): Li
 }
 
 /** What the open project offers, in order: chat, Beads, pin, edit, archive, delete. */
-internal fun projectActions(project: ProjectSummary, state: ProjectsPageState, actions: ProjectsPageActions): List<SettingsRow.Link> {
+internal fun projectActions(
+    project: ProjectSummary, state: ProjectsPageState, actions: ProjectsPageActions, verbs: ObjectVerbMenus? = null,
+): List<SettingsRow.Link> {
     val id = project.key
-    val pinned = state.isPinned(project)
     val beads = state.beadsOf(project)
     return projectChatActions(project, actions.list) + listOfNotNull(
         SettingsRow.Link(
@@ -87,7 +94,9 @@ internal fun projectActions(project: ProjectSummary, state: ProjectsPageState, a
             enabled = state.provisioning != id,
             confirm = SettingsConfirmText("Provision Beads remote?", "This creates the remote backing store for ${project.name}.", "Provision"),
         ) { actions.detail.onProvisionBeads(id) }.takeUnless { beads?.isProvisioned == true },
-        SettingsRow.Link(ProjectDetailKeys.PIN, if (pinned) UNPIN else PIN) { actions.list.onTogglePinned(id) },
+        verbs?.items(ObjectRef("project", id.value), "context-menu").orEmpty().singleOrNull()?.let { item ->
+            SettingsRow.Link(ProjectDetailKeys.PIN, item.label, enabled = item.enabled, onClick = item.onClick)
+        },
         SettingsRow.Link(ProjectDetailKeys.EDIT, "Edit settings", supporting = "Path and git URL") { actions.detail.onStartEdit(id) },
         SettingsRow.Link(
             ProjectDetailKeys.ARCHIVE,

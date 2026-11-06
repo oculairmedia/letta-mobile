@@ -81,18 +81,23 @@ private fun ShellDrawerMenuButton(onClick: () -> Unit) {
  * rail's focus. A tap opens [onSwitch] (the drawer, whose rail is the agent switcher); a long press
  * pins or unpins it through the rail's pin action, where the host has one.
  */
-internal fun ShellWorkspaceNavigation.focusedIdentity(actions: ShellAgentRailActions, onSwitch: () -> Unit): AgentIdentity? {
+internal fun ShellWorkspaceNavigation.focusedIdentity(
+    @Suppress("UNUSED_PARAMETER") actions: ShellAgentRailActions,
+    onSwitch: () -> Unit,
+    verbs: com.letta.mobile.ui.components.ObjectVerbMenus? = null,
+): AgentIdentity? {
     val agentId = rail.focus.selectedAgentId ?: return null
     val name = rail.agents.firstOrNull { (id, _) -> id == agentId }?.second
         ?: panel.agent.name.takeIf { panel.agent.agentId == agentId && it.isNotBlank() }
         ?: agentId
     val pinned = agentId in rail.focus.pinnedAgentIds
+    val pin = verbs?.invoke(com.letta.mobile.data.objectverbs.ObjectRef("agent", agentId), "rail", null)?.singleOrNull()
     return AgentIdentity(
         agentId = agentId,
         name = name,
         isFavorite = false,
         isPinned = pinned,
         onClick = onSwitch,
-        onLongClick = { actions.onAgentPinnedChange?.invoke(agentId, !pinned) },
+        onLongClick = { pin?.onClick?.invoke() },
     )
 }

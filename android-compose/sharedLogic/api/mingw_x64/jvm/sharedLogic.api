@@ -12193,7 +12193,8 @@ public final class com/letta/mobile/data/chat/conversations/ConversationManageme
 }
 
 public final class com/letta/mobile/data/chat/conversations/ConversationManagementPrefs$Companion {
-	public final fun from (Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
+	public final fun from (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/flow/StateFlow;)Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
+	public static synthetic fun from$default (Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs$Companion;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/flow/StateFlow;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/conversations/ConversationManagementPrefs;
 }
 
 public final class com/letta/mobile/data/chat/conversations/ConversationOrigin {
@@ -13814,8 +13815,9 @@ public final class com/letta/mobile/data/chat/runtime/PermissionModeGateway$Defa
 public final class com/letta/mobile/data/chat/runtime/PinnedConversations {
 	public static final field Companion Lcom/letta/mobile/data/chat/runtime/PinnedConversations$Companion;
 	public static final field DEFAULT_KEY Ljava/lang/String;
-	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Lkotlinx/coroutines/flow/StateFlow;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Lkotlinx/coroutines/flow/StateFlow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBinding ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public final fun getPinned ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun inherit (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun isPinned (Ljava/lang/String;)Z
@@ -21561,6 +21563,13 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/flow/DerivedStateFlow : kotlinx/coroutines/flow/StateFlow {
+	public fun <init> (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;)V
+	public fun collect (Lkotlinx/coroutines/flow/FlowCollector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getReplayCache ()Ljava/util/List;
+	public fun getValue ()Ljava/lang/Object;
+}
+
 public abstract interface class com/letta/mobile/data/health/AppServerReachability {
 	public abstract fun probe (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -21828,7 +21837,7 @@ public abstract interface class com/letta/mobile/data/home/HomePageActions {
 	public abstract fun reorderPins (Ljava/util/List;)V
 	public abstract fun selectSort (Lcom/letta/mobile/data/home/FleetSortKey;)V
 	public abstract fun setAgentPinned (Ljava/lang/String;Z)V
-	public abstract fun setShortcutPinned (Lcom/letta/mobile/data/home/HomeShortcut;Z)V
+	public abstract fun setShortcutPinned (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;Z)V
 	public abstract fun updateSearchQuery (Ljava/lang/String;)V
 }
 
@@ -21854,13 +21863,14 @@ public final class com/letta/mobile/data/home/HomePageController : com/letta/mob
 	public synthetic fun <init> (Lcom/letta/mobile/data/home/HomePageSource;Lcom/letta/mobile/data/home/HomePinStore;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/home/HomePageConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun clearSearch ()V
 	public fun close ()V
+	public final fun getObjectPins ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun loadIfStale ()V
 	public fun refresh ()V
 	public fun reorderPins (Ljava/util/List;)V
 	public fun selectSort (Lcom/letta/mobile/data/home/FleetSortKey;)V
 	public fun setAgentPinned (Ljava/lang/String;Z)V
-	public fun setShortcutPinned (Lcom/letta/mobile/data/home/HomeShortcut;Z)V
+	public fun setShortcutPinned (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;Z)V
 	public final fun start ()V
 	public final fun updateFavorite (Lcom/letta/mobile/data/home/HomeAgentRef;)V
 	public final fun updateFleet (Lcom/letta/mobile/data/home/FleetOverview;)V
@@ -21930,7 +21940,7 @@ public final class com/letta/mobile/data/home/HomePageState {
 	public final fun getUnpinnedShortcuts ()Ljava/util/List;
 	public fun hashCode ()I
 	public final fun isAgentPinned (Ljava/lang/String;)Z
-	public final fun shortcutInfo (Lcom/letta/mobile/data/home/HomeShortcut;)Ljava/lang/String;
+	public final fun shortcutInfo (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -21965,18 +21975,18 @@ public final class com/letta/mobile/data/home/HomePinnedItem$Agent : com/letta/m
 public final class com/letta/mobile/data/home/HomePinnedItem$Companion {
 	public final fun agentKey (Ljava/lang/String;)Ljava/lang/String;
 	public final fun parseAgentKey (Ljava/lang/String;)Ljava/lang/String;
-	public final fun parseShortcutKey (Ljava/lang/String;)Lcom/letta/mobile/data/home/HomeShortcut;
-	public final fun shortcutKey (Lcom/letta/mobile/data/home/HomeShortcut;)Ljava/lang/String;
+	public final fun parseShortcutKey (Ljava/lang/String;)Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public final fun shortcutKey (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/home/HomePinnedItem$Shortcut : com/letta/mobile/data/home/HomePinnedItem {
-	public fun <init> (Lcom/letta/mobile/data/home/HomeShortcut;)V
-	public final fun component1 ()Lcom/letta/mobile/data/home/HomeShortcut;
-	public final fun copy (Lcom/letta/mobile/data/home/HomeShortcut;)Lcom/letta/mobile/data/home/HomePinnedItem$Shortcut;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/home/HomePinnedItem$Shortcut;Lcom/letta/mobile/data/home/HomeShortcut;ILjava/lang/Object;)Lcom/letta/mobile/data/home/HomePinnedItem$Shortcut;
+	public fun <init> (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)V
+	public final fun component1 ()Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public final fun copy (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Lcom/letta/mobile/data/home/HomePinnedItem$Shortcut;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/home/HomePinnedItem$Shortcut;Lcom/letta/mobile/data/home/shortcut/HomeShortcut;ILjava/lang/Object;)Lcom/letta/mobile/data/home/HomePinnedItem$Shortcut;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getKey ()Ljava/lang/String;
-	public final fun getShortcut ()Lcom/letta/mobile/data/home/HomeShortcut;
+	public final fun getShortcut ()Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -22050,57 +22060,21 @@ public final class com/letta/mobile/data/home/HomeShellSearchState {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/home/HomeShortcut : java/lang/Enum {
-	public static final field ABOUT Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field AGENTS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field BLOCKS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field BOT_SETTINGS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field CONVERSATIONS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field FAVORITE_AGENT Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field MCP_SERVERS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field MODELS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field PROJECTS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field PROVIDERS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field RUNS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field SCHEDULES Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field SETTINGS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field SYSTEM_ACCESS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field TELEMETRY Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field TEMPLATES Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field TOOLS Lcom/letta/mobile/data/home/HomeShortcut;
-	public static final field USAGE Lcom/letta/mobile/data/home/HomeShortcut;
-	public final fun getDescription ()Ljava/lang/String;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public final fun getGroup ()Lcom/letta/mobile/data/home/HomeShortcut$Group;
-	public final fun getLabel ()Ljava/lang/String;
-	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/home/HomeShortcut;
-	public static fun values ()[Lcom/letta/mobile/data/home/HomeShortcut;
-}
-
-public final class com/letta/mobile/data/home/HomeShortcut$Group : java/lang/Enum {
-	public static final field PRIMARY Lcom/letta/mobile/data/home/HomeShortcut$Group;
-	public static final field SECONDARY Lcom/letta/mobile/data/home/HomeShortcut$Group;
-	public static final field UTILITY Lcom/letta/mobile/data/home/HomeShortcut$Group;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/home/HomeShortcut$Group;
-	public static fun values ()[Lcom/letta/mobile/data/home/HomeShortcut$Group;
-}
-
 public final class com/letta/mobile/data/home/HomeStatTile {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/HomeShortcut;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/HomeShortcut;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/shortcut/HomeShortcut;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()Lcom/letta/mobile/data/home/HomeShortcut;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/HomeShortcut;)Lcom/letta/mobile/data/home/HomeStatTile;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/home/HomeStatTile;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/HomeShortcut;ILjava/lang/Object;)Lcom/letta/mobile/data/home/HomeStatTile;
+	public final fun component5 ()Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Lcom/letta/mobile/data/home/HomeStatTile;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/home/HomeStatTile;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/home/shortcut/HomeShortcut;ILjava/lang/Object;)Lcom/letta/mobile/data/home/HomeStatTile;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCaption ()Ljava/lang/String;
 	public final fun getLabel ()Ljava/lang/String;
 	public final fun getSeries ()Ljava/util/List;
-	public final fun getShortcut ()Lcom/letta/mobile/data/home/HomeShortcut;
+	public final fun getShortcut ()Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
 	public final fun getValue ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -22199,8 +22173,9 @@ public final class com/letta/mobile/data/home/SessionHomePageSource : com/letta/
 public final class com/letta/mobile/data/home/SettingsStoreHomePinStore : com/letta/mobile/data/home/HomePinStore {
 	public static final field Companion Lcom/letta/mobile/data/home/SettingsStoreHomePinStore$Companion;
 	public static final field DEFAULT_STORAGE_KEY Ljava/lang/String;
-	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/util/List;Ljava/lang/String;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/util/List;Ljava/lang/String;Lkotlinx/coroutines/flow/StateFlow;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/util/List;Ljava/lang/String;Lkotlinx/coroutines/flow/StateFlow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBinding ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public fun getPersistedAgentNames ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getPinnedKeys ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun setOrder (Ljava/util/List;)V
@@ -22208,6 +22183,42 @@ public final class com/letta/mobile/data/home/SettingsStoreHomePinStore : com/le
 }
 
 public final class com/letta/mobile/data/home/SettingsStoreHomePinStore$Companion {
+}
+
+public final class com/letta/mobile/data/home/shortcut/HomeShortcut : java/lang/Enum {
+	public static final field ABOUT Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field AGENTS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field BLOCKS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field BOT_SETTINGS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field CONVERSATIONS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field FAVORITE_AGENT Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field MCP_SERVERS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field MODELS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field PROJECTS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field PROVIDERS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field RUNS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field SCHEDULES Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field SETTINGS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field SYSTEM_ACCESS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field TELEMETRY Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field TEMPLATES Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field TOOLS Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static final field USAGE Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public final fun getDescription ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getGroup ()Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
+	public final fun getLabel ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+	public static fun values ()[Lcom/letta/mobile/data/home/shortcut/HomeShortcut;
+}
+
+public final class com/letta/mobile/data/home/shortcut/HomeShortcut$Group : java/lang/Enum {
+	public static final field PRIMARY Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
+	public static final field SECONDARY Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
+	public static final field UTILITY Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
+	public static fun values ()[Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
 }
 
 public final class com/letta/mobile/data/lanes/ConversationLane {
@@ -36025,13 +36036,7 @@ public final synthetic class com/letta/mobile/data/objectverbs/ObjectRef$$serial
 }
 
 public final class com/letta/mobile/data/objectverbs/ObjectRef$Companion {
-	public final fun agent-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
-	public final fun canvas (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
-	public final fun conversation-LfPRSJk (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
-	public final fun project-1YMDjXU (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
-	public final fun project-prkdxy8 (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-	public final fun shortcut (Lcom/letta/mobile/data/home/HomeShortcut;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
 }
 
 public final class com/letta/mobile/data/objectverbs/ObjectVerb {
@@ -36421,6 +36426,66 @@ public final synthetic class com/letta/mobile/data/objectverbs/VerbToggleState$$
 
 public final class com/letta/mobile/data/objectverbs/VerbToggleState$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/objectverbs/binding/DevicePinSettingsStore : com/letta/mobile/data/storage/SecureSettingsStore {
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;)V
+	public fun clear ()V
+	public fun getString (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public fun putDurableString (Ljava/lang/String;Ljava/lang/String;)V
+	public fun putString (Ljava/lang/String;Ljava/lang/String;)V
+	public fun remove (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/objectverbs/binding/DevicePins {
+	public static final field INSTANCE Lcom/letta/mobile/data/objectverbs/binding/DevicePins;
+	public final fun bind (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/flow/StateFlow;)Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
+	public static synthetic fun bind$default (Lcom/letta/mobile/data/objectverbs/binding/DevicePins;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/flow/StateFlow;ILjava/lang/Object;)Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
+	public final fun store (Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/pins/DevicePinStore;
+}
+
+public final class com/letta/mobile/data/objectverbs/binding/PinBinding {
+	public fun <init> (Lcom/letta/mobile/data/pins/DevicePinStore;Lkotlinx/coroutines/flow/StateFlow;)V
+	public final fun getReferences ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getRegistry ()Lcom/letta/mobile/data/objectverbs/registry/VerbRegistry;
+	public final fun getSource ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getStore ()Lcom/letta/mobile/data/pins/DevicePinStore;
+	public final fun ids (Ljava/lang/String;)Lkotlinx/coroutines/flow/StateFlow;
+	public final fun reorder (Ljava/util/List;)V
+	public final fun scoped (Lcom/letta/mobile/data/objectverbs/ObjectRef;)Lcom/letta/mobile/data/pins/ScopedObjectRef;
+	public final fun setPinned (Lcom/letta/mobile/data/objectverbs/ObjectRef;Z)Lcom/letta/mobile/data/objectverbs/VerbOutcome;
+}
+
+public final class com/letta/mobile/data/objectverbs/binding/PinBindingKt {
+	public static final fun withDevicePins (Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/storage/SecureSettingsStore;
+}
+
+public final class com/letta/mobile/data/objectverbs/refs/ObjectRefsKt {
+	public static final fun agent-0BYXKD8 (Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public static final fun canvas (Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public static final fun conversation-yAG5dVA (Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public static final fun project-8Mk8c6g (Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public static final fun project-Wsmx0P8 (Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public static final fun shortcut (Lcom/letta/mobile/data/objectverbs/ObjectRef$Companion;Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+}
+
+public final class com/letta/mobile/data/objectverbs/registry/CoreVerbProvider {
+	public static final field Companion Lcom/letta/mobile/data/objectverbs/registry/CoreVerbProvider$Companion;
+	public static final field PIN Ljava/lang/String;
+	public fun <init> (Lcom/letta/mobile/data/pins/DevicePinStore;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
+	public final fun describe (Lcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;)Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public final fun invoke (Lcom/letta/mobile/data/objectverbs/VerbInvocation;)Lcom/letta/mobile/data/objectverbs/VerbOutcome;
+	public final fun observe (Lcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/data/objectverbs/registry/CoreVerbProvider$Companion {
+	public final fun getKINDS ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/data/objectverbs/registry/VerbRegistry {
+	public fun <init> (Lcom/letta/mobile/data/objectverbs/registry/CoreVerbProvider;)V
+	public final fun describe (Lcom/letta/mobile/data/objectverbs/ObjectRef;Lcom/letta/mobile/data/objectverbs/VerbContext;)Lcom/letta/mobile/data/objectverbs/ObjectVerbSnapshot;
+	public final fun invoke (Lcom/letta/mobile/data/objectverbs/VerbInvocation;)Lcom/letta/mobile/data/objectverbs/VerbOutcome;
 }
 
 public final class com/letta/mobile/data/observability/KotzillaKmpMonitoringKt {
@@ -37009,6 +37074,189 @@ public final class com/letta/mobile/data/pairing/composition/RelayPairingNetwork
 }
 
 public final class com/letta/mobile/data/pairing/composition/RelayPairingNetwork$Companion {
+}
+
+public final class com/letta/mobile/data/pins/DevicePinStore {
+	public static final field Companion Lcom/letta/mobile/data/pins/DevicePinStore$Companion;
+	public static final field STORAGE_KEY Ljava/lang/String;
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;)V
+	public final fun facets (Lcom/letta/mobile/data/pins/ScopedObjectRef;)Lcom/letta/mobile/data/objectverbs/ObjectFacets;
+	public final fun getAvailability ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getHasReadableState ()Z
+	public final fun getJournal ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun importLegacy (Ljava/util/List;Lkotlin/jvm/functions/Function2;)V
+	public static synthetic fun importLegacy$default (Lcom/letta/mobile/data/pins/DevicePinStore;Ljava/util/List;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
+	public final fun reload ()Z
+	public final fun reorder (Ljava/util/List;)V
+	public final fun resolvePending (Lkotlin/jvm/functions/Function2;)V
+	public final fun seedHomeDefaults (Ljava/util/List;)Z
+	public final fun setPinned (Lcom/letta/mobile/data/pins/ScopedObjectRef;Z)V
+	public final fun tryImportLegacy (Ljava/util/List;)Z
+}
+
+public final class com/letta/mobile/data/pins/DevicePinStore$Companion {
+}
+
+public final class com/letta/mobile/data/pins/LegacyPinSource {
+	public fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
+	public final fun getDecode ()Lkotlin/jvm/functions/Function1;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getRead ()Lkotlin/jvm/functions/Function0;
+}
+
+public final class com/letta/mobile/data/pins/LegacyPinSources {
+	public static final field HOME_DEFAULT Ljava/lang/String;
+	public static final field HOME_PRODUCTION Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/LegacyPinSources;
+	public static final field SETTINGS_CONVERSATIONS Ljava/lang/String;
+	public static final field SETTINGS_ORDER Ljava/lang/String;
+	public static final field SETTINGS_PROJECTS Ljava/lang/String;
+	public final fun getKeys ()Ljava/util/List;
+	public final fun objectRef (Ljava/lang/String;)Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun secure (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/util/Set;)Ljava/util/List;
+	public final fun settings (Lcom/letta/mobile/data/storage/SettingsPreferencesSnapshot;)Ljava/util/List;
+	public final fun shortcut (Ljava/lang/String;)Lcom/letta/mobile/data/pins/ScopedObjectRef;
+}
+
+public final class com/letta/mobile/data/pins/PinImportRecord {
+	public static final field Companion Lcom/letta/mobile/data/pins/PinImportRecord$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()Ljava/util/Map;
+	public final fun component8 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;)Lcom/letta/mobile/data/pins/PinImportRecord;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/PinImportRecord;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZZLjava/util/Map;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/PinImportRecord;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCaptured ()Z
+	public final fun getComplete ()Z
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getError ()Ljava/lang/String;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getRaw ()Ljava/lang/String;
+	public final fun getResolved ()Ljava/util/Map;
+	public final fun getSnapshots ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/pins/PinImportRecord$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/PinImportRecord$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/pins/PinImportRecord;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/pins/PinImportRecord;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinImportRecord$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinImportSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/pins/PinImportSnapshot$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/pins/PinImportSnapshot;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/PinImportSnapshot;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/PinImportSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getError ()Ljava/lang/String;
+	public final fun getRaw ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/pins/PinImportSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/PinImportSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/pins/PinImportSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/pins/PinImportSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinImportSnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinJournal {
+	public static final field Companion Lcom/letta/mobile/data/pins/PinJournal$Companion;
+	public fun <init> ()V
+	public fun <init> (ILjava/util/List;Ljava/util/Set;Ljava/util/List;Z)V
+	public synthetic fun <init> (ILjava/util/List;Ljava/util/Set;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/Set;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Z
+	public final fun copy (ILjava/util/List;Ljava/util/Set;Ljava/util/List;Z)Lcom/letta/mobile/data/pins/PinJournal;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/PinJournal;ILjava/util/List;Ljava/util/Set;Ljava/util/List;ZILjava/lang/Object;)Lcom/letta/mobile/data/pins/PinJournal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHomeDefaultsConsidered ()Z
+	public final fun getImports ()Ljava/util/List;
+	public final fun getPins ()Ljava/util/List;
+	public final fun getTombstones ()Ljava/util/Set;
+	public final fun getVersion ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/pins/PinJournal$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/PinJournal$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/pins/PinJournal;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/pins/PinJournal;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/PinJournal$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/ScopedObjectRef {
+	public static final field Companion Lcom/letta/mobile/data/pins/ScopedObjectRef$Companion;
+	public static final field DEVICE_SOURCE Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/ObjectRef;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/ObjectRef;)Lcom/letta/mobile/data/pins/ScopedObjectRef;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/pins/ScopedObjectRef;Ljava/lang/String;Lcom/letta/mobile/data/objectverbs/ObjectRef;ILjava/lang/Object;)Lcom/letta/mobile/data/pins/ScopedObjectRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getObjectRef ()Lcom/letta/mobile/data/objectverbs/ObjectRef;
+	public final fun getSource ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/pins/ScopedObjectRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/pins/ScopedObjectRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/pins/ScopedObjectRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/pins/ScopedObjectRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/pins/ScopedObjectRef$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/letta/mobile/data/platform/HeapPressure {
@@ -42565,8 +42813,9 @@ public final class com/letta/mobile/data/projects/SettingsProjectPinStore : com/
 public final class com/letta/mobile/data/projects/SettingsStoreProjectPinStore : com/letta/mobile/data/projects/ProjectPinStore {
 	public static final field Companion Lcom/letta/mobile/data/projects/SettingsStoreProjectPinStore$Companion;
 	public static final field DEFAULT_STORAGE_KEY Ljava/lang/String;
-	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Lkotlinx/coroutines/flow/StateFlow;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Lkotlinx/coroutines/flow/StateFlow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBinding ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public fun getPinned ()Lkotlinx/coroutines/flow/Flow;
 	public fun set-PFf1qb4 (Ljava/lang/String;Lcom/letta/mobile/data/projects/ProjectPin;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -42881,6 +43130,7 @@ public class com/letta/mobile/data/repository/CachedSettingsRepository : com/let
 	public fun getHapticsEnabled ()Lkotlinx/coroutines/flow/Flow;
 	public fun getHuggingFaceToken ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getLastChatSelection ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getObjectPins ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public fun getOpenChatsOnCanvas ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedAgentIds ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedAgentOrder ()Lkotlinx/coroutines/flow/Flow;
@@ -49416,6 +49666,10 @@ public final class com/letta/mobile/data/session/graph/UnservedVibesyncEventStre
 	public fun stop ()V
 }
 
+public final class com/letta/mobile/data/session/pins/SessionPinsKt {
+	public static final fun pinSource (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;)Lkotlinx/coroutines/flow/StateFlow;
+}
+
 public final class com/letta/mobile/data/settings/AppearanceSettings {
 	public fun <init> ()V
 	public fun <init> (Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;Lcom/letta/mobile/data/settings/SettingValue;)V
@@ -50092,7 +50346,7 @@ public final class com/letta/mobile/data/shell/ShellHomePrompt {
 public final class com/letta/mobile/data/shell/ShellHomeShortcuts {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/ShellHomeShortcuts;
 	public static final field PIN_STORAGE_KEY Ljava/lang/String;
-	public final fun destinationFor (Lcom/letta/mobile/data/home/HomeShortcut;)Lcom/letta/mobile/data/shell/ShellDestination;
+	public final fun destinationFor (Lcom/letta/mobile/data/home/shortcut/HomeShortcut;)Lcom/letta/mobile/data/shell/ShellDestination;
 	public final fun getConfig ()Lcom/letta/mobile/data/home/HomePageConfig;
 	public final fun getDefaultPins ()Ljava/util/List;
 }
@@ -50463,6 +50717,7 @@ public final class com/letta/mobile/data/storage/InMemorySecureSettingsStore : c
 	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun clear ()V
 	public fun getString (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public fun putDurableString (Ljava/lang/String;Ljava/lang/String;)V
 	public fun putString (Ljava/lang/String;Ljava/lang/String;)V
 	public fun remove (Ljava/lang/String;)V
 }
@@ -50497,12 +50752,14 @@ public abstract interface class com/letta/mobile/data/storage/SecureSettingsStor
 	public abstract fun clear ()V
 	public abstract fun getString (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 	public static synthetic fun getString$default (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public fun putDurableString (Ljava/lang/String;Ljava/lang/String;)V
 	public abstract fun putString (Ljava/lang/String;Ljava/lang/String;)V
 	public abstract fun remove (Ljava/lang/String;)V
 }
 
 public final class com/letta/mobile/data/storage/SecureSettingsStore$DefaultImpls {
 	public static synthetic fun getString$default (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public static fun putDurableString (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;Ljava/lang/String;)V
 }
 
 public final class com/letta/mobile/data/storage/SettingsPlatformDefaults {
@@ -70410,13 +70667,6 @@ public final class com/letta/mobile/ui/chat/session/CoordinatorSendQueue : com/l
 	public fun getQueue ()Lkotlinx/coroutines/flow/Flow;
 	public fun resume ()V
 	public fun sendNow-XbArkYg (Ljava/lang/String;)V
-}
-
-public final class com/letta/mobile/ui/chat/session/DerivedStateFlow : kotlinx/coroutines/flow/StateFlow {
-	public fun <init> (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;)V
-	public fun collect (Lkotlinx/coroutines/flow/FlowCollector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun getReplayCache ()Ljava/util/List;
-	public fun getValue ()Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/ui/chat/session/GatewayPermissionModes : com/letta/mobile/ui/chat/session/ChatPermissionModeSource {

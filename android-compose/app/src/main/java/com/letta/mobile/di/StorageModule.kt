@@ -2,12 +2,13 @@ package com.letta.mobile.di
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.util.EncryptedPrefsHelper
-import androidx.core.content.edit
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -42,7 +43,7 @@ object StorageModule {
     @Singleton
     fun provideSecureSettingsStore(
         @EncryptedPrefs sharedPreferences: SharedPreferences,
-    ): SecureSettingsStore = SharedPreferencesSecureSettingsStore(sharedPreferences)
+    ): SecureSettingsStore = SharedPreferencesSecureSettingsStore(sharedPreferences).withDevicePins()
 }
 
 private class SharedPreferencesSecureSettingsStore(
@@ -53,6 +54,10 @@ private class SharedPreferencesSecureSettingsStore(
 
     override fun putString(key: String, value: String) {
         sharedPreferences.edit { putString(key, value) }
+    }
+
+    override fun putDurableString(key: String, value: String) {
+        check(sharedPreferences.edit().putString(key, value).commit()) { "Settings persistence failed" }
     }
 
     override fun remove(key: String) {

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.home
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
@@ -130,7 +132,7 @@ class HomeDashboardTest {
 
     @Test
     fun theSettingsPinStoreStartsFromDefaultsAndPersistsChanges() {
-        val store = MapSettingsStore()
+        val store = MapSettingsStore().withDevicePins()
         val pins = SettingsStoreHomePinStore(store, defaults = listOf(conversations))
         assertEquals(listOf(conversations), pins.pinnedKeys.value)
 

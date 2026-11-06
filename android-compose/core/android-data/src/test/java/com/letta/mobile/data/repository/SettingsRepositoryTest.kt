@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -33,11 +35,35 @@ class SettingsRepositoryTest {
     fun setup() {
         repository = SettingsRepository(
             dataStore = createTestPreferencesDataStore(),
-            secureSettingsStore = InMemorySecureSettingsStore(),
+            secureSettingsStore = InMemorySecureSettingsStore().withDevicePins(),
         )
         runBlocking {
             repository.clearAllData()
         }
+    }
+
+    @Test
+    fun `settings Home and conversation adapters share scoped confirmed pins`() = runTest {
+        val storage = InMemorySecureSettingsStore().withDevicePins()
+        val settings = SettingsRepository(createTestPreferencesDataStore(), storage)
+        val config = LettaConfig(id = "pins", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://pins.invalid")
+        settings.saveConfig(config)
+        val namespace = com.letta.mobile.data.session.remoteLettaBackendDescriptor(
+            config, com.letta.mobile.data.session.ANDROID_REMOTE_LETTA_ID_PREFIX,
+        ).backendId.value
+        val source = kotlinx.coroutines.flow.MutableStateFlow<String?>(namespace)
+        val home = com.letta.mobile.data.home.SettingsStoreHomePinStore(storage, emptyList(), source = source)
+        settings.setAgentPinned("alpha", true)
+        assertEquals(listOf("agent:alpha"), home.pinnedKeys.value)
+        assertEquals(listOf("alpha"), settings.getPinnedAgentOrder().first())
+        home.setPinned("agent:alpha", false)
+        assertEquals(emptyList<String>(), settings.getPinnedAgentOrder().first())
+        settings.setConversationPinned("chat", true)
+        val conversations = com.letta.mobile.data.chat.runtime.PinnedConversations(storage, source = source)
+        assertEquals(setOf("chat"), conversations.pinned.value)
+        conversations.inherit("chat", "fork")
+        assertEquals(setOf("chat", "fork"), settings.getPinnedConversationIds().first())
+        assertTrue(home.binding.store.journal.value.imports.none { it.key == "desktop.conversations.pinned" && it.complete })
     }
 
     @Test
@@ -91,7 +117,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `saveConfig persists local on-device model metadata`() = runTest {
-        val secureStore = InMemorySecureSettingsStore()
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
         val dataStore = createTestPreferencesDataStore()
         val scopedRepository = SettingsRepository(
             dataStore = dataStore,
@@ -197,7 +223,7 @@ class SettingsRepositoryTest {
         val activeIdsAtClear = mutableListOf<String?>()
         scopedRepository = SettingsRepository.forTests(
             dataStore = createTestPreferencesDataStore(),
-            secureSettingsStore = InMemorySecureSettingsStore(),
+            secureSettingsStore = InMemorySecureSettingsStore().withDevicePins(),
             clearBackendScopedCaches = {
                 activeIdsAtClear += scopedRepository.activeConfig.value?.id
                 BackendSwitchClearResult(successes = 1, failures = emptyList())
@@ -351,7 +377,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `stored agent name survives restart after a blank selection write`() {
-        val secureStore = InMemorySecureSettingsStore()
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
         val dataStore = createTestPreferencesDataStore()
         val initialRepo = SettingsRepository(
             dataStore = dataStore,

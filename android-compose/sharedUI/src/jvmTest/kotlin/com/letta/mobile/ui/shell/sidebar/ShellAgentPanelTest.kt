@@ -2,6 +2,8 @@
 
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,6 +32,13 @@ import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbContext
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.ui.components.ProvideObjectVerbs
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LettaHost
 import kotlin.test.Test
@@ -302,10 +311,19 @@ class ShellAgentPanelTest {
     @Test
     fun aPinnedRowShowsItsPinAndItsMenuOffersUnpin() = runComposeUiTest {
         val pins = mutableListOf<Pair<String, Boolean>>()
+        val binding = DevicePins.bind(InMemorySecureSettingsStore().withDevicePins(), MutableStateFlow("panel-backend"))
+        val ref = ObjectRef("conversation", "c1")
+        binding.setPinned(ref, true)
         val pinned = state.copy(conversations = state.conversations.map { it.copy(pinned = true) })
         setContent {
             CompositionLocalProvider(LocalLettaHost provides menuAsButtons) {
-                Panel(pinned, ShellAgentPanelActions(onPinConversation = { id, pin -> pins += id to pin }))
+                ProvideObjectVerbs(binding, onOutcome = { outcome, _ ->
+                    if (outcome is VerbOutcome.Updated) {
+                        pins += outcome.snapshot.objectRef.id to (outcome.snapshot.facets.pinned == true)
+                    }
+                }) {
+                    Panel(pinned, ShellAgentPanelActions())
+                }
             }
         }
 
@@ -314,6 +332,7 @@ class ShellAgentPanelTest {
         onNodeWithText("menu:Unpin chat").performClick()
 
         assertEquals(listOf("c1" to false), pins)
+        assertEquals(false, binding.registry.describe(ref, VerbContext("context-menu"))?.facets?.pinned)
     }
 
     @androidx.compose.runtime.Composable

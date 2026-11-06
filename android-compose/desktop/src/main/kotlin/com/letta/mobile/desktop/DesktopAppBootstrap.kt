@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.objectverbs.binding.withDevicePins
+import com.letta.mobile.data.storage.SecureSettingsStore
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,14 +45,12 @@ internal data class DesktopConfigBootstrap(
 )
 
 /** The vault-encrypted settings, read once per process by whichever thread asks first. */
-internal val desktopSecureSettingsStore: EncryptingSecureSettingsStore by lazy {
+internal val desktopSecureSettingsStore: SecureSettingsStore by lazy {
     EncryptingSecureSettingsStore(
         delegate = DesktopFileSecureSettingsStore(),
         vault = DesktopSecretVaults.forCurrentOs(defaultDesktopStateDirectory()),
-    ).also { store ->
-        // Before the first local-runtime spawn, so a saved directory override applies to it.
+    ).withDevicePins().also { store ->
         DesktopLocalBackendDirectorySettings.applyStoredOverride(store)
-        // F05: stable instance id and the default working directory for the child.
         DesktopRuntimeLaunchSettings.applyStored(store)
     }
 }
