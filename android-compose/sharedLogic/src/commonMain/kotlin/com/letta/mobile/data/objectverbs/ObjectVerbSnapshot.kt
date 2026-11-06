@@ -38,11 +38,11 @@ data class ObjectVerbSnapshot(
      * bound provider/adapter. Unknown kinds/versions expose neither verbs nor facets. Hidden,
      * unknown or malformed availability and unsupported verb IDs render nothing.
      */
-    fun forRendering(knownKinds: Set<String>, knownVerbIds: Set<String>): ObjectVerbSnapshot? {
-        if (contractVersion != 1 || contribution.contractVersion != 1 ||
-            objectRef.kind !in knownKinds || objectRef.kind !in contribution.kinds
-        ) return null
-        return copy(verbs = verbs.filter { verb ->
+    fun forRendering(knownKinds: Set<String>, knownVerbIds: Set<String>): ObjectVerbSnapshot? = when {
+        contractVersion != 1 || contribution.contractVersion != 1 -> null
+        objectRef.kind !in knownKinds -> null
+        objectRef.kind !in contribution.kinds -> null
+        else -> copy(verbs = verbs.filter { verb ->
             verb.id in knownVerbIds && verb.label.isNotBlank() && when (verb.availability.state) {
                 "enabled" -> true
                 "disabled" -> !verb.availability.reason.isNullOrBlank()
