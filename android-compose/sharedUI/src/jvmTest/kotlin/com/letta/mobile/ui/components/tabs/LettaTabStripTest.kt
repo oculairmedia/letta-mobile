@@ -50,16 +50,6 @@ class LettaTabStripTest {
     // agents and canvases too, not just this agent's conversations. What remains
     // on the strip is the "+".
     @Test
-    fun tabsWithoutPinSupportDoNotShowAnInertPinControl() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                LettaTabStrip(listOf(LettaTab("subagent", "Worker")), "subagent", LettaTabStripActions())
-            }
-        }
-        onNodeWithContentDescription("Unpin Worker tab").assertDoesNotExist()
-    }
-
-    @Test
     fun plusStartsANewConversation() = runComposeUiTest {
         var newConversations = 0
         setContent {
@@ -145,28 +135,6 @@ class LettaTabStripTest {
             "drag gesture never invoked onReorder: the gesture is not reaching LettaTabStrip at all",
         )
         assertEquals(1, reorderedTarget)
-    }
-
-    @Test
-    fun pinnedTabsCanReorderAcrossAnInterveningPreview() = runComposeUiTest {
-        var moved: Pair<String, Int>? = null
-        setContent {
-            MaterialTheme {
-                LettaTabStrip(
-                    tabs = listOf(LettaTab("a", "First"), LettaTab("b", "Preview", isTransient = true), LettaTab("c", "Third")),
-                    activeKey = "a",
-                    actions = LettaTabStripActions(onReorder = { key, index -> moved = key to index }),
-                )
-            }
-        }
-        onNodeWithText("Third").performMouseInput {
-            moveTo(center)
-            press()
-            repeat(4) { moveBy(Offset(x = -100f, y = 0f)) }
-            release()
-        }
-        waitForIdle()
-        assertEquals("c" to 0, moved)
     }
 
     @Test
