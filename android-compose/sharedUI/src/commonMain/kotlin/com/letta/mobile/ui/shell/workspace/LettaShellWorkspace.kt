@@ -1,5 +1,12 @@
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.ui.components.ProvideObjectVerbs
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayAction
+import com.letta.mobile.ui.host.OverlayResponse
+import com.letta.mobile.ui.host.LocalOverlayHost
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -116,8 +123,10 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalConversationPurposes provides purposes,
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
-                                    WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
-                                    host.slots.overlays()
+                                    ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {
+                                        WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
+                                        host.slots.overlays()
+                                    }
                                 }
                             }
                         }
@@ -173,10 +182,11 @@ private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
     val railActions = host.actions.rail
     val currentDrawer = drawer
     // Retain callbacks across frames with the same navigation instead of capturing WorkspaceFrame.
-    val minimal = remember(navigation, railActions, currentDrawer) {
+    val verbs = com.letta.mobile.ui.components.LocalObjectVerbs.current
+    val minimal = remember(navigation, railActions, currentDrawer, verbs) {
         val openDrawer = { currentDrawer.open = true }
         ShellMinimalHeader(
-            identity = navigation.focusedIdentity(railActions, onSwitch = openDrawer),
+            identity = navigation.focusedIdentity(railActions, onSwitch = openDrawer, verbs = verbs),
             onOpenNavigation = openDrawer,
         )
     }
@@ -338,4 +348,21 @@ fun ShellCollapsibleSidebar(
     ) {
         Row(Modifier.fillMaxHeight()) { content() }
     }
+}
+
+
+@Composable
+private fun shellObjectVerbFeedback(): (VerbOutcome, (() -> Unit)?) -> Unit {
+    val overlays = LocalOverlayHost.current
+    return remember(overlays) { { outcome, retry ->
+        val reason = when (outcome) {
+            is VerbOutcome.Failed -> outcome.reason
+            is VerbOutcome.Unavailable -> outcome.reason
+            is VerbOutcome.InvalidInput -> outcome.errors.values.joinToString()
+            is VerbOutcome.Updated, is VerbOutcome.Open, VerbOutcome.Cancelled -> null
+        }
+        if (reason != null) overlays?.show(Overlay.Snackbar(reason, response = OverlayResponse(
+            action = retry?.let { OverlayAction("Retry", it) },
+        )))
+    } }
 }

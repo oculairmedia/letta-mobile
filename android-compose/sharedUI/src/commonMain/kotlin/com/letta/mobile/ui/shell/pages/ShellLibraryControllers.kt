@@ -95,7 +95,9 @@ object ShellLibraryFactory {
     fun home(provider: ShellGraphProvider, settings: SecureSettingsStore, scope: CoroutineScope): HomePageController =
         HomePageController(
             source = SessionHomePageSource(sessionGraphProvider = provider, scope = scope),
-            pins = SettingsStoreHomePinStore(settings, ShellHomeShortcuts.defaultPins, ShellHomeShortcuts.PIN_STORAGE_KEY, provider.pinSource()),
+            pins = SettingsStoreHomePinStore(
+                settings, ShellHomeShortcuts.defaultPins, ShellHomeShortcuts.PIN_STORAGE_KEY, provider.pinSource(),
+            ),
             scope = scope,
             config = ShellHomeShortcuts.config,
         )

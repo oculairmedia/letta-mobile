@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.pages.conversations
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -118,6 +120,7 @@ private fun ConversationsRosterList(
     sections: List<RosterSection<ShellConversationRowModel>>,
     ui: ShellConversationListUi,
 ) {
+    val verbs = LocalObjectVerbs.current
     val panel = actions.conversations
     RosterList(
         RosterSpec(
@@ -125,7 +128,9 @@ private fun ConversationsRosterList(
             key = ShellConversationRowModel::id,
             selection = RosterSelection(isSelected = ShellConversationRowModel::selected, onSelect = { panel.onConversationSelected(it.id) }),
             actions = RosterActions(
-                menu = { model, row -> shellConversationMenu(model, conversationRowActions(model, panel), ui, row) + actions.rowMenu(model) },
+                menu = { model, row ->
+                    shellConversationMenu(model, conversationRowActions(model, panel), ui, row, verbs) + actions.rowMenu(model)
+                },
                 rename = panel.onRenameConversation?.let(::conversationRename),
             ),
             options = RosterOptions(loading = state.loading, testTag = RosterListTag(ConversationsPageTags.LIST)),

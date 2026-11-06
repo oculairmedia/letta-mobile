@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.objectverbs.binding.PinBinding
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
@@ -105,6 +107,7 @@ class LettaShellWorkspaceHost(
     val drawer: ShellWorkspaceDrawer,
     val events: ShellWorkspaceEvents,
     val conversationLanes: ConversationLaneProjection? = null,
+    val objectPins: PinBinding? = null,
 )
 
 /** The window events the workspace reports. */

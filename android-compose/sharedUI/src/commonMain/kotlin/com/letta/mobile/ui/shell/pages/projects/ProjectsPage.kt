@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.shell.pages.projects
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.items
+import com.letta.mobile.data.objectverbs.ObjectRef
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -25,7 +29,6 @@ import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRowSpec
-import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterActions
@@ -176,6 +179,7 @@ private fun ProjectsHeader(state: ProjectsPageState, actions: ProjectsListAction
 
 @Composable
 private fun ColumnScope.ProjectsRoster(state: ProjectsPageState, actions: ProjectsListActions) {
+    val verbs = LocalObjectVerbs.current
     val section = RosterSection(key = "projects", items = state.visibleProjects)
     LettaRefreshable(state.refreshing, actions.onRefresh, Modifier.fillMaxWidth().weight(1f)) {
         RosterList(
@@ -183,7 +187,9 @@ private fun ColumnScope.ProjectsRoster(state: ProjectsPageState, actions: Projec
                 sections = RosterSections.pinnedFirst(section, state::isPinned),
                 key = ProjectSummary::identifier,
                 selection = RosterSelection(isSelected = { it.key == state.selectedKey }, onSelect = { actions.onSelect(it.key) }),
-                actions = RosterActions(menu = { project, _ -> listOf(pinMenuItem(project, state, actions)) }),
+                actions = RosterActions(menu = { project, _ ->
+                    verbs?.items(ObjectRef("project", project.identifier), "context-menu").orEmpty()
+                }),
                 options = RosterOptions(loading = state.loading && state.projects.isEmpty(), testTag = ProjectsPageTags.LIST),
                 empty = { LettaEmptyHint(emptyHint(state), Modifier.padding(LettaDimens.Space.md)) },
             ),
@@ -202,10 +208,7 @@ private fun ColumnScope.ProjectsRoster(state: ProjectsPageState, actions: Projec
     }
 }
 
-private fun pinMenuItem(project: ProjectSummary, state: ProjectsPageState, actions: ProjectsListActions): LettaMenuItem {
-    val pinned = state.isPinned(project)
-    return LettaMenuItem(label = if (pinned) UNPIN else PIN, onClick = { actions.onTogglePinned(project.key) })
-}
+
 
 private fun emptyHint(state: ProjectsPageState): String =
     if (state.query.isNotBlank()) "No projects match \"${state.query.trim()}\"" else "No projects yet"

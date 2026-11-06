@@ -76,6 +76,7 @@ internal fun webWorkspaceHost(shell: WebShell, page: androidx.compose.runtime.St
     val workspace = shell.workspace
     return LettaShellWorkspaceHost(
         conversationLanes = page.value.session.graph.conversationLanes,
+        objectPins = page.value.session.controllers.home.objectPins,
         actions = shell.navigator.workspaceNavigationActions(page.value.chat.list),
         slots = LettaShellWorkspaceSlots(
             main = { modifier ->

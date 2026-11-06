@@ -107,7 +107,19 @@ class HomePageTest {
         width: Dp = WIDE,
         host: LettaHost = LettaHost.Touch,
     ) {
+        val pinStore = com.letta.mobile.data.home.SettingsStoreHomePinStore(
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), emptyList(),
+            source = kotlinx.coroutines.flow.MutableStateFlow("fixture"),
+        )
+        state.pinKeys.forEach { pinStore.setPinned(it, true) }
         setContent {
+            com.letta.mobile.ui.components.ProvideObjectVerbs(pinStore.binding, onOutcome = { outcome, _ ->
+                if (outcome is com.letta.mobile.data.objectverbs.VerbOutcome.Updated) {
+                    val ref = outcome.snapshot.objectRef
+                    val prefix = if (ref.kind == "shortcut") "pin" else "agent"
+                    actions.events += "$prefix:${ref.id}=${outcome.snapshot.facets.pinned}"
+                }
+            }) {
             MaterialTheme {
                 ProvideLettaHost(host) {
                     Box(Modifier.width(width).height(PAGE_HEIGHT)) {
@@ -116,6 +128,7 @@ class HomePageTest {
                 }
             }
         }
+            }
         waitForIdle()
         assertEquals(listOf("loadIfStale"), actions.events, "entering Home requests aggregates without forcing a reload")
         actions.events.clear()

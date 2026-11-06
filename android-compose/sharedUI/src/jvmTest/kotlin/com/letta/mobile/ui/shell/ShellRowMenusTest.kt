@@ -1,5 +1,13 @@
 package com.letta.mobile.ui.shell
 
+import com.letta.mobile.ui.components.objectVerbMenus
+import com.letta.mobile.ui.components.items
+
+import com.letta.mobile.data.objectverbs.ObjectRef
+import com.letta.mobile.data.objectverbs.VerbOutcome
+import com.letta.mobile.data.objectverbs.binding.DevicePins
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailEntry
@@ -50,7 +58,12 @@ class ShellRowMenusTest {
     fun aConversationOffersRenameAndPinWhenTheHostDoes() {
         // letta-mobile-bzvro.17
         val events = mutableListOf<String>()
-        val manage = ShellConversationManageMenu(pinned = false, onRenameRequest = { events += "rename" }, onPinToggle = { events += "pin" })
+        val binding = DevicePins.bind(InMemorySecureSettingsStore(), MutableStateFlow("fixture"))
+        val ref = ObjectRef("conversation", "chat-1")
+        val verbs = objectVerbMenus(binding) { outcome, _ -> if (outcome is VerbOutcome.Updated) events += "pin" }
+        val manage = ShellConversationManageMenu(
+            onRenameRequest = { events += "rename" }, pinItems = verbs.items(ref, "context-menu"),
+        )
         val menu = ShellRowMenus.conversation(
             archived = false,
             deleting = false,
@@ -69,7 +82,9 @@ class ShellRowMenusTest {
             ShellRowMenus.conversation(
                 false,
                 false,
-                ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {}, manage = manage.copy(pinned = true)),
+                ShellConversationMenuActions(
+                    onArchiveToggle = {}, onRequestDelete = {}, manage = manage.copy(pinItems = verbs.items(ref, "context-menu")),
+                ),
             )[1].label,
         )
         assertTrue(
@@ -105,17 +120,20 @@ class ShellRowMenusTest {
         assertEquals(listOf("Open"), ShellRowMenus.agent(entry, ShellAgentRailActions()).map { it.label })
 
         val events = mutableListOf<String>()
+        val binding = DevicePins.bind(InMemorySecureSettingsStore(), MutableStateFlow("fixture"))
+        val verbs = objectVerbMenus(binding) { outcome, _ ->
+            if (outcome is VerbOutcome.Updated) events += "pin:${outcome.snapshot.objectRef.id}:${outcome.snapshot.facets.pinned}"
+        }
         val actions = ShellAgentRailActions(
             onAgentSelected = { events += "open:$it" },
-            onAgentPinnedChange = { id, pinned -> events += "pin:$id:$pinned" },
             onAgentSettings = { events += "settings:$it" },
         )
-        val menu = ShellRowMenus.agent(entry, actions)
+        val menu = ShellRowMenus.agent(entry, actions, verbs)
         assertEquals(listOf("Open", "Pin agent", "Agent settings"), menu.map { it.label })
         menu.forEach { it.onClick() }
         assertEquals(listOf("open:a1", "pin:a1:true", "settings:a1"), events)
 
-        val pinned = ShellRowMenus.agent(entry.copy(pinned = true), actions)
+        val pinned = ShellRowMenus.agent(entry.copy(pinned = true), actions, verbs)
         assertEquals("Unpin agent", pinned[1].label)
         pinned[1].onClick()
         assertEquals("pin:a1:false", events.last())

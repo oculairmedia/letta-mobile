@@ -311,7 +311,9 @@ private fun buildDesktopChatController(
         persistArchivedConversationIds = { ids -> archived.save(ids.mapTo(mutableSetOf(), ::ConversationId)) },
         // Conversations created or changed on another device arrive as Meridian pushes.
         conversationChanges = bindings.irohTransport,
-        conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(bindings.secureSettingsStore, runtime.dataBindings.sessionGraphProvider.pinSource()),
+        conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(
+            bindings.secureSettingsStore, runtime.dataBindings.sessionGraphProvider.pinSource(),
+        ),
     )
 }
 

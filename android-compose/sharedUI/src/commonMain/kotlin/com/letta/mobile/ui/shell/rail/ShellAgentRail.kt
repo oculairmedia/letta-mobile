@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.rail
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -163,7 +165,7 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
         body = entry.activity?.preview?.trim()?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) },
     )
     val host = LocalLettaHost.current
-    host.rowMenu(ShellRowMenus.agent(entry, actions)) {
+    host.rowMenu(ShellRowMenus.agent(entry, actions, LocalObjectVerbs.current)) {
         host.hoverCard(card) {
             Box(
                 modifier = Modifier

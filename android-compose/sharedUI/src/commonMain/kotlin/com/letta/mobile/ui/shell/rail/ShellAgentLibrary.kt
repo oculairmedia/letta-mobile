@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.rail
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,13 +110,14 @@ fun ColumnScope.ShellAgentLibrary(groups: List<AgentRailGroup>, entries: List<Sh
         search = PickerSearch(placeholder = "Search agents", autoFocus = false),
         fieldModifier = Modifier,
     )
+    val verbs = LocalObjectVerbs.current
     val roster = rememberRosterListState()
     RosterList(
         RosterSpec(
             sections = sections,
             key = ShellRailEntry::key,
             selection = RosterSelection(isSelected = ShellRailEntry::selected, onSelect = { actions.onAgentSelected(it.agentId) }),
-            actions = RosterActions(menu = { entry, _ -> ShellRowMenus.agent(entry, actions) }),
+            actions = RosterActions(menu = { entry, _ -> ShellRowMenus.agent(entry, actions, verbs) }),
             options = RosterOptions(testTag = RosterListTag(ShellAgentLibraryTags.LIST)),
             empty = { LettaEmptyHint("No agents match \"$needle\"", Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) },
         ),

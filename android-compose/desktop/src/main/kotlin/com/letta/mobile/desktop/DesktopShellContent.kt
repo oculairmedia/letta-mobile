@@ -103,6 +103,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                         ShellWindowChrome.Hoisted { hoistedHeader.value(it) },
                         drawer, ShellWorkspaceEvents(onWindowWidthChanged, shortcuts),
                         conversationLanes = context.core.sessionGraph.value.conversationLanes,
+                        objectPins = context.panels.libraries.home.objectPins,
                     )
                 },
             )
@@ -232,7 +233,6 @@ private fun desktopWorkspaceActions(
         rail = ShellAgentRailActions(
             onHome = { navigator.navigate(DesktopDestination.Home) },
             onAgentSelected = { agentId ->
-                // Search-driven library: picking an agent is the "done" gesture, so the expanded panel closes.
                 navigator.railExpanded = false
                 context.router.openAgent(AgentId(agentId))
             },

@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.shell.pages.home
 
+import com.letta.mobile.ui.components.LocalObjectVerbs
+import com.letta.mobile.ui.components.items
+import com.letta.mobile.data.objectverbs.ObjectRef
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -145,7 +149,7 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
                     FleetBarSpark(values = agent.activityByHour, modifier = Modifier.width(SparkBarsWidth).height(LettaDimens.Space.lg))
                 }
             }
-            AgentPinToggle(agent, page)
+            AgentPinToggle(agent)
         }
         RowHairline()
     }
@@ -175,17 +179,18 @@ private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modif
 }
 
 @Composable
-private fun AgentPinToggle(agent: FleetAgentStat, page: HomePageScope) {
+private fun AgentPinToggle(agent: FleetAgentStat) {
     val agentId = agent.agentId
-    val pinned = page.state.isAgentPinned(agentId)
+    val pin = LocalObjectVerbs.current?.items(ObjectRef("agent", agentId), "home-tile")?.singleOrNull() ?: return
     IconButton(
-        onClick = { page.actions.setAgentPinned(agentId, !pinned) },
+        onClick = pin.onClick,
+        enabled = pin.enabled,
         modifier = Modifier.width(PinWidth).testTag(HomePageTags.pinAgent(agent)),
     ) {
         Icon(
-            imageVector = if (pinned) LettaIcons.PinOff else LettaIcons.Pin,
-            contentDescription = if (pinned) UNPIN_AGENT else PIN_AGENT,
-            tint = if (pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            imageVector = pin.icon ?: LettaIcons.Pin,
+            contentDescription = pin.label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(LettaDimens.Control.iconSm),
         )
     }
@@ -214,8 +219,6 @@ private fun sortArrow(descending: Boolean): String = if (descending) "▼" else 
 private const val FLEET_LABEL = "Fleet"
 private const val STRIP_LABEL = "LAST 48H"
 private const val NO_AGENTS = "No agents yet. Create one to see it here."
-private const val PIN_AGENT = "Pin to Home"
-private const val UNPIN_AGENT = "Unpin from Home"
 private const val DASH = "—"
 private val ModelWidth = 150.dp
 private val CountWidth = 56.dp

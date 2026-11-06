@@ -72,6 +72,7 @@ private fun workspaceHost(
     chrome: ShellWindowChrome = ShellWindowChrome.Inline,
     drawer: ShellWorkspaceDrawer = ShellWorkspaceDrawer(),
     actions: ShellWorkspaceNavigationActions = ShellWorkspaceNavigationActions(),
+    objectPins: com.letta.mobile.data.objectverbs.binding.PinBinding? = null,
     main: @Composable (Modifier) -> Unit = { modifier -> Text("The page", modifier.testTag(PageTag)) },
 ) = LettaShellWorkspaceHost(
     actions = actions,
@@ -84,6 +85,7 @@ private fun workspaceHost(
     chrome = chrome,
     drawer = drawer,
     events = ShellWorkspaceEvents(),
+    objectPins = objectPins,
 )
 
 /** letta-mobile-ckmub.17.4: the one workspace desktop and web mount, wide and compact. */
@@ -301,14 +303,16 @@ class LettaShellWorkspaceTest {
     @Test
     fun thePillOpensTheDrawerOnTapAndPinsOnLongPress() = runComposeUiTest {
         val drawer = ShellWorkspaceDrawer()
-        val pins = mutableListOf<Pair<String, Boolean>>()
-        val actions = ShellWorkspaceNavigationActions(
-            rail = ShellAgentRailActions(onAgentPinnedChange = { id, pinned -> pins += id to pinned }),
+        val binding = com.letta.mobile.data.objectverbs.binding.DevicePins.bind(
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), kotlinx.coroutines.flow.MutableStateFlow("fixture"),
         )
-        setContent { LettaShellWorkspace(workspaceState(), workspaceHost(drawer = drawer, actions = actions), sized(400.dp)) }
+        setContent {
+            LettaShellWorkspace(workspaceState(), workspaceHost(drawer = drawer, objectPins = binding), sized(400.dp))
+        }
+        assertEquals(emptyList(), binding.ids("agent").value)
 
         onNodeWithTag(AgentIdentityPillTestTags.TRIGGER).performTouchInput { longClick() }
-        runOnIdle { assertEquals(listOf("agent-a" to true), pins) }
+        runOnIdle { assertEquals(listOf("agent-a"), binding.ids("agent").value) }
         onNodeWithTag(AgentIdentityPillTestTags.TRIGGER).performClick()
         runOnIdle { assertTrue(drawer.open) }
     }
@@ -317,8 +321,16 @@ class LettaShellWorkspaceTest {
     fun aPinnedAgentsLongPressUnpinsIt() {
         val pinned = Navigation.copy(rail = Navigation.rail.copy(focus = Navigation.rail.focus.copy(pinnedAgentIds = setOf("agent-a"))))
         val pins = mutableListOf<Pair<String, Boolean>>()
-        val actions = ShellAgentRailActions(onAgentPinnedChange = { id, p -> pins += id to p })
-        val identity = checkNotNull(pinned.focusedIdentity(actions, onSwitch = {}))
+        val binding = com.letta.mobile.data.objectverbs.binding.DevicePins.bind(
+            com.letta.mobile.data.storage.InMemorySecureSettingsStore(), kotlinx.coroutines.flow.MutableStateFlow("fixture"),
+        )
+        binding.setPinned(com.letta.mobile.data.objectverbs.ObjectRef("agent", "agent-a"), true)
+        val verbs = com.letta.mobile.ui.components.objectVerbMenus(binding) { outcome, _ ->
+            if (outcome is com.letta.mobile.data.objectverbs.VerbOutcome.Updated) {
+                pins += outcome.snapshot.objectRef.id to checkNotNull(outcome.snapshot.facets.pinned)
+            }
+        }
+        val identity = checkNotNull(pinned.focusedIdentity(ShellAgentRailActions(), onSwitch = {}, verbs = verbs))
 
         assertTrue(identity.isPinned)
         identity.onLongClick()
