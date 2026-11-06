@@ -418,7 +418,7 @@ internal class NotebookHistoryArchive(
         /** The canvas id in [document]'s metadata; null if it has none or it does not parse. */
         private fun canvasIdOf(document: Read): CanvasId? =
             (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-                ?.let { runCatching { Json.decodeFromString<CanvasDocument>(it).id }.getOrNull() }
+                ?.let { runCatching { CanvasDocument.serializer().decodeStored(it).id }.getOrNull() }
 
         /** Reads [file] into [buffer] from [start]; returns the offset after the last byte read. */
         private fun readInto(file: Path, buffer: ByteArray, start: Int): Int {
