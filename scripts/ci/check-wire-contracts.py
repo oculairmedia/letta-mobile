@@ -17,7 +17,7 @@ SPECS = "docs/reference/contracts"
 FIXTURES = "android-compose/sharedLogic/src/commonTest/resources/contracts"
 INDEX = SPECS + "/README.md"
 # Explicit semantic fixtures have their own common tests; all other JSON still needs RPC coverage.
-NON_RPC_FIXTURES = {"object-verbs/v1.json"}
+NON_RPC_FIXTURES = {"object-verbs/v1.json", "current-focus/v1.json"}
 NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+")
 
 

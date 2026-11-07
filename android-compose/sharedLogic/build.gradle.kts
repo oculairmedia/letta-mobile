@@ -202,6 +202,7 @@ kotlin {
 val contractTestFixtures = listOf(
     Triple("VisibleRecents", "conversation.list/visible-recents-v1.json", "com.letta.mobile.data.transport.iroh"),
     Triple("ObjectVerbs", "object-verbs/v1.json", "com.letta.mobile.data.objectverbs"),
+    Triple("CurrentFocus", "current-focus/v1.json", "com.letta.mobile.data.shell.focus"),
 )
 contractTestFixtures.forEach { (name, fixture, packageName) ->
     val generate = tasks.register("generate${name}TestData") {

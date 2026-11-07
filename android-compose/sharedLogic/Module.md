@@ -726,3 +726,7 @@ Projects the trusted session graph's backend namespace for a pin binding. Sessio
 # Package com.letta.mobile.data.home.shortcut
 
 Existing Home shortcut identities, separated from Home controllers and storage. The original HomeShortcut source alias remains available; persistence names are unchanged.
+
+# Package com.letta.mobile.data.shell.focus
+
+Proposed current-focus v1 values and pure startup precedence. A saved workspace envelope keeps the main focus, tab order, editor target and rail expansion together under a trusted source namespace. New external entries precede new explicit routes, same-source restoration and verified settings seeds. These values do not implement the live workspace owner or migrate any consumer; the contract and shared fixture define that later cutover.

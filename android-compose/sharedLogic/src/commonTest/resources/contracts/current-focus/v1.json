@@ -1,0 +1,832 @@
+[
+  {
+    "name": "rotation mid-chat",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      },
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    },
+    "observation": "send in flight; no send or transport data in the snapshot"
+  },
+  {
+    "name": "rotation with tabs and editor open",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor?agent=agent-b",
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "backend switch",
+    "inputs": {
+      "sourceKey": "backend-b",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      },
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-b",
+      "focus": {
+        "pageRoute": "home",
+        "agentId": null,
+        "conversationId": null,
+        "chatMode": "resume"
+      },
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "agent removed from roster",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      },
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    },
+    "roster": [
+      "agent-b"
+    ],
+    "availability": "agent-unavailable"
+  },
+  {
+    "name": "deleted conversation",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    },
+    "authoritativeConversations": [
+      "conv-other"
+    ],
+    "availability": "conversation-unavailable"
+  },
+  {
+    "name": "deep link vs restored state precedence",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "deepLink": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-link",
+          "conversationId": "conv-link",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      },
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      },
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-link",
+        "conversationId": "conv-link",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": null,
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "cold start from lastChatSelection",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-old",
+        "conversationId": "conv-old",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "explicit route vs restored state precedence",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "explicitRoute": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "default",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      },
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "default",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "deep link vs explicit route precedence",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "deepLink": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-link",
+          "conversationId": "conv-link",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      },
+      "explicitRoute": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "default",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      },
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-link",
+        "conversationId": "conv-link",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "explicit new chat vs restored conversation",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "explicitRoute": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": null,
+          "chatMode": "new"
+        },
+        "contractVersion": 1
+      },
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": null,
+        "chatMode": "new"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "explicit Home vs settings seed",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "explicitRoute": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "home",
+          "agentId": null,
+          "conversationId": null,
+          "chatMode": "resume"
+        },
+        "contractVersion": 1
+      },
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "home",
+        "agentId": null,
+        "conversationId": null,
+        "chatMode": "resume"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "settings is focus only",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "unscoped legacy settings cannot seed",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "settingsSeed": {
+        "sourceKey": "unresolved-legacy",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "home",
+        "agentId": null,
+        "conversationId": null,
+        "chatMode": "resume"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "incompatible saved version",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 2
+      },
+      "settingsSeed": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-old",
+          "conversationId": "conv-old",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-old",
+        "conversationId": "conv-old",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "desktop resize retains snapshot",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor?agent=agent-b",
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "process death restores navigation only",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor?agent=agent-b",
+      "railExpanded": true,
+      "contractVersion": 1
+    },
+    "drop": [
+      "send jobs",
+      "connections",
+      "editor draft",
+      "composer draft",
+      "pairing secret",
+      "resolution request tokens"
+    ]
+  },
+  {
+    "name": "empty cold start",
+    "inputs": {
+      "sourceKey": "backend-a"
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "home",
+        "agentId": null,
+        "conversationId": null,
+        "chatMode": "resume"
+      },
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "new-agent editor survives recreation",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor",
+        "railExpanded": true,
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor",
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "deep link editor keeps underlying chat",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      },
+      "deepLink": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "editorRoute": "agent-editor?agent=agent-c",
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor?agent=agent-c",
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "explicit new-agent editor entry",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      },
+      "explicitRoute": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "editorRoute": "agent-editor",
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor",
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  },
+  {
+    "name": "foreign-source entry cannot override restored state",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "restored": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "pinnedConversationIds": [
+          "conv-1",
+          "conv-9"
+        ],
+        "previewConversationId": "conv-3",
+        "editorRoute": "agent-editor?agent=agent-b",
+        "railExpanded": true,
+        "contractVersion": 1
+      },
+      "deepLink": {
+        "sourceKey": "backend-b",
+        "focus": {
+          "pageRoute": "chat",
+          "agentId": "agent-a",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "editorRoute": "agent-editor",
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "agentId": "agent-a",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "pinnedConversationIds": [
+        "conv-1",
+        "conv-9"
+      ],
+      "previewConversationId": "conv-3",
+      "editorRoute": "agent-editor?agent=agent-b",
+      "railExpanded": true,
+      "contractVersion": 1
+    }
+  }
+]
