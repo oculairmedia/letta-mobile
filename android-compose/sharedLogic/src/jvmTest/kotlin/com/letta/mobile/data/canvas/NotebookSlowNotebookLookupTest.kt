@@ -27,7 +27,7 @@ class NotebookSlowNotebookLookupTest {
         val (slowCanvas, fastCanvas) = seed(path)
         val slowStorage = NotebookHistoryArchive(path).storageName(notebookKeyOf(path, slowCanvas))
         val release = CompletableFuture<Unit>()
-        val hold = { delegate: Storage -> HeldStorage(delegate, slowStorage, release) }
+        val hold = { delegate: Storage -> HeldStorage(delegate, setOf(slowStorage), release) }
 
         try {
             NotebookLocalStore(path, "slow-lookup-peer", storage = hold).use { notebooks ->
@@ -52,12 +52,37 @@ class NotebookSlowNotebookLookupTest {
         }
     }
 
-    private suspend fun seed(path: Path): Pair<CanvasId, CanvasId> = NotebookLocalStore(path, "slow-lookup-peer").use { notebooks ->
+    @Test
+    fun aLookupStopsOnceItsScanBudgetIsSpent() = runBlocking {
+        val path = Files.createTempDirectory("notebook-slow-budget-")
+        val canvases = seedCanvases(path, count = 3)
+        val held = canvases.take(2).map { NotebookHistoryArchive(path).storageName(notebookKeyOf(path, it)) }.toSet()
+        val release = CompletableFuture<Unit>()
+
+        try {
+            NotebookLocalStore(path, "slow-lookup-peer", storage = { HeldStorage(it, held, release) }).use { notebooks ->
+                val elapsed = measureTimeMillis {
+                    assertFailsWith<TimeoutException>("two slow notebooks spend the budget before the third is reached") {
+                        notebooks.notebookHolding(canvases[2])
+                    }
+                }
+                assertTrue(elapsed < SCAN_BUDGET_MS + LOAD_TIMEOUT_MS, "stopped near the budget, took ${elapsed}ms")
+            }
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
+    private suspend fun seed(path: Path): Pair<CanvasId, CanvasId> = seedCanvases(path, count = 2).let { it[0] to it[1] }
+
+    private suspend fun seedCanvases(path: Path, count: Int): List<CanvasId> =
+        NotebookLocalStore(path, "slow-lookup-peer").use { notebooks -> createCanvases(notebooks, count) }
+
+    private suspend fun createCanvases(notebooks: NotebookLocalStore, count: Int): List<CanvasId> {
         val store = NotebookCanvasDocumentStore(notebooks)
-        val slow = CanvasSession.create(store).canvasId
-        val fast = CanvasSession.create(store).canvasId
+        val created = List(count) { CanvasSession.create(store).canvasId }
         notebooks.listDocuments().forEach { notebooks.persistCanvas(it) }
-        slow to fast
+        return created
     }
 
     private fun notebookKeyOf(path: Path, canvasId: CanvasId): String = NotebookLocalStore(path, "slow-lookup-peer").use { notebooks ->
@@ -68,10 +93,10 @@ class NotebookSlowNotebookLookupTest {
     /** Storage whose loads for one document never complete until [release]. */
     private class HeldStorage(
         private val delegate: Storage,
-        private val heldName: String,
+        private val heldNames: Set<String>,
         private val release: CompletableFuture<Unit>,
     ) : Storage by delegate {
-        private fun held(key: StorageKey) = key.parts.firstOrNull() == heldName
+        private fun held(key: StorageKey) = key.parts.firstOrNull() in heldNames
 
         override fun load(key: StorageKey): CompletableFuture<Optional<ByteArray>> =
             if (held(key)) release.thenCompose { delegate.load(key) } else delegate.load(key)
@@ -82,5 +107,9 @@ class NotebookSlowNotebookLookupTest {
 
     private companion object {
         const val HINTED_LOOKUP_MS = 5_000L
+
+        /** NotebookLocalStore's scan budget and per-notebook load limit (20 s and 10 s). */
+        const val SCAN_BUDGET_MS = 20_000L
+        const val LOAD_TIMEOUT_MS = 10_000L
     }
 }

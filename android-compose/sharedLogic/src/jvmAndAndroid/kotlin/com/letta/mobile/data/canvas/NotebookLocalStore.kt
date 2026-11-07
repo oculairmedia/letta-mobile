@@ -413,11 +413,16 @@ class NotebookLocalStore(
      * slow to load is passed over so the others are still checked, but if nothing matched among
      * the ones that loaded the answer is inconclusive and this throws [TimeoutException] rather
      * than reporting "absent": a caller must never create a second notebook for a canvas whose
-     * own notebook was only slow.
+     * own notebook was only slow. The whole scan has one budget ([SCAN_BUDGET_SECONDS]); once it
+     * is spent the lookup stops and throws instead of waiting on the next slow notebook.
      */
     internal fun firstNotebook(match: (CanvasDocument) -> Boolean): DocumentId? {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(SCAN_BUDGET_SECONDS)
         var slow: TimeoutException? = null
         val found = listDocuments().firstOrNull { id ->
+            if (System.nanoTime() >= deadline) {
+                throw TimeoutException("Canvas lookup passed its $SCAN_BUDGET_SECONDS second budget").apply { slow?.let(::initCause) }
+            }
             try {
                 canvasMetadata(id)?.let(match) == true
             } catch (timeout: TimeoutException) {
@@ -637,6 +642,9 @@ class NotebookLocalStore(
 
     private companion object {
         const val TIMEOUT_SECONDS = 10L
+
+        /** One canvas lookup over every notebook gives up after this, however many notebooks are slow. */
+        const val SCAN_BUDGET_SECONDS = 2 * TIMEOUT_SECONDS
     }
 }
 
