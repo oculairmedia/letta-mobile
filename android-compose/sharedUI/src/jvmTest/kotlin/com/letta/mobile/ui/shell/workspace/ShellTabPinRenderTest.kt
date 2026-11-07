@@ -19,7 +19,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutStore
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.SessionShellChatPort
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
@@ -39,8 +38,7 @@ import kotlin.test.assertEquals
 class ShellTabPinRenderTest {
     @Test
     fun headerPinsAndUnpinsPreview() = runComposeUiTest {
-        val state = ShellWorkspaceState(ShellDestination.Chat())
-        state.conversationShown(ConversationId("a"), null)
+        val state = ShellWorkspaceState(ShellDestination.Chat(conversationId = "a"))
         val navigator = ShellWorkspaceNavigator(state, SessionShellChatPort())
         val layout = ShellLayoutController(ShellLayoutStore(InMemorySecureSettingsStore(), "test"))
         setContent {

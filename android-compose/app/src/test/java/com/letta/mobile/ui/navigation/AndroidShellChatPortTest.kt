@@ -5,6 +5,8 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.LastChatSelection
+import com.letta.mobile.data.shell.CurrentFocus
+import com.letta.mobile.data.shell.CurrentFocusChatMode
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
@@ -38,7 +40,12 @@ class AndroidShellChatPortTest {
     @Test
     fun aNewChatKeepsItsPageOnceItsConversationExists() {
         var created: ConversationId? = null
-        port.createConversationForAgent(agent) { created = it }
+        assertTrue(workspace.selectFocus(CurrentFocus("chat", agent, chatMode = CurrentFocusChatMode.New)))
+        val request = workspace.requestToken()
+        port.createConversationForAgent(agent) {
+            created = it
+            assertTrue(workspace.conversationShown(request, it, agent))
+        }
         val opening = checkNotNull(port.opening)
         assertNull(opening.conversation)
         assertEquals(7L, opening.fresh)

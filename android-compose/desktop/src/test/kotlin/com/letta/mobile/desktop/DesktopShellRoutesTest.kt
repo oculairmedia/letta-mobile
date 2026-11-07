@@ -53,6 +53,7 @@ class DesktopShellRoutesTest {
     fun theRailsNavigationLeavesTheEditorAndResetsTheAnchors() {
         val workspace = ShellWorkspaceState()
         workspace.navigate(ShellDestination.Skills(section = ShellSkillsSection.Tools))
+        workspace.focusedAgentId = AgentId("agent-1")
         assertEquals(DesktopDestination.Agents, workspace.selectedDestination)
         assertEquals(
             ShellDestination.Skills("agent-1", ShellSkillsSection.Tools),
