@@ -125,13 +125,15 @@ class NotebookLocalStore(
 
     /** Sync [id]'s projection unless nothing changed since its last sync; null when skipped. */
     private fun pollProjection(id: DocumentId, full: Boolean): NotebookProjectionResult? {
-        val heads = headsOf(id)
-        if (!full && heads != null && projection.isUnchangedSinceSync(id, heads)) return null
+        if (!full && isIdle(id)) return null
         val result = projectionResult { if (projection.hasBaseline(id)) reconcile(id) else project(id) }!!
         // An error is retried on every poll; any other outcome waits until something changes.
         if (result != NotebookProjectionResult.ERROR) headsOf(id)?.let { projection.markSynced(id, it) }
         return result
     }
+
+    /** Whether [id] can be skipped: its version is readable and nothing changed since its last sync. */
+    private fun isIdle(id: DocumentId): Boolean = headsOf(id)?.let { projection.isUnchangedSinceSync(id, it) } == true
 
     private fun report(onResult: (DocumentId, NotebookProjectionResult) -> Unit, id: DocumentId, result: NotebookProjectionResult) {
         try { onResult(id, result) } catch (_: Exception) { /* A callback must not stop future polls. */ }
