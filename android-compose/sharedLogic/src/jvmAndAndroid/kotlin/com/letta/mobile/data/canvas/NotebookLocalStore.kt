@@ -325,15 +325,22 @@ class NotebookLocalStore(
         return handle.documentId
     }
 
-    fun open(id: DocumentId): DocHandle? {
+    fun open(id: DocumentId): DocHandle? = openWithin(id, TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS))
+
+    /**
+     * [open], waiting at most [nanos]. Only a wait of the full per-notebook limit records the
+     * notebook as slow on the fault board; a shorter wait cut by a lookup's budget says nothing
+     * about the notebook itself.
+     */
+    private fun openWithin(id: DocumentId, nanos: Long): DocHandle? {
         health.awaitPrepared()
         if (health.isQuarantined(id.stableKey()) || health.isRetired(id.stableKey())) return null
         return try {
-            repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
+            repo.find(id).get(nanos, TimeUnit.NANOSECONDS).orElse(null)
         } catch (timeout: TimeoutException) {
             val key = id.stableKey()
             val failure = TimeoutException("Notebook $key did not load within $TIMEOUT_SECONDS seconds").apply { initCause(timeout) }
-            health.readTimedOut(key, failure)
+            if (nanos >= TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)) health.readTimedOut(key, failure)
             throw failure
         }
     }
@@ -377,9 +384,16 @@ class NotebookLocalStore(
      * built. Lookups by id or conversation match on this, so finding one canvas no longer
      * decodes every board in the repository.
      */
-    internal fun canvasMetadata(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
-        (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { CanvasDocument.serializer().decodeStored(it) }?.also { remember(id, it) }
+    internal fun canvasMetadata(id: DocumentId): CanvasDocument? =
+        canvasMetadataBy(id, System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS))
+
+    /** [canvasMetadata], with every wait (loading the notebook, then reading it) ending by [deadline]. */
+    private fun canvasMetadataBy(id: DocumentId, deadline: Long): CanvasDocument? {
+        val left = { (deadline - System.nanoTime()).coerceAtLeast(1L) }
+        return openWithin(id, minOf(left(), TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)))?.withDocument { document ->
+            (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
+        }?.get(left(), TimeUnit.NANOSECONDS)?.let { CanvasDocument.serializer().decodeStored(it) }?.also { remember(id, it) }
+    }
 
     /**
      * [canvasMetadata], or null when [id] did not load in time. A scan over every notebook uses
@@ -413,18 +427,22 @@ class NotebookLocalStore(
      * slow to load is passed over so the others are still checked, but if nothing matched among
      * the ones that loaded the answer is inconclusive and this throws [TimeoutException] rather
      * than reporting "absent": a caller must never create a second notebook for a canvas whose
-     * own notebook was only slow. The whole scan has one budget ([SCAN_BUDGET_SECONDS]); once it
+     * own notebook was only slow. The whole scan has one budget ([budgetNanos], by default
+     * [SCAN_BUDGET_SECONDS]); every wait inside it ends by the scan's deadline, and once the budget
      * is spent the lookup stops and throws instead of waiting on the next slow notebook.
      */
-    internal fun firstNotebook(match: (CanvasDocument) -> Boolean): DocumentId? {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(SCAN_BUDGET_SECONDS)
+    internal fun firstNotebook(
+        budgetNanos: Long = TimeUnit.SECONDS.toNanos(SCAN_BUDGET_SECONDS),
+        match: (CanvasDocument) -> Boolean,
+    ): DocumentId? {
+        val deadline = System.nanoTime() + budgetNanos
         var slow: TimeoutException? = null
         val found = listDocuments().firstOrNull { id ->
             if (System.nanoTime() >= deadline) {
-                throw TimeoutException("Canvas lookup passed its $SCAN_BUDGET_SECONDS second budget").apply { slow?.let(::initCause) }
+                throw TimeoutException("Canvas lookup passed its scan budget").apply { slow?.let(::initCause) }
             }
             try {
-                canvasMetadata(id)?.let(match) == true
+                canvasMetadataBy(id, minOf(deadline, System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)))?.let(match) == true
             } catch (timeout: TimeoutException) {
                 slow = timeout
                 false

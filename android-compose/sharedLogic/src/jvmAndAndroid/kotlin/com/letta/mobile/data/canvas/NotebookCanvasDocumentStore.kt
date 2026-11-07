@@ -39,7 +39,7 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
     private val notebookOf = ConcurrentHashMap<CanvasId, DocumentId>()
 
     /** The notebook holding the first canvas whose metadata matches; boards are not decoded. */
-    private fun find(match: (CanvasDocument) -> Boolean): DocumentId? = notebooks.firstNotebook(match)
+    private fun find(match: (CanvasDocument) -> Boolean): DocumentId? = notebooks.firstNotebook(match = match)
 
     /** [find] by canvas id, answering from [notebookOf] when its hint still holds. */
     private fun findCanvas(id: CanvasId): DocumentId? {

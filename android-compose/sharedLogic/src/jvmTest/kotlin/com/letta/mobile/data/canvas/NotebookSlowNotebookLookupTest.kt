@@ -73,6 +73,27 @@ class NotebookSlowNotebookLookupTest {
         }
     }
 
+    @Test
+    fun aReadStartedNearTheDeadlineWaitsOnlyForWhatIsLeft() = runBlocking {
+        val path = Files.createTempDirectory("notebook-slow-deadline-")
+        val canvases = seedCanvases(path, count = 3)
+        val held = canvases.take(2).map { NotebookHistoryArchive(path).storageName(notebookKeyOf(path, it)) }.toSet()
+        val release = CompletableFuture<Unit>()
+
+        try {
+            NotebookLocalStore(path, "slow-lookup-peer", storage = { HeldStorage(it, held, release) }).use { notebooks ->
+                val budget = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(SHORT_BUDGET_MS)
+                val elapsed = measureTimeMillis {
+                    assertFailsWith<TimeoutException> { notebooks.firstNotebook(budget) { it.id == canvases[2] } }
+                }
+                // The first stuck notebook takes its full 10 s; the second may only use the 5 s left.
+                assertTrue(elapsed < SHORT_BUDGET_MS + DEADLINE_SLACK_MS, "the second wait was cut to the budget, took ${elapsed}ms")
+            }
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
     private suspend fun seed(path: Path): Pair<CanvasId, CanvasId> = seedCanvases(path, count = 2).let { it[0] to it[1] }
 
     private suspend fun seedCanvases(path: Path, count: Int): List<CanvasId> =
@@ -111,5 +132,7 @@ class NotebookSlowNotebookLookupTest {
         /** NotebookLocalStore's scan budget and per-notebook load limit (20 s and 10 s). */
         const val SCAN_BUDGET_MS = 20_000L
         const val LOAD_TIMEOUT_MS = 10_000L
+        const val SHORT_BUDGET_MS = 15_000L
+        const val DEADLINE_SLACK_MS = 2_000L
     }
 }
