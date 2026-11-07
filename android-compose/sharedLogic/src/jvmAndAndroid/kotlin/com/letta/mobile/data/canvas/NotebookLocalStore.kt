@@ -15,6 +15,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
@@ -89,10 +92,7 @@ class NotebookLocalStore(
     /** Indexed notebooks include local creations and explicitly registered remote documents. */
     @Synchronized
     fun listDocuments(): List<DocumentId> = health.awaitPrepared().let { documents.read() }
-        .filterNot { health.isQuarantined(it) || health.isRetired(it) }.map(::documentIdOf)
-
-    private fun documentIdOf(key: String): DocumentId =
-        DocumentId.fromBytes(key.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+        .filterNot { health.isQuarantined(it) || health.isRetired(it) }.map { it.toDocumentId() }
 
     /** Reconcile previously projected documents; new documents are exported by startPolling. */
     @Synchronized
@@ -325,22 +325,22 @@ class NotebookLocalStore(
         return handle.documentId
     }
 
-    fun open(id: DocumentId): DocHandle? = openWithin(id, TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS), cutByBudget = false)
+    fun open(id: DocumentId): DocHandle? = openWithin(id, TIMEOUT_SECONDS.seconds, health::readTimedOut)
 
     /**
-     * [open], waiting at most [nanos]. A wait that ran to the notebook's own limit records it as
-     * slow on the fault board; one [cutByBudget] (a lookup's scan budget ran out first) says
-     * nothing about the notebook itself and records nothing.
+     * [open], waiting at most [wait]. [reportSlow] records the notebook as slow on the fault
+     * board when the wait ran to its own limit; it is null when a lookup's scan budget cut the
+     * wait short, which says nothing about the notebook itself.
      */
-    private fun openWithin(id: DocumentId, nanos: Long, cutByBudget: Boolean): DocHandle? {
+    private fun openWithin(id: DocumentId, wait: Duration, reportSlow: ((String, Throwable) -> Unit)?): DocHandle? {
         health.awaitPrepared()
         if (health.isQuarantined(id.stableKey()) || health.isRetired(id.stableKey())) return null
         return try {
-            repo.find(id).get(nanos, TimeUnit.NANOSECONDS).orElse(null)
+            repo.find(id).get(wait.inWholeNanoseconds.coerceAtLeast(1L), TimeUnit.NANOSECONDS).orElse(null)
         } catch (timeout: TimeoutException) {
             val key = id.stableKey()
             val failure = TimeoutException("Notebook $key did not load within $TIMEOUT_SECONDS seconds").apply { initCause(timeout) }
-            if (!cutByBudget) health.readTimedOut(key, failure)
+            reportSlow?.invoke(key, failure)
             throw failure
         }
     }
@@ -385,18 +385,24 @@ class NotebookLocalStore(
      * decodes every board in the repository.
      */
     internal fun canvasMetadata(id: DocumentId): CanvasDocument? =
-        canvasMetadataBy(id, System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS), cutByBudget = false)
+        canvasMetadataBy(id, TimeSource.Monotonic.markNow() + TIMEOUT_SECONDS.seconds, health::readTimedOut)
 
     /**
      * [canvasMetadata], with every wait (loading the notebook, then reading it) ending by
-     * [deadline]. [cutByBudget] says the deadline is a lookup's scan budget rather than this
-     * notebook's own limit, so running out of time is not the notebook's fault.
+     * [deadline]. [reportSlow] is null when the deadline is a lookup's scan budget rather than
+     * this notebook's own limit, so running out of time is not the notebook's fault.
      */
-    private fun canvasMetadataBy(id: DocumentId, deadline: Long, cutByBudget: Boolean): CanvasDocument? {
-        val left = { (deadline - System.nanoTime()).coerceAtLeast(1L) }
-        return openWithin(id, left(), cutByBudget)?.withDocument { document ->
+    private fun canvasMetadataBy(
+        id: DocumentId,
+        deadline: TimeSource.Monotonic.ValueTimeMark,
+        reportSlow: ((String, Throwable) -> Unit)?,
+    ): CanvasDocument? {
+        val left = { -deadline.elapsedNow() }
+        return openWithin(id, left(), reportSlow)?.withDocument { document ->
             (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-        }?.get(left(), TimeUnit.NANOSECONDS)?.let { CanvasDocument.serializer().decodeStored(it) }?.also { remember(id, it) }
+        }?.get(left().inWholeNanoseconds.coerceAtLeast(1L), TimeUnit.NANOSECONDS)
+            ?.let { CanvasDocument.serializer().decodeStored(it) }
+            ?.also { remember(id, it) }
     }
 
     /**
@@ -421,7 +427,7 @@ class NotebookLocalStore(
      * [firstNotebook]. Every metadata read records what it saw, so a scan also answers later lookups.
      */
     internal fun notebookHolding(canvasId: CanvasId): DocumentId? {
-        val hinted = health.notebookLastHolding(canvasId)?.let(::documentIdOf)
+        val hinted = health.notebookLastHolding(canvasId)?.toDocumentId()
         if (hinted != null && canvasMetadataOrSkip(hinted)?.id == canvasId) return hinted
         return firstNotebook { it.id == canvasId }
     }
@@ -431,23 +437,24 @@ class NotebookLocalStore(
      * slow to load is passed over so the others are still checked, but if nothing matched among
      * the ones that loaded the answer is inconclusive and this throws [TimeoutException] rather
      * than reporting "absent": a caller must never create a second notebook for a canvas whose
-     * own notebook was only slow. The whole scan has one budget ([budgetNanos], by default
+     * own notebook was only slow. The whole scan has one budget ([budget], by default
      * [SCAN_BUDGET_SECONDS]); every wait inside it ends by the scan's deadline, and once the budget
      * is spent the lookup stops and throws instead of waiting on the next slow notebook.
      */
     internal fun firstNotebook(
-        budgetNanos: Long = TimeUnit.SECONDS.toNanos(SCAN_BUDGET_SECONDS),
+        budget: Duration = SCAN_BUDGET_SECONDS.seconds,
         match: (CanvasDocument) -> Boolean,
     ): DocumentId? {
-        val deadline = System.nanoTime() + budgetNanos
+        val deadline = TimeSource.Monotonic.markNow() + budget
         var slow: TimeoutException? = null
         val found = listDocuments().firstOrNull { id ->
-            if (System.nanoTime() >= deadline) {
+            if (deadline.hasPassedNow()) {
                 throw TimeoutException("Canvas lookup passed its scan budget").apply { slow?.let(::initCause) }
             }
-            val ownLimit = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)
+            val ownLimit = TimeSource.Monotonic.markNow() + TIMEOUT_SECONDS.seconds
+            val cutByBudget = deadline < ownLimit
             try {
-                canvasMetadataBy(id, minOf(deadline, ownLimit), cutByBudget = deadline < ownLimit)?.let(match) == true
+                canvasMetadataBy(id, minOf(deadline, ownLimit), health::readTimedOut.takeUnless { cutByBudget })?.let(match) == true
             } catch (timeout: TimeoutException) {
                 slow = timeout
                 false
@@ -683,3 +690,6 @@ private fun Read.succeeds(key: String): Boolean {
             .getOrDefault(false)
     } == true
 }
+
+/** The repository id for a notebook's stable key (32 lowercase hex characters). */
+private fun String.toDocumentId(): DocumentId = DocumentId.fromBytes(chunked(2).map { it.toInt(16).toByte() }.toByteArray())

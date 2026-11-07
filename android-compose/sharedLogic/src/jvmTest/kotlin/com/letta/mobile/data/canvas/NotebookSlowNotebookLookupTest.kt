@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeoutException
 import kotlin.system.measureTimeMillis
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -83,7 +84,7 @@ class NotebookSlowNotebookLookupTest {
 
         try {
             NotebookLocalStore(path, "slow-lookup-peer", storage = { HeldStorage(it, held, release) }).use { notebooks ->
-                val budget = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(SHORT_BUDGET_MS)
+                val budget = SHORT_BUDGET_MS.milliseconds
                 val elapsed = measureTimeMillis {
                     assertFailsWith<TimeoutException> { notebooks.firstNotebook(budget) { it.id == canvases[2] } }
                 }
