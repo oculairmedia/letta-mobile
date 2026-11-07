@@ -10,11 +10,14 @@ import java.nio.file.StandardOpenOption.WRITE
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -57,6 +60,19 @@ class NotebookLocalStore(
     storage: (Storage) -> Storage = { it },
 ) : AutoCloseable, CanvasStorageHealth {
     private val canvasLockFile = directory.resolve("notebook-canvas.lock")
+    private val hintsDirectory: Path = directory
+
+    /**
+     * Canvas id to the notebook key that last held it, kept across restarts (see [readCanvasHints]).
+     * Read once here, at construction, so no lookup reads the file while holding the canvas lock.
+     */
+    private val canvasHints: MutableMap<String, String> = ConcurrentHashMap(hintsDirectory.readCanvasHints())
+    /** Hints changed since they were last saved. */
+    private val hintsDirty = AtomicBoolean(false)
+
+    /** A delayed save is queued on the poller. */
+    private val hintsSaveQueued = AtomicBoolean(false)
+    private val hintsSaveLock = Any()
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
 
     /**
@@ -345,7 +361,38 @@ class NotebookLocalStore(
         }
     }
 
-    private fun remember(id: DocumentId, doc: CanvasDocument) = health.rememberCanvas(id.stableKey(), doc.id)
+    private fun remember(id: DocumentId, doc: CanvasDocument) {
+        val key = id.stableKey()
+        health.rememberCanvas(key, doc.id)
+        if (canvasHints.put(doc.id.value, key) != key) scheduleHintsSave()
+    }
+
+    /**
+     * Save the hints a second after a change, so a full scan writes the file once. A change made
+     * after a failed save queues another try, since the failed save left nothing queued.
+     */
+    private fun scheduleHintsSave() {
+        hintsDirty.set(true)
+        if (!hintsSaveQueued.compareAndSet(false, true)) return
+        try {
+            poller.schedule(::saveHints, HINTS_SAVE_DELAY_SECONDS, TimeUnit.SECONDS)
+        } catch (_: RejectedExecutionException) {
+            saveHints()
+        }
+    }
+
+    /**
+     * Write the hints if they changed. Saves run one at a time, so [close] waits for a save
+     * already in progress and then retries it if it failed; a failed write stays pending.
+     */
+    private fun saveHints() {
+        synchronized(hintsSaveLock) {
+            hintsSaveQueued.set(false)
+            if (!hintsDirty.getAndSet(false)) return
+            val saved = hintsDirectory.writeCanvasHints(HashMap(canvasHints))
+            if (!saved) hintsDirty.set(true)
+        }
+    }
 
     /** Update one element without replacing other elements' Automerge registers. */
     fun putBoardElement(id: DocumentId, element: JsonObject) {
@@ -427,10 +474,19 @@ class NotebookLocalStore(
      * [firstNotebook]. Every metadata read records what it saw, so a scan also answers later lookups.
      */
     internal fun notebookHolding(canvasId: CanvasId): DocumentId? {
-        val hinted = health.notebookLastHolding(canvasId)?.toDocumentId()
-        if (hinted != null && canvasMetadataOrSkip(hinted)?.id == canvasId) return hinted
-        return firstNotebook { it.id == canvasId }
+        val started = TimeSource.Monotonic.markNow()
+        val hinted = (health.notebookLastHolding(canvasId) ?: canvasHints[canvasId.value])?.toDocumentId()
+        if (hinted != null && confirmsCanvas(hinted, canvasId, started + TIMEOUT_SECONDS.seconds)) return hinted
+        // Time spent on the hint counts against the scan's budget: one lookup, one deadline.
+        return firstNotebook(SCAN_BUDGET_SECONDS.seconds - started.elapsedNow()) { it.id == canvasId }
     }
+
+    private fun confirmsCanvas(id: DocumentId, canvasId: CanvasId, deadline: TimeSource.Monotonic.ValueTimeMark): Boolean =
+        try {
+            canvasMetadataBy(id, deadline, health::readTimedOut)?.id == canvasId
+        } catch (_: TimeoutException) {
+            false
+        }
 
     /**
      * The first notebook whose canvas metadata matches, or null when none does. A notebook too
@@ -661,6 +717,7 @@ class NotebookLocalStore(
         closed = true
         stopPolling()
         poller.shutdownNow()
+        saveHints()
         repo.close()
         health.settleCompactions()
         health.close()
@@ -675,6 +732,7 @@ class NotebookLocalStore(
 
         /** One canvas lookup over every notebook gives up after this, however many notebooks are slow. */
         const val SCAN_BUDGET_SECONDS = 2 * TIMEOUT_SECONDS
+        const val HINTS_SAVE_DELAY_SECONDS = 1L
     }
 }
 
