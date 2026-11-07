@@ -385,9 +385,13 @@ class NotebookLocalStore(
      * Write the hints if they changed. Saves run one at a time, so [close] waits for a save
      * already in progress and then retries it if it failed; a failed write stays pending.
      */
-    private fun saveHints() = synchronized(hintsSaveLock) {
-        hintsSaveQueued.set(false)
-        if (hintsDirty.getAndSet(false) && !hintsDirectory.writeCanvasHints(HashMap(canvasHints))) hintsDirty.set(true)
+    private fun saveHints() {
+        synchronized(hintsSaveLock) {
+            hintsSaveQueued.set(false)
+            if (!hintsDirty.getAndSet(false)) return
+            val saved = hintsDirectory.writeCanvasHints(HashMap(canvasHints))
+            if (!saved) hintsDirty.set(true)
+        }
     }
 
     /** Update one element without replacing other elements' Automerge registers. */
