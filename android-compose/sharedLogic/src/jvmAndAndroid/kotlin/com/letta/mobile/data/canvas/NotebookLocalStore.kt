@@ -67,7 +67,12 @@ class NotebookLocalStore(
      * Read once here, at construction, so no lookup reads the file while holding the canvas lock.
      */
     private val canvasHints: MutableMap<String, String> = ConcurrentHashMap(hintsDirectory.readCanvasHints())
+    /** Hints changed since they were last saved. */
     private val hintsDirty = AtomicBoolean(false)
+
+    /** A delayed save is queued on the poller. */
+    private val hintsSaveQueued = AtomicBoolean(false)
+    private val hintsSaveLock = Any()
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
 
     /**
@@ -362,9 +367,13 @@ class NotebookLocalStore(
         if (canvasHints.put(doc.id.value, key) != key) scheduleHintsSave()
     }
 
-    /** Save the hints a second after the first change, so a full scan writes the file once. */
+    /**
+     * Save the hints a second after a change, so a full scan writes the file once. A change made
+     * after a failed save queues another try, since the failed save left nothing queued.
+     */
     private fun scheduleHintsSave() {
-        if (!hintsDirty.compareAndSet(false, true)) return
+        hintsDirty.set(true)
+        if (!hintsSaveQueued.compareAndSet(false, true)) return
         try {
             poller.schedule(::saveHints, HINTS_SAVE_DELAY_SECONDS, TimeUnit.SECONDS)
         } catch (_: RejectedExecutionException) {
@@ -372,8 +381,12 @@ class NotebookLocalStore(
         }
     }
 
-    /** A failed write stays pending, so the next change or [close] tries again. */
-    private fun saveHints() {
+    /**
+     * Write the hints if they changed. Saves run one at a time, so [close] waits for a save
+     * already in progress and then retries it if it failed; a failed write stays pending.
+     */
+    private fun saveHints() = synchronized(hintsSaveLock) {
+        hintsSaveQueued.set(false)
         if (hintsDirty.getAndSet(false) && !hintsDirectory.writeCanvasHints(HashMap(canvasHints))) hintsDirty.set(true)
     }
 

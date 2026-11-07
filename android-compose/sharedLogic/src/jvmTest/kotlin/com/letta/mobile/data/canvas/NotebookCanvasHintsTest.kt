@@ -57,6 +57,41 @@ class NotebookCanvasHintsTest {
         NotebookLocalStore(path, PEER).use { notebooks -> assertEquals(keyOf(path, second), notebooks.notebookHolding(second)?.key()) }
     }
 
+    @Test
+    fun aFailedSaveIsRetriedOnClose() = runBlocking {
+        val path = Files.createTempDirectory("notebook-hints-retry-close-")
+        val blocker = blockHintsFile(path)
+        val canvas = NotebookLocalStore(path, PEER).use { notebooks ->
+            val created = CanvasSession.create(NotebookCanvasDocumentStore(notebooks)).canvasId
+            Thread.sleep(SAVE_SETTLE_MS) // the delayed save runs and fails against the blocker
+            blocker.toFile().deleteRecursively()
+            created
+        }
+
+        assertTrue(path.readCanvasHints().containsKey(canvas.value), "close retried the failed save")
+    }
+
+    @Test
+    fun aChangeAfterAFailedSaveQueuesAnotherTry() = runBlocking {
+        val path = Files.createTempDirectory("notebook-hints-retry-change-")
+        val blocker = blockHintsFile(path)
+        NotebookLocalStore(path, PEER).use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val first = CanvasSession.create(store).canvasId
+            Thread.sleep(SAVE_SETTLE_MS)
+            blocker.toFile().deleteRecursively()
+            val second = CanvasSession.create(store).canvasId
+            Thread.sleep(SAVE_SETTLE_MS)
+
+            val saved = path.readCanvasHints()
+            assertTrue(saved.containsKey(first.value) && saved.containsKey(second.value), "saved without closing: $saved")
+        }
+    }
+
+    /** A non-empty directory where the hints file goes, so every save fails until it is removed. */
+    private fun blockHintsFile(path: Path): Path =
+        Files.createDirectories(path.resolve(CANVAS_HINTS_FILE)).also { Files.writeString(it.resolve("keep"), "x") }
+
     private suspend fun seed(path: Path): Pair<CanvasId, CanvasId> = NotebookLocalStore(path, PEER).use { notebooks ->
         val store = NotebookCanvasDocumentStore(notebooks)
         val first = CanvasSession.create(store).canvasId
@@ -93,5 +128,8 @@ class NotebookCanvasHintsTest {
     private companion object {
         const val PEER = "hints-peer"
         const val HINTED_LOOKUP_MS = 5_000L
+
+        /** Longer than the store's one-second save delay. */
+        const val SAVE_SETTLE_MS = 2_500L
     }
 }
