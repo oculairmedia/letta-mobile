@@ -90,4 +90,3 @@ internal fun CurrentFocusSnapshot.withTabs(tabs: ConversationTabsState): Current
 internal fun CurrentFocusSnapshot.tabs(): ConversationTabsState = ConversationTabsState(
     pinnedConversationIds.map { it.value }, previewConversationId?.value,
 )
-
