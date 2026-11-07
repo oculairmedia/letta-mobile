@@ -81,8 +81,10 @@ backend source, is the sole live owner.** Migration replaces its independently
 writable focus fields with one immutable `CurrentFocus` published atomically. No
 new platform state manager or parallel registry. The [CurrentFocus.kt][values] values
 are proposed serializable contract types; the live transition implementation is deferred.
-The new package `com.letta.mobile.data.shell.focus` avoids growing a capped package;
-its four declared contract types are below the structure ratchet's default 50.
+The four contract types live in the existing `com.letta.mobile.data.shell` package,
+which already depends on `data.model`. At the contract-only base, shell had 25 types;
+these four bring it to 29. With the 13 additional slice-1 owner/helper types, the
+package has exactly 42 types, below the structure ratchet's default cap of 50.
 
 | Authoritative value | Exact meaning |
 | --- | --- |
@@ -315,7 +317,7 @@ not claims that an API already exists.
 
 | Slice / owned files | Work and acceptance |
 | --- | --- |
-| 1. Shared owner: `sharedLogic/.../data/shell/` including `focus/`, `ShellWorkspaceState.kt`, `ShellWorkspaceNavigator.kt`; `data/desktopshell/ConversationTabsState.kt`; corresponding common tests, `sharedLogic/Module.md` and API dumps | Implement one atomic transition owner, invariant validation, versioned snapshot/restore, source reset and request tokens. Existing navigator facades dispatch it. Test races A→B→B2, switch generations, missing/deleted targets, tab close and all round trips. No consumer edits |
+| 1. Shared owner: `sharedLogic/.../data/shell/`, `ShellWorkspaceState.kt`, `ShellWorkspaceNavigator.kt`; `data/desktopshell/ConversationTabsState.kt`; corresponding common tests, `sharedLogic/Module.md` and API dumps | Implement one atomic transition owner, invariant validation, versioned snapshot/restore, source reset and request tokens. Existing navigator facades dispatch it. Test races A→B→B2, switch generations, missing/deleted targets, tab close and all round trips. No consumer edits |
 | 2. Shared UI binding: `sharedUI/.../ui/shell/` **except `pages/`** and its tests | Saver uses envelope; remove competing Sync effects; rail/header/tabs and web timeline binding project owner. Persist editor separately from main focus. Test state-holder recreation and identical navigation projections with null/stale chat emissions |
 | 3. Android host: `app/.../ui/navigation/`, `feature-chat/.../route/`, `feature-chat/.../coordination/`, `feature-chat/.../session/`, `feature-chat/.../screen/` and corresponding tests | Launch arbitration, backend source fence, token-bound `Opening` replacement, route/handle reads as projections, one lifecycle binding. Remove 9cb37 mutable precedence only when explicit `default`/fresh route tests pass; retain VM work on rotation. Instrument rotation, tabs/editor, source switch, process death and stale callback tests |
 | 4. Desktop: `desktop/src/main/kotlin/` and matching tests | Controller selection becomes projection/effects, frame/helpers/sidebar/main pane read owner. Remove first-conversation/rail-head fallback. Test delayed resolution against rail switch, explicit deleted target, resize and recreated window; real gateway load/send target must match header |
@@ -399,5 +401,5 @@ Recommendations encoded above, awaiting review:
 [session-pins]: ../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/session/pins/SessionPins.kt
 [descriptors]: ../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/session/RemoteLettaBackendDescriptors.kt
 [layout]: ../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/desktopshell/ShellLayoutStore.kt
-[values]: ../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/shell/focus/CurrentFocus.kt
+[values]: ../../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/shell/CurrentFocus.kt
 [fixture]: ../../../android-compose/sharedLogic/src/commonTest/resources/contracts/current-focus/v1.json

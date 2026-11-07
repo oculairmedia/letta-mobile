@@ -2,9 +2,6 @@ package com.letta.mobile.data.shell
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.shell.focus.CurrentFocus
-import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
-import com.letta.mobile.data.shell.focus.CurrentFocusSnapshot
 
 internal val ShellDestination.isChatPage: Boolean
     get() = this is ShellDestination.Chat || this is ShellDestination.Canvas

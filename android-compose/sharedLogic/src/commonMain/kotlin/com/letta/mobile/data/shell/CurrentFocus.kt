@@ -1,4 +1,4 @@
-package com.letta.mobile.data.shell.focus
+package com.letta.mobile.data.shell
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId

@@ -4,10 +4,6 @@ import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.shell.focus.CurrentFocus
-import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
-import com.letta.mobile.data.shell.focus.CurrentFocusInputs
-import com.letta.mobile.data.shell.focus.CurrentFocusSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

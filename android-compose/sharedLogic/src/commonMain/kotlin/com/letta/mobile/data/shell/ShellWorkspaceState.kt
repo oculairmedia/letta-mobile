@@ -11,11 +11,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.serialization.LettaJson
-import com.letta.mobile.data.shell.focus.CurrentFocus
-import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
-import com.letta.mobile.data.shell.focus.CurrentFocusInputs
-import com.letta.mobile.data.shell.focus.CurrentFocusSnapshot
-import com.letta.mobile.data.shell.focus.initialCurrentFocus
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.serialization.SerializationException

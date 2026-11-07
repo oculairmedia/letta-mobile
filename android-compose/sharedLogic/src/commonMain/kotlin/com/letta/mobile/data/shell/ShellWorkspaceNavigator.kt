@@ -8,8 +8,6 @@ import com.letta.mobile.data.home.conversationRecency
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.lanes.ConversationPurpose
-import com.letta.mobile.data.shell.focus.CurrentFocus
-import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
 
 /**
  * What the shell's navigation needs from a host's chat. Read when a verb runs, never captured: the

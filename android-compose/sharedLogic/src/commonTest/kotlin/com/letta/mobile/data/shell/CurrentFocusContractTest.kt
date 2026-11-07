@@ -1,7 +1,6 @@
-package com.letta.mobile.data.shell.focus
+package com.letta.mobile.data.shell
 
 import com.letta.mobile.data.serialization.LettaJson
-import com.letta.mobile.data.shell.ShellWorkspaceState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

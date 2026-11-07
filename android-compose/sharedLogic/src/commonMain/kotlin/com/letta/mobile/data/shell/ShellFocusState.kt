@@ -4,9 +4,6 @@ import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
-import com.letta.mobile.data.shell.focus.CurrentFocus
-import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
-import com.letta.mobile.data.shell.focus.CurrentFocusSnapshot
 
 /** Availability is evidence about a requested target, never a replacement selection. */
 enum class FocusAvailability {

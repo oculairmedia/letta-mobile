@@ -2,7 +2,6 @@ package com.letta.mobile.data.shell
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.shell.focus.CurrentFocus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
