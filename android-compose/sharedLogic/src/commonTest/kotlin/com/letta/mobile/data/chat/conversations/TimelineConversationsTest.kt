@@ -280,7 +280,10 @@ class TimelineConversationsTest {
         val owner = owner(host)
         runCurrent()
         owner.openInitial(routed = ConversationId("gone"), focused = ivo, createIfNone = true)
-        assertEquals(ConversationId("c2"), owner.selectedConversation)
+        runCurrent()
+        assertEquals(ConversationId("gone"), owner.selectedConversation)
+        assertNull(owner.selectedTarget())
+        assertTrue(owner.state.value.error != null)
 
         val routed = owner(host)
         runCurrent()
@@ -294,6 +297,21 @@ class TimelineConversationsTest {
         fresh.openInitial(routed = null, focused = nora, createIfNone = true)
         runCurrent()
         assertEquals(ConversationId("new-1"), fresh.selectedConversation)
+    }
+
+    @Test
+    fun explicitRouteOutsideTheLoadedRosterKeepsItsExactTarget() = runTest {
+        val host = IrohHost(HostConversation("c2", "agent-2"), HostConversation("outside", "agent-3"))
+        val owner = owner(host)
+        runCurrent()
+        assertTrue(owner.state.value.conversations.none { it.id == ConversationId("outside") })
+
+        owner.openInitial(routed = ConversationId("outside"), focused = ivo, createIfNone = true)
+        runCurrent()
+
+        assertEquals(ConversationId("outside"), owner.selectedConversation)
+        assertEquals(TimelineChatTarget("agent-3", "", "outside"), owner.selectedTarget())
+        assertTrue("conversation.create" !in host.methods)
     }
 
     @Test
@@ -328,7 +346,7 @@ class TimelineConversationsTest {
     }
 
     @Test
-    fun deletingTheOpenChatMovesToTheAgentsNextActiveOne() = runTest {
+    fun archivingTheOpenChatKeepsItsExactTargetOpen() = runTest {
         val host = IrohHost(HostConversation("c1", "agent-1"), HostConversation("c2", "agent-2"), HostConversation("c3", "agent-1"))
         val owner = owner(host)
         runCurrent()
@@ -338,10 +356,30 @@ class TimelineConversationsTest {
         assertEquals(setOf(ConversationId("c1")), owner.state.value.deleting)
         runCurrent()
 
-        assertEquals(listOf("c2", "c3"), owner.state.value.conversations.map { it.id.value })
-        assertEquals(ConversationId("c3"), owner.selectedConversation)
+        assertEquals(listOf("c1", "c2", "c3"), owner.state.value.conversations.map { it.id.value })
+        assertEquals(ConversationId("c1"), owner.selectedConversation)
+        assertEquals(TimelineChatTarget("agent-1", "Nora", "c1"), owner.selectedTarget())
+        assertEquals(true, owner.state.value.conversations.first().archived)
         assertTrue(owner.state.value.deleting.isEmpty())
         assertEquals(ConversationDeleteBehavior.MovesToArchived, owner.management.deleteBehavior)
+    }
+
+    @Test
+    fun removingAnExactTargetDoesNotSelectAnotherConversation() {
+        val removed = ConversationId("removed")
+        val next = ConversationId("next")
+        val state = TimelineConversationsState(
+            conversations = listOf(Conversation(removed, nora), Conversation(next, nora)),
+            selected = removed,
+            deleting = setOf(removed),
+        )
+
+        val result = state.without(removed)
+
+        assertEquals(removed, result.selected)
+        assertNull(result.selectedRecord())
+        assertEquals(listOf(next), result.conversations.map { it.id })
+        assertTrue(result.deleting.isEmpty())
     }
 
     @Test

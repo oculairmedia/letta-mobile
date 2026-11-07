@@ -14,17 +14,6 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
-/** A routed conversation outside the recents page, fetched once; null when listed, in legacy mode or already failed. */
-internal fun TimelineConversationsState.unlistedRoute(
-    routed: ConversationId?,
-    failed: ConversationId?,
-    legacyMode: Boolean,
-): ConversationId? {
-    if (legacyMode) return null
-    val route = routed?.takeIf { it != failed } ?: return null
-    return route.takeIf { record(it) == null }
-}
-
 /** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
 internal suspend fun ChatGateway.existingChat(
     agent: AgentId,
@@ -65,11 +54,10 @@ internal fun TimelineConversationsState.record(conversation: ConversationId?): C
 internal fun TimelineConversationsState.edit(conversation: ConversationId, change: (Conversation) -> Conversation) =
     copy(conversations = conversations.map { if (it.id == conversation) change(it) else it })
 
-/** The list without [conversation]; when it was the selected one, its agent's next active conversation is. */
+/** The list without [conversation]; its selected identity remains until the workspace changes it. */
 internal fun TimelineConversationsState.without(conversation: ConversationId): TimelineConversationsState {
     val remaining = conversations.filterNot { it.id == conversation }
-    val next = if (selected == conversation) record(conversation)?.agentId?.let { agent -> remaining.activeChatOf(agent) } else selected
-    return copy(conversations = remaining, selected = next, deleting = deleting - conversation)
+    return copy(conversations = remaining, deleting = deleting - conversation)
 }
 
 /** This list, then the [others] it does not carry (newest first within each). */
@@ -77,9 +65,6 @@ internal fun List<Conversation>.keeping(others: List<Conversation>): List<Conver
     val ids = mapTo(mutableSetOf()) { it.id }
     return this + others.filterNot { it.id in ids }
 }
-
-/** [conversation] while the list carries it. */
-internal fun TimelineConversationsState.listed(conversation: ConversationId?): ConversationId? = record(conversation)?.id
 
 /** [agent]'s home conversation, else its newest active human conversation in the list. */
 internal fun TimelineConversationsState.activeChatOf(agent: AgentId): ConversationId? = conversations.activeChatOf(agent)
