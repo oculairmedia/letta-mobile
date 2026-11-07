@@ -65,6 +65,16 @@ class WireContractsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "without fixture"):
             self.module.contracts(self.root)
 
+    def test_current_focus_fixture_is_not_admin_rpc_coverage(self):
+        self.pair()
+        fixture = self.root / self.module.FIXTURES / "current-focus/v1.json"
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('[{"name":"rotation mid-chat","inputs":{},"expected":{}}]')
+        self.assertEqual(1, len(self.module.contracts(self.root)))
+        fixture.with_name("v2.json").write_text("[]")
+        with self.assertRaisesRegex(ValueError, "without spec"):
+            self.module.contracts(self.root)
+
     def test_empty_cases_do_not_count_as_coverage(self):
         _, fixture = self.pair()
         fixture.write_text('{"method":"health.check","version":1,"handler":"handler.kt","cases":[]}')
