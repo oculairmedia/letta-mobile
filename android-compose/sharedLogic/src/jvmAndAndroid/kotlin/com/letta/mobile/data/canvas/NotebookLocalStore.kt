@@ -10,11 +10,14 @@ import java.nio.file.StandardOpenOption.WRITE
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -57,6 +60,11 @@ class NotebookLocalStore(
     storage: (Storage) -> Storage = { it },
 ) : AutoCloseable, CanvasStorageHealth {
     private val canvasLockFile = directory.resolve("notebook-canvas.lock")
+    private val hintsDirectory: Path = directory
+
+    /** Canvas id to the notebook key that last held it, kept across restarts (see [readCanvasHints]). */
+    private val canvasHints: MutableMap<String, String> by lazy { ConcurrentHashMap(hintsDirectory.readCanvasHints()) }
+    private val hintsDirty = AtomicBoolean(false)
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
 
     /**
@@ -345,7 +353,25 @@ class NotebookLocalStore(
         }
     }
 
-    private fun remember(id: DocumentId, doc: CanvasDocument) = health.rememberCanvas(id.stableKey(), doc.id)
+    private fun remember(id: DocumentId, doc: CanvasDocument) {
+        val key = id.stableKey()
+        health.rememberCanvas(key, doc.id)
+        if (canvasHints.put(doc.id.value, key) != key) scheduleHintsSave()
+    }
+
+    /** Save the hints a second after the first change, so a full scan writes the file once. */
+    private fun scheduleHintsSave() {
+        if (!hintsDirty.compareAndSet(false, true)) return
+        try {
+            poller.schedule(::saveHints, HINTS_SAVE_DELAY_SECONDS, TimeUnit.SECONDS)
+        } catch (_: RejectedExecutionException) {
+            saveHints()
+        }
+    }
+
+    private fun saveHints() {
+        if (hintsDirty.getAndSet(false)) hintsDirectory.writeCanvasHints(HashMap(canvasHints))
+    }
 
     /** Update one element without replacing other elements' Automerge registers. */
     fun putBoardElement(id: DocumentId, element: JsonObject) {
@@ -427,7 +453,7 @@ class NotebookLocalStore(
      * [firstNotebook]. Every metadata read records what it saw, so a scan also answers later lookups.
      */
     internal fun notebookHolding(canvasId: CanvasId): DocumentId? {
-        val hinted = health.notebookLastHolding(canvasId)?.toDocumentId()
+        val hinted = (health.notebookLastHolding(canvasId) ?: canvasHints[canvasId.value])?.toDocumentId()
         if (hinted != null && canvasMetadataOrSkip(hinted)?.id == canvasId) return hinted
         return firstNotebook { it.id == canvasId }
     }
@@ -661,6 +687,7 @@ class NotebookLocalStore(
         closed = true
         stopPolling()
         poller.shutdownNow()
+        saveHints()
         repo.close()
         health.settleCompactions()
         health.close()
@@ -675,6 +702,7 @@ class NotebookLocalStore(
 
         /** One canvas lookup over every notebook gives up after this, however many notebooks are slow. */
         const val SCAN_BUDGET_SECONDS = 2 * TIMEOUT_SECONDS
+        const val HINTS_SAVE_DELAY_SECONDS = 1L
     }
 }
 
