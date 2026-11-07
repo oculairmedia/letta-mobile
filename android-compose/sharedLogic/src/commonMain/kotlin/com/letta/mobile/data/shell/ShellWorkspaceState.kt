@@ -176,7 +176,8 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             val saved = value.saved.copy(focus = focus).withTabs(tabFor(conversation))
             value = value.copy(
                 saved = saved,
-                agentAvailability = if (agentAvailability == FocusAvailability.Unavailable) agentAvailability else FocusAvailability.Available,
+                agentAvailability =
+                    if (agentAvailability == FocusAvailability.Unavailable) agentAvailability else FocusAvailability.Available,
                 conversationAvailability = FocusAvailability.Available,
                 history = humanHistory(token, reference, agent, conversation),
                 owners = if (conversation.value == "default") value.owners else value.owners + (conversation to agent),
@@ -213,7 +214,11 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             if (sourceKey == key && sourceGeneration == generation) return@transition
             val changedSource = sourceKey != null && sourceKey != key
             if (changedSource) startupAvailable = false
-            val saved = if (changedSource) initialFocusSnapshot(ShellDestination.Home, key, railExpanded) else value.saved.copy(sourceKey = key)
+            val saved = if (changedSource) {
+                initialFocusSnapshot(ShellDestination.Home, key, railExpanded)
+            } else {
+                value.saved.copy(sourceKey = key)
+            }
             value = if (changedSource) {
                 WorkspaceFocusState(saved, generation = generation, revision = focusRevision + 1)
             } else {
