@@ -28,6 +28,7 @@ class NotebookSlowNotebookLookupTest {
         val (slowCanvas, fastCanvas) = seed(path)
         val slowStorage = NotebookHistoryArchive(path).storageName(notebookKeyOf(path, slowCanvas))
         val release = CompletableFuture<Unit>()
+        forgetSavedHints(path)
         val hold = { delegate: Storage -> HeldStorage(delegate, setOf(slowStorage), release) }
 
         try {
@@ -59,6 +60,7 @@ class NotebookSlowNotebookLookupTest {
         val canvases = seedCanvases(path, count = 3)
         val held = canvases.take(2).map { NotebookHistoryArchive(path).storageName(notebookKeyOf(path, it)) }.toSet()
         val release = CompletableFuture<Unit>()
+        forgetSavedHints(path)
 
         try {
             NotebookLocalStore(path, "slow-lookup-peer", storage = { HeldStorage(it, held, release) }).use { notebooks ->
@@ -81,6 +83,7 @@ class NotebookSlowNotebookLookupTest {
         val (fullWait, cutWait) = canvases.take(2).map { notebookKeyOf(path, it) }
         val held = setOf(fullWait, cutWait).map { NotebookHistoryArchive(path).storageName(it) }.toSet()
         val release = CompletableFuture<Unit>()
+        forgetSavedHints(path)
 
         try {
             NotebookLocalStore(path, "slow-lookup-peer", storage = { HeldStorage(it, held, release) }).use { notebooks ->
@@ -99,6 +102,9 @@ class NotebookSlowNotebookLookupTest {
             release.complete(Unit)
         }
     }
+
+    /** These tests exercise the scan itself, so the hints a store saves for restarts are removed. */
+    private fun forgetSavedHints(path: Path) = Files.deleteIfExists(path.resolve(CANVAS_HINTS_FILE))
 
     private suspend fun seed(path: Path): Pair<CanvasId, CanvasId> = seedCanvases(path, count = 2).let { it[0] to it[1] }
 
