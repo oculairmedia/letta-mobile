@@ -62,8 +62,11 @@ class NotebookLocalStore(
     private val canvasLockFile = directory.resolve("notebook-canvas.lock")
     private val hintsDirectory: Path = directory
 
-    /** Canvas id to the notebook key that last held it, kept across restarts (see [readCanvasHints]). */
-    private val canvasHints: MutableMap<String, String> by lazy { ConcurrentHashMap(hintsDirectory.readCanvasHints()) }
+    /**
+     * Canvas id to the notebook key that last held it, kept across restarts (see [readCanvasHints]).
+     * Read once here, at construction, so no lookup reads the file while holding the canvas lock.
+     */
+    private val canvasHints: MutableMap<String, String> = ConcurrentHashMap(hintsDirectory.readCanvasHints())
     private val hintsDirty = AtomicBoolean(false)
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
 
@@ -369,8 +372,9 @@ class NotebookLocalStore(
         }
     }
 
+    /** A failed write stays pending, so the next change or [close] tries again. */
     private fun saveHints() {
-        if (hintsDirty.getAndSet(false)) hintsDirectory.writeCanvasHints(HashMap(canvasHints))
+        if (hintsDirty.getAndSet(false) && !hintsDirectory.writeCanvasHints(HashMap(canvasHints))) hintsDirty.set(true)
     }
 
     /** Update one element without replacing other elements' Automerge registers. */
@@ -453,10 +457,19 @@ class NotebookLocalStore(
      * [firstNotebook]. Every metadata read records what it saw, so a scan also answers later lookups.
      */
     internal fun notebookHolding(canvasId: CanvasId): DocumentId? {
+        val started = TimeSource.Monotonic.markNow()
         val hinted = (health.notebookLastHolding(canvasId) ?: canvasHints[canvasId.value])?.toDocumentId()
-        if (hinted != null && canvasMetadataOrSkip(hinted)?.id == canvasId) return hinted
-        return firstNotebook { it.id == canvasId }
+        if (hinted != null && confirmsCanvas(hinted, canvasId, started + TIMEOUT_SECONDS.seconds)) return hinted
+        // Time spent on the hint counts against the scan's budget: one lookup, one deadline.
+        return firstNotebook(SCAN_BUDGET_SECONDS.seconds - started.elapsedNow()) { it.id == canvasId }
     }
+
+    private fun confirmsCanvas(id: DocumentId, canvasId: CanvasId, deadline: TimeSource.Monotonic.ValueTimeMark): Boolean =
+        try {
+            canvasMetadataBy(id, deadline, health::readTimedOut)?.id == canvasId
+        } catch (_: TimeoutException) {
+            false
+        }
 
     /**
      * The first notebook whose canvas metadata matches, or null when none does. A notebook too

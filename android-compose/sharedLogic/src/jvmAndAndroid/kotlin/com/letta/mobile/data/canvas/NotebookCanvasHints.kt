@@ -29,8 +29,8 @@ internal fun Path.readCanvasHints(): Map<String, String> = runCatching {
     Json.decodeFromString(HINTS, Files.readString(file, UTF_8)).filterValues { it.isNotebookKey() }
 }.getOrDefault(emptyMap())
 
-/** Replace the hints file with [hints]. A failure only costs a scan on the next start. */
-internal fun Path.writeCanvasHints(hints: Map<String, String>) {
+/** Replace the hints file with [hints]; false when the write failed (a missed save only costs a scan). */
+internal fun Path.writeCanvasHints(hints: Map<String, String>): Boolean =
     runCatching {
         val temp = Files.createTempFile(this, ".notebook-canvases-", ".tmp")
         try {
@@ -39,5 +39,4 @@ internal fun Path.writeCanvasHints(hints: Map<String, String>) {
         } finally {
             Files.deleteIfExists(temp)
         }
-    }
-}
+    }.isSuccess
