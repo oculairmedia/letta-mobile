@@ -2906,6 +2906,23 @@ final enum class com.letta.mobile.data.settings/SettingsTone : kotlin/Enum<com.l
     final fun values(): kotlin/Array<com.letta.mobile.data.settings/SettingsTone> // com.letta.mobile.data.settings/SettingsTone.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.shell.focus/CurrentFocusChatMode : kotlin/Enum<com.letta.mobile.data.shell.focus/CurrentFocusChatMode> { // com.letta.mobile.data.shell.focus/CurrentFocusChatMode|null[0]
+    enum entry Exact // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.Exact|null[0]
+    enum entry New // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.New|null[0]
+    enum entry Resume // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.Resume|null[0]
+
+    final val entries // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shell.focus/CurrentFocusChatMode> // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.shell.focus/CurrentFocusChatMode // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.shell.focus/CurrentFocusChatMode> // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.shell.focus/CurrentFocusChatMode> // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.shell.focus/CurrentFocusChatMode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.shell/ShellPageKind : kotlin/Enum<com.letta.mobile.data.shell/ShellPageKind> { // com.letta.mobile.data.shell/ShellPageKind|null[0]
     enum entry AgentEditor // com.letta.mobile.data.shell/ShellPageKind.AgentEditor|null[0]
     enum entry Canvas // com.letta.mobile.data.shell/ShellPageKind.Canvas|null[0]
@@ -58537,6 +58554,127 @@ final class com.letta.mobile.data.settings/SettingsStatus { // com.letta.mobile.
     final fun toString(): kotlin/String // com.letta.mobile.data.settings/SettingsStatus.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.shell.focus/CurrentFocus { // com.letta.mobile.data.shell.focus/CurrentFocus|null[0]
+    constructor <init>(kotlin/String = ..., com.letta.mobile.data.model/AgentId? = ..., com.letta.mobile.data.model/ConversationId? = ..., com.letta.mobile.data.shell.focus/CurrentFocusChatMode = ...) // com.letta.mobile.data.shell.focus/CurrentFocus.<init>|<init>(kotlin.String;com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.shell.focus.CurrentFocusChatMode){}[0]
+
+    final val agentId // com.letta.mobile.data.shell.focus/CurrentFocus.agentId|{}agentId[0]
+        final fun <get-agentId>(): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell.focus/CurrentFocus.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val chatMode // com.letta.mobile.data.shell.focus/CurrentFocus.chatMode|{}chatMode[0]
+        final fun <get-chatMode>(): com.letta.mobile.data.shell.focus/CurrentFocusChatMode // com.letta.mobile.data.shell.focus/CurrentFocus.chatMode.<get-chatMode>|<get-chatMode>(){}[0]
+    final val conversationId // com.letta.mobile.data.shell.focus/CurrentFocus.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.shell.focus/CurrentFocus.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val pageRoute // com.letta.mobile.data.shell.focus/CurrentFocus.pageRoute|{}pageRoute[0]
+        final fun <get-pageRoute>(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocus.pageRoute.<get-pageRoute>|<get-pageRoute>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocus.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell.focus/CurrentFocus.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.shell.focus/CurrentFocus.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.shell.focus/CurrentFocusChatMode // com.letta.mobile.data.shell.focus/CurrentFocus.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., com.letta.mobile.data.model/AgentId? = ..., com.letta.mobile.data.model/ConversationId? = ..., com.letta.mobile.data.shell.focus/CurrentFocusChatMode = ...): com.letta.mobile.data.shell.focus/CurrentFocus // com.letta.mobile.data.shell.focus/CurrentFocus.copy|copy(kotlin.String;com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.shell.focus.CurrentFocusChatMode){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.focus/CurrentFocus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.focus/CurrentFocus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocus.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.shell.focus/CurrentFocus> { // com.letta.mobile.data.shell.focus/CurrentFocus.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.shell.focus/CurrentFocus.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.shell.focus/CurrentFocus.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.shell.focus/CurrentFocus.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.shell.focus/CurrentFocus // com.letta.mobile.data.shell.focus/CurrentFocus.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.shell.focus/CurrentFocus) // com.letta.mobile.data.shell.focus/CurrentFocus.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.shell.focus.CurrentFocus){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.shell.focus/CurrentFocus.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.shell.focus/CurrentFocus.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.shell.focus/CurrentFocus> // com.letta.mobile.data.shell.focus/CurrentFocus.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.shell.focus/CurrentFocusInputs { // com.letta.mobile.data.shell.focus/CurrentFocusInputs|null[0]
+    constructor <init>(kotlin/String, com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ...) // com.letta.mobile.data.shell.focus/CurrentFocusInputs.<init>|<init>(kotlin.String;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?){}[0]
+
+    final val deepLink // com.letta.mobile.data.shell.focus/CurrentFocusInputs.deepLink|{}deepLink[0]
+        final fun <get-deepLink>(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.deepLink.<get-deepLink>|<get-deepLink>(){}[0]
+    final val explicitRoute // com.letta.mobile.data.shell.focus/CurrentFocusInputs.explicitRoute|{}explicitRoute[0]
+        final fun <get-explicitRoute>(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.explicitRoute.<get-explicitRoute>|<get-explicitRoute>(){}[0]
+    final val restored // com.letta.mobile.data.shell.focus/CurrentFocusInputs.restored|{}restored[0]
+        final fun <get-restored>(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.restored.<get-restored>|<get-restored>(){}[0]
+    final val settingsSeed // com.letta.mobile.data.shell.focus/CurrentFocusInputs.settingsSeed|{}settingsSeed[0]
+        final fun <get-settingsSeed>(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.settingsSeed.<get-settingsSeed>|<get-settingsSeed>(){}[0]
+    final val sourceKey // com.letta.mobile.data.shell.focus/CurrentFocusInputs.sourceKey|{}sourceKey[0]
+        final fun <get-sourceKey>(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocusInputs.sourceKey.<get-sourceKey>|<get-sourceKey>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocusInputs.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? // com.letta.mobile.data.shell.focus/CurrentFocusInputs.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ..., com.letta.mobile.data.shell.focus/CurrentFocusSnapshot? = ...): com.letta.mobile.data.shell.focus/CurrentFocusInputs // com.letta.mobile.data.shell.focus/CurrentFocusInputs.copy|copy(kotlin.String;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.focus/CurrentFocusInputs.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.focus/CurrentFocusInputs.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocusInputs.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.shell.focus/CurrentFocusInputs> { // com.letta.mobile.data.shell.focus/CurrentFocusInputs.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.shell.focus/CurrentFocusInputs.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.shell.focus/CurrentFocusInputs.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.shell.focus/CurrentFocusInputs.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.shell.focus/CurrentFocusInputs // com.letta.mobile.data.shell.focus/CurrentFocusInputs.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.shell.focus/CurrentFocusInputs) // com.letta.mobile.data.shell.focus/CurrentFocusInputs.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.shell.focus.CurrentFocusInputs){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.shell.focus/CurrentFocusInputs.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.shell.focus/CurrentFocusInputs> // com.letta.mobile.data.shell.focus/CurrentFocusInputs.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.shell.focus/CurrentFocusSnapshot { // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot|null[0]
+    constructor <init>(kotlin/String, com.letta.mobile.data.shell.focus/CurrentFocus = ..., kotlin.collections/List<com.letta.mobile.data.model/ConversationId> = ..., com.letta.mobile.data.model/ConversationId? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.<init>|<init>(kotlin.String;com.letta.mobile.data.shell.focus.CurrentFocus;kotlin.collections.List<com.letta.mobile.data.model.ConversationId>;com.letta.mobile.data.model.ConversationId?;kotlin.String?;kotlin.Boolean;kotlin.Int){}[0]
+
+    final val contractVersion // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    final val editorRoute // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.editorRoute|{}editorRoute[0]
+        final fun <get-editorRoute>(): kotlin/String? // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.editorRoute.<get-editorRoute>|<get-editorRoute>(){}[0]
+    final val focus // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.focus|{}focus[0]
+        final fun <get-focus>(): com.letta.mobile.data.shell.focus/CurrentFocus // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.focus.<get-focus>|<get-focus>(){}[0]
+    final val pinnedConversationIds // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.pinnedConversationIds|{}pinnedConversationIds[0]
+        final fun <get-pinnedConversationIds>(): kotlin.collections/List<com.letta.mobile.data.model/ConversationId> // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.pinnedConversationIds.<get-pinnedConversationIds>|<get-pinnedConversationIds>(){}[0]
+    final val previewConversationId // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.previewConversationId|{}previewConversationId[0]
+        final fun <get-previewConversationId>(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.previewConversationId.<get-previewConversationId>|<get-previewConversationId>(){}[0]
+    final val railExpanded // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.railExpanded|{}railExpanded[0]
+        final fun <get-railExpanded>(): kotlin/Boolean // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.railExpanded.<get-railExpanded>|<get-railExpanded>(){}[0]
+    final val sourceKey // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.sourceKey|{}sourceKey[0]
+        final fun <get-sourceKey>(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.sourceKey.<get-sourceKey>|<get-sourceKey>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.shell.focus/CurrentFocus // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.letta.mobile.data.model/ConversationId> // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component5|component5(){}[0]
+    final fun component6(): kotlin/Boolean // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component6|component6(){}[0]
+    final fun component7(): kotlin/Int // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., com.letta.mobile.data.shell.focus/CurrentFocus = ..., kotlin.collections/List<com.letta.mobile.data.model/ConversationId> = ..., com.letta.mobile.data.model/ConversationId? = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.copy|copy(kotlin.String;com.letta.mobile.data.shell.focus.CurrentFocus;kotlin.collections.List<com.letta.mobile.data.model.ConversationId>;com.letta.mobile.data.model.ConversationId?;kotlin.String?;kotlin.Boolean;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.shell.focus/CurrentFocusSnapshot> { // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.shell.focus/CurrentFocusSnapshot) // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.shell.focus.CurrentFocusSnapshot){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.shell.focus/CurrentFocusSnapshot> // com.letta.mobile.data.shell.focus/CurrentFocusSnapshot.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.shell/SessionShellChatPort : com.letta.mobile.data.shell/ShellChatPort { // com.letta.mobile.data.shell/SessionShellChatPort|null[0]
     constructor <init>() // com.letta.mobile.data.shell/SessionShellChatPort.<init>|<init>(){}[0]
 
@@ -73993,6 +74131,7 @@ final fun com.letta.mobile.data.schedules.runs/leaseRecords(com.letta.mobile.dat
 final fun com.letta.mobile.data.session.graph/hostRemoteLettaDescriptor(com.letta.mobile.data.backend/SessionPlatform, com.letta.mobile.data.model/LettaConfig?): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.session.graph/hostRemoteLettaDescriptor|hostRemoteLettaDescriptor(com.letta.mobile.data.backend.SessionPlatform;com.letta.mobile.data.model.LettaConfig?){}[0]
 final fun com.letta.mobile.data.session.graph/hostServedKind(com.letta.mobile.data.model/LettaConfig?): com.letta.mobile.data.model/BackendKind? // com.letta.mobile.data.session.graph/hostServedKind|hostServedKind(com.letta.mobile.data.model.LettaConfig?){}[0]
 final fun com.letta.mobile.data.session/remoteLettaBackendDescriptor(com.letta.mobile.data.model/LettaConfig?, kotlin/String, kotlin/String = ...): com.letta.mobile.runtime/BackendDescriptor // com.letta.mobile.data.session/remoteLettaBackendDescriptor|remoteLettaBackendDescriptor(com.letta.mobile.data.model.LettaConfig?;kotlin.String;kotlin.String){}[0]
+final fun com.letta.mobile.data.shell.focus/initialCurrentFocus(com.letta.mobile.data.shell.focus/CurrentFocusInputs): com.letta.mobile.data.shell.focus/CurrentFocusSnapshot // com.letta.mobile.data.shell.focus/initialCurrentFocus|initialCurrentFocus(com.letta.mobile.data.shell.focus.CurrentFocusInputs){}[0]
 final fun com.letta.mobile.data.subagents/projectSubagentRoster(kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>, kotlin/Long, kotlin.collections/Set<kotlin/String> = ...): com.letta.mobile.data.subagents/SubagentRoster // com.letta.mobile.data.subagents/projectSubagentRoster|projectSubagentRoster(kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>;kotlin.Long;kotlin.collections.Set<kotlin.String>){}[0]
 final fun com.letta.mobile.data.subagents/subagentIdentityOf(kotlin/String?, kotlin.collections/List<kotlin/String?> = ...): com.letta.mobile.data.subagents/SubagentIdentity // com.letta.mobile.data.subagents/subagentIdentityOf|subagentIdentityOf(kotlin.String?;kotlin.collections.List<kotlin.String?>){}[0]
 final fun com.letta.mobile.data.subagents/subagentViewOf(com.letta.mobile.data.model/AgentId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.subagents/SubagentViewLabel): com.letta.mobile.data.subagents/SubagentView? // com.letta.mobile.data.subagents/subagentViewOf|subagentViewOf(com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.subagents.SubagentViewLabel){}[0]
