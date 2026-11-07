@@ -50,6 +50,15 @@ class ShellFocusRegressionTest {
     }
 
     @Test
+    fun aCompleteGlobalCatalogPrunesUnknownInactiveTabsAndKeepsTheActiveUnavailableReference() {
+        val state = ShellWorkspaceState(ShellDestination.Chat("a", "active"))
+        state.tabs = com.letta.mobile.data.desktopshell.ConversationTabsState(listOf("unknown", "recent"), "active")
+        state.conversationsReported(setOf(ConversationId("recent")))
+        assertEquals(listOf("recent", "active"), state.tabs.openConversationIds)
+        assertEquals(ConversationId("active"), state.selectedConversationId)
+    }
+
+    @Test
     fun openingAnotherAgentsEditorKeepsTheChatUnderneath() {
         val state = ShellWorkspaceState(ShellDestination.Chat("a", "a1"))
         state.navigate(ShellDestination.AgentEditor("b"))

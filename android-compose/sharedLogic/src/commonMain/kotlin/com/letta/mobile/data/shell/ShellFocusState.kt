@@ -63,13 +63,21 @@ internal fun CurrentFocus.valid(): Boolean {
 }
 
 internal fun CurrentFocusSnapshot.valid(): Boolean {
-    val editor = editorRoute?.let(ShellRoute::decode)
-    val validEditor = editorRoute == null || editor is ShellDestination.AgentEditor &&
-        editor.agentId?.isBlank() != true && ShellRoute.encode(editor) == editorRoute
-    val validTabs = pinnedConversationIds.distinct().size == pinnedConversationIds.size &&
-        pinnedConversationIds.none { it.value.isBlank() } && previewConversationId?.value?.isBlank() != true &&
-        previewConversationId !in pinnedConversationIds
-    return contractVersion == 1 && sourceKey.isNotBlank() && focus.valid() && validEditor && validTabs
+    return contractVersion == 1 && sourceKey.isNotBlank() && focus.valid() &&
+        validFocusEditorRoute(editorRoute) && validFocusTabs()
+}
+
+internal fun validFocusEditorRoute(route: String?): Boolean {
+    if (route == null) return true
+    val editor = ShellRoute.decode(route) as? ShellDestination.AgentEditor ?: return false
+    return editor.agentId?.isBlank() != true && ShellRoute.encode(editor) == route
+}
+
+private fun CurrentFocusSnapshot.validFocusTabs(): Boolean {
+    val uniquePins = pinnedConversationIds.distinct().size == pinnedConversationIds.size
+    val validIds = pinnedConversationIds.none { it.value.isBlank() } && previewConversationId?.value?.isBlank() != true
+    val uniquePreview = previewConversationId !in pinnedConversationIds
+    return uniquePins && validIds && uniquePreview
 }
 
 internal fun CurrentFocusSnapshot.detached(): CurrentFocusSnapshot = copy(pinnedConversationIds = pinnedConversationIds.toList())
@@ -83,22 +91,3 @@ internal fun CurrentFocusSnapshot.tabs(): ConversationTabsState = ConversationTa
     pinnedConversationIds.map { it.value }, previewConversationId?.value,
 )
 
-internal val ShellDestination.isChatPage: Boolean
-    get() = this is ShellDestination.Chat || this is ShellDestination.Canvas
-
-/** Preserve payload (including Canvas) while projecting the owner's identity. */
-internal fun ShellDestination.refinedBy(agent: String?, conversation: String?): ShellDestination = when (this) {
-    is ShellDestination.Chat -> copy(agentId = agent, conversationId = conversation)
-    is ShellDestination.Canvas -> copy(agentId = agent, conversationId = conversation)
-    is ShellDestination.Memory -> ShellDestination.Memory(agent)
-    is ShellDestination.Schedules -> ShellDestination.Schedules(agent)
-    is ShellDestination.Skills -> copy(agentId = agent)
-    else -> this
-}
-
-internal fun ShellDestination.initialFocus(): CurrentFocus = CurrentFocus(
-    pageRoute = ShellRoute.encode(if (this is ShellDestination.AgentEditor) ShellDestination.Chat() else refinedBy(null, null)),
-    agentId = agentId?.takeUnless { this is ShellDestination.AgentEditor }?.let(::AgentId),
-    conversationId = conversationId?.let(::ConversationId),
-    chatMode = if (conversationId == null) CurrentFocusChatMode.Resume else CurrentFocusChatMode.Exact,
-)

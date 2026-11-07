@@ -127,11 +127,7 @@ class ShellWorkspaceNavigator(
             chat.stageComposerText(text)
             return
         }
-        val conversations = chat.conversations().filter {
-            it.agent != null && it.lane.canTarget && it.lane.purpose != ConversationPurpose.INBOX
-        }
-        val focused = prompt.focusedAgent?.let { agent -> newest(conversations.filter { it.agent == agent }) }
-        val target = if (prompt.focusedAgent == null) newest(conversations) else focused
+        val target = homeConversation(prompt.focusedAgent)
         if (target != null) {
             openConversation(target)
             if (state.selectedConversationId == target) chat.send(target, text)
@@ -179,6 +175,16 @@ class ShellWorkspaceNavigator(
     /** Reorder within the pinned group; a preview keeps its trailing position. */
     fun reorderConversationTab(conversation: ConversationId, targetIndex: Int) {
         state.tabs = ConversationTabsReducer.reorder(state.tabs, conversation.value, targetIndex)
+    }
+
+    private fun homeConversation(agent: AgentId?): ConversationId? {
+        val conversations = chat.conversations().filter {
+            it.agent != null && it.lane.isHumanFallback
+        }
+        return when (agent) {
+            null -> newest(conversations)
+            else -> newest(conversations.filter { it.agent == agent })
+        }
     }
 
     private fun startConversation(text: String, agent: AgentId?) {

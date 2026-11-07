@@ -33,12 +33,7 @@ import kotlinx.serialization.encodeToString
 class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home) {
     private val transitionLock = SynchronizedObject()
     private val requestOwner = FocusRequestOwner()
-    private var value by mutableStateOf(WorkspaceFocusState(CurrentFocusSnapshot(
-        sourceKey = "",
-        focus = initialPage.initialFocus().also { require(it.valid()) },
-        editorRoute = (initialPage as? ShellDestination.AgentEditor)?.let(ShellRoute::encode),
-        previewConversationId = initialPage.conversationId?.takeIf { initialPage.isChatPage }?.let(::ConversationId),
-    ).also { require(it.copy(sourceKey = "unbound").valid()) }))
+    private var value by mutableStateOf(WorkspaceFocusState(initialFocusSnapshot(initialPage)))
     private var startupAvailable = true
 
     /** Atomically published requested identity; absence in a roster never changes it. */
@@ -132,26 +127,32 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     }
 
     /** Select an entire validated target, closing any editor. Invalid values leave everything untouched. */
-    fun selectFocus(focus: CurrentFocus): Boolean = transition<Boolean> {
-        if (!focus.valid()) return@transition false
-        startupAvailable = false
-        publishSelection(value.saved.copy(focus = focus, editorRoute = null))
-        return@transition true
+    fun selectFocus(focus: CurrentFocus): Boolean {
+        return transition<Boolean> {
+            if (!focus.valid()) return@transition false
+            startupAvailable = false
+            publishSelection(value.saved.copy(focus = focus, editorRoute = null))
+            return@transition true
+        }
     }
 
     /** Capture once before starting resolution, lookup, creation or hydration. */
-    fun requestToken(): CurrentFocusRequest = transition {
-        CurrentFocusRequest(sourceKey, sourceGeneration, focusRevision, currentFocus.agentId,
-            currentFocus.chatMode, currentFocus.conversationId, requestOwner)
+    fun requestToken(): CurrentFocusRequest {
+        return transition {
+            CurrentFocusRequest(sourceKey, sourceGeneration, focusRevision, currentFocus.agentId,
+                currentFocus.chatMode, currentFocus.conversationId, requestOwner)
+        }
     }
 
     /** All request fields and the owner incarnation must still match; requests are never restored. */
-    fun accepts(token: CurrentFocusRequest): Boolean = transition {
-        val sameSource = token.owner === requestOwner && token.sourceKey == sourceKey && token.sourceGeneration == sourceGeneration
-        val focus = currentFocus
-        val sameSelection = token.focusRevision == focusRevision && token.requestedAgent == focus.agentId &&
-            token.mode == focus.chatMode && token.exactConversation == focus.conversationId
-        sameSource && sameSelection
+    fun accepts(token: CurrentFocusRequest): Boolean {
+        return transition {
+            val sameSource = token.owner === requestOwner && token.sourceKey == sourceKey && token.sourceGeneration == sourceGeneration
+            val focus = currentFocus
+            val sameSelection = token.focusRevision == focusRevision && token.requestedAgent == focus.agentId &&
+                token.mode == focus.chatMode && token.exactConversation == focus.conversationId
+            sameSource && sameSelection
+        }
     }
 
     /**
@@ -165,21 +166,24 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         conversation: ConversationId?,
         agent: AgentId?,
         reference: ShellConversationRef? = null,
-    ): Boolean = transition<Boolean> {
-        if (!accepts(token) || conversation == null || agent == null) return@transition false
-        if (!matchesCompletion(token, conversation, agent, reference)) return@transition false
-        val focus = currentFocus.copy(agentId = agent, conversationId = conversation, chatMode = CurrentFocusChatMode.Exact)
-        if (!focus.valid()) return@transition false
-        val saved = value.saved.copy(focus = focus).withTabs(tabFor(conversation))
-        value = value.copy(
-            saved = saved,
-            agentAvailability = if (agentAvailability == FocusAvailability.Unavailable) agentAvailability else FocusAvailability.Available,
-            conversationAvailability = FocusAvailability.Available,
-            history = humanHistory(token, reference, agent, conversation),
-            owners = if (conversation.value == "default") value.owners else value.owners + (conversation to agent),
-            settled = saved.takeIf { sourceKey != null },
-        )
-        return@transition true
+    ): Boolean {
+        return transition<Boolean> {
+            if (!accepts(token)) return@transition false
+            if (conversation == null || agent == null) return@transition false
+            if (!matchesCompletion(token, conversation, agent, reference)) return@transition false
+            val focus = currentFocus.copy(agentId = agent, conversationId = conversation, chatMode = CurrentFocusChatMode.Exact)
+            if (!focus.valid()) return@transition false
+            val saved = value.saved.copy(focus = focus).withTabs(tabFor(conversation))
+            value = value.copy(
+                saved = saved,
+                agentAvailability = if (agentAvailability == FocusAvailability.Unavailable) agentAvailability else FocusAvailability.Available,
+                conversationAvailability = FocusAvailability.Available,
+                history = humanHistory(token, reference, agent, conversation),
+                owners = if (conversation.value == "default") value.owners else value.owners + (conversation to agent),
+                settled = saved.takeIf { sourceKey != null },
+            )
+            true
+        }
     }
 
     /** Lookup failure/deletion changes availability only. Unavailable exact IDs and tabs survive. */
@@ -187,53 +191,64 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         token: CurrentFocusRequest,
         agent: FocusAvailability = agentAvailability,
         conversation: FocusAvailability = conversationAvailability,
-    ): Boolean = transition<Boolean> {
-        if (!accepts(token)) return@transition false
-        val deleted = currentFocus.conversationId.takeIf { conversation == FocusAvailability.Unavailable }
-        val selected = currentFocus.conversationId
-        value = value.copy(
-            saved = selected?.let { value.saved.withTabs(tabFor(it)) } ?: value.saved,
-            agentAvailability = agent,
-            conversationAvailability = conversation,
-            history = value.history.filter { (owner, id) -> owner != currentFocus.agentId || id != deleted },
-        )
-        return@transition true
+    ): Boolean {
+        return transition<Boolean> {
+            if (!accepts(token)) return@transition false
+            val deleted = currentFocus.conversationId.takeIf { conversation == FocusAvailability.Unavailable }
+            val selected = currentFocus.conversationId
+            value = value.copy(
+                saved = selected?.let { value.saved.withTabs(tabFor(it)) } ?: value.saved,
+                agentAvailability = agent,
+                conversationAvailability = conversation,
+                history = value.history.filter { (owner, id) -> owner != currentFocus.agentId || id != deleted },
+            )
+            return@transition true
+        }
     }
 
     /** Trusted durable namespace plus live generation. Reconnect fences requests without resetting focus. */
-    fun bindSource(key: String, generation: Long) = transition<Unit> {
-        require(key.isNotBlank())
-        if (sourceKey == key && sourceGeneration == generation) return@transition
-        val changedSource = sourceKey != null && sourceKey != key
-        if (changedSource) startupAvailable = false
-        val saved = if (changedSource) CurrentFocusSnapshot(key, railExpanded = railExpanded) else value.saved.copy(sourceKey = key)
-        value = if (changedSource) {
-            WorkspaceFocusState(saved, generation = generation, revision = focusRevision + 1)
-        } else {
-            value.copy(saved = saved, generation = generation, revision = focusRevision + 1, settled = null)
+    fun bindSource(key: String, generation: Long) {
+        return transition<Unit> {
+            require(key.isNotBlank())
+            if (sourceKey == key && sourceGeneration == generation) return@transition
+            val changedSource = sourceKey != null && sourceKey != key
+            if (changedSource) startupAvailable = false
+            val saved = if (changedSource) initialFocusSnapshot(ShellDestination.Home, key, railExpanded) else value.saved.copy(sourceKey = key)
+            value = if (changedSource) {
+                WorkspaceFocusState(saved, generation = generation, revision = focusRevision + 1)
+            } else {
+                value.copy(saved = saved, generation = generation, revision = focusRevision + 1, settled = null)
+            }
         }
     }
 
     /** Legacy session key is a namespace, not a roster refresh. New bindings use [bindSource]. */
-    fun sessionChanged(key: String): Unit = transition {
-        bindSource(key, if (sourceKey == key) sourceGeneration else sourceGeneration + 1)
+    fun sessionChanged(key: String) {
+        return transition {
+            bindSource(key, if (sourceKey == key) sourceGeneration else sourceGeneration + 1)
+        }
     }
 
     /** One versioned envelope; no requests, jobs, history, drafts or secrets. Requires a trusted source. */
-    fun snapshot(): CurrentFocusSnapshot = transition<CurrentFocusSnapshot> {
-        check(sourceKey != null) { "Bind a trusted source before saving focus" }
-        return@transition value.saved.detached()
+    fun snapshot(): CurrentFocusSnapshot {
+        return transition<CurrentFocusSnapshot> {
+            check(sourceKey != null) { "Bind a trusted source before saving focus" }
+            return@transition value.saved.detached()
+        }
     }
 
     /** Encode the entire snapshot with the canonical persisted JSON policy. */
     fun snapshotJson(): String = LettaJson.persisted.encodeToString(snapshot())
 
     /** Restore once before user navigation from a complete same-source envelope; rebuild runtime evidence. */
-    fun restore(snapshot: CurrentFocusSnapshot): Boolean = transition<Boolean> {
-        if (!startupAvailable || !snapshot.valid() || snapshot.sourceKey != sourceKey) return@transition false
-        startupAvailable = false
-        value = WorkspaceFocusState(snapshot.detached(), generation = sourceGeneration, revision = focusRevision + 1)
-        return@transition true
+    fun restore(snapshot: CurrentFocusSnapshot): Boolean {
+        return transition<Boolean> {
+            val canRestore = startupAvailable && snapshot.valid() && snapshot.sourceKey == sourceKey
+            if (!canRestore) return@transition false
+            startupAvailable = false
+            value = WorkspaceFocusState(snapshot.detached(), generation = sourceGeneration, revision = focusRevision + 1)
+            return@transition true
+        }
     }
 
     /** Malformed JSON and unknown versions/modes are rejected together, without partial writes. */
@@ -246,54 +261,66 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     }
 
     /** Validate every candidate before the single startup arbitration; late settings cannot reseed. */
-    fun initialize(inputs: CurrentFocusInputs): Boolean = transition<Boolean> {
-        if (!startupAvailable || inputs.sourceKey.isBlank()) return@transition false
-        if (sourceKey != null && sourceKey != inputs.sourceKey) return@transition false
-        val validated = inputs.copy(
-            deepLink = inputs.deepLink?.takeIf { it.valid() },
-            explicitRoute = inputs.explicitRoute?.takeIf { it.valid() },
-            restored = inputs.restored?.takeIf { it.valid() },
-            settingsSeed = inputs.settingsSeed?.takeIf { it.valid() },
-        )
-        val initial = initialCurrentFocus(validated)
-        value = WorkspaceFocusState(initial.detached(), generation = sourceGeneration, revision = focusRevision + 1)
-        startupAvailable = false
-        return@transition true
+    fun initialize(inputs: CurrentFocusInputs): Boolean {
+        return transition<Boolean> {
+            if (!startupAvailable || inputs.sourceKey.isBlank()) return@transition false
+            if (sourceKey != null && sourceKey != inputs.sourceKey) return@transition false
+            val validated = inputs.copy(
+                deepLink = inputs.deepLink?.takeIf { it.valid() },
+                explicitRoute = inputs.explicitRoute?.takeIf { it.valid() },
+                restored = inputs.restored?.takeIf { it.valid() },
+                settingsSeed = inputs.settingsSeed?.takeIf { it.valid() },
+            )
+            val initial = initialCurrentFocus(validated)
+            value = WorkspaceFocusState(initial.detached(), generation = sourceGeneration, revision = focusRevision + 1)
+            startupAvailable = false
+            return@transition true
+        }
     }
 
     /** Navigate through the owner; an editor preserves the underlying chat identity. */
-    fun navigate(target: ShellDestination) = transition<Unit> {
-        if (target is ShellDestination.AgentEditor) {
-            openEditor(target)
-            return@transition
+    fun navigate(target: ShellDestination) {
+        return transition<Unit> {
+            if (target is ShellDestination.AgentEditor) {
+                openEditor(target)
+                return@transition
+            }
+            val next = target.initialFocus()
+            val focus = when {
+                target == ShellDestination.Home -> next
+                target.conversationId != null -> next
+                target.agentId != null && next.agentId != currentFocus.agentId -> next
+                target is ShellDestination.Chat && target.agentId != null -> next
+                else -> currentFocus.copy(pageRoute = next.pageRoute)
+            }
+            selectFocus(focus)
         }
-        val next = target.initialFocus()
-        val focus = when {
-            target == ShellDestination.Home -> next
-            target.conversationId != null -> next
-            target.agentId != null && next.agentId != currentFocus.agentId -> next
-            target is ShellDestination.Chat && target.agentId != null -> next
-            else -> currentFocus.copy(pageRoute = next.pageRoute)
-        }
-        selectFocus(focus)
     }
 
     /** Shows a different page kind without closing the editor or changing the underlying target. */
-    fun showPage(target: ShellDestination) = transition<Unit> {
-        if (target.kind == page.kind) return@transition
-        val focus = currentFocus.copy(pageRoute = target.initialFocus().pageRoute)
-        if (!focus.valid()) return@transition
-        startupAvailable = false
-        publishSelection(value.saved.copy(focus = focus))
+    fun showPage(target: ShellDestination) {
+        return transition<Unit> {
+            if (target.kind == page.kind) return@transition
+            val focus = currentFocus.copy(pageRoute = target.initialFocus().pageRoute)
+            if (!focus.valid()) return@transition
+            startupAvailable = false
+            publishSelection(value.saved.copy(focus = focus))
+        }
     }
 
     /** Show chat without closing its editor or changing the requested target. */
-    fun showChat() = transition<Unit> {
-        if (!page.isChatPage) showPage(ShellDestination.Chat())
+    fun showChat() {
+        return transition<Unit> {
+            if (!page.isChatPage) showPage(ShellDestination.Chat())
+        }
     }
 
     /** Open create-agent navigation beside the current chat, without restoring a draft. */
-    fun openNewAgent(): Unit = transition { openEditor(ShellDestination.AgentEditor()) }
+    fun openNewAgent() {
+        return transition {
+            openEditor(ShellDestination.AgentEditor())
+        }
+    }
 
     /** Decode a route entry and dispatch navigation; false for an unknown destination. */
     fun openRoute(route: String): Boolean {
@@ -307,10 +334,12 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
      * It cannot supply the missing provenance of a resume/create/owner lookup. Migrated hosts return
      * the originally captured token; null and conflicting legacy emissions never navigate.
      */
-    fun conversationShown(conversation: ConversationId?, agent: AgentId?) = transition<Unit> {
-        if (currentFocus.chatMode != CurrentFocusChatMode.Exact || currentFocus.agentId == null) return@transition
-        if (currentFocus.conversationId != conversation || currentFocus.agentId != agent) return@transition
-        completeFocus(requestToken(), conversation, agent)
+    fun conversationShown(conversation: ConversationId?, agent: AgentId?) {
+        return transition<Unit> {
+            if (currentFocus.chatMode != CurrentFocusChatMode.Exact || currentFocus.agentId == null) return@transition
+            if (currentFocus.conversationId != conversation || currentFocus.agentId != agent) return@transition
+            completeFocus(requestToken(), conversation, agent)
+        }
     }
 
     /** Return the token captured when the chat effect began, including retained-owner rebinding. */
@@ -318,19 +347,23 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         completeFocus(token, conversation, agent)
 
     /** Token-bound roster observation; absence remains unknown until a targeted not-found. */
-    fun rosterChanged(token: CurrentFocusRequest, agents: List<AgentId>): Boolean = transition<Boolean> {
-        if (!accepts(token)) return@transition false
-        rosterChanged(agents)
-        return@transition true
+    fun rosterChanged(token: CurrentFocusRequest, agents: List<AgentId>): Boolean {
+        return transition<Boolean> {
+            if (!accepts(token)) return@transition false
+            rosterChanged(agents)
+            return@transition true
+        }
     }
 
     /** Roster absence, including an empty/truncated roster, is unknown rather than deletion. */
-    fun rosterChanged(agents: List<AgentId>) = transition<Unit> {
-        value = value.copy(agentAvailability = when {
-            currentFocus.agentId in agents -> FocusAvailability.Available
-            agentAvailability == FocusAvailability.Unavailable -> FocusAvailability.Unavailable
-            else -> FocusAvailability.Unknown
-        })
+    fun rosterChanged(agents: List<AgentId>) {
+        return transition<Unit> {
+            value = value.copy(agentAvailability = when {
+                currentFocus.agentId in agents -> FocusAvailability.Available
+                agentAvailability == FocusAvailability.Unavailable -> FocusAvailability.Unavailable
+                else -> FocusAvailability.Unknown
+            })
+        }
     }
 
     /** Compatibility read adapter; caller selection and roster cannot override the owner. */
@@ -338,14 +371,25 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     fun focusFor(selectedConversationAgent: AgentId?, roster: List<AgentId>): AgentId? = currentFocus.agentId
 
     /** Complete legacy/global catalog: prune inactive references, retaining the selected target. */
-    fun conversationsReported(available: Set<ConversationId>) = transition<Unit> {
-        val knownAgents = value.owners.values.toSet()
-        applyCatalog(value.owners.filterKeys { it in available }, knownAgents, available)
+    fun conversationsReported(available: Set<ConversationId>) {
+        return transition<Unit> {
+            val availableValues = available.mapTo(mutableSetOf()) { it.value }
+            val selected = selectedConversationId
+            val gone = selected != null && selected.value != "default" && selected !in available
+            value = value.copy(
+                saved = value.saved.withTabs(ConversationTabsReducer.retainAvailable(tabs, availableValues, selected?.value)),
+                history = value.history.filterValues { it.value == "default" || it in available },
+                owners = value.owners.filterKeys { it in available },
+                conversationAvailability = if (gone) FocusAvailability.Unavailable else conversationAvailability,
+            )
+        }
     }
 
     /** Partial pages can prune only owners whose entire page sequence completed. */
-    fun conversationsReported(available: Map<ConversationId, AgentId>, authoritativeAgents: Set<AgentId>) = transition<Unit> {
-        applyCatalog(available, authoritativeAgents, available.keys)
+    fun conversationsReported(available: Map<ConversationId, AgentId>, authoritativeAgents: Set<AgentId>) {
+        return transition<Unit> {
+            applyCatalog(available, authoritativeAgents, available.keys)
+        }
     }
 
     /** Token-bound catalog completion for migrated consumers. */
@@ -353,9 +397,11 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         token: CurrentFocusRequest,
         available: Map<ConversationId, AgentId>,
         authoritativeAgents: Set<AgentId>,
-    ): Boolean = transition<Boolean> {
-        if (!accepts(token)) return@transition false
-        return@transition applyCatalog(available, authoritativeAgents, available.keys)
+    ): Boolean {
+        return transition<Boolean> {
+            if (!accepts(token)) return@transition false
+            return@transition applyCatalog(available, authoritativeAgents, available.keys)
+        }
     }
 
     /** Resume policy uses home-lane semantics, then trusted history, then eligible human recency. */
@@ -363,19 +409,21 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         resolveChat(agent, conversations, value.history[agent])
 
     /** Close in strip order, right neighbour then left; unresolved neighbours never borrow an agent. */
-    fun closeConversationTab(conversation: ConversationId) = transition<Unit> {
-        val result = ConversationTabsReducer.close(tabs, conversation.value)
-        if (conversation != selectedConversationId) {
-            tabs = result.state
-            return@transition
+    fun closeConversationTab(conversation: ConversationId) {
+        return transition<Unit> {
+            val result = ConversationTabsReducer.close(tabs, conversation.value)
+            if (conversation != selectedConversationId) {
+                tabs = result.state
+                return@transition
+            }
+            val fallback = result.fallbackConversationId?.let(::ConversationId)
+            val focus = if (fallback == null) CurrentFocus() else CurrentFocus(
+                "chat", value.owners[fallback], fallback, CurrentFocusChatMode.Exact,
+            )
+            startupAvailable = false
+            val validFocus = focus.takeIf { it.valid() } ?: CurrentFocus()
+            publishSelection(value.saved.copy(focus = validFocus, editorRoute = null).withTabs(result.state))
         }
-        val fallback = result.fallbackConversationId?.let(::ConversationId)
-        val focus = if (fallback == null) CurrentFocus() else CurrentFocus(
-            "chat", value.owners[fallback], fallback, CurrentFocusChatMode.Exact,
-        )
-        startupAvailable = false
-        val validFocus = focus.takeIf { it.valid() } ?: CurrentFocus()
-        publishSelection(value.saved.copy(focus = validFocus, editorRoute = null).withTabs(result.state))
     }
 
     private fun matchesCompletion(
@@ -384,13 +432,27 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         agent: AgentId,
         reference: ShellConversationRef?,
     ): Boolean {
+        val matchingOwner = conversation.value == "default" || value.owners[conversation]?.let { it == agent } != false
+        return requestedTargetMatches(token, conversation, agent) && matchingOwner &&
+            referenceMatches(token, conversation, agent, reference)
+    }
+
+    private fun requestedTargetMatches(token: CurrentFocusRequest, conversation: ConversationId, agent: AgentId): Boolean {
         val matchingAgent = token.requestedAgent == agent || token.requestedAgent == null && token.mode == CurrentFocusChatMode.Exact
         val matchingConversation = token.mode != CurrentFocusChatMode.Exact || token.exactConversation == conversation
-        val matchingOwner = conversation.value == "default" || value.owners[conversation]?.let { it == agent } != false
-        val matchingReference = reference == null || reference.id == conversation && reference.agent == agent
-        val humanResume = token.mode == CurrentFocusChatMode.Exact || reference?.lane?.isHumanFallback != false
-        val matchingIdentity = matchingAgent && matchingConversation && matchingOwner
-        return matchingIdentity && matchingReference && humanResume
+        return matchingAgent && matchingConversation
+    }
+
+    private fun referenceMatches(
+        token: CurrentFocusRequest,
+        conversation: ConversationId,
+        agent: AgentId,
+        reference: ShellConversationRef?,
+    ): Boolean {
+        if (reference == null) return true
+        val matchingTarget = reference.id == conversation && reference.agent == agent
+        val humanResume = token.mode == CurrentFocusChatMode.Exact || reference.lane.isHumanFallback
+        return matchingTarget && humanResume
     }
 
     private fun humanHistory(
@@ -412,7 +474,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
 
     private fun openEditor(editor: ShellDestination.AgentEditor) {
         val route = ShellRoute.encode(editor)
-        if (ShellRoute.decode(route) != editor || editor.agentId?.isBlank() == true) return
+        if (!validFocusEditorRoute(route)) return
         startupAvailable = false
         val focus = currentFocus.copy(pageRoute = "chat")
         val saved = value.saved.copy(focus = focus, editorRoute = route)
@@ -442,13 +504,18 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     private fun tabFor(conversation: ConversationId): ConversationTabsState =
         if (page.isChatPage) ConversationTabsReducer.select(tabs, conversation.value) else tabs
 
+    private fun catalogOwnerMatches(id: ConversationId, agent: AgentId): Boolean {
+        val validIds = id.value.isNotBlank() && agent.value.isNotBlank()
+        val matchingOwner = value.owners[id]?.let { it == agent } != false
+        return validIds && matchingOwner
+    }
+
     private fun applyCatalog(
         available: Map<ConversationId, AgentId>,
         authoritative: Set<AgentId>,
         ids: Set<ConversationId>,
     ): Boolean {
-        if (available.any { (id, agent) -> id.value.isBlank() || agent.value.isBlank() ||
-                value.owners[id]?.let { it != agent } == true }) return false
+        if (available.any { (id, agent) -> !catalogOwnerMatches(id, agent) }) return false
         val owners = value.owners + available.filterKeys { it.value != "default" }
         val gone = owners.filter { (id, agent) -> agent in authoritative && id !in ids }.keys
         val kept = tabs.openConversationIds.filterNot { ConversationId(it) in gone }.toSet()
