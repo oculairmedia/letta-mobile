@@ -21,17 +21,17 @@ class ShellWorkspaceStateTest {
     private val other = ShellConversationRef(cOther, a2, "2026-10-03T10:00:00Z")
 
     @Test
-    fun selectingAnAgentGoesToItsLastActiveThenItsLatestThenANewConversation() {
+    fun selectingAnAgentResumesItsLastActiveThenLatestWithoutImplicitCreation() {
         val chat = FakeChat(listOf(older, newer, other))
         val navigator = ShellWorkspaceNavigator(ShellWorkspaceState(), chat)
 
         navigator.openAgent(a1)
         assertEquals(listOf(cNew), chat.selected)
 
-        navigator.state.conversationShown(cOld, a1)
+        navigator.openConversation(cOld)
         navigator.openAgent(a2)
         navigator.openAgent(a1)
-        assertEquals(listOf(cNew, cOther, cOld), chat.selected)
+        assertEquals(listOf(cNew, cOld, cOther, cOld), chat.selected)
 
         // The last active conversation is gone: back to the latest.
         chat.all = listOf(newer, other)
@@ -40,7 +40,7 @@ class ShellWorkspaceStateTest {
         assertEquals(cNew, chat.selected.last())
 
         navigator.openAgent(a3)
-        assertEquals(listOf(a3), chat.created)
+        assertEquals(emptyList(), chat.created, "resume with no conversation does not create")
         assertEquals(a3, navigator.state.focusedAgentId)
         assertEquals(a3.value, navigator.state.destination.agentId)
     }
@@ -51,7 +51,7 @@ class ShellWorkspaceStateTest {
         val navigator = ShellWorkspaceNavigator(ShellWorkspaceState(ShellDestination.Chat()), chat)
         val state = navigator.state
         for (id in listOf(cOld, cNew, cOther)) {
-            state.conversationShown(id, null)
+            state.navigate(ShellDestination.Chat(conversationId = id.value))
             navigator.pinConversationTab(id)
         }
         assertEquals(listOf("c-old", "c-new", "c-other"), state.tabs.openConversationIds)
@@ -60,6 +60,7 @@ class ShellWorkspaceStateTest {
         assertEquals(listOf("c-other", "c-old", "c-new"), state.tabs.openConversationIds)
 
         // Not the active tab: only the strip changes.
+        state.navigate(ShellDestination.Chat(a1.value, cNew.value))
         chat.selectedConversation = cNew
         navigator.closeConversationTab(cOther)
         assertEquals(listOf("c-old", "c-new"), state.tabs.openConversationIds)
@@ -75,10 +76,11 @@ class ShellWorkspaceStateTest {
     }
 
     @Test
-    fun unpinUsesTheConversationActuallyShownByTheChat() {
+    fun unpinUsesTheCommittedOwnerRatherThanAStaleChatSelection() {
         val chat = FakeChat(listOf(older, newer))
         val state = ShellWorkspaceState(ShellDestination.Chat())
         val navigator = ShellWorkspaceNavigator(state, chat)
+        state.navigate(ShellDestination.Chat(a1.value, cOld.value))
         state.conversationShown(cOld, a1)
         navigator.pinConversationTab(cOld)
         chat.selectedConversation = cOld
@@ -86,16 +88,18 @@ class ShellWorkspaceStateTest {
 
         navigator.unpinConversationTab(cOld)
 
-        assertEquals("c-old", state.tabs.transientConversationId)
-        assertEquals(listOf("c-old"), state.tabs.openConversationIds)
+        assertEquals("c-new", state.tabs.transientConversationId)
+        assertEquals(listOf("c-new"), state.tabs.openConversationIds)
     }
 
     @Test
     fun partialCatalogPrunesOnlyCompletedAgentsAndKeepsOtherMemories() {
         val state = ShellWorkspaceState(ShellDestination.Chat())
-        state.conversationShown(cOld, a1)
+        state.navigate(ShellDestination.Chat(a1.value, cOld.value))
+        state.completeFocus(state.requestToken(), cOld, a1, older)
         state.tabs = com.letta.mobile.data.desktopshell.ConversationTabsReducer.pin(state.tabs, 0)
-        state.conversationShown(cOther, a2)
+        state.navigate(ShellDestination.Chat(a2.value, cOther.value))
+        state.completeFocus(state.requestToken(), cOther, a2, other)
         state.conversationShown(null, null)
         state.conversationsReported(mapOf(cNew to a1), emptySet())
         assertEquals(listOf("c-old", "c-other"), state.tabs.openConversationIds)
@@ -109,8 +113,8 @@ class ShellWorkspaceStateTest {
 
     @Test
     fun aConversationGetsATabOnlyWhileTheChatIsThePage() {
-        val state = ShellWorkspaceState(ShellDestination.Memory())
-        state.conversationShown(cOld, a1)
+        val state = ShellWorkspaceState(ShellDestination.Memory(a1.value))
+        state.conversationShown(state.requestToken(), cOld, a1)
         assertTrue(state.tabs.openConversationIds.isEmpty())
         state.showChat()
         state.conversationShown(cOld, a1)
@@ -137,7 +141,7 @@ class ShellWorkspaceStateTest {
         assertEquals(ShellDestination.Skills("agent-2", ShellSkillsSection.Tools), reopened.destination)
         assertTrue(reopened.openRoute("agent-editor?agent=agent-1"))
         assertEquals(ShellDestination.AgentEditor("agent-1"), reopened.destination)
-        assertEquals(ShellDestination.Chat("agent-1"), reopened.pageFor(a1, null))
+        assertEquals(ShellDestination.Chat("agent-2"), reopened.pageFor(a1, null))
 
         assertFalse(reopened.openRoute("nowhere"))
         assertFalse(reopened.openRoute(""))
@@ -164,23 +168,23 @@ class ShellWorkspaceStateTest {
     }
 
     @Test
-    fun aRosterRefreshKeepsTheFocusWhileTheAgentIsThere() {
+    fun aRosterRefreshNeverChoosesOrReplacesTheRequestedAgent() {
         val state = ShellWorkspaceState(ShellDestination.Chat())
         state.rosterChanged(listOf(a1, a2))
-        assertEquals(a1, state.focusedAgentId)
+        assertNull(state.focusedAgentId)
         state.focusedAgentId = a2
         state.rosterChanged(listOf(a1, a2, a3))
         assertEquals(a2, state.focusedAgentId)
         state.rosterChanged(listOf(a3))
-        assertEquals(a3, state.focusedAgentId)
+        assertEquals(a2, state.focusedAgentId)
         state.rosterChanged(emptyList())
-        assertNull(state.focusedAgentId)
+        assertEquals(a2, state.focusedAgentId)
 
         val stranger = AgentId("agent-9")
-        assertEquals(stranger, state.focusFor(stranger, listOf(a3)))
+        assertEquals(a2, state.focusFor(stranger, listOf(a3)))
         state.focusedAgentId = a3
         assertEquals(a3, state.focusFor(null, listOf(a1, a3)))
-        assertEquals(a1, state.focusFor(null, listOf(a1)))
+        assertEquals(a3, state.focusFor(null, listOf(a1)))
     }
 
     @Test
@@ -188,7 +192,7 @@ class ShellWorkspaceStateTest {
         val state = ShellWorkspaceState(ShellDestination.Memory("agent-1"))
         state.sessionChanged("session-1")
         state.showChat()
-        state.conversationShown(cOld, a1)
+        state.conversationShown(state.requestToken(), cOld, a1)
         state.navigate(ShellDestination.Memory("agent-1"))
         state.editAgentId = a1
         state.sessionChanged("session-1")
@@ -199,7 +203,7 @@ class ShellWorkspaceStateTest {
         assertNull(state.selectedConversationId)
         assertNull(state.agentEditor)
         assertTrue(state.tabs.openConversationIds.isEmpty())
-        assertEquals(ShellDestination.Memory(), state.destination)
+        assertEquals(ShellDestination.Home, state.destination)
         assertNull(state.resolveAgentChat(a1, listOf(other)))
     }
 
@@ -215,9 +219,10 @@ class ShellWorkspaceStateTest {
 
         chat.all = emptyList()
         val roster = AgentId("agent-5")
-        navigator.submitHomePrompt(ShellHomePrompt("new", focusedAgent = null, rosterAgent = roster))
+        navigator.submitHomePrompt(ShellHomePrompt("new", focusedAgent = roster, rosterAgent = null))
         assertEquals(listOf(roster), chat.created)
         assertEquals(ConversationId("created-agent-5") to "new", chat.sent.last())
+        chat.all = emptyList()
         navigator.submitHomePrompt(ShellHomePrompt("staged", focusedAgent = null, rosterAgent = null))
         assertEquals("staged", chat.staged)
         navigator.submitHomePrompt(ShellHomePrompt("   ", focusedAgent = null, rosterAgent = null))
@@ -234,12 +239,15 @@ class ShellWorkspaceStateTest {
         override fun conversations(): List<ShellConversationRef> = all
 
         override fun selectConversation(conversation: ConversationId) {
+            require(all.any { it.id == conversation && it.agent != null })
             selected += conversation
         }
 
         override fun createConversationForAgent(agent: AgentId, onCreated: (ConversationId) -> Unit) {
             created += agent
-            onCreated(ConversationId("created-${agent.value}"))
+            val id = ConversationId("created-${agent.value}")
+            all = all + ShellConversationRef(id, agent, "2026-11-07")
+            onCreated(id)
         }
 
         override fun startNewChat(agent: AgentId?) {
@@ -247,6 +255,7 @@ class ShellWorkspaceStateTest {
         }
 
         override fun send(conversation: ConversationId, text: String) {
+            require(all.any { it.id == conversation && it.agent != null && it.lane.canTarget })
             sent += conversation to text
         }
 

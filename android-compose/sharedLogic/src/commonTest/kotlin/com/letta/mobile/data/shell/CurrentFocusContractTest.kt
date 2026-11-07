@@ -1,4 +1,4 @@
-package com.letta.mobile.data.shell.focus
+package com.letta.mobile.data.shell
 
 import com.letta.mobile.data.serialization.LettaJson
 import kotlin.test.Test
@@ -20,6 +20,18 @@ class CurrentFocusContractTest {
             val persisted = LettaJson.persisted.encodeToString(case.expected)
             assertEquals(case.expected, LettaJson.persisted.decodeFromString<CurrentFocusSnapshot>(persisted), case.name)
             assertTrue(persisted.contains("\"contractVersion\":1"), case.name)
+        }
+    }
+
+    @Test
+    fun liveOwnerArbitratesAndRestoresEveryAcceptedFixtureEnvelope() {
+        cases.forEach { case ->
+            val owner = ShellWorkspaceState()
+            assertTrue(owner.initialize(case.inputs), case.name)
+            assertEquals(case.expected, owner.snapshot(), case.name)
+            val restored = ShellWorkspaceState().apply { bindSource(case.inputs.sourceKey, 1) }
+            assertTrue(restored.restoreJson(owner.snapshotJson()), case.name)
+            assertEquals(case.expected, restored.snapshot(), case.name)
         }
     }
 

@@ -72,7 +72,7 @@ data class ShellHomePrompt(
     val text: String,
     /** The focused agent, whose newest conversation takes the prompt first. */
     val focusedAgent: AgentId?,
-    /** With nothing focused, the roster's first agent gets a new conversation. */
+    /** Legacy roster suggestion, retained for compatibility; it cannot choose the current agent. */
     val rosterAgent: AgentId?,
 )
 
@@ -85,99 +85,113 @@ class ShellWorkspaceNavigator(
     val state: ShellWorkspaceState,
     private val chat: ShellChatPort,
 ) {
-    /** Shows a destination; see [ShellWorkspaceState.navigate]. */
+    /** Dispatch a destination to the workspace's atomic transition owner. */
     fun navigate(destination: ShellDestination) = state.navigate(destination)
 
-    /** Leaves any editor and shows [conversation] in the chat. */
+    /** Commit exact identity before asking a port to load it. An unknown owner stays unresolved. */
     fun openConversation(conversation: ConversationId) {
-        state.editAgentId = null
-        chat.selectConversation(conversation)
-        state.showChat()
+        val references = chat.conversations().filter { it.id == conversation }
+        val owners = references.mapNotNull { it.agent }.distinct()
+        val agent = owners.singleOrNull()
+        if (!state.selectFocus(CurrentFocus("chat", agent, conversation, CurrentFocusChatMode.Exact))) return
+        if (agent != null) {
+            state.completeFocus(state.requestToken(), conversation, agent, references.singleOrNull())
+            chat.selectConversation(conversation)
+        }
     }
 
-    /**
-     * "Open this agent" from any surface: its last active conversation, else its newest, else - for
-     * a roster-only agent with none - its first chat ([ShellWorkspaceState.resolveAgentChat]).
-     */
+    /** Resume this agent only. No eligible conversation means unresolved/empty, never implicit creation. */
     fun openAgent(agent: AgentId) {
-        state.editAgentId = null
-        state.focusedAgentId = agent
-        val existing = state.resolveAgentChat(agent, chat.conversations())
-        if (existing != null) chat.selectConversation(existing) else chat.createConversationForAgent(agent)
-        state.showChat()
+        if (!state.selectFocus(CurrentFocus("chat", agent))) return
+        val token = state.requestToken()
+        val conversations = chat.conversations()
+        val existing = state.resolveAgentChat(agent, conversations) ?: return
+        val reference = conversations.singleOrNull { it.id == existing && it.agent == agent }
+        if (state.completeFocus(token, existing, agent, reference)) chat.selectConversation(existing)
     }
 
-    /** A new chat with [agent], or with the chat's own default agent when there is none. */
+    /** Explicit New keeps null distinct from Resume; ports must return token-bound completions. */
     fun openNewChat(agent: AgentId?) {
-        state.editAgentId = null
-        agent?.let { state.focusedAgentId = it }
-        state.showChat()
-        chat.startNewChat(agent)
+        val target = agent ?: state.currentFocus.agentId
+        if (!state.selectFocus(CurrentFocus("chat", target, chatMode = CurrentFocusChatMode.New))) return
+        if (target != null && state.agentAvailability != FocusAvailability.Unavailable) chat.startNewChat(target)
     }
 
-    /**
-     * Home's chatbox reuses the chat rather than owning a second one: the focused agent's newest
-     * conversation takes the prompt, else the fleet's newest; with none at all, a new conversation
-     * for the focused (or first) agent, else the composer holds the text. The chat then shows.
-     */
+    /** Home send is an explicit operation. Capture creation identity before starting its effect. */
     fun submitHomePrompt(prompt: ShellHomePrompt) {
         val text = prompt.text.trim()
         if (text.isEmpty()) return
-        state.editAgentId = null
-        val conversations = chat.conversations().filter {
-            it.lane.canTarget && it.lane.purpose != ConversationPurpose.INBOX
+        if (prompt.focusedAgent == state.currentFocus.agentId && state.agentAvailability == FocusAvailability.Unavailable) {
+            chat.stageComposerText(text)
+            return
         }
-        val focused = prompt.focusedAgent?.let { agent -> newest(conversations.filter { it.agent == agent }) }
-        val target = focused ?: newest(conversations)
+        val target = homeConversation(prompt.focusedAgent)
         if (target != null) {
-            chat.send(target, text)
+            openConversation(target)
+            if (state.selectedConversationId == target) chat.send(target, text)
         } else {
-            startConversation(text, prompt.focusedAgent ?: prompt.rosterAgent)
+            startConversation(text, prompt.focusedAgent)
         }
-        state.showChat()
     }
 
-    /** Sends [prompt] to the selected conversation; with none, the composer holds it. */
+    /** Read the committed owner, never a port's independently selected conversation. */
     fun sendToSelectedConversation(prompt: String) {
-        val target = chat.selectedConversation
+        val focus = state.currentFocus
+        val target = focus.conversationId
         if (target == null) {
             chat.stageComposerText(prompt)
-        } else if (chat.conversations().any { it.id == target && it.lane.canTarget }) {
-            chat.send(target, prompt)
+        } else {
+            val available = state.agentAvailability != FocusAvailability.Unavailable &&
+                state.conversationAvailability != FocusAvailability.Unavailable
+            val ownedTarget = chat.conversations().any { it.id == target && it.agent == focus.agentId && it.lane.canTarget }
+            if (available && ownedTarget) chat.send(target, prompt)
         }
     }
 
-    /** Closes [conversation]'s tab; closing the active tab shows the tab beside it, or Home when none is left. */
+    /** Adjacent close is one owner transition; a port cannot supply a different active tab. */
     fun closeConversationTab(conversation: ConversationId) {
-        val result = ConversationTabsReducer.close(state.tabs, conversation.value)
-        val closingActiveTab = conversation == chat.selectedConversation
-        state.tabs = result.state
-        if (!closingActiveTab) return
-        val fallback = result.fallbackConversationId
-        if (fallback != null) openConversation(ConversationId(fallback)) else state.showPage(ShellDestination.Home)
+        val active = state.selectedConversationId == conversation
+        val knownOwners = chat.conversations().mapNotNull { ref -> ref.agent?.let { ref.id to it } }.toMap()
+        state.conversationsReported(knownOwners, emptySet())
+        state.closeConversationTab(conversation)
+        val next = state.currentFocus
+        if (active && next.agentId != null) next.conversationId?.let(chat::selectConversation)
     }
 
-    /** Keeps the preview tab until explicitly closed or unpinned. */
+    /** Keep the preview until explicitly unpinned or closed. */
     fun pinConversationTab(conversation: ConversationId) {
         state.tabs = ConversationTabsReducer.pin(state.tabs, state.tabs.openConversationIds.indexOf(conversation.value))
     }
 
-    /** Makes the active tab a preview, or removes an inactive tab. */
+    /** Unpin the owner-selected tab to preview, or close an inactive pinned tab. */
     fun unpinConversationTab(conversation: ConversationId) {
-        val displayed = chat.selectedConversation ?: state.selectedConversationId
         state.tabs = ConversationTabsReducer.unpin(
-            state.tabs, state.tabs.pinnedConversationIds.indexOf(conversation.value), conversation == displayed,
+            state.tabs, state.tabs.pinnedConversationIds.indexOf(conversation.value), conversation == state.selectedConversationId,
         )
     }
 
-    /** Moves [conversation]'s tab to [targetIndex]. */
+    /** Reorder within the pinned group; a preview keeps its trailing position. */
     fun reorderConversationTab(conversation: ConversationId, targetIndex: Int) {
         state.tabs = ConversationTabsReducer.reorder(state.tabs, conversation.value, targetIndex)
     }
 
+    private fun homeConversation(agent: AgentId?): ConversationId? {
+        val conversations = chat.conversations().filter {
+            it.agent != null && it.lane.isHumanFallback
+        }
+        return when (agent) {
+            null -> newest(conversations)
+            else -> newest(conversations.filter { it.agent == agent })
+        }
+    }
+
     private fun startConversation(text: String, agent: AgentId?) {
+        if (!state.selectFocus(CurrentFocus("chat", agent, chatMode = CurrentFocusChatMode.New))) return
+        val token = state.requestToken()
         if (agent != null) {
-            chat.createConversationForAgent(agent) { created -> chat.send(created, text) }
+            chat.createConversationForAgent(agent) { created ->
+                if (state.completeFocus(token, created, agent)) chat.send(created, text)
+            }
         } else {
             chat.stageComposerText(text)
         }

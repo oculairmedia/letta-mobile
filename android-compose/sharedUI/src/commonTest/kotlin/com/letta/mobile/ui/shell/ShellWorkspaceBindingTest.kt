@@ -23,6 +23,7 @@ class ShellWorkspaceBindingTest {
     @Test
     fun theFocusedAgentHeadsThePanelAndTheRestAreOnTheRail() {
         val workspace = ShellWorkspaceState(ShellDestination.Chat())
+        workspace.focusedAgentId = AgentId("agent-1")
         workspace.rosterChanged(roster.map { AgentId(it.first) })
 
         val drawer = workspace.navDrawerState(roster, now)
@@ -65,7 +66,8 @@ class ShellWorkspaceBindingTest {
         val workspace = ShellWorkspaceState(ShellDestination.Chat())
         workspace.rosterChanged(roster.map { AgentId(it.first) })
         workspace.navigate(ShellDestination.Chat("agent-3"))
-        workspace.conversationShown(ConversationId("conv-9"), AgentId("agent-3"))
+        val request = workspace.requestToken()
+        assertTrue(workspace.conversationShown(request, ConversationId("conv-9"), AgentId("agent-3")))
 
         val restored = recreated(workspace)
         restored.rosterChanged(roster.map { AgentId(it.first) })

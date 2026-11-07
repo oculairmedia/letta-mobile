@@ -25,6 +25,7 @@ class ShellTimelineConversationListTest {
     @Test
     fun theFocusedAgentsConversationsListInThePanelPinnedFirst() {
         val workspace = ShellWorkspaceState(ShellDestination.Chat())
+        workspace.focusedAgentId = AgentId("agent-1")
         workspace.rosterChanged(roster.map { AgentId(it.first) })
         val list = list(
             conversations = listOf(
