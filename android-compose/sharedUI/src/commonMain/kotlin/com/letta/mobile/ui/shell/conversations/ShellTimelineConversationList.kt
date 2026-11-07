@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
@@ -17,6 +18,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.conversations.ClientCommandRoutes
 import com.letta.mobile.data.chat.conversations.ComposerHostCommandSources
 import com.letta.mobile.data.chat.conversations.composerHostCommands
+import com.letta.mobile.data.shell.CurrentFocusChatMode
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.ui.chat.session.ChatHostCommand
@@ -31,9 +33,7 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.conversations.TimelineConversations
 import com.letta.mobile.data.chat.conversations.TimelineConversationsState
 import com.letta.mobile.ui.components.tabs.LettaTab
-import com.letta.mobile.ui.shell.ShellChatSelection
 import com.letta.mobile.ui.shell.ShellDrawerConversations
-import com.letta.mobile.ui.shell.SyncShellWorkspace
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import kotlinx.coroutines.CoroutineScope
@@ -114,13 +114,8 @@ fun rememberShellTimelineConversationList(
     )
 }
 
-/**
- * Keeps [workspace] and the owner in step, as desktop's controller and the workspace are: the
- * owner's selection is the chat the workspace shows (its agent focused, a tab while the chat is
- * the page). Only authoritative results prune known rows. The supplied reactive roster resumes
- * focused paging on directory arrival or visibility restoration. With nothing selected, the route's
- * conversation (a reload, a link) or else the focused agent's chat opens.
- */
+/** Projects the committed exact target to the timeline without writing chat emissions back to focus. */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun SyncTimelineConversations(
     workspace: ShellWorkspaceState,
@@ -129,23 +124,17 @@ fun SyncTimelineConversations(
     agents: List<Agent> = owner?.roster.orEmpty(),
 ) {
     val visibleAgents = agents.visibleInLists().mapTo(mutableSetOf()) { it.id }
-    // Read before the sync below reports the owner's (still empty) selection over it.
-    val routed = remember(owner) { workspace.selectedConversationId }
     val state = owner?.state.collectOr(NoConversations)
-    val selected = state.conversations.firstOrNull { it.id == state.selected }
-    val reported = state.authoritativeConversationIds()
-    SyncShellWorkspace(workspace, ShellChatSelection(session, state.selected, selected?.agentId, reported))
-    LaunchedEffect(workspace, state.conversations, state.authoritativeAgents, state.authoritative) {
-        workspace.reportPartial(state)
-    }
-    LaunchedEffect(workspace, selected?.agentId) { selected?.agentId?.let { workspace.focusedAgentId = it } }
-    LaunchedEffect(owner, state.loaded, state.authoritativeAgents, workspace.focusedAgentId, visibleAgents) {
-        val agent = workspace.focusedAgentId ?: return@LaunchedEffect
+    val focus = workspace.currentFocus
+    LaunchedEffect(owner, state.loaded, state.authoritativeAgents, focus.agentId, visibleAgents) {
+        val agent = focus.agentId ?: return@LaunchedEffect
         owner?.takeIf { state.loaded }?.readThroughFocused(agent)
     }
-    val chatShown = workspace.page is ShellDestination.Chat
-    LaunchedEffect(owner, state.loaded, state.selected, workspace.focusedAgentId, chatShown) {
-        owner?.openInitial(routed, workspace.focusedAgentId, createIfNone = chatShown)
+    LaunchedEffect(owner, focus, state.selected) {
+        val conversation = focus.conversationId ?: return@LaunchedEffect
+        if (focus.chatMode == CurrentFocusChatMode.Exact && state.selected != conversation) {
+            owner?.selectConversation(conversation)
+        }
     }
 }
 
@@ -155,14 +144,6 @@ private suspend fun TimelineConversations.readThroughFocused(agent: AgentId) {
     lists.focusAgent(agent)
     while (lists.hasMore(agent) && state.value.error == null) lists.loadMore(agent)
 }
-
-/** A bounded recents window is never evidence that an absent conversation was deleted. */
-/** A partial (recents) catalog prunes only the owners whose pages are complete. */
-private fun ShellWorkspaceState.reportPartial(state: TimelineConversationsState) {
-    if (state.authoritative) return
-    conversationsReported(state.conversations.associate { it.id to it.agentId }, state.authoritativeAgents)
-}
-
 
 internal fun TimelineConversationsState.authoritativeConversationIds(): Set<ConversationId>? =
     conversations.takeIf { loaded && authoritative }?.mapTo(mutableSetOf()) { it.id }
@@ -236,29 +217,37 @@ class ShellTimelineChat<P : ChatSessionPort>(
 
 /**
  * A host's whole chat over the shared [TimelineConversations] owner: the
- * owner per session ([rememberTimelineConversations]), kept in step with the workspace
- * ([SyncTimelineConversations]), its list for the drawer, and a port per selected conversation whose
+ * owner per session ([rememberTimelineConversations]), targeted from the workspace
+ * ([SyncTimelineConversations]), its list for the drawer, and a port for the committed conversation whose
  * scope ends when the selection or the owner changes; the owner's waiting prompts and failures
  * reach that port's composer while it is open.
  */
 @Composable
 fun <P : ChatSessionPort> rememberShellTimelineChat(binding: ShellTimelineChatBinding<P>): ShellTimelineChat<P> {
-    val owner = rememberTimelineConversations(
-        binding.connection, binding.backend, binding.agents,
-        binding.preferences,
-    )
+    val owner = key(binding.session) {
+        rememberTimelineConversations(
+            binding.connection, binding.backend, binding.agents,
+            binding.preferences,
+        )
+    }
     SyncTimelineConversations(binding.workspace, owner, binding.session, binding.agents)
     val list = rememberShellTimelineConversationList(owner, binding.preferences.pinnedAgents)
-    val target = remember(owner, list.state) { owner?.selectedTarget() }
+    val focus = binding.workspace.currentFocus
+    val target = owner?.selectedTarget()?.takeIf {
+        focus.chatMode == CurrentFocusChatMode.Exact &&
+            it.conversationId == focus.conversationId?.value && it.agentId == focus.agentId?.value
+    }
     val open by rememberUpdatedState(binding.open)
     val close by rememberUpdatedState(binding.close)
-    val port by produceState<P?>(null, owner, target) {
-        val live = owner ?: return@produceState
-        val chat = target ?: return@produceState
-        val opened = open(live, chat, this) ?: return@produceState
-        launch { live.deliverTo(ConversationId(chat.conversationId), opened.actions) }
-        value = opened
-        awaitDispose { close(opened) }
+    val port by key(owner, target) {
+        produceState<P?>(null, owner, target) {
+            val live = owner ?: return@produceState
+            val chat = target ?: return@produceState
+            val opened = open(live, chat, this) ?: return@produceState
+            launch { live.deliverTo(ConversationId(chat.conversationId), opened.actions) }
+            value = opened
+            awaitDispose { close(opened) }
+        }
     }
     return ShellTimelineChat(owner, list, port)
 }

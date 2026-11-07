@@ -105,6 +105,15 @@ class ShellWorkspaceBindingTest {
         assertFalse(drawer.panel.home)
     }
 
+    @Test
+    fun missingRosterKeepsTheRequestedAgentInThePanel() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat("agent-3"))
+        val drawer = workspace.navDrawerState(emptyList(), now)
+
+        assertEquals("agent-3", drawer.panel.agent.agentId)
+        assertEquals("Letta", drawer.panel.agent.name)
+    }
+
     private object NoChat : ShellChatPort {
         override fun conversations(): List<ShellConversationRef> = emptyList()
         override val selectedConversation: ConversationId? = null
