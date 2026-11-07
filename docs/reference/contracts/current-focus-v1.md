@@ -82,9 +82,9 @@ writable focus fields with one immutable `CurrentFocus` published atomically. No
 new platform state manager or parallel registry. The [CurrentFocus.kt][values] values
 are proposed serializable contract types; the live transition implementation is deferred.
 The four contract types live in the existing `com.letta.mobile.data.shell` package,
-which already depends on `data.model`. At the contract-only base, shell had 25 types;
-these four bring it to 29. With the 13 additional slice-1 owner/helper types, the
-package has exactly 42 types, below the structure ratchet's default cap of 50.
+which already depends on `data.model`. The structure scanner counts 34 shell types
+at the contract-only base, plus four slice-1 owner/helper types (38), plus these
+four relocated contract types: exactly 42, below the default cap of 50.
 
 | Authoritative value | Exact meaning |
 | --- | --- |
