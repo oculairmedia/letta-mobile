@@ -325,14 +325,14 @@ class NotebookLocalStore(
         return handle.documentId
     }
 
-    fun open(id: DocumentId): DocHandle? = openWithin(id, TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS))
+    fun open(id: DocumentId): DocHandle? = openWithin(id, TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS), cutByBudget = false)
 
     /**
-     * [open], waiting at most [nanos]. Only a wait of the full per-notebook limit records the
-     * notebook as slow on the fault board; a shorter wait cut by a lookup's budget says nothing
-     * about the notebook itself.
+     * [open], waiting at most [nanos]. A wait that ran to the notebook's own limit records it as
+     * slow on the fault board; one [cutByBudget] (a lookup's scan budget ran out first) says
+     * nothing about the notebook itself and records nothing.
      */
-    private fun openWithin(id: DocumentId, nanos: Long): DocHandle? {
+    private fun openWithin(id: DocumentId, nanos: Long, cutByBudget: Boolean): DocHandle? {
         health.awaitPrepared()
         if (health.isQuarantined(id.stableKey()) || health.isRetired(id.stableKey())) return null
         return try {
@@ -340,7 +340,7 @@ class NotebookLocalStore(
         } catch (timeout: TimeoutException) {
             val key = id.stableKey()
             val failure = TimeoutException("Notebook $key did not load within $TIMEOUT_SECONDS seconds").apply { initCause(timeout) }
-            if (nanos >= TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)) health.readTimedOut(key, failure)
+            if (!cutByBudget) health.readTimedOut(key, failure)
             throw failure
         }
     }
@@ -385,12 +385,16 @@ class NotebookLocalStore(
      * decodes every board in the repository.
      */
     internal fun canvasMetadata(id: DocumentId): CanvasDocument? =
-        canvasMetadataBy(id, System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS))
+        canvasMetadataBy(id, System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS), cutByBudget = false)
 
-    /** [canvasMetadata], with every wait (loading the notebook, then reading it) ending by [deadline]. */
-    private fun canvasMetadataBy(id: DocumentId, deadline: Long): CanvasDocument? {
+    /**
+     * [canvasMetadata], with every wait (loading the notebook, then reading it) ending by
+     * [deadline]. [cutByBudget] says the deadline is a lookup's scan budget rather than this
+     * notebook's own limit, so running out of time is not the notebook's fault.
+     */
+    private fun canvasMetadataBy(id: DocumentId, deadline: Long, cutByBudget: Boolean): CanvasDocument? {
         val left = { (deadline - System.nanoTime()).coerceAtLeast(1L) }
-        return openWithin(id, minOf(left(), TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)))?.withDocument { document ->
+        return openWithin(id, left(), cutByBudget)?.withDocument { document ->
             (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
         }?.get(left(), TimeUnit.NANOSECONDS)?.let { CanvasDocument.serializer().decodeStored(it) }?.also { remember(id, it) }
     }
@@ -441,8 +445,9 @@ class NotebookLocalStore(
             if (System.nanoTime() >= deadline) {
                 throw TimeoutException("Canvas lookup passed its scan budget").apply { slow?.let(::initCause) }
             }
+            val ownLimit = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)
             try {
-                canvasMetadataBy(id, minOf(deadline, System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)))?.let(match) == true
+                canvasMetadataBy(id, minOf(deadline, ownLimit), cutByBudget = deadline < ownLimit)?.let(match) == true
             } catch (timeout: TimeoutException) {
                 slow = timeout
                 false

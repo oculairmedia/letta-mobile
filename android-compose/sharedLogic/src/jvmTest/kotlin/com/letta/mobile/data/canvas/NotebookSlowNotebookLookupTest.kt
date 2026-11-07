@@ -77,7 +77,8 @@ class NotebookSlowNotebookLookupTest {
     fun aReadStartedNearTheDeadlineWaitsOnlyForWhatIsLeft() = runBlocking {
         val path = Files.createTempDirectory("notebook-slow-deadline-")
         val canvases = seedCanvases(path, count = 3)
-        val held = canvases.take(2).map { NotebookHistoryArchive(path).storageName(notebookKeyOf(path, it)) }.toSet()
+        val (fullWait, cutWait) = canvases.take(2).map { notebookKeyOf(path, it) }
+        val held = setOf(fullWait, cutWait).map { NotebookHistoryArchive(path).storageName(it) }.toSet()
         val release = CompletableFuture<Unit>()
 
         try {
@@ -88,6 +89,10 @@ class NotebookSlowNotebookLookupTest {
                 }
                 // The first stuck notebook takes its full 10 s; the second may only use the 5 s left.
                 assertTrue(elapsed < SHORT_BUDGET_MS + DEADLINE_SLACK_MS, "the second wait was cut to the budget, took ${elapsed}ms")
+
+                val slow = notebooks.storageFaults.value.filter { it.kind == CanvasStorageFault.Kind.LOAD_FAILED }.map { it.documentId }
+                assertTrue(fullWait in slow, "a notebook that used its whole limit is reported slow")
+                assertTrue(cutWait !in slow, "a wait the scan budget cut short is not the notebook's fault")
             }
         } finally {
             release.complete(Unit)
