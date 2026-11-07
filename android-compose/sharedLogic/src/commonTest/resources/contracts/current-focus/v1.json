@@ -828,5 +828,30 @@
       "railExpanded": true,
       "contractVersion": 1
     }
+  },
+  {
+    "name": "conversation-only deep link keeps its id while the owner is unresolved",
+    "inputs": {
+      "sourceKey": "backend-a",
+      "deepLink": {
+        "sourceKey": "backend-a",
+        "focus": {
+          "pageRoute": "chat",
+          "conversationId": "conv-9",
+          "chatMode": "exact"
+        },
+        "contractVersion": 1
+      }
+    },
+    "expected": {
+      "sourceKey": "backend-a",
+      "focus": {
+        "pageRoute": "chat",
+        "conversationId": "conv-9",
+        "chatMode": "exact"
+      },
+      "contractVersion": 1
+    },
+    "availability": "owner-unresolved"
   }
 ]

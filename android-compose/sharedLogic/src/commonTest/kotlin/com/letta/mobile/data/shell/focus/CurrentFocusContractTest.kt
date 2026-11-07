@@ -57,6 +57,17 @@ class CurrentFocusContractTest {
         }
     }
 
+    @Test
+    fun aConversationOnlyEntryKeepsItsIdWhileTheOwnerIsUnresolved() {
+        val case = cases.single { it.name == "conversation-only deep link keeps its id while the owner is unresolved" }
+        val actual = initialCurrentFocus(case.inputs)
+        assertNull(actual.focus.agentId, "no owner is guessed")
+        assertEquals("conv-9", actual.focus.conversationId?.value)
+        assertEquals(CurrentFocusChatMode.Exact, actual.focus.chatMode)
+        val persisted = LettaJson.persisted.encodeToString(actual)
+        assertEquals(actual, LettaJson.persisted.decodeFromString<CurrentFocusSnapshot>(persisted), "survives recreation")
+    }
+
     @Serializable
     private data class FocusCase(
         val name: String,
