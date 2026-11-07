@@ -15,6 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -101,21 +102,47 @@ class NotebookLocalStore(
         .filterValues { it != null }
         .mapValues { it.value!! }
 
-    /** Opt-in lifecycle polling; report conflicts to the caller rather than overwriting either side. */
+    /**
+     * Opt-in lifecycle polling; report conflicts to the caller rather than overwriting either side.
+     * A notebook whose version and projected files are unchanged since its last sync is skipped
+     * (a few file stats instead of reading and formatting it), so [onResult] hears only about the
+     * notebooks a poll actually synced. Every [FULL_SYNC_EVERY] polls every notebook is synced, in
+     * case an external edit kept a file's timestamp and size.
+     */
     @Synchronized
     fun startPolling(intervalMillis: Long, onResult: (DocumentId, NotebookProjectionResult) -> Unit = { _, _ -> }) {
         require(intervalMillis > 0)
         check(!closed) { "Notebook store is closed" }
         check(polling == null) { "Projection polling already started" }
+        val polls = AtomicLong()
         polling = poller.scheduleWithFixedDelay({
             try {
-                listDocuments().forEach { id ->
-                    val result = projectionResult { if (projection.hasBaseline(id)) reconcile(id) else project(id) }
-                    try { onResult(id, result!!) } catch (_: Exception) { /* A callback must not stop future polls. */ }
-                }
+                val full = polls.getAndIncrement() % FULL_SYNC_EVERY == 0L
+                listDocuments().forEach { id -> pollProjection(id, full)?.let { result -> report(onResult, id, result) } }
             } catch (_: Exception) { /* Index errors are retried on the next poll. */ }
         }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS)
     }
+
+    /** Sync [id]'s projection unless nothing changed since its last sync; null when skipped. */
+    private fun pollProjection(id: DocumentId, full: Boolean): NotebookProjectionResult? {
+        val heads = headsOf(id)
+        if (!full && heads != null && projection.isUnchangedSinceSync(id, heads)) return null
+        val result = projectionResult { if (projection.hasBaseline(id)) reconcile(id) else project(id) }!!
+        // An error is retried on every poll; any other outcome waits until something changes.
+        if (result != NotebookProjectionResult.ERROR) headsOf(id)?.let { projection.markSynced(id, it) }
+        return result
+    }
+
+    private fun report(onResult: (DocumentId, NotebookProjectionResult) -> Unit, id: DocumentId, result: NotebookProjectionResult) {
+        try { onResult(id, result) } catch (_: Exception) { /* A callback must not stop future polls. */ }
+    }
+
+    /** [id]'s current version (its heads), or null when it cannot be read now. */
+    private fun headsOf(id: DocumentId): String? = runCatching {
+        open(id)?.withDocument { document ->
+            document.heads.joinToString(",") { head -> head.bytes.joinToString("") { "%02x".format(it) } }
+        }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }.getOrNull()
 
     @Synchronized
     fun stopPolling() {
@@ -672,6 +699,9 @@ class NotebookLocalStore(
 
     private companion object {
         const val TIMEOUT_SECONDS = 10L
+
+        /** With one-second polling, a full sync of every notebook about once a minute. */
+        const val FULL_SYNC_EVERY = 60L
 
         /** One canvas lookup over every notebook gives up after this, however many notebooks are slow. */
         const val SCAN_BUDGET_SECONDS = 2 * TIMEOUT_SECONDS

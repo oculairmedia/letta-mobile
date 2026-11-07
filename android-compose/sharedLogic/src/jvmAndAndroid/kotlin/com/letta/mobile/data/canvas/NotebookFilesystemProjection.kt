@@ -7,6 +7,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -18,6 +19,9 @@ enum class NotebookProjectionResult { UNCHANGED, EXPORTED, IMPORTED, CONFLICT, E
 
 internal class NotebookFilesystemProjection(private val root: Path) {
     private enum class SyncMode { EXPORT_ONLY, RECONCILE }
+
+    /** Per notebook, its version and its files' timestamps and sizes when it was last synced. */
+    private val syncedStamps = ConcurrentHashMap<String, String>()
 
     @Serializable
     private data class Baseline(val id: String, val markdown: String, val yaml: String)
@@ -71,9 +75,24 @@ internal class NotebookFilesystemProjection(private val root: Path) {
         }
     }
 
+    /**
+     * Whether neither the notebook (its [heads]) nor its projected files changed since it was last
+     * synced. Answering this costs a few file stats instead of reading and formatting the notebook.
+     */
+    fun isUnchangedSinceSync(id: DocumentId, heads: String): Boolean = syncedStamps[id.hexKey()] == stampOf(id, heads)
+
+    /** Remember the state a sync left [id] in, so an idle poll can skip it. */
+    fun markSynced(id: DocumentId, heads: String) {
+        syncedStamps[id.hexKey()] = stampOf(id, heads)
+    }
+
+    private fun stampOf(id: DocumentId, heads: String): String {
+        val files = ProjectionFiles(folder(NotebookDocumentId(id.hexKey())))
+        return listOf(files.markdown, files.yaml, files.baseline).joinToString("|", prefix = "$heads|") { it.fileStamp() }
+    }
+
     fun hasBaseline(id: DocumentId): Boolean {
-        val hex = id.getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
-        val folder = folder(NotebookDocumentId(hex))
+        val folder = folder(NotebookDocumentId(id.hexKey()))
         if (!Files.exists(folder, NOFOLLOW_LINKS)) return false
         require(Files.isDirectory(folder, NOFOLLOW_LINKS)) { "Not a safe projection directory: $folder" }
         return safeRead(folder.resolve(".baseline.json")) != null
@@ -200,3 +219,10 @@ internal class NotebookFilesystemProjection(private val root: Path) {
             .digest(value.toByteArray(UTF_8)).joinToString("") { "%02x".format(it) }
     }
 }
+
+private fun DocumentId.hexKey(): String = getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+
+/** Modification time and size, or "-" when the file is absent. */
+private fun Path.fileStamp(): String =
+    if (!Files.exists(this, NOFOLLOW_LINKS)) "-"
+    else "${Files.getLastModifiedTime(this, NOFOLLOW_LINKS).toMillis()}:${Files.size(this)}"
