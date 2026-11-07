@@ -729,4 +729,10 @@ Existing Home shortcut identities, separated from Home controllers and storage. 
 
 # Package com.letta.mobile.data.shell.focus
 
-Proposed current-focus v1 values and pure startup precedence. A saved workspace envelope keeps the main focus, tab order, editor target and rail expansion together under a trusted source namespace. New external entries precede new explicit routes, same-source restoration and verified settings seeds. These values do not implement the live workspace owner or migrate any consumer; the contract and shared fixture define that later cutover.
+Current-focus v1 values and pure startup precedence. A saved workspace envelope keeps the main focus, tab order, editor target and rail expansion together under a trusted source namespace. New external entries precede new explicit routes, same-source restoration and verified settings seeds.
+
+`ShellWorkspaceState` owns one immutable focus/envelope and publishes validated transitions before chat effects. Capture `requestToken()` before asynchronous work and return it to `completeFocus` or `reportAvailability`; source generation, selection revision, requested agent, mode and exact ID fence stale results. Exact completions contribute human resume history only when a matching `ShellConversationRef` establishes an eligible lane; unclassified exact targets and inbox/work records cannot become resume fallbacks. `bindSource` separates a durable trusted namespace from live connection generation; a namespace change opens Home and clears source state, while reconnect retains navigation.
+
+`snapshot`/`snapshotJson` and `restore`/`restoreJson` preserve the versioned navigation envelope, including unresolved exact owners, ordered tabs, editor target and rail. `initialize` validates startup candidates once; unknown-source legacy settings remain outside the owner pending source verification. Runtime tokens, jobs, drafts and per-agent history are never restored.
+
+Existing workspace/navigator names remain dispatch/read adapters for later consumer slices; migrated consumers read `currentFocus` and observe `settledSnapshot` for source-scoped next-start seeds, without a feedback sync loop.

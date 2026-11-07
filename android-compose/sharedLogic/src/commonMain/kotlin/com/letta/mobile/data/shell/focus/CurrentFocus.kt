@@ -21,9 +21,9 @@ enum class CurrentFocusChatMode {
 }
 
 /**
- * Proposed v1 workspace focus value. [pageRoute] is a canonical ShellRoute without agent or
+ * Immutable v1 workspace focus value. [pageRoute] is a canonical ShellRoute without agent or
  * conversation query parameters and never an agent-editor route. Identity is stored only here;
- * routes, names, roster membership and loading/availability are projections. See current-focus-v1.md.
+ * routes, names, roster membership and loading/availability are projections. The shell workspace validates and owns live transitions; see current-focus-v1.md.
  */
 @Serializable
 data class CurrentFocus(
@@ -67,7 +67,7 @@ data class CurrentFocusInputs(
 )
 
 /**
- * Pure proposal precedence, without storage, resolution or a live state owner. A new external
+ * Pure startup precedence, without storage or target resolution. A new external
  * entry wins over a new route, then same-source saved state, then a verified settings seed, then
  * Home. New entries retain same-source saved tabs/rail and supply their own editor target (null
  * closes it). Settings seeds contribute focus only. Other versions/sources cannot restore state.
