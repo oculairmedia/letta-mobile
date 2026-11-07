@@ -377,17 +377,17 @@ class NotebookLocalStore(
      */
     internal fun canvasMetadata(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
         (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { Json.decodeFromString<CanvasDocument>(it) }?.also { remember(id, it) }
+    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { CanvasDocument.serializer().decodeStored(it) }?.also { remember(id, it) }
 
     /** The canvas's metadata (identity, revision, ownership) without its board. */
     private fun metadataFrom(read: Read): CanvasDocument? =
         (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-            ?.let { Json.decodeFromString<CanvasDocument>(it) }
+            ?.let { CanvasDocument.serializer().decodeStored(it) }
 
     private fun canvasFrom(read: Read): CanvasDocument? {
         val metadata = (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
             ?: return null
-        val doc = Json.decodeFromString<CanvasDocument>(metadata)
+        val doc = CanvasDocument.serializer().decodeStored(metadata)
         val board = Json.parseToJsonElement(boardFrom(read)).jsonObject
         val scene = JsonObject(board.filterKeys { it != "schema" }).toString()
         val blankBase = NotebookBoardStorage.baseIsBlank(read) == true
@@ -433,7 +433,8 @@ class NotebookLocalStore(
         if (current != null && current.id != doc.id) return null
         val base = NotebookBoardStorage.readSceneBase(tx)
         if (base == null) NotebookBoardStorage.writeBoard(tx, write.incoming) else NotebookBoardStorage.mergeCanvasBoard(tx, base, write.save)
-        val metadata = Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = ""))
+        val stored = (tx.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
+        val metadata = CanvasDocument.serializer().encodeKeepingUnknown(doc.copy(sceneJson = ""), stored)
         NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "canvasMetadata", metadata)
         NotebookBoardStorage.writeSceneBase(tx, write.base)
         NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", doc.title)
@@ -458,7 +459,7 @@ class NotebookLocalStore(
         val itemsId = (document.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
         val items = document.keys(itemsId).orElseThrow().map { key ->
             val value = (document.get(itemsId, key).orElseThrow() as AmValue.Str).value
-            Json.decodeFromString<NotebookItem>(value).also { require(it.id == key) }
+            NotebookItem.serializer().decodeStored(value).also { require(it.id == key) }
         }
         NotebookDocument(NotebookDocumentId(id.stableKey()), title, document.text(textId).orElseThrow(), board, items)
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -546,7 +547,8 @@ class NotebookLocalStore(
         require(item.id.isNotBlank())
         mutate(id) { tx ->
             val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-            tx.set(itemsId, item.id, Json.encodeToString(NotebookItem.serializer(), item))
+            val stored = (tx.get(itemsId, item.id).orElse(null) as? AmValue.Str)?.value
+            tx.set(itemsId, item.id, NotebookItem.serializer().encodeKeepingUnknown(item, stored))
         }
     }
 
