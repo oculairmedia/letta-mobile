@@ -48899,6 +48899,134 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceState {
 	public final fun showPage (Lcom/letta/mobile/data/shell/ShellDestination;)V
 }
 
+public final class com/letta/mobile/data/shell/focus/CurrentFocus {
+	public static final field Companion Lcom/letta/mobile/data/shell/focus/CurrentFocus$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-hzr7vF4 ()Ljava/lang/String;
+	public final fun component3-hsG4S5c ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+	public final fun copy-nGNQqBU (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;)Lcom/letta/mobile/data/shell/focus/CurrentFocus;
+	public static synthetic fun copy-nGNQqBU$default (Lcom/letta/mobile/data/shell/focus/CurrentFocus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/focus/CurrentFocus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-hzr7vF4 ()Ljava/lang/String;
+	public final fun getChatMode ()Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+	public final fun getConversationId-hsG4S5c ()Ljava/lang/String;
+	public final fun getPageRoute ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shell/focus/CurrentFocus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/focus/CurrentFocus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shell/focus/CurrentFocus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shell/focus/CurrentFocus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusChatMode : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode$Companion;
+	public static final field Exact Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+	public static final field New Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+	public static final field Resume Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+	public static fun values ()[Lcom/letta/mobile/data/shell/focus/CurrentFocusChatMode;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusChatMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusInputs {
+	public static final field Companion Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs$Companion;
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun component3 ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun component4 ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun component5 ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;)Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs;Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDeepLink ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun getExplicitRoute ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun getRestored ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun getSettingsSeed ()Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public final fun getSourceKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shell/focus/CurrentFocusInputs$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusInputs$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusKt {
+	public static final fun initialCurrentFocus (Lcom/letta/mobile/data/shell/focus/CurrentFocusInputs;)Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusSnapshot {
+	public static final field Companion Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocus;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocus;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/focus/CurrentFocus;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4-hsG4S5c ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Z
+	public final fun component7 ()I
+	public final fun copy-yK1dbxc (Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocus;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ZI)Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public static synthetic fun copy-yK1dbxc$default (Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;Ljava/lang/String;Lcom/letta/mobile/data/shell/focus/CurrentFocus;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;ZIILjava/lang/Object;)Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContractVersion ()I
+	public final fun getEditorRoute ()Ljava/lang/String;
+	public final fun getFocus ()Lcom/letta/mobile/data/shell/focus/CurrentFocus;
+	public final fun getPinnedConversationIds ()Ljava/util/List;
+	public final fun getPreviewConversationId-hsG4S5c ()Ljava/lang/String;
+	public final fun getRailExpanded ()Z
+	public final fun getSourceKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shell/focus/CurrentFocusSnapshot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shell/focus/CurrentFocusSnapshot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/focus/CurrentFocusSnapshot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/letta/mobile/data/skills/Skill {
 	public static final field Companion Lcom/letta/mobile/data/skills/Skill$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/lang/String;Z)V
