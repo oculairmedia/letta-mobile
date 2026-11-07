@@ -8,6 +8,7 @@ import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import androidx.compose.runtime.saveable.SaverScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -52,6 +53,45 @@ class ShellWorkspaceBindingTest {
         actions.panel.onOpenSection(LensDestination.Memory)
         assertEquals(ShellDestination.Memory("agent-2"), workspace.destination)
         assertEquals(4, closed)
+    }
+
+    private fun recreated(state: ShellWorkspaceState): ShellWorkspaceState {
+        val saved = with(ShellWorkspaceSaver) { SaverScope { true }.save(state) }
+        return requireNotNull(ShellWorkspaceSaver.restore(requireNotNull(saved)))
+    }
+
+    @Test
+    fun aRecreationKeepsTheAgentAndConversationTheUserIsIn() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat())
+        workspace.rosterChanged(roster.map { AgentId(it.first) })
+        workspace.navigate(ShellDestination.Chat("agent-3"))
+        workspace.conversationShown(ConversationId("conv-9"), AgentId("agent-3"))
+
+        val restored = recreated(workspace)
+        restored.rosterChanged(roster.map { AgentId(it.first) })
+
+        assertEquals(AgentId("agent-3"), restored.focusedAgentId, "rotation must not fall back to the roster's first agent")
+        assertEquals(ConversationId("conv-9"), restored.selectedConversationId)
+        assertEquals(ShellDestination.Chat("agent-3", "conv-9"), restored.destination)
+    }
+
+    @Test
+    fun aRecreationKeepsTheRailWidthAndAnOtherPage() {
+        val workspace = ShellWorkspaceState(ShellDestination.Home)
+        workspace.railExpanded = true
+        workspace.navigate(ShellDestination.Memory("agent-2"))
+
+        val restored = recreated(workspace)
+
+        assertTrue(restored.railExpanded)
+        assertEquals(ShellDestination.Memory("agent-2"), restored.destination)
+    }
+
+    @Test
+    fun aRecreationOfAFreshWorkspaceStaysOnHome() {
+        val restored = recreated(ShellWorkspaceState(ShellDestination.Home))
+        assertEquals(ShellDestination.Home, restored.destination)
+        assertFalse(restored.railExpanded)
     }
 
     @Test
