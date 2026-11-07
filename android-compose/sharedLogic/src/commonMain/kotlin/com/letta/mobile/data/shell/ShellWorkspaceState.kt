@@ -9,6 +9,7 @@ import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.shell.focus.CurrentFocus
 import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
@@ -174,13 +175,18 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             val focus = currentFocus.copy(agentId = agent, conversationId = conversation, chatMode = CurrentFocusChatMode.Exact)
             if (!focus.valid()) return@transition false
             val saved = value.saved.copy(focus = focus).withTabs(tabFor(conversation))
+            val resolvedOwners = if (conversation.value == IdFormats.DEFAULT_CONVERSATION_ID) {
+                value.owners
+            } else {
+                value.owners + (conversation to agent)
+            }
             value = value.copy(
                 saved = saved,
                 agentAvailability =
                     if (agentAvailability == FocusAvailability.Unavailable) agentAvailability else FocusAvailability.Available,
                 conversationAvailability = FocusAvailability.Available,
                 history = humanHistory(token, reference, agent, conversation),
-                owners = if (conversation.value == "default") value.owners else value.owners + (conversation to agent),
+                owners = resolvedOwners,
                 settled = saved.takeIf { sourceKey != null },
             )
             true
@@ -380,10 +386,10 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         return transition<Unit> {
             val availableValues = available.mapTo(mutableSetOf()) { it.value }
             val selected = selectedConversationId
-            val gone = selected != null && selected.value != "default" && selected !in available
+            val gone = selected != null && selected.value != IdFormats.DEFAULT_CONVERSATION_ID && selected !in available
             value = value.copy(
                 saved = value.saved.withTabs(ConversationTabsReducer.retainAvailable(tabs, availableValues, selected?.value)),
-                history = value.history.filterValues { it.value == "default" || it in available },
+                history = value.history.filterValues { it.value == IdFormats.DEFAULT_CONVERSATION_ID || it in available },
                 owners = value.owners.filterKeys { it in available },
                 conversationAvailability = if (gone) FocusAvailability.Unavailable else conversationAvailability,
             )
@@ -437,7 +443,8 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         agent: AgentId,
         reference: ShellConversationRef?,
     ): Boolean {
-        val matchingOwner = conversation.value == "default" || value.owners[conversation]?.let { it == agent } != false
+        val matchingOwner = conversation.value == IdFormats.DEFAULT_CONVERSATION_ID ||
+            value.owners[conversation]?.let { it == agent } != false
         return requestedTargetMatches(token, conversation, agent) && matchingOwner &&
             referenceMatches(token, conversation, agent, reference)
     }
@@ -521,7 +528,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         ids: Set<ConversationId>,
     ): Boolean {
         if (available.any { (id, agent) -> !catalogOwnerMatches(id, agent) }) return false
-        val owners = value.owners + available.filterKeys { it.value != "default" }
+        val owners = value.owners + available.filterKeys { it.value != IdFormats.DEFAULT_CONVERSATION_ID }
         val gone = owners.filter { (id, agent) -> agent in authoritative && id !in ids }.keys
         val kept = tabs.openConversationIds.filterNot { ConversationId(it) in gone }.toSet()
         val nextTabs = ConversationTabsReducer.retainAvailable(tabs, kept, selectedConversationId?.value)

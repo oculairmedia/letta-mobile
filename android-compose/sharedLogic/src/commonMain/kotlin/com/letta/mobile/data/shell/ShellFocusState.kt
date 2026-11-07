@@ -3,6 +3,7 @@ package com.letta.mobile.data.shell
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.shell.focus.CurrentFocus
 import com.letta.mobile.data.shell.focus.CurrentFocusChatMode
 import com.letta.mobile.data.shell.focus.CurrentFocusSnapshot
@@ -57,7 +58,7 @@ internal fun CurrentFocus.valid(): Boolean {
         CurrentFocusChatMode.Exact -> conversationId != null
         CurrentFocusChatMode.Resume, CurrentFocusChatMode.New -> conversationId == null
     }
-    val scopedDefault = conversationId?.value != "default" || agentId != null
+    val scopedDefault = conversationId?.value != IdFormats.DEFAULT_CONVERSATION_ID || agentId != null
     return canonicalPage && validMode && scopedDefault && agentId?.value?.isBlank() != true &&
         conversationId?.value?.isBlank() != true
 }
