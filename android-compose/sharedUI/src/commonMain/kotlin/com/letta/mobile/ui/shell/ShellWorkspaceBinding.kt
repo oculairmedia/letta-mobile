@@ -32,9 +32,14 @@ import kotlin.time.Instant
 fun rememberShellWorkspaceState(initialPage: ShellDestination): ShellWorkspaceState =
     rememberSaveable(saver = ShellWorkspaceSaver) { ShellWorkspaceState(initialPage) }
 
-/** Saved as the rail's width mark, then the page's route: `+home`, `-chat?agent=a`. */
-private val ShellWorkspaceSaver = Saver<ShellWorkspaceState, String>(
-    save = { (if (it.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + ShellRoute.encode(it.page) },
+/**
+ * Saved as the rail's width mark, then the destination's route with the focus filled in
+ * (`+home`, `-chat?agent=a&conversation=c`). The destination, not the bare page, carries the agent
+ * and conversation the user is in, so a recreation (rotation, a fold) comes back to them rather
+ * than to the roster's first agent.
+ */
+internal val ShellWorkspaceSaver = Saver<ShellWorkspaceState, String>(
+    save = { (if (it.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + it.route },
     restore = { saved ->
         val page = ShellRoute.decode(saved.drop(1)) ?: ShellDestination.Home
         ShellWorkspaceState(page).apply { railExpanded = saved.startsWith(RAIL_EXPANDED) }
