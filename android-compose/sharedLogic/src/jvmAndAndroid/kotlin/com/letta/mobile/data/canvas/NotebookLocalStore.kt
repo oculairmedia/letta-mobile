@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.mutations.NotebookMutationFence
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.attr
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
@@ -88,9 +89,10 @@ class NotebookLocalStore(
     /** Indexed notebooks include local creations and explicitly registered remote documents. */
     @Synchronized
     fun listDocuments(): List<DocumentId> = health.awaitPrepared().let { documents.read() }
-        .filterNot { health.isQuarantined(it) || health.isRetired(it) }.map { key ->
+        .filterNot { health.isQuarantined(it) || health.isRetired(it) }.map(::documentIdOf)
+
+    private fun documentIdOf(key: String): DocumentId =
         DocumentId.fromBytes(key.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
-    }
 
     /** Reconcile previously projected documents; new documents are exported by startPolling. */
     @Synchronized
@@ -378,6 +380,53 @@ class NotebookLocalStore(
     internal fun canvasMetadata(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
         (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { Json.decodeFromString<CanvasDocument>(it) }?.also { remember(id, it) }
+
+    /**
+     * [canvasMetadata], or null when [id] did not load in time. A scan over every notebook uses
+     * this so one notebook that is slow to load is skipped instead of failing the whole lookup;
+     * the timeout itself is already on the fault board.
+     */
+    internal fun canvasMetadataOrSkip(id: DocumentId): CanvasDocument? = skippingSlow { canvasMetadata(id) }
+
+    /** [canvasDocument], or null when [id] did not load in time; see [canvasMetadataOrSkip]. */
+    internal fun canvasDocumentOrSkip(id: DocumentId): CanvasDocument? = skippingSlow { canvasDocument(id) }
+
+    private inline fun <T> skippingSlow(read: () -> T?): T? = try {
+        read()
+    } catch (_: TimeoutException) {
+        null
+    }
+
+    /**
+     * The notebook holding [canvasId], or null when no notebook holds it. The notebook last seen
+     * holding it this session is tried first and confirmed with one metadata read; otherwise see
+     * [firstNotebook]. Every metadata read records what it saw, so a scan also answers later lookups.
+     */
+    internal fun notebookHolding(canvasId: CanvasId): DocumentId? {
+        val hinted = health.notebookLastHolding(canvasId)?.let(::documentIdOf)
+        if (hinted != null && canvasMetadataOrSkip(hinted)?.id == canvasId) return hinted
+        return firstNotebook { it.id == canvasId }
+    }
+
+    /**
+     * The first notebook whose canvas metadata matches, or null when none does. A notebook too
+     * slow to load is passed over so the others are still checked, but if nothing matched among
+     * the ones that loaded the answer is inconclusive and this throws [TimeoutException] rather
+     * than reporting "absent": a caller must never create a second notebook for a canvas whose
+     * own notebook was only slow.
+     */
+    internal fun firstNotebook(match: (CanvasDocument) -> Boolean): DocumentId? {
+        var slow: TimeoutException? = null
+        val found = listDocuments().firstOrNull { id ->
+            try {
+                canvasMetadata(id)?.let(match) == true
+            } catch (timeout: TimeoutException) {
+                slow = timeout
+                false
+            }
+        }
+        return found ?: slow?.let { throw it }
+    }
 
     /** The canvas's metadata (identity, revision, ownership) without its board. */
     private fun metadataFrom(read: Read): CanvasDocument? =

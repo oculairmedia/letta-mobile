@@ -1,0 +1,86 @@
+package com.letta.mobile.data.canvas
+
+import com.letta.mobile.data.canvas.notes.NotebookCanvasIdentity
+import com.letta.mobile.data.model.CanvasId
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Optional
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeoutException
+import kotlin.system.measureTimeMillis
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlinx.coroutines.runBlocking
+import org.automerge.repo.Storage
+import org.automerge.repo.StorageKey
+
+/**
+ * One notebook that will not load must not break lookups of canvases in other notebooks, and
+ * must never make the store answer "absent" for a canvas whose own notebook was only slow.
+ */
+class NotebookSlowNotebookLookupTest {
+    @Test
+    fun aSlowNotebookIsPassedOverButNeverReportedAbsent() = runBlocking {
+        val path = Files.createTempDirectory("notebook-slow-lookup-")
+        val (slowCanvas, fastCanvas) = seed(path)
+        val slowStorage = NotebookHistoryArchive(path).storageName(notebookKeyOf(path, slowCanvas))
+        val release = CompletableFuture<Unit>()
+        val hold = { delegate: Storage -> HeldStorage(delegate, slowStorage, release) }
+
+        try {
+            NotebookLocalStore(path, "slow-lookup-peer", storage = hold).use { notebooks ->
+                val store = NotebookCanvasDocumentStore(notebooks)
+                val indexed = notebooks.listDocuments().size
+
+                assertEquals(fastCanvas, store.get(fastCanvas)?.id, "a slow unrelated notebook must not hide this canvas")
+                val listed = store.listAll().map { it.id }
+                assertEquals(listOf(fastCanvas), listed, "listing skips the slow notebook instead of failing")
+
+                val identity = NotebookCanvasIdentity(notebooks)
+                val elapsed = measureTimeMillis { assertTrue(identity.notebookOf(fastCanvas) != null) }
+                assertTrue(elapsed < HINTED_LOOKUP_MS, "a canvas seen this session resolves from its hint, took ${elapsed}ms")
+
+                assertFailsWith<TimeoutException>("a canvas whose own notebook is slow is unknown, not absent") {
+                    store.get(slowCanvas)
+                }
+                assertEquals(indexed, notebooks.listDocuments().size, "no second notebook was created")
+            }
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
+    private suspend fun seed(path: Path): Pair<CanvasId, CanvasId> = NotebookLocalStore(path, "slow-lookup-peer").use { notebooks ->
+        val store = NotebookCanvasDocumentStore(notebooks)
+        val slow = CanvasSession.create(store).canvasId
+        val fast = CanvasSession.create(store).canvasId
+        notebooks.listDocuments().forEach { notebooks.persistCanvas(it) }
+        slow to fast
+    }
+
+    private fun notebookKeyOf(path: Path, canvasId: CanvasId): String = NotebookLocalStore(path, "slow-lookup-peer").use { notebooks ->
+        val id = requireNotNull(notebooks.notebookHolding(canvasId))
+        id.bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** Storage whose loads for one document never complete until [release]. */
+    private class HeldStorage(
+        private val delegate: Storage,
+        private val heldName: String,
+        private val release: CompletableFuture<Unit>,
+    ) : Storage by delegate {
+        private fun held(key: StorageKey) = key.parts.firstOrNull() == heldName
+
+        override fun load(key: StorageKey): CompletableFuture<Optional<ByteArray>> =
+            if (held(key)) release.thenCompose { delegate.load(key) } else delegate.load(key)
+
+        override fun loadRange(prefix: StorageKey): CompletableFuture<MutableMap<StorageKey, ByteArray>> =
+            if (held(prefix)) release.thenCompose { delegate.loadRange(prefix) } else delegate.loadRange(prefix)
+    }
+
+    private companion object {
+        const val HINTED_LOOKUP_MS = 5_000L
+    }
+}

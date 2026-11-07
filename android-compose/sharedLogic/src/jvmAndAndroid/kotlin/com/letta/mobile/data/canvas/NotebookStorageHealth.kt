@@ -294,6 +294,9 @@ internal class NotebookStorageHealth(
         canvases[key] = canvasId
     }
 
+    /** The notebook last seen holding [canvasId] in this session; only a hint, callers confirm it. */
+    fun notebookLastHolding(canvasId: CanvasId): String? = canvases.entries.firstOrNull { it.value == canvasId }?.key
+
     /**
      * The repository's storage: failures are reported, and retired documents are neither loaded
      * nor stored, so a peer offering one cannot bring it back.

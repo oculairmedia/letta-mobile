@@ -15,7 +15,7 @@ import kotlinx.coroutines.runInterruptible
 class NotebookCanvasIdentity(private val notebooks: NotebookLocalStore) : CanvasNotebookIdentity {
     /** The notebook's current storage generation; a note opened by an earlier ID still resolves to it. */
     override suspend fun notebookOf(canvasId: CanvasId): NotebookDocumentId? = locked {
-        notebooks.listDocuments().firstOrNull { notebooks.canvasMetadata(it)?.id == canvasId }?.let(::notebookDocumentId)
+        notebooks.notebookHolding(canvasId)?.let(::notebookDocumentId)
     }
 
     override suspend fun canvasOf(notebook: NotebookDocumentId): CanvasId? = locked {

@@ -39,16 +39,15 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
     private val notebookOf = ConcurrentHashMap<CanvasId, DocumentId>()
 
     /** The notebook holding the first canvas whose metadata matches; boards are not decoded. */
-    private fun find(match: (CanvasDocument) -> Boolean): DocumentId? =
-        notebooks.listDocuments().firstOrNull { id -> notebooks.canvasMetadata(id)?.let(match) == true }
+    private fun find(match: (CanvasDocument) -> Boolean): DocumentId? = notebooks.firstNotebook(match)
 
     /** [find] by canvas id, answering from [notebookOf] when its hint still holds. */
     private fun findCanvas(id: CanvasId): DocumentId? {
         notebookOf[id]?.let { hint ->
-            if (notebooks.canvasMetadata(hint)?.id == id) return hint
+            if (notebooks.canvasMetadataOrSkip(hint)?.id == id) return hint
             notebookOf.remove(id, hint)
         }
-        return find { it.id == id }?.also { notebookOf[id] = it }
+        return notebooks.notebookHolding(id)?.also { notebookOf[id] = it }
     }
 
     /**
@@ -67,7 +66,7 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
         findCanvas(id)?.let(notebooks::deletedBoardElements) ?: emptyList()
     }
 
-    private fun all(): List<CanvasDocument> = notebooks.listDocuments().mapNotNull { notebooks.canvasDocument(it) }
+    private fun all(): List<CanvasDocument> = notebooks.listDocuments().mapNotNull { notebooks.canvasDocumentOrSkip(it) }
 
     override suspend fun get(id: CanvasId): CanvasDocument? = locked {
         findCanvas(id)?.let(notebooks::canvasDocument)
@@ -115,8 +114,8 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
 
     override suspend fun listForAgent(agentId: AgentId): List<CanvasDocument> = locked {
         notebooks.listDocuments()
-            .filter { id -> notebooks.canvasMetadata(id)?.agentId == agentId.value }
-            .mapNotNull(notebooks::canvasDocument)
+            .filter { id -> notebooks.canvasMetadataOrSkip(id)?.agentId == agentId.value }
+            .mapNotNull(notebooks::canvasDocumentOrSkip)
             .sortedByDescending { it.updatedAtEpochMs }
     }
 
