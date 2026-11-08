@@ -58870,6 +58870,7 @@ final class com.letta.mobile.data.shell/ShellWorkspaceState { // com.letta.mobil
     final fun conversationsReported(kotlin.collections/Map<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId>, kotlin.collections/Set<com.letta.mobile.data.model/AgentId>) // com.letta.mobile.data.shell/ShellWorkspaceState.conversationsReported|conversationsReported(kotlin.collections.Map<com.letta.mobile.data.model.ConversationId,com.letta.mobile.data.model.AgentId>;kotlin.collections.Set<com.letta.mobile.data.model.AgentId>){}[0]
     final fun conversationsReported(kotlin.collections/Set<com.letta.mobile.data.model/ConversationId>) // com.letta.mobile.data.shell/ShellWorkspaceState.conversationsReported|conversationsReported(kotlin.collections.Set<com.letta.mobile.data.model.ConversationId>){}[0]
     final fun focusFor(com.letta.mobile.data.model/AgentId?, kotlin.collections/List<com.letta.mobile.data.model/AgentId>): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell/ShellWorkspaceState.focusFor|focusFor(com.letta.mobile.data.model.AgentId?;kotlin.collections.List<com.letta.mobile.data.model.AgentId>){}[0]
+    final fun holdPending(com.letta.mobile.data.shell/CurrentFocusSnapshot): kotlin/Boolean // com.letta.mobile.data.shell/ShellWorkspaceState.holdPending|holdPending(com.letta.mobile.data.shell.CurrentFocusSnapshot){}[0]
     final fun initialize(com.letta.mobile.data.shell/CurrentFocusInputs): kotlin/Boolean // com.letta.mobile.data.shell/ShellWorkspaceState.initialize|initialize(com.letta.mobile.data.shell.CurrentFocusInputs){}[0]
     final fun navigate(com.letta.mobile.data.shell/ShellDestination) // com.letta.mobile.data.shell/ShellWorkspaceState.navigate|navigate(com.letta.mobile.data.shell.ShellDestination){}[0]
     final fun openNewAgent() // com.letta.mobile.data.shell/ShellWorkspaceState.openNewAgent|openNewAgent(){}[0]
@@ -58888,6 +58889,7 @@ final class com.letta.mobile.data.shell/ShellWorkspaceState { // com.letta.mobil
     final fun showPage(com.letta.mobile.data.shell/ShellDestination) // com.letta.mobile.data.shell/ShellWorkspaceState.showPage|showPage(com.letta.mobile.data.shell.ShellDestination){}[0]
     final fun snapshot(): com.letta.mobile.data.shell/CurrentFocusSnapshot // com.letta.mobile.data.shell/ShellWorkspaceState.snapshot|snapshot(){}[0]
     final fun snapshotJson(): kotlin/String // com.letta.mobile.data.shell/ShellWorkspaceState.snapshotJson|snapshotJson(){}[0]
+    final fun snapshotOrPending(): com.letta.mobile.data.shell/CurrentFocusSnapshot? // com.letta.mobile.data.shell/ShellWorkspaceState.snapshotOrPending|snapshotOrPending(){}[0]
 }
 
 final class com.letta.mobile.data.skills/Skill { // com.letta.mobile.data.skills/Skill|null[0]
