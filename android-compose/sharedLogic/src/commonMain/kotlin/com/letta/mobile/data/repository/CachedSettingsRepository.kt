@@ -1,7 +1,5 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -183,30 +181,22 @@ open class CachedSettingsRepository(
         }
     }
 
-    // The old screen writer has no source or owner provenance; retain its on-disk record untouched.
-    override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) = Unit
-
     override fun lastChatSeed(sourceKey: String): LastChatSelection? = synchronized(settledChatLock) {
         readSettledChatSelection(sourceKey)
     }
 
-    override fun setSettledChatSelection(
-        sourceKey: String,
-        agentId: AgentId,
-        conversationId: ConversationId,
-        agentName: String?,
-    ) {
-        if (sourceKey.isBlank()) return
-        if (agentId.value.isBlank()) return
-        if (conversationId.value.isBlank()) return
+    override fun setSettledChatSelection(selection: LastChatSelection) {
+        val sourceKey = selection.sourceKey?.takeIf { it.isNotBlank() } ?: return
+        if (selection.agentId.isBlank()) return
+        if (selection.conversationId.isNullOrBlank()) return
         synchronized(settledChatLock) {
-            val selection = mergeLastChatSelection(
+            val merged = mergeLastChatSelection(
                 previous = readSettledChatSelection(sourceKey),
-                agentId = agentId.value,
-                agentName = agentName,
-                conversationId = conversationId.value,
+                agentId = selection.agentId,
+                agentName = selection.agentName,
+                conversationId = selection.conversationId,
             )?.copy(sourceKey = sourceKey) ?: return@synchronized
-            val serialized = LastChatSelectionStorage.serialize(selection) ?: return@synchronized
+            val serialized = LastChatSelectionStorage.serialize(merged) ?: return@synchronized
             secureSettingsStore.putDurableString(SettingsSecureKeys.SETTLED_CHAT_SELECTION, serialized)
         }
     }

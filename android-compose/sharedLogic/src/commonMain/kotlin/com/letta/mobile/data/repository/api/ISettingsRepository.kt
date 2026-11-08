@@ -46,7 +46,8 @@ interface ISettingsRepository {
     fun getPinnedAgentIds(): Flow<Set<String>>
     fun getPinnedAgentOrder(): Flow<List<String>>
     fun getPinnedConversationIds(): Flow<Set<String>>
-    fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?)
+    /** Legacy writers lack source and owner provenance; retain their on-disk record untouched. */
+    fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) = Unit
     /** Read a next-start seed only for the same trusted source. */
     fun lastChatSeed(sourceKey: String): LastChatSelection? = null
 
@@ -56,7 +57,10 @@ interface ISettingsRepository {
         agentId: AgentId,
         conversationId: ConversationId,
         agentName: String? = null,
-    ) = Unit
+    ) = setSettledChatSelection(LastChatSelection(agentId.value, agentName, conversationId.value, sourceKey))
+
+    /** Persist an atomic source-scoped target reported by the settled workspace. */
+    fun setSettledChatSelection(selection: LastChatSelection) = Unit
     suspend fun setConversationPinned(conversationId: String, pinned: Boolean)
     fun setFavoriteAgentId(agentId: String?)
     suspend fun setAgentPinned(agentId: String, pinned: Boolean)

@@ -42850,6 +42850,7 @@ public final class com/letta/mobile/data/repository/ActiveConfigSettingsReposito
 	public fun getPinnedProjectIds ()Lkotlinx/coroutines/flow/Flow;
 	public fun getTheme ()Lkotlinx/coroutines/flow/Flow;
 	public fun getThemePreset ()Lkotlinx/coroutines/flow/Flow;
+	public fun lastChatSeed (Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
 	public fun observeResumeRecentConversation ()Lkotlinx/coroutines/flow/Flow;
 	public fun saveConfig (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setActiveConfigId (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -42866,6 +42867,8 @@ public final class com/letta/mobile/data/repository/ActiveConfigSettingsReposito
 	public fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun setOpenChatsOnCanvas (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setProjectPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setSettledChatSelection (Lcom/letta/mobile/data/repository/LastChatSelection;)V
+	public fun setSettledChatSelection--_5_hO4 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun setTheme (Lcom/letta/mobile/data/model/AppTheme;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setThemePreset (Lcom/letta/mobile/data/model/ThemePreset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun updateActiveConfig (Lcom/letta/mobile/data/model/LettaConfig;)V
@@ -43140,6 +43143,7 @@ public class com/letta/mobile/data/repository/CachedSettingsRepository : com/let
 	public fun getPinnedProjectIds ()Lkotlinx/coroutines/flow/Flow;
 	public fun getTheme ()Lkotlinx/coroutines/flow/Flow;
 	public fun getThemePreset ()Lkotlinx/coroutines/flow/Flow;
+	public fun lastChatSeed (Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
 	public fun observeResumeRecentConversation ()Lkotlinx/coroutines/flow/Flow;
 	public fun saveConfig (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setActiveConfigId (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -43157,6 +43161,8 @@ public class com/letta/mobile/data/repository/CachedSettingsRepository : com/let
 	public fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun setOpenChatsOnCanvas (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setProjectPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setSettledChatSelection (Lcom/letta/mobile/data/repository/LastChatSelection;)V
+	public fun setSettledChatSelection--_5_hO4 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun setTheme (Lcom/letta/mobile/data/model/AppTheme;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setThemePreset (Lcom/letta/mobile/data/model/ThemePreset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -43427,17 +43433,19 @@ public final class com/letta/mobile/data/repository/IrohBackendHelperKt {
 }
 
 public final class com/letta/mobile/data/repository/LastChatSelection {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/repository/LastChatSelection;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/LastChatSelection;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/repository/LastChatSelection;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/LastChatSelection;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId ()Ljava/lang/String;
 	public final fun getAgentName ()Ljava/lang/String;
 	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getSourceKey ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -44466,6 +44474,7 @@ public abstract interface class com/letta/mobile/data/repository/api/ISettingsRe
 	public abstract fun getPinnedProjectIds ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getTheme ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getThemePreset ()Lkotlinx/coroutines/flow/Flow;
+	public fun lastChatSeed (Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
 	public abstract fun observeResumeRecentConversation ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun saveConfig (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setActiveConfigId (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -44479,16 +44488,24 @@ public abstract interface class com/letta/mobile/data/repository/api/ISettingsRe
 	public fun setFeatureFlag (Lcom/letta/mobile/data/repository/api/FeatureFlag;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setHapticsEnabled (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setHuggingFaceToken (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public abstract fun setOpenChatsOnCanvas (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setProjectPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setSettledChatSelection (Lcom/letta/mobile/data/repository/LastChatSelection;)V
+	public fun setSettledChatSelection--_5_hO4 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun setSettledChatSelection--_5_hO4$default (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public abstract fun setTheme (Lcom/letta/mobile/data/model/AppTheme;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setThemePreset (Lcom/letta/mobile/data/model/ThemePreset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/ISettingsRepository$DefaultImpls {
 	public static fun getFeatureFlag (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Lcom/letta/mobile/data/repository/api/FeatureFlag;)Lkotlinx/coroutines/flow/Flow;
+	public static fun lastChatSeed (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Ljava/lang/String;)Lcom/letta/mobile/data/repository/LastChatSelection;
 	public static fun setFeatureFlag (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Lcom/letta/mobile/data/repository/api/FeatureFlag;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun setLastChatSelection (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static fun setSettledChatSelection (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Lcom/letta/mobile/data/repository/LastChatSelection;)V
+	public static fun setSettledChatSelection--_5_hO4 (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun setSettledChatSelection--_5_hO4$default (Lcom/letta/mobile/data/repository/api/ISettingsRepository;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 }
 
 public final class com/letta/mobile/data/repository/api/ISettingsRepositoryKt {
