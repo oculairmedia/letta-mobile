@@ -1,102 +1,102 @@
 package com.letta.mobile.feature.chat.route
-
 import androidx.lifecycle.SavedStateHandle
-import com.letta.mobile.ui.chat.render.ProjectChatContext
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.shell.CurrentFocusChatMode
+import com.letta.mobile.data.shell.CurrentFocusRequest
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import javax.inject.Inject
-
-internal class ChatRouteArgs @Inject constructor(
-    private val savedStateHandle: SavedStateHandle,
-) {
-    val agentId: String = requireNotNull(savedStateHandle.get<String>(AGENT_ID_KEY)) {
+/** Route inputs are consumed once; a bound workspace supplies every subsequent selection read. */
+internal class ChatRouteArgs @Inject constructor(private val savedStateHandle: SavedStateHandle) {
+    val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
         "Missing agentId in AdminChatViewModel navigation arguments"
     }
-
-    val initialAgentName: String? = savedStateHandle.get<String>(AGENT_NAME_KEY)
-        ?.takeIf { it.isNotBlank() }
-
-    val initialMessage: String? = savedStateHandle.get<String>(INITIAL_MESSAGE_KEY)
-
-    // letta-mobile-aw0dv: chat display mode the route asked to open in
-    // ("simple" | "interactive" | "debug"); null = screen default. Captured
-    // once at construction so a later SavedStateHandle restore can't flip it.
-    val initialChatMode: String? = savedStateHandle.get<String>(INITIAL_CHAT_MODE_KEY)
-        ?.takeIf { it.isNotBlank() }
-
-    val requestedConversationArg: String?
-        get() = savedStateHandle.get<String>(CONVERSATION_ID_KEY)
-
+    val initialAgentName = savedStateHandle.get<String>("agentName")?.takeIf(String::isNotBlank)
+    val initialMessage = savedStateHandle.get<String>("initialMessage")
+    val initialChatMode = savedStateHandle.get<String>("initialChatMode")?.takeIf(String::isNotBlank)
+    val scrollToMessageId = savedStateHandle.get<String>("scrollToMessageId")
+    val workspaceOwned = savedStateHandle.get<Boolean>("workspaceOwned") == true
+    private val freshKey = savedStateHandle.get<Long>("freshRouteKey")
+    private val entryConversation = savedStateHandle.get<String>("conversationId")
+    val isFreshRoute = freshKey != null || entryConversation?.isBlank() == true
+    val explicitNewChat = freshKey != null
+    private var runtimeConversation = entryConversation?.takeIf { it.isNotBlank() && !explicitNewChat }?.let(::ConversationId)
+    var workspace: ShellWorkspaceState? = null
+        private set
+    private var request: CurrentFocusRequest? = null
+    private var boundSource: String? = null
+    private var reboundRequests = emptySet<CurrentFocusRequest>()
+    var session: SessionRepositoryGraph? = null
+    var isOwnerCurrent: () -> Boolean = { true }
+    var liveGeneration: () -> Long? = { workspace?.sourceGeneration }
+    var onSettled: (ConversationId) -> Unit = {}
     val explicitConversationId: String?
-        get() = requestedConversationArg?.takeIf { it.isNotBlank() }
-
-    private val freshRouteKeyAtConstruction: Long? = savedStateHandle.get<Long>(FRESH_ROUTE_KEY)
-    private val requestedConversationArgAtConstruction: String? = requestedConversationArg
-
-    /**
-     * letta-mobile-9cb37: the conversation id carried by the *route* at the
-     * moment this destination was (re)entered, captured ONCE at construction.
-     *
-     * [explicitConversationId] is a live read of [CONVERSATION_ID_KEY], which
-     * [setRouteConversationId] mutates as conversations resolve. When the user
-     * switches to a DIFFERENT agent, Compose Navigation can restore that agent's
-     * previously-saved SavedStateHandle, whose [CONVERSATION_ID_KEY] still holds
-     * the resolved/last conversation from the prior visit. That restored value
-     * then shadows the explicit `conversationId` the new route asked for (e.g.
-     * the subagent transcript's `default`), so the chat opens the agent's
-     * active/last conversation instead of the one the route demanded.
-     *
-     * This snapshot is the authoritative "the route explicitly asked for THIS
-     * conversation" signal. It is null for fresh/blank routes (no explicit
-     * request) so it never suppresses the resume-recent / picker flows.
-     */
-    val pinnedExplicitConversationId: String? =
-        requestedConversationArgAtConstruction
-            ?.takeIf { it.isNotBlank() }
-            ?.takeIf { freshRouteKeyAtConstruction == null }
-
-    val scrollToMessageId: String? = savedStateHandle.get<String>(SCROLL_TO_MESSAGE_ID_KEY)
-
-    // Freshness is a route-entry property, not mutable conversation state. The
-    // resolved conversation id is now written back to CONVERSATION_ID_KEY, so
-    // this must not be recomputed from requestedConversationArg after init.
-    val isFreshRoute: Boolean
-        get() = freshRouteKeyAtConstruction != null || requestedConversationArgAtConstruction?.isBlank() == true
-
-    val explicitNewChat: Boolean
-        get() = freshRouteKeyAtConstruction != null
-
-    val projectContext: ProjectChatContext? =
-        savedStateHandle.get<String>(PROJECT_IDENTIFIER_KEY)?.let { identifier ->
-            ProjectChatContext(
-                identifier = identifier,
-                name = savedStateHandle.get<String>(PROJECT_NAME_KEY) ?: identifier,
-                lettaFolderId = savedStateHandle.get<String>(PROJECT_LETTA_FOLDER_ID_KEY),
-                filesystemPath = savedStateHandle.get<String>(PROJECT_FILESYSTEM_PATH_KEY),
-                gitUrl = savedStateHandle.get<String>(PROJECT_GIT_URL_KEY),
-                lastSyncAt = savedStateHandle.get<String>(PROJECT_LAST_SYNC_AT_KEY),
-                activeCodingAgents = savedStateHandle.get<String>(PROJECT_ACTIVE_CODING_AGENTS_KEY),
-            )
+        get() = when {
+            workspace == null -> runtimeConversation?.value
+            isCurrent() -> workspace?.currentFocus?.conversationId?.let { subagentConversation(agentId, it.value) }
+            else -> runtimeConversation?.value
         }
-
-    fun setRouteConversationId(conversationId: String?) {
-        savedStateHandle[CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
+    /** Explicit lifecycle rebind only; rotation may retain the same VM over a recreated owner. */
+    fun bindWorkspace(owner: ShellWorkspaceState, retainRequest: Boolean = true): Boolean {
+        require(owner.currentFocus.agentId == AgentId(agentId))
+        require(boundSource == null || boundSource == owner.sourceKey)
+        val old = workspace
+        val previous = request
+        val accepted = retainRequest && acceptedBy(old, previous)
+        val sameSource = old?.sourceKey == owner.sourceKey && old?.sourceGeneration == owner.sourceGeneration
+        val retained = old != null && old !== owner && accepted && old.currentFocus == owner.currentFocus && sameSource
+        reboundRequests = when {
+            retained -> reboundRequests + checkNotNull(previous)
+            old === owner && accepted -> reboundRequests
+            else -> emptySet()
+        }
+        boundSource = owner.sourceKey
+        workspace = owner
+        request = if (old === owner && accepted) previous else owner.requestToken()
+        runtimeConversation = owner.currentFocus.conversationId?.let { subagentConversation(agentId, it.value)?.let(::ConversationId) }
+        return old != null && !retained && (old !== owner || !accepted)
     }
-
+    private fun acceptedBy(owner: ShellWorkspaceState?, token: CurrentFocusRequest?): Boolean =
+        token != null && owner?.accepts(token) == true && token.sourceGeneration == liveGeneration()
+    private fun effectiveRequest(token: CurrentFocusRequest?): CurrentFocusRequest? {
+        val owner = workspace ?: return null
+        val current = request ?: return null
+        if (!isOwnerCurrent() || current.sourceGeneration != liveGeneration()) return null
+        return when {
+            token != null && owner.accepts(token) -> token
+            token != null && token in reboundRequests && owner.accepts(current) -> current
+            else -> null
+        }
+    }
+    fun requestToken(): CurrentFocusRequest? = request
+    fun accepts(token: CurrentFocusRequest?): Boolean = if (workspace == null) !workspaceOwned else effectiveRequest(token) != null
+    fun isCurrent(): Boolean = accepts(request)
+    fun canPrepare(conversation: ConversationId): Boolean = workspace?.let {
+        boundSource == it.sourceKey && request?.sourceGeneration == liveGeneration() &&
+            (isCurrent() || runtimeConversation == conversation)
+    } ?: !workspaceOwned
+    /** Complete the originally captured request before hydration/send can use the resolved ID. */
+    fun complete(token: CurrentFocusRequest?, conversation: ConversationId): Boolean {
+        val owner = workspace
+        val active = effectiveRequest(token)
+        val requested = active?.exactConversation?.takeIf { subagentConversation(agentId, it.value) == conversation.value } ?: conversation
+        val accepted = owner?.let { active != null && when (active.mode) {
+            CurrentFocusChatMode.Exact -> it.accepts(active) && requested == active.exactConversation && it.reportAvailability(active)
+            CurrentFocusChatMode.New, CurrentFocusChatMode.Resume -> it.completeFocus(active, requested, AgentId(agentId))
+        } } ?: !workspaceOwned
+        if (accepted) {
+            runtimeConversation = if (owner == null) conversation else owner.currentFocus.conversationId
+                ?.let { subagentConversation(agentId, it.value)?.let(::ConversationId) }
+            request = active?.takeIf { owner?.accepts(it) == true } ?: owner?.requestToken()
+            if (active?.mode != CurrentFocusChatMode.Exact) reboundRequests = emptySet()
+            onSettled(owner?.currentFocus?.conversationId ?: conversation)
+        }
+        return accepted
+    }
+    fun settle(conversation: ConversationId) {
+        if (!complete(request, conversation)) throw kotlinx.coroutines.CancellationException("Chat focus superseded")
+    }
     internal fun savedStateHandle(): SavedStateHandle = savedStateHandle
-
-    private companion object {
-        const val AGENT_ID_KEY = "agentId"
-        const val AGENT_NAME_KEY = "agentName"
-        const val INITIAL_MESSAGE_KEY = "initialMessage"
-        const val INITIAL_CHAT_MODE_KEY = "initialChatMode"
-        const val CONVERSATION_ID_KEY = "conversationId"
-        const val FRESH_ROUTE_KEY = "freshRouteKey"
-        const val SCROLL_TO_MESSAGE_ID_KEY = "scrollToMessageId"
-        const val PROJECT_IDENTIFIER_KEY = "projectIdentifier"
-        const val PROJECT_NAME_KEY = "projectName"
-        const val PROJECT_LETTA_FOLDER_ID_KEY = "projectLettaFolderId"
-        const val PROJECT_FILESYSTEM_PATH_KEY = "projectFilesystemPath"
-        const val PROJECT_GIT_URL_KEY = "projectGitUrl"
-        const val PROJECT_LAST_SYNC_AT_KEY = "projectLastSyncAt"
-        const val PROJECT_ACTIVE_CODING_AGENTS_KEY = "projectActiveCodingAgents"
-    }
+    val projectContext = savedStateHandle.projectChatContext()
 }

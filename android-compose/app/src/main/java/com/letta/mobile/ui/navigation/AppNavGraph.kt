@@ -1,5 +1,13 @@
 package com.letta.mobile.ui.navigation
 
+import com.letta.mobile.data.shell.CurrentFocusInputs
+import com.letta.mobile.data.shell.CurrentFocusChatMode
+import com.letta.mobile.data.shell.CurrentFocus
+import com.letta.mobile.data.shell.CurrentFocusSnapshot
+import com.letta.mobile.feature.chat.screen.WorkspaceChatStoreOwner
+import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
+import com.letta.mobile.data.session.SessionGraph
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.util.attr
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -143,31 +151,24 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
 class NavViewModel @Inject constructor(private val settingsRepository: ISettingsRepository) : ViewModel() {
     val activeConfig: StateFlow<LettaConfig?> = settingsRepository.activeConfig
 
-    /** letta-mobile-v7aln: read once, synchronously (every input is filled at construction). */
-    internal fun startDestination(target: AppLaunchTarget?) = resolveStartDestination(
+    internal fun startDestination() = resolveStartDestination(
         hasConfig = settingsRepository.activeConfig.value != null,
-        initialTarget = target,
-        restoredChatSelection = settingsRepository.lastChatSelection.value,
-        fallbackAgentId = settingsRepository.favoriteAgentId.value ?: settingsRepository.adminAgentId.value,
+        initialTarget = null, restoredChatSelection = null, fallbackAgentId = null,
     )
 }
 
-/**
- * letta-mobile-ckmub.2 (hard cut): the app is the shared shell workspace ([AndroidShellWorkspace]); the
- * nav host above it only holds Android's own screens the workspace leaves for: the camera scanner and
- * the pairing invite, the system-access dashboard, the full-screen board and
- * the canvas debug board.
- */
+/** The shared workspace, with Android scanner, pairing, system-access and board routes above it. */
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
     notificationTarget: AppLaunchTarget? = null,
     onNotificationTargetConsumed: () -> Unit = {},
+    focusInputs: com.letta.mobile.data.shell.CurrentFocusInputs? = null,
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
     val activeConfig by navViewModel.activeConfig.collectAsStateWithLifecycle()
     // Decided once: a new start page would replace the workspace (see resolveStartDestination).
-    val start = remember { navViewModel.startDestination(notificationTarget) }
+    val start = remember { navViewModel.startDestination() }
     // letta-mobile-bglj6.1: the shared chat page docks under the conversation's canvas; the
     // canvas screen lives here in :app, so it is handed to feature-chat as a slot.
     androidx.compose.runtime.CompositionLocalProvider(LocalChatCanvasSlot provides AppChatCanvasSlot) {
@@ -177,9 +178,10 @@ fun AppNavGraph(
                     start = start,
                     config = activeConfig,
                     exits = androidShellExits(navController),
-                    launch = AndroidShellLaunch(notificationTarget, onNotificationTargetConsumed) {
-                        navController.navigate(PairingScanRoute)
-                    },
+                    launch = AndroidShellLaunch(
+                        notificationTarget, onNotificationTargetConsumed,
+                        { navController.navigate(PairingScanRoute) }, focusInputs,
+                    ),
                 )
             }
             pairingRoutes(navController)
@@ -214,11 +216,7 @@ private fun androidShellExits(navController: NavHostController) = AndroidShellEx
     ),
 )
 
-/**
- * letta-mobile-ckmub.2: what Android adds to the shared shell pages: its chat page, its Settings and
- * Plugins, the Home connection hero, and the agent editor's creator and Dreaming panel. Every page
- * itself is the shared one desktop and web bind.
- */
+/** Android bindings for shared chat, settings, plugins, Home and agent-editor pages. */
 @Composable
 internal fun androidPageHost(shell: WorkspaceShell): ShellPageHost {
     val workspace = shell.workspace
@@ -256,7 +254,7 @@ internal fun androidPageHost(shell: WorkspaceShell): ShellPageHost {
 
 /** The backend's state as the shared pages show it: none configured, failed, or there. */
 @Composable
-private fun rememberAndroidConnection(shell: WorkspaceShell): BackendConnectionStatus {
+internal fun rememberAndroidConnection(shell: WorkspaceShell): BackendConnectionStatus {
     val sessions = shell.drawerModel.sources.sessions
     val error by sessions.sessionError.collectAsStateWithLifecycle()
     val agents by shell.drawerModel.agents.collectAsStateWithLifecycle()
@@ -286,4 +284,29 @@ private fun dropUnroutableA2uiAction(action: A2uiAction) {
         "surfaceId" attr action.surfaceId, "name" attr action.name,
         level = Telemetry.Level.WARN,
     )
+}
+
+/** Bind the trusted Android session and arbitrate a new entry before chat effects mount. */
+internal fun bindAndroidFocus(
+    workspace: ShellWorkspaceState, graph: SessionGraph, source: String,
+    port: AndroidShellChatPort, drawerModel: SharedNavDrawerViewModel,
+    config: LettaConfig?, focusInputs: CurrentFocusInputs?,
+) {
+    val saved = workspace.sourceKey?.let { workspace.snapshot() }
+    val changed = workspace.sourceKey != source || workspace.sourceGeneration != graph.id
+    workspace.bindSource(source, graph.id)
+    if (changed) port.sourceChanged()
+    WorkspaceChatStoreOwner.bindSource(drawerModel, source)
+    val inputs = focusInputs?.takeIf {
+        source == AndroidShellChatPort.sourceKey(graph) && WorkspaceChatStoreOwner.claimInputs(drawerModel, it)
+    } ?: CurrentFocusInputs(source)
+    val initial = CurrentFocusSnapshot(source, CurrentFocus("settings"))
+    val startup = if (config == null) inputs.copy(deepLink = null, explicitRoute = initial, settingsSeed = null) else inputs
+    val newEntry = initializeAndroidFocus(workspace, startup.copy(sourceKey = source, restored = saved ?: inputs.restored))
+    if (newEntry && workspace.currentFocus.chatMode == CurrentFocusChatMode.New) {
+        port.startNewChat(workspace.currentFocus.agentId)
+    }
+    WorkspaceChatStoreOwner.rebindRetained(drawerModel, workspace, retainRequest = !newEntry) { agent, conversation ->
+        port.open(agent, conversation)
+    }
 }

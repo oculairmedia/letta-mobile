@@ -18,8 +18,6 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.chat.route.toArgs
-import com.letta.mobile.feature.chat.route.toViewModelKey
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.ui.theme.ChatBackground
@@ -117,11 +115,13 @@ private fun rememberSelectedConversationModel(viewModel: AdminChatViewModel): St
     }
 }
 
-/** The chat's view model store inside the workspace, keyed by its route ([WorkspaceChatStoreOwner]). */
 @Composable
-internal fun rememberChatStoreOwner(route: AgentChatRoute, drawer: SharedNavDrawerViewModel): WorkspaceChatStoreOwner {
+internal fun rememberChatStoreOwner(route: AgentChatRoute, host: WorkspaceChatHost): WorkspaceChatStoreOwner {
     val parent = LocalViewModelStoreOwner.current as NavBackStackEntry
     val context = LocalContext.current
-    val key = route.toViewModelKey()
-    return remember(key, parent) { WorkspaceChatStoreOwner(key, drawer, parent, context, route.toArgs()) }
+    val key = WorkspaceChatStoreOwner.retain(host.focus, route, host.drawer)
+    val open = host.openConversation
+    return remember(key, parent) { WorkspaceChatStoreOwner(key, host.drawer, parent, context, route, host.focus) { agent, conversation ->
+        open(agent.value, conversation.value)
+    } }
 }

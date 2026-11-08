@@ -15,9 +15,13 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellWorkspaceState
 
 /**
  * letta-mobile-7mys7 / bzvro.32: on Android's paged timeline the page's message list is empty, so a
@@ -74,6 +78,50 @@ class ChatConversationBranchingTest {
         branching.page {}.forkFrom(prompt, view)
 
         assertEquals(listOf("host offline"), errors)
+    }
+
+    @Test
+    fun `a rejected second branch cannot replace the pending requests opener`() = runTest {
+        val release = kotlinx.coroutines.CompletableDeferred<Conversation>()
+        coEvery { repository.forkConversation(ConversationId("conv-1"), AgentId("agent-1"), null) } coAnswers { release.await() }
+        val first = mutableListOf<String>()
+        val second = mutableListOf<String>()
+        val branching = ChatConversationBranching(this, repository, onError = {}, history = { stored })
+        branching.page(first::add).forkConversation(null, view)
+        runCurrent()
+        branching.page(second::add).forkConversation(null, view)
+        release.complete(Conversation(id = ConversationId("fork-1"), agentId = AgentId("agent-1")))
+        advanceUntilIdle()
+        assertEquals(listOf("fork-1"), first)
+        assertTrue(second.isEmpty())
+    }
+
+    @Test
+    fun `stale rerun cannot open a fork or leave an automatic send draft`() = runTest {
+        val owner = ShellWorkspaceState(ShellDestination.Chat("agent-1", "conv-1")).apply {
+            bindSource("source", 1L)
+        }
+        val token = owner.requestToken()
+        val release = kotlinx.coroutines.CompletableDeferred<Conversation>()
+        coEvery { repository.forkConversation(ConversationId("conv-1"), AgentId("agent-1"), "message-2") } coAnswers { release.await() }
+        val drafts = PendingComposerDrafts()
+        val opened = mutableListOf<String>()
+        val branching = ChatConversationBranching(this, repository, onError = {}, history = { stored }, drafts = drafts)
+        val page = branching.Page { currentView ->
+            ChatConversationBranching.Origin(
+                "conv-1", "agent-1", currentView, { _, conversation -> opened += conversation },
+                isCurrent = { owner.accepts(token) },
+            )
+        }
+        page.rerun(prompt, view)
+        runCurrent()
+        owner.navigate(ShellDestination.Chat("agent-b", "conversation-b"))
+        release.complete(Conversation(id = ConversationId("fork-1"), agentId = AgentId("agent-1")))
+        advanceUntilIdle()
+
+        assertTrue(opened.isEmpty())
+        assertEquals(null, drafts.take("fork-1"))
+        assertEquals(ConversationId("conversation-b"), owner.currentFocus.conversationId)
     }
 
     private val view = ChatBranchView(emptyList(), hasOlderMessages = false)

@@ -16,6 +16,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import com.letta.mobile.data.shell.FocusAvailability
 
 /** How the shared shell's verbs drive Android's chat page (letta-mobile-ckmub.2). */
 @Tag("unit")
@@ -84,13 +85,141 @@ class AndroidShellChatPortTest {
     }
 
     @Test
-    fun theStartPageIsTheLaunchesChatThenTheLastThenTheFavouritesThenHome() {
+    fun theStartPageRequiresConfigAndNeverUsesUnscopedHistoryOrPreferences() {
         val notification = NotificationNavigationTarget("agent-n", "conv-n")
         val last = LastChatSelection(agentId = "agent-l", conversationId = "conv-l")
         assertEquals(ShellDestination.Settings(), resolveStartDestination(false, notification, last, "agent-f"))
-        assertEquals(ShellDestination.Chat("agent-n", "conv-n"), resolveStartDestination(true, notification, last, "agent-f"))
-        assertEquals(ShellDestination.Chat("agent-l", "conv-l"), resolveStartDestination(true, null, last, "agent-f"))
-        assertEquals(ShellDestination.Chat("agent-f"), resolveStartDestination(true, null, null, "agent-f"))
+        assertEquals(ShellDestination.Home, resolveStartDestination(true, notification, last, "agent-f"))
+        assertEquals(ShellDestination.Home, resolveStartDestination(true, null, last, "agent-f"))
+        assertEquals(ShellDestination.Home, resolveStartDestination(true, null, null, "agent-f"))
         assertEquals(ShellDestination.Home, resolveStartDestination(true, null, null, null))
     }
+    @Test
+    fun lateCreationCannotReplaceAnotherAgentsExactFocusOrSend() {
+        workspace.bindSource("backend-a", 1L)
+        navigator.openNewChat(agent)
+        var callbacks = 0
+        port.createConversationForAgent(agent) { callbacks++ }
+        val openingA = checkNotNull(port.opening)
+        val agentB = AgentId("agent-b")
+        port.open(agentB, ConversationId("b-exact"))
+        val openingB = port.opening
+
+        port.conversationShown(openingA, ConversationId("a-created"))
+
+        assertEquals(agentB, workspace.currentFocus.agentId)
+        assertEquals(ConversationId("b-exact"), workspace.currentFocus.conversationId)
+        assertSame(openingB, port.opening)
+        assertEquals(0, callbacks)
+    }
+
+    @Test
+    fun sourceSwitchRejectsTheOldPagesCallback() {
+        workspace.bindSource("backend-a", 1L)
+        navigator.openNewChat(agent)
+        val old = checkNotNull(port.opening)
+        workspace.bindSource("backend-b", 2L)
+
+        port.conversationShown(old, ConversationId("a-created"))
+
+        assertEquals(ShellDestination.Home, workspace.page)
+        assertNull(workspace.currentFocus.agentId)
+        assertNull(workspace.currentFocus.conversationId)
+        assertNull(port.openingFor(agent, null))
+    }
+
+    @Test
+    fun unknownConversationNeverBorrowsTheFocusedAgent() {
+        navigator.openAgent(agent)
+        val before = workspace.currentFocus
+        val opening = port.opening
+
+        port.selectConversation(ConversationId("unknown"))
+
+        assertEquals(before, workspace.currentFocus)
+        assertSame(opening, port.opening)
+    }
+
+    @Test
+    fun newChatWithoutARequestedAgentDoesNotChooseTheRosterHead() {
+        port.startNewChat(null)
+        assertNull(workspace.currentFocus.agentId)
+        assertNull(port.opening)
+    }
+
+    @Test
+    fun aLateResumeCannotReplaceAnExactConversationForTheSameAgent() {
+        workspace.bindSource("backend-a", 1L)
+        workspace.selectFocus(CurrentFocus("chat", agent))
+        val resume = port.adopt(agent, null)
+        port.open(agent, ConversationId("exact"))
+
+        port.conversationShown(resume, ConversationId("resumed"))
+
+        assertEquals(ConversationId("exact"), workspace.currentFocus.conversationId)
+    }
+
+    @Test
+    fun unscopedLegacySelectionAndFavouriteCannotSeedTheActiveBackend() {
+        val legacy = LastChatSelection(agentId = "agent-legacy", conversationId = "conversation-legacy")
+        assertEquals(ShellDestination.Home, resolveStartDestination(true, null, legacy, "agent-favourite"))
+    }
+
+    @Test
+    fun lateShownReportCannotMakeADeletedExactTargetAvailableAgain() {
+        workspace.bindSource("source", 1L)
+        workspace.navigate(ShellDestination.Chat(agent.value, "deleted"))
+        val shown = port.adopt(agent, ConversationId("deleted"))
+        workspace.reportAvailability(workspace.requestToken(), conversation = FocusAvailability.Unavailable)
+
+        port.conversationShown(shown, ConversationId("deleted"))
+
+        assertEquals(ConversationId("deleted"), workspace.currentFocus.conversationId)
+        assertEquals(FocusAvailability.Unavailable, workspace.conversationAvailability)
+        assertTrue("The selected unavailable tab remains", "deleted" in workspace.tabs.openConversationIds)
+    }
+
+    @Test
+    fun anOldOpeningCannotDeliverItsCreateCallbackToARecreatedOwner() {
+        workspace.bindSource("source", 1L)
+        navigator.openNewChat(agent)
+        var callbacks = 0
+        port.createConversationForAgent(agent) { callbacks++ }
+        val old = checkNotNull(port.opening)
+        assertTrue(workspace.completeFocus(workspace.requestToken(), ConversationId("settled"), agent))
+        val recreated = ShellWorkspaceState().apply {
+            bindSource("source", 1L)
+            assertTrue(restore(workspace.snapshot()))
+        }
+        val newPort = AndroidShellChatPort(recreated, { fleet }, { listOf(agent) })
+
+        newPort.conversationShown(old, ConversationId("settled"))
+
+        assertEquals(0, callbacks)
+        assertEquals(ConversationId("settled"), recreated.currentFocus.conversationId)
+    }
+
+    @Test
+    fun retiredPortCannotCompleteOrStartAnotherRequestAfterOwnerRecreation() {
+        workspace.bindSource("source", 1L)
+        var active = true
+        val oldPort = AndroidShellChatPort(workspace, { fleet }, { listOf(agent) }, isCurrentOwner = { active })
+        var callbacks = 0
+        oldPort.createConversationForAgent(agent) { callbacks++ }
+        val opening = checkNotNull(oldPort.opening)
+        val recreated = ShellWorkspaceState().apply {
+            bindSource("source", 1L)
+            assertTrue(restore(workspace.snapshot()))
+        }
+        active = false
+
+        oldPort.conversationShown(opening, ConversationId("late"))
+        oldPort.open(agent, ConversationId("stale-navigation"))
+
+        assertEquals(0, callbacks)
+        assertNull(workspace.currentFocus.conversationId)
+        assertNull(recreated.currentFocus.conversationId)
+        assertEquals(CurrentFocusChatMode.New, recreated.currentFocus.chatMode)
+    }
+
 }

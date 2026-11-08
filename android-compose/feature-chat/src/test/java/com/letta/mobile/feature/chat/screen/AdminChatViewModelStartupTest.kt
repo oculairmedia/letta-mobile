@@ -19,6 +19,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.data.model.IdFormats
+import com.letta.mobile.data.shell.CurrentFocus
+import com.letta.mobile.data.shell.CurrentFocusChatMode
+import com.letta.mobile.data.shell.FocusAvailability
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.feature.chat.route.ChatRouteArgs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatViewModelStartupTest {
@@ -135,6 +143,167 @@ class AdminChatViewModelStartupTest {
         } finally {
             viewModel?.viewModelScope?.cancel()
             com.letta.mobile.data.canvas.CanvasShare.clearStagedAttachments()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `owner explicit default opens its qualified target despite a stale route handle and never writes settings`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var model: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-default", "Default")
+            val owner = ShellWorkspaceState().apply {
+                bindSource("source", 1L)
+                navigate(ShellDestination.Chat(agent.id.value, IdFormats.DEFAULT_CONVERSATION_ID))
+            }
+            val args = ChatRouteArgs(SavedStateHandle(mapOf(
+                "agentId" to agent.id.value, "conversationId" to "stale-last", "workspaceOwned" to true,
+            )))
+            var opens = 0
+            val host = ChatPagingHost().apply {
+                openCanonical = { targetAgent, targetConversation, _, _ ->
+                    assertEquals(agent.id.value, targetAgent)
+                    assertEquals(IdFormats.defaultConversationIdFor(agent.id.value), targetConversation)
+                    opens++
+                    ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {})
+                }
+            }
+            val session = FixtureSession("default", focus = owner, routeArgs = args)
+            model = openedChatViewModel(host, agent, "stale-last", session)
+            assertEquals(1, opens)
+            assertEquals(IdFormats.DEFAULT_CONVERSATION_ID, owner.currentFocus.conversationId?.value)
+            assertEquals(IdFormats.defaultConversationIdFor(agent.id.value), model.conversationId?.value)
+            io.mockk.verify(exactly = 0) { session.settings.setLastChatSelection(any(), any(), any()) }
+            owner.reportAvailability(owner.requestToken(), conversation = FocusAvailability.Unavailable)
+            assertFalse(model.canSendMessages)
+            val before = model.uiState.value
+            model.sendMessage("unavailable target must not send")
+            assertEquals(before, model.uiState.value)
+            assertEquals(IdFormats.DEFAULT_CONVERSATION_ID, owner.currentFocus.conversationId?.value)
+
+        } finally {
+            model?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `recreated owner new chat ignores stale saved conversation without opening or creating one`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var model: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-new", "New")
+            val owner = ShellWorkspaceState().apply {
+                bindSource("source", 1L)
+                selectFocus(CurrentFocus("chat", agent.id, chatMode = CurrentFocusChatMode.New))
+            }
+            val args = ChatRouteArgs(SavedStateHandle(mapOf(
+                "agentId" to agent.id.value, "conversationId" to "stale-last", "workspaceOwned" to true,
+            )))
+            var opens = 0
+            val host = ChatPagingHost().apply {
+                openCanonical = { _, _, _, _ -> opens++; error("An empty New target must not open a transcript") }
+            }
+            model = openedChatViewModel(host, agent, "stale-last", FixtureSession("new", focus = owner, routeArgs = args))
+            assertEquals(0, opens)
+            assertEquals(null, model.conversationId)
+            assertEquals(null, owner.currentFocus.conversationId)
+            assertEquals(CurrentFocusChatMode.New, owner.currentFocus.chatMode)
+        } finally {
+            model?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `retained vm reconciles completion after save without replaying new chat startup`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var model: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-new", "New")
+            val old = ShellWorkspaceState().apply {
+                bindSource("source", 1L)
+                selectFocus(CurrentFocus("chat", agent.id, chatMode = CurrentFocusChatMode.New))
+            }
+            val saved = old.snapshot()
+            val args = ChatRouteArgs(SavedStateHandle(mapOf("agentId" to agent.id.value, "workspaceOwned" to true)))
+            var opens = 0
+            val host = ChatPagingHost().apply {
+                openCanonical = { _, _, _, _ ->
+                    opens++
+                    ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {})
+                }
+            }
+            model = openedChatViewModel(host, agent, "resolved", FixtureSession("retained", focus = old, routeArgs = args))
+            assertEquals(0, opens)
+            assertTrue(args.complete(args.requestToken(), ConversationId("resolved")))
+            val restored = ShellWorkspaceState().apply { bindSource("source", 1L); assertTrue(restore(saved)) }
+            model.bindWorkspace(restored) {}
+
+            assertEquals(ConversationId("resolved"), restored.currentFocus.conversationId)
+            assertEquals(ConversationId("resolved"), model.conversationId)
+            assertEquals(CurrentFocusChatMode.Exact, restored.currentFocus.chatMode)
+            assertEquals("No startup replay", 0, opens)
+        } finally {
+            model?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `bound startup never independently persists last selection`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var model: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-writer", "Writer")
+            val owner = ShellWorkspaceState().apply {
+                bindSource("source", 1L)
+                navigate(ShellDestination.Chat(agent.id.value, "writer-conversation"))
+            }
+            val session = FixtureSession("writer", focus = owner)
+            val host = ChatPagingHost().apply {
+                openCanonical = { _, _, _, _ ->
+                    ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {})
+                }
+            }
+            model = openedChatViewModel(host, agent, "writer-conversation", session)
+            io.mockk.verify(exactly = 0) { session.settings.setLastChatSelection(any(), any(), any()) }
+            assertEquals(ConversationId("writer-conversation"), owner.currentFocus.conversationId)
+        } finally {
+            model?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `retired source cannot clear visibility for an identical id on the new source`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val store = androidx.lifecycle.ViewModelStore()
+        try {
+            val agent = TestData.agent("agent-source", "Source")
+            val owner = ShellWorkspaceState().apply {
+                bindSource("source-a", 1L)
+                navigate(ShellDestination.Chat(agent.id.value, "same-raw-id"))
+            }
+            val tracker = com.letta.mobile.data.channel.CurrentConversationTracker()
+            val session = FixtureSession("visibility", focus = owner, currentConversationTracker = tracker)
+            val host = ChatPagingHost().apply {
+                openCanonical = { _, _, _, _ ->
+                    ChatPagingPresentation(flowOf(PagingData.empty()), MutableStateFlow(emptyList()), {})
+                }
+            }
+            val model = openedChatViewModel(host, agent, "same-raw-id", session)
+            store.put("chat", model)
+            owner.bindSource("source-b", 2L)
+            owner.navigate(ShellDestination.Chat(agent.id.value, "same-raw-id"))
+            tracker.setCurrent("same-raw-id")
+            model.onScreenPaused()
+            assertEquals("same-raw-id", tracker.current)
+            store.clear()
+            assertEquals("same-raw-id", tracker.current)
+        } finally {
+            store.clear()
             Dispatchers.resetMain()
         }
     }

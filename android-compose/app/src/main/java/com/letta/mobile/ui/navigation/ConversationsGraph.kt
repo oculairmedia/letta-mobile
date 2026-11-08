@@ -41,6 +41,13 @@ import com.letta.mobile.ui.shell.workspace.openSearchHit
 /** The page beside the workspace's navigation: the shared page for its destination, over the session graph. */
 @Composable
 internal fun AndroidShellPage(shell: WorkspaceShell, modifier: Modifier) {
+    if (!shell.sourceReady && shell.workspace.destination !is ShellDestination.Settings) {
+        val connection = rememberAndroidConnection(shell)
+        androidWaitingPage(
+            shell, if (connection is BackendConnectionStatus.Connected) BackendConnectionStatus.Connecting else connection,
+        ).Content(shell.workspace.destination, modifier)
+        return
+    }
     val graph by shell.drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
     val deps = rememberShellPageDeps(graph, shell.controllers, androidPageHost(shell))
     ShellPage(destination = shell.workspace.destination, deps = deps, modifier = modifier)
@@ -62,14 +69,7 @@ private fun AndroidChatPage(shell: WorkspaceShell, agent: AgentId, modifier: Mod
     val conversation = shell.workspace.selectedConversationId
     val adopted = remember(agent, conversation) { port.adopt(agent, conversation) }
     val opening = port.openingFor(agent, conversation) ?: adopted
-    val route = remember(opening) {
-        AgentChatRoute(
-            agentId = opening.agent.value,
-            conversationId = opening.conversation?.value,
-            freshRouteKey = opening.fresh,
-            initialMessage = opening.firstMessage,
-        )
-    }
+    val route = remember(opening) { opening.toRoute() }
     // The enabled plugins' tool and command presenters draw their tools' steps.
     val context = LocalContext.current
     val plugins = remember(context) { pluginViewsOf(context) }
@@ -78,28 +78,37 @@ private fun AndroidChatPage(shell: WorkspaceShell, agent: AgentId, modifier: Mod
     }
 }
 
-private fun chatHost(shell: WorkspaceShell, opening: AndroidShellChatPort.Opening) = WorkspaceChatHost(
-    // A library board opens full screen (Android's board route); everything else is a shell page.
-    open = { destination ->
-        val board = (destination as? ShellDestination.Canvas)?.canvasId
-        if (board != null) shell.exits.openCanvasById(board) else shell.navigator.navigate(destination)
-    },
-    openConversation = { agentId, conversationId ->
-        if (conversationId == null) {
-            shell.navigator.openNewChat(AgentId(agentId))
-        } else {
-            shell.port.open(AgentId(agentId), ConversationId(conversationId))
-            shell.workspace.showChat()
-        }
-    },
-    openAgentPane = { showNavigation(shell) },
-    openCanvas = { agentId, conversationId, shareRecipient -> shell.exits.openCanvas(agentId, conversationId, shareRecipient) },
-    onConversationShown = { _, conversationId -> shell.port.conversationShown(opening, ConversationId(conversationId)) },
-    draft = shell.port.draft,
-    openSearch = { shell.workspace.overlays.commandPalette = true },
-    drawer = shell.drawerModel,
-    panel = shell.chatPanel,
+internal fun AndroidShellChatPort.Opening.toRoute() = AgentChatRoute(
+    agentId = agent.value, conversationId = conversation?.value, freshRouteKey = fresh, initialMessage = firstMessage,
 )
+
+private fun chatHost(shell: WorkspaceShell, opening: AndroidShellChatPort.Opening): WorkspaceChatHost {
+    val port = shell.port
+    val workspace = shell.workspace
+    val navigator = shell.navigator
+    return WorkspaceChatHost(
+        // A library board opens full screen (Android's board route); everything else is a shell page.
+        open = { destination ->
+            val board = (destination as? ShellDestination.Canvas)?.canvasId
+            if (board != null) shell.exits.openCanvasById(board) else shell.navigator.navigate(destination)
+        },
+        openConversation = { agentId, conversationId ->
+            if (conversationId == null) {
+                navigator.openNewChat(AgentId(agentId))
+            } else {
+                port.open(AgentId(agentId), ConversationId(conversationId))
+                workspace.showChat()
+            }
+        },
+        openAgentPane = { showNavigation(shell) },
+        openCanvas = { agentId, conversationId, shareRecipient -> shell.exits.openCanvas(agentId, conversationId, shareRecipient) },
+        onConversationShown = { _, conversationId -> shell.port.conversationShown(opening, ConversationId(conversationId)) },
+        draft = shell.port.draft,
+        openSearch = { shell.workspace.overlays.commandPalette = true },
+        drawer = shell.drawerModel,
+        panel = shell.chatPanel,
+    )
+}
 
 /** Brings the agents back: the drawer on a phone, the sidebar on a wide window. */
 internal fun showNavigation(shell: WorkspaceShell) {

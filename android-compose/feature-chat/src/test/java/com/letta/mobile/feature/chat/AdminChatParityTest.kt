@@ -314,8 +314,8 @@ class AdminChatParityTest {
 
     @Test
     fun `metadata failure completes timeline resolution before retry`() = runTest {
-        val harness = Harness(this, pinnedConversationId = "pinned-conversation")
-        harness.routeConversationId = "stale-before-first-attempt"
+        val harness = Harness(this)
+        harness.routeConversationId = "pinned-conversation"
         coEvery { harness.agentRepository.getAgent(AgentId("agent-1")) } throws RuntimeException("Network error")
 
         harness.coordinator.resolveConversationAndLoad()
@@ -352,7 +352,6 @@ class AdminChatParityTest {
 
     private class Harness(
         scope: CoroutineScope,
-        private val pinnedConversationId: String? = null,
     ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)
@@ -384,7 +383,6 @@ class AdminChatParityTest {
                         agentId = "agent-1",
                         initialMessage = null,
                         explicitConversationId = { routeConversationId },
-                        pinnedExplicitConversationId = pinnedConversationId,
                         setConversationId = { routeConversationId = it },
                         isFresh = false,
                     ),

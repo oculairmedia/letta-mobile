@@ -1,5 +1,4 @@
 package com.letta.mobile.ui.navigation
-
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
@@ -18,12 +17,14 @@ import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.lanes.ConversationLaneProjection
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
+import com.letta.mobile.feature.chat.screen.WorkspaceChatStoreOwner
 import com.letta.mobile.feature.chat.screen.WorkspaceChatPanel
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellDrawerConversations
@@ -61,17 +62,12 @@ import com.letta.mobile.ui.shell.workspace.workspaceNavigation
 import com.letta.mobile.ui.shell.workspace.workspaceNavigationActions
 import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import kotlin.time.Clock
-
-/** Where the workspace leaves for Android's own screens: the camera, diagnostics and the full-screen board. */
 internal class AndroidShellExits(
     val openCanvas: (agentId: String?, conversationId: String?, shareRecipient: String?) -> Unit,
     val openCanvasById: (canvasId: String) -> Unit,
     val settings: com.letta.mobile.ui.screens.config.SettingsDestinations,
 )
-
-/** One composition's Android shell: the workspace, its navigation, the chat it drives and the drawer binding. */
 internal class WorkspaceShell(
-    /** The active backend config; null before one is configured. */
     val config: LettaConfig?,
     val workspace: ShellWorkspaceState,
     val port: AndroidShellChatPort,
@@ -79,28 +75,36 @@ internal class WorkspaceShell(
     val layout: ShellLayoutController,
     val drawer: ShellWorkspaceDrawer,
     val exits: AndroidShellExits,
-    /** The open chat's model card and Chat options, which its page puts here while it shows. */
     val chatPanel: MutableState<WorkspaceChatPanel?>,
     val controllers: ShellLibraryControllers,
 ) {
-    /** The shell's verbs over the workspace and the chat they drive. */
     val navigator = ShellWorkspaceNavigator(workspace, port)
+    val sourceReady = drawerModel.sources.sessions.currentGraph.value.let {
+        workspace.sourceKey == AndroidShellChatPort.sourceKey(it) && workspace.sourceGeneration == it.id
+    }
 }
-
-/**
- * letta-mobile-ckmub.2 (hard cut): Android mounts the shared [LettaShellWorkspace] as desktop and web do.
- * This only binds Android's state into it: the roster and conversations from the drawer binding, the
- * session graph's pages ([androidPageHost]), Android's chat page ([androidChatPage]) and the back gesture.
- */
 @Composable
 internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?, exits: AndroidShellExits, launch: AndroidShellLaunch) {
     val drawerModel: SharedNavDrawerViewModel = hiltViewModel()
-    val agents by drawerModel.agents.collectAsStateWithLifecycle()
-    val fleet by drawerModel.fleet.collectAsStateWithLifecycle()
+    val observedAgents by drawerModel.agents.collectAsStateWithLifecycle()
+    val observedFleet by drawerModel.fleet.collectAsStateWithLifecycle()
+    val graph by drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
+    val source = remember(graph, config) { AndroidShellChatPort.sourceKey(graph, config) }
+    val bound = source == AndroidShellChatPort.sourceKey(graph)
+    val agents = observedAgents.takeIf { bound }.orEmpty()
+    val fleet = observedFleet.takeIf { bound }.orEmpty()
     val workspace = rememberShellWorkspaceState(start)
+    if (!WorkspaceChatStoreOwner.claimOwner(drawerModel, workspace, LocalContext.current, ready = bound)) return
     val latestFleet by rememberUpdatedState(fleet)
     val latestAgents by rememberUpdatedState(agents)
-    val port = remember(workspace) { AndroidShellChatPort(workspace, { latestFleet }, { latestAgents.map { it.id } }) }
+    val port = remember(workspace) {
+        AndroidShellChatPort(workspace, { latestFleet }, { latestAgents.map { it.id } },
+            isCurrentOwner = { WorkspaceChatStoreOwner.isCurrentOwner(drawerModel, workspace) },
+            onOpening = { WorkspaceChatStoreOwner.retain(workspace, it.toRoute(), drawerModel) })
+    }
+    remember(workspace, source, graph.id, launch.target, launch.focusInputs) {
+        bindAndroidFocus(workspace, graph, source, port, drawerModel, config, launch.focusInputs)
+    }
     val sources = drawerModel.sources
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val shell = WorkspaceShell(
@@ -114,39 +118,40 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
         chatPanel = remember { mutableStateOf(null) },
         controllers = rememberShellLibraryControllers(sources.sessions, sources.library, scope),
     )
+    if (!shell.sourceReady) return AndroidShellPage(shell, androidx.compose.ui.Modifier)
     LaunchedEffect(agents) { workspace.rosterChanged(agents.map { it.id }) }
-    // Each backend's roster and conversations load as the workspace comes up (a new backend reloads them).
-    LaunchedEffect(config?.id) { drawerModel.refresh(workspace.focusedAgentId, roster = true) }
+    LaunchedEffect(graph.id) { drawerModel.refresh(workspace.focusedAgentId, roster = true) }
     LaunchedEffect(shell.drawer.open, workspace.focusedAgentId) { if (shell.drawer.open) drawerModel.refresh(workspace.focusedAgentId) }
     AndroidShellLaunchEffect(shell, launch)
     ShellHomeBackendFleetEffect(shell.controllers.home, fleet, agents)
     ShellFailures(drawerModel)
-    // Back closes the drawer, then returns to Home; on Home it leaves the app.
     BackHandler(enabled = shell.drawer.open || workspace.page != ShellDestination.Home) {
         if (shell.drawer.open) shell.drawer.open = false else workspace.navigate(ShellDestination.Home)
     }
+    LettaShellWorkspace(
+        state = androidState(shell, agents, fleet),
+        host = androidHost(shell, agents, sources.sessions.currentGraph.collectAsStateWithLifecycle().value.conversationLanes),
+    )
+}
+@Composable
+private fun androidState(shell: WorkspaceShell, agents: List<Agent>, fleet: List<Conversation>): LettaShellWorkspaceState {
     val header = rememberShellWorkspaceHeader(
         ShellWorkspaceHeaderBinding(
             navigator = shell.navigator,
             layout = shell.layout,
-            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, workspace.focusedAgentId)),
+            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, shell.workspace.focusedAgentId)),
             tabFor = fleetTabFor(fleet),
         ),
     )
-    LettaShellWorkspace(
-        state = LettaShellWorkspaceState(
-            header = header,
-            navigation = rememberAndroidNavigation(shell, agents),
-            layout = ShellWorkspaceLayout(
-                sidebarVisible = shell.layout.state.isSidebarVisible,
-                reducedMotion = rememberReducedMotionEnabled(),
-            ),
+    return LettaShellWorkspaceState(
+        header = header,
+        navigation = rememberAndroidNavigation(shell, agents),
+        layout = ShellWorkspaceLayout(
+            sidebarVisible = shell.layout.state.isSidebarVisible,
+            reducedMotion = rememberReducedMotionEnabled(),
         ),
-        host = androidHost(shell, agents, sources.sessions.currentGraph.collectAsStateWithLifecycle().value.conversationLanes),
     )
 }
-
-/** The shell's actions, slots and events, with the session graph's lane activity for its rows. */
 @Composable
 private fun androidHost(shell: WorkspaceShell, agents: List<Agent>, lanes: ConversationLaneProjection?) = LettaShellWorkspaceHost(
     actions = androidNavigationActions(shell),
@@ -160,16 +165,12 @@ private fun androidHost(shell: WorkspaceShell, agents: List<Agent>, lanes: Conve
         shortcuts = rememberAndroidShortcuts(shell, agents),
     ),
 )
-
-/** The page, the open chat's card in the panel, the background tasks beside the page, and the overlays. */
 private fun androidSlots(shell: WorkspaceShell, agents: List<Agent>) = LettaShellWorkspaceSlots(
     main = { modifier -> AndroidShellPage(shell, modifier) },
     agentCard = { shell.chatPanel.value?.agentCard?.invoke() },
     sidePane = { AndroidBackgroundTasks(shell) },
     overlays = { AndroidShellOverlays(shell, agents) },
 )
-
-/** The rail over the roster (most recent first) and the focused agent's panel: conversations, marks, canvases, Chat options. */
 @Composable
 private fun rememberAndroidNavigation(shell: WorkspaceShell, agents: List<Agent>): ShellWorkspaceNavigation {
     val model = shell.drawerModel
@@ -191,16 +192,12 @@ private fun rememberAndroidNavigation(shell: WorkspaceShell, agents: List<Agent>
         pinnedAgentIds = model.pinnedAgentIds.collectAsStateWithLifecycle().value,
         agentLastActiveAt = RecentAgents.merge(model.agentActivity.collectAsStateWithLifecycle().value, RecentAgents.lastActiveAt(agents)),
     )
-    // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(shell.drawer.open) { Clock.System.now() }
     return shell.workspace.workspaceNavigation(agents.map { it.id.value to it.name }, now, drawer, library)
 }
-
-/** The shared verbs, with the rows' conversation actions and the agent pins written through Android's stores. */
 private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavigationActions {
     val base = shell.navigator.workspaceNavigationActions()
     val model = shell.drawerModel
-    // The panel lists a focused agent's conversations only, so its rows always have one.
     val agent = { checkNotNull(shell.workspace.focusedAgentId) }
     return base.copy(
         panel = base.panel.copy(
@@ -218,8 +215,6 @@ private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavig
         ),
     )
 }
-
-/** The shared keymap on Android's hardware keyboards: the workspace's verbs, without the rename dialog. */
 @Composable
 private fun rememberAndroidShortcuts(shell: WorkspaceShell, agents: List<Agent>): ShellShortcutBinding {
     val latestAgents by rememberUpdatedState(agents)
@@ -246,8 +241,6 @@ private fun rememberAndroidShortcuts(shell: WorkspaceShell, agents: List<Agent>)
         }
     }
 }
-
-/** A row action that failed says so briefly. */
 @Composable
 private fun ShellFailures(model: SharedNavDrawerViewModel) {
     val context = LocalContext.current
