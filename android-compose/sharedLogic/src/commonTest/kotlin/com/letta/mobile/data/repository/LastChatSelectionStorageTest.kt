@@ -46,6 +46,14 @@ class LastChatSelectionStorageTest {
     }
 
     @Test
+    fun `a scoped selection keeps its source in the atomic record`() {
+        val input = """{"agentId":"agent-1","conversationId":"conv-1","sourceKey":"source-a"}"""
+        val selection = assertNotNull(LastChatSelectionStorage.deserialize(input))
+        val stored = assertNotNull(LastChatSelectionStorage.serialize(selection))
+        assertEquals(true, stored.contains("\"sourceKey\":\"source-a\""))
+    }
+
+    @Test
     fun `missing stored value is absent`() {
         assertNull(LastChatSelectionStorage.deserialize(null))
         assertNull(LastChatSelectionStorage.deserialize(""))

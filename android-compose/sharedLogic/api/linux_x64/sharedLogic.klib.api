@@ -5412,7 +5412,6 @@ abstract interface com.letta.mobile.data.repository.api/ISettingsRepository { //
     abstract fun getThemePreset(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.model/ThemePreset> // com.letta.mobile.data.repository.api/ISettingsRepository.getThemePreset|getThemePreset(){}[0]
     abstract fun observeResumeRecentConversation(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.repository.api/ISettingsRepository.observeResumeRecentConversation|observeResumeRecentConversation(){}[0]
     abstract fun setFavoriteAgentId(kotlin/String?) // com.letta.mobile.data.repository.api/ISettingsRepository.setFavoriteAgentId|setFavoriteAgentId(kotlin.String?){}[0]
-    abstract fun setLastChatSelection(kotlin/String, kotlin/String?, kotlin/String?) // com.letta.mobile.data.repository.api/ISettingsRepository.setLastChatSelection|setLastChatSelection(kotlin.String;kotlin.String?;kotlin.String?){}[0]
     abstract suspend fun clearAllData() // com.letta.mobile.data.repository.api/ISettingsRepository.clearAllData|clearAllData(){}[0]
     abstract suspend fun deleteConfig(kotlin/String) // com.letta.mobile.data.repository.api/ISettingsRepository.deleteConfig|deleteConfig(kotlin.String){}[0]
     abstract suspend fun saveConfig(com.letta.mobile.data.model/LettaConfig) // com.letta.mobile.data.repository.api/ISettingsRepository.saveConfig|saveConfig(com.letta.mobile.data.model.LettaConfig){}[0]
@@ -5430,6 +5429,10 @@ abstract interface com.letta.mobile.data.repository.api/ISettingsRepository { //
     abstract suspend fun setTheme(com.letta.mobile.data.model/AppTheme) // com.letta.mobile.data.repository.api/ISettingsRepository.setTheme|setTheme(com.letta.mobile.data.model.AppTheme){}[0]
     abstract suspend fun setThemePreset(com.letta.mobile.data.model/ThemePreset) // com.letta.mobile.data.repository.api/ISettingsRepository.setThemePreset|setThemePreset(com.letta.mobile.data.model.ThemePreset){}[0]
     open fun getFeatureFlag(com.letta.mobile.data.repository.api/FeatureFlag): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.repository.api/ISettingsRepository.getFeatureFlag|getFeatureFlag(com.letta.mobile.data.repository.api.FeatureFlag){}[0]
+    open fun lastChatSeed(kotlin/String): com.letta.mobile.data.repository/LastChatSelection? // com.letta.mobile.data.repository.api/ISettingsRepository.lastChatSeed|lastChatSeed(kotlin.String){}[0]
+    open fun setLastChatSelection(kotlin/String, kotlin/String?, kotlin/String?) // com.letta.mobile.data.repository.api/ISettingsRepository.setLastChatSelection|setLastChatSelection(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    open fun setSettledChatSelection(com.letta.mobile.data.repository/LastChatSelection) // com.letta.mobile.data.repository.api/ISettingsRepository.setSettledChatSelection|setSettledChatSelection(com.letta.mobile.data.repository.LastChatSelection){}[0]
+    open fun setSettledChatSelection(kotlin/String, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId, kotlin/String? = ...) // com.letta.mobile.data.repository.api/ISettingsRepository.setSettledChatSelection|setSettledChatSelection(kotlin.String;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId;kotlin.String?){}[0]
     open suspend fun setFeatureFlag(com.letta.mobile.data.repository.api/FeatureFlag, kotlin/Boolean) // com.letta.mobile.data.repository.api/ISettingsRepository.setFeatureFlag|setFeatureFlag(com.letta.mobile.data.repository.api.FeatureFlag;kotlin.Boolean){}[0]
 }
 
@@ -55657,7 +55660,7 @@ final class com.letta.mobile.data.repository/IrohAdminRpcToolSource { // com.let
 }
 
 final class com.letta.mobile.data.repository/LastChatSelection { // com.letta.mobile.data.repository/LastChatSelection|null[0]
-    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.repository/LastChatSelection.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.repository/LastChatSelection.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
 
     final val agentId // com.letta.mobile.data.repository/LastChatSelection.agentId|{}agentId[0]
         final fun <get-agentId>(): kotlin/String // com.letta.mobile.data.repository/LastChatSelection.agentId.<get-agentId>|<get-agentId>(){}[0]
@@ -55665,11 +55668,14 @@ final class com.letta.mobile.data.repository/LastChatSelection { // com.letta.mo
         final fun <get-agentName>(): kotlin/String? // com.letta.mobile.data.repository/LastChatSelection.agentName.<get-agentName>|<get-agentName>(){}[0]
     final val conversationId // com.letta.mobile.data.repository/LastChatSelection.conversationId|{}conversationId[0]
         final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.repository/LastChatSelection.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val sourceKey // com.letta.mobile.data.repository/LastChatSelection.sourceKey|{}sourceKey[0]
+        final fun <get-sourceKey>(): kotlin/String? // com.letta.mobile.data.repository/LastChatSelection.sourceKey.<get-sourceKey>|<get-sourceKey>(){}[0]
 
     final fun component1(): kotlin/String // com.letta.mobile.data.repository/LastChatSelection.component1|component1(){}[0]
     final fun component2(): kotlin/String? // com.letta.mobile.data.repository/LastChatSelection.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.repository/LastChatSelection.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.repository/LastChatSelection // com.letta.mobile.data.repository/LastChatSelection.copy|copy(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.repository/LastChatSelection.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.repository/LastChatSelection // com.letta.mobile.data.repository/LastChatSelection.copy|copy(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.repository/LastChatSelection.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.repository/LastChatSelection.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.repository/LastChatSelection.toString|toString(){}[0]
@@ -68995,9 +69001,10 @@ open class com.letta.mobile.data.repository/CachedSettingsRepository : com.letta
     open fun getPinnedProjectIds(): kotlinx.coroutines.flow/Flow<kotlin.collections/Set<kotlin/String>> // com.letta.mobile.data.repository/CachedSettingsRepository.getPinnedProjectIds|getPinnedProjectIds(){}[0]
     open fun getTheme(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.model/AppTheme> // com.letta.mobile.data.repository/CachedSettingsRepository.getTheme|getTheme(){}[0]
     open fun getThemePreset(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.model/ThemePreset> // com.letta.mobile.data.repository/CachedSettingsRepository.getThemePreset|getThemePreset(){}[0]
+    open fun lastChatSeed(kotlin/String): com.letta.mobile.data.repository/LastChatSelection? // com.letta.mobile.data.repository/CachedSettingsRepository.lastChatSeed|lastChatSeed(kotlin.String){}[0]
     open fun observeResumeRecentConversation(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // com.letta.mobile.data.repository/CachedSettingsRepository.observeResumeRecentConversation|observeResumeRecentConversation(){}[0]
     open fun setFavoriteAgentId(kotlin/String?) // com.letta.mobile.data.repository/CachedSettingsRepository.setFavoriteAgentId|setFavoriteAgentId(kotlin.String?){}[0]
-    open fun setLastChatSelection(kotlin/String, kotlin/String?, kotlin/String?) // com.letta.mobile.data.repository/CachedSettingsRepository.setLastChatSelection|setLastChatSelection(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    open fun setSettledChatSelection(com.letta.mobile.data.repository/LastChatSelection) // com.letta.mobile.data.repository/CachedSettingsRepository.setSettledChatSelection|setSettledChatSelection(com.letta.mobile.data.repository.LastChatSelection){}[0]
     open suspend fun clearAllData() // com.letta.mobile.data.repository/CachedSettingsRepository.clearAllData|clearAllData(){}[0]
     open suspend fun deleteConfig(kotlin/String) // com.letta.mobile.data.repository/CachedSettingsRepository.deleteConfig|deleteConfig(kotlin.String){}[0]
     open suspend fun saveConfig(com.letta.mobile.data.model/LettaConfig) // com.letta.mobile.data.repository/CachedSettingsRepository.saveConfig|saveConfig(com.letta.mobile.data.model.LettaConfig){}[0]

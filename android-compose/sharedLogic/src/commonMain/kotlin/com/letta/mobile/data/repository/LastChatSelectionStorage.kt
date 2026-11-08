@@ -45,6 +45,7 @@ object LastChatSelectionStorage {
         val agentId: String,
         val agentName: String? = null,
         val conversationId: String? = null,
+        val sourceKey: String? = null,
     )
 
     /**
@@ -60,6 +61,7 @@ object LastChatSelectionStorage {
                 agentId = fenced.agentId,
                 agentName = fenced.agentName,
                 conversationId = fenced.conversationId,
+                sourceKey = fenced.sourceKey,
             ),
         )
     }
@@ -92,6 +94,7 @@ object LastChatSelectionStorage {
                 agentId = record.agentId,
                 agentName = record.agentName,
                 conversationId = record.conversationId,
+                sourceKey = record.sourceKey,
             ),
             source = "deserialize",
         )
@@ -128,6 +131,7 @@ object LastChatSelectionStorage {
             agentId = agentId,
             agentName = selection.agentName?.takeIf { it.isNotBlank() },
             conversationId = selection.conversationId?.takeIf { it.isNotBlank() },
+            sourceKey = selection.sourceKey?.takeIf { it.isNotBlank() },
         )
     }
 

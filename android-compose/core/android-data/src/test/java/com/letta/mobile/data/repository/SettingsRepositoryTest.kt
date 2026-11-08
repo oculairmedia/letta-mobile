@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.objectverbs.binding.withDevicePins
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -351,56 +353,89 @@ class SettingsRepositoryTest {
         assertEquals(false, dynamicColor)
     }
 
-    // letta-mobile-etib9: a blank agentName from a cold-start nav arg must not
-    // erase a previously resolved name, and must not survive across a switch to
-    // a different agent.
+    // Retain the name regression coverage for owner-confirmed writes, with source fencing.
     @Test
-    fun `setLastChatSelection blank agentName preserves stored name for same agent`() {
-        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
-        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+    fun `unknown source legacy selection stays on disk but is not a startup selection`() {
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
+        val legacy = """{"agentId":"agent-1","agentName":"Agent","conversationId":"conv-1"}"""
+        secureStore.putString(LastChatSelectionStorage.KEY, legacy)
+        val restored = SettingsRepository(createTestPreferencesDataStore(), secureStore)
 
-        repository.setLastChatSelection("agent-1", null, "conv-1")
-        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
-
-        repository.setLastChatSelection("agent-1", "   ", "conv-1")
-        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+        assertNull(restored.lastChatSelection.value)
+        assertEquals(legacy, secureStore.getString(LastChatSelectionStorage.KEY))
     }
 
     @Test
-    fun `setLastChatSelection blank agentName does not leak name across agents`() {
-        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
-        repository.setLastChatSelection("agent-2", null, "conv-2")
+    fun `legacy screen writer cannot overwrite the unresolved triple`() {
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
+        val legacy = """{"agentId":"agent-1","agentName":"Agent","conversationId":"conv-1"}"""
+        secureStore.putString(LastChatSelectionStorage.KEY, legacy)
+        val settings = SettingsRepository(createTestPreferencesDataStore(), secureStore)
 
-        assertEquals("agent-2", repository.lastChatSelection.value?.agentId)
-        assertNull(repository.lastChatSelection.value?.agentName)
+        settings.setLastChatSelection("agent-2", "Other", "conv-2")
+
+        assertEquals(legacy, secureStore.getString(LastChatSelectionStorage.KEY))
     }
 
     @Test
-    fun `stored agent name survives restart after a blank selection write`() {
+    fun `settled selection blank agentName preserves stored name for same source and agent`() {
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "PM-letta-mobile")
+        assertEquals("PM-letta-mobile", repository.lastChatSeed("source-1")?.agentName)
+
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), null)
+        assertEquals("PM-letta-mobile", repository.lastChatSeed("source-1")?.agentName)
+
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "   ")
+        assertEquals("PM-letta-mobile", repository.lastChatSeed("source-1")?.agentName)
+    }
+
+    @Test
+    fun `settled selection blank agentName does not leak name across agents or sources`() {
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "PM-letta-mobile")
+        repository.setSettledChatSelection("source-1", AgentId("agent-2"), ConversationId("conv-2"), null)
+        assertEquals("agent-2", repository.lastChatSeed("source-1")?.agentId)
+        assertNull(repository.lastChatSeed("source-1")?.agentName)
+
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "PM-letta-mobile")
+        repository.setSettledChatSelection("source-2", AgentId("agent-1"), ConversationId("conv-2"), null)
+        assertNull(repository.lastChatSeed("source-2")?.agentName)
+        assertNull(repository.lastChatSeed("source-1"))
+    }
+
+    @Test
+    fun `settled seed survives restart and remains source scoped`() {
         val secureStore = InMemorySecureSettingsStore().withDevicePins()
         val dataStore = createTestPreferencesDataStore()
-        val initialRepo = SettingsRepository(
-            dataStore = dataStore,
-            secureSettingsStore = secureStore,
-        )
+        val initialRepo = SettingsRepository(dataStore = dataStore, secureSettingsStore = secureStore)
+        initialRepo.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "PM-letta-mobile")
+        initialRepo.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), null)
 
-        initialRepo.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
-        // Cold-start entry into chat re-writes the selection with a blank name.
-        initialRepo.setLastChatSelection("agent-1", null, "conv-1")
-
-        val restoredRepo = SettingsRepository(
-            dataStore = dataStore,
-            secureSettingsStore = secureStore,
-        )
-        assertEquals("PM-letta-mobile", restoredRepo.lastChatSelection.value?.agentName)
+        val restoredRepo = SettingsRepository(dataStore = dataStore, secureSettingsStore = secureStore)
+        assertEquals("PM-letta-mobile", restoredRepo.lastChatSeed("source-1")?.agentName)
+        assertEquals("conv-1", restoredRepo.lastChatSeed("source-1")?.conversationId)
+        assertNull(restoredRepo.lastChatSeed("source-2"))
     }
 
     @Test
-    fun `setLastChatSelection still stores a newly resolved name`() {
-        repository.setLastChatSelection("agent-1", null, "conv-1")
-        assertNull(repository.lastChatSelection.value?.agentName)
+    fun `settled selection still stores a newly resolved name`() {
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), null)
+        assertNull(repository.lastChatSeed("source-1")?.agentName)
 
-        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
-        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+        repository.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "PM-letta-mobile")
+        assertEquals("PM-letta-mobile", repository.lastChatSeed("source-1")?.agentName)
     }
+
+    @Test
+    fun `settled seed preserves legacy record and rejects a blank source`() {
+        val secureStore = InMemorySecureSettingsStore().withDevicePins()
+        val legacy = """{"agentId":"legacy","conversationId":"conv-legacy"}"""
+        secureStore.putString(LastChatSelectionStorage.KEY, legacy)
+        val settings = SettingsRepository(createTestPreferencesDataStore(), secureStore)
+        settings.setSettledChatSelection(" ", AgentId("agent-1"), ConversationId("conv-1"), "Agent")
+        assertNull(settings.lastChatSeed(" "))
+        settings.setSettledChatSelection("source-1", AgentId("agent-1"), ConversationId("conv-1"), "Agent")
+        assertEquals("agent-1", settings.lastChatSeed("source-1")?.agentId)
+        assertEquals(legacy, secureStore.getString(LastChatSelectionStorage.KEY))
+    }
+
 }

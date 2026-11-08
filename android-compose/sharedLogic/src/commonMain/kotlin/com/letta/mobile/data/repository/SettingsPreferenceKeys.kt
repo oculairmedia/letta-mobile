@@ -23,5 +23,6 @@ internal object SettingsSecureKeys {
     const val FAVORITE_AGENT_ID = "favorite_agent_id"
     const val ADMIN_AGENT_ID = "admin_agent_id"
     const val LAST_CHAT_SELECTION = LastChatSelectionStorage.KEY
+    const val SETTLED_CHAT_SELECTION = "settled_chat_selection_v1"
     const val HUGGING_FACE_TOKEN = "hugging_face_token"
 }
