@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,19 +69,26 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
-        Column(
-            // Tight under the controls: the row's own buttons already carry their touch padding.
-            modifier = Modifier.padding(
-                start = LettaDimens.Space.md,
-                end = LettaDimens.Space.md,
-                top = LettaDimens.Space.sm,
-                bottom = LettaDimens.Space.xs,
-            ),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        ) {
-            ComposerAttachmentStrip(attachments = model.composer.attachments, onRemove = model.actions::removeAttachment)
-            ComposerTextField(model = model, style = FullFieldStyle)
-            ComposerControlRow(model = model, onAttachImage = onAttachImage)
+        val fieldEndPadding = cornerContentPadding()
+        Box {
+            Column(
+                modifier = Modifier.padding(
+                    start = LettaDimens.Space.md,
+                    end = LettaDimens.Space.md,
+                    top = LettaDimens.Space.sm,
+                    bottom = LettaDimens.Space.xs,
+                ),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            ) {
+                if (model.composer.attachments.isNotEmpty()) {
+                    Box(Modifier.padding(end = fieldEndPadding)) {
+                        ComposerAttachmentStrip(attachments = model.composer.attachments, onRemove = model.actions::removeAttachment)
+                    }
+                }
+                ComposerTextField(model = model, style = FullFieldStyle, modifier = Modifier.padding(end = fieldEndPadding))
+                ComposerControlRow(model = model, onAttachImage = onAttachImage)
+            }
+            ComposerActionButton(model, Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm))
         }
     }
 }
@@ -121,17 +129,30 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            // A bar dragged taller keeps its buttons on the bottom line, by Send, like the full card.
-            verticalAlignment = if (fieldHeight == null) Alignment.CenterVertically else Alignment.Bottom,
-        ) {
-            ComposerExpandButton(onExpand = { model.onIntent(ChatSurfaceIntent.Expand) })
-            ComposerPlusButton(model, onAttachImage)
-            ComposerTextField(model = model, style = dockedFieldStyle(DockedFieldStyle, fieldHeight), modifier = Modifier.weight(1f))
-            ComposerVoiceButton(model)
-            ComposerActionButton(model)
+        Box {
+            Row(
+                modifier = Modifier
+                    .heightIn(min = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2)
+                    .padding(
+                        start = LettaDimens.Space.sm,
+                        end = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2,
+                        top = LettaDimens.Space.xs,
+                        bottom = LettaDimens.Space.xs,
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                // A dragged-taller bar keeps its other controls on the bottom line.
+                verticalAlignment = if (fieldHeight == null) Alignment.CenterVertically else Alignment.Bottom,
+            ) {
+                ComposerExpandButton(onExpand = { model.onIntent(ChatSurfaceIntent.Expand) })
+                ComposerPlusButton(model, onAttachImage)
+                ComposerTextField(model = model, style = dockedFieldStyle(DockedFieldStyle, fieldHeight), modifier = Modifier.weight(1f))
+                ComposerVoiceButton(model)
+            }
+            ComposerActionButton(model, Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm))
         }
     }
 }
+
+// The column already has md end padding; reserve the rest of the button, inset and gap.
+private fun cornerContentPadding(): Dp =
+    LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2 - LettaDimens.Space.md
