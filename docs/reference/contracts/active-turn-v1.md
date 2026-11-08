@@ -48,6 +48,10 @@ The future `ActiveTurnCoordinator` in sharedLogic is session-bound and owns one
 immutable `ActiveTurnState` per resolved conversation. It is not scoped to the
 currently visible chat: background turns survive focus changes. Trusted session
 identity scopes all IDs; switching backend disposes the owner and observers.
+A raw `default` conversation ID is ambiguous across agents. Resolve it through the
+existing `ConversationReadTarget` with verified agent ownership before indexing or
+dispatch. Short action signatures run on that trusted binding (or a uniquely resolved
+operation/request); ambiguous ownership rejects rather than borrowing current focus.
 
 | Field | Exact meaning |
 | --- | --- |

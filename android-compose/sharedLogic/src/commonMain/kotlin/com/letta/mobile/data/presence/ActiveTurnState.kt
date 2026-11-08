@@ -83,22 +83,35 @@ fun arbitrateActiveTurn(
     boundary: ActiveTurnBoundary,
 ): ActiveTurnState {
     if (!candidate.isResolvedFor(current)) return current
-    val sameTurn = candidate.runId == current.runId && candidate.turnId == current.turnId
-    val unbound = current.runId == null && current.turnId == null && current.phase == ActiveTurnPhase.Idle
     return when (boundary) {
-        ActiveTurnBoundary.Start -> if (sameTurn) current else candidate
-        ActiveTurnBoundary.Terminal -> if (sameTurn || unbound) candidate.closed() else current
-        ActiveTurnBoundary.Delete -> if (sameTurn) current.closed() else current
-        ActiveTurnBoundary.Interrupt -> if (sameTurn) current.interrupted() else current
-        ActiveTurnBoundary.Progress -> if (sameTurn) current.progressed(candidate) else current
-        ActiveTurnBoundary.ApprovalResolved ->
-            if (sameTurn && current.phase == ActiveTurnPhase.AwaitingInput) {
-                candidate.copy(startedAtEpochMs = current.startedAtEpochMs)
-            } else {
-                current
-            }
+        ActiveTurnBoundary.Start -> if (current.sameTurn(candidate)) current else candidate
+        ActiveTurnBoundary.Terminal -> current.terminated(candidate)
+        ActiveTurnBoundary.Delete, ActiveTurnBoundary.Interrupt,
+        ActiveTurnBoundary.Progress, ActiveTurnBoundary.ApprovalResolved -> current.withinTurn(candidate, boundary)
     }
 }
+
+private fun ActiveTurnState.sameTurn(candidate: ActiveTurnState): Boolean =
+    candidate.runId == runId && candidate.turnId == turnId
+
+private fun ActiveTurnState.terminated(candidate: ActiveTurnState): ActiveTurnState {
+    val unbound = runId == null && turnId == null && phase == ActiveTurnPhase.Idle
+    return if (sameTurn(candidate) || unbound) candidate.closed() else this
+}
+
+private fun ActiveTurnState.withinTurn(candidate: ActiveTurnState, boundary: ActiveTurnBoundary): ActiveTurnState {
+    if (!sameTurn(candidate)) return this
+    return when (boundary) {
+        ActiveTurnBoundary.Delete -> closed()
+        ActiveTurnBoundary.Interrupt -> interrupted()
+        ActiveTurnBoundary.Progress -> progressed(candidate)
+        ActiveTurnBoundary.ApprovalResolved -> approvalResolved(candidate)
+        ActiveTurnBoundary.Start, ActiveTurnBoundary.Terminal -> this
+    }
+}
+
+private fun ActiveTurnState.approvalResolved(candidate: ActiveTurnState): ActiveTurnState =
+    if (phase == ActiveTurnPhase.AwaitingInput) candidate.copy(startedAtEpochMs = startedAtEpochMs) else this
 
 private fun ActiveTurnState.isResolvedFor(current: ActiveTurnState): Boolean =
     conversationId == current.conversationId && agentId == current.agentId && runId != null && turnId != null
