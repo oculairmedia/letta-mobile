@@ -286,23 +286,29 @@ private fun dropUnroutableA2uiAction(action: A2uiAction) {
     )
 }
 
-/** Bind the trusted Android session and arbitrate a new entry before chat effects mount. */
+/** Bind the captured session; arbitrate startup before consuming a pending saved envelope. */
 internal fun bindAndroidFocus(
     workspace: ShellWorkspaceState, graph: SessionGraph, source: String,
     port: AndroidShellChatPort, drawerModel: SharedNavDrawerViewModel,
     config: LettaConfig?, focusInputs: CurrentFocusInputs?,
 ) {
-    val saved = workspace.sourceKey?.let { workspace.snapshot() }
+    if (source != AndroidShellChatPort.sourceKey(graph)) {
+        port.sourceChanged()
+        WorkspaceChatStoreOwner.bindSource(drawerModel, source)
+        return
+    }
+    val saved = workspace.snapshotOrPending()
     val changed = workspace.sourceKey != source || workspace.sourceGeneration != graph.id
+    val inputs = focusInputs?.takeIf { WorkspaceChatStoreOwner.claimInputs(drawerModel, it) } ?: CurrentFocusInputs(source)
+    val initial = CurrentFocusSnapshot(source, CurrentFocus("settings"))
+    val startup = (if (config == null) inputs.copy(deepLink = null, explicitRoute = initial, settingsSeed = null) else inputs)
+        .copy(sourceKey = source, restored = saved ?: inputs.restored)
+    val unbound = workspace.sourceKey == null
+    val initializedEntry = unbound && initializeAndroidFocus(workspace, startup)
     workspace.bindSource(source, graph.id)
     if (changed) port.sourceChanged()
     WorkspaceChatStoreOwner.bindSource(drawerModel, source)
-    val inputs = focusInputs?.takeIf {
-        source == AndroidShellChatPort.sourceKey(graph) && WorkspaceChatStoreOwner.claimInputs(drawerModel, it)
-    } ?: CurrentFocusInputs(source)
-    val initial = CurrentFocusSnapshot(source, CurrentFocus("settings"))
-    val startup = if (config == null) inputs.copy(deepLink = null, explicitRoute = initial, settingsSeed = null) else inputs
-    val newEntry = initializeAndroidFocus(workspace, startup.copy(sourceKey = source, restored = saved ?: inputs.restored))
+    val newEntry = initializedEntry || !unbound && initializeAndroidFocus(workspace, startup)
     if (newEntry && workspace.currentFocus.chatMode == CurrentFocusChatMode.New) {
         port.startNewChat(workspace.currentFocus.agentId)
     }
