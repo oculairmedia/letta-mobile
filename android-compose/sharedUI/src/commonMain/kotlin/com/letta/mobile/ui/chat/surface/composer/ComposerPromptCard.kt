@@ -69,6 +69,7 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
+        val fieldEndPadding = cornerContentPadding()
         Box {
             Column(
                 modifier = Modifier.padding(
@@ -80,11 +81,11 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 if (model.composer.attachments.isNotEmpty()) {
-                    Box(Modifier.padding(end = cornerContentPadding())) {
+                    Box(Modifier.padding(end = fieldEndPadding)) {
                         ComposerAttachmentStrip(attachments = model.composer.attachments, onRemove = model.actions::removeAttachment)
                     }
                 }
-                ComposerTextField(model = model, style = FullFieldStyle, modifier = Modifier.padding(end = cornerContentPadding()))
+                ComposerTextField(model = model, style = FullFieldStyle, modifier = Modifier.padding(end = fieldEndPadding))
                 ComposerControlRow(model = model, onAttachImage = onAttachImage)
             }
             ComposerActionButton(model, Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm))
