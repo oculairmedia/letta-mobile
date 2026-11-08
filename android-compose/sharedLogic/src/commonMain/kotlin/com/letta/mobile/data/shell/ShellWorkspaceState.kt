@@ -225,17 +225,18 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             }
             if (sourceKey == key && sourceGeneration == generation) return@transition
             val changedSource = pending != null || sourceKey != null && sourceKey != key
-            if (changedSource) closeStartup()
-            val saved = if (changedSource) {
-                initialFocusSnapshot(ShellDestination.Home, key, railExpanded)
-            } else {
-                value.saved.copy(sourceKey = key)
+            if (changedSource) {
+                closeStartup()
+                value = WorkspaceFocusState(
+                    initialFocusSnapshot(ShellDestination.Home, key, railExpanded),
+                    generation = generation, revision = focusRevision + 1,
+                )
+                return@transition
             }
-            value = if (changedSource) {
-                WorkspaceFocusState(saved, generation = generation, revision = focusRevision + 1)
-            } else {
-                value.copy(saved = saved, generation = generation, revision = focusRevision + 1, settled = null)
-            }
+            value = value.copy(
+                saved = value.saved.copy(sourceKey = key), generation = generation,
+                revision = focusRevision + 1, settled = null,
+            )
         }
     }
 
@@ -270,7 +271,8 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
      * [initialize] and any [restore] attempt discard it. After binding, use [restore] instead.
      */
     fun holdPending(snapshot: CurrentFocusSnapshot): Boolean = transition {
-        if (!startupAvailable || sourceKey != null || !snapshot.valid()) return@transition false
+        if (!startupAvailable || sourceKey != null) return@transition false
+        if (!snapshot.valid()) return@transition false
         pendingSnapshot = snapshot.detached()
         true
     }
