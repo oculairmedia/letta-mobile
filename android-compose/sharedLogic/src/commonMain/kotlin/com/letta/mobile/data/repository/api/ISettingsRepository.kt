@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository.api
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -45,6 +47,16 @@ interface ISettingsRepository {
     fun getPinnedAgentOrder(): Flow<List<String>>
     fun getPinnedConversationIds(): Flow<Set<String>>
     fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?)
+    /** Read a next-start seed only for the same trusted source. */
+    fun lastChatSeed(sourceKey: String): LastChatSelection? = null
+
+    /** Persist a target reported by the workspace after it has settled. */
+    fun setSettledChatSelection(
+        sourceKey: String,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        agentName: String? = null,
+    ) = Unit
     suspend fun setConversationPinned(conversationId: String, pinned: Boolean)
     fun setFavoriteAgentId(agentId: String?)
     suspend fun setAgentPinned(agentId: String, pinned: Boolean)

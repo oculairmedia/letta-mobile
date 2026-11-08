@@ -4,6 +4,7 @@ data class LastChatSelection(
     val agentId: String,
     val agentName: String? = null,
     val conversationId: String? = null,
+    val sourceKey: String? = null,
 )
 
 /**

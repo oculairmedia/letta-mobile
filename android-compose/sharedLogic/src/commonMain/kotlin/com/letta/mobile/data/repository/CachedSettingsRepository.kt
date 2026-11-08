@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -22,6 +24,8 @@ import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +72,7 @@ open class CachedSettingsRepository(
     private val _adminAgentId = MutableStateFlow<String?>(null)
     override val adminAgentId: StateFlow<String?> = _adminAgentId.asStateFlow()
 
+    private val settledChatLock = SynchronizedObject()
     private val _lastChatSelection = MutableStateFlow<LastChatSelection?>(null)
     override val lastChatSelection: StateFlow<LastChatSelection?> = _lastChatSelection.asStateFlow()
 
@@ -79,7 +84,6 @@ open class CachedSettingsRepository(
         loadActiveConfig()
         _favoriteAgentId.value = secureSettingsStore.getString(SettingsSecureKeys.FAVORITE_AGENT_ID)
         _adminAgentId.value = secureSettingsStore.getString(SettingsSecureKeys.ADMIN_AGENT_ID)
-        _lastChatSelection.value = loadLastChatSelection()
         _huggingFaceToken.value =
             secureSettingsStore.getString(SettingsSecureKeys.HUGGING_FACE_TOKEN)?.takeIf { it.isNotBlank() }
     }
@@ -179,20 +183,39 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
-        val selection = mergeLastChatSelection(
-            previous = _lastChatSelection.value,
-            agentId = agentId,
-            agentName = agentName,
-            conversationId = conversationId,
-        ) ?: return
-        val serialized = LastChatSelectionStorage.serialize(selection) ?: return
-        _lastChatSelection.update { selection }
-        secureSettingsStore.putString(SettingsSecureKeys.LAST_CHAT_SELECTION, serialized)
+    // The old screen writer has no source or owner provenance; retain its on-disk record untouched.
+    override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) = Unit
+
+    override fun lastChatSeed(sourceKey: String): LastChatSelection? = synchronized(settledChatLock) {
+        readSettledChatSelection(sourceKey)
     }
 
-    private fun loadLastChatSelection(): LastChatSelection? {
-        return LastChatSelectionStorage.deserialize(secureSettingsStore.getString(SettingsSecureKeys.LAST_CHAT_SELECTION))
+    override fun setSettledChatSelection(
+        sourceKey: String,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        agentName: String?,
+    ) {
+        if (sourceKey.isBlank()) return
+        if (agentId.value.isBlank()) return
+        if (conversationId.value.isBlank()) return
+        synchronized(settledChatLock) {
+            val selection = mergeLastChatSelection(
+                previous = readSettledChatSelection(sourceKey),
+                agentId = agentId.value,
+                agentName = agentName,
+                conversationId = conversationId.value,
+            )?.copy(sourceKey = sourceKey) ?: return@synchronized
+            val serialized = LastChatSelectionStorage.serialize(selection) ?: return@synchronized
+            secureSettingsStore.putDurableString(SettingsSecureKeys.SETTLED_CHAT_SELECTION, serialized)
+        }
+    }
+
+    private fun readSettledChatSelection(sourceKey: String): LastChatSelection? {
+        if (sourceKey.isBlank()) return null
+        val stored = secureSettingsStore.getString(SettingsSecureKeys.SETTLED_CHAT_SELECTION)
+        return LastChatSelectionStorage.deserialize(stored)
+            ?.takeIf { it.sourceKey == sourceKey && it.conversationId != null }
     }
 
     override suspend fun clearAllData() = withContext(Dispatchers.Default) {
