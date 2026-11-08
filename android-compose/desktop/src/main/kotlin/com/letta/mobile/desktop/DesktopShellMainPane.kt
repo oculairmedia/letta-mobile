@@ -150,7 +150,7 @@ private fun desktopMainContentInputs(
     return DesktopMainContentInputs(
         agentEditor = navigator.agentEditor,
         selectedDestination = navigator.selectedDestination,
-        pageDestination = navigator.pageFor(frame),
+        pageDestination = navigator.pageFor(null, null),
         selectedConversationId = frame.chatState.selectedConversationId,
         pages = rememberShellPageDeps(core.sessionGraph.value, context.panels.libraries, desktopPageHost(context, frame, host)),
         activeCanvasSession = core.canvasShell.activeSession,
@@ -254,7 +254,7 @@ private fun DesktopShellSharedChatPage(
     DesktopSharedChatPage(
         state = DesktopSharedChatPageState(
             port = page.port,
-            pagedTimeline = canonicalPresentation,
+            pagedTimeline = canonicalPresentation.takeIf { context.core.chatController.isSelectionCurrent() },
             hostInputs = ChatComposerHostInputs(
                 commands = page.host.composerCommands,
                 mentionables = frame.lists.mentionables,

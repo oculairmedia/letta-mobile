@@ -40,6 +40,8 @@ class DesktopChatControllerRunGlowTest {
         )
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("run the checks")
         controller.send()
         runCurrent()

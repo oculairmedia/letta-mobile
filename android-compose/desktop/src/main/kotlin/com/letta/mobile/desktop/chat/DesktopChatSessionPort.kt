@@ -1,9 +1,12 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.runtime.snapshotFlow
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
@@ -21,6 +24,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.GatewayPermissionModes
 import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
 import com.letta.mobile.ui.chat.session.TimelineLocalState
+import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import com.letta.mobile.ui.chat.session.currentHostApprovals
 import com.letta.mobile.ui.chat.session.forgetAcknowledgedOnceCleared
 import com.letta.mobile.ui.chat.session.hostApprovals
@@ -45,22 +49,11 @@ internal data class DesktopChatSessionBindings(
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Persists a pinch/zoom font scale through the desktop font-scale host. */
     val onSetFontScale: (Float) -> Unit = {},
-    /**
-     * letta-mobile-by4vm.85: the host's model catalog (the window's model-control session), whose
-     * rows say which reasoning efforts each model takes; null leaves the effort chip off.
-     */
+    /** Model catalog and available reasoning efforts; null hides the effort chip. */
     val modelCatalog: ModelCatalogRepository? = null,
 )
 
-/**
- * letta-mobile-bglj6.1: desktop's [ChatSessionPort], an adapter over [DesktopChatController].
- *
- * The controller stays the conversation owner; this only maps its flows onto the shared page's
- * contracts (see DesktopChatSessionMapping.kt), reads the shared extension points
- * ([ChatSessionExtensions]) and forwards the owner's [ChatActions] to it. Construct one per
- * controller and share it across every presentation, so the draft and the run are the same object
- * in each mode.
- */
+/** Map controller effects and workspace focus to the shared chat session. */
 internal class DesktopChatSessionPort(
     private val controller: DesktopChatController,
     private val scope: CoroutineScope,
@@ -68,6 +61,12 @@ internal class DesktopChatSessionPort(
 ) : ChatSessionPort {
     private val hostInputs = MutableStateFlow(ChatComposerHostInputs())
     private val localTimeline = MutableStateFlow(TimelineLocalState())
+    private val surface = controller.workspaceOwner?.let { owner ->
+        DerivedStateFlow(combine(controller.state, snapshotFlow {
+            Triple(owner.currentFocus, owner.agentAvailability, owner.conversationAvailability)
+        }) { state, _ -> state.projectWorkspace(owner, controller.isTargetCurrent()) },
+            { controller.state.value.projectWorkspace(owner, controller.isTargetCurrent()) })
+    } ?: controller.state
 
     /**
      * by4vm.98: the selected conversation's extension points, the shared bindings
@@ -78,8 +77,8 @@ internal class DesktopChatSessionPort(
         workingDirectory = controller.workingDirectory,
         permissionModes = GatewayPermissionModes(
             scope = scope,
-            targets = controller.state.map { controller.activeGateway.permissionModeTarget(it.selectedConversation) },
-            current = { controller.activeGateway.permissionModeTarget(controller.state.value.selectedConversation) },
+            targets = surface.map { controller.activeGateway.permissionModeTarget(it.selectedConversation) },
+            current = { controller.activeGateway.permissionModeTarget(surface.value.selectedConversation) },
         ),
         models = controller.models,
         sendQueue = controller.sendQueue,
@@ -87,7 +86,7 @@ internal class DesktopChatSessionPort(
         onA2uiAction = bindings.onA2uiAction,
         branching = controller.conversationManagement.branches,
         recompile = controller.conversationManagement.recompile,
-        liveStatus = runLiveStatus(controller.runs, controller.state.map { it.selectedConversationId }),
+        liveStatus = runLiveStatus(controller.runs, surface.map { it.selectedConversationId }),
         attachmentLimits = controller.attachmentLimits,
     )
     private val extensions = ChatSessionExtensions(options, scope)
@@ -101,17 +100,18 @@ internal class DesktopChatSessionPort(
         hostInputs.value = inputs
     }
 
-    override val uiState: StateFlow<ChatUiState> = timelineInputs()
-        .runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
-        .map { it ?: initialUiState() }
-        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
+    override val uiState: StateFlow<ChatUiState> = DerivedStateFlow(
+        timelineInputs().runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
+            .map { it ?: initialUiState() }, ::initialUiState,
+    )
 
-    override val composer: StateFlow<ChatComposerUiState> = combine(controller.state, extensions.chrome) { surface, chrome ->
-        surface.composerUiState(controller.attachmentLimits).withChrome(chrome)
-    }.stateIn(
-        scope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        controller.state.value.composerUiState(controller.attachmentLimits).withChrome(extensions.chrome.value),
+    override val composer: StateFlow<ChatComposerUiState> = DerivedStateFlow(
+        combine(surface, extensions.chrome) { surface, chrome ->
+            surface.composerUiState(controller.attachmentLimits).let { if (controller.isSelectionCurrent()) it.withChrome(chrome) else it }
+        },
+        { surface.value.composerUiState(controller.attachmentLimits).let {
+            if (controller.isSelectionCurrent()) it.withChrome(extensions.chrome.value) else it
+        } },
     )
 
     override val liveStatus: StateFlow<RuntimeLiveStatus> get() = extensions.liveStatus
@@ -152,22 +152,25 @@ internal class DesktopChatSessionPort(
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
 
     private fun currentTimelineInputs() = DesktopChatTimelineInputs(
-        surface = controller.state.value,
-        presence = controller.replyPresence.value,
-        cancellingConversationId = controller.cancellingConversationId.value,
+        surface = surface.value,
+        presence = if (controller.isSelectionCurrent()) controller.replyPresence.value else ChatStreamingPresence(false, false),
+        cancellingConversationId = controller.cancellingConversationId.value.takeIf { controller.isSelectionCurrent() },
         sendQueue = ConversationSendQueue(),
         local = localTimeline.value,
-        approvals = controller.approvals.currentHostApprovals(),
+        approvals = if (controller.isSelectionCurrent()) controller.approvals.currentHostApprovals() else TimelineHostApprovals(),
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
-        controller.state,
+        surface,
         controller.replyPresence,
         controller.cancellingConversationId,
         controller.sendQueue.queue,
         combine(localTimeline, controller.approvals.hostApprovals(), ::Pair),
     ) { surface, presence, cancelling, queue, (local, approvals) ->
-        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, approvals)
+        if (controller.workspaceOwner != null && !controller.isSelectionCurrent()) {
+            DesktopChatTimelineInputs(surface, ChatStreamingPresence(false, false), null, ConversationSendQueue(), local,
+                TimelineHostApprovals())
+        } else DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, approvals)
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
         localTimeline.update { it.forgetAcknowledgedOnceCleared(inputs.surface.errorMessage) }
@@ -202,23 +205,23 @@ internal class DesktopChatActions(
     state: ChatExtensionActionState,
     private val onSetFontScale: (Float) -> Unit = {},
 ) : ChatExtensionActions(options, state) {
-    override fun updateComposerText(text: String) = controller.updateComposerText(text)
+    override fun updateComposerText(text: String) { if (controller.canEditDraft()) controller.updateComposerText(text) }
 
     override fun send() = controller.sendOrBranch()
 
     /** A draft-free send: the user's draft and staged images stay exactly as they are. */
     override fun sendText(text: String) = controller.sendText(text)
 
-    override fun attachImage(image: MessageContentPart.Image) = controller.attachImage(image)
+    override fun attachImage(image: MessageContentPart.Image) { if (controller.canEditDraft()) controller.attachImage(image) }
 
-    override fun removeAttachment(index: Int) = controller.removeImageAttachment(index)
+    override fun removeAttachment(index: Int) { if (controller.canEditDraft()) controller.removeImageAttachment(index) }
 
     override fun reportComposerError(message: String) = controller.showComposerError(message)
 
     override fun clearComposerError() = controller.clearComposerError()
 
     override fun stopRun() {
-        controller.state.value.selectedConversationId?.let(controller::stopActiveRun)
+        if (controller.isSelectionCurrent()) controller.state.value.selectedConversationId?.let(controller::stopActiveRun)
     }
 
     override fun submitApproval(answer: ChatApprovalAnswer) {

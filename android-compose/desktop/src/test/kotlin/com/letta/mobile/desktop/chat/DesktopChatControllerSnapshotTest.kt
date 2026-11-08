@@ -35,6 +35,8 @@ class DesktopChatControllerSnapshotTest {
         }
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         assertTrue(opened.isCompleted)
         kotlin.test.assertFalse(gateway.hydrationStarted.isCompleted)
         controller.close()
@@ -53,6 +55,8 @@ class DesktopChatControllerSnapshotTest {
         controller.canonicalEligible = { true }
         controller.canonicalOpen = { error("Canonical unavailable") }
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         kotlin.test.assertFalse(gateway.hydrationStarted.isCompleted)
         controller.close()
@@ -96,6 +100,8 @@ class DesktopChatControllerSnapshotTest {
             com.letta.mobile.desktop.data.openDesktopCanonicalPresentation(coordinator, owner, request.scope)
         }
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         val first = checkNotNull(owners["conv-1"])
         kotlin.test.assertFalse(coordinator.retire(first))

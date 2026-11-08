@@ -21,9 +21,9 @@ internal fun parseDesktopDeepLink(uri: URI): ShellLink? = ShellDeepLink.parse(ur
 /** Where each kind of deep link goes; grouped so the routing functions stay small. */
 internal class DesktopDeepLinkHandlers(
     val onDestinationSelected: (ShellDestination) -> Unit,
-    /** A conversation link; selected once the conversation list has it. */
+    /** Legacy adapter retained while callers migrate to destination entries. */
     val onConversationSelected: (String) -> Unit,
-    /** An agent link; opened once the first conversation load settled. */
+    /** Legacy adapter retained while callers migrate to destination entries. */
     val onAgentSelected: (String) -> Unit,
     /** letta-mobile-dpv7m.3: a scan-to-pair link; it carries a one-time secret. */
     val onPairLink: (String) -> Unit = {},
@@ -41,15 +41,5 @@ internal fun handleDesktopDeepLink(link: ShellLink?, handlers: DesktopDeepLinkHa
 }
 
 private fun openDeepLinkDestination(destination: ShellDestination, handlers: DesktopDeepLinkHandlers) {
-    val chat = destination as? ShellDestination.Chat
-    val conversationId = chat?.conversationId
-    val agentId = chat?.agentId
-    when {
-        conversationId != null -> {
-            handlers.onConversationSelected(conversationId)
-            handlers.onDestinationSelected(destination)
-        }
-        agentId != null -> handlers.onAgentSelected(agentId)
-        else -> handlers.onDestinationSelected(destination)
-    }
+    handlers.onDestinationSelected(destination)
 }

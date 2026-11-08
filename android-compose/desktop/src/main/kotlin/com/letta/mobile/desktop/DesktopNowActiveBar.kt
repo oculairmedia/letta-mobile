@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.letta.mobile.data.chat.runtime.nowActiveStatus
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.ui.shell.nowactive.NowActiveBarActions
@@ -38,28 +39,15 @@ internal data class NowActiveBarPin(
     val state: NowActiveBarState,
 )
 
-/**
- * Derives the header identity block's pinned conversation and live status
- * from controller state: pinned to the conversation the user LAST PROMPTED
- * (sticky across browsing, like now-playing), falling back to the selection
- * until the first send. Returns null when there is no conversation at all —
- * callers should degrade to a generic title in that case.
- *
- * Pure by design (no Compose state reads) so the mapping is unit-testable
- * without a Compose UI test harness.
- */
+/** Derive the selected chat's header identity while retaining background-work attribution. */
 internal fun deriveNowActiveBarPin(
-    lastPromptedId: String?,
+    ownerConversationId: ConversationId?,
     streamingId: String?,
     cancellingId: String?,
     chatState: DesktopChatSurfaceState,
     host: NowActiveBarHostState,
 ): NowActiveBarPin? {
-    val barConversation = lastPromptedId
-        ?.let { id -> chatState.conversations.firstOrNull { it.id == id } }
-        ?: chatState.selectedConversation
-        ?: return null
-    val barIsSelected = barConversation.id == chatState.selectedConversationId
+    val barConversation = chatState.conversations.firstOrNull { it.id == ownerConversationId?.value } ?: return null
     return NowActiveBarPin(
         conversationId = barConversation.id,
         state = NowActiveBarState(
@@ -68,16 +56,12 @@ internal fun deriveNowActiveBarPin(
             agentId = barConversation.agentId,
             status = nowActiveStatus(
                 isThinking = host.thinkingConversationId == barConversation.id,
-                isStreaming = if (barIsSelected) {
-                    host.isStreamingReplySelected
-                } else {
-                    streamingId == barConversation.id
-                },
-                hasError = barIsSelected && chatState.errorMessage != null,
+                isStreaming = host.isStreamingReplySelected && streamingId == barConversation.id,
+                hasError = chatState.selectedConversationId == barConversation.id && chatState.errorMessage != null,
                 isStopping = cancellingId == barConversation.id,
             ),
-            backgroundWorkAgentName = host.thinkingConversationId
-                ?.takeIf { it != barConversation.id }
+            backgroundWorkAgentName = listOfNotNull(host.thinkingConversationId, streamingId)
+                .firstOrNull { it != barConversation.id }
                 ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
         ),
     )
@@ -99,16 +83,16 @@ internal data class DesktopHeaderIdentity(
 internal fun DesktopNowActiveBarHost(
     chatController: DesktopChatController,
     chatState: DesktopChatSurfaceState,
+    ownerConversationId: ConversationId?,
     host: NowActiveBarHostState,
     actions: NowActiveBarHostActions,
 ): DesktopHeaderIdentity {
-    val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
     val streamingId by chatController.streamingConversationId.collectAsState()
     // letta-mobile-lgns8.19: an abort was sent but the terminal frame hasn't
     // landed — the run is still live, so the header says "stopping…" and the
     // stop button stays available as the local force-clear escape hatch.
     val cancellingId by chatController.cancellingConversationId.collectAsState()
-    val pin = deriveNowActiveBarPin(lastPromptedId, streamingId, cancellingId, chatState, host)
+    val pin = deriveNowActiveBarPin(ownerConversationId, streamingId, cancellingId, chatState, host)
         ?: return DesktopHeaderIdentity(state = null, actions = NowActiveBarActions.None)
     return DesktopHeaderIdentity(
         state = pin.state,

@@ -1,7 +1,15 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import androidx.compose.runtime.mutableStateOf
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.shell.ShellWorkspaceNavigator
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.desktop.DesktopShellChatPort
+import com.letta.mobile.desktop.NowActiveBarHostState
+import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import com.letta.mobile.desktop.deriveNowActiveBarPin
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -17,9 +25,11 @@ import com.letta.mobile.runtime.TurnEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -36,6 +46,54 @@ import kotlinx.serialization.json.boolean
 class DesktopAppServerChatGatewayAdminTest {
     private fun adminGateway(client: AppServerClient) =
         DesktopAppServerChatGateway(turnEngine = RecordingTurnEngine(), client = client)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `gateway load and send follow the selected header target`() = runTest {
+        val owners = mapOf(ConversationId("conversation-a") to AgentId("agent-a"), ConversationId("conversation-b") to AgentId("agent-b"))
+        val client = FakeAppServerClient(failedCreateResponse(), strict = true).apply {
+            listedConversations = owners.map { (id, agent) ->
+                com.letta.mobile.data.model.Conversation(id, agent, summary = id.value)
+            }
+        }
+        val engine = RecordingTurnEngine(owners)
+        val gateway = DesktopAppServerChatGateway(turnEngine = engine, client = client)
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(),
+            scope = backgroundScope,
+            rosterProvider = { owners.values.map { Agent(id = it, name = it.value) } },
+            gatewayFactory = { gateway },
+        )
+        controller.start()
+        runCurrent()
+        val workspace = ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        val router = ShellWorkspaceNavigator(workspace, DesktopShellChatPort(controller, mutableStateOf(controller.state.value), workspace))
+        router.openConversation(ConversationId("conversation-a"))
+        runCurrent()
+        controller.updateComposerText("first")
+        controller.send()
+        runCurrent()
+        router.openConversation(ConversationId("conversation-b"))
+        runCurrent()
+
+        val header = deriveNowActiveBarPin(
+            ownerConversationId = workspace.selectedConversationId,
+            streamingId = controller.streamingConversationId.value,
+            cancellingId = controller.cancellingConversationId.value,
+            chatState = controller.state.value,
+            host = NowActiveBarHostState(thinkingConversationId = null, isStreamingReplySelected = false),
+        )
+        assertEquals("conversation-b", workspace.currentFocus.conversationId?.value)
+        assertEquals("conversation-b", header?.conversationId)
+        assertEquals("conversation-b", client.messagesCommand?.conversationId)
+        controller.updateComposerText("second")
+        controller.send()
+        runCurrent()
+        assertEquals("conversation-b", engine.command?.conversationId?.value)
+        assertEquals("agent-b", engine.command?.agentId?.value)
+        controller.close()
+    }
 
     @Test
     fun `create conversation uses authoritative App Server identity for subsequent reads`() = runTest {
@@ -305,10 +363,11 @@ class DesktopAppServerChatGatewayAdminTest {
         ),
     )
 
-    private class RecordingTurnEngine : TurnEngine {
+    private class RecordingTurnEngine(private val owners: Map<ConversationId, AgentId>? = null) : TurnEngine {
         var command: TurnCommand? = null
 
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
+            if (owners != null) require(owners[ConversationId(command.conversationId.value)]?.value == command.agentId.value)
             this.command = command
             return emptyFlow()
         }
@@ -316,6 +375,7 @@ class DesktopAppServerChatGatewayAdminTest {
 
     private class FakeAppServerClient(
         private val createResponse: AppServerInboundFrame.ConversationCreateResponse,
+        private val strict: Boolean = false,
     ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         var createCommand: AppServerCommand.ConversationCreate? = null
@@ -367,26 +427,32 @@ class DesktopAppServerChatGatewayAdminTest {
 
         override suspend fun conversationList(
             command: AppServerCommand.ConversationList,
-        ): AppServerInboundFrame.ConversationListResponse = AppServerInboundFrame.ConversationListResponse(
-            requestId = command.requestId,
-            success = true,
-            conversations = if (omitConversationList) null else kotlinx.serialization.json.JsonArray(
-                listedConversations.map {
-                    desktopChatJson.encodeToJsonElement(com.letta.mobile.data.model.Conversation.serializer(), it)
-                },
-            ),
-        )
+        ): AppServerInboundFrame.ConversationListResponse {
+            val agent = command.query?.get("agent_id")?.jsonPrimitive?.content
+            if (strict) require(agent != null)
+            val rows = if (strict) listedConversations.filter { it.agentId.value == agent } else listedConversations
+            return AppServerInboundFrame.ConversationListResponse(
+                requestId = command.requestId,
+                success = true,
+                conversations = if (omitConversationList) null else kotlinx.serialization.json.JsonArray(
+                    rows.map { desktopChatJson.encodeToJsonElement(com.letta.mobile.data.model.Conversation.serializer(), it) },
+                ),
+            )
+        }
 
         override suspend fun conversationRetrieve(
             command: AppServerCommand.ConversationRetrieve,
-        ): AppServerInboundFrame.ConversationRetrieveResponse = AppServerInboundFrame.ConversationRetrieveResponse(
-            requestId = command.requestId,
-            success = retrieveConversation != null,
-            conversation = retrieveConversation?.let {
-                desktopChatJson.encodeToJsonElement(com.letta.mobile.data.model.Conversation.serializer(), it).jsonObject
-            },
-            error = if (retrieveConversation == null) "missing" else null,
-        )
+        ): AppServerInboundFrame.ConversationRetrieveResponse {
+            val found = if (strict) listedConversations.firstOrNull { it.id.value == command.conversationId } else retrieveConversation
+            return AppServerInboundFrame.ConversationRetrieveResponse(
+                requestId = command.requestId,
+                success = found != null,
+                conversation = found?.let {
+                    desktopChatJson.encodeToJsonElement(com.letta.mobile.data.model.Conversation.serializer(), it).jsonObject
+                },
+                error = if (found == null) "missing" else null,
+            )
+        }
 
         override suspend fun conversationUpdate(
             command: AppServerCommand.ConversationUpdate,
@@ -429,6 +495,11 @@ class DesktopAppServerChatGatewayAdminTest {
             command: AppServerCommand.ConversationMessagesList,
         ): AppServerInboundFrame.ConversationMessagesListResponse {
             messagesCommand = command
+            if (strict && listedConversations.none { it.id.value == command.conversationId }) {
+                return AppServerInboundFrame.ConversationMessagesListResponse(
+                    requestId = command.requestId, success = false, error = "missing",
+                )
+            }
             return AppServerInboundFrame.ConversationMessagesListResponse(
                 requestId = command.requestId,
                 success = true,

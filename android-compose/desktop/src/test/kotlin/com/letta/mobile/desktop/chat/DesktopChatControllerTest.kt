@@ -49,6 +49,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
 
         val state = controller.state.value
         assertTrue(state.isRemoteBacked)
@@ -86,6 +88,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-default-agent-1")
+        runCurrent()
 
         val state = controller.state.value
         assertEquals(listOf("conv-default-agent-1", "conv-2"), state.conversations.map { it.id })
@@ -105,6 +109,8 @@ class DesktopChatControllerTest {
         val controller = testController(gateway)
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-default-agent-1")
         runCurrent()
         controller.selectConversation("conv-default-agent-2")
         runCurrent()
@@ -132,6 +138,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("Ship live desktop chat")
         controller.send()
         runCurrent()
@@ -155,6 +163,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("hey")
         controller.send()
         // Thinking is set the instant the prompt is sent (before the reply lands).
@@ -177,6 +187,8 @@ class DesktopChatControllerTest {
         )
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.updateComposerText("hey")
         controller.send()
@@ -219,6 +231,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         // Idle before any send.
         assertFalse(controller.replyPresence.value.isStreaming)
 
@@ -243,6 +257,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("hey")
         controller.send()
         runCurrent()
@@ -261,6 +277,8 @@ class DesktopChatControllerTest {
         val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.updateComposerText("Describe this")
         controller.attachImage(image)
@@ -293,6 +311,8 @@ class DesktopChatControllerTest {
         )
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.updateComposerText("try remote send")
         controller.attachImage(image)
@@ -437,6 +457,8 @@ class DesktopChatControllerTest {
 
         controller.retryConnection()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
 
         val state = controller.state.value
         assertEquals(DesktopChatConnectionState.Live, state.connectionState)
@@ -456,6 +478,8 @@ class DesktopChatControllerTest {
         )
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.updateComposerText("try remote send")
         controller.send()
@@ -503,6 +527,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         assertTrue(loop.hydrateStarted.isCompleted)
 
         controller.close()
@@ -528,6 +554,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.selectConversation("conv-2")
         runCurrent()
 
@@ -549,6 +577,8 @@ class DesktopChatControllerTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.close()
         controller.updateComposerText("should not send")
         controller.send()
@@ -569,6 +599,8 @@ class DesktopChatControllerTest {
         )
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.selectConversation("conv-2")
         runCurrent()
@@ -592,6 +624,8 @@ class DesktopChatControllerTest {
         val prompt = TITLE_PROMPT
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.updateComposerText(prompt)
         controller.send()
@@ -781,7 +815,7 @@ private class TitleSummaryGateway :
     }
 }
 
-private class FakeDesktopTimelineLoop(
+internal class FakeDesktopTimelineLoop(
     conversationId: String,
     private val sendFailure: Throwable? = null,
 ) : DesktopTimelineLoop {

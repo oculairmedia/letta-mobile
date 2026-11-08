@@ -69,10 +69,14 @@ class DesktopCreateAgentRoutingTest {
         )
         val controller = routingController(gateway, mapOf(template.id.value to template))
 
-        startAndCreate(
-            controller,
-            AgentCreateParams(name = "Cloned west agent", model = template.model),
-        )
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+        backgroundScope.launch {
+            controller.createAgentAndOpen(AgentCreateParams(name = "Cloned west agent", model = template.model))
+        }
+        runCurrent()
 
         assertEquals("openai/gpt-4o", gateway.createdParams?.model)
         assertEquals("byok-west", gateway.createdParams?.modelSettings?.providerName)
@@ -97,6 +101,107 @@ class DesktopCreateAgentRoutingTest {
 
         assertEquals("llmux", gateway.createdParams?.modelSettings?.providerName)
         assertEquals(16_384, gateway.createdParams?.modelSettings?.maxOutputTokens)
+        controller.close()
+    }
+
+    @Test
+    fun creatingAnAgentDoesNotSelectAnUnrelatedListedConversation() = runTest {
+        val gateway = RoutingGateway()
+        val controller = routingController(gateway)
+        controller.start()
+        runCurrent()
+
+        val created = controller.createAgentAndOpen(AgentCreateParams(name = "New agent"))
+        runCurrent()
+
+        assertEquals("created-conversation", created.conversationId)
+        assertNull(controller.state.value.selectedConversationId)
+        controller.close()
+    }
+
+    @Test
+    fun aNewGatewayNeverReceivesCleanupForThePreviousGateway() = runTest {
+        val first = RoutingGateway()
+        val second = RoutingGateway()
+        val gateways = ArrayDeque(listOf(first, second))
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(),
+            scope = this,
+            rosterProvider = TEST_ROSTER,
+            gatewayFactory = { gateways.removeFirst() },
+        )
+        controller.start()
+        runCurrent()
+        controller.createConversationForAgent("agent-0")
+        runCurrent()
+        controller.retryConnection()
+        runCurrent()
+
+        controller.createConversationForAgent("agent-0")
+        runCurrent()
+
+        assertEquals(0, second.deleteCalls)
+        assertEquals(1, second.createCalls)
+        controller.close()
+    }
+
+    @Test
+    fun oldUnsentCleanupCannotRemoveANewGatewayConversationWithTheSameId() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val first = RoutingGateway(deleteStarted = started, deleteRelease = release)
+        val second = RoutingGateway()
+        val gateways = ArrayDeque(listOf(first, second))
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this, rosterProvider = TEST_ROSTER,
+            gatewayFactory = { gateways.removeFirst() })
+        controller.start()
+        runCurrent()
+        controller.createConversationForAgent("agent-0")
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+        assertEquals(true, started.isCompleted)
+        controller.retryConnection()
+        runCurrent()
+        controller.createConversationForAgent("agent-0")
+        runCurrent()
+        assertEquals(true, controller.state.value.conversations.any { it.id == "created-conversation" })
+
+        release.complete(Unit)
+        runCurrent()
+
+        assertEquals(true, controller.state.value.conversations.any { it.id == "created-conversation" })
+        controller.close()
+    }
+
+    @Test
+    fun anOldCreateDoesNotRunAgainstANewGatewayAfterCleanupWaits() = runTest {
+        val deleteStarted = CompletableDeferred<Unit>()
+        val deleteRelease = CompletableDeferred<Unit>()
+        val first = RoutingGateway(deleteStarted = deleteStarted, deleteRelease = deleteRelease)
+        val second = RoutingGateway()
+        val gateways = ArrayDeque(listOf(first, second))
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(),
+            scope = this,
+            rosterProvider = TEST_ROSTER,
+            gatewayFactory = { gateways.removeFirst() },
+        )
+        controller.start()
+        runCurrent()
+        controller.createConversationForAgent("agent-0")
+        runCurrent()
+        assertEquals(1, first.createCalls)
+
+        controller.createConversationForAgent("agent-0")
+        runCurrent()
+        assertEquals(true, deleteStarted.isCompleted)
+        controller.retryConnection()
+        runCurrent()
+        deleteRelease.complete(Unit)
+        runCurrent()
+
+        assertEquals(0, second.createCalls)
         controller.close()
     }
 
@@ -137,7 +242,14 @@ private fun duplicateRoutingModels(): List<LlmModel> = listOf("east", "west").ma
 private class RoutingGateway(
     private val models: List<LlmModel> = defaultRoutingModels(),
     private val catalogReady: CompletableDeferred<Unit>? = null,
+    private val deleteStarted: CompletableDeferred<Unit>? = null,
+    private val deleteRelease: CompletableDeferred<Unit>? = null,
 ) : FakeDesktopChatGateway(), ChatGatewayExtras {
+    var createCalls = 0
+        private set
+    var deleteCalls = 0
+        private set
+    private var hasCreated = false
     var createdParams: AgentCreateParams? = null
         private set
 
@@ -166,8 +278,20 @@ private class RoutingGateway(
         return Agent(id = AgentId("created-agent"), name = params.name.orEmpty())
     }
 
-    override suspend fun createConversation(agentId: String, summary: String?): Conversation =
-        Conversation(id = ConversationId("created-conversation"), agentId = AgentId(agentId))
+    override suspend fun createConversation(agentId: String, summary: String?): Conversation {
+        require(agentId in setOf("agent-0", "created-agent"))
+        createCalls++
+        hasCreated = true
+        return Conversation(id = ConversationId("created-conversation"), agentId = AgentId(agentId))
+    }
+
+    override suspend fun deleteConversation(conversationId: String) {
+        deleteCalls++
+        require(conversationId == "created-conversation" && hasCreated)
+        deleteStarted?.complete(Unit)
+        deleteRelease?.await()
+        hasCreated = false
+    }
 
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
         error("unused")

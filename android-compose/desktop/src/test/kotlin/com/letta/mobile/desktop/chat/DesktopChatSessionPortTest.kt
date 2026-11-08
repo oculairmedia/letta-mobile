@@ -29,6 +29,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -56,6 +57,285 @@ class DesktopChatSessionPortTest {
         assertNull(state.error)
         assertTrue(state.a2uiSurfaces.isEmpty())
 
+        controller.close()
+    }
+
+    @Test
+    fun timelineDoesNotShowOldMessagesAfterAnOwnerOnlySwitch() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        backgroundScope.launch { port.uiState.collect {} }
+        backgroundScope.launch { port.composer.collect {} }
+        runCurrent()
+        assertTrue(port.uiState.value.messages.any { it.content == "Hello from history" })
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1")))
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        runCurrent()
+
+        assertTrue(port.uiState.value.messages.isEmpty())
+        assertFalse(port.composer.value.canSend)
+        controller.close()
+    }
+
+    @Test
+    fun typingAfterAnOwnerOnlySwitchDoesNotChangeTheOldDraft() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        controller.updateComposerText("previous draft")
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1")))
+        port.actions.updateComposerText("new target draft")
+
+        assertEquals("previous draft", controller.state.value.composerText)
+        controller.close()
+    }
+
+    @Test
+    fun attachmentsAfterAnOwnerOnlySwitchDoNotChangeTheOldDraft() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        val original = MessageContentPart.Image(base64 = "aGVsbG8=", mediaType = "image/png")
+        controller.attachImage(original)
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1")))
+        port.actions.removeAttachment(0)
+        port.actions.attachImage(MessageContentPart.Image(base64 = "d29ybGQ=", mediaType = "image/png"))
+
+        assertEquals(listOf(original), controller.state.value.pendingImageAttachments)
+        controller.close()
+    }
+
+    @Test
+    fun stoppingAfterAnOwnerOnlySwitchDoesNotAbortTheOldConversation() = runTest {
+        val stopped = mutableListOf<String>()
+        var active = false
+        val gateway = object : FakeDesktopChatGateway(), DesktopTurnAborter {
+            override suspend fun sendConversationMessage(
+                conversationId: com.letta.mobile.data.model.ConversationId, request: com.letta.mobile.data.model.MessageCreateRequest,
+            ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = kotlinx.coroutines.flow.flow {
+                require(conversationId.value == "conv-1")
+                active = true
+                kotlinx.coroutines.awaitCancellation()
+            }
+            override suspend fun abortConversationTurn(conversationId: String): Boolean {
+                require(active && conversationId == "conv-1")
+                stopped += conversationId
+                return true
+            }
+        }
+        val controller = testController(gateway)
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        controller.updateComposerText("start a live turn")
+        controller.send()
+        runCurrent()
+        assertTrue(active)
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1")))
+        port.actions.stopRun()
+        runCurrent()
+
+        assertEquals(emptyList(), stopped)
+        controller.close()
+    }
+
+    @Test
+    fun aNewChatWithoutAConversationKeepsItsDraftEditable() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus(
+            "chat", chatMode = com.letta.mobile.data.shell.CurrentFocusChatMode.New,
+        ))
+        com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        controller.clearSelection { true }
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+
+        port.actions.updateComposerText("editable starter")
+
+        assertEquals("editable starter", controller.state.value.composerText)
+        controller.close()
+    }
+
+    @Test
+    fun aNewChatRebindsTheDraftAfterAnotherNewTarget() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            chatMode = com.letta.mobile.data.shell.CurrentFocusChatMode.New))
+        val old = workspace.requestToken()
+        controller.clearSelection { workspace.accepts(old) }
+        controller.updateComposerText("old unsent draft")
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1"),
+            chatMode = com.letta.mobile.data.shell.CurrentFocusChatMode.New))
+        val current = workspace.requestToken()
+        controller.clearSelection { workspace.accepts(current) }
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        assertEquals("", controller.state.value.composerText)
+
+        port.actions.updateComposerText("new target draft")
+
+        assertEquals("new target draft", controller.state.value.composerText)
+        controller.close()
+    }
+
+    @Test
+    fun anUncollectedPortReadsTheNewOwnerWithoutAnOldTimelineFlash() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        assertTrue(port.uiState.value.messages.any { it.content == "Hello from history" })
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1")))
+
+        assertTrue(port.uiState.value.messages.isEmpty())
+        assertTrue(port.uiState.first().messages.isEmpty())
+        assertFalse(port.composer.value.canSend)
+        controller.close()
+    }
+
+    @Test
+    fun anUncollectedPortDoesNotShowAnotherOwnersCancellation() = runTest {
+        val abort = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var active = false
+        val gateway = object : FakeDesktopChatGateway(), DesktopTurnAborter {
+            override suspend fun sendConversationMessage(
+                conversationId: com.letta.mobile.data.model.ConversationId, request: com.letta.mobile.data.model.MessageCreateRequest,
+            ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = kotlinx.coroutines.flow.flow {
+                require(conversationId.value == "conv-1")
+                active = true
+                kotlinx.coroutines.awaitCancellation()
+            }
+            override suspend fun abortConversationTurn(conversationId: String): Boolean {
+                require(active && conversationId == "conv-1")
+                abort.await()
+                return true
+            }
+        }
+        val controller = DesktopChatController(
+            defaultDesktopBootstrapState(), backgroundScope, rosterProvider = TEST_ROSTER, gatewayFactory = { gateway },
+        )
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-0"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        controller.updateComposerText("start a live turn")
+        controller.send()
+        runCurrent()
+        assertTrue(active)
+        controller.stopActiveRun("conv-1")
+        runCurrent()
+        assertEquals("conv-1", controller.cancellingConversationId.value)
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        assertTrue(port.uiState.value.isCancelling)
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1"),
+            com.letta.mobile.data.model.ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+
+        assertFalse(port.uiState.value.isCancelling)
+        assertFalse(port.uiState.first().isCancelling)
+        controller.close()
+    }
+
+    @Test
+    fun aReselectedTargetDoesNotReuseAnOldTokenBeforeRebinding() = runTest {
+        val controller = testController()
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        val original = com.letta.mobile.data.shell.CurrentFocus(
+            "chat", com.letta.mobile.data.model.AgentId("agent-0"), com.letta.mobile.data.model.ConversationId("conv-1"),
+            com.letta.mobile.data.shell.CurrentFocusChatMode.Exact,
+        )
+        workspace.selectFocus(original)
+        val shellPort = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        shellPort.selectConversation(com.letta.mobile.data.model.ConversationId("conv-1"))
+        runCurrent()
+        val port = DesktopChatSessionPort(controller, backgroundScope)
+        assertTrue(port.uiState.value.messages.any { it.content == "Hello from history" })
+
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", com.letta.mobile.data.model.AgentId("agent-1")))
+        workspace.selectFocus(original)
+
+        assertTrue(port.uiState.value.messages.isEmpty())
         controller.close()
     }
 
@@ -423,6 +703,8 @@ class DesktopChatSessionPortTest {
         backgroundScope.launch { port.uiState.collect {} }
         backgroundScope.launch { port.composer.collect {} }
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         return controller to port
     }

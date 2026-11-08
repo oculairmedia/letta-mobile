@@ -8,6 +8,10 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.timeline.TimelineStreamFrame
+import kotlinx.coroutines.flow.Flow
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
@@ -19,6 +23,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-lks7m: a conversation started on another client (e.g. Android) reaches the desktop
@@ -30,8 +36,36 @@ class DesktopChatControllerConversationPushTest {
 
     /** A backend whose roster another client can grow while the desktop is running. */
     private class SharedRosterGateway(initial: List<String>) : FakeDesktopChatGateway(conversationIds = initial) {
+        private val knownIds = initial.toMutableSet()
         var roster: List<String> = initial
+            set(value) {
+                knownIds.addAll(value)
+                field = value
+            }
         var listCalls = 0
+
+        override suspend fun getConversation(conversationId: String): Conversation {
+            require(conversationId in knownIds)
+            return listConversations().firstOrNull { it.id.value == conversationId }
+                ?: Conversation(ConversationId(conversationId), AgentId("agent-0"))
+        }
+
+        override suspend fun listConversationMessages(
+            conversationId: ConversationId, limit: Int?, after: String?, order: String?,
+        ): List<LettaMessage> {
+            require(conversationId.value in knownIds)
+            return super.listConversationMessages(conversationId, limit, after, order)
+        }
+
+        override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+            require(conversationId.value in knownIds)
+            return super.streamConversation(conversationId)
+        }
+
+        override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> {
+            require(conversationId.value in knownIds)
+            return super.sendConversationMessage(conversationId, request)
+        }
 
         override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
             listCalls += 1
@@ -63,6 +97,16 @@ class DesktopChatControllerConversationPushTest {
             return rows.filter { it.agentId == page.agent }
         }
         override suspend fun getConversation(conversationId: String): Conversation = rows.first { it.id.value == conversationId }
+        override suspend fun listConversationMessages(
+            conversationId: ConversationId, limit: Int?, after: String?, order: String?,
+        ): List<LettaMessage> {
+            require(conversationId.value in setOf("target", "unchanged"))
+            return super.listConversationMessages(conversationId, limit, after, order)
+        }
+        override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+            require(conversationId.value in setOf("target", "unchanged"))
+            return super.streamConversation(conversationId)
+        }
     }
 
     private class PushingTransport : NoOpChannelTransport() {
@@ -77,6 +121,158 @@ class DesktopChatControllerConversationPushTest {
         agentId = "agent-0",
         reason = reason,
     )
+
+    @Test
+    fun loadingConversationsDoesNotChooseAChat() = runTest {
+        val gateway = FakeDesktopChatGateway()
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this, rosterProvider = TEST_ROSTER,
+            gatewayFactory = { gateway })
+
+        controller.start()
+        runCurrent()
+
+        assertEquals(listOf("conv-1"), controller.state.value.conversations.map { it.id })
+        assertNull(controller.state.value.selectedConversationId)
+        assertTrue(gateway.conversationMessageRequests.isEmpty())
+        controller.close()
+    }
+
+    @Test
+    fun hydrationDoesNotCompleteAfterOwnerSwitchesWithoutControllerReselection() = runTest {
+        val loop = FakeDesktopTimelineLoop("conv-1")
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this, rosterProvider = TEST_ROSTER,
+            gatewayFactory = { FakeDesktopChatGateway() }, loopFactory = { _, _, _ -> loop })
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus(
+            "chat", AgentId("agent-0"), ConversationId("conv-1"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact,
+        ))
+        val port = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        port.selectConversation(ConversationId("conv-1"))
+        runCurrent()
+        assertTrue(loop.hydrateStarted.isCompleted)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", AgentId("agent-1")))
+        loop.completeHydrate()
+        runCurrent()
+
+        assertEquals(AgentId("agent-1"), workspace.currentFocus.agentId)
+        assertTrue(controller.state.value.isLoading)
+        controller.close()
+    }
+
+    @Test
+    fun retryKeepsTheExplicitlySelectedChat() = runTest {
+        val gateway = FakeDesktopChatGateway(conversationIds = listOf("conv-1", "conv-2"))
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this, rosterProvider = TEST_ROSTER,
+            gatewayFactory = { gateway })
+        controller.start()
+        runCurrent()
+        val workspace = com.letta.mobile.data.shell.ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(com.letta.mobile.data.shell.CurrentFocus(
+            "chat", AgentId("agent-1"), ConversationId("conv-2"), com.letta.mobile.data.shell.CurrentFocusChatMode.Exact,
+        ))
+        val port = com.letta.mobile.desktop.DesktopShellChatPort(
+            controller, androidx.compose.runtime.mutableStateOf(controller.state.value), workspace,
+        )
+        port.selectConversation(ConversationId("conv-2"))
+        runCurrent()
+
+        controller.retryConnection()
+        runCurrent()
+        com.letta.mobile.desktop.projectDesktopFocus(workspace, controller.state.value) { port.selectConversation(it) }
+        runCurrent()
+
+        assertEquals(ConversationId("conv-2"), workspace.currentFocus.conversationId)
+        assertEquals("conv-2", controller.state.value.selectedConversationId)
+        controller.close()
+    }
+
+    @Test
+    fun queuedNotificationReplyDoesNotReopenAChatAfterSwitch() = runTest {
+        val gateway = object : FakeDesktopChatGateway(conversationIds = listOf("conv-1", "conv-2")) {
+            override suspend fun listConversationMessages(
+                conversationId: ConversationId, limit: Int?, after: String?, order: String?,
+            ): List<LettaMessage> {
+                require(listConversations().any { it.id == conversationId })
+                return super.listConversationMessages(conversationId, limit, after, order)
+            }
+            override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+                require(listConversations().any { it.id == conversationId })
+                return super.streamConversation(conversationId)
+            }
+            override suspend fun sendConversationMessage(
+                conversationId: ConversationId, request: MessageCreateRequest,
+            ): Flow<LettaMessage> {
+                require(listConversations().any { it.id == conversationId })
+                return super.sendConversationMessage(conversationId, request)
+            }
+        }
+        val controller = DesktopChatController(defaultDesktopBootstrapState(), this, rosterProvider = TEST_ROSTER,
+            gatewayFactory = { gateway })
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+
+        controller.replyFromNotification("conv-1", "reply")
+        controller.selectConversation("conv-2")
+        runCurrent()
+
+        assertEquals("conv-2", controller.state.value.selectedConversationId)
+        assertTrue(gateway.sentRequests.isEmpty())
+        controller.close()
+    }
+
+    @Test
+    fun notificationReplyDoesNotSendToAChatSelectedDuringHydration() = runTest {
+        val loops = mutableListOf<FakeDesktopTimelineLoop>()
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(), scope = this, rosterProvider = TEST_ROSTER,
+            gatewayFactory = { FakeDesktopChatGateway(conversationIds = listOf("conv-1", "conv-2")) },
+            loopFactory = { _, conversation, _ ->
+                FakeDesktopTimelineLoop(conversation.id).also { loop ->
+                    if (conversation.id == "conv-1") loop.completeHydrate()
+                    loops += loop
+                }
+            },
+        )
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+        controller.replyFromNotification("conv-2", "reply")
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+
+        assertEquals("conv-1", controller.state.value.selectedConversationId)
+        assertTrue(loops.all { it.sentMessages.isEmpty() })
+        controller.close()
+    }
+
+    @Test
+    fun aPushIntoAnEmptyCatalogDoesNotChooseAChat() = runTest {
+        val gateway = SharedRosterGateway(emptyList())
+        val transport = PushingTransport()
+        val controller = testController(gateway, transport)
+        controller.start()
+        runCurrent()
+        assertNull(controller.state.value.selectedConversationId)
+
+        gateway.roster = listOf("conv-mobile")
+        transport.pushes.emit(push("conv-mobile"))
+        runCurrent()
+
+        assertEquals(listOf("conv-mobile"), controller.state.value.conversations.map { it.id })
+        assertNull(controller.state.value.selectedConversationId)
+        assertTrue(gateway.conversationMessageRequests.isEmpty())
+        controller.close()
+    }
 
     @Test
     fun conversationCreatedElsewhereAppearsWithoutMovingTheSelection() = runTest {
@@ -143,7 +339,7 @@ class DesktopChatControllerConversationPushTest {
     }
 
     @Test
-    fun emptyRosterOpensTheFirstConversationThatArrives() = runTest {
+    fun emptyRosterKeepsFocusUntilTheArrivingConversationIsSelected() = runTest {
         val gateway = SharedRosterGateway(emptyList())
         val transport = PushingTransport()
         val controller = testController(gateway, transport)
@@ -155,6 +351,9 @@ class DesktopChatControllerConversationPushTest {
         transport.pushes.emit(push("conv-mobile"))
         runCurrent()
 
+        assertNull(controller.state.value.selectedConversationId)
+        controller.selectConversation("conv-mobile")
+        runCurrent()
         assertEquals("conv-mobile", controller.state.value.selectedConversationId)
         assertEquals("Agent 0", controller.state.value.conversations.single().agentName)
         assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
@@ -175,6 +374,30 @@ class DesktopChatControllerConversationPushTest {
         runCurrent()
 
         assertEquals(callsAtClose, gateway.listCalls)
+    }
+
+    @Test
+    fun reconnectDoesNotReplaceAnExplicitTargetMissingFromTheVisibleCatalog() = runTest {
+        val gateway = CountingGateway()
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(), scope = backgroundScope,
+            rosterProvider = { listOf(Agent(AgentId("agent-0"), name = "Zero"), Agent(AgentId("agent-1"), name = "One")) },
+            gatewayFactory = { gateway },
+        )
+        controller.start()
+        runCurrent()
+        controller.selectConversation("target")
+        runCurrent()
+        controller.updateComposerText("keep draft")
+        gateway.rows = gateway.rows.filterNot { it.id.value == "target" }
+        gateway.connectionState.value = ChannelTransportState.Disconnected(1006, "offline")
+        runCurrent()
+        gateway.connectionState.value = ChannelTransportState.Connected("server", "session-2", "device")
+        runCurrent()
+
+        assertEquals("target", controller.state.value.selectedConversationId)
+        assertEquals("keep draft", controller.state.value.composerText)
+        controller.close()
     }
 
     @Test

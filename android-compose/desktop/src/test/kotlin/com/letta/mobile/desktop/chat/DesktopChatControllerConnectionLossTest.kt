@@ -125,6 +125,8 @@ class DesktopChatControllerConnectionLossTest {
         val controller = testController { gatewayBuilds += 1; gateway }
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         val listCallsBefore = gateway.conversationMessageRequests.size
 
         gateway.states.value = degraded()

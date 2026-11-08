@@ -59,7 +59,7 @@ internal fun rememberDesktopShellContext(
     val chatState = chatController.state.collectAsState()
     val panels = rememberDesktopShellPanels(core, chatState.value)
     val router = remember(navigator, chatController, chatState) {
-        ShellWorkspaceNavigator(navigator, DesktopShellChatPort(chatController, chatState))
+        ShellWorkspaceNavigator(navigator, DesktopShellChatPort(chatController, chatState, navigator))
     }
     // No transport carries A2UI card actions (the shim's user_action frame is gone, by4vm.111) and
     // desktop has no registry-backed approval path (by4vm.2), so every card action is dropped, logged.

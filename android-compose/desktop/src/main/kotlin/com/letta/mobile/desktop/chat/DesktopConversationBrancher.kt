@@ -20,6 +20,7 @@ internal fun DesktopChatController.applyBranchDraft(pending: PendingDraft?) {
 
 /** The composer's send: a `/fork [name]` runs as a branch (the App Server does not run it), anything else is sent. */
 internal fun DesktopChatController.sendOrBranch() {
+    if (!isSelectionCurrent()) return
     if (conversationManagement.branches.runBranchCommand(state.value.composerText)) updateComposerText("") else send()
 }
 

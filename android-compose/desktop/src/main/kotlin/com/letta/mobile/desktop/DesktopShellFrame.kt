@@ -28,6 +28,7 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.chat.projectWorkspace
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.desktop.home.toFleetConversation
@@ -100,16 +101,17 @@ internal data class DesktopShellFrame(
 
 @Composable
 internal fun rememberDesktopShellFrame(context: DesktopShellContext, chatState: DesktopChatSurfaceState): DesktopShellFrame {
-    val focus = rememberDesktopAgentFocus(context, chatState)
-    val activity = rememberDesktopShellActivity(context, chatState)
+    val surface = chatState.projectWorkspace(context.navigator, context.core.chatController.isTargetCurrent())
+    val focus = rememberDesktopAgentFocus(context, surface)
+    val activity = rememberDesktopShellActivity(context, surface)
     val libraries = collectLibraryStates(context.panels.libraries)
     return DesktopShellFrame(
-        chatState = chatState,
+        chatState = surface,
         focus = focus,
         activity = activity,
         libraries = libraries,
-        lists = rememberDesktopShellLists(context, chatState, focus, libraries.memory),
-        subagentViews = rememberSubagentDualView(chatState.subagentParent, desktopSubagentViewSessions(context.core.chatController)),
+        lists = rememberDesktopShellLists(context, surface, focus, libraries.memory),
+        subagentViews = rememberSubagentDualView(surface.subagentParent, desktopSubagentViewSessions(context.core.chatController)),
     )
 }
 
@@ -128,7 +130,7 @@ private fun rememberDesktopAgentFocus(context: DesktopShellContext, chatState: D
     }
     val conversations = chatState.conversations
     val railAgents = remember(conversations, rosterAgents) { buildRailAgents(conversations, rosterAgents) }
-    val selectedAgentId = context.navigator.focusFor(chatState, railAgents)
+    val selectedAgentId = context.navigator.currentFocus.agentId?.value
     // Session overrides win over the cached/backend value so a just-saved icon shows instantly.
     val identityByAgentId = rememberCachedIdentities(railAgents, rosterAgents, context.core.bootstrap.secureSettingsStore) +
         context.avatarOverrides.value
@@ -217,7 +219,8 @@ private fun rememberDesktopShellActivity(context: DesktopShellContext, chatState
         thinkingAgentId = thinkingAgentId,
         isThinkingSelected = thinkingConversationId != null &&
             thinkingConversationId == chatState.selectedConversationId,
-        isStreamingReplySelected = replyPresence.isStreaming,
+        isStreamingReplySelected = replyPresence.isStreaming &&
+            chatState.selectedConversationId == chatController.state.value.selectedConversationId,
         runningAgentIds = runningAgentIds,
     )
 }

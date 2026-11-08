@@ -24,6 +24,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.shell.FocusAvailability
 import com.letta.mobile.desktop.DesktopBootstrapState
 import com.letta.mobile.ui.chat.session.ConversationModelFocus
 import com.letta.mobile.ui.chat.session.ConversationModelUpdate
@@ -44,11 +45,7 @@ data class DesktopChatSurfaceState(
     val connectionState: DesktopChatConnectionState = DesktopChatConnectionState.Demo,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
-    /**
-     * The composer's own error (attachment limits, a refused send, a failed canvas share). It is
-     * also written to [errorMessage] so the legacy page, which has one error, still shows it; the
-     * shared page shows it in the composer and keeps it out of the page snackbar.
-     */
+    /** Composer-specific error, also mirrored in [errorMessage] for the legacy page. */
     val composerErrorMessage: String? = null,
     val backendLabel: String,
     val sessionGraphId: Long,
@@ -76,31 +73,39 @@ data class DesktopChatSurfaceState(
             selectionGeneration = selectionGeneration,
         )
 
-    val selectedConversation: DesktopConversationSummary?
-        get() = conversations.firstOrNull { it.id == selectedConversationId }
+    val selectedConversation: DesktopConversationSummary? get() = conversations.firstOrNull { it.id == selectedConversationId }
 
-    val conversationGroups: List<ChatConversationGroup>
-        get() = groupConversationsByAgentName(conversations)
+    val conversationGroups: List<ChatConversationGroup> get() = groupConversationsByAgentName(conversations)
 
-    val selectedMessages: List<UiMessage>
-        get() = selectedConversationId?.let { messagesByConversationId[it] }.orEmpty()
+    val selectedMessages: List<UiMessage> get() = selectedConversationId?.let { messagesByConversationId[it] }.orEmpty()
 
-    val renderItems: List<ChatRenderItem>
-        get() = buildDesktopChatRenderItems(selectedMessages)
+    val renderItems: List<ChatRenderItem> get() = buildDesktopChatRenderItems(selectedMessages)
 
     val canSend: Boolean
-        get() = ChatSessionReducer.canSend(runtimeState)
+        get() = selectedConversation != null && ChatSessionReducer.canSend(runtimeState)
 
     val shouldShowStatePanel: Boolean
         get() = ChatSessionReducer.shouldShowStatePanel(runtimeState)
 
-    /**
-     * Shared platform-neutral descriptor for the current chat screen condition.
-     * Desktop UI composables switch on this to decide which panel/icon/copy to
-     * show, instead of re-deriving the meaning from [connectionState] directly.
-     */
+    /** Shared descriptor for the current chat screen condition. */
     val chatScreenStatus: ChatScreenStatus
         get() = chatScreenStatusOf(runtimeState)
+}
+/** Read the chat surface through the workspace target while controller effects catch up. */
+internal fun DesktopChatSurfaceState.projectWorkspace(workspace: com.letta.mobile.data.shell.ShellWorkspaceState,
+    currentTarget: Boolean): DesktopChatSurfaceState {
+    val target = workspace.currentFocus
+    val same = currentTarget && selectedConversationId == target.conversationId?.value &&
+        (selectedConversationId == null || selectedConversation?.agentId == target.agentId?.value || selectedConversation == null &&
+            workspace.conversationAvailability == FocusAvailability.Unavailable)
+    if (same) return if (workspace.agentAvailability != FocusAvailability.Unavailable &&
+        workspace.conversationAvailability != FocusAvailability.Unavailable) this else copy(isRemoteBacked = false)
+    val lookupError = currentTarget && target.conversationId != null && selectedConversation == null &&
+        selectedConversationId == target.conversationId?.value && errorMessage != null
+    return copy(selectedConversationId = target.conversationId?.value, messagesByConversationId = emptyMap(),
+        composerText = "", pendingImageAttachments = emptyList(), isSending = false,
+        isLoading = target.conversationId != null && !lookupError, isRemoteBacked = false,
+        errorMessage = errorMessage.takeIf { lookupError }, composerErrorMessage = null)
 }
 
 fun defaultDesktopChatSurfaceState(

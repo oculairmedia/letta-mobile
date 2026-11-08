@@ -49,6 +49,8 @@ class DesktopChatEffortTest {
         val controller = testController(gateway)
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
 
         controller.models.select(SOL, ReasoningEffortChoice.Named("high"))
         runCurrent()
@@ -67,6 +69,8 @@ class DesktopChatEffortTest {
         val gateway = EffortGateway(confirm = true)
         val controller = testController(gateway)
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
 
         controller.models.select(SOL, ReasoningEffortChoice.Named("low"))
@@ -97,6 +101,8 @@ class DesktopChatEffortTest {
         val controller = testController(gateway)
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         assertFalse(controller.models.supportsReasoningEffort)
 
         controller.models.select(SOL, ReasoningEffortChoice.Named("high"))
@@ -113,6 +119,8 @@ class DesktopChatEffortTest {
         val gateway = modelOnlyGateway()
         val controller = testController(gateway)
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
 
         controller.models.select(SOL)
@@ -163,6 +171,8 @@ class DesktopChatEffortTest {
         backgroundScope.launch { port.uiState.collect {} }
         backgroundScope.launch { port.composer.collect {} }
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         return controller to port
     }
