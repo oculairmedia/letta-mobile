@@ -55,6 +55,16 @@ class WireContractsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "without spec"):
             self.module.contracts(self.root)
 
+    def test_active_turn_fixture_is_not_admin_rpc_coverage(self):
+        self.pair()
+        fixture = self.root / self.module.FIXTURES / "active-turn/v1.json"
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('[]')
+        self.assertEqual(1, len(self.module.contracts(self.root)))
+        fixture.with_name("v2.json").write_text("[]")
+        with self.assertRaisesRegex(ValueError, "without spec"):
+            self.module.contracts(self.root)
+
     def test_orphans_fail(self):
         spec, fixture = self.pair()
         spec.unlink()

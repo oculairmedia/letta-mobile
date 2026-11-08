@@ -2392,6 +2392,64 @@ final enum class com.letta.mobile.data.plugin/TemplateNamespace : kotlin/Enum<co
     final fun values(): kotlin/Array<com.letta.mobile.data.plugin/TemplateNamespace> // com.letta.mobile.data.plugin/TemplateNamespace.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.presence/ActiveTurnBoundary : kotlin/Enum<com.letta.mobile.data.presence/ActiveTurnBoundary> { // com.letta.mobile.data.presence/ActiveTurnBoundary|null[0]
+    enum entry ApprovalResolved // com.letta.mobile.data.presence/ActiveTurnBoundary.ApprovalResolved|null[0]
+    enum entry Delete // com.letta.mobile.data.presence/ActiveTurnBoundary.Delete|null[0]
+    enum entry Interrupt // com.letta.mobile.data.presence/ActiveTurnBoundary.Interrupt|null[0]
+    enum entry Progress // com.letta.mobile.data.presence/ActiveTurnBoundary.Progress|null[0]
+    enum entry Start // com.letta.mobile.data.presence/ActiveTurnBoundary.Start|null[0]
+    enum entry Terminal // com.letta.mobile.data.presence/ActiveTurnBoundary.Terminal|null[0]
+
+    final val entries // com.letta.mobile.data.presence/ActiveTurnBoundary.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.presence/ActiveTurnBoundary> // com.letta.mobile.data.presence/ActiveTurnBoundary.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.presence/ActiveTurnBoundary // com.letta.mobile.data.presence/ActiveTurnBoundary.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.presence/ActiveTurnBoundary> // com.letta.mobile.data.presence/ActiveTurnBoundary.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.presence/ActiveTurnBoundary.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.presence/ActiveTurnBoundary> // com.letta.mobile.data.presence/ActiveTurnBoundary.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.presence/ActiveTurnBoundary.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.presence/ActiveTurnPhase : kotlin/Enum<com.letta.mobile.data.presence/ActiveTurnPhase> { // com.letta.mobile.data.presence/ActiveTurnPhase|null[0]
+    enum entry AwaitingInput // com.letta.mobile.data.presence/ActiveTurnPhase.AwaitingInput|null[0]
+    enum entry Cancelling // com.letta.mobile.data.presence/ActiveTurnPhase.Cancelling|null[0]
+    enum entry Idle // com.letta.mobile.data.presence/ActiveTurnPhase.Idle|null[0]
+    enum entry Thinking // com.letta.mobile.data.presence/ActiveTurnPhase.Thinking|null[0]
+    enum entry ToolExecuting // com.letta.mobile.data.presence/ActiveTurnPhase.ToolExecuting|null[0]
+
+    final val entries // com.letta.mobile.data.presence/ActiveTurnPhase.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.presence/ActiveTurnPhase> // com.letta.mobile.data.presence/ActiveTurnPhase.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.presence/ActiveTurnPhase // com.letta.mobile.data.presence/ActiveTurnPhase.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.presence/ActiveTurnPhase> // com.letta.mobile.data.presence/ActiveTurnPhase.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.presence/ActiveTurnPhase.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.presence/ActiveTurnPhase> // com.letta.mobile.data.presence/ActiveTurnPhase.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.presence/ActiveTurnPhase.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.presence/ActiveTurnTerminalKind : kotlin/Enum<com.letta.mobile.data.presence/ActiveTurnTerminalKind> { // com.letta.mobile.data.presence/ActiveTurnTerminalKind|null[0]
+    enum entry Cancelled // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Cancelled|null[0]
+    enum entry Deleted // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Deleted|null[0]
+    enum entry Failed // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Failed|null[0]
+    enum entry Finished // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Finished|null[0]
+    enum entry LocalClear // com.letta.mobile.data.presence/ActiveTurnTerminalKind.LocalClear|null[0]
+
+    final val entries // com.letta.mobile.data.presence/ActiveTurnTerminalKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.presence/ActiveTurnTerminalKind> // com.letta.mobile.data.presence/ActiveTurnTerminalKind.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.presence/ActiveTurnTerminalKind // com.letta.mobile.data.presence/ActiveTurnTerminalKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.presence/ActiveTurnTerminalKind> // com.letta.mobile.data.presence/ActiveTurnTerminalKind.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.presence/ActiveTurnTerminalKind> // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.presence/ActiveTurnTerminalKind.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.presence/AgentActivityKind : kotlin/Enum<com.letta.mobile.data.presence/AgentActivityKind> { // com.letta.mobile.data.presence/AgentActivityKind|null[0]
     enum entry DELEGATING // com.letta.mobile.data.presence/AgentActivityKind.DELEGATING|null[0]
     enum entry IDLE // com.letta.mobile.data.presence/AgentActivityKind.IDLE|null[0]
@@ -53820,6 +53878,55 @@ final class com.letta.mobile.data.plugin/TemplateScan { // com.letta.mobile.data
     final fun toString(): kotlin/String // com.letta.mobile.data.plugin/TemplateScan.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.presence/ActiveTurnState { // com.letta.mobile.data.presence/ActiveTurnState|null[0]
+    constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.presence/ActiveTurnPhase = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/Long? = ...) // com.letta.mobile.data.presence/ActiveTurnState.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlin.String?;kotlin.String?;com.letta.mobile.data.presence.ActiveTurnPhase;kotlin.String?;kotlin.Int;kotlin.Long?){}[0]
+
+    final val activeTool // com.letta.mobile.data.presence/ActiveTurnState.activeTool|{}activeTool[0]
+        final fun <get-activeTool>(): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnState.activeTool.<get-activeTool>|<get-activeTool>(){}[0]
+    final val agentId // com.letta.mobile.data.presence/ActiveTurnState.agentId|{}agentId[0]
+        final fun <get-agentId>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.presence/ActiveTurnState.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversationId // com.letta.mobile.data.presence/ActiveTurnState.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.presence/ActiveTurnState.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val phase // com.letta.mobile.data.presence/ActiveTurnState.phase|{}phase[0]
+        final fun <get-phase>(): com.letta.mobile.data.presence/ActiveTurnPhase // com.letta.mobile.data.presence/ActiveTurnState.phase.<get-phase>|<get-phase>(){}[0]
+    final val runId // com.letta.mobile.data.presence/ActiveTurnState.runId|{}runId[0]
+        final fun <get-runId>(): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnState.runId.<get-runId>|<get-runId>(){}[0]
+    final val startedAtEpochMs // com.letta.mobile.data.presence/ActiveTurnState.startedAtEpochMs|{}startedAtEpochMs[0]
+        final fun <get-startedAtEpochMs>(): kotlin/Long? // com.letta.mobile.data.presence/ActiveTurnState.startedAtEpochMs.<get-startedAtEpochMs>|<get-startedAtEpochMs>(){}[0]
+    final val subagentCount // com.letta.mobile.data.presence/ActiveTurnState.subagentCount|{}subagentCount[0]
+        final fun <get-subagentCount>(): kotlin/Int // com.letta.mobile.data.presence/ActiveTurnState.subagentCount.<get-subagentCount>|<get-subagentCount>(){}[0]
+    final val turnId // com.letta.mobile.data.presence/ActiveTurnState.turnId|{}turnId[0]
+        final fun <get-turnId>(): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnState.turnId.<get-turnId>|<get-turnId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.presence/ActiveTurnState.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.presence/ActiveTurnState.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnState.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnState.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.presence/ActiveTurnPhase // com.letta.mobile.data.presence/ActiveTurnState.component5|component5(){}[0]
+    final fun component6(): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnState.component6|component6(){}[0]
+    final fun component7(): kotlin/Int // com.letta.mobile.data.presence/ActiveTurnState.component7|component7(){}[0]
+    final fun component8(): kotlin/Long? // com.letta.mobile.data.presence/ActiveTurnState.component8|component8(){}[0]
+    final fun copy(com.letta.mobile.data.model/ConversationId = ..., com.letta.mobile.data.model/AgentId = ..., kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.presence/ActiveTurnPhase = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin/Long? = ...): com.letta.mobile.data.presence/ActiveTurnState // com.letta.mobile.data.presence/ActiveTurnState.copy|copy(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlin.String?;kotlin.String?;com.letta.mobile.data.presence.ActiveTurnPhase;kotlin.String?;kotlin.Int;kotlin.Long?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.presence/ActiveTurnState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnState.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.presence/ActiveTurnState> { // com.letta.mobile.data.presence/ActiveTurnState.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.presence/ActiveTurnState.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.presence/ActiveTurnState.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.presence/ActiveTurnState.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.presence/ActiveTurnState // com.letta.mobile.data.presence/ActiveTurnState.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.presence/ActiveTurnState) // com.letta.mobile.data.presence/ActiveTurnState.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.presence.ActiveTurnState){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.presence/ActiveTurnState.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.presence/ActiveTurnState.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.presence/ActiveTurnState> // com.letta.mobile.data.presence/ActiveTurnState.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.presence/AgentPresence { // com.letta.mobile.data.presence/AgentPresence|null[0]
     constructor <init>(com.letta.mobile.data.presence/AgentActivityKind = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.presence/RunEdges = ...) // com.letta.mobile.data.presence/AgentPresence.<init>|<init>(com.letta.mobile.data.presence.AgentActivityKind;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?;kotlin.Boolean;com.letta.mobile.data.presence.RunEdges){}[0]
 
@@ -74174,6 +74281,7 @@ final fun com.letta.mobile.data.plugin.catalog/liveViewsSetting(com.letta.mobile
 final fun com.letta.mobile.data.plugin.catalog/pluginPackageSha256(kotlin/ByteArray): kotlin/String // com.letta.mobile.data.plugin.catalog/pluginPackageSha256|pluginPackageSha256(kotlin.ByteArray){}[0]
 final fun com.letta.mobile.data.plugin.catalog/pluginsSettingsContribution(kotlin/Function0<kotlin/Unit>): com.letta.mobile.data.settings/SettingsContribution // com.letta.mobile.data.plugin.catalog/pluginsSettingsContribution|pluginsSettingsContribution(kotlin.Function0<kotlin.Unit>){}[0]
 final fun com.letta.mobile.data.plugin.catalog/pluginsSettingsContributionOrNull(kotlin/Function0<kotlin/Unit>?): com.letta.mobile.data.settings/SettingsContribution? // com.letta.mobile.data.plugin.catalog/pluginsSettingsContributionOrNull|pluginsSettingsContributionOrNull(kotlin.Function0<kotlin.Unit>?){}[0]
+final fun com.letta.mobile.data.presence/arbitrateActiveTurn(com.letta.mobile.data.presence/ActiveTurnState, com.letta.mobile.data.presence/ActiveTurnState, com.letta.mobile.data.presence/ActiveTurnBoundary): com.letta.mobile.data.presence/ActiveTurnState // com.letta.mobile.data.presence/arbitrateActiveTurn|arbitrateActiveTurn(com.letta.mobile.data.presence.ActiveTurnState;com.letta.mobile.data.presence.ActiveTurnState;com.letta.mobile.data.presence.ActiveTurnBoundary){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/chatModelPicker(com.letta.mobile.data.repository.modelcontrol/ModelPickerSource?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>?, com.letta.mobile.data.repository.modelcontrol/ModelPickerSource, kotlinx.coroutines.flow/Flow<kotlin.collections/List<kotlin/String>>?, kotlin/Function1<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/Unit>, kotlin/Function2<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?, kotlin/Unit>, kotlin/Function0<kotlin/Unit>?): com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding // com.letta.mobile.data.repository.modelcontrol/chatModelPicker|chatModelPicker(com.letta.mobile.data.repository.modelcontrol.ModelPickerSource?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.repository.modelcontrol.ProviderManagementController>?;com.letta.mobile.data.repository.modelcontrol.ModelPickerSource;kotlinx.coroutines.flow.Flow<kotlin.collections.List<kotlin.String>>?;kotlin.Function1<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.Unit>;kotlin.Function2<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.String?,kotlin.Unit>;kotlin.Function0<kotlin.Unit>?){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/defaultProviderOAuthHttp(): com.letta.mobile.data.repository.modelcontrol/ProviderOAuthHttp? // com.letta.mobile.data.repository.modelcontrol/defaultProviderOAuthHttp|defaultProviderOAuthHttp(){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/providerEditForm(com.letta.mobile.data.repository.modelcontrol/ConnectableProvider): com.letta.mobile.data.repository.modelcontrol/ProviderConnectForm // com.letta.mobile.data.repository.modelcontrol/providerEditForm|providerEditForm(com.letta.mobile.data.repository.modelcontrol.ConnectableProvider){}[0]

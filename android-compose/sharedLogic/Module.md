@@ -445,6 +445,8 @@ JVM LCP JSON-RPC codecs, framing, typed calls and sessions. NDJSON/WebSocket tra
 
 Agent/conversation run-presence state and reduction. Live status and avatar behavior consume these projections instead of inferring work state from message text. Keep text-derived guesses outside run identity and phase state; publish authoritative transitions through [ConversationRunPhasePublisher](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.presence/-conversation-run-phase-publisher/index.html) and retain them in [ConversationRunRegistry](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.presence/-conversation-run-registry/index.html).
 
+The proposed active-turn-v1 contract adds serializable exact-turn snapshots and pure arbitration only. ActiveTurnState is not yet a live owner; consumers continue using the existing publisher until the reviewed migration.
+
 # Package com.letta.mobile.data.projects
 
 Project page state, backend ports and controller operations. Host project summaries/identifiers are separate from issue-work repository capabilities. Keep issue-work capabilities distinct from project catalog access; provide backend operations through [ProjectsBackend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-projects-backend/index.html) and pin persistence through [ProjectPinStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.projects/-project-pin-store/index.html).
