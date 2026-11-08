@@ -28,6 +28,7 @@ import com.letta.mobile.data.shell.CurrentFocusChatMode
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.toArgs
 import com.letta.mobile.feature.chat.route.toViewModelKey
+import com.letta.mobile.feature.chat.route.subagentConversation
 
 /** Source-scoped retained chat VM and fresh/exact aliases, with an ephemeral route handle. */
 class WorkspaceChatStoreOwner internal constructor(
@@ -120,7 +121,7 @@ class WorkspaceChatStoreOwner internal constructor(
         private fun bindRetained(
             model: AdminChatViewModel, drawer: SharedNavDrawerViewModel, workspace: ShellWorkspaceState,
             route: AgentChatRoute, key: String,
-            open: (com.letta.mobile.data.model.AgentId, com.letta.mobile.data.model.ConversationId) -> Unit,
+            open: ((com.letta.mobile.data.model.AgentId, com.letta.mobile.data.model.ConversationId) -> Unit)?,
             retainRequest: Boolean = true,
         ) {
             model.bindWorkspace(workspace, open, { isCurrentOwner(drawer, workspace) }, retainRequest) { conversation ->
@@ -150,6 +151,16 @@ class WorkspaceChatStoreOwner internal constructor(
             workspace.currentFocus.conversationId?.let { conversation ->
                 val exact = route.copy(conversationId = conversation.value, freshRouteKey = null, initialMessage = null)
                 drawer.chatStore(key, focusKey(workspace, exact, CurrentFocusChatMode.Exact))
+            }
+            val focus = workspace.currentFocus
+            val target = focus.conversationId?.value?.let { subagentConversation(route.agentId, it) }
+            val supplied = route.conversationId?.let { subagentConversation(route.agentId, it) }
+            if (route.initialMessage != null && focus.agentId?.value == route.agentId && target == supplied) {
+                val store = drawer.chatStore(key)
+                store.keys().mapNotNull { store[it] as? AdminChatViewModel }.forEach {
+                    bindRetained(it, drawer, workspace, route, key, open = null)
+                    it.acceptWorkspaceMessage(route.initialMessage)
+                }
             }
             return key
         }

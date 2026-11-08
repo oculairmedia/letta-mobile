@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.screen
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
@@ -20,6 +21,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceUntilIdle
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.spyk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -196,6 +199,57 @@ class WorkspaceChatStoreOwnerTest {
         coVerify(exactly = 0) { following.deleteConversation("same-id", "agent-a") }
         coVerify(exactly = 0) { captured.deleteConversation(ConversationId("same-id"), AgentId("agent-a")) }
         coVerify(exactly = 0) { captured.deleteConversation("same-id", "agent-a") }
+    }
+
+    @Test
+    fun laterHomePromptReachesTheRetainedVmOnceAndDoesNotReplayOnRecreation() = runTest {
+        val drawer = viewModel()
+        every { drawer.sources.sessions.current.id } returns 1L
+        val agent = com.letta.mobile.testutil.TestData.agent("agent-prompt", "Prompt")
+        val owner = ShellWorkspaceState(ShellDestination.Chat(agent.id.value, "conversation-prompt")).apply {
+            bindSource("source", 1L)
+        }
+        drawer.workspaceOwner = owner
+        drawer.workspaceReady = true
+        val route = AgentChatRoute(agent.id.value, conversationId = "conversation-prompt")
+        val key = WorkspaceChatStoreOwner.retain(owner, route, drawer)
+        val model = spyk(openedChatViewModel(
+            ChatPagingHost(), agent, "conversation-prompt", FixtureSession("prompt", focus = owner),
+        ))
+        every { model.sendInitialMessage("a later Home prompt") } answers {
+            val current = checkNotNull(drawer.workspaceOwner)
+            assertTrue(WorkspaceChatStoreOwner.isCurrentOwner(drawer, current))
+            assertEquals(agent.id, current.currentFocus.agentId)
+            assertEquals(ConversationId("conversation-prompt"), current.currentFocus.conversationId)
+            assertEquals(ConversationId("conversation-prompt"), model.conversationId)
+        }
+        drawer.chatStore(key).put("chat", model)
+        try {
+            owner.navigate(ShellDestination.Home)
+            owner.navigate(ShellDestination.Chat(agent.id.value, "conversation-prompt"))
+            val prompt = route.copy(initialMessage = "a later Home prompt")
+
+            WorkspaceChatStoreOwner.retain(owner, prompt, drawer)
+            WorkspaceChatStoreOwner.retain(owner, prompt, drawer)
+            advanceUntilIdle()
+
+            assertSame(model, drawer.chatStore(key)["chat"])
+            verify(exactly = 1) { model.sendInitialMessage("a later Home prompt") }
+            val recreated = ShellWorkspaceState().apply {
+                bindSource("source", 1L)
+                assertTrue(restore(owner.snapshot()))
+            }
+            drawer.workspaceOwner = recreated
+            WorkspaceChatStoreOwner.retain(recreated, prompt, drawer)
+            advanceUntilIdle()
+            verify(exactly = 1) { model.sendInitialMessage("a later Home prompt") }
+            recreated.navigate(ShellDestination.Home)
+            recreated.navigate(ShellDestination.Chat(agent.id.value, "conversation-prompt"))
+            WorkspaceChatStoreOwner.retain(recreated, prompt, drawer)
+            verify(exactly = 2) { model.sendInitialMessage("a later Home prompt") }
+        } finally {
+            model.viewModelScope.cancel()
+        }
     }
 
 }

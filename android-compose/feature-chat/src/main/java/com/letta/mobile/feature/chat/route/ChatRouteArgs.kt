@@ -27,6 +27,8 @@ internal class ChatRouteArgs @Inject constructor(private val savedStateHandle: S
     private var request: CurrentFocusRequest? = null
     private var boundSource: String? = null
     private var reboundRequests = emptySet<CurrentFocusRequest>()
+    internal var workspaceMessageRequest: CurrentFocusRequest? = null
+    internal var pendingWorkspaceMessage: Pair<CurrentFocusRequest, String>? = null
     var session: SessionRepositoryGraph? = null
     var isOwnerCurrent: () -> Boolean = { true }
     var liveGeneration: () -> Long? = { workspace?.sourceGeneration }
@@ -54,7 +56,8 @@ internal class ChatRouteArgs @Inject constructor(private val savedStateHandle: S
         boundSource = owner.sourceKey
         workspace = owner
         request = if (old === owner && accepted) previous else owner.requestToken()
-        runtimeConversation = owner.currentFocus.conversationId?.let { subagentConversation(agentId, it.value)?.let(::ConversationId) }
+        if (old == null && initialMessage != null) workspaceMessageRequest = request
+        runtimeConversation = subagentConversation(agentId, owner.currentFocus.conversationId?.value.orEmpty())?.let(::ConversationId)
         return old != null && !retained && (old !== owner || !accepted)
     }
     private fun acceptedBy(owner: ShellWorkspaceState?, token: CurrentFocusRequest?): Boolean =

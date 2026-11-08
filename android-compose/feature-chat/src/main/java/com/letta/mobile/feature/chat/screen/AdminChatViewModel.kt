@@ -37,6 +37,7 @@ import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.route.focusedCreation
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
+import com.letta.mobile.feature.chat.route.takeWorkspaceMessage
 import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
@@ -116,8 +117,7 @@ internal fun chatFontScaleState(
     scales: Flow<Float>,
     scope: CoroutineScope,
 ): MutableStateFlow<Float?> = MutableStateFlow<Float?>(null).also { current ->
-    // Storage seeds the current zoom once; later disk emissions cannot roll back a gesture.
-    // Unknown remains null until loaded, and an early local choice wins over a late read.
+    // Seed unknown zoom once; gestures and cached choices win over later storage emissions.
     scope.launch { current.compareAndSet(null, scales.first()) }
 }
 
@@ -139,8 +139,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val clientVersionProvider: ChatClientVersionProvider,
     private val selfTodoRepository: ISelfTodoRepository,
     private val modelRepository: IModelRepository,
-    val attachmentLimits: AttachmentLimits =
-        AttachmentLimits.Default,
+    val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     private val pagingHost: ChatPagingHost = ChatPagingHost(),
     private val selectedRuntimeProvider: com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider? = null,
     /** App-wide run state; this screen publishes its conversation here for the lists and the mascots. */
@@ -197,8 +196,7 @@ internal class AdminChatViewModel @Inject constructor(
         WsSelfTodoSource(selfTodoRepository)
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
-    // letta-mobile-aw0dv: the display mode the route asked to open in (e.g.
-    // subagent-chip nav requests "interactive"); null = screen default.
+    // letta-mobile-aw0dv: requested display mode (e.g. subagent "interactive"); null uses the screen default.
     val initialChatMode: String? = routeArgs.initialChatMode
     private val explicitConversationId: String?
         get() = routeArgs.explicitConversationId
@@ -322,6 +320,7 @@ internal class AdminChatViewModel @Inject constructor(
         val requestedGeneration = routeArgs.requestToken()?.sourceGeneration
         if (routeArgs.workspaceOwned && runtime != null && runtime.generation != requestedGeneration) return false
         replacingSendRuntime = false
+        acceptWorkspaceMessage()
         if (screenSelected && routeArgs.isCurrent() && isRuntimeBound) sendPipeline.wsChatSendCoordinator.selectForEvents()
         return true
     }
@@ -506,8 +505,7 @@ internal class AdminChatViewModel @Inject constructor(
     )
     val chatFontScale: StateFlow<Float?> = currentChatFontScale
 
-    // Master switch for the expressive Jindong activity haptics (streaming +
-    // tool-call pattern cues). Default-on; gates the new ChatScreen effects.
+    // Default-on switch for streaming and tool-call haptics in ChatScreen.
     val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
@@ -637,7 +635,7 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    private val sendInitialMessage: (String) -> Unit = { message ->
+    internal fun sendInitialMessage(message: String) {
         if (!replacingSendRuntime && focusCanSend) sendPipeline.sendInitialMessage(message)
     }
 
@@ -671,7 +669,7 @@ internal class AdminChatViewModel @Inject constructor(
                 },
             ),
             send = ConversationSendConfig(
-                viaTimeline = sendInitialMessage,
+                viaTimeline = ::sendInitialMessage,
                 markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
             ),
             hydration = HydrationRouteConfig(identity = { convId -> hydrationIdentity(agentId, convId) }),
@@ -1011,10 +1009,11 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
 
-    // Keep startup after all backing fields and lazy delegates: Main.immediate can
-    // resolve a cached route and start its observer before this constructor returns.
+    // Main.immediate can resolve and observe synchronously: start after all backing fields.
     private var sessionStarted = false
     private var workspaceEntry: com.letta.mobile.data.shell.CurrentFocusRequest? = null
+    internal fun acceptWorkspaceMessage(message: String? = null) =
+        routeArgs.takeWorkspaceMessage(message, !replacingSendRuntime && focusCanSend)?.let(::sendInitialMessage)
 
     internal fun bindWorkspace(
         workspace: com.letta.mobile.data.shell.ShellWorkspaceState,
@@ -1024,7 +1023,7 @@ internal class AdminChatViewModel @Inject constructor(
         onSettled: (ConversationId) -> Unit,
     ) {
         val newOwner = routeArgs.workspace !== workspace
-        branchOpener = open
+        if (open != null) branchOpener = open
         if (retainRequest) reconcileSavedPendingFocus(workspace)
         routeArgs.isOwnerCurrent = isOwnerCurrent
         routeArgs.onSettled = onSettled
@@ -1038,6 +1037,7 @@ internal class AdminChatViewModel @Inject constructor(
             if (refresh) resolveConversationAndLoad()
         }
         if (routeArgs.isCurrent()) startSession()
+        acceptWorkspaceMessage()
     }
 
     private fun reconcileSavedPendingFocus(owner: com.letta.mobile.data.shell.ShellWorkspaceState) {

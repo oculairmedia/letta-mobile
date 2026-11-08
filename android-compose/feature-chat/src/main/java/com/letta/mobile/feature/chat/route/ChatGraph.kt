@@ -83,3 +83,18 @@ internal fun ChatRouteArgs.focusedCreation(
             return fork
         }
     }
+
+/** A retained VM consumes entry text once; its request and text never enter SavedStateHandle. */
+internal fun ChatRouteArgs.takeWorkspaceMessage(message: String?, ready: Boolean): String? {
+    val token = requestToken() ?: return null
+    if (!message.isNullOrBlank() && !accepts(workspaceMessageRequest)) {
+        workspaceMessageRequest = token
+        pendingWorkspaceMessage = token to message
+    }
+    val pending = pendingWorkspaceMessage ?: return null
+    return when {
+        !accepts(pending.first) -> { pendingWorkspaceMessage = null; null }
+        !ready -> null
+        else -> { pendingWorkspaceMessage = null; pending.second }
+    }
+}
