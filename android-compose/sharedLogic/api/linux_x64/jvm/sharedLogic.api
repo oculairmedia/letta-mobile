@@ -50646,6 +50646,7 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceState {
 	public final fun getSourceKey ()Ljava/lang/String;
 	public final fun getTabs ()Lcom/letta/mobile/data/desktopshell/ConversationTabsState;
 	public final fun getWorkPlayMode ()Lcom/letta/mobile/data/lens/WorkPlayMode;
+	public final fun holdPending (Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;)Z
 	public final fun initialize (Lcom/letta/mobile/data/shell/CurrentFocusInputs;)Z
 	public final fun navigate (Lcom/letta/mobile/data/shell/ShellDestination;)V
 	public final fun openNewAgent ()V
@@ -50673,6 +50674,7 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceState {
 	public final fun showPage (Lcom/letta/mobile/data/shell/ShellDestination;)V
 	public final fun snapshot ()Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;
 	public final fun snapshotJson ()Ljava/lang/String;
+	public final fun snapshotOrPending ()Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;
 }
 
 public final class com/letta/mobile/data/skills/Skill {

@@ -31,6 +31,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     private val requestOwner = FocusRequestOwner()
     private var value by mutableStateOf(WorkspaceFocusState(initialFocusSnapshot(initialPage)))
     private var startupAvailable = true
+    private var pendingSnapshot: CurrentFocusSnapshot? = null
 
     /** Atomically published requested identity; absence in a roster never changes it. */
     val currentFocus: CurrentFocus get() = value.saved.focus
@@ -56,7 +57,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         get() = value.saved.editorRoute?.let(ShellRoute::decode) as? ShellDestination.AgentEditor
         set(editor) = transition {
             if (editor == null) {
-                startupAvailable = false
+                closeStartup()
                 value = value.copy(saved = value.saved.copy(editorRoute = null))
             } else {
                 openEditor(editor)
@@ -126,7 +127,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     fun selectFocus(focus: CurrentFocus): Boolean {
         return transition<Boolean> {
             if (!focus.valid()) return@transition false
-            startupAvailable = false
+            closeStartup()
             publishSelection(value.saved.copy(focus = focus, editorRoute = null))
             return@transition true
         }
@@ -208,13 +209,23 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         }
     }
 
-    /** Trusted durable namespace plus live generation. Reconnect fences requests without resetting focus. */
+    /**
+     * Bind a trusted namespace and live generation. A matching pending envelope restores atomically
+     * once; a foreign envelope is discarded and opens Home. Reconnect only fences requests.
+     * Submit new startup entries to [initialize] before binding so they precede pending restoration.
+     */
     fun bindSource(key: String, generation: Long) {
         return transition<Unit> {
             require(key.isNotBlank())
+            val pending = pendingSnapshot
+            pendingSnapshot = null
+            if (pending != null && pending.sourceKey == key) {
+                commitRestoration(pending, generation)
+                return@transition
+            }
             if (sourceKey == key && sourceGeneration == generation) return@transition
-            val changedSource = sourceKey != null && sourceKey != key
-            if (changedSource) startupAvailable = false
+            val changedSource = pending != null || sourceKey != null && sourceKey != key
+            if (changedSource) closeStartup()
             val saved = if (changedSource) {
                 initialFocusSnapshot(ShellDestination.Home, key, railExpanded)
             } else {
@@ -243,16 +254,40 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
         }
     }
 
+    /**
+     * Save the bound workspace, or a detached pending envelope before source binding, or null when
+     * neither exists. This lets a saver survive recreation during startup without inventing a source
+     * or publishing unverified identity as [currentFocus].
+     */
+    fun snapshotOrPending(): CurrentFocusSnapshot? = transition {
+        if (sourceKey != null) snapshot() else pendingSnapshot?.detached()
+    }
+
+    /**
+     * Hold one complete validated envelope before source binding and before navigation or startup
+     * arbitration commits. A later valid hold replaces it; invalid envelopes leave it unchanged.
+     * Holding never publishes focus or changes revision. [bindSource] consumes it once; navigation,
+     * [initialize] and any [restore] attempt discard it. After binding, use [restore] instead.
+     */
+    fun holdPending(snapshot: CurrentFocusSnapshot): Boolean = transition {
+        if (!startupAvailable || sourceKey != null || !snapshot.valid()) return@transition false
+        pendingSnapshot = snapshot.detached()
+        true
+    }
+
     /** Encode the entire snapshot with the canonical persisted JSON policy. */
     fun snapshotJson(): String = LettaJson.persisted.encodeToString(snapshot())
 
-    /** Restore once before user navigation from a complete same-source envelope; rebuild runtime evidence. */
+    /**
+     * Restore once before user navigation from a complete same-source envelope; rebuild runtime
+     * evidence. Every attempt discards a held pending envelope, including a rejected restore.
+     */
     fun restore(snapshot: CurrentFocusSnapshot): Boolean {
         return transition<Boolean> {
+            pendingSnapshot = null
             val canRestore = startupAvailable && snapshot.valid() && snapshot.sourceKey == sourceKey
             if (!canRestore) return@transition false
-            startupAvailable = false
-            value = WorkspaceFocusState(snapshot.detached(), generation = sourceGeneration, revision = focusRevision + 1)
+            commitRestoration(snapshot, sourceGeneration)
             return@transition true
         }
     }
@@ -279,7 +314,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             )
             val initial = initialCurrentFocus(validated)
             value = WorkspaceFocusState(initial.detached(), generation = sourceGeneration, revision = focusRevision + 1)
-            startupAvailable = false
+            closeStartup()
             return@transition true
         }
     }
@@ -309,7 +344,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             if (target.kind == page.kind) return@transition
             val focus = currentFocus.copy(pageRoute = target.initialFocus().pageRoute)
             if (!focus.valid()) return@transition
-            startupAvailable = false
+            closeStartup()
             publishSelection(value.saved.copy(focus = focus))
         }
     }
@@ -426,7 +461,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
             val focus = if (fallback == null) CurrentFocus() else CurrentFocus(
                 "chat", value.owners[fallback], fallback, CurrentFocusChatMode.Exact,
             )
-            startupAvailable = false
+            closeStartup()
             val validFocus = focus.takeIf { it.valid() } ?: CurrentFocus()
             publishSelection(value.saved.copy(focus = validFocus, editorRoute = null).withTabs(result.state))
         }
@@ -479,10 +514,20 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
 
     private inline fun <T> transition(block: () -> T): T = synchronized(transitionLock, block)
 
+    private fun closeStartup() {
+        startupAvailable = false
+        pendingSnapshot = null
+    }
+
+    private fun commitRestoration(snapshot: CurrentFocusSnapshot, generation: Long) {
+        closeStartup()
+        value = WorkspaceFocusState(snapshot.detached(), generation = generation, revision = focusRevision + 1)
+    }
+
     private fun openEditor(editor: ShellDestination.AgentEditor) {
         val route = ShellRoute.encode(editor)
         if (!validFocusEditorRoute(route)) return
-        startupAvailable = false
+        closeStartup()
         val focus = currentFocus.copy(pageRoute = "chat")
         val saved = value.saved.copy(focus = focus, editorRoute = route)
         if (focus == currentFocus) value = value.copy(saved = saved) else publishSelection(saved)
