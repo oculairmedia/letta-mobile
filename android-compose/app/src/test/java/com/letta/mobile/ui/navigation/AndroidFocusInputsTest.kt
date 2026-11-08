@@ -80,30 +80,30 @@ class AndroidFocusInputsTest {
     @Test
     fun sourceNamespaceUsesCapturedBackendBindingAndIgnoresReconnectGeneration() {
         val remote = LettaConfig("config", LettaConfig.Mode.SELF_HOSTED, "https://endpoint-a.invalid", accessToken = "principal-a")
-        val key = AndroidShellChatPort.sourceKey(graph(remote))
-        assertEquals(key, AndroidShellChatPort.sourceKey(graph(remote, 2L)))
-        assertNotEquals(key, AndroidShellChatPort.sourceKey(graph(remote.copy(serverUrl = "https://endpoint-b.invalid"))))
-        assertNotEquals(key, AndroidShellChatPort.sourceKey(graph(remote.copy(accessToken = "principal-b"))))
+        val key = AndroidShellChatPort.sourceKey(androidFocusGraph(remote))
+        assertEquals(key, AndroidShellChatPort.sourceKey(androidFocusGraph(remote, 2L)))
+        assertNotEquals(key, AndroidShellChatPort.sourceKey(androidFocusGraph(remote.copy(serverUrl = "https://endpoint-b.invalid"))))
+        assertNotEquals(key, AndroidShellChatPort.sourceKey(androidFocusGraph(remote.copy(accessToken = "principal-b"))))
         assertFalse(key.contains(remote.serverUrl))
         assertFalse(key.contains(checkNotNull(remote.accessToken)))
         val local = remote.copy(mode = LettaConfig.Mode.LOCAL, localModelPath = "model-a")
         assertEquals(
-            AndroidShellChatPort.sourceKey(graph(local)),
-            AndroidShellChatPort.sourceKey(graph(local.copy(localModelPath = "model-b"))),
+            AndroidShellChatPort.sourceKey(androidFocusGraph(local)),
+            AndroidShellChatPort.sourceKey(androidFocusGraph(local.copy(localModelPath = "model-b"))),
         )
     }
 
     @Test
     fun newEditorEntryWinsOverPendingRestoreBeforeSourceBinding() {
         val config = LettaConfig("config-a", LettaConfig.Mode.SELF_HOSTED, "https://a.invalid", accessToken = "principal-a")
-        val graph = graph(config)
+        val graph = androidFocusGraph(config)
         val source = AndroidShellChatPort.sourceKey(graph)
         val saved = CurrentFocusSnapshot(
             source, exact(AgentId("saved"), ConversationId("saved-conversation")),
             pinnedConversationIds = listOf(ConversationId("saved-conversation")), railExpanded = true,
         )
         val owner = ShellWorkspaceState().apply { assertTrue(holdPending(saved)) }
-        val drawer = drawer(graph)
+        val drawer = androidFocusDrawer(graph)
         try {
             bindAndroidFocus(owner, graph, source, AndroidShellChatPort(owner, { emptyList() }, { emptyList() }), drawer, config,
                 CurrentFocusInputs(source, deepLink = CurrentFocusSnapshot(
@@ -122,8 +122,8 @@ class AndroidFocusInputsTest {
     fun pendingRestoreWaitsForTheCapturedBackendBeforeItCanPublishIdentity() {
         val oldConfig = LettaConfig("config-a", LettaConfig.Mode.SELF_HOSTED, "https://a.invalid", accessToken = "principal-a")
         val nextConfig = oldConfig.copy(id = "config-b", serverUrl = "https://b.invalid", accessToken = "principal-b")
-        val oldGraph = graph(oldConfig)
-        val nextGraph = graph(nextConfig, 2L)
+        val oldGraph = androidFocusGraph(oldConfig)
+        val nextGraph = androidFocusGraph(nextConfig, 2L)
         val source = AndroidShellChatPort.sourceKey(nextGraph)
         val saved = CurrentFocusSnapshot(
             source, exact(AgentId("next"), ConversationId("next-conversation")),
@@ -131,7 +131,7 @@ class AndroidFocusInputsTest {
         )
         val owner = ShellWorkspaceState().apply { assertTrue(holdPending(saved)) }
         val port = AndroidShellChatPort(owner, { emptyList() }, { emptyList() })
-        val drawer = drawer(oldGraph)
+        val drawer = androidFocusDrawer(oldGraph)
         try {
             bindAndroidFocus(owner, oldGraph, AndroidShellChatPort.sourceKey(oldGraph, nextConfig), port, drawer, nextConfig, null)
             assertNull(owner.sourceKey)
@@ -146,23 +146,25 @@ class AndroidFocusInputsTest {
         } finally { drawer.viewModelScope.cancel() }
     }
 
-    private fun drawer(graph: SessionGraph): SharedNavDrawerViewModel {
-        val all = mockk<IAllConversationsRepository> {
-            every { conversations } returns MutableStateFlow(emptyList())
-        }
-        val sources = mockk<SharedNavDrawerSources>(relaxed = true) {
-            every { agents.agents } returns MutableStateFlow(emptyList())
-            every { sessions.current } returns graph
-        }
-        return SharedNavDrawerViewModel(
-            FakeSettingsRepository(), mockk(relaxed = true), all, InMemorySecureSettingsStore(), sources,
-        )
-    }
-
     private fun exact(agent: AgentId, conversation: ConversationId) = CurrentFocus("chat", agent, conversation, CurrentFocusChatMode.Exact)
-    private fun graph(config: LettaConfig, generation: Long = 1L) = mockk<SessionGraph> {
-        every { id } returns generation
-        every { capturedConfig } returns config
-        every { backendDescriptor.backendId } returns BackendId("remote-letta:config")
+
+}
+
+internal fun androidFocusDrawer(graph: SessionGraph): SharedNavDrawerViewModel {
+    val all = mockk<IAllConversationsRepository> {
+        every { conversations } returns MutableStateFlow(emptyList())
     }
+    val sources = mockk<SharedNavDrawerSources>(relaxed = true) {
+        every { agents.agents } returns MutableStateFlow(emptyList())
+        every { sessions.current } returns graph
+    }
+    return SharedNavDrawerViewModel(
+        FakeSettingsRepository(), mockk(relaxed = true), all, InMemorySecureSettingsStore(), sources,
+    )
+}
+
+internal fun androidFocusGraph(config: LettaConfig, generation: Long = 1L) = mockk<SessionGraph> {
+    every { id } returns generation
+    every { capturedConfig } returns config
+    every { backendDescriptor.backendId } returns BackendId("remote-letta:config")
 }
