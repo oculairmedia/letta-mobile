@@ -30,6 +30,8 @@ class DesktopChatControllerModelSwitchTest {
         val controller = testController(gateway, agentModel = "anthropic/old")
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         assertEquals("anthropic/old", controller.state.value.composerModelLabel)
 
         controller.models.select("openai/new")
@@ -45,6 +47,8 @@ class DesktopChatControllerModelSwitchTest {
         val gateway = ModelSwitchGateway(conversationIds = listOf("conv-1", "conv-2"))
         val controller = testController(gateway, agentModel = "anthropic/old")
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
 
         controller.models.select("openai/new")
@@ -74,6 +78,8 @@ class DesktopChatControllerModelSwitchTest {
         )
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
 
         controller.models.select("openai/new")
         runCurrent()
@@ -89,6 +95,8 @@ class DesktopChatControllerModelSwitchTest {
         val gateway = ModelSwitchGateway(failModelUpdate = true)
         val controller = testController(gateway, agentModel = "anthropic/old")
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
 
         controller.models.select("openai/new")
@@ -113,6 +121,8 @@ class DesktopChatControllerModelSwitchTest {
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = "anthropic/old") } },
         )
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
 
         controller.models.select("openai/new")

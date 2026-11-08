@@ -2,11 +2,17 @@
 
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
+import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.SideEffect
@@ -18,6 +24,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.desktopshell.ConversationTabsState
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
@@ -44,9 +56,96 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class DesktopJewelWindowTest {
+    @Test
+    fun aMissingCatalogRowRemainsInTheOpenTabs() = runComposeUiTest {
+        var result: List<LettaTab> = emptyList()
+        setContent {
+            val tabs = rememberOpenTabs(ConversationTabsState(transientConversationId = "deleted-chat"), emptyList())
+            SideEffect { result = tabs }
+        }
+        waitForIdle()
+        runOnIdle {
+            assertEquals(listOf("deleted-chat"), result.map { it.key })
+            assertTrue(result.single().isTransient)
+        }
+    }
+
+    @Test
+    fun anUnavailableTargetIsLabeledInTheOpenTabs() = runComposeUiTest {
+        var result: List<LettaTab> = emptyList()
+        val workspace = ShellWorkspaceState().apply {
+            bindSource("test-source", 1)
+            selectFocus(com.letta.mobile.data.shell.CurrentFocus("chat", AgentId("agent-1"), ConversationId("deleted-chat"),
+                com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+            reportAvailability(requestToken(), conversation = com.letta.mobile.data.shell.FocusAvailability.Unavailable)
+        }
+        setContent {
+            val tabs = rememberOpenTabs(
+                ConversationTabsState(transientConversationId = "deleted-chat"), emptyList(), workspace,
+            )
+            SideEffect { result = tabs }
+        }
+        waitForIdle()
+        runOnIdle {
+            assertEquals("Unavailable conversation", result.single().title)
+        }
+    }
+
+    @Test
+    fun workspaceHolderRestoresFocusTabsAndEditorAfterLayoutChange() = runComposeUiTest {
+        var mounted by mutableStateOf(true)
+        var width by mutableStateOf(900)
+        var registry by mutableStateOf(SaveableStateRegistry(null) { true })
+        var current: ShellWorkspaceState? = null
+        var saved: Map<String, List<Any?>>? = null
+        setContent {
+            if (mounted) {
+                CompositionLocalProvider(LocalSaveableStateRegistry provides registry) {
+                    val workspace = rememberShellWorkspaceState(ShellDestination.Home)
+                    SideEffect { current = workspace }
+                    Box(Modifier.width(width.dp).height(200.dp)) {}
+                }
+            }
+        }
+        waitForIdle()
+        val original = requireNotNull(current)
+        runOnIdle {
+            original.bindSource("test-source", 1)
+            original.navigate(ShellDestination.Chat("agent-1", "conv-1"))
+            original.tabs = ConversationTabsState(listOf("conv-1"), "conv-2")
+            original.navigate(ShellDestination.AgentEditor("agent-2"))
+            original.railExpanded = false
+            width = 500
+        }
+        waitForIdle()
+        runOnIdle {
+            assertSame(original, current)
+            assertEquals(AgentId("agent-1"), original.currentFocus.agentId)
+            assertEquals(ConversationId("conv-1"), original.currentFocus.conversationId)
+            saved = registry.performSave()
+            mounted = false
+        }
+        waitForIdle()
+        runOnIdle {
+            registry = SaveableStateRegistry(saved) { true }
+            mounted = true
+        }
+        waitForIdle()
+        runOnIdle {
+            val restored = requireNotNull(current)
+            restored.bindSource("test-source", 1)
+            assertEquals(AgentId("agent-1"), restored.currentFocus.agentId)
+            assertEquals(ConversationId("conv-1"), restored.currentFocus.conversationId)
+            assertEquals(ConversationTabsState(listOf("conv-1"), "conv-2"), restored.tabs)
+            assertEquals(ShellDestination.AgentEditor("agent-2"), restored.agentEditor)
+            assertFalse(restored.railExpanded)
+        }
+    }
+
     @Test
     fun idleHoistedHeaderDoesNotRecomposeContent() = runDesktopComposeUiTest(width = 1440, height = 900) {
         mainClock.autoAdvance = false

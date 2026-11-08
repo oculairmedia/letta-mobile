@@ -4,16 +4,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.CurrentFocusChatMode
+import com.letta.mobile.data.shell.FocusAvailability
+import com.letta.mobile.data.shell.ShellConversationRef
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.canvas.ProvideCanvasHost
 import com.letta.mobile.ui.components.tabs.LettaTab
@@ -25,20 +26,19 @@ import com.letta.mobile.ui.shell.workspace.ShellConversationTabs
 import com.letta.mobile.ui.shell.workspace.ShellSidebarControl
 import com.letta.mobile.ui.shell.workspace.ShellSidebarOverflow
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
-import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.runtime.installDesktopMemoryPressure
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceFileViewerHost
 import dev.nucleusframework.application.NucleusApplicationScope
 import java.awt.Window
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Application-scoped inputs the desktop shell composes over. */
 internal data class DesktopAppShellBindings(
     val nucleusApplicationScope: NucleusApplicationScope,
     val window: Window,
-    val deepLinks: StateFlow<DesktopDeepLinkRequest?>,
+    val deepLinks: MutableStateFlow<DesktopDeepLinkRequest?>,
     val quickQuery: DesktopQuickQueryCoordinator,
 )
 
@@ -48,19 +48,14 @@ internal class DesktopShellHeader(
     val onHoisted: (ShellWorkspaceHeaderState) -> Unit,
 )
 
-/**
- * The desktop shell. letta-mobile-bglj6.1.10: it only assembles the pieces - the services and
- * navigation ([rememberDesktopShellContext]), the state derived from them each composition
- * ([rememberDesktopShellFrame]), the effects, the window content and the header chrome.
- */
+/** Assemble desktop services, workspace state, effects, window content and header chrome. */
 @Composable
 internal fun LettaDesktopApp(
     shell: DesktopAppShellBindings,
     onActiveTitleChange: (String) -> Unit = {},
     onHeaderChromeChange: (ShellWorkspaceHeaderState) -> Unit = {},
 ) {
-    // Launch on the fleet dashboard: it is the only view that says something
-    // before a conversation is selected.
+    // Launch on the fleet dashboard while no conversation is selected.
     DisposableEffect(Unit) { installDesktopMemoryPressure().let { onDispose(it::close) } }
     val navigator = rememberShellWorkspaceState(ShellDestination.Home)
     val context = rememberDesktopShellContext(shell, navigator)
@@ -89,7 +84,8 @@ private fun rememberDesktopShellHeader(context: DesktopShellContext, frame: Desk
     val layout = context.core.layout
     val identity = desktopHeaderIdentity(context, frame)
     return ShellWorkspaceHeaderState(
-        title = desktopActiveTitle(context.navigator.selectedDestination, frame.chatState.selectedConversation?.title),
+        title = desktopActiveTitle(context.navigator.selectedDestination,
+            frame.chatState.conversations.firstOrNull { it.id == context.navigator.selectedConversationId?.value }?.title),
         identity = identity.state,
         identityActions = identity.actions,
         sidebar = ShellSidebarControl(
@@ -100,13 +96,12 @@ private fun rememberDesktopShellHeader(context: DesktopShellContext, frame: Desk
         ),
         search = rememberDesktopShellSearch(context, frame),
         tabs = ShellConversationTabs(
-            tabs = rememberOpenTabs(context.navigator.tabs, frame.chatState.conversations),
-            activeKey = frame.chatState.selectedConversationId,
+            tabs = rememberOpenTabs(context.navigator.tabs, frame.chatState.conversations, context.navigator),
+            activeKey = context.navigator.selectedConversationId?.value,
             actions = desktopTabActions(context, frame),
         ),
     )
 }
-
 
 /**
  * The shared header search over this window's unified search sources (conversations, message text,
@@ -131,6 +126,7 @@ private fun desktopHeaderIdentity(context: DesktopShellContext, frame: DesktopSh
     DesktopNowActiveBarHost(
         chatController = context.core.chatController,
         chatState = frame.chatState,
+        ownerConversationId = context.navigator.selectedConversationId,
         host = NowActiveBarHostState(
             thinkingConversationId = frame.activity.thinkingConversationId,
             isStreamingReplySelected = frame.activity.isStreamingReplySelected,
@@ -140,14 +136,17 @@ private fun desktopHeaderIdentity(context: DesktopShellContext, frame: DesktopSh
             onStopRun = context.core.chatController::stopActiveRun,
         ),
     )
-
-/** The open tabs, in strip order, for the conversations the chat surface still knows. */
+/** Keep every owner tab visible even while its catalog row is absent. */
 @Composable
-private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>): List<LettaTab> {
+internal fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>,
+    workspace: ShellWorkspaceState? = null): List<LettaTab> {
     val byId = remember(conversations) { conversations.associateBy { it.id } }
-    return remember(tabs, byId) {
-        tabs.openConversationIds.mapNotNull { id ->
-            byId[id]?.let { LettaTab(it.id, it.displayTitle(), it.agentName, id == tabs.transientConversationId) }
+    val unavailable = workspace?.selectedConversationId.takeIf { workspace?.conversationAvailability == FocusAvailability.Unavailable }
+    return remember(tabs, byId, unavailable) {
+        tabs.openConversationIds.map { id ->
+            val row = byId[id]
+            LettaTab(id, if (id == unavailable?.value) "Unavailable conversation" else row?.displayTitle() ?: "Conversation",
+                row?.agentName, id == tabs.transientConversationId)
         }
     }
 }
@@ -172,74 +171,76 @@ private fun DesktopShellRoutingEffects(
 ) {
     val navigator = context.navigator
     val chatState = frame.chatState
-    val activeTitle = desktopActiveTitle(navigator.selectedDestination, chatState.selectedConversation?.title)
+    val activeTitle = desktopActiveTitle(navigator.selectedDestination,
+        chatState.conversations.firstOrNull { it.id == navigator.selectedConversationId?.value }?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
     DesktopDeepLinkRouting(
         deepLinks = context.shell.deepLinks,
-        chatState = chatState,
         actions = DesktopDeepLinkRoutingActions(
-            // Deep links must win over the full-page agent editor, matching
-            // the sidebar navigation paths that clear edit mode before routing.
             onDestinationSelected = navigator::navigate,
-            onSelectConversation = { conversationId ->
-                navigator.editAgentId = null
-                context.core.chatController.selectConversation(conversationId)
-            },
-            onOpenAgent = { context.router.openAgent(AgentId(it)) },
             onPairLink = { navigator.pendingPairLink = it },
         ),
     )
+    DesktopFocusProjection(context, chatState)
 }
 
 private data class DesktopDeepLinkRoutingActions(
-    val onDestinationSelected: (com.letta.mobile.data.shell.ShellDestination) -> Unit,
-    val onSelectConversation: (String) -> Unit,
-    val onOpenAgent: (String) -> Unit,
+    val onDestinationSelected: (ShellDestination) -> Unit,
     val onPairLink: (String) -> Unit,
 )
 
-/**
- * Routes deep links into the app, buffering targets that arrive before the
- * conversation list has loaded (cold-start protocol activation):
- * selectConversation ignores unknown ids and openAgent would treat the empty
- * list as "no existing chat", so both wait for the initial load to settle.
- */
 @Composable
 private fun DesktopDeepLinkRouting(
-    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
-    chatState: DesktopChatSurfaceState,
+    deepLinks: MutableStateFlow<DesktopDeepLinkRequest?>,
     actions: DesktopDeepLinkRoutingActions,
 ) {
-    var pendingConversationId by remember { mutableStateOf<String?>(null) }
-    var pendingAgentId by remember { mutableStateOf<String?>(null) }
     DesktopDeepLinkEffect(
-        deepLinks = deepLinks,
-        handlers = DesktopDeepLinkHandlers(
-            onDestinationSelected = actions.onDestinationSelected,
-            onConversationSelected = { pendingConversationId = it },
-            onAgentSelected = { pendingAgentId = it },
-            onPairLink = actions.onPairLink,
-        ),
+        deepLinks,
+        DesktopDeepLinkHandlers(actions.onDestinationSelected, {}, {}, actions.onPairLink),
     )
-    LaunchedEffect(pendingConversationId, chatState.conversations) {
-        val target = pendingConversationId ?: return@LaunchedEffect
-        if (chatState.conversations.any { it.id == target }) {
-            actions.onSelectConversation(target)
-            pendingConversationId = null
+}
+
+/** Re-evaluate the owner target when the catalog or its source changes. */
+@Composable
+private fun DesktopFocusProjection(context: DesktopShellContext, chatState: DesktopChatSurfaceState) {
+    val workspace = context.navigator
+    LaunchedEffect(workspace.currentFocus, workspace.sourceKey, workspace.sourceGeneration, workspace.focusRevision,
+        chatState.conversations, chatState.connectionState, chatState.isLoading) {
+        if (workspace.page is ShellDestination.Chat && workspace.currentFocus.conversationId == null) {
+            val token = workspace.requestToken()
+            context.core.chatController.clearSelection { workspace.accepts(token) }
         }
-    }
-    LaunchedEffect(pendingAgentId, chatState.isLoading, chatState.connectionState) {
-        val target = pendingAgentId ?: return@LaunchedEffect
-        if (initialConversationLoadSettled(chatState)) {
-            actions.onOpenAgent(target)
-            pendingAgentId = null
+        projectDesktopFocus(workspace, chatState) { id ->
+            val token = workspace.requestToken()
+            context.core.chatController.selectConversation(id.value, allowUnlisted = true) { workspace.accepts(token) }
         }
     }
 }
 
-private fun initialConversationLoadSettled(chatState: DesktopChatSurfaceState): Boolean {
-    if (chatState.isLoading) return false
-    return chatState.connectionState != DesktopChatConnectionState.Loading
+/** Only the owner's current target may turn a catalog observation into a chat load. */
+internal fun projectDesktopFocus(
+    workspace: ShellWorkspaceState,
+    chatState: DesktopChatSurfaceState,
+    select: (ConversationId) -> Unit,
+) {
+    if (workspace.sourceKey == null || workspace.page !is ShellDestination.Chat) return
+    val focus = workspace.currentFocus
+    val token = workspace.requestToken()
+    val references = chatState.conversations.map { row ->
+        ShellConversationRef(ConversationId(row.id), row.agentId?.let(::AgentId), row.updatedAtLabel, tags = row.tags)
+    }
+    val target = when (focus.chatMode) {
+        CurrentFocusChatMode.Exact -> focus.conversationId
+        CurrentFocusChatMode.Resume -> focus.agentId?.let { workspace.resolveAgentChat(it, references) }
+        CurrentFocusChatMode.New -> null
+    } ?: return
+    val reference = references.singleOrNull { it.id == target }
+    if (reference == null && focus.chatMode == CurrentFocusChatMode.Exact) {
+        select(target)
+        return
+    }
+    val agent = reference?.agent ?: return
+    if (workspace.completeFocus(token, target, agent, reference)) select(target)
 }
 
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {

@@ -36,6 +36,8 @@ class DesktopChatControllerStopAbortTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("run a long tool")
         controller.send()
         runCurrent()
@@ -70,6 +72,8 @@ class DesktopChatControllerStopAbortTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("run a long tool")
         controller.send()
         runCurrent()
@@ -94,6 +98,8 @@ class DesktopChatControllerStopAbortTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("run a long tool")
         controller.send()
         runCurrent()
@@ -117,6 +123,8 @@ class DesktopChatControllerStopAbortTest {
 
         controller.start()
         runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
         controller.updateComposerText("run a long tool")
         controller.send()
         runCurrent()
@@ -138,6 +146,8 @@ class DesktopChatControllerStopAbortTest {
         val controller = testController(gateway, loop)
 
         controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
         runCurrent()
         controller.updateComposerText("run a long tool")
         controller.send()

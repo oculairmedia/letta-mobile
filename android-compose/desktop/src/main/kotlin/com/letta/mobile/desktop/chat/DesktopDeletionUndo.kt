@@ -64,10 +64,15 @@ class DesktopDeletionUndo {
     }
 
     companion object {
-        /** [roster] with the offer's row back in it (as it was archived), or null when it is already there or unknown. */
+        /** Restore the row or its archive flag, preserving newer details on an existing row. */
         fun rosterWithRowPutBack(roster: List<DesktopConversationSummary>, offer: Offer): List<DesktopConversationSummary>? {
             val row = offer.listed?.copy(archived = offer.wasArchived) ?: return null
-            return if (roster.any { it.id == row.id }) null else listOf(row) + roster
+            val current = roster.firstOrNull { it.id == row.id }
+            return when {
+                current == null -> listOf(row) + roster
+                current.archived == row.archived -> null
+                else -> roster.map { if (it.id == row.id) it.copy(archived = row.archived) else it }
+            }
         }
     }
 }

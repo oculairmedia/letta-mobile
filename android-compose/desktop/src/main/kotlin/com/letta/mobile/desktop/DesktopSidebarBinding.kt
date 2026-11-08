@@ -79,7 +79,7 @@ internal fun desktopSidebarPanelState(
         conversations = frame.lists.agentConversations,
         archivedConversations = frame.lists.archivedAgentConversations,
         marks = ShellConversationMarks(
-            selectedId = desktopOpenConversation(destination, frame.chatState.selectedConversationId),
+            selectedId = desktopOpenConversation(destination, navigator.selectedConversationId?.value),
             thinkingId = frame.activity.thinkingConversationId,
             deletingIds = inputs.marks.deletingIds,
             pinnedIds = inputs.marks.pinnedIds,

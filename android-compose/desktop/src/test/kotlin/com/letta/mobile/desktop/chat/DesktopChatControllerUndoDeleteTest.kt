@@ -3,12 +3,14 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -23,6 +25,8 @@ class DesktopChatControllerUndoDeleteTest {
     private class ArchivingGateway(
         private val behavior: ConversationDeleteBehavior,
         archived: Set<String> = emptySet(),
+        private val deleteStarted: CompletableDeferred<Unit>? = null,
+        private val deleteRelease: CompletableDeferred<Unit>? = null,
     ) : FakeDesktopChatGateway(conversationIds = listOf("conv-1", "conv-2", "conv-3")) {
         val archived = archived.toMutableSet()
         val hidden = mutableSetOf<String>()
@@ -38,6 +42,9 @@ class DesktopChatControllerUndoDeleteTest {
                 .map { it.copy(archived = it.id.value in archived) }
 
         override suspend fun deleteConversation(conversationId: String) {
+            require(listConversations().any { it.id.value == conversationId })
+            deleteStarted?.complete(Unit)
+            deleteRelease?.await()
             when (behavior) {
                 ConversationDeleteBehavior.RemovesFromLists -> { archived += conversationId; hidden += conversationId }
                 ConversationDeleteBehavior.MovesToArchived -> archived += conversationId
@@ -53,6 +60,110 @@ class DesktopChatControllerUndoDeleteTest {
     }
 
     private fun DesktopChatController.listed() = state.value.conversations.associate { it.id to it.archived }
+
+    @Test
+    fun deletingTheOpenChatDoesNotSelectAnotherConversation() = runTest {
+        val controller = testController { ArchivingGateway(ConversationDeleteBehavior.Permanent) }
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-2")
+        runCurrent()
+
+        controller.deleteConversation("conv-2")
+        runCurrent()
+
+        assertEquals("conv-2", controller.state.value.selectedConversationId)
+        assertFalse(controller.state.value.canSend)
+        assertNotNull(controller.state.value.errorMessage)
+        assertEquals(setOf("conv-1", "conv-3"), controller.listed().keys)
+        controller.close()
+    }
+
+    @Test
+    fun undoRestoresArchiveStateOfARetainedRowWithoutLosingItsNewerTitle() {
+        val original = DesktopConversationSummary(
+            id = "conv-1", title = "Original", agentName = "Agent", updatedAtLabel = "Remote", lastMessagePreview = "",
+        )
+        val offer = DesktopDeletionUndo.Offer(
+            conversationId = "conv-1", wasArchived = false, behavior = ConversationDeleteBehavior.MovesToArchived,
+            backendGeneration = 1, listed = original,
+        )
+        val retained = original.copy(title = "Renamed", archived = true)
+
+        val result = assertNotNull(DesktopDeletionUndo.rosterWithRowPutBack(listOf(retained), offer))
+        assertEquals(listOf(retained.copy(archived = false)), result)
+    }
+
+    @Test
+    fun anOpenChatMovedToArchiveRemainsAvailable() = runTest {
+        val gateway = ArchivingGateway(ConversationDeleteBehavior.MovesToArchived)
+        val controller = testController { gateway }
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+
+        controller.deleteConversation("conv-1")
+        runCurrent()
+
+        assertEquals("conv-1", controller.state.value.selectedConversationId)
+        assertEquals(true, controller.state.value.selectedConversation?.archived)
+        assertTrue(controller.state.value.canSend)
+        assertNull(controller.state.value.errorMessage)
+        controller.close()
+    }
+
+    @Test
+    fun deletingTheSameIdOnANewGatewayDoesNotWaitForTheOldGateway() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val first = ArchivingGateway(ConversationDeleteBehavior.Permanent, deleteStarted = started, deleteRelease = release)
+        val second = ArchivingGateway(ConversationDeleteBehavior.Permanent)
+        val gateways = ArrayDeque(listOf(first, second))
+        val controller = testController { gateways.removeFirst() }
+        controller.start()
+        runCurrent()
+        controller.deleteConversation("conv-1")
+        runCurrent()
+        assertTrue(started.isCompleted)
+        controller.retryConnection()
+        runCurrent()
+
+        controller.deleteConversation("conv-1")
+        runCurrent()
+        assertTrue("conv-1" in second.hidden)
+        release.complete(Unit)
+        runCurrent()
+        assertTrue("conv-1" !in controller.listed())
+        controller.close()
+    }
+
+    @Test
+    fun aDeleteFromAnOldGatewayCannotRemoveTheNewGatewayRow() = runTest {
+        val deleteStarted = CompletableDeferred<Unit>()
+        val deleteRelease = CompletableDeferred<Unit>()
+        val first = ArchivingGateway(ConversationDeleteBehavior.Permanent, deleteStarted = deleteStarted, deleteRelease = deleteRelease)
+        val second = ArchivingGateway(ConversationDeleteBehavior.Permanent)
+        val gateways = ArrayDeque(listOf(first, second))
+        val controller = testController { gateways.removeFirst() }
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-1")
+        runCurrent()
+        controller.deleteConversation("conv-1")
+        runCurrent()
+        assertTrue(deleteStarted.isCompleted)
+
+        controller.retryConnection()
+        runCurrent()
+        val before = controller.listed()
+        deleteRelease.complete(Unit)
+        runCurrent()
+
+        assertEquals(setOf("conv-1", "conv-2", "conv-3"), before.keys)
+        assertEquals(before, controller.listed())
+        controller.close()
+    }
 
     @Test
     fun anArchivingDeleteOffersAnUndoThatRestoresTheConversation() = runTest {

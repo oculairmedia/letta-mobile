@@ -1,10 +1,24 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
 package com.letta.mobile.desktop
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.shell.CurrentFocus
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.desktop.chat.initialLiveDesktopChatSurfaceState
 import com.letta.mobile.data.shell.ShellLink
 import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.data.shell.ShellSkillsSection
 import java.net.URI
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -52,6 +66,82 @@ class DesktopDeepLinkTest {
     }
 
     @Test
+    fun recreatingTheRoutingEffectDoesNotReplayAConsumedLink() = runComposeUiTest {
+        var mounted by mutableStateOf(true)
+        val requests = MutableStateFlow<DesktopDeepLinkRequest?>(DesktopDeepLinkRequest(1, URI("meridian://memory")))
+        var opens = 0
+        val handlers = DesktopDeepLinkHandlers(
+            onDestinationSelected = { opens++ },
+            onConversationSelected = {},
+            onAgentSelected = {},
+        )
+        setContent { if (mounted) DesktopDeepLinkEffect(requests, handlers) }
+        waitForIdle()
+        runOnIdle { mounted = false }
+        waitForIdle()
+        runOnIdle { mounted = true }
+        waitForIdle()
+        runOnIdle { assertEquals(1, opens) }
+    }
+
+    @Test
+    fun conversationLinkIsOneNavigationEntry() {
+        val destinations = mutableListOf<ShellDestination>()
+        val oldCallbacks = mutableListOf<String>()
+        val handlers = DesktopDeepLinkHandlers(
+            onDestinationSelected = { destinations.add(it) },
+            onConversationSelected = { oldCallbacks.add(it) },
+            onAgentSelected = { oldCallbacks.add(it) },
+        )
+        handleDesktopDeepLink(parseDesktopDeepLink(URI("meridian://conversation/missing")), handlers)
+        assertEquals(listOf<ShellDestination>(ShellDestination.Chat(conversationId = "missing")), destinations)
+        assertEquals(emptyList<String>(), oldCallbacks)
+    }
+
+    @Test
+    fun newestUnlistedLinkCannotBeReplacedByAnOlderCatalogRow() {
+        val workspace = ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        val handlers = DesktopDeepLinkHandlers(workspace::navigate, {}, {})
+        handleDesktopDeepLink(parseDesktopDeepLink(URI("meridian://conversation/older")), handlers)
+        handleDesktopDeepLink(parseDesktopDeepLink(URI("meridian://conversation/missing")), handlers)
+        val oldRow = DesktopConversationSummary(
+            id = "older", title = "Old", agentName = "A", updatedAtLabel = "2026-01-01T00:00:00Z",
+            lastMessagePreview = "", agentId = "agent-a",
+        )
+        val chat = initialLiveDesktopChatSurfaceState(defaultDesktopBootstrapState()).copy(
+            conversations = listOf(oldRow), connectionState = DesktopChatConnectionState.Live, isLoading = false,
+        )
+        val selected = mutableListOf<ConversationId>()
+
+        projectDesktopFocus(workspace, chat) { selected.add(it) }
+
+        assertEquals(ConversationId("missing"), workspace.currentFocus.conversationId)
+        assertEquals(listOf(ConversationId("missing")), selected)
+        workspace.selectFocus(CurrentFocus("chat", AgentId("agent-b")))
+        projectDesktopFocus(workspace, chat) { selected.add(it) }
+        assertEquals(AgentId("agent-b"), workspace.currentFocus.agentId)
+        assertNull(workspace.currentFocus.conversationId)
+        assertEquals(listOf(ConversationId("missing")), selected)
+    }
+
+    @Test
+    fun ownerSwitchWhileOldChatLoadsOpensNewTarget() {
+        val workspace = ShellWorkspaceState()
+        workspace.bindSource("test-source", 1)
+        workspace.selectFocus(CurrentFocus("chat", AgentId("agent-b"), ConversationId("new-chat"),
+            com.letta.mobile.data.shell.CurrentFocusChatMode.Exact))
+        val chat = initialLiveDesktopChatSurfaceState(defaultDesktopBootstrapState()).copy(
+            conversations = listOf(DesktopConversationSummary("new-chat", "New", "B", "2026-01-01T00:00:00Z", "", agentId = "agent-b")),
+            selectedConversationId = "old-chat", connectionState = DesktopChatConnectionState.Loading, isLoading = true,
+        )
+        val selected = mutableListOf<ConversationId>()
+        projectDesktopFocus(workspace, chat) { selected.add(it) }
+        assertEquals(listOf(ConversationId("new-chat")), selected)
+        assertEquals(ConversationId("new-chat"), workspace.currentFocus.conversationId)
+    }
+
+    @Test
     fun handlersRouteEachLinkKind() {
         val calls = mutableListOf<String>()
         val handlers = DesktopDeepLinkHandlers(
@@ -67,9 +157,8 @@ class DesktopDeepLinkTest {
         handleDesktopDeepLink(null, handlers)
         assertEquals(
             listOf(
-                "conversation:c1",
                 "destination:${ShellDestination.Chat(conversationId = "c1")}",
-                "agent:a1",
+                "destination:${ShellDestination.Chat(agentId = "a1")}",
                 "pair",
                 "destination:${ShellDestination.Settings(ShellSettingsSection.Pairing)}",
                 "destination:${ShellDestination.Memory()}",

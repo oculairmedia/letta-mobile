@@ -29,6 +29,9 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.shell.CurrentFocusRequest
+import com.letta.mobile.data.shell.FocusAvailability
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.conversationChanges
 import com.letta.mobile.data.repository.observeConversationInvalidations
@@ -76,6 +79,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
@@ -122,12 +126,7 @@ class DesktopChatController(
     private val _archiveFilter = MutableStateFlow(ConversationArchiveFilter.Active)
     val archiveFilter: StateFlow<ConversationArchiveFilter> = _archiveFilter.asStateFlow()
 
-    /**
-     * A freshly-created conversation the user hasn't sent anything to yet. We
-     * auto-remove it when they navigate away or spin up another, so accidental
-     * "New chat" taps don't spam the history. Cleared the moment a message is
-     * sent into it.
-     */
+    /** Unsent new chats are removed when abandoned; sending keeps them. */
     private var unsentConversationId: String? = null
 
     /** Locally-tracked archived conversation ids (durable; see constructor note). */
@@ -138,17 +137,10 @@ class DesktopChatController(
         onError = ::showPageError,
     )
 
-    /**
-     * letta-mobile-by4vm.97: the approval state the session port overlays on the timeline (answers
-     * in flight, queued offline, parked details) and whether the active gateway can answer at all.
-     */
+    /** Approval state and gateway support exposed to the session port. */
     val approvals: DesktopChatApprovalState = approvalCoordinator
 
-    /**
-     * letta-mobile folder-settings #2, by4vm.98: the SELECTED conversation's working directory, as
-     * the shared extension point the session port reads (null where the active gateway cannot
-     * report one: remote/HTTP backends). The shell re-reads it on a selection change.
-     */
+    /** The selected conversation's shared working directory, or null when the gateway cannot report it. */
     val workingDirectory = ChatWorkingDirectoryState(scope) {
         gateway.takeUnless { closed }.workingDirectoryTarget(_state.value.selectedConversation)
     }
@@ -160,27 +152,15 @@ class DesktopChatController(
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
 
-    /**
-     * letta-mobile-bzvro.31: the delete the shell offers to take back (an undo snackbar). Empty when
-     * nothing is pending, where delete is permanent, or once the backend changed. Only the latest
-     * delete can be undone.
-     */
+    /** The latest reversible delete, cleared when unavailable or the backend changes. */
     val deletionUndo = DesktopDeletionUndo()
 
     private val _deleteBehavior = MutableStateFlow(ConversationDeleteBehavior.Permanent)
 
-    /**
-     * What the active backend's delete really does (the bundled App Server has no delete command,
-     * Iroh only archives), observable so the confirm dialog's wording follows a reconnect.
-     */
+    /** Active delete behavior (Iroh archives); confirmation wording follows reconnects. */
     val deleteBehavior: StateFlow<ConversationDeleteBehavior> = _deleteBehavior.asStateFlow()
 
-    /**
-     * Conversation awaiting the agent's reply. Set the moment a prompt is sent
-     * and cleared once the agent's response starts landing (or on failure/
-     * timeout). Drives the "thinking" indicator — `isSending` alone is too brief
-     * because the reply streams in over a separate background subscription.
-     */
+    /** The conversation awaiting a streamed reply; cleared on reply, failure, or timeout. */
     private val _thinkingConversationId = MutableStateFlow<String?>(null)
     val thinkingConversationId: StateFlow<String?> = _thinkingConversationId.asStateFlow()
 
@@ -188,14 +168,7 @@ class DesktopChatController(
     // for a newer send in the same conversation.
     private var thinkingGeneration = 0
 
-    /**
-     * Conversation whose reply is actively streaming — set on send and cleared
-     * only when the send job (which suspends for the whole reply stream)
-     * completes, fails, or is cancelled. Unlike [thinkingConversationId], which
-     * clears the instant the first token lands, this survives the entire stream,
-     * so it (not "thinking") is the correct gate for revealing streamed text
-     * progressively in the message list.
-     */
+    /** The reply's conversation until the complete stream ends, unlike the shorter thinking phase. */
     private val _streamingConversationId = MutableStateFlow<String?>(null)
     val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
 
@@ -214,29 +187,13 @@ class DesktopChatController(
         telemetry = ChatRunInterruptTelemetry(TELEMETRY_TAG),
     )
 
-    /**
-     * letta-mobile-lgns8.19: conversation whose turn has an abort in flight.
-     * Set when the user presses stop and cleared ONLY when the turn's stream
-     * actually ends (the send job's finally, driven by the server's terminal
-     * frame) — never optimistically. While set, the composer refuses new sends,
-     * so a message can't be interleaved into a turn that is still running.
-     */
+    /** The aborting conversation; sends stay blocked until the stream actually ends. */
     val cancellingConversationId: StateFlow<String?> = interrupter.cancelling
 
-    /**
-     * The shared chat timeline presenter - the same one Android's ChatTimelineObserver uses
-     * (letta-mobile-2dsi5.1). Projection gives the desktop list the incremental tail cache,
-     * optimistic-twin dedup, A2UI history stripping, and no-change suppression; presentation
-     * derives streaming/typing with the same inputs Android passes, including the in-flight turn
-     * and the projection's own "a run is still active" fact. Stateful per bound conversation -
-     * reset on rebind in [selectRemoteConversation].
-     */
+    /** The shared timeline presenter is stateful per conversation and resets on rebind. */
     private val timelinePresenter = ChatTimelinePresenter()
 
-    /**
-     * The bound conversation's latest projection, kept so [replyPresence] can re-derive when the
-     * stream signal or selection changes without re-projecting. Reset on rebind.
-     */
+    /** Latest bound-conversation projection for re-deriving presence; reset on rebind. */
     private data class BoundProjection(
         val conversationId: String? = null,
         val projection: TimelineProjection? = null,
@@ -244,13 +201,7 @@ class DesktopChatController(
 
     private val _boundProjection = MutableStateFlow(BoundProjection())
 
-    /**
-     * The selected conversation's "agent is working" presence, derived by the
-     * SHARED [ChatStreamingPresencePolicy] — the same rules Android's chat uses —
-     * from the bound conversation's projection facts plus the active reply-stream
-     * signal. Desktop is server-mode only, so the client-mode / A2UI-thinking /
-     * duplicate-initial branches are inert here.
-     */
+    /** Shared streaming presence derived from the bound projection and active reply. */
     private val _replyPresence = MutableStateFlow(ChatStreamingPresence(isStreaming = false, isAgentTyping = false))
     val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
 
@@ -275,30 +226,17 @@ class DesktopChatController(
 
     // --- run phases (letta-mobile-8a3bz) --------------------------------------
 
-    /**
-     * What every conversation in this window is doing, as phases rather than booleans: reduced
-     * from the runtime's own events by the shared [RunPhaseReducer], not from this controller's
-     * timeline projection. The shell reads presence from here
-     * ([com.letta.mobile.data.presence.presenceByAgent]) — there is no desktop-only resolver any
-     * more, so a parked approval and a failed turn belong to the conversation they happened in
-     * rather than to whichever one is selected.
-     */
+    /** Per-conversation run phases, reduced from runtime events for shell presence. */
     val runs: StateFlow<Map<String, ConversationRunState>> = runRegistry.runs
 
     // `by lazy` so the presence collector above (which publishes into it) can never observe it
     // before construction reaches this line.
     private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }) }
 
-    /**
-     * The window's active-subagent list (letta-mobile-te3n1.1): a tool with subagents under it
-     * reads DELEGATING and a background dream makes its agent dream, through the shared publisher.
-     */
+    /** Publish active subagent and background-dream phases through the shared publisher. */
     internal fun publishSubagents(entries: List<com.letta.mobile.data.model.SubagentEntry>) = runPhases.publishSubagents(entries)
 
-    /**
-     * Streaming/typing for the selected conversation through the shared presenter, so desktop and
-     * Android agree on "Thinking…" and the cancel chrome, including across tool rounds.
-     */
+    /** Selected conversation streaming and typing through the shared presenter. */
     private fun derivePresence(
         projection: TimelineProjection?,
         turnInFlight: Boolean,
@@ -331,10 +269,7 @@ class DesktopChatController(
 
     private var gateway: DesktopChatGateway? = null
 
-    /**
-     * letta-mobile-by4vm.98.1: the chat's models (list, per-conversation picks and efforts, the
-     * switch) and the composer's model chip, the shared extension point the session port reads.
-     */
+    /** Model catalog, conversation picks, and reasoning efforts for the chat port. */
     val models = ConversationModels(scope, ModelHost(), agentByIdProvider)
 
     private inner class ModelHost : ConversationModelHost {
@@ -356,18 +291,10 @@ class DesktopChatController(
 
     /** Reconnecting re-reads the roster, preferring whatever the user was already looking at. */
     private suspend fun onTransportConnected() {
-        runCatching {
-            reloadConversationsAndSelect(
-                preferConversationId = _state.value.runtimeState.selectedConversationId,
-            )
-        }
+        runCatching { reloadConversationsAndSelect(preferConversationId = null) }
     }
 
-    /**
-     * An auth failure is terminal for the roster, so it reports as a load failure. Anything else is
-     * the stream dropping, which may still reconnect - and the status has to say which, or a blip
-     * and a dead connection read identically.
-     */
+    /** Auth failures terminate roster loading; other disconnects may reconnect. */
     private fun onTransportDisconnected(transportState: ChannelTransportState.Disconnected) {
         if (transportState.isAuthFailure) {
             _state.update { current ->
@@ -435,6 +362,9 @@ class DesktopChatController(
 
     private fun bindGateway(next: DesktopChatGateway?) {
         if (gateway !== next) {
+            _deletingConversationIds.value = emptySet()
+            pendingDeletes.clear()
+            unsentConversationId = null
             models.catalogLoader.reset()
             deletionUndo.backendChanged()
         }
@@ -446,8 +376,9 @@ class DesktopChatController(
         connectionWatcher.start(next)
     }
 
-    private val gatewayExtras: ChatGatewayExtras?
-        get() = gateway as? ChatGatewayExtras
+    private var selectionStillCurrent: () -> Boolean = { true }
+    internal var ownerAllowsSending: () -> Boolean = { true }
+    internal var workspaceOwner: ShellWorkspaceState? = null
     private var activeLoop: DesktopTimelineLoop? = null
     private var timelineJob: Job? = null
     private var loadJob: Job? = null
@@ -500,10 +431,7 @@ class DesktopChatController(
         start()
     }
 
-    /**
-     * The machine woke from sleep (letta-mobile-bzvro.4, F04): a connection that is down now is
-     * retried at once rather than after the sustained-outage window.
-     */
+    /** Retry a disconnected transport immediately when the machine wakes. */
     fun onSystemResumed() {
         if (closed) return
         connectionWatcher.onSystemResumed()
@@ -526,67 +454,169 @@ class DesktopChatController(
         bindGateway(null)
     }
 
-    /**
-     * Selects [conversationId]. Returns the remote-selection [Job] when a
-     * remote load (and timeline-loop rebinding) was kicked off, so callers
-     * that must not race the loop swap — e.g. notification replies — can
-     * await it; null when the selection was a no-op or local-only.
-     */
-    fun selectConversation(conversationId: String): Job? {
-        if (closed) return null
+    /** Select a known chat or resolve an explicit unlisted target. */
+    fun selectConversation(conversationId: String, allowUnlisted: Boolean = false, stillCurrent: () -> Boolean = { true }): Job? {
+        if (closed || !stillCurrent()) return null
+        val rebind = !selectionStillCurrent()
         cleanupUnsentConversation(except = conversationId)
+        if (allowUnlisted && _state.value.conversations.none { it.id == conversationId }) {
+            val id = ConversationId(conversationId)
+            resetSelectionSurface(id, stillCurrent)
+            return resolveUnlistedConversation(id, stillCurrent)
+        }
         var generation: Long? = null
         var shouldLoadRemote = false
         _state.update { current ->
             val currentRuntime = current.runtimeState
+            val candidate = if (rebind && currentRuntime.selectedConversationId == conversationId &&
+                currentRuntime.conversations.any { it.id == conversationId }) {
+                currentRuntime.copy(selectedConversationId = null)
+            } else currentRuntime
             val next = ChatSessionReducer.selectConversation(
-                state = currentRuntime,
+                state = candidate,
                 conversationId = conversationId,
                 remoteBacked = current.isRemoteBacked,
             )
-            shouldLoadRemote = current.isRemoteBacked && next != currentRuntime
-            generation = if (shouldLoadRemote) next.selectionGeneration else null
-            current.withRuntimeState(next)
+            val rebound = if (candidate !== currentRuntime && next.selectedConversationId == conversationId) {
+                next.copy(composer = currentRuntime.composer)
+            } else next
+            shouldLoadRemote = current.isRemoteBacked && rebound != currentRuntime
+            generation = if (shouldLoadRemote) rebound.selectionGeneration else null
+            current.withRuntimeState(rebound)
         }
-        if (!shouldLoadRemote) return null
+        if (!shouldLoadRemote) {
+            if (_state.value.selectedConversationId == conversationId) selectionStillCurrent = stillCurrent
+            return null
+        }
+        selectionStillCurrent = stillCurrent
         selectJob?.cancel()
         return scope.launch {
             selectRemoteConversation(conversationId, generation ?: return@launch)
         }.also { selectJob = it }
     }
 
+    /** Resolve an exact unlisted target only while its captured owner and gateway remain current. */
+    private fun resolveUnlistedConversation(id: ConversationId, stillCurrent: () -> Boolean): Job? {
+        if (id.value == com.letta.mobile.data.model.IdFormats.DEFAULT_CONVERSATION_ID || !stillCurrent()) return null
+        val source = gateway ?: return null
+        val owner = workspaceOwner
+        val token = owner?.requestToken()
+        selectJob?.cancel()
+        return scope.launch(start = CoroutineStart.LAZY) {
+            if (!lookupStillCurrent(source, owner, stillCurrent)) return@launch
+            val resolved = runCatchingCancellable { source.getConversation(id.value) }.getOrElse { error ->
+                if (lookupStillCurrent(source, owner, stillCurrent)) reportLookupFailure(owner, token, error, stillCurrent)
+                return@launch
+            }
+            finishUnlistedLookup(id, source, owner, token, stillCurrent, resolved)
+        }.also { job ->
+            selectJob = job
+            job.start()
+        }
+    }
+
+    private fun lookupStillCurrent(source: DesktopChatGateway, owner: ShellWorkspaceState?, check: () -> Boolean): Boolean =
+        !closed && gateway === source && workspaceOwner === owner && check()
+
+    private fun reportLookupFailure(
+        owner: ShellWorkspaceState?, token: CurrentFocusRequest?, error: Throwable, stillCurrent: () -> Boolean,
+    ) {
+        val missing = error is com.letta.mobile.data.timeline.TimelineTransportHttpException &&
+            error.code == io.ktor.http.HttpStatusCode.NotFound.value
+        if (missing && owner != null && (token == null ||
+            !owner.reportAvailability(token, conversation = FocusAvailability.Unavailable))) return
+        if (stillCurrent()) showError(
+            if (missing) "This conversation is unavailable." else "Could not load this conversation. Try again.",
+        )
+    }
+
+    private suspend fun finishUnlistedLookup(
+        id: ConversationId, source: DesktopChatGateway, owner: ShellWorkspaceState?, token: CurrentFocusRequest?,
+        stillCurrent: () -> Boolean, resolved: com.letta.mobile.data.model.Conversation,
+    ) {
+        if (!lookupStillCurrent(source, owner, stillCurrent) || resolved.id != id || resolved.agentId.value.isBlank()) return
+        if (owner != null && (token == null || !owner.completeFocus(token, id, resolved.agentId))) return
+        val rebound = owner?.requestToken()
+        val current = { lookupStillCurrent(source, owner) {
+            if (owner != null && rebound != null) owner.accepts(rebound) else stillCurrent()
+        } }
+        if (!current()) return
+        val row = listOf(resolved).toChatConversationSummaries().single()
+        val updated = _state.updateAndGet { state ->
+            if (!current() || state.selectedConversationId != id.value) state else state.copy(
+                conversations = listOf(row) + state.conversations.filterNot { it.id == id.value },
+                selectedConversationId = null,
+            )
+        }
+        if (!current() || updated.selectedConversationId != null || updated.conversations.none { it.id == id.value }) return
+        models.picks.seedFromHost(listOf(resolved))
+        selectJob = null
+        selectConversation(id.value, stillCurrent = current)?.join()
+    }
+
+    internal fun clearSelection(stillCurrent: () -> Boolean) = resetSelectionSurface(null, stillCurrent)
+
+    private fun resetSelectionSurface(target: ConversationId?, stillCurrent: () -> Boolean) {
+        if (closed || !stillCurrent()) return
+        val rebind = !selectionStillCurrent()
+        if (_state.value.selectedConversationId == target?.value && !rebind) return
+        selectionStillCurrent = stillCurrent
+        selectJob?.cancel()
+        timelineJob?.cancel()
+        closeActiveLoopAsync()
+        _canonicalPresentation.value = null
+        _boundProjection.value = BoundProjection()
+        _state.update { it.copy(selectedConversationId = target?.value, selectionGeneration = it.selectionGeneration + 1,
+            isLoading = false, isSending = false, errorMessage = null, composerText = "", pendingImageAttachments = emptyList()) }
+    }
+
     fun deleteConversation(conversationId: String) {
         if (closed) return
         if (conversationId == unsentConversationId) unsentConversationId = null
-        conversationManagement.delete(ConversationId(conversationId))
+        val source = gateway ?: return
+        val token = workspaceOwner?.requestToken()
+        ConversationManagement(scope, ListHost(source, deletionUndo.backendGeneration, token),
+            ConversationManagementPrefs(conversationPrefs.pins, conversationPrefs.lineage)).delete(ConversationId(conversationId))
     }
 
     /** Each delete in flight: the row it removes and the backend it started on, for the undo. */
     private val pendingDeletes = mutableMapOf<String, Pair<ChatConversationSummary?, Long>>()
 
-    /** The backend deleted [conversationId]: offer the undo, drop the row and, when it was open, move the chat on. */
+    /** The backend deleted [conversationId]: offer undo and retain an unavailable open target. */
     private suspend fun onConversationDeleted(conversationId: String, behavior: ConversationDeleteBehavior) {
         if (closed) return
         val (listed, startedOn) = pendingDeletes.remove(conversationId) ?: (null to deletionUndo.backendGeneration)
+        if (startedOn != deletionUndo.backendGeneration) return
         deletionUndo.offer(conversationId, listed, behavior, startedOn)
-        val wasSelected = _state.value.selectedConversationId == conversationId
-        _state.update { it.withRuntimeState(ChatSessionReducer.conversationDeleted(it.runtimeState, conversationId)) }
-        if (!wasSelected) return
+        if (behavior == ConversationDeleteBehavior.MovesToArchived) {
+            _state.update { current ->
+                current.copy(conversations = current.conversations.map { row ->
+                    if (row.id == conversationId) row.copy(archived = true) else row
+                })
+            }
+            return
+        }
+        var deletedGeneration: Long? = null
+        _state.update { current ->
+            val runtime = current.runtimeState
+            val removed = ChatSessionReducer.conversationDeleted(runtime, conversationId)
+            deletedGeneration = if (runtime.selectedConversationId == conversationId) runtime.selectionGeneration + 1 else null
+            current.withRuntimeState(deletedGeneration?.let { generation ->
+                removed.copy(
+                    selectedConversationId = conversationId, selectionGeneration = generation, isLoading = false, isSending = false,
+                    connectionState = if (removed.conversations.isEmpty()) ChatConnectionState.NoConversations
+                    else ChatConnectionState.Live, errorMessage = "This conversation is unavailable.",
+                )
+            } ?: removed)
+        }
+        if (deletedGeneration == null || _state.value.selectionGeneration != deletedGeneration) return
         sendJob?.cancel()
         if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
         timelineJob?.cancel()
         closeActiveLoopAsync()
-        val runtime = _state.value.runtimeState
-        runtime.selectedConversationId?.let { selectRemoteConversation(it, runtime.selectionGeneration) }
     }
 
-    /**
-     * letta-mobile-bzvro.31: brings back the conversation a delete removed, in the state it had
-     * before (a chat that was archived comes back archived), then re-reads the roster so it
-     * rejoins the list; if the roster cannot be read right now the row is put back as it was
-     * listed. The current selection is left alone. An offer from another backend is refused with
-     * a message rather than sent to the wrong one.
-     */
+    /** Restore the deleted chat and its archive state, only on the backend that deleted it. */
     fun undoDeleteConversation(offer: DesktopDeletionUndo.Offer) {
         if (closed) return
         deletionUndo.clear(offer.conversationId)
@@ -618,47 +648,39 @@ class DesktopChatController(
         }
     }
 
-    private fun showError(message: String) {
-        _state.update { it.copy(errorMessage = message) }
-    }
+    private fun showError(message: String) = _state.update { it.copy(errorMessage = message) }
 
-    /** Create a new conversation for the active agent and select it. */
-    fun createConversation() {
-        if (closed) return
-        val agentId = _state.value.selectedConversation?.agentId
-            ?: _state.value.conversations.firstOrNull()?.agentId
-        if (agentId.isNullOrBlank()) {
-            _state.update { it.copy(errorMessage = "Select an agent before starting a new chat.") }
-            return
-        }
-        createConversationForAgent(agentId)
-    }
-
-    /**
-     * Create and select a conversation for an EXPLICIT agent — used when the
-     * rail selects an agent that has no conversations yet (e.g. bulk-imported
-     * fleets), where selection can't go through an existing conversation.
-     */
-    fun createConversationForAgent(agentId: String, onCreated: (String) -> Unit = {}) {
-        if (closed) return
+    /** Create for an explicit agent; the callback decides whether the result is still current. */
+    fun createConversationForAgent(agentId: String, stillCurrent: () -> Boolean = { true }, onCreated: (String) -> Unit = {}) {
+        if (closed || !stillCurrent()) return
         if (agentId.isBlank()) return
+        val source = gateway ?: return
+        val creator = source as? ChatGatewayExtras ?: return
+        val generation = _state.value.selectionGeneration
+        val isCurrent = { !closed && gateway === source && stillCurrent() }
         createConversationJob?.cancel()
         createConversationJob = scope.launch {
             try {
+                if (!isCurrent()) return@launch
                 val priorUnsent = unsentConversationId
                 unsentConversationId = null
                 if (priorUnsent != null) {
-                    runCatching { gateway?.deleteConversation(priorUnsent) }
+                    runCatchingCancellable { source.deleteConversation(priorUnsent) }
                 }
-                val created = gatewayExtras?.createConversation(agentId) ?: return@launch
+                if (!isCurrent()) return@launch
+                val created = creator.createConversation(agentId)
+                if (!isCurrent()) return@launch
+                check(created.agentId.value == agentId) { "Created conversation belongs to another agent" }
+                models.picks.seedFromHost(listOf(created))
+                val row = listOf(created).toChatConversationSummaries().single()
+                _state.update { it.copy(conversations = listOf(row) + it.conversations.filterNot { item -> item.id == row.id }) }
                 unsentConversationId = created.id.value
-                reloadConversationsAndSelect(preferConversationId = created.id.value)
                 onCreated(created.id.value)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
-                _state.update {
-                    it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create chat")
+                if (isCurrent() && ChatSessionReducer.isCurrentSelection(_state.value.runtimeState, generation)) {
+                    _state.update { it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create chat") }
                 }
             }
         }
@@ -672,26 +694,29 @@ class DesktopChatController(
         scope.launch {
             runCatching { gw.deleteConversation(pending) }
                 .onSuccess {
-                    if (!closed) {
-                        _state.update {
-                            it.withRuntimeState(
-                                ChatSessionReducer.conversationDeleted(it.runtimeState, pending),
-                            )
+                    if (!closed && gateway === gw) {
+                        _state.update { current ->
+                            val before = current.runtimeState
+                            val removed = ChatSessionReducer.conversationDeleted(before, pending)
+                            val retained = if (before.selectedConversationId == pending) removed.copy(
+                                selectedConversationId = pending,
+                                selectionGeneration = before.selectionGeneration + 1,
+                                isLoading = false,
+                                isSending = false,
+                                errorMessage = "This conversation is unavailable.",
+                            ) else removed
+                            current.withRuntimeState(retained)
                         }
                     }
                 }
         }
     }
 
-    /**
-     * letta-mobile-ckmub.3.24: the shared agent editor's create on the desktop. Creates [params]'
-     * agent routed over the chat's model catalog (with a starting human and persona block when it
-     * brings none), opens its first conversation and selects it. Throws what the backend answered, so
-     * the editor shows it.
-     */
+    /** Create an agent and starting conversation with catalog routing; the owner decides whether to open it. */
     suspend fun createAgentAndOpen(params: AgentCreateParams): com.letta.mobile.data.agenteditor.AgentCreated {
-        val gw = gatewayExtras.takeUnless { closed } ?: error("Not connected to a backend")
-        val backend = ConversationModelBackend.of(gateway) ?: error("Not connected to a backend")
+        val source = gateway.takeUnless { closed } ?: error("Not connected to a backend")
+        val gw = source as? ChatGatewayExtras ?: error("Not connected to a backend")
+        val backend = ConversationModelBackend.of(source) ?: error("Not connected to a backend")
         val agentName = params.name?.ifBlank { null } ?: "New agent"
         val catalogModel = params.model?.let { models.catalogLoader.requireCatalogModel(backend, models.available.value, it) }
         val agent = gw.createAgent(
@@ -705,8 +730,13 @@ class DesktopChatController(
                 ),
             ).withCatalogModelRouting(catalogModel?.models.orEmpty()),
         )
+        if (closed || gateway !== source) throw CancellationException("Chat source changed")
         val conversation = gw.createConversation(agent.id.value)
-        reloadConversationsAndSelect(preferConversationId = conversation.id.value)
+        if (closed || gateway !== source) throw CancellationException("Chat source changed")
+        check(conversation.agentId == agent.id) { "Created conversation belongs to another agent" }
+        models.picks.seedFromHost(listOf(conversation))
+        val row = listOf(conversation).toChatConversationSummaries(mapOf(agent.id.value to agent.name)).single()
+        _state.update { it.copy(conversations = listOf(row) + it.conversations.filterNot { item -> item.id == row.id }) }
         return com.letta.mobile.data.agenteditor.AgentCreated(agent.id.value, conversation.id.value)
     }
 
@@ -716,11 +746,7 @@ class DesktopChatController(
         _archiveFilter.value = filter
     }
 
-    /**
-     * Archive (non-destructive, recoverable) or restore a conversation, then
-     * re-list so it leaves/joins the current filter view. Selection is preserved
-     * when the affected conversation isn't the one being archived away.
-     */
+    /** Archive or restore, then re-list without changing an unrelated selection. */
     fun setConversationArchived(conversationId: String, archived: Boolean) {
         if (closed) return
         conversationManagement.setArchived(ConversationId(conversationId), archived)
@@ -733,9 +759,15 @@ class DesktopChatController(
     /** letta-mobile-zxk2n.5: settled chats, markers, auto-pin and the chat's display options. */
     internal val conversationMarks = DesktopConversationMarks(conversationPrefs)
 
-    private inner class ListHost : ConversationListHost {
-        override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway
-        override val isClosed: Boolean get() = closed
+    private inner class ListHost(
+        private val deleteSource: DesktopChatGateway? = null,
+        private val deleteGeneration: Long = 0,
+        private val deleteToken: CurrentFocusRequest? = null,
+    ) : ConversationListHost {
+        private fun sourceMatches() = deleteSource == null ||
+            (deleteSource === this@DesktopChatController.gateway && deleteGeneration == deletionUndo.backendGeneration)
+        override val gateway: DesktopChatGateway? get() = deleteSource ?: this@DesktopChatController.gateway
+        override val isClosed: Boolean get() = closed || !sourceMatches()
 
         override val gatewayChanges get() = state.map { }
 
@@ -769,8 +801,13 @@ class DesktopChatController(
         }
 
         override suspend fun endDelete(conversation: ConversationId, behavior: ConversationDeleteBehavior?) {
+            if (!sourceMatches()) return
             try {
                 if (behavior != null) onConversationDeleted(conversation.value, behavior)
+                if (behavior != null && behavior != ConversationDeleteBehavior.MovesToArchived &&
+                    deleteToken?.exactConversation == conversation) {
+                    workspaceOwner?.reportAvailability(deleteToken, conversation = FocusAvailability.Unavailable)
+                }
             } finally {
                 pendingDeletes.remove(conversation.value)
                 _deletingConversationIds.update { it - conversation.value }
@@ -778,7 +815,7 @@ class DesktopChatController(
         }
 
         override fun showError(message: String) {
-            if (!closed) _state.update { it.copy(errorMessage = message) }
+            if (!isClosed) _state.update { it.copy(errorMessage = message) }
         }
 
         override fun listedTitle(conversation: ConversationId): String? =
@@ -842,26 +879,23 @@ class DesktopChatController(
         _state.update { it.withoutComposerError() }
     }
 
-    /**
-     * An error about the page (not the draft), such as a starter prompt that could not send. A
-     * closed controller no longer owns the surface, so it must not write to it.
-     */
+    /** A page error is not written after this controller closes. */
     private fun showPageError(message: String) {
         if (closed) return
         _state.update { it.copy(errorMessage = message) }
     }
 
-    /**
-     * Inline reply from a notification toast: select the target conversation
-     * and await the selection's remote load before sending.
-     */
-    fun replyFromNotification(conversationId: String, text: String) {
-        if (closed) return
+    /** Select a notification reply's target and await its load before sending. */
+    fun replyFromNotification(conversationId: String, text: String, stillCurrent: () -> Boolean = { true }) {
+        if (closed || !stillCurrent()) return
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        val generation = _state.value.selectionGeneration
         scope.launch {
-            val selection = selectConversation(conversationId)
+            if (!stillCurrent() || !ChatSessionReducer.isCurrentSelection(_state.value.runtimeState, generation)) return@launch
+            val selection = selectConversation(conversationId, stillCurrent = stillCurrent)
             withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS.milliseconds) { selection?.join() }
+            if (!stillCurrent() || _state.value.selectedConversationId != conversationId) return@launch
             updateComposerText(trimmed)
             send()
         }
@@ -902,7 +936,7 @@ class DesktopChatController(
     }
 
     fun send() {
-        if (closed) return
+        if (!isSelectionCurrent()) return
         _state.update { it.withoutComposerError() }
         if (stopBlocksSend()) {
             showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
@@ -918,7 +952,7 @@ class DesktopChatController(
      * again"), through the same route as [send]. A send that cannot start says so on the page.
      */
     fun sendText(text: String) {
-        if (closed || text.isBlank()) return
+        if (!isSelectionCurrent() || text.isBlank()) return
         if (stopBlocksSend()) {
             showPageError(STOPPING_SEND_BLOCKED_MESSAGE)
             return
@@ -926,6 +960,14 @@ class DesktopChatController(
         val draft = ChatComposerSendDraft(text = text.trim(), attachments = emptyList(), nextState = _state.value.composer)
         dispatchSend(draft, onRefused = ::showPageError, onNotConnected = { showPageError(SEND_NOT_CONNECTED_MESSAGE) })
     }
+
+    internal fun isSelectionCurrent(): Boolean = !closed && selectionStillCurrent() && ownerAllowsSending()
+    internal fun isTargetCurrent(): Boolean = !closed && selectionStillCurrent() &&
+        workspaceOwner?.selectedConversationId?.value == _state.value.selectedConversationId
+    internal fun canEditDraft(): Boolean = isSelectionCurrent() ||
+        (!closed && selectionStillCurrent() && _state.value.selectedConversationId == null &&
+            workspaceOwner?.currentFocus?.chatMode == com.letta.mobile.data.shell.CurrentFocusChatMode.New &&
+            workspaceOwner?.page?.kind == com.letta.mobile.data.shell.ShellPageKind.Chat)
 
     private fun stopBlocksSend(): Boolean {
         val cancelling = cancellingConversationId.value ?: return false
@@ -953,17 +995,7 @@ class DesktopChatController(
         launchRemoteSend(loop, draft)
     }
 
-    /**
-     * Sends through the shared [com.letta.mobile.data.chat.send.ChatSendCoordinator], the same
-     * orchestration Android uses. The optimistic bubble, otid reconciliation and turn lifecycle all
-     * land in the canonical ledger the paginated list is already reading, so there is no second
-     * durable copy of the conversation and no second send path to keep in agreement with this one.
-     */
-    /**
-     * The shared send coordinator serving the selected conversation, resolved by the same routing
-     * the presentation used, so the send and the history it lands beside are indexed against one
-     * transport. Null off the canonical route.
-     */
+    /** The shared send coordinator uses the selected conversation's canonical presentation transport. */
     private fun selectedCanonicalCoordinator(): com.letta.mobile.data.chat.send.ChatSendCoordinator? {
         val conversationId = _state.value.selectedConversationId
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return null
@@ -1094,17 +1126,18 @@ class DesktopChatController(
     private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
         val nextGateway = gateway ?: return
         val summaries = loadConversationSummaries(nextGateway)
-        if (closed) return
-        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
-            state = _state.value.runtimeState,
-            conversations = summaries,
-        )
-        _state.update { it.withRuntimeState(loadedRuntime) }
+        if (closed || gateway !== nextGateway) return
+        val loadedRuntime = _state.updateAndGet { current ->
+            val beforeLoad = current.runtimeState
+            val loaded = ChatSessionReducer.conversationsLoaded(beforeLoad, summaries)
+            current.withRuntimeState(if (preferConversationId != null) loaded else loaded.copy(
+                selectedConversationId = beforeLoad.selectedConversationId, selectionGeneration = beforeLoad.selectionGeneration,
+                composer = beforeLoad.composer, messagesByConversationId = beforeLoad.messagesByConversationId))
+        }.runtimeState
         val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
             ?: loadedRuntime.selectedConversationId
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
-
     private suspend fun loadConversationSummaries(
         nextGateway: DesktopChatGateway,
         dirty: Map<ConversationId, AgentId?>? = null,
@@ -1120,12 +1153,7 @@ class DesktopChatController(
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
     }
 
-    /**
-     * Re-reads the roster WITHOUT reloading the session: the list is merged through
-     * [ChatSessionReducer.conversationRosterRefreshed], so the selection, its timeline loop and the
-     * composer draft are untouched. Only an empty session (nothing selected yet) takes the full load
-     * path, because then there is no selection to preserve and the first conversation should open.
-     */
+    /** Refresh the catalog without selecting a chat or disturbing its active timeline. */
     private suspend fun refreshConversationRoster(dirty: Map<ConversationId, AgentId?>? = null): Boolean {
         val nextGateway = gateway?.takeUnless { closed } ?: return false
         val runtime = _state.value.runtimeState
@@ -1134,39 +1162,22 @@ class DesktopChatController(
         val summaries = loadConversationSummaries(nextGateway, dirty).filterNot { it.id in deleting }
         if (closed || gateway !== nextGateway) return false
         mergeConversationRoster(summaries)
-        if (runtime.selectedConversationId == null) {
-            // The shared reducer chose the anchor (home first) while merging; open that one.
-            _state.value.runtimeState.selectedConversationId?.let { selectRemoteConversation(it, _state.value.selectionGeneration) }
-        }
         return true
     }
 
     private fun mergeConversationRoster(summaries: List<ChatConversationSummary>) {
         _state.update { current ->
-            val next = if (current.runtimeState.selectedConversationId == null) {
-                ChatSessionReducer.conversationsLoaded(current.runtimeState, summaries)
-            } else {
-                ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries)
-            }
-            current.withRuntimeState(next)
+            val next = ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries)
+            val populated = next.connectionState == ChatConnectionState.NoConversations && summaries.isNotEmpty()
+            current.withRuntimeState(if (populated) next.copy(connectionState = ChatConnectionState.Live, statusMessage = "Live") else next)
         }
     }
 
-    /**
-     * Installed by the canonical host on Iroh backends; null keeps the in-memory timeline loop.
-     *
-     * The request carries the transport because per-conversation routing lives here, not in the
-     * host: a default-shim conversation is served by a different transport than the gateway, and a
-     * canonical ledger opened against the wrong one would index another conversation's history.
-     */
+    /** The canonical opener receives the target-specific transport; null keeps the in-memory loop. */
     var canonicalOpen: (suspend (DesktopCanonicalOpenRequest) -> com.letta.mobile.data.timeline.CanonicalTimelinePresentation)? = null
     var canonicalEligible: (String) -> Boolean = { false }
 
-    /**
-     * Resolves the shared send coordinator for an agent. Installed alongside [canonicalOpen]: a
-     * canonical route without it can render history but cannot send, which is a state the host must
-     * not be able to produce by accident.
-     */
+    /** The canonical host supplies the matching send coordinator alongside its opener. */
     var canonicalSendFor: (
         (agentId: String, transport: com.letta.mobile.data.timeline.TimelineTransport) ->
         com.letta.mobile.data.chat.send.ChatSendCoordinator
@@ -1175,11 +1186,7 @@ class DesktopChatController(
     /** The turn-indicator and error state the shared send coordinator is allowed to move. */
     internal val sendSurface: DesktopChatSendSurface = ControllerSendSurface()
 
-    /**
-     * Named rather than an anonymous object in a property initializer: this is the whole contract
-     * the shared coordinator drives the desktop UI through, and it belongs in a declaration that can
-     * be read on its own.
-     */
+    /** The shared send coordinator's desktop state binding. */
     private inner class ControllerSendSurface : DesktopChatSendSurface {
         override fun currentError(): String? = _state.value.errorMessage
         override fun setError(message: String?) {
@@ -1201,11 +1208,7 @@ class DesktopChatController(
     @Volatile internal var liveReply: Pair<String, List<com.letta.mobile.data.chat.projection.ChatRenderItem>>? = null
         private set
 
-    /**
-     * letta-mobile-1n5py, by4vm.98.2: the selected conversation's send queue, the shared extension
-     * point the session port reads; re-resolved when the selection or the canonical route changes.
-     * Only the canonical route queues a send during a run.
-     */
+    /** The selected canonical conversation's send queue, re-resolved as selection changes. */
     val sendQueue: ChatSendQueueSource = CoordinatorSendQueue(
         targets = combine(canonicalPresentation, state.map { it.selectedConversationId }.distinctUntilChanged()) { _, _ ->
             selectedQueueTarget()
@@ -1322,10 +1325,10 @@ class DesktopChatController(
     }
 
     private fun isActiveSelection(generation: Long): Boolean =
-        !closed && ChatSessionReducer.isCurrentSelection(_state.value.runtimeState, generation)
+        !closed && selectionStillCurrent() && ChatSessionReducer.isCurrentSelection(_state.value.runtimeState, generation)
 
     private fun updateTimelineMessages(conversationId: String, generation: Long, timeline: Timeline) {
-        if (closed) return
+        if (!isActiveSelection(generation)) return
         val projection = timelinePresenter.project(
             timeline = timeline,
             prefix = timelinePresenter.olderPrefixFor(conversationId),
