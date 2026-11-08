@@ -22,7 +22,7 @@ class ShellWorkspaceSearch(
 /**
  * What a host whose navigation is the shared [ShellWorkspaceNavigator] gives the header: the
  * sidebar's [layout], the header [search], and how an open tab is titled ([tabFor] a conversation
- * id; null drops the tab until the conversation is known).
+ * id; null keeps the tab with a generic title until the conversation is known).
  */
 class ShellWorkspaceHeaderBinding(
     val navigator: ShellWorkspaceNavigator,
@@ -50,10 +50,10 @@ fun rememberShellWorkspaceHeader(binding: ShellWorkspaceHeaderBinding): ShellWor
             onOpen = { hit -> navigator.openSearchHit(hit) },
         ),
         tabs = ShellConversationTabs(
-            tabs = state.tabs.openConversationIds.mapNotNull { id ->
-                binding.tabFor(id)?.copy(isTransient = id == state.tabs.transientConversationId)
+            tabs = state.tabs.openConversationIds.map { id ->
+                (binding.tabFor(id) ?: LettaTab(id, "Chat")).copy(isTransient = id == state.tabs.transientConversationId)
             },
-            activeKey = state.selectedConversationId?.value,
+            activeKey = state.currentFocus.conversationId?.value,
             actions = navigator.tabStripActions(),
         ),
     )

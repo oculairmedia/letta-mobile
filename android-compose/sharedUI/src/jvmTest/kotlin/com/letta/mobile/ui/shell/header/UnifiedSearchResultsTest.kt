@@ -144,7 +144,9 @@ class UnifiedSearchResultsTest {
         }
         waitForIdle()
         assertEquals(emptyList(), reads, "unresolved roster membership must not widen the read")
-        assertEquals("late-recent", owner?.selectedTarget()?.conversationId, "the fetched row already opens the chat")
+        assertEquals(null, owner?.selectedTarget(), "loading rows cannot choose the workspace chat")
+        assertEquals(agent, workspace.currentFocus.agentId)
+        assertEquals(null, workspace.currentFocus.conversationId)
         runOnIdle { agents.value = listOf(Agent(agent, name = "Late agent")) }
         waitForIdle()
         assertEquals(listOf(agent), reads, "the focused visible agent must load after directory arrival")

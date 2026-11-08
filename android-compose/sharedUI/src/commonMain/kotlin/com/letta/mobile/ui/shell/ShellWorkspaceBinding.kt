@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.shell
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.avatar.core.model.MascotIdentity
@@ -12,6 +11,10 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.CurrentFocusSnapshot
+import com.letta.mobile.data.serialization.LettaJson
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import com.letta.mobile.data.shell.ShellRoute
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
@@ -39,39 +42,53 @@ fun rememberShellWorkspaceState(initialPage: ShellDestination): ShellWorkspaceSt
  * than to the roster's first agent.
  */
 internal val ShellWorkspaceSaver = Saver<ShellWorkspaceState, String>(
-    save = { (if (it.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + it.route },
+    save = { state ->
+        val snapshot = state.snapshotOrPending()
+        if (snapshot != null) {
+            SNAPSHOT_PREFIX + LettaJson.persisted.encodeToString(snapshot)
+        } else {
+            (if (state.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + state.route
+        }
+    },
     restore = { saved ->
-        val page = ShellRoute.decode(saved.drop(1)) ?: ShellDestination.Home
-        ShellWorkspaceState(page).apply { railExpanded = saved.startsWith(RAIL_EXPANDED) }
+        if (saved.startsWith(SNAPSHOT_PREFIX)) {
+            val json = saved.removePrefix(SNAPSHOT_PREFIX)
+            val snapshot = try {
+                LettaJson.persisted.decodeFromString<CurrentFocusSnapshot>(json)
+            } catch (_: Exception) { null }
+            if (snapshot != null) {
+                ShellWorkspaceState(ShellDestination.Home).apply {
+                    holdPending(snapshot)
+                }
+            } else {
+                ShellWorkspaceState(ShellDestination.Home)
+            }
+        } else {
+            val page = ShellRoute.decode(saved.drop(1)) ?: ShellDestination.Home
+            ShellWorkspaceState(page).apply { railExpanded = saved.startsWith(RAIL_EXPANDED) }
+        }
     },
 )
+
+private const val SNAPSHOT_PREFIX = "@"
 
 private const val RAIL_EXPANDED = "+"
 private const val RAIL_COLLAPSED = "-"
 
-/** What a host's chat shows, as [SyncShellWorkspace] reports it to the workspace. */
+/** Legacy host chat emission, retained while host bindings migrate to request tokens. */
 data class ShellChatSelection(
-    /** The session the chat runs over; a new one resets the workspace ([ShellWorkspaceState.sessionChanged]). */
+    /** The session the chat runs over. Source binding is the host's responsibility. */
     val session: String,
     val conversation: ConversationId?,
     val agent: AgentId?,
-    /** The chat's conversations once its backend has reported them authoritatively; null until then. */
+    /** The host's reported conversations; this legacy emission does not prune workspace tabs. */
     val reported: Set<ConversationId>?,
 )
 
-/**
- * Keeps [workspace] in step with the host's chat: a new session resets it, the shown conversation is
- * its agent's last active one and gets a tab while the chat is the page, and once the conversations
- * are reported, gone ones lose their tabs.
- */
+/** Legacy chat emissions carry no request token and cannot change workspace selection. */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-fun SyncShellWorkspace(workspace: ShellWorkspaceState, selection: ShellChatSelection) {
-    LaunchedEffect(workspace, selection.session) { workspace.sessionChanged(selection.session) }
-    LaunchedEffect(workspace, workspace.page.kind, selection.conversation, selection.agent) {
-        workspace.conversationShown(selection.conversation, selection.agent)
-    }
-    LaunchedEffect(workspace, selection.reported) { selection.reported?.let(workspace::conversationsReported) }
-}
+fun SyncShellWorkspace(workspace: ShellWorkspaceState, selection: ShellChatSelection) = Unit
 
 /**
  * The shared navigation drawer's input over the workspace and its roster [agents] as (id, name):
@@ -83,16 +100,17 @@ fun ShellWorkspaceState.navDrawerInput(
     conversations: ShellDrawerConversations = ShellDrawerConversations(),
     library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellNavDrawerInput {
-    val focusedIndex = agents.indexOfFirst { it.first == focusedAgentId?.value }
+    val focus = currentFocus
+    val focusedIndex = agents.indexOfFirst { it.first == focus.agentId?.value }
     return ShellNavDrawerInput(
         agent = ShellPanelAgent(
             name = agents.getOrNull(focusedIndex)?.second ?: "Letta",
             orbIndex = focusedIndex.coerceAtLeast(0),
-            agentId = focusedAgentId?.value?.takeIf { focusedIndex >= 0 },
+            agentId = focus.agentId?.value,
         ),
         agents = agents,
         recentAgentsPolicy = RecentAgentsPolicy(maxAgents = agents.size.coerceAtLeast(1), fillToCap = true),
-        openConversationId = selectedConversationId?.value,
+        openConversationId = focus.conversationId?.value,
         conversations = conversations.conversations,
         archiveFilter = conversations.archiveFilter,
         pinnedConversationIds = conversations.pinnedIds,

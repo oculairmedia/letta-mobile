@@ -36,7 +36,7 @@ fun ShellWorkspaceState.workspaceNavigation(
     workspaceNavigation(
         agents = agents,
         now = now,
-        conversations = conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations(),
+        conversations = conversations?.drawer(currentFocus.agentId) ?: ShellDrawerConversations(),
         library = ShellDrawerLibrary(
             identities = identities,
             pinnedAgentIds = conversations?.pinnedAgentIds.orEmpty(),
@@ -61,7 +61,7 @@ fun ShellWorkspaceState.workspaceNavigation(
         rail = ShellLibraryRailState(
             agents = ordered,
             focus = ShellRailFocus(
-                selectedAgentId = focusedAgentId?.value,
+                selectedAgentId = currentFocus.agentId?.value,
                 identityByAgentId = identities,
                 pinnedAgentIds = library.pinnedAgentIds,
             ),

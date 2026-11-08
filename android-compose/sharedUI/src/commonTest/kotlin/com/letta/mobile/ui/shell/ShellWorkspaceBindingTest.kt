@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell
 
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellChatPort
@@ -78,6 +79,39 @@ class ShellWorkspaceBindingTest {
     }
 
     @Test
+    fun recreationKeepsTheWholeSourceBoundWorkspaceUnderAnEditor() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat()).apply {
+            bindSource("source-a", 7)
+            navigate(ShellDestination.Chat("agent-3", "conv-9"))
+            tabs = ConversationTabsState(listOf("conv-1", "conv-2"), "conv-9")
+            railExpanded = true
+            navigate(ShellDestination.AgentEditor("agent-2"))
+        }
+
+        val restored = recreated(workspace)
+        restored.bindSource("source-a", 7)
+
+        assertEquals("source-a", restored.sourceKey)
+        assertEquals(workspace.snapshot(), restored.snapshot())
+        assertEquals(ShellDestination.Chat("agent-3", "conv-9"), restored.pageFor(null, null))
+        assertEquals(ShellDestination.AgentEditor("agent-2"), restored.agentEditor)
+    }
+
+    @Test
+    fun recreationKeepsTheNewAgentEditorAboveTheSameChat() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat("agent-3", "conv-9")).apply {
+            bindSource("source-a", 7)
+            openNewAgent()
+        }
+        val restored = recreated(workspace)
+        restored.bindSource("source-a", 7)
+        assertEquals("source-a", restored.sourceKey)
+        assertEquals(workspace.snapshot(), restored.snapshot())
+        assertEquals(ShellDestination.AgentEditor(), restored.agentEditor)
+        assertEquals(ShellDestination.Chat("agent-3", "conv-9"), restored.pageFor(null, null))
+    }
+
+    @Test
     fun aRecreationKeepsTheRailWidthAndAnOtherPage() {
         val workspace = ShellWorkspaceState(ShellDestination.Home)
         workspace.railExpanded = true
@@ -103,6 +137,15 @@ class ShellWorkspaceBindingTest {
         val drawer = workspace.navDrawerState(emptyList(), now)
         assertEquals("Letta", drawer.panel.agent.name)
         assertFalse(drawer.panel.home)
+    }
+
+    @Test
+    fun missingRosterKeepsTheRequestedAgentInThePanel() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat("agent-3"))
+        val drawer = workspace.navDrawerState(emptyList(), now)
+
+        assertEquals("agent-3", drawer.panel.agent.agentId)
+        assertEquals("Letta", drawer.panel.agent.name)
     }
 
     private object NoChat : ShellChatPort {
