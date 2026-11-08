@@ -100,7 +100,6 @@ class TimelineConversations(
 
     /** Who waits for the chat being made (or found): every caller gets it, not only the first. */
     private val waitingForChat = mutableListOf<(ConversationId) -> Unit>()
-    private var failedInitialRoute: ConversationId? = null
 
     init {
         scope.launch { refresh() }
@@ -130,13 +129,11 @@ class TimelineConversations(
 
     override val selectedConversation: ConversationId? get() = mutableState.value.selected
 
-    override fun selectConversation(conversation: ConversationId) = selectConversation(conversation) {}
-
-    private fun selectConversation(conversation: ConversationId, onMissing: () -> Unit) {
+    override fun selectConversation(conversation: ConversationId) {
         mutableState.update { it.copy(selected = conversation) }
         scope.launch {
             val row = mutableState.readSelectedConversation(gateway, conversation)
-            if (row == null) onMissing() else lists.focusAgent(row.agentId)
+            if (row != null) lists.focusAgent(row.agentId)
         }
     }
 
@@ -156,29 +153,21 @@ class TimelineConversations(
 
     /**
      * Opens the first chat once the list has loaded and nothing is selected: [routed] (a reload or
-     * a link) while it is listed, else [focused]'s chat, made when [createIfNone] (the chat is the page).
+     * a link), else [focused]'s chat, made when [createIfNone] (the chat is the page).
      */
     fun openInitial(routed: ConversationId?, focused: AgentId?, createIfNone: Boolean) {
         val current = mutableState.value
         if (!current.awaitsFirstChat) return
-        val unlistedRoute = current.unlistedRoute(routed, failedInitialRoute, lists.legacyMode)
-        if (unlistedRoute != null) {
-            selectConversation(unlistedRoute) { initialRouteFailed(unlistedRoute, focused, createIfNone) }
+        if (routed != null) {
+            selectConversation(routed)
             return
         }
-        val first = current.listed(routed) ?: focused?.let(current::activeChatOf)
+        val first = focused?.let(current::activeChatOf)
         if (first != null) {
             selectConversation(first)
             return
         }
         if (focused != null && current.mayCreate(createIfNone)) createConversationForAgent(focused)
-    }
-
-    private fun initialRouteFailed(route: ConversationId, focused: AgentId?, createIfNone: Boolean) {
-        if (mutableState.value.selected != route) return
-        failedInitialRoute = route
-        mutableState.update { it.copy(selected = null, error = if (focused == null) it.error else null) }
-        openInitial(null, focused, createIfNone)
     }
 
     override fun send(conversation: ConversationId, text: String) {
@@ -264,7 +253,12 @@ class TimelineConversations(
 
         override suspend fun endDelete(conversation: ConversationId, behavior: ConversationDeleteBehavior?) {
             mutableState.update { current ->
-                if (behavior == null) current.copy(deleting = current.deleting - conversation) else current.without(conversation)
+                when {
+                    behavior == null -> current.copy(deleting = current.deleting - conversation)
+                    behavior == ConversationDeleteBehavior.MovesToArchived && current.selected == conversation ->
+                        current.edit(conversation) { it.copy(archived = true) }.copy(deleting = current.deleting - conversation)
+                    else -> current.without(conversation)
+                }
             }
         }
 
