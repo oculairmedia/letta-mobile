@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell
 
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellChatPort
@@ -75,6 +76,39 @@ class ShellWorkspaceBindingTest {
         assertEquals(AgentId("agent-3"), restored.focusedAgentId, "rotation must not fall back to the roster's first agent")
         assertEquals(ConversationId("conv-9"), restored.selectedConversationId)
         assertEquals(ShellDestination.Chat("agent-3", "conv-9"), restored.destination)
+    }
+
+    @Test
+    fun recreationKeepsTheWholeSourceBoundWorkspaceUnderAnEditor() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat()).apply {
+            bindSource("source-a", 7)
+            navigate(ShellDestination.Chat("agent-3", "conv-9"))
+            tabs = ConversationTabsState(listOf("conv-1", "conv-2"), "conv-9")
+            railExpanded = true
+            navigate(ShellDestination.AgentEditor("agent-2"))
+        }
+
+        val restored = recreated(workspace)
+        restored.bindSource("source-a", 7)
+
+        assertEquals("source-a", restored.sourceKey)
+        assertEquals(workspace.snapshot(), restored.snapshot())
+        assertEquals(ShellDestination.Chat("agent-3", "conv-9"), restored.pageFor(null, null))
+        assertEquals(ShellDestination.AgentEditor("agent-2"), restored.agentEditor)
+    }
+
+    @Test
+    fun recreationKeepsTheNewAgentEditorAboveTheSameChat() {
+        val workspace = ShellWorkspaceState(ShellDestination.Chat("agent-3", "conv-9")).apply {
+            bindSource("source-a", 7)
+            openNewAgent()
+        }
+        val restored = recreated(workspace)
+        restored.bindSource("source-a", 7)
+        assertEquals("source-a", restored.sourceKey)
+        assertEquals(workspace.snapshot(), restored.snapshot())
+        assertEquals(ShellDestination.AgentEditor(), restored.agentEditor)
+        assertEquals(ShellDestination.Chat("agent-3", "conv-9"), restored.pageFor(null, null))
     }
 
     @Test

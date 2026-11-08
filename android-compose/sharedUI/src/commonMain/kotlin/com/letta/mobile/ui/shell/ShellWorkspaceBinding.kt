@@ -11,6 +11,10 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.CurrentFocusSnapshot
+import com.letta.mobile.data.serialization.LettaJson
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import com.letta.mobile.data.shell.ShellRoute
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
@@ -38,12 +42,35 @@ fun rememberShellWorkspaceState(initialPage: ShellDestination): ShellWorkspaceSt
  * than to the roster's first agent.
  */
 internal val ShellWorkspaceSaver = Saver<ShellWorkspaceState, String>(
-    save = { (if (it.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + it.route },
+    save = { state ->
+        val snapshot = state.snapshotOrPending()
+        if (snapshot != null) {
+            SNAPSHOT_PREFIX + LettaJson.persisted.encodeToString(snapshot)
+        } else {
+            (if (state.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + state.route
+        }
+    },
     restore = { saved ->
-        val page = ShellRoute.decode(saved.drop(1)) ?: ShellDestination.Home
-        ShellWorkspaceState(page).apply { railExpanded = saved.startsWith(RAIL_EXPANDED) }
+        if (saved.startsWith(SNAPSHOT_PREFIX)) {
+            val json = saved.removePrefix(SNAPSHOT_PREFIX)
+            val snapshot = try {
+                LettaJson.persisted.decodeFromString<CurrentFocusSnapshot>(json)
+            } catch (_: Exception) { null }
+            if (snapshot != null) {
+                ShellWorkspaceState(ShellDestination.Home).apply {
+                    holdPending(snapshot)
+                }
+            } else {
+                ShellWorkspaceState(ShellDestination.Home)
+            }
+        } else {
+            val page = ShellRoute.decode(saved.drop(1)) ?: ShellDestination.Home
+            ShellWorkspaceState(page).apply { railExpanded = saved.startsWith(RAIL_EXPANDED) }
+        }
     },
 )
+
+private const val SNAPSHOT_PREFIX = "@"
 
 private const val RAIL_EXPANDED = "+"
 private const val RAIL_COLLAPSED = "-"
