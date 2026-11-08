@@ -34,7 +34,6 @@ class ChatSessionInitializerTest {
         advanceUntilIdle()
 
         assertEquals("No agent selected", harness.uiState.value.error)
-        assertFalse(harness.observedLastSelection)
         assertFalse(harness.seededAgentName)
         assertFalse(harness.observedAgentName)
         verify(exactly = 0) { harness.runExpansionState.hydrateUiState() }
@@ -62,32 +61,30 @@ class ChatSessionInitializerTest {
     }
 
     @Test
-    fun `fresh non-explicit route resumes recent conversation when feature flag is enabled`() = runTest {
+    fun `initializer cannot clear visibility or independently resume a conversation`() = runTest {
         val harness = Harness(
             scope = this,
-            isFreshRoute = true,
-            explicitNewChat = false,
             resumeRecentEnabled = true,
         )
         coEvery {
             harness.sessionResolver.resolveMostRecentConversation("agent-1", 123L)
         } returns "conv-recent"
 
+        harness.currentConversationTracker.setCurrent("owner-visible")
         harness.initializer.run()
         advanceUntilIdle()
 
-        assertEquals(null, harness.currentConversationTracker.current)
-        coVerify(exactly = 1) {
+        assertEquals("owner-visible", harness.currentConversationTracker.current)
+        assertEquals(1, harness.resolveRequests)
+        coVerify(exactly = 0) {
             harness.sessionResolver.resolveMostRecentConversation("agent-1", 123L)
         }
-        verify(exactly = 1) { harness.conversationCoordinator.setActiveConversationId("conv-recent") }
+        verify(exactly = 0) { harness.conversationCoordinator.setActiveConversationId(any()) }
     }
 
     private class Harness(
         scope: kotlinx.coroutines.CoroutineScope,
         val agentId: String = "agent-1",
-        val isFreshRoute: Boolean = false,
-        val explicitNewChat: Boolean = false,
         val projectContext: ProjectChatContext? = null,
         resumeRecentEnabled: Boolean? = null,
     ) {
@@ -99,7 +96,6 @@ class ChatSessionInitializerTest {
         val bannerController = ChatBannerController(uiState, ChatComposerController())
         val currentConversationTracker = CurrentConversationTracker()
         var refreshedAgentsCount = 0
-        var observedLastSelection = false
         var seededAgentName = false
         var observedAgentName = false
         var loadProjectAgentsCount = 0
@@ -110,24 +106,22 @@ class ChatSessionInitializerTest {
         val initializer = ChatSessionInitializer(
             scope = scope,
             agentId = agentId,
-            isFreshRoute = isFreshRoute,
-            explicitNewChat = explicitNewChat,
-            resumeCacheMaxAgeMs = 123L,
-            projectContext = projectContext,
             settingsRepository = settingsRepository,
-            sessionResolver = sessionResolver,
-            conversationCoordinator = conversationCoordinator,
-            runExpansionState = runExpansionState,
-            currentConversationTracker = currentConversationTracker,
             bannerController = bannerController,
+            runExpansionState = runExpansionState,
             refreshAvailableAgents = { refreshedAgentsCount++ },
-            observeLastChatSelection = { observedLastSelection = true },
-            seedAgentNameFromMemoryCache = { seededAgentName = true },
-            observeAgentNameCache = { observedAgentName = true },
-            loadProjectAgents = { loadProjectAgentsCount++ },
-            loadProjectBrief = { loadProjectBriefCount++ },
-            loadRecentBugReports = { loadRecentBugReportsCount++ },
-            resolveConversationAndLoad = { resolveRequests++ },
+            prepareChat = {
+                seededAgentName = true
+                observedAgentName = true
+            },
+            loadProject = {
+                if (projectContext != null) {
+                    loadProjectAgentsCount++
+                    loadProjectBriefCount++
+                    loadRecentBugReportsCount++
+                }
+            },
+            openConversation = { conversationCoordinator.recordOpenRequested(); resolveRequests++ },
         )
 
         init {

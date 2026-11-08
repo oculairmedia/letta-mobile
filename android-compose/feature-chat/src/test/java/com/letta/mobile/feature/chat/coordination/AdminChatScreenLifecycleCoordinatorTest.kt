@@ -16,12 +16,13 @@ class AdminChatScreenLifecycleCoordinatorTest {
         isAlreadyHydrated: () -> Boolean,
         initialState: ChatSessionState = ChatSessionState(),
     ) {
+        val tracker = CurrentConversationTracker()
         val sessionState = MutableStateFlow(initialState)
         var resolveCalls = 0
         var resumeSyncCalls = 0
 
         val coordinator = AdminChatScreenLifecycleCoordinator(
-            currentConversationTracker = CurrentConversationTracker(),
+            currentConversationTracker = tracker,
             conversationId = { ConversationId("conversation-1") },
             sessionState = sessionState,
             resolveConversationAndLoad = { resolveCalls++ },
@@ -108,4 +109,26 @@ class AdminChatScreenLifecycleCoordinatorTest {
         assertEquals(0, harness.resumeSyncCalls)
         assertEquals(1, harness.resolveCalls)
     }
+    @Test
+    fun `late pause cannot clear a different visible conversation`() {
+        val harness = Harness(isAlreadyHydrated = { true })
+        harness.tracker.setCurrent("conversation-b")
+        harness.coordinator.onScreenPaused()
+        assertEquals("conversation-b", harness.tracker.current)
+        harness.tracker.setCurrent("conversation-1")
+        harness.coordinator.onScreenPaused()
+        assertEquals(null, harness.tracker.current)
+    }
+
+    @Test
+    fun `late cleanup cannot clear a different visible conversation`() {
+        val harness = Harness(isAlreadyHydrated = { true })
+        harness.tracker.setCurrent("conversation-b")
+        harness.coordinator.onCleared()
+        assertEquals("conversation-b", harness.tracker.current)
+        harness.tracker.setCurrent("conversation-1")
+        harness.coordinator.onCleared()
+        assertEquals(null, harness.tracker.current)
+    }
+
 }

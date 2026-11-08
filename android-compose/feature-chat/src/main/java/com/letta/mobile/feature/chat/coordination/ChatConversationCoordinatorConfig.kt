@@ -26,9 +26,9 @@ internal data class ChatConversationRoute(
     val agentId: String,
     val initialMessage: String?,
     val explicitConversationId: () -> String?,
-    val pinnedExplicitConversationId: String? = null,
     val setConversationId: (String?) -> Unit,
     val isFresh: Boolean,
+    val focus: com.letta.mobile.feature.chat.route.ChatRouteArgs? = null,
 )
 
 internal data class TimelineObserverConfig(

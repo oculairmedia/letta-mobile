@@ -1,5 +1,5 @@
 package com.letta.mobile.feature.chat.coordination
-
+import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.chat.runtime.SharedChatSessionResolver
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -7,20 +7,10 @@ import com.letta.mobile.data.timeline.TimelineConversationAttributionCapture
 import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-
-/**
- * Android-side adapter over the platform-neutral [SharedChatSessionResolver].
- *
- * The conversation-lifecycle resolution itself (agent-name lookup, most-recent
- * conversation selection, stale-cache refresh) now lives in sharedLogic so
- * desktop no longer needs its own copy. This class only owns the Android wiring
- * (the [CoroutineScope] for background refresh comes from the ViewModel) and
- * delegates every decision to the shared resolver — there is intentionally no
- * Android-specific behavior here.
- */
+/** Android lifecycle adapter to the shared session resolver and focus owner. */
 internal class ChatSessionResolver(
     agentRepository: IAgentRepository,
-    conversationRepository: IConversationRepository,
+    private val conversationRepository: IConversationRepository,
     backgroundRefreshScope: CoroutineScope? = null,
 ) {
     private val delegate = SharedChatSessionResolver(
@@ -28,30 +18,44 @@ internal class ChatSessionResolver(
         conversationRepository = conversationRepository,
         backgroundRefreshScope = backgroundRefreshScope,
     )
-
     fun cachedAgentName(agentId: String): String? = delegate.cachedAgentName(agentId)
-
     fun observeCachedAgentName(agentId: String): Flow<String> =
         delegate.observeCachedAgentName(agentId)
-
     suspend fun resolveMostRecentConversation(
         agentId: String,
         maxAgeMs: Long,
     ): String? = delegate.resolveMostRecentConversation(agentId, maxAgeMs)
-
-    /** letta-mobile-grrhq: same selection, plus a bounded attribution capture. */
+    /** Bind Android loading to the shared owner's resume policy, never the resolver's fallback. */
+    suspend fun resolveFocus(
+        owner: com.letta.mobile.data.shell.ShellWorkspaceState,
+        request: com.letta.mobile.data.shell.CurrentFocusRequest,
+        maxAge: kotlin.time.Duration,
+        repository: IConversationRepository? = null,
+    ): com.letta.mobile.data.model.ConversationId? {
+        val conversations = repository ?: conversationRepository
+        if (!owner.accepts(request)) return null
+        val agent = request.requestedAgent ?: return null
+        return when (request.mode) {
+            com.letta.mobile.data.shell.CurrentFocusChatMode.Exact -> request.exactConversation
+            com.letta.mobile.data.shell.CurrentFocusChatMode.New -> null
+            com.letta.mobile.data.shell.CurrentFocusChatMode.Resume -> {
+                conversations.refreshConversationsIfStale(agent, maxAge.inWholeMilliseconds)
+                if (!owner.accepts(request)) return null
+                owner.resolveAgentChat(agent, conversations.getCachedConversations(agent).filter { it.agentId == agent }.map {
+                    ShellConversationRef(it.id, it.agentId, it.lastMessageAt ?: it.updatedAt ?: it.createdAt.orEmpty(), tags = it.tags)
+                })
+            }
+        }
+    }
     suspend fun resolveMostRecentConversationWithProvenance(
         agentId: String,
         maxAgeMs: Long,
         parentAgentId: String? = null,
     ): SharedChatSessionResolver.ConversationSelection =
         delegate.resolveMostRecentConversationWithProvenance(agentId, maxAgeMs, parentAgentId)
-
-    /** letta-mobile-grrhq: capture for a selection made outside the resolver. */
     fun captureAttribution(
         request: SharedChatSessionResolver.AttributionRequest,
     ): TimelineConversationAttributionCapture = delegate.captureAttribution(request)
-
     fun captureAttribution(
         requestedAgentId: String,
         selectedConversationId: String?,

@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.data.shell.ShellWorkspaceState
 
 /**
  * The Android chat inside the shared shell workspace (letta-mobile-ckmub.2): the workspace draws the
@@ -117,7 +118,9 @@ class AgentScaffoldHiltTest {
         drawer = SharedNavDrawerViewModel(
             FakeSettingsRepository(), mockk(relaxed = true), allConversations, settings,
             sources = mockk(relaxed = true) { every { conversations } returns conversationRepository },
-        )
+        ).apply {
+            workspaceOwner = ShellWorkspaceState(ShellDestination.Chat("agent-hilt-1")).apply { bindSource("test-source", 1L) }
+        }
     }
 
     private fun showChat(host: WorkspaceChatHost = host()) {

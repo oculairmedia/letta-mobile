@@ -49,7 +49,9 @@ class WorkspaceChatHost(
     /** The workspace's drawer binding, which the chat's display options and `/` commands read. */
     val drawer: SharedNavDrawerViewModel,
     val panel: MutableState<WorkspaceChatPanel?>,
-)
+) {
+    val focus: com.letta.mobile.data.shell.ShellWorkspaceState = checkNotNull(drawer.workspaceOwner)
+}
 
 /** The open chat's part of the agent panel: its model-and-context card and its Chat options. */
 class WorkspaceChatPanel(
@@ -61,6 +63,7 @@ class WorkspaceChatPanel(
 /** Android's chat page in the shared shell workspace: the agent chat for [route], without its own chrome. */
 @Composable
 fun WorkspaceAgentChat(route: AgentChatRoute, host: WorkspaceChatHost) {
+    val chatOwner = rememberChatStoreOwner(route, host)
     val navigation = AgentScaffoldNavigationCallbacks(
         onNavigateBack = host.openAgentPane,
         onNavigateToSettings = { agentId -> host.open(ShellDestination.AgentEditor(agentId)) },
@@ -83,7 +86,7 @@ fun WorkspaceAgentChat(route: AgentChatRoute, host: WorkspaceChatHost) {
         AgentScaffoldContent(
             initialProjectStartAction = route.projectStartAction,
             navigation = navigation,
-            viewModel = hiltViewModel(rememberChatStoreOwner(route, host.drawer)),
+            viewModel = hiltViewModel<AdminChatViewModel>(chatOwner).also(chatOwner::bind),
             workspace = host,
         )
     }

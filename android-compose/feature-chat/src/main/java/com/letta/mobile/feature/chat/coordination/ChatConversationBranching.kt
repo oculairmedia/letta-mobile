@@ -20,13 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * letta-mobile-bzvro.15 / .16, letta-mobile-7mys7: Android's binding of the shared
- * [ConversationBranchController]. Forks go through [IConversationRepository.forkConversation],
- * which routes by backend (App Server and Iroh hosts fork with `conversation_fork`, REST with
- * `/fork`). The fork opens as a new chat route, so an edit's or rerun's prompt crosses the
- * navigation through [PendingComposerDrafts].
- */
+/** Android lifecycle binding to the shared branch controller, with request-bound navigation. */
 class ChatConversationBranching(
     scope: CoroutineScope,
     conversations: IConversationRepository,
@@ -36,16 +30,21 @@ class ChatConversationBranching(
     /** letta-mobile-7mys7 (G37): where a fork records its parent, for the drawer's "Forked from". */
     lineage: ConversationLineage? = null,
 ) {
+    private var accepts: () -> Boolean = { true }
     private val branching = ConversationBranching(
         BranchBackend(
             fork = { request ->
+                if (!accepts()) throw kotlinx.coroutines.CancellationException("Chat focus superseded")
                 conversations.forkConversation(
                     ConversationId(request.conversationId),
                     AgentId(requireNotNull(request.agentId) { ConversationBranching.NO_AGENT }),
                     request.throughMessageId,
                 )
             },
-            createEmpty = { agentId -> conversations.createConversation(AgentId(agentId)) },
+            createEmpty = { agentId ->
+                if (!accepts()) throw kotlinx.coroutines.CancellationException("Chat focus superseded")
+                conversations.createConversation(AgentId(agentId))
+            },
             history = history,
         ),
     )
@@ -57,6 +56,7 @@ class ChatConversationBranching(
         scope = scope,
         branching = { branching },
         opener = BranchOpener { outcome ->
+            if (!accepts()) return@BranchOpener
             outcome.draft?.let { drafts.put(outcome.conversation.id.value, PendingDraft(it, outcome.sendNow)) }
             open(outcome.conversation.agentId.value.ifBlank { outcome.source.agentId.orEmpty() }, outcome.conversation.id.value)
         },
@@ -70,15 +70,13 @@ class ChatConversationBranching(
         val agentId: String,
         val view: ChatBranchView,
         val open: (agentId: String, conversationId: String) -> Unit,
+        val isCurrent: () -> Boolean = { true },
     ) {
         val source: BranchSource
             get() = BranchSource(conversationId, agentId, view.messages, historyComplete = !view.hasOlderMessages)
     }
 
-    /**
-     * letta-mobile-by4vm.98.4: these branches as a page's shared [ChatBranchingSource]; [origin] is
-     * where a branch from the page's view starts now (null: no conversation yet, nothing happens).
-     */
+    /** Page actions capture their origin before the shared branch controller starts. */
     inner class Page(private val origin: (ChatBranchView) -> Origin?) : ChatBranchingSource {
         override val support: StateFlow<ChatBranchSupport> = MutableStateFlow(ChatBranchSupport(fork = true))
 
@@ -93,8 +91,14 @@ class ChatConversationBranching(
 
         private fun from(view: ChatBranchView, request: (Origin) -> Boolean) {
             val start = origin(view) ?: return
+            val previousOpen = open
+            val previousAccepts = accepts
             open = start.open
-            request(start)
+            accepts = start.isCurrent
+            if (!request(start)) {
+                open = previousOpen
+                accepts = previousAccepts
+            }
         }
     }
 }

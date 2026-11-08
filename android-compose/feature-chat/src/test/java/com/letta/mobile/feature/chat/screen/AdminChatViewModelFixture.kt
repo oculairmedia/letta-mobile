@@ -20,6 +20,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import com.letta.mobile.data.shell.ShellWorkspaceState
 
 /**
  * An [AdminChatViewModel] opened on one conversation, with every collaborator it reads on the way
@@ -45,6 +46,10 @@ internal data class FixtureSession(
     val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
     /** The subagent registry the ViewModel's roster reads; relaxed (empty) by default. */
     val subagentRepository: ISubagentRepository = mockk(relaxed = true),
+    val focus: ShellWorkspaceState? = null,
+    val routeArgs: ChatRouteArgs? = null,
+    val settings: ISettingsRepository = stubSettingsRepository(),
+    val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker = mockk(relaxed = true),
 )
 
 internal fun openedChatViewModel(
@@ -53,18 +58,20 @@ internal fun openedChatViewModel(
     conversationId: String,
     session: FixtureSession,
 ): AdminChatViewModel = AdminChatViewModel(
-    routeArgs = ChatRouteArgs(
-        SavedStateHandle(mapOf("agentId" to agent.id.value, "conversationId" to conversationId)),
+    routeArgs = session.routeArgs ?: ChatRouteArgs(
+        SavedStateHandle(mapOf(
+            "agentId" to agent.id.value, "conversationId" to conversationId, "workspaceOwned" to (session.focus != null),
+        )),
     ),
     messageRepository = mockk(relaxed = true),
     agentRepository = stubAgentRepository(agent),
     blockRepository = mockk(relaxed = true),
     bugReportRepository = mockk(relaxed = true),
     conversationRepository = mockk(relaxed = true),
-    settingsRepository = stubSettingsRepository(),
-    sessionManager = stubSessionManager(session),
+    settingsRepository = session.settings,
+    sessionManager = stubSessionManager(session, agent),
     runtimeEventOutbox = mockk(relaxed = true),
-    currentConversationTracker = mockk(relaxed = true),
+    currentConversationTracker = session.currentConversationTracker,
     wsChatBridge = stubChatBridge(),
     subagentRepository = session.subagentRepository,
     slashCommandRepository = mockk(relaxed = true) {
@@ -79,7 +86,7 @@ internal fun openedChatViewModel(
     },
     pagingHost = pagingHost,
     runRegistry = session.runRegistry,
-)
+).also { model -> session.focus?.let { focus -> model.bindWorkspace(focus) {} } }
 
 /** Cached, so the ViewModel resolves the agent without suspending during construction. */
 private fun stubAgentRepository(agent: Agent) = mockk<IAgentRepository>(relaxed = true) {
@@ -105,15 +112,18 @@ private fun stubChatBridge() = mockk<WsChatBridge>(relaxed = true) {
     every { events } returns emptyFlow()
 }
 
-private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(relaxed = true) {
+private fun stubSessionManager(session: FixtureSession, agent: Agent) = mockk<SessionManager>(relaxed = true) {
+    every { current.id } returns (session.focus?.sourceGeneration ?: 0L)
+    every { current.agentRepository } returns stubAgentRepository(agent)
     every { current.backendDescriptor.backendId } returns BackendId(session.tag)
     every { current.backendDescriptor.runtimeId } returns RuntimeId(session.tag)
     every { currentGraph } returns MutableStateFlow(
         mockk<SessionGraph>(relaxed = true) {
+            every { id } returns (session.focus?.sourceGeneration ?: 0L)
             every { contextTokenReadings } returns session.contextReadings
             // A host without `agent.context`: the chip keeps the streamed total.
-            val agents = mockk<IAgentRepository>(relaxed = true) {
-                coEvery { getContextBreakdown(any(), any(), any()) } throws IllegalStateException("capability_unavailable")
+            val agents = stubAgentRepository(agent).also {
+                coEvery { it.getContextBreakdown(any(), any(), any()) } throws IllegalStateException("capability_unavailable")
             }
             every { agentRepository } returns agents
             every { contextBreakdown } returns ContextBreakdownLoader(agents)

@@ -1,12 +1,15 @@
 package com.letta.mobile.feature.chat.route
 
 import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellWorkspaceState
 class ChatRouteArgsTest {
     @Test
     fun `requires agent id`() {
@@ -48,7 +51,7 @@ class ChatRouteArgsTest {
             SavedStateHandle(
                 mapOf(
                     "agentId" to "agent-local-sub",
-                    "conversationId" to "default",
+                    "conversationId" to IdFormats.DEFAULT_CONVERSATION_ID,
                     "initialChatMode" to "interactive",
                 )
             )
@@ -57,7 +60,7 @@ class ChatRouteArgsTest {
         assertEquals("interactive", args.initialChatMode)
         // a subagent route pins its conversation, never fresh
         assertFalse(args.isFreshRoute)
-        assertEquals("default", args.pinnedExplicitConversationId)
+        assertEquals(IdFormats.DEFAULT_CONVERSATION_ID, args.explicitConversationId)
     }
 
     @Test
@@ -72,40 +75,40 @@ class ChatRouteArgsTest {
     }
 
     @Test
-    fun `pins explicit conversation id at construction and survives later route writes`() {
-        // letta-mobile-9cb37: the explicit route arg must be snapshotted so a
-        // later setRouteConversationId (resolved/last conversation) can't erase
-        // the "open exactly this conversation" intent the route carried.
+    fun `owner rejects resolution that conflicts with an explicit default target`() {
         val args = ChatRouteArgs(
             SavedStateHandle(
                 mapOf(
                     "agentId" to "agent-1",
-                    "conversationId" to "default",
+                    "conversationId" to IdFormats.DEFAULT_CONVERSATION_ID,
                 )
             )
         )
 
-        assertEquals("default", args.pinnedExplicitConversationId)
+        assertEquals(IdFormats.DEFAULT_CONVERSATION_ID, args.explicitConversationId)
 
-        args.setRouteConversationId("conv-other")
-
-        assertEquals("conv-other", args.explicitConversationId)
-        // The pinned snapshot is immutable and still reflects the route's request.
-        assertEquals("default", args.pinnedExplicitConversationId)
+        val owner = ShellWorkspaceState(
+            ShellDestination.Chat("agent-1", IdFormats.DEFAULT_CONVERSATION_ID),
+        ).apply { bindSource("source", 1L) }
+        args.bindWorkspace(owner)
+        val result = runCatching { args.settle(ConversationId("conv-other")) }
+        assertTrue(result.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertEquals("conv-default-agent-1", args.explicitConversationId)
+        assertEquals(ConversationId(IdFormats.DEFAULT_CONVERSATION_ID), owner.currentFocus.conversationId)
     }
 
     @Test
-    fun `pinned explicit conversation id is null for fresh and blank routes`() {
+    fun `fresh and blank routes have no explicit conversation target`() {
         val freshArgs = ChatRouteArgs(
             SavedStateHandle(
                 mapOf(
                     "agentId" to "agent-1",
-                    "conversationId" to "default",
+                    "conversationId" to IdFormats.DEFAULT_CONVERSATION_ID,
                     "freshRouteKey" to 123L,
                 )
             )
         )
-        assertNull(freshArgs.pinnedExplicitConversationId)
+        assertNull(freshArgs.explicitConversationId)
 
         val blankArgs = ChatRouteArgs(
             SavedStateHandle(
@@ -115,7 +118,7 @@ class ChatRouteArgsTest {
                 )
             )
         )
-        assertNull(blankArgs.pinnedExplicitConversationId)
+        assertNull(blankArgs.explicitConversationId)
     }
 
     @Test
@@ -135,7 +138,7 @@ class ChatRouteArgsTest {
     }
 
     @Test
-    fun `isFreshRoute is stable across setRouteConversationId writes`() {
+    fun `freshness stays stable as its effect resolves`() {
         val args = ChatRouteArgs(
             SavedStateHandle(
                 mapOf(
@@ -148,7 +151,7 @@ class ChatRouteArgsTest {
 
         assertTrue(args.isFreshRoute)
 
-        args.setRouteConversationId("conv-resolved")
+        args.settle(ConversationId("conv-resolved"))
 
         assertEquals("conv-resolved", args.explicitConversationId)
         assertTrue(args.isFreshRoute)
@@ -181,14 +184,47 @@ class ChatRouteArgsTest {
     }
 
     @Test
-    fun `persists route conversation id through typed mutator`() {
+    fun `resolution never persists a competing conversation selection in the route handle`() {
         val savedState = SavedStateHandle(mapOf("agentId" to "agent-1"))
         val args = ChatRouteArgs(savedState)
 
-        args.setRouteConversationId("route-conv")
-        assertEquals("route-conv", savedState.get<String>("conversationId"))
-
-        args.setRouteConversationId("")
+        args.settle(ConversationId("route-conv"))
+        assertEquals("route-conv", args.explicitConversationId)
         assertNull(savedState.get<String>("conversationId"))
+
+        savedState["conversationId"] = ""
+        assertEquals("route-conv", args.explicitConversationId)
+        assertEquals("", savedState.get<String>("conversationId"))
     }
+    @Test
+    fun `saved handle restoration cannot replace the explicit default target`() {
+        val handle = SavedStateHandle(mapOf("agentId" to "agent-1", "conversationId" to IdFormats.DEFAULT_CONVERSATION_ID))
+        val args = ChatRouteArgs(handle)
+        handle["conversationId"] = "stale-last-conversation"
+        assertEquals(IdFormats.DEFAULT_CONVERSATION_ID, args.explicitConversationId)
+    }
+
+    @Test
+    fun `fresh target ignores a conversation restored into the handle`() {
+        val handle = SavedStateHandle(mapOf("agentId" to "agent-1", "freshRouteKey" to 7L))
+        val args = ChatRouteArgs(handle)
+        handle["conversationId"] = "stale-last-conversation"
+        assertNull(args.explicitConversationId)
+        assertTrue(args.explicitNewChat)
+    }
+
+    @Test
+    fun callbacksPauseUntilTheRetainedVmBindsTheActiveOwner() {
+        val old = ShellWorkspaceState(ShellDestination.Chat("agent-a", "exact")).apply { bindSource("source", 1L) }
+        val args = ChatRouteArgs(SavedStateHandle(mapOf("agentId" to "agent-a"))).apply { bindWorkspace(old) }
+        val token = args.requestToken()
+        args.isOwnerCurrent = { false }
+        assertFalse(args.accepts(token))
+        val restored = ShellWorkspaceState().apply { bindSource("source", 1L); assertTrue(restore(old.snapshot())) }
+        args.bindWorkspace(restored)
+        args.isOwnerCurrent = { true }
+        assertTrue(args.accepts(token))
+        assertTrue(args.complete(token, ConversationId("exact")))
+    }
+
 }

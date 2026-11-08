@@ -43,7 +43,7 @@ internal class AdminChatScreenLifecycleCoordinator(
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
     fun onScreenPaused() {
-        currentConversationTracker.setCurrent(null)
+        if (currentConversationTracker.current == conversationId()?.value) currentConversationTracker.setCurrent(null)
     }
 
     fun onScreenResumed() {
@@ -76,6 +76,6 @@ internal class AdminChatScreenLifecycleCoordinator(
     }
 
     fun onCleared() {
-        currentConversationTracker.setCurrent(null)
+        if (currentConversationTracker.current == conversationId()?.value) currentConversationTracker.setCurrent(null)
     }
 }

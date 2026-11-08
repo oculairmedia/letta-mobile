@@ -6,7 +6,7 @@
 desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatControllerSupport.kt 1
 desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopCanonicalTimelineHost.kt 1
 feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/WsChatSendCoordinator.kt 1
-feature-chat/src/main/java/com/letta/mobile/feature/chat/route/ChatGraph.kt 2
+feature-chat/src/main/java/com/letta/mobile/feature/chat/route/ChatGraph.kt 0
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/ConversationBranchPlanner.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/compaction/ConversationCompactRpc.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/context/ContextReadingKey.kt 1

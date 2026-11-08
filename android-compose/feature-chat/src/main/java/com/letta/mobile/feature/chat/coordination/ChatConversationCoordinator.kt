@@ -27,13 +27,7 @@ private value class CoordinatorConversationId(val value: String)
 @JvmInline
 private value class CoordinatorAgentName(val value: String)
 
-/**
- * Owns chat route/conversation resolution and initial-message delivery policy.
- *
- * The ViewModel still exposes the public screen API, but this coordinator keeps
- * the fragile active-conversation/fresh-route state in one
- * place so send/search/project collaborators can be wired around a stable seam.
- */
+/** Hydrates the owner-requested conversation; retained runtime state never selects navigation. */
 internal class ChatConversationCoordinator(
     config: ChatConversationCoordinatorConfig,
 ) {
@@ -41,11 +35,12 @@ internal class ChatConversationCoordinator(
     private val agentId = config.route.agentId
     private val initialMessage = config.route.initialMessage
     private val explicitConversationId = config.route.explicitConversationId
-    private val pinnedExplicitConversationId = config.route.pinnedExplicitConversationId
-    private val setRouteConversationId = config.route.setConversationId
+    private val completeConversation = config.route.setConversationId
     private val isFreshRoute = config.route.isFresh
+    private val focus = config.route.focus
     private val chatSessionResolver = config.chatSessionResolver
-    private val agentRepository = config.agentRepository
+    private val fallbackAgentRepository = config.agentRepository
+    private val agentRepository get() = focus?.session?.agentRepository ?: fallbackAgentRepository
     private val currentConversationTracker = config.currentConversationTracker
     private val uiState = config.uiState
     private val updateSessionState = config.updateSessionState
@@ -75,6 +70,7 @@ internal class ChatConversationCoordinator(
     )
 
     fun conversationId(): String? = activeConversationId
+    fun abandonInitialMessage() { initialMessageConsumed.set(true) }
 
     /** Records a route-open only when the route already supplies a stable conversation id. */
     fun recordOpenRequested() {
@@ -82,7 +78,7 @@ internal class ChatConversationCoordinator(
     }
 
     fun setActiveConversationId(conversationId: String?) {
-        setRouteConversationId(conversationId)
+        if (conversationId != activeConversationId) completeConversation(conversationId)
     }
 
     /**
@@ -123,11 +119,15 @@ internal class ChatConversationCoordinator(
     }
 
     fun resolveConversationAndLoad() {
+        val request = focus?.requestToken()
+        val session = focus?.session
+        if (focus?.accepts(request) == false) return
         val attempt = if (hasResolvedConversationOnce) ResolutionAttempt.Subsequent else ResolutionAttempt.Initial
         if (isFreshRoute && attempt == ResolutionAttempt.Initial && explicitConversationId() == null) {
-            setRouteConversationId(null)
+            completeConversation(null)
         }
         scope.launch {
+            if (focus?.accepts(request) == false) return@launch
             // letta-mobile-6bqi1: skip the eager Loading flash when the
             // conversation's messages are already on screen (re-entry / device
             // rotation). The resolve below still runs — conversationsLoaded +
@@ -138,10 +138,11 @@ internal class ChatConversationCoordinator(
             }
 
             try {
-                if (resolveTimelineConversation(attempt)) hasResolvedConversationOnce = true
+                if (resolveTimelineConversation(attempt, request, session)) hasResolvedConversationOnce = true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (focus?.isCurrent() == false) return@launch
                 android.util.Log.w("AdminChatViewModel", "Failed to resolve conversation", e)
                 updateSessionState { ChatSessionReducer.conversationLoadFailed(it, e.message ?: "Failed to load conversation") }
                 uiState.value = uiState.value.copy(
@@ -157,21 +158,8 @@ internal class ChatConversationCoordinator(
     }
 
     private suspend fun determineTimelineConversationId(isFirstResolve: Boolean): String? {
-        // letta-mobile-9cb37: when the route explicitly asked for a conversation
-        // (e.g. the subagent "view conversation" shortcut targeting `default`),
-        // that request must win on the first resolve — even across an agent
-        // switch, where the live explicitConversationId() may have been restored
-        // stale to the target agent's prior active/last conversation. Pin it into
-        // the route key so downstream loads/sends agree, and skip the
-        // resolve-most-recent fallback that would otherwise override it.
-        val pinnedExplicit = pinnedExplicitConversationId?.takeIf { isFirstResolve }
-        if (pinnedExplicit != null && explicitConversationId() != pinnedExplicit) {
-            setRouteConversationId(pinnedExplicit)
-        }
-
         val suppressFreshRouteFallback = isFreshRoute && isFirstResolve
-        val usedMostRecentFallback = pinnedExplicit == null &&
-            !suppressFreshRouteFallback &&
+        val usedMostRecentFallback = !suppressFreshRouteFallback &&
             activeConversationId == null &&
             explicitConversationId() == null
         if (usedMostRecentFallback) {
@@ -179,21 +167,15 @@ internal class ChatConversationCoordinator(
         }
 
         val routeStateId = activeConversationId
-        val conversationId = pinnedExplicit
-            ?: if (suppressFreshRouteFallback) {
+        val conversationId = if (suppressFreshRouteFallback) {
                 explicitConversationId()
             } else {
                 activeConversationId ?: explicitConversationId()
             }
 
-        // letta-mobile-grrhq: the fallback already recorded its own (richer)
-        // selection inside resolveMostRecentConversation; only record here when
-        // it did NOT run, so an explicit route stays distinguishable from a
-        // resolver fallback in the emitted chain.
         if (!usedMostRecentFallback) {
             recordNonFallbackSelection(
                 conversationId = conversationId,
-                pinnedExplicit = pinnedExplicit,
                 fromRouteState = routeStateId != null && conversationId == routeStateId,
             )
         }
@@ -217,7 +199,6 @@ internal class ChatConversationCoordinator(
         }
         return loaded
     }
-
     private fun handleEmptyTimelineConversationState() {
         updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
         uiState.value = uiState.value.copy(
@@ -228,8 +209,26 @@ internal class ChatConversationCoordinator(
         )
     }
 
-    private suspend fun resolveTimelineConversation(attempt: ResolutionAttempt): Boolean {
-        val conversationId = determineTimelineConversationId(isFirstResolve = attempt == ResolutionAttempt.Initial)
+    private suspend fun resolveTimelineConversation(
+        attempt: ResolutionAttempt,
+        request: com.letta.mobile.data.shell.CurrentFocusRequest?,
+        session: com.letta.mobile.data.session.SessionRepositoryGraph?,
+    ): Boolean {
+        val boundFocus = focus
+        val owner = boundFocus?.workspace
+        val conversationId = if (boundFocus != null && owner != null && request != null) {
+            val resolved = chatSessionResolver.resolveFocus(
+                owner, request, CONVERSATION_CACHE_TTL_MS.milliseconds, session?.conversationRepository,
+            )
+            if (!boundFocus.accepts(request)) return false
+            if (resolved != null && !boundFocus.complete(request, resolved)) return false
+            recordNonFallbackSelection(
+                boundFocus.explicitConversationId, fromRouteState = true,
+            )
+            boundFocus.explicitConversationId
+        } else {
+            determineTimelineConversationId(isFirstResolve = attempt == ResolutionAttempt.Initial)
+        }
         val resolved = if (conversationId == null) {
             handleEmptyTimelineConversationState()
             true
@@ -237,6 +236,7 @@ internal class ChatConversationCoordinator(
             hydrateAndLoadTimelineConversation(conversationId)
         }
 
+        if (focus?.isCurrent() == false) return false
         consumeInitialMessageIfPresent()?.let { message ->
             sendMessageViaTimeline(message)
         }
@@ -316,12 +316,10 @@ internal class ChatConversationCoordinator(
      */
     private fun recordNonFallbackSelection(
         conversationId: String?,
-        pinnedExplicit: String?,
         fromRouteState: Boolean,
     ) {
         if (!timelineAcquisitionProvenanceEnabled.get()) return
         val mode = when {
-            pinnedExplicit != null -> TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID
             conversationId == null -> TimelineConversationSelectionMode.DEFAULT_FALLBACK
             fromRouteState -> TimelineConversationSelectionMode.ROUTE_STATE
             else -> TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID
@@ -359,10 +357,11 @@ internal class ChatConversationCoordinator(
         )
         recordSelection(TimelineConversationSelectionMode.MOST_RECENT_FALLBACK, selection.capture)
         return selection.conversationId
-            ?.also { setRouteConversationId(it) }
+            ?.also { completeConversation(it) }
     }
 
     suspend fun loadMessagesInternal(): Boolean {
+        if (focus?.isCurrent() == false) return false
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
         val requestedConversationId = (activeConversationId ?: explicitConversationId())
             ?.let(::CoordinatorConversationId)
@@ -434,7 +433,7 @@ internal class ChatConversationCoordinator(
     }
 
     private fun isCurrentConversation(conversationId: CoordinatorConversationId): Boolean =
-        conversationId.value == (activeConversationId ?: explicitConversationId())
+        focus?.isCurrent() != false && conversationId.value == (activeConversationId ?: explicitConversationId())
 
     private fun conversationSummary(
         conversationId: CoordinatorConversationId,
