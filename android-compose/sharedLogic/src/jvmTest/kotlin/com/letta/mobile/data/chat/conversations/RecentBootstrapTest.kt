@@ -370,15 +370,15 @@ class RecentBootstrapTest {
     }
 
     @Test
-    fun aMissingInitialRouteFallsBackToTheFocusedChatWithoutRetryingTheRoute() = runTest {
+    fun aMissingInitialRoutePreservesTheRequestedTargetWithoutFallback() = runTest {
         val host = VisibleHost()
         val owner = owner(host)
         runCurrent()
         val missing = ConversationId("missing-route")
         owner.openInitial(missing, b, createIfNone = false)
         runCurrent()
-        assertEquals(ConversationId("older"), owner.selectedConversation)
-        assertEquals("older", owner.selectedTarget()?.conversationId)
+        assertEquals(missing, owner.selectedConversation)
+        assertEquals(null, owner.selectedTarget()?.conversationId)
         owner.openInitial(missing, b, createIfNone = false)
         runCurrent()
         assertEquals(1, host.calls.count { it.first == "conversation.get" })
