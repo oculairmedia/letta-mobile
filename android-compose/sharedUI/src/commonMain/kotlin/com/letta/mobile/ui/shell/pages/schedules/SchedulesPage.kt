@@ -46,7 +46,6 @@ fun SchedulesPage(
     options: SchedulesPageOptions = SchedulesPageOptions(),
 ) {
     val clock = options.fixedClock ?: rememberTickingClock()
-    FocusedAgentSelection(state, actions)
     val ui = rememberSchedulesPageUi(clock, options.initialView)
     val data = rememberSchedulesData(state, clock)
     SchedulesPageLayout(ui, SchedulesPageInput(state, actions, options, data), modifier)
@@ -168,15 +167,6 @@ object SchedulesPageTags {
     fun agent(agentId: String): String = "schedules_agent_$agentId"
 
     fun cadence(label: String): String = "schedules_cadence_${label.lowercase().replace(' ', '_')}"
-}
-
-/** Native schedules load per agent: when the host focuses one, select it so its schedules load. */
-@Composable
-private fun FocusedAgentSelection(state: SchedulesPageState, actions: SchedulesPageActions) {
-    val focused = state.focusedAgentId
-    LaunchedEffect(focused, state.library.selectedAgentId) {
-        if (!focused.isNullOrBlank() && focused != state.library.selectedAgentId) actions.onSelectAgent(focused)
-    }
 }
 
 /** The page's clock, advanced every [NOW_TICK] so countdowns and the now line stay live. */

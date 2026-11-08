@@ -176,6 +176,21 @@ class MemoryParityMapperTest {
     }
 
     @Test
+    fun buildDoesNotSelectRosterHeadWhenThereIsNoFocus() {
+        val state = MemoryParityMapper.build(
+            agents = listOf(sampleAgent()),
+            selectedAgentId = null,
+            allTools = emptyList(),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+        )
+        assertEquals(null, state.selectedAgentId)
+        assertEquals(null, state.selectedAgentName)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Memory).items)
+    }
+
+    @Test
     fun buildDoesNotFallbackToAnotherAgentWhenRequestedAgentIsMissing() {
         val state = MemoryParityMapper.build(
             agents = listOf(sampleAgent()),

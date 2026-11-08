@@ -4,17 +4,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.memory.MemoryParityControllerState
+import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.data.memory.memfs.MemfsNavigation
+import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.schedules.ScheduleLibraryController
-import com.letta.mobile.data.schedules.ScheduleLibraryState
 import com.letta.mobile.data.session.SessionRepositoryGraph
+import com.letta.mobile.data.shell.CurrentFocusChatMode
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
+import com.letta.mobile.data.skills.SkillsCatalogController
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.shell.EmptyShellPage
 import com.letta.mobile.ui.chat.tools.ProvideToolStepExpansions
@@ -23,6 +28,7 @@ import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
+import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalMemoryPreview
 import com.letta.mobile.ui.shell.pages.memory.rememberMemoryWorkspaceView
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
@@ -31,7 +37,6 @@ import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
 import com.letta.mobile.ui.shell.shellChannelsPage
-import com.letta.mobile.ui.shell.shellMemoryPage
 import com.letta.mobile.ui.shell.shellSchedulesPage
 import com.letta.mobile.ui.shell.shellSkillsPage
 
@@ -81,7 +86,7 @@ fun rememberShellPageDeps(
     controllers: ShellLibraryControllers,
     host: ShellPageHost,
 ): ShellPageDeps {
-    ShellLibraryFocusEffects(controllers, host.navigator.state.page.kind, host.focus.agentId)
+    ShellLibraryFocusEffects(controllers, host.navigator.state.page.kind, host.navigator.state.currentFocus.agentId)
     return shellPageDeps(graph, controllers, host)
 }
 
@@ -96,7 +101,7 @@ fun shellPageDeps(
     val chat = host.pages.chat?.let { page ->
         ShellPageContent<ShellDestination.Chat> { destination, modifier ->
             ProvideToolStepExpansions(host.settings) {
-                ProvideShellMemoryPreview(controllers, host.focus) { page.Content(destination, modifier) }
+                ProvideShellMemoryPreview(controllers, host.navigator.state) { page.Content(destination, modifier) }
             }
         }
     }
@@ -105,8 +110,8 @@ fun shellPageDeps(
         chat = chat,
         // A board is a panel of its conversation's chat page.
         canvas = chat?.let { page -> ShellPageContent { _, modifier -> page.Content(ShellDestination.Chat(), modifier) } },
-        memory = memoryPage(controllers),
-        schedules = schedulesPage(graph, controllers.schedules, host.focus),
+        memory = memoryPage(controllers, host),
+        schedules = schedulesPage(graph, controllers.schedules, host),
         channels = channelsPage(controllers, host.pages.slots),
         skills = skillsPage(controllers, host),
         settings = host.pages.settings,
@@ -119,71 +124,135 @@ fun shellPageDeps(
 
 /** [content] whose memory tool steps open the Memory view over [controllers], for the focused agent. */
 @Composable
-private fun ProvideShellMemoryPreview(controllers: ShellLibraryControllers, focus: ShellPageFocus, content: @Composable () -> Unit) {
-    val agent by rememberUpdatedState(focus.agentId)
-    val preview = remember(controllers.memory, controllers.memfs) {
+private fun ProvideShellMemoryPreview(
+    controllers: ShellLibraryControllers,
+    workspace: ShellWorkspaceState,
+    content: @Composable () -> Unit,
+) {
+    val preview = remember(controllers.memory, controllers.memfs, workspace) {
         val sources = ShellMemorySources(
             memory = controllers.memory.state,
             memoryActions = controllers.memory,
             files = controllers.memfs.state,
-            filesActions = controllers.memfs,
-            selectFilesAgent = { agent -> controllers.memfs.selectAgent(agent?.value) },
+            filesActions = guardedMemfsActions(controllers, workspace),
+            selectFilesAgent = { agent ->
+                if (agent == null) controllers.memfs.selectAgent(null)
+                else requestMemoryAgent(controllers, workspace, agent) {}
+            },
         )
-        ShellMemoryPreview(sources) { agent }
+        ShellMemoryPreview(sources) { workspace.currentFocus.agentId }
     }
     CompositionLocalProvider(LocalMemoryPreview provides preview, content = content)
 }
 
 /** The shared Memory page over the memory graph and MemFS controllers. */
-private fun memoryPage(controllers: ShellLibraryControllers) = ShellPageContent<ShellDestination.Memory> { destination, modifier ->
-    val memory by controllers.memory.state.collectAsState()
-    val files by controllers.memfs.state.collectAsState()
-    var view by rememberMemoryWorkspaceView()
-    val binding = MemoryWorkspaceBinding(
-        memory = memory,
-        memoryActions = controllers.memory,
-        files = files,
-        filesActions = controllers.memfs,
-        onFilesAgentChange = controllers.memfs::selectAgent,
-        view = view,
-        onViewChange = { view = it },
-    )
-    shellMemoryPage(binding).Content(destination, modifier)
+private fun memoryPage(controllers: ShellLibraryControllers, host: ShellPageHost) =
+    ShellPageContent<ShellDestination.Memory> { _, modifier ->
+        val memory by controllers.memory.state.collectAsState()
+        val files by controllers.memfs.state.collectAsState()
+        var view by rememberMemoryWorkspaceView()
+        val workspace = host.navigator.state
+        val filesActions = guardedMemfsActions(controllers, workspace)
+        val binding = MemoryWorkspaceBinding(
+            memory = memoryForFocus(memory, workspace.currentFocus.agentId),
+            memoryActions = controllers.memory,
+            files = files,
+            filesActions = filesActions,
+            onFilesAgentChange = { controllers.memfs.selectAgent(workspace.currentFocus.agentId?.value) },
+            view = view,
+            onViewChange = { view = it },
+        )
+        FocusMemoryWorkspacePage(binding, onSelectAgent = { agent ->
+            requestMemoryAgent(controllers, workspace, agent) { view = MemoryWorkspaceView.Files }
+        }, modifier = modifier)
+    }
+
+private fun requestMemoryAgent(
+    controllers: ShellLibraryControllers,
+    workspace: ShellWorkspaceState,
+    agent: AgentId,
+    onHeld: () -> Unit,
+) {
+    val files = controllers.memfs.state.value
+    if (files.agentId != agent.value && files.editor?.dirty == true) {
+        controllers.memfs.selectAgent(agent.value)
+        onHeld()
+    } else if (selectPageAgent(workspace, agent)) {
+        controllers.memfs.selectAgent(agent.value)
+    }
+}
+
+private fun guardedMemfsActions(controllers: ShellLibraryControllers, workspace: ShellWorkspaceState): MemfsPageActions =
+    object : MemfsPageActions by controllers.memfs {
+        override fun confirmDiscard() {
+            val files = controllers.memfs.state.value
+            val pendingAgent = (files.pendingNavigation as? MemfsNavigation.SwitchAgent)?.agentId
+            if (pendingAgent != null && workspace.currentFocus.agentId?.value != pendingAgent) {
+                if (workspace.currentFocus.agentId?.value != files.agentId) return
+                if (!selectPageAgent(workspace, AgentId(pendingAgent))) return
+            }
+            controllers.memfs.confirmDiscard()
+        }
+    }
+
+/** Do not render another agent's graph or expose its actions while the focused target loads. */
+internal fun memoryForFocus(memory: MemoryPageState, agent: AgentId?): MemoryPageState =
+    if (memory.parity.memory.selectedAgentId == agent?.value) {
+        memory
+    } else {
+        MemoryPageState(parity = MemoryParityControllerState(
+            isLoading = memory.parity.isLoading,
+            errorMessage = memory.parity.errorMessage,
+        ))
+    }
+
+/** Publish the chosen agent together with a cleared conversation, before starting its queries. */
+private fun selectPageAgent(workspace: ShellWorkspaceState, agent: AgentId): Boolean {
+    if (workspace.currentFocus.agentId == agent) return true
+    return workspace.selectFocus(workspace.currentFocus.copy(
+        agentId = agent, conversationId = null, chatMode = CurrentFocusChatMode.Resume,
+    ))
 }
 
 /** The shared Schedules page; a schedule can be made where the session serves them and an agent is chosen. */
 private fun schedulesPage(
     graph: SessionRepositoryGraph,
     schedules: ScheduleLibraryController,
-    focus: ShellPageFocus,
+    host: ShellPageHost,
 ) = ShellPageContent<ShellDestination.Schedules> { destination, modifier ->
     val library by schedules.state.collectAsState()
-    val focused = focus.agentId?.value
-    val agentChosen = library.selectedAgentId != null || focused != null
+    val focused = host.navigator.state.currentFocus.agentId?.value
+    val agentChosen = focused != null
     val state = SchedulesPageState(
         library = library,
         focusedAgentId = focused,
         canCreate = graph.capabilities.supports(SessionRoute.SCHEDULES) && agentChosen,
     )
-    shellSchedulesPage(state, shellScheduleActions(schedules, library, focus.agentId)).Content(destination, modifier)
+    shellSchedulesPage(state, shellScheduleActions(schedules, host.navigator.state)).Content(destination, modifier)
 }
 
 /**
- * The Schedules page's actions over the shared schedule library. The controller deletes under its
- * selected agent, so a delete for any other agent's row is dropped; a new
- * schedule is for the request's agent, else the focused one.
+ * The Schedules page's actions over the shared library. A row or form can mutate only while its
+ * agent still matches both the workspace focus and the library's current query target.
  */
 internal fun shellScheduleActions(
     schedules: ScheduleLibraryController,
-    library: ScheduleLibraryState,
-    focusedAgent: AgentId?,
+    workspace: ShellWorkspaceState,
 ) = SchedulesPageActions(
-    onRefresh = schedules::loadData,
-    onSelectAgent = schedules::selectAgent,
-    onDeleteSchedule = { ref -> if (ref.agentId == library.selectedAgentId) schedules.deleteSchedule(ref.scheduleId) },
+    onRefresh = {
+        if (workspace.currentFocus.agentId?.value == schedules.state.value.selectedAgentId) schedules.loadData()
+    },
+    onSelectAgent = { id -> selectPageAgent(workspace, AgentId(id)) },
+    onDeleteSchedule = { ref ->
+        if (workspace.currentFocus.agentId?.value == ref.agentId && schedules.state.value.selectedAgentId == ref.agentId) {
+            schedules.deleteSchedule(ref.scheduleId)
+        }
+    },
     onCreate = { request ->
-        val agent = request.agentId ?: focusedAgent?.value
-        if (agent != null) schedules.createRecurringSchedule(request.copy(agentId = agent))
+        val agent = workspace.currentFocus.agentId?.value
+        if (agent != null && schedules.state.value.selectedAgentId == agent && (request.agentId == null || request.agentId == agent)) {
+            schedules.createRecurringSchedule(request.copy(agentId = agent))
+        }
     },
 )
 
@@ -200,21 +269,22 @@ private fun skillsPage(controllers: ShellLibraryControllers, host: ShellPageHost
         val tools by controllers.tools.state.collectAsState()
         val skills = controllers.skills
         val toolLibrary = controllers.tools
+        val focused = host.navigator.state.currentFocus.agentId
+        val matchesFocus = focused != null && catalog.agentId == focused.value && !catalog.isLoading
         val state = SkillsPageState(
             skills = catalog.skills,
-            installedSkillNames = catalog.installedSkillNames,
+            installedSkillNames = catalog.installedSkillNames.takeIf { matchesFocus }.orEmpty(),
             skillsLoading = catalog.isLoading,
             skillsError = catalog.errorMessage,
             skillActionError = catalog.actionError,
-            canManageSkills = catalog.canManage,
-            focusedAgentName = host.focus.agentName,
+            canManageSkills = catalog.canManage && matchesFocus,
+            focusedAgentName = host.focus.agentName.takeIf { host.focus.agentId == focused },
             tools = tools,
         )
-        val agent = host.focus.agentId?.value
         val actions = SkillsPageActions(
-            onRefreshSkills = { skills.reload(agent) },
-            onInstallSkill = skills::install,
-            onUninstallSkill = skills::uninstall,
+            onRefreshSkills = { skills.reload(host.navigator.state.currentFocus.agentId?.value) },
+            onInstallSkill = { name -> if (skillsMatchFocus(skills, host.navigator.state)) skills.install(name) },
+            onUninstallSkill = { name -> if (skillsMatchFocus(skills, host.navigator.state)) skills.uninstall(name) },
             onDismissSkillActionError = skills::dismissActionError,
             onRefreshTools = toolLibrary::loadTools,
             onToolTagToggled = toolLibrary::toggleTag,
@@ -223,3 +293,9 @@ private fun skillsPage(controllers: ShellLibraryControllers, host: ShellPageHost
         )
         shellSkillsPage(state, actions, SkillsPageOptions(slots = host.pages.slots)).Content(destination, modifier)
     }
+
+private fun skillsMatchFocus(skills: SkillsCatalogController, workspace: ShellWorkspaceState): Boolean {
+    val agent = workspace.currentFocus.agentId ?: return false
+    val catalog = skills.state.value
+    return catalog.agentId == agent.value && !catalog.isLoading
+}

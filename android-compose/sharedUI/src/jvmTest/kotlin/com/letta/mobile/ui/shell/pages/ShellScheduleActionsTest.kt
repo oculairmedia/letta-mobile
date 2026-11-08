@@ -8,7 +8,10 @@ import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
+import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryController
+import com.letta.mobile.data.shell.CurrentFocus
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.shell.pages.schedules.NativeScheduleRef
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,6 +28,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellScheduleActionsTest {
     private val scheduleDeletes = mutableListOf<Pair<String, String>>()
+    private val scheduleCreates = mutableListOf<String>()
 
     @Test
     fun aScheduleDeleteGoesToItsAgentAndOtherAgentsAreDropped() = runTest {
@@ -39,11 +43,35 @@ class ShellScheduleActionsTest {
         assertEquals(listOf("a1" to "s1"), scheduleDeletes)
     }
 
-    private fun TestScope.wiredActions(): SchedulesPageActions {
-        val controller = ScheduleLibraryController(agents, schedules, scope = this)
+    @Test
+    fun aStaleScheduleRowCannotDeleteAfterWorkspaceFocusChanges() = runTest {
+        val workspace = ShellWorkspaceState().apply { selectFocus(CurrentFocus(pageRoute = "schedules", agentId = AgentId("a1"))) }
+        val actions = wiredActions(workspace)
+        workspace.selectFocus(CurrentFocus(pageRoute = "schedules", agentId = AgentId("a2")))
+        actions.onDeleteSchedule(NativeScheduleRef(agentId = "a1", scheduleId = "s1"))
+        advanceUntilIdle()
+        assertEquals(emptyList(), scheduleDeletes)
+    }
+
+    @Test
+    fun aStaleScheduleFormCannotCreateAfterWorkspaceFocusChanges() = runTest {
+        val workspace = ShellWorkspaceState().apply { selectFocus(CurrentFocus(pageRoute = "schedules", agentId = AgentId("a1"))) }
+        val actions = wiredActions(workspace)
+        workspace.selectFocus(CurrentFocus(pageRoute = "schedules", agentId = AgentId("a2")))
+        actions.onCreate(ScheduleCreateRequest("a1", "Digest", "work", "0 18 * * *", "UTC"))
+        advanceUntilIdle()
+        assertEquals(emptyList(), scheduleCreates)
+    }
+
+    private fun TestScope.wiredActions(
+        workspace: ShellWorkspaceState = ShellWorkspaceState().apply {
+            selectFocus(CurrentFocus(pageRoute = "schedules", agentId = AgentId("a1")))
+        },
+    ): SchedulesPageActions {
+        val controller = ScheduleLibraryController(agents, schedules, scope = this, initialAgentId = "a1")
         controller.start()
         advanceUntilIdle()
-        return shellScheduleActions(controller, controller.state.value, focusedAgent = AgentId("a1"))
+        return shellScheduleActions(controller, workspace)
     }
 
     /** Only what the wiring touches; any other call fails the test. */
@@ -52,6 +80,12 @@ class ShellScheduleActionsTest {
             "refreshSchedules" -> Unit
             "getSchedules" -> flowOf(if (args[0] == "a1") listOf(NATIVE_S1) else emptyList())
             "deleteSchedule" -> { scheduleDeletes += args[0] as String to args[1] as String }
+            "createSchedule" -> {
+                val agent = args[0] as String
+                check(agent == "a1" || agent == "a2")
+                scheduleCreates += agent
+                NATIVE_S1.copy(id = "created", agentId = agent)
+            }
             else -> error("unused: ${method.name}")
         }
     }

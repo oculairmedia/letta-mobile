@@ -29,6 +29,7 @@ import com.letta.mobile.data.memory.MemoryParityState
 import com.letta.mobile.data.memory.graph.MemoryNodeDetails
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.data.memory.memfs.MemfsNavigation
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.memory.memfs.MemfsPageState
 import com.letta.mobile.data.model.AgentId
@@ -45,7 +46,6 @@ import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
-import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspacePage
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
 import com.letta.mobile.ui.shell.pages.workspace.MemoryPreview
 import com.letta.mobile.ui.theme.LettaDimens
@@ -59,7 +59,7 @@ class ShellMemorySources(
     val memoryActions: MemoryPageActions,
     val files: StateFlow<MemfsPageState>,
     val filesActions: MemfsPageActions,
-    /** Shows another agent's MemFS files (the files controller's own agent switch). */
+    /** Requests an agent for the shared workspace and its MemFS files. */
     val selectFilesAgent: (AgentId?) -> Unit,
 )
 
@@ -86,14 +86,19 @@ class ShellMemoryPreview(private val sources: ShellMemorySources, private val ag
     /** Opens [target], which [step] touched, focusing the Memory view on it for the conversation's agent. */
     fun open(target: ToolPreviewTarget, step: UiToolCall) {
         val view = viewOf(target) ?: return
-        opened = OpenedEntry(target, step, view)
+        val focused = agent() ?: return
+        val entry = OpenedEntry(target, step, view, focused)
+        opened = entry
         val shown = sources.memory.value.parity.memory.selectedAgentId?.let(::AgentId)
-        val focused = agent() ?: shown
         // The agent's blocks as they are now: the step may have just changed them.
-        if (focused != null && focused != shown) sources.memoryActions.selectAgent(focused.value) else sources.memoryActions.refresh()
+        if (focused != shown) sources.memoryActions.selectAgent(focused.value) else sources.memoryActions.refresh()
         if (target is ToolPreviewTarget.Memory) {
             sources.selectFilesAgent(focused)
-            sources.filesActions.openFile(target.path)
+            if (sources.files.value.agentId == focused.value) {
+                sources.filesActions.openFile(target.path)
+            } else {
+                entry.waitingForAgent = true
+            }
         }
     }
 
@@ -105,9 +110,10 @@ class ShellMemoryPreview(private val sources: ShellMemorySources, private val ag
     override fun Chip(target: ToolPreviewTarget, step: UiToolCall) {
         if (viewOf(target) == null) return
         val state by sources.memory.collectAsState()
+        val visible = memoryForFocus(state, agent())
         AssistChip(
             onClick = { open(target, step) },
-            label = { Text(chipLabel(target, state.parity.memory), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            label = { Text(chipLabel(target, visible.parity.memory), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.testTag(ShellMemoryPreviewTags.CHIP),
         )
     }
@@ -115,16 +121,31 @@ class ShellMemoryPreview(private val sources: ShellMemorySources, private val ag
     @Composable
     override fun Pane(edits: (ToolPreviewTarget) -> List<UiToolCall>, draw: @Composable (UiToolCall) -> Unit) {
         val entry = opened ?: return
+        if (agent() != entry.agent) return
         val memory by sources.memory.collectAsState()
+        val visibleMemory = memoryForFocus(memory, entry.agent)
         val files by sources.files.collectAsState()
-        FocusBlock(entry, memory)
+        FocusBlock(entry, visibleMemory)
         var view by remember(entry) { mutableStateOf(entry.view) }
+        LaunchedEffect(entry, files.agentId, files.pendingNavigation) {
+            if (files.pendingNavigation is MemfsNavigation.SwitchAgent) {
+                view = MemoryWorkspaceView.Files
+            }
+            val target = entry.target as? ToolPreviewTarget.Memory ?: return@LaunchedEffect
+            if (!entry.waitingForAgent) return@LaunchedEffect
+            if (files.agentId == entry.agent.value && agent() == entry.agent) {
+                entry.waitingForAgent = false
+                sources.filesActions.openFile(target.path)
+            } else if (files.pendingNavigation == null) {
+                entry.waitingForAgent = false
+            }
+        }
         val binding = MemoryWorkspaceBinding(
-            memory = memory,
+            memory = visibleMemory,
             memoryActions = sources.memoryActions,
             files = files,
             filesActions = sources.filesActions,
-            onFilesAgentChange = { shown -> sources.selectFilesAgent(shown?.let(::AgentId)) },
+            onFilesAgentChange = { sources.selectFilesAgent(agent()) },
             view = view,
             onViewChange = { view = it },
             memoryOptions = MemoryPageOptions(showTitle = false),
@@ -133,10 +154,14 @@ class ShellMemoryPreview(private val sources: ShellMemorySources, private val ag
         val title = stringResource(Res.string.rows_memory_preview_title)
         InspectorPane(title = title, onClose = ::close, testTag = ShellMemoryPreviewTags.PANE) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                MemoryWorkspacePage(binding, Modifier.height(MEMORY_VIEW_HEIGHT))
+                FocusMemoryWorkspacePage(
+                    binding,
+                    onSelectAgent = { sources.selectFilesAgent(it) },
+                    modifier = Modifier.height(MEMORY_VIEW_HEIGHT),
+                )
                 // Asked for only while the pane is open, once per opened entry.
                 val earlier = remember(entry) { edits(entry.target).filterNot { it.sameStepAs(entry.step) }.take(EARLIER_EDITS_MAX) }
-                MemoryInspector(InspectorSteps(entry.step, earlier, draw), usageOf(entry.target, memory.parity.memory))
+                MemoryInspector(InspectorSteps(entry.step, earlier, draw), usageOf(entry.target, visibleMemory.parity.memory))
             }
         }
     }
@@ -151,7 +176,13 @@ class ShellMemoryPreview(private val sources: ShellMemorySources, private val ag
         }
     }
 
-    private class OpenedEntry(val target: ToolPreviewTarget, val step: UiToolCall, val view: MemoryWorkspaceView)
+    private class OpenedEntry(
+        val target: ToolPreviewTarget,
+        val step: UiToolCall,
+        val view: MemoryWorkspaceView,
+        val agent: AgentId,
+        var waitingForAgent: Boolean = false,
+    )
 
     private companion object {
         fun viewOf(target: ToolPreviewTarget): MemoryWorkspaceView? = when (target) {

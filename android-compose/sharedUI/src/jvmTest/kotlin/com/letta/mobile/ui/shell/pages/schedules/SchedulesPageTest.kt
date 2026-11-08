@@ -188,13 +188,13 @@ class SchedulesPageTest {
     }
 
     @Test
-    fun anUnfocusedPageOffersTheAgentsAndAFocusedOneSelectsItsAgent() = runComposeUiTest {
+    fun aFocusedPageDoesNotDispatchAnotherSelection() = runComposeUiTest {
         val selected = mutableListOf<String>()
         val agents = listOf(AgentSummary(AgentId("a1"), "Ada"), AgentSummary(AgentId("a2"), "Bo"))
         val library = ScheduleLibraryState(isLoading = false, agents = agents, selectedAgentId = "a2")
         show(state(focusedAgentId = "a1", library = library), SchedulesPageActions(onSelectAgent = { selected += it }))
         waitForIdle()
-        assertEquals(listOf("a1"), selected)
+        assertEquals(emptyList(), selected)
         onNodeWithTag(SchedulesPageTags.agent("a2")).assertDoesNotExist()
     }
 
