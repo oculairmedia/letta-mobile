@@ -183,9 +183,9 @@ class ComposerChipPlacementUiTest {
                 assertTrue(bounds.left >= card.left && bounds.right <= card.right, "$tag $bounds overflows the card $card")
             }
         // The mode chip wraps below the primary row.
-        val send = onNodeWithTag(ComposerTestTags.SEND).getUnclippedBoundsInRoot()
+        val model = onNodeWithTag(ComposerTestTags.MODEL_CHIP).getUnclippedBoundsInRoot()
         val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).getUnclippedBoundsInRoot()
-        assertTrue(mode.top >= send.bottom, "mode chip $mode did not wrap below Send $send")
+        assertTrue(mode.top >= model.bottom, "mode chip $mode did not wrap below model chip $model")
     }
 
     /** The Touch bar carries no mode chip: its "+" sheet offers the mode (TouchComposerBarUiTest). */

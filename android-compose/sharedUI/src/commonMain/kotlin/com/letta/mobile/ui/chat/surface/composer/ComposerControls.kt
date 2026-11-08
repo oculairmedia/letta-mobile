@@ -61,9 +61,9 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The prompt card's control row: the plus (attach / open canvas), the model and effort chips,
  * the permission-mode chip, the context chip (unless it rides the hint footer, see
- * [ComposerModel.contextInHintFooter]), the platform's voice button and the send/stop button.
+ * [ComposerModel.contextInHintFooter]) and the platform's voice button.
  * Below [ChatComposerDimens.controlsWrapBreakpoint] the permission-mode and context chips wrap
- * to a second row so the primary controls and Send stay reachable. Lifted from desktop's
+ * to a second row so the primary controls stay reachable. Lifted from desktop's
  * ComposerControlRow.
  */
 @Composable
@@ -75,7 +75,7 @@ internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit)
             ControlsRow {
                 if (model.offersOpenCanvas) ComposerShowCanvasButton(onShowCanvas = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
                 ComposerPlusButton(model, onAttachImage)
-                // The chips take what is left and clip their labels before they push Send off the card.
+                // The chips take what is left and clip their labels before they push the voice button off the card.
                 Row(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -85,7 +85,6 @@ internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit)
                     if (!narrow) secondary?.invoke()
                 }
                 ComposerVoiceButton(model)
-                ComposerActionButton(model)
             }
             if (narrow && secondary != null) WrappedControlsRow { secondary() }
         }
@@ -232,7 +231,7 @@ internal fun ComposerVoiceButton(model: ComposerModel) {
  * and Android's stop morph.
  */
 @Composable
-internal fun ComposerActionButton(model: ComposerModel) {
+internal fun ComposerActionButton(model: ComposerModel, modifier: Modifier = Modifier) {
     val stops = model.decisions.action == ComposerAction.Stop
     val enabled = stops || model.decisions.sendEnabled
     val colors = actionButtonColors(stops = stops, enabled = enabled)
@@ -244,7 +243,7 @@ internal fun ComposerActionButton(model: ComposerModel) {
     Surface(
         onClick = model::runAction,
         enabled = enabled,
-        modifier = Modifier
+        modifier = modifier
             .size(LettaDimens.Control.actionButton)
             .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND)
             .graphicsLayer {
