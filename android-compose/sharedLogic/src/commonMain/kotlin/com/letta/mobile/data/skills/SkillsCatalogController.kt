@@ -1,6 +1,7 @@
 package com.letta.mobile.data.skills
 
 import androidx.compose.runtime.Immutable
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -44,21 +45,32 @@ class SkillsCatalogController(
     val state: StateFlow<SkillsCatalogState> = stateFlow.asStateFlow()
 
     private var loadJob: Job? = null
+    private val loadRevision = atomic(0L)
 
     /** Loads [agentId]'s catalog (the current agent when null is not passed explicitly). */
     fun reload(agentId: String? = stateFlow.value.agentId) {
         val skillsApi = api ?: return
+        val revision = loadRevision.incrementAndGet()
         loadJob?.cancel()
-        stateFlow.update { it.copy(agentId = agentId, isLoading = true, errorMessage = null) }
+        stateFlow.update { current ->
+            current.copy(
+                agentId = agentId,
+                installedSkillNames = current.installedSkillNames.takeIf { current.agentId == agentId }.orEmpty(),
+                isLoading = true,
+                errorMessage = null,
+            )
+        }
         loadJob = scope.launch {
             try {
                 val registry = skillsApi.listSkills()
+                if (loadRevision.value != revision) return@launch
                 val installed = agentId?.let { id -> skillsApi.listAgentSkills(id).map { it.name }.toSet() }.orEmpty()
+                if (loadRevision.value != revision) return@launch
                 stateFlow.update { it.copy(skills = registry, installedSkillNames = installed, isLoading = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                stateFlow.update { it.copy(isLoading = false, errorMessage = e.message ?: LOAD_FAILED) }
+                if (loadRevision.value == revision) stateFlow.update { it.copy(isLoading = false, errorMessage = e.message ?: LOAD_FAILED) }
             }
         }
     }
@@ -81,14 +93,17 @@ class SkillsCatalogController(
                 throw e
             } catch (e: Exception) {
                 val reason = e.message?.let { ": $it" } ?: "."
-                stateFlow.update { it.copy(actionError = "Couldn't $verb $skillName$reason") }
+                stateFlow.update {
+                    if (it.agentId == agent) it.copy(actionError = "Couldn't $verb $skillName$reason") else it
+                }
                 return@launch
             }
-            reload(agent)
+            reload()
         }
     }
 
     override fun close() {
+        loadRevision.incrementAndGet()
         loadJob?.cancel()
     }
 

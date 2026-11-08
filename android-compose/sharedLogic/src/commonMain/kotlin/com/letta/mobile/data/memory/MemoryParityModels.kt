@@ -383,11 +383,7 @@ object MemoryParityMapper {
         contextWindowOverview: ContextWindowOverview? = null,
         availability: MemoryParityAvailability = MemoryParityAvailability(),
     ): MemoryParityState {
-        val selectedAgent = if (selectedAgentId != null) {
-            agents.firstOrNull { it.id.value == selectedAgentId }
-        } else {
-            agents.firstOrNull()
-        }
+        val selectedAgent = selectedAgentId?.let { id -> agents.firstOrNull { it.id.value == id } }
         val selectedTools = selectedAgent?.tools
             ?: allTools.takeIf { selectedAgentId == null && agents.isEmpty() }
             ?: emptyList()

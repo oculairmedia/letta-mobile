@@ -1,8 +1,13 @@
 package com.letta.mobile.data.skills
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -63,6 +68,83 @@ class SkillsCatalogControllerTest {
         advanceUntilIdle()
         assertEquals(emptySet(), controller.state.value.installedSkillNames)
         assertFalse(controller.state.value.canManage)
+    }
+
+    @Test
+    fun changingAgentsClearsTheOldInstalledSetBeforeLoading() = runTest {
+        val global = mutableSetOf("notion")
+        val api = object : SkillsApi {
+            override suspend fun listSkills() = global.map { Skill(name = it) }
+            override suspend fun listAgentSkills(agentId: String): List<Skill> {
+                check(agentId.isNotBlank())
+                return global.map { Skill(name = it) }
+            }
+            override suspend fun installSkill(agentId: String, skillName: String) = error("unexpected install")
+            override suspend fun uninstallSkill(agentId: String, skillName: String) = error("unexpected uninstall")
+        }
+        val controller = SkillsCatalogController(api, this)
+        controller.reload("agent-1")
+        advanceUntilIdle()
+        assertEquals(setOf("notion"), controller.state.value.installedSkillNames)
+        controller.reload("agent-2")
+        val immediate = controller.state.value.installedSkillNames
+        advanceUntilIdle()
+
+        lateinit var oldRequest: Continuation<List<Skill>>
+        val delayed = object : SkillsApi {
+            override suspend fun listSkills() = global.map { Skill(name = it) }
+            override suspend fun listAgentSkills(agentId: String): List<Skill> {
+                check(agentId.isNotBlank())
+                return if (agentId == "agent-1") suspendCoroutine { oldRequest = it } else global.map { Skill(name = it) }
+            }
+            override suspend fun installSkill(agentId: String, skillName: String) = error("unexpected install")
+            override suspend fun uninstallSkill(agentId: String, skillName: String) = error("unexpected uninstall")
+        }
+        val second = SkillsCatalogController(delayed, this)
+        second.reload("agent-1")
+        runCurrent()
+        global.clear()
+        second.reload("agent-2")
+        runCurrent()
+        oldRequest.resume(listOf(notion))
+        advanceUntilIdle()
+        assertEquals(
+            listOf(emptySet<String>(), "agent-2", emptySet<String>()),
+            listOf(immediate, second.state.value.agentId, second.state.value.installedSkillNames),
+        )
+    }
+
+    @Test
+    fun finishingAnOldAgentMutationRefreshesTheCurrentGlobalCatalogWithoutRetargeting() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val global = mutableSetOf<String>()
+        val mutationAgents = mutableListOf<String>()
+        val api = object : SkillsApi {
+            override suspend fun listSkills() = global.map { Skill(name = it) }
+            override suspend fun listAgentSkills(agentId: String): List<Skill> {
+                check(agentId.isNotBlank())
+                return global.map { Skill(name = it) }
+            }
+            override suspend fun installSkill(agentId: String, skillName: String) {
+                check(agentId.isNotBlank() && skillName == "github")
+                gate.await()
+                mutationAgents += agentId
+                global += skillName
+            }
+            override suspend fun uninstallSkill(agentId: String, skillName: String) = error("unexpected uninstall")
+        }
+        val controller = SkillsCatalogController(api, this)
+        controller.reload("agent-1")
+        advanceUntilIdle()
+        controller.install("github")
+        runCurrent()
+        controller.reload("agent-2")
+        runCurrent()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("agent-2", controller.state.value.agentId)
+        assertEquals(setOf("github"), controller.state.value.installedSkillNames)
+        assertEquals(listOf("agent-1"), mutationAgents)
     }
 
     @Test

@@ -22,6 +22,7 @@ import com.letta.mobile.data.schedules.leases.LeaseState
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.repository.api.IScheduleRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
@@ -44,10 +46,69 @@ class ScheduleLibraryControllerTest {
         Instant.parse("2026-11-02T13:00:00Z"), LeaseState.ACTIVE)
 
     @Test
+    fun rosterDoesNotSelectAnAgentWhenFocusIsAbsent() = runTest {
+        val schedules = FakeScheduleRepository()
+        val controller = controller(scheduleRepository = schedules, initialAgentId = null)
+        controller.start()
+        advanceUntilIdle()
+        assertNull(controller.state.value.selectedAgentId)
+        assertEquals(0, schedules.refreshScheduleCallCount)
+    }
+
+    @Test
+    fun missingRosterEntryDoesNotReplaceRequestedAgent() = runTest {
+        val controller = controller(initialAgentId = "missing")
+        controller.start()
+        advanceUntilIdle()
+        assertEquals("missing", controller.state.value.selectedAgentId)
+    }
+
+    @Test
+    fun changingFocusImmediatelyClearsThePreviousAgentsRows() = runTest {
+        val controller = controller(initialAgentId = "a1")
+        controller.start()
+        advanceUntilIdle()
+        controller.selectAgent("a2")
+        assertEquals("a2", controller.state.value.selectedAgentId)
+        assertTrue(controller.state.value.schedules.isEmpty())
+        advanceUntilIdle()
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun finishingAnOldAgentsCreateDoesNotChangeTheCurrentTarget() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val schedules = FakeScheduleRepository().apply { createGate = gate }
+        val controller = controller(scheduleRepository = schedules, initialAgentId = "a1")
+        controller.start()
+        advanceUntilIdle()
+        controller.createRecurringSchedule(ScheduleCreateRequest(null, "Digest", "work", "0 18 * * *", "UTC"))
+        runCurrent()
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("a2", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun failedRosterStillLoadsTheFocusedAgentsSchedules() = runTest {
+        val agents = FakeAgentRepository().apply { rosterFailure = true }
+        val schedules = FakeScheduleRepository()
+        val controller = controller(agentRepository = agents, scheduleRepository = schedules, initialAgentId = "a2")
+        controller.start()
+        advanceUntilIdle()
+        assertEquals("a2", controller.state.value.selectedAgentId)
+        assertEquals(listOf("a2"), schedules.refreshedAgents)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
     fun coldScheduleFailureStillLoadsSelectedAgentsLeases() = runTest {
         val schedules = FakeScheduleRepository().apply { error = RuntimeException("schedule failure") }
         val controller = ScheduleLibraryController(FakeAgentRepository(), schedules, this,
-            recordSources = ScheduleRecordSources(leases = { listOf(lease) }))
+            initialAgentId = "a1", recordSources = ScheduleRecordSources(leases = { listOf(lease) }))
         controller.start()
         advanceUntilIdle()
         assertEquals("a1", controller.state.value.selectedAgentId)
@@ -60,7 +121,7 @@ class ScheduleLibraryControllerTest {
         var fail = false
         val schedules = FakeScheduleRepository()
         val controller = ScheduleLibraryController(FakeAgentRepository(), schedules, this,
-            scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
+            initialAgentId = "a1", scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
             recordSources = ScheduleRecordSources(leases = { if (fail) error("lease failure") else listOf(lease) }))
         controller.start()
         advanceUntilIdle()
@@ -80,7 +141,7 @@ class ScheduleLibraryControllerTest {
     @Test
     fun runAndLeaseFailuresAreBothReported() = runTest {
         val controller = ScheduleLibraryController(FakeAgentRepository(), FakeScheduleRepository(), this,
-            recordSources = ScheduleRecordSources(
+            initialAgentId = "a1", recordSources = ScheduleRecordSources(
                 runHistory = { _, _ -> error("run failure") },
                 leases = { error("lease failure") },
             ))
@@ -92,7 +153,7 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
-    fun loadDataSelectsFirstAgentAndLoadsSchedules() = runTest {
+    fun loadDataLoadsTheExplicitAgentsSchedules() = runTest {
         val controller = controller()
 
         controller.start()
@@ -140,6 +201,7 @@ class ScheduleLibraryControllerTest {
             agentRepository = FakeAgentRepository(),
             scheduleRepository = FakeScheduleRepository(),
             scope = this,
+            initialAgentId = "a1",
             recordSources = ScheduleRecordSources(
                 runHistory = { agent, ids ->
                     calls += agent.value to ids
@@ -167,6 +229,7 @@ class ScheduleLibraryControllerTest {
             agentRepository = FakeAgentRepository(),
             scheduleRepository = FakeScheduleRepository(),
             scope = this,
+            initialAgentId = "a1",
             recordSources = ScheduleRecordSources(leases = LeaseHistory(transport)::load),
         )
         controller.start()
@@ -195,6 +258,8 @@ class ScheduleLibraryControllerTest {
         controller.start()
         advanceUntilIdle()
 
+        controller.selectAgent("a2")
+        advanceUntilIdle()
         controller.createSchedule(
             "a2",
             ScheduleCreateParams(
@@ -478,25 +543,25 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
-    fun `null initialAgentId falls back to existing first-agent behaviour`() = runTest {
+    fun `null initialAgentId leaves selection empty`() = runTest {
         val controller = controller(initialAgentId = null)
 
         controller.start()
         advanceUntilIdle()
 
-        assertEquals("a1", controller.state.value.selectedAgentId)
-        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+        assertNull(controller.state.value.selectedAgentId)
+        assertEquals(emptyList(), controller.state.value.schedules)
     }
 
     @Test
-    fun `initialAgentId not in agent list falls back gracefully to first agent`() = runTest {
+    fun `initialAgentId not in agent list remains the target`() = runTest {
         val controller = controller(initialAgentId = "does-not-exist")
 
         controller.start()
         advanceUntilIdle()
 
-        assertEquals("a1", controller.state.value.selectedAgentId)
-        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+        assertEquals("does-not-exist", controller.state.value.selectedAgentId)
+        assertEquals(emptyList(), controller.state.value.schedules)
     }
 
     /**
@@ -511,6 +576,7 @@ class ScheduleLibraryControllerTest {
             scheduleRepository = schedules,
             scope = this,
             nativeScheduleRoute = false,
+            initialAgentId = "a1",
         )
 
         controller.start()
@@ -526,7 +592,7 @@ class ScheduleLibraryControllerTest {
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
         cronSource: CronScheduleSource? = null,
-        initialAgentId: String? = null,
+        initialAgentId: String? = "a1",
     ) = ScheduleLibraryController(
         agentRepository = agentRepository,
         scheduleRepository = scheduleRepository,
@@ -546,6 +612,7 @@ class ScheduleLibraryControllerTest {
             ),
         )
         val calls = mutableListOf<String>()
+        var rosterFailure = false
         override val agents: StateFlow<List<Agent>> = agentsFlow.asStateFlow()
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
@@ -557,6 +624,7 @@ class ScheduleLibraryControllerTest {
 
         override suspend fun listAgentSummaries(): List<AgentSummary> {
             calls += "listAgentSummaries"
+            if (rosterFailure) error("roster unavailable")
             return agents.value.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
         }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
@@ -580,10 +648,12 @@ class ScheduleLibraryControllerTest {
             "a2" to mutableListOf(sampleSchedule("s2", "a2")),
         )
         var error: Throwable? = null
+        var createGate: CompletableDeferred<Unit>? = null
         val createdSchedules = mutableListOf<ScheduleCreateParams>()
         val deletedScheduleIds = mutableListOf<String>()
 
         /** Number of times the native refresh round-trip was attempted. */
+        val refreshedAgents = mutableListOf<String>()
         var refreshScheduleCallCount = 0
             private set
 
@@ -602,6 +672,7 @@ class ScheduleLibraryControllerTest {
 
         override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
             refreshScheduleCallCount++
+            refreshedAgents += agentId
             error?.let { throw it }
         }
 
@@ -609,6 +680,7 @@ class ScheduleLibraryControllerTest {
             schedulesByAgent[agentId].orEmpty().first { it.id == scheduledMessageId }
 
         override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
+            createGate?.await()
             error?.let { throw it }
             createdSchedules.add(params)
             val schedule = sampleSchedule("created-${createdSchedules.size}", agentId)
@@ -618,8 +690,10 @@ class ScheduleLibraryControllerTest {
 
         override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
             error?.let { throw it }
+            val owner = schedulesByAgent.values.firstOrNull { schedules -> schedules.any { it.id == scheduledMessageId } }
+                ?: error("scheduled message $scheduledMessageId not found")
             deletedScheduleIds.add(scheduledMessageId)
-            schedulesByAgent[agentId]?.removeAll { it.id == scheduledMessageId }
+            owner.removeAll { it.id == scheduledMessageId }
         }
     }
 }
