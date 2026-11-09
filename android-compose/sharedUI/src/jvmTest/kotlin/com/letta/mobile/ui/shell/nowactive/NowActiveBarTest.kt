@@ -10,6 +10,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.presence.ActiveTurnState
 import com.letta.mobile.data.chat.runtime.NowActiveStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +25,22 @@ import kotlin.test.assertTrue
  * draws (formerly DesktopHeaderIdentityBlock / DesktopHeaderTrailingControls).
  */
 class NowActiveBarTest {
+    @Test
+    fun activeTurnPhasesProjectToCanonicalStatus() {
+        val expected = mapOf(
+            ActiveTurnPhase.Idle to NowActiveStatus.Idle,
+            ActiveTurnPhase.Thinking to NowActiveStatus.Thinking,
+            ActiveTurnPhase.ToolExecuting to NowActiveStatus.Thinking,
+            ActiveTurnPhase.AwaitingInput to NowActiveStatus.Thinking,
+            ActiveTurnPhase.Cancelling to NowActiveStatus.Stopping,
+        )
+        expected.forEach { (phase, status) ->
+            val turn = ActiveTurnState(ConversationId("conv-1"), AgentId("agent-1"), phase = phase)
+            assertEquals(status, turn.toNowActiveStatus(), "phase $phase")
+            assertEquals(NowActiveStatus.Error, turn.toNowActiveStatus(hasError = true), "error during $phase")
+        }
+    }
+
     private fun state(
         status: NowActiveStatus = NowActiveStatus.Idle,
         backgroundWorkAgentName: String? = null,

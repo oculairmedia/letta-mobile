@@ -9,6 +9,9 @@ import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
 import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
 import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.presence.ActiveTurnCoordinator
+import com.letta.mobile.data.presence.ActiveTurnIdentity
+import com.letta.mobile.data.presence.ActiveTurnPhase
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.timeline.Timeline
@@ -32,6 +35,8 @@ import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * The conversation a [TimelineChatSessionPort] serves. One port per conversation: a host that
@@ -95,6 +100,8 @@ data class TimelineChatSessionOptions(
     /** The conversation's live status line; null keeps it hidden. */
     val liveStatus: Flow<RuntimeLiveStatus>? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
+    /** Trusted owner for this exact target; null retains the legacy timeline stop lifecycle. */
+    val activeTurnCoordinator: ActiveTurnCoordinator? = null,
 )
 
 /**
@@ -130,7 +137,15 @@ class TimelineChatSessionPort(
         presented,
         run.map { it.clearedLocally }.distinctUntilChanged(),
         options.sendQueue?.queue ?: flowOf(ConversationSendQueue()),
-    ) { ui, cleared, queue -> ui.withRunClearedLocally(cleared).copy(sendQueue = queue) }
+        options.activeTurnCoordinator?.state ?: flowOf(null),
+        options.activeTurnCoordinator?.outcome ?: flowOf(null),
+    ) { ui, cleared, queue, turn, outcome ->
+        val projected = when (turn) {
+            null -> ui.withRunClearedLocally(cleared)
+            else -> ui.withActiveTurn(turn, outcome)
+        }
+        projected.copy(sendQueue = queue)
+    }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
     /** Stop's lifecycle, the same shared state machine Android and desktop run. */
@@ -175,6 +190,11 @@ class TimelineChatSessionPort(
     )
 
     init {
+        options.activeTurnCoordinator?.state?.value?.let { turn ->
+            require(turn.conversationId.value == target.conversationId && turn.agentId.value == target.agentId) {
+                "Active turn owner must match the session target"
+            }
+        }
         scope.launch { session.events.collect(::onSyncEvent) }
         scope.launch { load() }
     }
@@ -218,7 +238,11 @@ class TimelineChatSessionPort(
             .withHostApprovals(inputs.approvals, inputs.run.submittingApprovals)
     }
 
-    private fun initialUiState(): ChatUiState = ChatUiState(agentName = target.agentName, agentId = target.agentId)
+    private fun initialUiState(): ChatUiState {
+        val initial = ChatUiState(agentName = target.agentName, agentId = target.agentId)
+        val owner = options.activeTurnCoordinator ?: return initial
+        return initial.withActiveTurn(owner.state.value, owner.outcome.value)
+    }
 
     internal fun updateDraft(transform: (TimelineComposerDraft) -> TimelineComposerDraft) = draft.update(transform)
 
@@ -275,6 +299,10 @@ class TimelineChatSessionPort(
      */
     internal fun stopRun() {
         val stop = options.controls.stopRun ?: return
+        options.activeTurnCoordinator?.let { coordinator ->
+            stopOwnedRun(coordinator, stop)
+            return
+        }
         if (!uiState.value.isRunInFlight) return
         interrupter.request(
             ChatStopRequest(
@@ -284,6 +312,33 @@ class TimelineChatSessionPort(
                 awaitTerminal = { presented.first { !it.isRunInFlight } },
             ),
         )
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    private fun stopOwnedRun(coordinator: ActiveTurnCoordinator, stop: suspend () -> Boolean) {
+        val captured = coordinator.state.value
+        val turn = ActiveTurnIdentity(captured.runId ?: return, captured.turnId ?: return)
+        coordinator.interrupt(turn, Uuid.random().toString()) { abortOwnedRun(coordinator, turn, stop) }
+    }
+
+    private suspend fun abortOwnedRun(
+        coordinator: ActiveTurnCoordinator,
+        turn: ActiveTurnIdentity,
+        stop: suspend () -> Boolean,
+    ): Boolean = try {
+        stop()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        if (isCurrentCancellation(coordinator, turn)) {
+            run.update { it.copy(error = failure.message ?: CONTROL_FAILED) }
+        }
+        throw failure
+    }
+
+    private fun isCurrentCancellation(coordinator: ActiveTurnCoordinator, turn: ActiveTurnIdentity): Boolean {
+        val current = coordinator.state.value
+        return current.phase == ActiveTurnPhase.Cancelling && current.runId == turn.runId && current.turnId == turn.turnId
     }
 
     /** After a local clear, the timeline's own run ending lifts the overlay. */
