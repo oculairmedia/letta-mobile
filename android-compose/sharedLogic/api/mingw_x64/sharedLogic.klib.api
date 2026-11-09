@@ -53878,6 +53878,17 @@ final class com.letta.mobile.data.plugin/TemplateScan { // com.letta.mobile.data
     final fun toString(): kotlin/String // com.letta.mobile.data.plugin/TemplateScan.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.presence/ActiveTurnApproval { // com.letta.mobile.data.presence/ActiveTurnApproval|null[0]
+    constructor <init>(com.letta.mobile.runtime/ToolApprovalId, com.letta.mobile.runtime/ToolCallId, kotlin.coroutines/SuspendFunction1<kotlin/Boolean, kotlin/Boolean>) // com.letta.mobile.data.presence/ActiveTurnApproval.<init>|<init>(com.letta.mobile.runtime.ToolApprovalId;com.letta.mobile.runtime.ToolCallId;kotlin.coroutines.SuspendFunction1<kotlin.Boolean,kotlin.Boolean>){}[0]
+
+    final val requestId // com.letta.mobile.data.presence/ActiveTurnApproval.requestId|{}requestId[0]
+        final fun <get-requestId>(): com.letta.mobile.runtime/ToolApprovalId // com.letta.mobile.data.presence/ActiveTurnApproval.requestId.<get-requestId>|<get-requestId>(){}[0]
+    final val submit // com.letta.mobile.data.presence/ActiveTurnApproval.submit|{}submit[0]
+        final fun <get-submit>(): kotlin.coroutines/SuspendFunction1<kotlin/Boolean, kotlin/Boolean> // com.letta.mobile.data.presence/ActiveTurnApproval.submit.<get-submit>|<get-submit>(){}[0]
+    final val toolCallId // com.letta.mobile.data.presence/ActiveTurnApproval.toolCallId|{}toolCallId[0]
+        final fun <get-toolCallId>(): com.letta.mobile.runtime/ToolCallId // com.letta.mobile.data.presence/ActiveTurnApproval.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+}
+
 final class com.letta.mobile.data.presence/ActiveTurnCoordinator { // com.letta.mobile.data.presence/ActiveTurnCoordinator|null[0]
     constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, kotlinx.coroutines/CoroutineScope, kotlin/Function0<kotlin/Long>) // com.letta.mobile.data.presence/ActiveTurnCoordinator.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;kotlinx.coroutines.CoroutineScope;kotlin.Function0<kotlin.Long>){}[0]
 
@@ -53886,13 +53897,29 @@ final class com.letta.mobile.data.presence/ActiveTurnCoordinator { // com.letta.
     final val state // com.letta.mobile.data.presence/ActiveTurnCoordinator.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.presence/ActiveTurnState> // com.letta.mobile.data.presence/ActiveTurnCoordinator.state.<get-state>|<get-state>(){}[0]
 
-    final fun awaitApproval(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin.coroutines/SuspendFunction1<kotlin/Boolean, kotlin/Boolean>) // com.letta.mobile.data.presence/ActiveTurnCoordinator.awaitApproval|awaitApproval(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.coroutines.SuspendFunction1<kotlin.Boolean,kotlin.Boolean>){}[0]
+    final fun awaitApproval(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.data.presence/ActiveTurnApproval) // com.letta.mobile.data.presence/ActiveTurnCoordinator.awaitApproval|awaitApproval(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.data.presence.ActiveTurnApproval){}[0]
     final fun delete() // com.letta.mobile.data.presence/ActiveTurnCoordinator.delete|delete(){}[0]
-    final fun interrupt(kotlin/String, kotlin/String, kotlin/String, kotlin.coroutines/SuspendFunction0<kotlin/Boolean>) // com.letta.mobile.data.presence/ActiveTurnCoordinator.interrupt|interrupt(kotlin.String;kotlin.String;kotlin.String;kotlin.coroutines.SuspendFunction0<kotlin.Boolean>){}[0]
-    final fun progress(kotlin/String, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/Int = ...) // com.letta.mobile.data.presence/ActiveTurnCoordinator.progress|progress(kotlin.String;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.Int){}[0]
-    final fun start(kotlin/String, kotlin/String) // com.letta.mobile.data.presence/ActiveTurnCoordinator.start|start(kotlin.String;kotlin.String){}[0]
-    final fun terminate(kotlin/String, kotlin/String, com.letta.mobile.data.presence/ActiveTurnTerminalKind) // com.letta.mobile.data.presence/ActiveTurnCoordinator.terminate|terminate(kotlin.String;kotlin.String;com.letta.mobile.data.presence.ActiveTurnTerminalKind){}[0]
-    final suspend fun submitApproval(kotlin/String, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnCoordinator.submitApproval|submitApproval(kotlin.String;kotlin.Boolean){}[0]
+    final fun interrupt(com.letta.mobile.data.presence/ActiveTurnIdentity, kotlin/String, kotlin.coroutines/SuspendFunction0<kotlin/Boolean>) // com.letta.mobile.data.presence/ActiveTurnCoordinator.interrupt|interrupt(com.letta.mobile.data.presence.ActiveTurnIdentity;kotlin.String;kotlin.coroutines.SuspendFunction0<kotlin.Boolean>){}[0]
+    final fun progress(com.letta.mobile.data.presence/ActiveTurnIdentity, kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/Int = ...) // com.letta.mobile.data.presence/ActiveTurnCoordinator.progress|progress(com.letta.mobile.data.presence.ActiveTurnIdentity;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.Int){}[0]
+    final fun start(com.letta.mobile.data.presence/ActiveTurnIdentity) // com.letta.mobile.data.presence/ActiveTurnCoordinator.start|start(com.letta.mobile.data.presence.ActiveTurnIdentity){}[0]
+    final fun terminate(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.data.presence/ActiveTurnTerminalKind) // com.letta.mobile.data.presence/ActiveTurnCoordinator.terminate|terminate(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.data.presence.ActiveTurnTerminalKind){}[0]
+    final suspend fun submitApproval(com.letta.mobile.runtime/ToolApprovalId, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnCoordinator.submitApproval|submitApproval(com.letta.mobile.runtime.ToolApprovalId;kotlin.Boolean){}[0]
+}
+
+final class com.letta.mobile.data.presence/ActiveTurnIdentity { // com.letta.mobile.data.presence/ActiveTurnIdentity|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.presence/ActiveTurnIdentity.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val runId // com.letta.mobile.data.presence/ActiveTurnIdentity.runId|{}runId[0]
+        final fun <get-runId>(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnIdentity.runId.<get-runId>|<get-runId>(){}[0]
+    final val turnId // com.letta.mobile.data.presence/ActiveTurnIdentity.turnId|{}turnId[0]
+        final fun <get-turnId>(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnIdentity.turnId.<get-turnId>|<get-turnId>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnIdentity.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnIdentity.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.presence/ActiveTurnIdentity // com.letta.mobile.data.presence/ActiveTurnIdentity.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnIdentity.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.presence/ActiveTurnIdentity.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnIdentity.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.presence/ActiveTurnState { // com.letta.mobile.data.presence/ActiveTurnState|null[0]
