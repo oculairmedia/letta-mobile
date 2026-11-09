@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout
 
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test
@@ -13,7 +14,10 @@ class ShellLayoutConfigStoreTest {
         lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.SIDE to listOf(notes)),
     )
 
-    private fun store(backend: String? = "backend-a") = ShellLayoutConfigStore.forBackend(settings, backend)
+    private fun store(backend: String = "backend-a") = ShellLayoutConfigStore.forBackend(
+        settings,
+        LettaConfig(id = backend, mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = ""),
+    )
 
     @Test
     fun nothingStoredReadsAsTheDefault() {

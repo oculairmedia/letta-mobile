@@ -48,5 +48,5 @@ fun shellLayoutStore(backend: LettaConfig?, preferences: SecureSettingsStore): S
 @Composable
 fun rememberShellLayoutController(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutController =
     remember(backend?.id, preferences) {
-        ShellLayoutController(shellLayoutStore(backend, preferences), ShellLayoutConfigStore.forBackend(preferences, backend?.id))
+        ShellLayoutController(shellLayoutStore(backend, preferences), ShellLayoutConfigStore.forBackend(preferences, backend))
     }

@@ -23,7 +23,7 @@ class ShellLayoutControllerTest {
 
     private fun controller(backend: String) = ShellLayoutController(
         shellLayoutStore(backendConfig(backend), preferences),
-        ShellLayoutConfigStore.forBackend(preferences, backend),
+        ShellLayoutConfigStore.forBackend(preferences, backendConfig(backend)),
     )
 
     private fun backendConfig(id: String) = LettaConfig(id = id, mode = LettaConfig.Mode.entries.first(), serverUrl = "")

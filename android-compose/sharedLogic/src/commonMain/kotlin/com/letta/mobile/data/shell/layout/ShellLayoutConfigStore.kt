@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout
 
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,10 +37,10 @@ class ShellLayoutConfigStore(private val settings: SecureSettingsStore, private 
     /** The per-backend store. */
     companion object {
         /**
-         * The store for the backend config [backendId] (null before one is configured), beside that
+         * The store for the backend config [backend] (null before one is configured), beside that
          * backend's sidebar layout: switching backends never draws another backend's lanes.
          */
-        fun forBackend(settings: SecureSettingsStore, backendId: String?): ShellLayoutConfigStore =
-            ShellLayoutConfigStore(settings, key = "shell.${backendId.orEmpty()}.lanes")
+        fun forBackend(settings: SecureSettingsStore, backend: LettaConfig?): ShellLayoutConfigStore =
+            ShellLayoutConfigStore(settings, key = "shell.${backend?.id.orEmpty()}.lanes")
     }
 }

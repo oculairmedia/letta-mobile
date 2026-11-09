@@ -211,10 +211,10 @@ class ShellWorkspaceLanesTest {
      */
     private fun restartedShell(width: Dp, saved: ShellLayoutConfig?, block: ComposeUiTest.(ShellLayoutController) -> Unit) {
         val settings = InMemorySecureSettingsStore()
-        saved?.let { ShellLayoutConfigStore.forBackend(settings, "backend-a").save(it) }
+        saved?.let { ShellLayoutConfigStore.forBackend(settings, null).save(it) }
         val controller = ShellLayoutController(
             ShellLayoutStore(settings, "layout"),
-            ShellLayoutConfigStore.forBackend(settings, "backend-a"),
+            ShellLayoutConfigStore.forBackend(settings, null),
         )
         runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
             setContent {

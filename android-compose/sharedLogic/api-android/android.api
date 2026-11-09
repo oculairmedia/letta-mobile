@@ -49302,7 +49302,7 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore {
 }
 
 public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Companion {
-	public final fun forBackend (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
+	public final fun forBackend (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/model/LettaConfig;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
 }
 
 public final class com/letta/mobile/data/shell/layout/ShellViews {
