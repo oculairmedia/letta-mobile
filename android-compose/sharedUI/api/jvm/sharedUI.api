@@ -10623,8 +10623,9 @@ public final class com/letta/mobile/ui/shell/workspace/ShellFloatingChromeKt {
 
 public final class com/letta/mobile/ui/shell/workspace/ShellLayoutController {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/desktopshell/ShellLayoutStore;)V
+	public fun <init> (Lcom/letta/mobile/data/desktopshell/ShellLayoutStore;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)V
 	public final fun dispatch (Lcom/letta/mobile/data/desktopshell/ShellLayoutEvent;)V
+	public final fun getLanes ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
 	public final fun getState ()Lcom/letta/mobile/data/desktopshell/ShellLayoutState;
 }
 

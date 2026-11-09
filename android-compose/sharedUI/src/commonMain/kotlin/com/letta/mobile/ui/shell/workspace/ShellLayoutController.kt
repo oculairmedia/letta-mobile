@@ -9,14 +9,15 @@ import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.desktopshell.ShellLayoutStore
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.storage.SecureSettingsStore
 
 /**
- * The shell's sidebar layout as Compose state (moved from:desktop by
- *): the shared [ShellLayoutReducer]'s rules over the shared [ShellLayoutStore],
- * so the desktop window and the browser keep the same sidebar the same way.
+ * The shell's layout for one backend config: the sidebar as Compose state (the shared
+ * [ShellLayoutReducer]'s rules over the shared [ShellLayoutStore], so every host keeps the same
+ * sidebar the same way) and what the shell's lanes hold ([lanes], the stored layout config).
  */
-class ShellLayoutController(private val store: ShellLayoutStore) {
+class ShellLayoutController(private val store: ShellLayoutStore, val lanes: ShellLayoutConfigStore) {
     var state by mutableStateOf(store.load())
         private set
 
@@ -31,7 +32,12 @@ class ShellLayoutController(private val store: ShellLayoutStore) {
 fun shellLayoutStore(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutStore =
     ShellLayoutStore(preferences, key = "shell.${backend?.id.orEmpty()}.layout")
 
-/** The [ShellLayoutController] for [backend], kept while the backend config is the same; null before one is configured. */
+/**
+ * The [ShellLayoutController] for [backend] (null before one is configured), kept while the backend
+ * config is the same: its sidebar and its lanes are both that backend's.
+ */
 @Composable
 fun rememberShellLayoutController(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutController =
-    remember(backend?.id, preferences) { ShellLayoutController(shellLayoutStore(backend, preferences)) }
+    remember(backend?.id, preferences) {
+        ShellLayoutController(shellLayoutStore(backend, preferences), ShellLayoutConfigStore.forBackend(preferences, backend?.id))
+    }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +27,9 @@ import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
+import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.shell.layout.ShellViews
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.ui.shell.modules.ShellModuleTags
 import com.letta.mobile.ui.shell.modules.ShellModuleView
 import com.letta.mobile.ui.shell.modules.ShellModules
@@ -195,5 +198,41 @@ class ShellWorkspaceLanesTest {
         onNodeWithTag("stateful:first:1").assertIsDisplayed()
         onNodeWithTag("stateful:second:2").assertIsDisplayed()
         assertEquals(true, bounds("stateful:second:2").left < bounds("stateful:first:1").left, "the order did change")
+    }
+
+    /** A layout saved by one launch and read by the next (a second store over the same settings), drawn [width] wide. */
+    private fun storedLayoutWindow(width: Dp, block: ComposeUiTest.() -> Unit) {
+        val settings = InMemorySecureSettingsStore()
+        ShellLayoutConfigStore.forBackend(settings, "backend-a").save(lanes(main = listOf(PageSlot, NotesSlot)))
+        val afterRestart = ShellLayoutConfigStore.forBackend(settings, "backend-a")
+        runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
+            setContent {
+                val config = afterRestart.config.collectAsState().value
+                CompositionLocalProvider(LocalShellModules provides withNotes(config)) {
+                    LettaShellWorkspace(state, host, Modifier.size(width = width, height = WindowHeight))
+                }
+            }
+            block()
+        }
+    }
+
+    @Test
+    fun aStoredLayoutIsWhatTheWorkspaceDrawsAfterARestart() = storedLayoutWindow(1200.dp) {
+        val page = bounds(Page)
+        val notes = bounds("$Notes:project-notes")
+        assertEquals(true, notes.left >= page.right, "the stored notes module sits after the page")
+        assertDp(1200.dp - HostPaneWidth, notes.right, "the lane still ends at the host pane")
+    }
+
+    @Test
+    fun aStoredLayoutKeepsThePageOnAPhone() = storedLayoutWindow(360.dp) {
+        assertDp(360.dp - HostPaneWidth, bounds(Page).right, "the page runs to the host pane")
+        onNodeWithTag("$Notes:project-notes").assertDoesNotExist()
+    }
+
+    @Test
+    fun aStoredLayoutKeepsThePageJustAboveTheWideBreakpoint() = storedLayoutWindow(760.dp) {
+        assertDp(760.dp - HostPaneWidth, bounds(Page).right, "the page runs to the host pane")
+        onNodeWithTag("$Notes:project-notes").assertDoesNotExist()
     }
 }

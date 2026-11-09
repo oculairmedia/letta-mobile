@@ -7621,7 +7621,10 @@ final class com.letta.mobile.ui.shell.workspace/ShellConversationTabs { // com.l
 }
 
 final class com.letta.mobile.ui.shell.workspace/ShellLayoutController { // com.letta.mobile.ui.shell.workspace/ShellLayoutController|null[0]
-    constructor <init>(com.letta.mobile.data.desktopshell/ShellLayoutStore) // com.letta.mobile.ui.shell.workspace/ShellLayoutController.<init>|<init>(com.letta.mobile.data.desktopshell.ShellLayoutStore){}[0]
+    constructor <init>(com.letta.mobile.data.desktopshell/ShellLayoutStore, com.letta.mobile.data.shell.layout/ShellLayoutConfigStore) // com.letta.mobile.ui.shell.workspace/ShellLayoutController.<init>|<init>(com.letta.mobile.data.desktopshell.ShellLayoutStore;com.letta.mobile.data.shell.layout.ShellLayoutConfigStore){}[0]
+
+    final val lanes // com.letta.mobile.ui.shell.workspace/ShellLayoutController.lanes|{}lanes[0]
+        final fun <get-lanes>(): com.letta.mobile.data.shell.layout/ShellLayoutConfigStore // com.letta.mobile.ui.shell.workspace/ShellLayoutController.lanes.<get-lanes>|<get-lanes>(){}[0]
 
     final var state // com.letta.mobile.ui.shell.workspace/ShellLayoutController.state|{}state[0]
         final fun <get-state>(): com.letta.mobile.data.desktopshell/ShellLayoutState // com.letta.mobile.ui.shell.workspace/ShellLayoutController.state.<get-state>|<get-state>(){}[0]
