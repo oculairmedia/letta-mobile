@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.shell.ShellNavDrawerActions
+import com.letta.mobile.ui.shell.modules.ShellModules
 import com.letta.mobile.ui.shell.ShellNavDrawerState
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
@@ -108,6 +109,8 @@ class LettaShellWorkspaceHost(
     val events: ShellWorkspaceEvents,
     val conversationLanes: ConversationLaneProjection? = null,
     val objectPins: PinBinding? = null,
+    /** What the page lane and the side lane hold; the default is the page with the side pane after it. */
+    val modules: ShellModules = ShellModules(),
 )
 
 /** The window events the workspace reports. */

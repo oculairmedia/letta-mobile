@@ -52,7 +52,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry
-import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.InspectorHost
 import com.letta.mobile.ui.host.LocalPaneWindowClass
 import com.letta.mobile.ui.host.OverlayHostRoot
@@ -293,8 +292,7 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
             )
             VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
-        InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) { slots.main(Modifier.fillMaxSize()) }
-        slots.sidePane()
+        ShellWorkspaceLanes(frame.host, inspectors, compact = false)
     }
 }
 
@@ -324,8 +322,7 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floati
         // not under that, so its sheet still pads its rail and panel below the status bar.
         Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
             Row(Modifier.fillMaxSize()) {
-                InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) { slots.main(Modifier.fillMaxSize()) }
-                slots.sidePane()
+                ShellWorkspaceLanes(frame.host, inspectors, compact = true)
             }
             floating?.let { ShellFloatingHeader(it) }
         }

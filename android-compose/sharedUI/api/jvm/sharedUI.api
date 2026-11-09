@@ -7824,6 +7824,25 @@ public final class com/letta/mobile/ui/shell/header/UnifiedShellSearch {
 	public static synthetic fun sections$default (Lcom/letta/mobile/ui/shell/header/UnifiedShellSearch;Lcom/letta/mobile/ui/shell/header/UnifiedSearchQuery;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;Ljava/util/List;IILjava/lang/Object;)Ljava/util/List;
 }
 
+public final class com/letta/mobile/ui/shell/modules/ShellModuleTags {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/modules/ShellModuleTags;
+	public static final field UNAVAILABLE Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/modules/ShellModules {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Ljava/util/Map;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConfig ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getViews ()Ljava/util/Map;
+}
+
+public final class com/letta/mobile/ui/shell/modules/ShellModulesKt {
+	public static final fun ShellModuleSlot (Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/util/Map;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/shell/nowactive/NowActiveBarActions {
 	public static final field $stable I
 	public static final field Companion Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions$Companion;
@@ -10408,13 +10427,14 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lcom/letta/mobile/ui/shell/modules/ShellModules;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lcom/letta/mobile/ui/shell/modules/ShellModules;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getActions ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;
 	public final fun getChrome ()Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;
 	public final fun getConversationLanes ()Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 	public final fun getDrawer ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;
 	public final fun getEvents ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;
+	public final fun getModules ()Lcom/letta/mobile/ui/shell/modules/ShellModules;
 	public final fun getObjectPins ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public final fun getSlots ()Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;
 }
