@@ -30,8 +30,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal val LocalShellModules = staticCompositionLocalOf { ShellModules() }
 
 /**
- * The shell's lanes beside the navigation, drawn from the shell's layout config
- * (letta-mobile-n2stx.2): the main lane inside the inspector frame, then the side lane. With the
+ * The shell's lanes beside the navigation, drawn from the shell's layout config: the main lane
+ * inside the inspector frame, then the side lane. With the
  * default config that is the page followed by the host's side pane.
  *
  * A window shows as many main modules side by side as it has room for and a compact one shows one;

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * One module in the shell: which view draws, and the object it shows ([objectRef] is null for a view
- * that needs none). This is the shell's only composition unit (letta-mobile-n2stx.2): a container is
+ * that needs none). This is the shell's only composition unit: a container is
  * a view whose own document holds slots, so nesting needs no second concept.
  *
  * @property view the view that draws this module.
