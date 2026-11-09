@@ -32,6 +32,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.presence.ActiveTurnState
 import com.letta.mobile.data.chat.runtime.NowActiveStatus
 import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
@@ -228,3 +230,13 @@ private fun BackgroundWorkChip(agentName: String, onClick: () -> Unit) {
 }
 
 private const val STATUS_PULSE_MS = 650
+
+/** Canonical foreground status; errors remain a separate session concern. */
+fun ActiveTurnState.toNowActiveStatus(hasError: Boolean = false): NowActiveStatus =
+    if (hasError) NowActiveStatus.Error else when (phase) {
+        ActiveTurnPhase.Idle -> NowActiveStatus.Idle
+        ActiveTurnPhase.Thinking,
+        ActiveTurnPhase.ToolExecuting,
+        ActiveTurnPhase.AwaitingInput -> NowActiveStatus.Thinking
+        ActiveTurnPhase.Cancelling -> NowActiveStatus.Stopping
+    }

@@ -5,6 +5,15 @@ import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.runtime.ToolApprovalId
+import com.letta.mobile.runtime.ToolCallId
+import com.letta.mobile.data.presence.ActiveTurnApproval
+import com.letta.mobile.data.presence.ActiveTurnCoordinator
+import com.letta.mobile.data.presence.ActiveTurnIdentity
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.presence.ActiveTurnTerminalKind
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.DeliveryState
@@ -26,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -336,12 +346,212 @@ class TimelineChatSessionPortTest {
         assertNull(port.composer.value.error)
     }
 
+    @Test
+    fun ownerCancellationProjectsWithoutTimelineActivity() = runTest {
+        val owner = owner()
+        val turn = ActiveTurnIdentity("run-1", "turn-1")
+        owner.start(turn)
+        val port = port(FakeTimelineChatSession(), activeTurnCoordinator = owner)
+        assertTrue(port.uiState.value.isRunInFlight, "initial snapshot must already agree with the owner")
+        runCurrent()
+        port.actions.updateComposerText("next")
+        runCurrent()
+        assertTrue(port.uiState.value.isRunInFlight)
+        assertFalse(port.composer.value.canSend)
+
+        owner.interrupt(turn, "external-stop") { true }
+        runCurrent()
+        assertTrue(port.uiState.value.isCancellingRun)
+
+        val recreated = port(FakeTimelineChatSession(), activeTurnCoordinator = owner)
+        assertTrue(recreated.uiState.value.isCancellingRun, "recreation must not replay an idle frame")
+        runCurrent()
+        assertTrue(recreated.uiState.value.isCancellingRun)
+    }
+
+    @Test
+    fun ownerLocalClearAndTerminalOverrideStaleTimelineUntilANewTurn() = runTest {
+        val owner = owner()
+        val turn = ActiveTurnIdentity("run-1", "turn-1")
+        owner.start(turn)
+        val session = FakeTimelineChatSession()
+        session.timeline.value = timelineWith(pendingPrompt("stale"))
+        val port = port(session, activeTurnCoordinator = owner)
+        runCurrent()
+        assertTrue(port.uiState.value.isRunInFlight)
+
+        owner.terminate(turn, ActiveTurnTerminalKind.LocalClear)
+        runCurrent()
+        assertFalse(port.uiState.value.isRunInFlight)
+        assertFalse(port.uiState.value.isCancelling)
+        session.events.emit(TimelineSyncEvent.StreamError("stream", "offline"))
+        runCurrent()
+        assertEquals("offline", port.uiState.value.error)
+
+        val next = ActiveTurnIdentity("run-2", "turn-2")
+        owner.start(next)
+        runCurrent()
+        assertTrue(port.uiState.value.isRunInFlight)
+        owner.terminate(next, ActiveTurnTerminalKind.Finished)
+        runCurrent()
+        assertFalse(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun stopGesturesUseTheOwnerAndDispatchOnlyOneAbort() = runTest {
+        val owner = owner()
+        val turn = ActiveTurnIdentity("run-1", "turn-1")
+        owner.start(turn)
+        var stops = 0
+        val session = FakeTimelineChatSession()
+        session.timeline.value = timelineWith(pendingPrompt("long task"))
+        val port = port(session, TimelineChatRunControls(stopRun = { stops++; true }), activeTurnCoordinator = owner)
+        runCurrent()
+
+        pressStop(port)
+        assertEquals(ActiveTurnPhase.Cancelling, owner.state.value.phase)
+        assertTrue(port.uiState.value.isCancellingRun)
+        pressStop(port)
+        assertEquals(ActiveTurnTerminalKind.LocalClear, owner.outcome.value)
+        assertFalse(port.uiState.value.isRunInFlight)
+        assertEquals(1, stops)
+        pressStop(port)
+        assertEquals(1, stops)
+    }
+
+    @Test
+    fun ownerAbortFailureKeepsTheSessionErrorAndClearsLocally() = runTest {
+        val owner = owner()
+        owner.start(ActiveTurnIdentity("run-1", "turn-1"))
+        val port = port(
+            FakeTimelineChatSession(),
+            TimelineChatRunControls(stopRun = { throw IllegalStateException("socket closed") }),
+            activeTurnCoordinator = owner,
+        )
+        runCurrent()
+        pressStop(port)
+        assertEquals(ActiveTurnTerminalKind.LocalClear, owner.outcome.value)
+        assertEquals("socket closed", port.uiState.value.error)
+        assertFalse(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun ownerMustMatchThePortsTrustedConversationAndAgent() = runTest {
+        val wrongConversation = ActiveTurnCoordinator(
+            ConversationId("other"), AgentId(target.agentId), backgroundScope, now = { 0L },
+        )
+        val wrongAgent = ActiveTurnCoordinator(
+            ConversationId(target.conversationId), AgentId("other"), backgroundScope, now = { 0L },
+        )
+        listOf(wrongConversation, wrongAgent).forEach { owner ->
+            assertFailsWith<IllegalArgumentException> { port(FakeTimelineChatSession(), activeTurnCoordinator = owner) }
+        }
+    }
+
+    @Test
+    fun lateAbortFailureCannotAttachAnErrorToANewerTurn() = runTest {
+        val owner = owner()
+        owner.start(ActiveTurnIdentity("run-1", "turn-1"))
+        val release = CompletableDeferred<Unit>()
+        val port = port(
+            FakeTimelineChatSession(),
+            TimelineChatRunControls(stopRun = { release.await(); error("old failure") }),
+            activeTurnCoordinator = owner,
+        )
+        runCurrent()
+        pressStop(port)
+        owner.start(ActiveTurnIdentity("run-2", "turn-2"))
+        release.complete(Unit)
+        runCurrent()
+        assertNull(port.uiState.value.error)
+        assertTrue(port.uiState.value.isRunInFlight)
+        assertEquals(ActiveTurnPhase.Thinking, owner.state.value.phase)
+    }
+
+    @Test
+    fun pendingOwnerApprovalKeepsTheComposerBusyUntilAcceptance() = runTest {
+        val owner = owner()
+        val turn = ActiveTurnIdentity("run-1", "turn-1")
+        val request = ToolApprovalId("req-1")
+        val accepted = CompletableDeferred<Boolean>()
+        owner.start(turn)
+        owner.awaitApproval(turn, ActiveTurnApproval(request, ToolCallId("call-1")) { accepted.await() })
+        var submissions = 0
+        val port = port(
+            FakeTimelineChatSession(),
+            TimelineChatRunControls(answerApproval = { answer ->
+                submissions++
+                check(owner.submitApproval(turn, ToolApprovalId(answer.requestId), answer.approve))
+            }),
+            activeTurnCoordinator = owner,
+        )
+        runCurrent()
+        val answer = ChatApprovalAnswer("req-1", listOf("call-1"), approve = true, reason = null)
+        port.actions.submitApproval(answer)
+        port.actions.submitApproval(answer)
+        runCurrent()
+        assertEquals(1, submissions)
+        assertEquals(ActiveTurnPhase.AwaitingInput, owner.state.value.phase)
+        assertTrue(port.uiState.value.isRunInFlight)
+        accepted.complete(true)
+        runCurrent()
+        assertEquals(ActiveTurnPhase.ToolExecuting, owner.state.value.phase)
+        assertTrue(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun changingFocusPreservesTheBackgroundOwnersStopLifecycle() = runTest {
+        val firstOwner = owner()
+        val firstTurn = ActiveTurnIdentity("run-1", "turn-1")
+        firstOwner.start(firstTurn)
+        val first = TimelineChatSessionPort(
+            FakeTimelineChatSession(), target, backgroundScope,
+            TimelineChatSessionOptions(activeTurnCoordinator = firstOwner),
+        )
+        val firstView = backgroundScope.launch { first.uiState.collect {} }
+        runCurrent()
+        assertTrue(first.uiState.value.isRunInFlight)
+        firstView.cancel()
+        val focusAwayDurationMs = 60_000L
+        advanceTimeBy(focusAwayDurationMs)
+        runCurrent()
+
+        val otherTarget = TimelineChatTarget("agent-2", "Other", "conv-2")
+        val otherOwner = ActiveTurnCoordinator(
+            ConversationId("conv-2"), AgentId("agent-2"), backgroundScope, now = { testScheduler.currentTime },
+        )
+        otherOwner.start(ActiveTurnIdentity("run-2", "turn-2"))
+        val otherSession = FakeTimelineChatSession().apply { timeline.value = Timeline(conversationId = "conv-2") }
+        val other = TimelineChatSessionPort(
+            otherSession, otherTarget, backgroundScope, TimelineChatSessionOptions(activeTurnCoordinator = otherOwner),
+        )
+        backgroundScope.launch { other.uiState.collect {} }
+        firstOwner.interrupt(firstTurn, "background-stop") { true }
+        runCurrent()
+        assertTrue(other.uiState.value.isRunInFlight)
+        assertFalse(other.uiState.value.isCancellingRun)
+
+        backgroundScope.launch { first.uiState.collect {} }
+        runCurrent()
+        assertTrue(first.uiState.value.isCancellingRun)
+        firstOwner.terminate(firstTurn, ActiveTurnTerminalKind.LocalClear)
+        runCurrent()
+        assertFalse(first.uiState.value.isRunInFlight)
+        assertTrue(other.uiState.value.isRunInFlight)
+    }
+
+    private fun TestScope.owner() = ActiveTurnCoordinator(
+        ConversationId(target.conversationId), AgentId(target.agentId), backgroundScope,
+        now = { testScheduler.currentTime },
+    )
+
     private fun TestScope.port(
         session: FakeTimelineChatSession,
         controls: TimelineChatRunControls = TimelineChatRunControls(),
         sendQueue: ChatSendQueueSource? = null,
+        activeTurnCoordinator: ActiveTurnCoordinator? = null,
     ): TimelineChatSessionPort {
-        val options = TimelineChatSessionOptions(controls = controls, sendQueue = sendQueue)
+        val options = TimelineChatSessionOptions(controls = controls, sendQueue = sendQueue, activeTurnCoordinator = activeTurnCoordinator)
         val port = TimelineChatSessionPort(session, target, backgroundScope, options)
         // The page's flows share while collected, as ChatSurface collects them.
         backgroundScope.launch { port.uiState.collect {} }

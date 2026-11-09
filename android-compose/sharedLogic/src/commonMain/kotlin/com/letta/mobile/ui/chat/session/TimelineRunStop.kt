@@ -2,6 +2,9 @@ package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.chat.runtime.ChatRunInterruptHost
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.presence.ActiveTurnState
+import com.letta.mobile.data.presence.ActiveTurnTerminalKind
 
 /*
  * letta-mobile-by4vm.81: a TimelineChatSessionPort's side of the shared
@@ -44,3 +47,10 @@ internal class TimelineRunStopHost(
  */
 fun ChatUiState.withRunClearedLocally(clearedLocally: Boolean): ChatUiState =
     if (clearedLocally) copy(isStreaming = false, isAgentTyping = false, isCancelling = false) else this
+
+/** Owner-backed ports derive foreground activity entirely from the captured session snapshot. */
+internal fun ChatUiState.withActiveTurn(turn: ActiveTurnState, outcome: ActiveTurnTerminalKind?): ChatUiState = copy(
+    isStreaming = turn.phase != ActiveTurnPhase.Idle,
+    isAgentTyping = isAgentTyping && turn.phase != ActiveTurnPhase.Idle,
+    isCancelling = turn.phase == ActiveTurnPhase.Cancelling,
+).withRunClearedLocally(outcome == ActiveTurnTerminalKind.LocalClear)

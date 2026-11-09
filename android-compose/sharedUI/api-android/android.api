@@ -7720,6 +7720,8 @@ public final class com/letta/mobile/ui/shell/nowactive/NowActiveBarKt {
 	public static final fun NowActiveRunControls (Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getLabel (Lcom/letta/mobile/data/chat/runtime/NowActiveStatus;)Ljava/lang/String;
 	public static final fun isLiveRun (Lcom/letta/mobile/data/chat/runtime/NowActiveStatus;)Z
+	public static final fun toNowActiveStatus (Lcom/letta/mobile/data/presence/ActiveTurnState;Z)Lcom/letta/mobile/data/chat/runtime/NowActiveStatus;
+	public static synthetic fun toNowActiveStatus$default (Lcom/letta/mobile/data/presence/ActiveTurnState;ZILjava/lang/Object;)Lcom/letta/mobile/data/chat/runtime/NowActiveStatus;
 }
 
 public final class com/letta/mobile/ui/shell/nowactive/NowActiveBarState {

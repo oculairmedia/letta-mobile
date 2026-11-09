@@ -47,7 +47,10 @@ data class TimelineSend(
     val attachments: List<MessageContentPart.Image>,
 )
 
-/** The run and load facts the timeline itself does not carry. */
+/**
+ * Session errors, loading and approval submissions, plus the legacy stop lifecycle.
+ * Owner-backed ports ignore [cancelling] and [clearedLocally] in favor of their coordinator.
+ */
 data class TimelineRunState(
     val loading: Boolean = true,
     val loadError: String? = null,
