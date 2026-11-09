@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell.workspace
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,14 @@ class ShellLayoutController(private val store: ShellLayoutStore, val lanes: Shel
         state = ShellLayoutReducer.reduce(previous, event)
         store.record(previous, state)
     }
+
+    /**
+     * The workspace's layout as this controller now has it: the stored lanes, collected so a saved
+     * layout redraws the shell at once, and the person's sidebar choice.
+     */
+    @Composable
+    fun workspaceLayout(reducedMotion: Boolean = false, forceCompact: Boolean = false): ShellWorkspaceLayout =
+        ShellWorkspaceLayout(lanes.config.collectAsState().value, state.isSidebarVisible, reducedMotion, forceCompact)
 }
 
 /** The layout store for [backend] in [preferences]: one record per backend config. */

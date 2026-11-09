@@ -7628,6 +7628,7 @@ final class com.letta.mobile.ui.shell.workspace/ShellLayoutController { // com.l
         final fun <get-state>(): com.letta.mobile.data.desktopshell/ShellLayoutState // com.letta.mobile.ui.shell.workspace/ShellLayoutController.state.<get-state>|<get-state>(){}[0]
 
     final fun dispatch(com.letta.mobile.data.desktopshell/ShellLayoutEvent) // com.letta.mobile.ui.shell.workspace/ShellLayoutController.dispatch|dispatch(com.letta.mobile.data.desktopshell.ShellLayoutEvent){}[0]
+    final fun workspaceLayout(kotlin/Boolean, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int): com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout // com.letta.mobile.ui.shell.workspace/ShellLayoutController.workspaceLayout|workspaceLayout(kotlin.Boolean;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 }
 
 final class com.letta.mobile.ui.shell.workspace/ShellMinimalHeader { // com.letta.mobile.ui.shell.workspace/ShellMinimalHeader|null[0]

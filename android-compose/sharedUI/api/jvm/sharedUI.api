@@ -10625,6 +10625,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellLayoutController {
 	public final fun dispatch (Lcom/letta/mobile/data/desktopshell/ShellLayoutEvent;)V
 	public final fun getLanes ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
 	public final fun getState ()Lcom/letta/mobile/data/desktopshell/ShellLayoutState;
+	public final fun workspaceLayout (ZZLandroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellLayoutControllerKt {
