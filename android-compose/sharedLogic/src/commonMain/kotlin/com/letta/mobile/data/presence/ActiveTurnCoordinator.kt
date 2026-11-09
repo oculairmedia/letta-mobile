@@ -121,11 +121,11 @@ class ActiveTurnCoordinator(
     }
 
     /** Distinct stop gestures have distinct IDs; redelivery reuses the same operation ID. */
-    fun interrupt(turn: ActiveTurnIdentity, operationId: String, abort: suspend () -> Boolean) {
+    fun interrupt(turn: ActiveTurnIdentity, operationKey: String, abort: suspend () -> Boolean) {
         val requestedAt = now()
         synchronized(lock) {
-            require(operationId.isNotBlank())
-            if (!active(turn) || !operations.add(operationId)) return
+            require(operationKey.isNotBlank())
+            if (!active(turn) || !operations.add(operationKey)) return
             if (state.value.phase == ActiveTurnPhase.Cancelling) {
                 close(turn, ActiveTurnTerminalKind.LocalClear)
                 return
