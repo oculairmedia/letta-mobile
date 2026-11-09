@@ -40796,6 +40796,101 @@ public final class com/letta/mobile/data/plugin/view/ViewTheme$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/presence/ActiveTurnBoundary : java/lang/Enum {
+	public static final field ApprovalResolved Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static final field Companion Lcom/letta/mobile/data/presence/ActiveTurnBoundary$Companion;
+	public static final field Delete Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static final field Interrupt Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static final field Progress Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static final field Start Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static final field Terminal Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+	public static fun values ()[Lcom/letta/mobile/data/presence/ActiveTurnBoundary;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnBoundary$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnPhase : java/lang/Enum {
+	public static final field AwaitingInput Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public static final field Cancelling Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public static final field Companion Lcom/letta/mobile/data/presence/ActiveTurnPhase$Companion;
+	public static final field Idle Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public static final field Thinking Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public static final field ToolExecuting Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public static fun values ()[Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnPhase$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnState {
+	public static final field Companion Lcom/letta/mobile/data/presence/ActiveTurnState$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnPhase;Ljava/lang/String;ILjava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnPhase;Ljava/lang/String;ILjava/lang/Long;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-nFOXY6g ()Ljava/lang/String;
+	public final fun component2-zqmzO_A ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()I
+	public final fun component8 ()Ljava/lang/Long;
+	public final fun copy-MIQ9GtE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnPhase;Ljava/lang/String;ILjava/lang/Long;)Lcom/letta/mobile/data/presence/ActiveTurnState;
+	public static synthetic fun copy-MIQ9GtE$default (Lcom/letta/mobile/data/presence/ActiveTurnState;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnPhase;Ljava/lang/String;ILjava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/data/presence/ActiveTurnState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActiveTool ()Ljava/lang/String;
+	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
+	public final fun getConversationId-nFOXY6g ()Ljava/lang/String;
+	public final fun getPhase ()Lcom/letta/mobile/data/presence/ActiveTurnPhase;
+	public final fun getRunId ()Ljava/lang/String;
+	public final fun getStartedAtEpochMs ()Ljava/lang/Long;
+	public final fun getSubagentCount ()I
+	public final fun getTurnId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/presence/ActiveTurnState$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/presence/ActiveTurnState$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/presence/ActiveTurnState;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/presence/ActiveTurnState;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnStateKt {
+	public static final fun arbitrateActiveTurn (Lcom/letta/mobile/data/presence/ActiveTurnState;Lcom/letta/mobile/data/presence/ActiveTurnState;Lcom/letta/mobile/data/presence/ActiveTurnBoundary;)Lcom/letta/mobile/data/presence/ActiveTurnState;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnTerminalKind : java/lang/Enum {
+	public static final field Cancelled Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+	public static final field Companion Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind$Companion;
+	public static final field Deleted Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+	public static final field Failed Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+	public static final field Finished Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+	public static final field LocalClear Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+	public static fun values ()[Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnTerminalKind$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/letta/mobile/data/presence/AgentActivityKind : java/lang/Enum {
 	public static final field DELEGATING Lcom/letta/mobile/data/presence/AgentActivityKind;
 	public static final field IDLE Lcom/letta/mobile/data/presence/AgentActivityKind;

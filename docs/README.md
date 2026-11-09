@@ -205,6 +205,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 ### reference/contracts
 
+- [Active turn v1: contract proposal](reference/contracts/active-turn-v1.md)
 - [Conversation lanes v1](reference/contracts/conversation-lanes-v1.md)
 - [Current focus v1: contract proposal](reference/contracts/current-focus-v1.md)
 - [Lane inbox v1](reference/contracts/lane-inbox-v1.md)

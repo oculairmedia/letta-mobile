@@ -1,0 +1,843 @@
+[
+  {
+    "name": "normal turn start stream finished",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": null,
+      "turnId": null,
+      "phase": "Idle",
+      "activeTool": null,
+      "subagentCount": 0,
+      "startedAtEpochMs": null
+    },
+    "steps": [
+      {
+        "boundary": "Start",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Start",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      }
+    ]
+  },
+  {
+    "name": "tool execution and approval request",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": "run-1",
+      "turnId": "turn-1",
+      "phase": "Thinking",
+      "activeTool": null,
+      "subagentCount": 0,
+      "startedAtEpochMs": 1000
+    },
+    "steps": [
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "AwaitingInput",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "AwaitingInput",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "AwaitingInput",
+          "activeTool": "Bash",
+          "subagentCount": 1,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "AwaitingInput",
+          "activeTool": "Bash",
+          "subagentCount": 1,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "AwaitingInput",
+          "activeTool": "Bash",
+          "subagentCount": 1,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "ApprovalResolved",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      }
+    ]
+  },
+  {
+    "name": "stop during streaming",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": "run-1",
+      "turnId": "turn-1",
+      "phase": "Thinking",
+      "activeTool": null,
+      "subagentCount": 0,
+      "startedAtEpochMs": 1000
+    },
+    "steps": [
+      {
+        "boundary": "Interrupt",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Cancelling",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Cancelling",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      }
+    ]
+  },
+  {
+    "name": "second stop force clear",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": "run-1",
+      "turnId": "turn-1",
+      "phase": "Thinking",
+      "activeTool": null,
+      "subagentCount": 0,
+      "startedAtEpochMs": 1000
+    },
+    "steps": [
+      {
+        "boundary": "Interrupt",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Cancelling",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Interrupt",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Interrupt",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Start",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-2",
+          "turnId": "turn-2",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 2000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-2",
+          "turnId": "turn-2",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 2000
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-2",
+          "turnId": "turn-2",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 2000
+        }
+      }
+    ]
+  },
+  {
+    "name": "out of order terminal recovery",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": null,
+      "turnId": null,
+      "phase": "Idle",
+      "activeTool": null,
+      "subagentCount": 0,
+      "startedAtEpochMs": null
+    },
+    "steps": [
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Start",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Start",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-2",
+          "turnId": "turn-2",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 2000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-2",
+          "turnId": "turn-2",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 2000
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-2",
+          "turnId": "turn-2",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 2000
+        }
+      }
+    ]
+  },
+  {
+    "name": "conversation deletion active run",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": "run-1",
+      "turnId": "turn-1",
+      "phase": "ToolExecuting",
+      "activeTool": "Bash",
+      "subagentCount": 2,
+      "startedAtEpochMs": 1000
+    },
+    "steps": [
+      {
+        "boundary": "Delete",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        }
+      }
+    ]
+  },
+  {
+    "name": "wrong scope and turn never fallback",
+    "initial": {
+      "conversationId": "conv-1",
+      "agentId": "agent-1",
+      "runId": "run-1",
+      "turnId": "turn-1",
+      "phase": "Thinking",
+      "activeTool": null,
+      "subagentCount": 0,
+      "startedAtEpochMs": 1000
+    },
+    "steps": [
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-other",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Interrupt",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "wrong",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Terminal",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "wrong",
+          "phase": "Idle",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": null
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      },
+      {
+        "boundary": "Progress",
+        "candidate": {
+          "conversationId": "conv-1",
+          "agentId": "agent-other",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "ToolExecuting",
+          "activeTool": "Bash",
+          "subagentCount": 2,
+          "startedAtEpochMs": 1000
+        },
+        "expected": {
+          "conversationId": "conv-1",
+          "agentId": "agent-1",
+          "runId": "run-1",
+          "turnId": "turn-1",
+          "phase": "Thinking",
+          "activeTool": null,
+          "subagentCount": 0,
+          "startedAtEpochMs": 1000
+        }
+      }
+    ]
+  }
+]
