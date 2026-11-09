@@ -64,12 +64,13 @@ import kotlin.time.Instant
  * the desktop window does: the shared navigation over the workspace and its roster, the shared pages
  * in the main pane, the shared overlays, and the shared agent context card with the connection's status.
  */
-internal fun webWorkspaceState(shell: WebShell, page: WebPageInputs, header: ShellWorkspaceHeaderState, now: Instant) =
-    LettaShellWorkspaceState(
-        header,
-        shell.workspace.workspaceNavigation(shell.backend.roster, now, conversations = page.chat.list),
-        ShellWorkspaceLayout(sidebarVisible = shell.layout.state.isSidebarVisible),
-    )
+internal fun WebShell.workspaceState(
+    page: WebPageInputs,
+    header: ShellWorkspaceHeaderState,
+    now: Instant,
+    layout: ShellWorkspaceLayout,
+) =
+    LettaShellWorkspaceState(header, workspace.workspaceNavigation(backend.roster, now, conversations = page.chat.list), layout)
 
 /** The web's part in the workspace, kept across passes: every slot reads the [page] as it now stands. */
 internal fun webWorkspaceHost(shell: WebShell, page: androidx.compose.runtime.State<WebPageInputs>): LettaShellWorkspaceHost {

@@ -45,7 +45,6 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
-import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
@@ -84,11 +83,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 state = LettaShellWorkspaceState(
                     header = header.state,
                     navigation = desktopWorkspaceNavigation(context, frame),
-                    layout = ShellWorkspaceLayout(
-                        sidebarVisible = layout.controller.state.isSidebarVisible,
-                        reducedMotion = layout.reducedMotion,
-                        forceCompact = phone != null,
-                    ),
+                    layout = layout.controller.workspaceLayout(layout.reducedMotion, forceCompact = phone != null),
                 ),
                 host = com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHost(
                     frame,

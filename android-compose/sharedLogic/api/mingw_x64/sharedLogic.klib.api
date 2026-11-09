@@ -58796,6 +58796,19 @@ final class com.letta.mobile.data.shell.layout/ShellLayoutConfig { // com.letta.
     }
 }
 
+final class com.letta.mobile.data.shell.layout/ShellLayoutConfigStore { // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore|null[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore, kotlin/String) // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore;kotlin.String){}[0]
+
+    final val config // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.config|{}config[0]
+        final fun <get-config>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.shell.layout/ShellLayoutConfig> // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.config.<get-config>|<get-config>(){}[0]
+
+    final fun save(com.letta.mobile.data.shell.layout/ShellLayoutConfig) // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.save|save(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+
+    final object Companion { // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion|null[0]
+        final fun forBackend(com.letta.mobile.data.storage/SecureSettingsStore, com.letta.mobile.data.model/LettaConfig?): com.letta.mobile.data.shell.layout/ShellLayoutConfigStore // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion.forBackend|forBackend(com.letta.mobile.data.storage.SecureSettingsStore;com.letta.mobile.data.model.LettaConfig?){}[0]
+    }
+}
+
 final class com.letta.mobile.data.shell/CurrentFocus { // com.letta.mobile.data.shell/CurrentFocus|null[0]
     constructor <init>(kotlin/String = ..., com.letta.mobile.data.model/AgentId? = ..., com.letta.mobile.data.model/ConversationId? = ..., com.letta.mobile.data.shell/CurrentFocusChatMode = ...) // com.letta.mobile.data.shell/CurrentFocus.<init>|<init>(kotlin.String;com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.shell.CurrentFocusChatMode){}[0]
 

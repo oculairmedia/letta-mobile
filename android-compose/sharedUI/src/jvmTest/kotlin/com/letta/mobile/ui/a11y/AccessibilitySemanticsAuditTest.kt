@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.a11y
 
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
 import com.letta.mobile.ui.theme.HighContrastPreference
@@ -214,6 +216,7 @@ private fun AccessibilityAuditFixture() {
                 canvases = listOf(ShellCanvasRowModel(id = CanvasId("k1"), title = "Canvas", timeLabel = "1h")),
             ),
         ),
+        layout = ShellWorkspaceLayout(lanes = ShellLayoutConfig.Default),
     )
     val workspaceHost = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),

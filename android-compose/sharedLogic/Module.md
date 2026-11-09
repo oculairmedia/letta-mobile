@@ -547,7 +547,7 @@ Portable shell destinations, routes, workspace navigation and page errors. Entry
 
 # Package com.letta.mobile.data.shell.layout
 
-What the shell's lanes hold, as data: a slot names a view and the object it shows, and a layout config lists the slots in each lane. The default config is the page with the host's side pane after it, the page is always recoverable, and a saved config gains new default modules once. Keep rendering and window sizes outside the config; it only says what is placed where.
+What the shell's lanes hold, as data: a slot names a view and the object it shows, and a layout config lists the slots in each lane. The default config is the page with the host's side pane after it, the page is always recoverable, and a saved config gains new default modules once. Keep rendering and window sizes outside the config; it only says what is placed where. `ShellLayoutConfigStore` keeps one config per backend config in the shared settings port, reads it once so the first frame draws it, and falls back to the default when nothing readable is stored.
 
 # Package com.letta.mobile.data.skills
 

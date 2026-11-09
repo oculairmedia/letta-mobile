@@ -2,8 +2,14 @@ package com.letta.mobile.ui.shell.workspace
 
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.shell.layout.ModuleSlot
+import com.letta.mobile.data.shell.layout.ShellLanes
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
+import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -15,8 +21,10 @@ import kotlin.test.assertTrue
 class ShellLayoutControllerTest {
     private val preferences = InMemorySecureSettingsStore()
 
-    private fun controller(backend: String) =
-        ShellLayoutController(shellLayoutStore(backendConfig(backend), preferences))
+    private fun controller(backend: String) = ShellLayoutController(
+        shellLayoutStore(backendConfig(backend), preferences),
+        ShellLayoutConfigStore.forBackend(preferences, backendConfig(backend)),
+    )
 
     private fun backendConfig(id: String) = LettaConfig(id = id, mode = LettaConfig.Mode.entries.first(), serverUrl = "")
 
@@ -50,5 +58,16 @@ class ShellLayoutControllerTest {
         val laterWideLaunch = controller("backend-a")
         laterWideLaunch.dispatch(ShellLayoutEvent.WindowWidthChanged(1400f))
         assertFalse(laterWideLaunch.state.collapsedPreference)
+    }
+
+    @Test
+    fun savedLanesSurviveASimulatedRestartForTheirBackendOnly() {
+        val notes = ShellLayoutConfig.Default.copy(
+            lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.SIDE to listOf(ModuleSlot(RuntimeViewId("test.notes")))),
+        )
+        controller("backend-a").lanes.save(notes)
+
+        assertEquals(notes, controller("backend-a").lanes.config.value)
+        assertEquals(ShellLayoutConfig.Default, controller("backend-b").lanes.config.value)
     }
 }

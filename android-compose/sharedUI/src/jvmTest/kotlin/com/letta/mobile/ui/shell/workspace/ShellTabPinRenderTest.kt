@@ -23,6 +23,7 @@ import com.letta.mobile.data.shell.SessionShellChatPort
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.ui.components.tabs.LettaTabStripTags
 import com.letta.mobile.ui.components.tabs.LettaTab
@@ -40,7 +41,8 @@ class ShellTabPinRenderTest {
     fun headerPinsAndUnpinsPreview() = runComposeUiTest {
         val state = ShellWorkspaceState(ShellDestination.Chat(conversationId = "a"))
         val navigator = ShellWorkspaceNavigator(state, SessionShellChatPort())
-        val layout = ShellLayoutController(ShellLayoutStore(InMemorySecureSettingsStore(), "test"))
+        val settings = InMemorySecureSettingsStore()
+        val layout = ShellLayoutController(ShellLayoutStore(settings, "test"), ShellLayoutConfigStore(settings, "test.lanes"))
         setContent {
             MaterialTheme { ProvideLettaHost(LettaHost.desktopPointer { it }) {
                 val header = rememberShellWorkspaceHeader(

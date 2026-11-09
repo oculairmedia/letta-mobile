@@ -49294,6 +49294,17 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig$Companio
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore {
+	public static final field Companion Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Companion;
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;)V
+	public final fun getConfig ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun save (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)V
+}
+
+public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Companion {
+	public final fun forBackend (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/model/LettaConfig;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
+}
+
 public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellViews;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;

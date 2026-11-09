@@ -2,6 +2,7 @@
 
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
@@ -263,7 +264,7 @@ private fun HeaderLoopWorkspace(header: MutableState<ShellWorkspaceHeaderState?>
                 ShellLibraryRailState(emptyList(), ShellRailFocus()),
                 ShellAgentPanelState(ShellPanelAgent(name = "", agentId = "")),
             ),
-            layout = ShellWorkspaceLayout(reducedMotion = true),
+            layout = ShellWorkspaceLayout(lanes = ShellLayoutConfig.Default, reducedMotion = true),
         ),
         host = host,
     )

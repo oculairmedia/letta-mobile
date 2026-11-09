@@ -82,7 +82,7 @@ fun LettaWebApp() {
                 // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
                 ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
                     ReportCompositionPasses("workspace root", enabled = pagePerfRequested)
-                    LettaShellWorkspace(webWorkspaceState(shell, page, header, rememberCoarseNow().value), host)
+                    LettaShellWorkspace(shell.workspaceState(page, header, rememberCoarseNow().value, layout.workspaceLayout()), host)
                 }
             }
         }

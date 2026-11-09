@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -114,7 +115,7 @@ class WorkspaceIdiomTest {
                             rail = ShellLibraryRailState(agents = emptyList(), focus = ShellRailFocus()),
                             panel = ShellAgentPanelState(agent = ShellPanelAgent(name = "Ada", agentId = "agent-a")),
                         ),
-                        layout = ShellWorkspaceLayout(forceCompact = forceCompact),
+                        layout = ShellWorkspaceLayout(lanes = ShellLayoutConfig.Default, forceCompact = forceCompact),
                     ),
                     host(main = { modifier -> Record(seen, modifier) }),
                     Modifier.size(width = width, height = 800.dp),

@@ -15,6 +15,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.InspectorHost
@@ -24,13 +25,13 @@ import com.letta.mobile.ui.shell.modules.ShellModules
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * What the lanes hold. Nothing saves or loads a layout yet, so the workspace always draws the
- * default; hosts get a way to supply this once there is a stored layout for them to supply.
+ * Views added for the lanes to draw. What the lanes hold comes from the workspace state's layout;
+ * this only supplies views (tests add theirs here), and the shell's own views always win.
  */
 internal val LocalShellModules = staticCompositionLocalOf { ShellModules() }
 
 /**
- * The shell's lanes beside the navigation, drawn from the shell's layout config: the main lane
+ * The shell's lanes beside the navigation, drawn from the shell's layout [config]: the main lane
  * inside the inspector frame, then the side lane. With the
  * default config that is the page followed by the host's side pane.
  *
@@ -38,10 +39,14 @@ internal val LocalShellModules = staticCompositionLocalOf { ShellModules() }
  * side modules other than the host's own pane are left out of a compact window.
  */
 @Composable
-internal fun RowScope.ShellWorkspaceLanes(host: LettaShellWorkspaceHost, inspectors: InspectorHost, compact: Boolean) {
+internal fun RowScope.ShellWorkspaceLanes(
+    host: LettaShellWorkspaceHost,
+    config: ShellLayoutConfig,
+    inspectors: InspectorHost,
+    compact: Boolean,
+) {
     val modules = LocalShellModules.current
     val views = remember(host, modules) { host.moduleViews(modules) }
-    val config = modules.config
     InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val room = if (compact) 1 else (maxWidth / LettaDimens.Pane.sidePanelWidth).toInt()

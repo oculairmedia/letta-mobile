@@ -147,6 +147,7 @@ private fun androidState(shell: WorkspaceShell, agents: List<Agent>, fleet: List
         header = header,
         navigation = rememberAndroidNavigation(shell, agents),
         layout = ShellWorkspaceLayout(
+            lanes = shell.layout.lanes.config.collectAsStateWithLifecycle().value,
             sidebarVisible = shell.layout.state.isSidebarVisible,
             reducedMotion = rememberReducedMotionEnabled(),
         ),
