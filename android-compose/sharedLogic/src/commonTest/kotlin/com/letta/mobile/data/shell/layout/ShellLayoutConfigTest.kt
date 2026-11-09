@@ -81,4 +81,79 @@ class ShellLayoutConfigTest {
 
         assertEquals(listOf(notes), repeated.lane(ShellLanes.SIDE))
     }
+
+    private val homeDefaults = listOf(
+        HomeViews.COMPOSER,
+        HomeViews.NOW,
+        HomeViews.RECENTS,
+        HomeViews.AGENTS,
+        HomeViews.STATS,
+        HomeViews.PINNED,
+        HomeViews.FLEET,
+    ).map { ModuleSlot(it) }
+
+    @Test
+    fun theDefaultHomeLaneIsTheWidePageOrder() {
+        assertEquals(homeDefaults, ShellLayoutConfig.Default.lane(ShellLanes.HOME))
+        assertEquals(
+            listOf("home.composer", "home.now", "home.recents", "home.agents", "home.stats", "home.pinned", "home.fleet"),
+            homeDefaults.map { it.view.value },
+        )
+    }
+
+    @Test
+    fun aVersionOneConfigWithoutAHomeLaneGainsItOnce() {
+        val v1 = ShellLayoutConfig(
+            version = 1,
+            lanes = mapOf(
+                ShellLanes.MAIN to listOf(ModuleSlot(ShellViews.PAGE)),
+                ShellLanes.SIDE to listOf(ModuleSlot(ShellViews.SIDE_PANE)),
+            ),
+        )
+
+        val upgraded = ShellLayoutConfig.decode(v1.encode())
+
+        assertEquals(ShellLayoutConfig.VERSION, upgraded.version)
+        assertEquals(homeDefaults, upgraded.lane(ShellLanes.HOME))
+        assertEquals(ShellLayoutConfig.Default, upgraded)
+
+        // The person then removes the stats strip; reading it back at the same version keeps it removed.
+        val noStats = homeDefaults - ModuleSlot(HomeViews.STATS)
+        val withoutStats = upgraded.copy(lanes = upgraded.lanes + (ShellLanes.HOME to noStats))
+        val reread = ShellLayoutConfig.decode(withoutStats.encode())
+
+        assertEquals(noStats, reread.lane(ShellLanes.HOME))
+        assertEquals(reread, reread.upgraded())
+    }
+
+    @Test
+    fun upgradingAVersionOneConfigDoesNotBringBackItsRemovedModules() {
+        val v1WithoutSidePane = ShellLayoutConfig(
+            version = 1,
+            lanes = mapOf(ShellLanes.MAIN to listOf(ModuleSlot(ShellViews.PAGE)), ShellLanes.SIDE to emptyList()),
+        )
+
+        val upgraded = v1WithoutSidePane.upgraded()
+
+        assertEquals(emptyList(), upgraded.lane(ShellLanes.SIDE))
+        assertEquals(homeDefaults, upgraded.lane(ShellLanes.HOME))
+    }
+
+    @Test
+    fun anUpgradeKeepsAHomeLaneTheConfigAlreadyHas() {
+        val own = listOf(ModuleSlot(HomeViews.RECENTS), notes)
+        val v1 = ShellLayoutConfig(version = 1, lanes = mapOf(ShellLanes.HOME to own))
+
+        assertEquals(own + (homeDefaults - ModuleSlot(HomeViews.RECENTS)), v1.upgraded().lane(ShellLanes.HOME))
+        assertEquals(emptyList(), v1.upgraded().lane(ShellLanes.SIDE))
+    }
+
+    @Test
+    fun aConfigWithoutAHomeLaneShowsTheDefaultSectionsAndAnEmptiedOneShowsNone() {
+        val noHomeLane = ShellLayoutConfig(version = ShellLayoutConfig.VERSION, lanes = mapOf(ShellLanes.MAIN to listOf(notes)))
+        val emptied = ShellLayoutConfig.Default.copy(lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.HOME to emptyList()))
+
+        assertEquals(homeDefaults, noHomeLane.homeLane())
+        assertEquals(emptyList(), emptied.homeLane())
+    }
 }

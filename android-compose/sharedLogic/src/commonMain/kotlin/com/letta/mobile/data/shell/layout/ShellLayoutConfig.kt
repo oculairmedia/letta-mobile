@@ -22,6 +22,12 @@ object ShellLanes {
 
     /** After the main lane, each module at its own width. */
     const val SIDE = "side"
+
+    /**
+     * The Home page's sections, top to bottom. The page draws its header, search results and
+     * refresh around them, and decides per width where a section goes (see [HomeViews]).
+     */
+    const val HOME = "home"
 }
 
 /** The views the shell itself supplies; every host binds them, so they are always available. */
@@ -31,6 +37,34 @@ object ShellViews {
 
     /** The host's side pane (the desktop's background tasks). */
     val SIDE_PANE = RuntimeViewId("shell.side-pane")
+}
+
+/**
+ * The Home page's sections, each a view the [ShellLanes.HOME] lane can hold. The lane's order is
+ * the order on a wide page; a compact page keeps the composer docked below the list wherever the
+ * lane puts it, and leaves the fleet table out.
+ */
+object HomeViews {
+    /** The quick-chat composer. */
+    val COMPOSER = RuntimeViewId("home.composer")
+
+    /** The one-line strip of agents running now (only while something runs). */
+    val NOW = RuntimeViewId("home.now")
+
+    /** The recent conversations, grouped by day. */
+    val RECENTS = RuntimeViewId("home.recents")
+
+    /** The agents as a row of avatars, pinned first. */
+    val AGENTS = RuntimeViewId("home.agents")
+
+    /** The one-line strip of backend counters. */
+    val STATS = RuntimeViewId("home.stats")
+
+    /** The pinned shortcuts, or the pinned-tile editor while it is open. */
+    val PINNED = RuntimeViewId("home.pinned")
+
+    /** The sortable table of every agent (wide pages only). */
+    val FLEET = RuntimeViewId("home.fleet")
 }
 
 /**
@@ -62,16 +96,25 @@ data class ShellLayoutConfig(
         return all.filter { it in kept }
     }
 
+    /**
+     * Home's sections, each once. A config that never had a home lane (one built in code rather
+     * than read through [decode], which upgrades it) shows Home's default sections; an emptied lane
+     * stays empty.
+     */
+    fun homeLane(): List<ModuleSlot> = if (ShellLanes.HOME in lanes) lane(ShellLanes.HOME) else Default.lane(ShellLanes.HOME)
+
     /** The side lane, without anything the main lane already shows: a module is drawn once. */
     fun sideLane(): List<ModuleSlot> = lane(ShellLanes.SIDE) - mainLane().toSet()
 
     /**
-     * Brought up to [VERSION]: default modules a lane lacks are added once. After that the config
-     * belongs to its owner, and anything removed from it stays removed.
+     * Brought up to [VERSION]: each default module added since this config's [version] is added to
+     * its lane once, unless the lane already shows its view. After that the config belongs to its
+     * owner, and anything removed from it stays removed, including defaults of an earlier version.
      */
     fun upgraded(): ShellLayoutConfig {
         if (version >= VERSION) return this
-        val merged = Default.lanes.mapValues { (id, defaults) ->
+        val added = DefaultModules.filter { it.since > version }.groupBy({ it.lane }, { it.slot })
+        val merged = added.mapValues { (id, defaults) ->
             val saved = lane(id)
             saved + defaults.filter { default -> saved.none { it.view == default.view } }
         }
@@ -84,15 +127,34 @@ data class ShellLayoutConfig(
     /** The default layout and reading a saved one. */
     companion object {
         /** The current set of defaults; a config below it gains the default modules it lacks. */
-        const val VERSION = 1
+        const val VERSION = 2
 
-        /** The shell as it was before lanes were configurable: the page, then the host's side pane. */
+        /** One default module: the [lane] it belongs to, its [slot], and the config version that added it. */
+        private class DefaultModule(val lane: String, view: RuntimeViewId, val since: Int) {
+            val slot = ModuleSlot(view)
+        }
+
+        /** Every default module with the [VERSION] that introduced it, in lane order. */
+        private val DefaultModules: List<DefaultModule> = listOf(
+            DefaultModule(ShellLanes.MAIN, ShellViews.PAGE, since = 1),
+            DefaultModule(ShellLanes.SIDE, ShellViews.SIDE_PANE, since = 1),
+        ) + listOf(
+            HomeViews.COMPOSER,
+            HomeViews.NOW,
+            HomeViews.RECENTS,
+            HomeViews.AGENTS,
+            HomeViews.STATS,
+            HomeViews.PINNED,
+            HomeViews.FLEET,
+        ).map { DefaultModule(ShellLanes.HOME, it, since = 2) }
+
+        /**
+         * The shell as it was before lanes were configurable: the page, then the host's side pane,
+         * and Home's sections in their wide order.
+         */
         val Default = ShellLayoutConfig(
             version = VERSION,
-            lanes = mapOf(
-                ShellLanes.MAIN to listOf(ModuleSlot(ShellViews.PAGE)),
-                ShellLanes.SIDE to listOf(ModuleSlot(ShellViews.SIDE_PANE)),
-            ),
+            lanes = DefaultModules.groupBy({ it.lane }, { it.slot }),
         )
 
         /** The saved config, upgraded; [Default] when [text] is not a readable config. */

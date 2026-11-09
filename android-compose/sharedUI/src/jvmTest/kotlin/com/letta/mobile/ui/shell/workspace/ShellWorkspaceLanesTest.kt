@@ -25,12 +25,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
 import com.letta.mobile.data.desktopshell.ShellLayoutStore
 import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.shell.layout.HomeViews
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.ui.shell.modules.LocalShellLayout
 import com.letta.mobile.ui.shell.modules.ShellModuleTags
 import com.letta.mobile.ui.shell.modules.ShellModuleView
 import com.letta.mobile.ui.shell.modules.ShellModules
@@ -72,10 +74,16 @@ class ShellWorkspaceLanesTest {
 
     private val withNotes = ShellModules(mapOf(NotesView to notesView))
 
+    /** The layout the page last read from the workspace it is drawn in. */
+    private var pageLayout: ShellLayoutConfig? = null
+
     private val host = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
         slots = LettaShellWorkspaceSlots(
-            main = { modifier -> Box(modifier.testTag(Page)) },
+            main = { modifier ->
+                pageLayout = LocalShellLayout.current
+                Box(modifier.testTag(Page))
+            },
             agentCard = {},
             sidePane = { Box(Modifier.width(HostPaneWidth).fillMaxHeight().testTag(HostPane)) },
             overlays = {},
@@ -261,4 +269,18 @@ class ShellWorkspaceLanesTest {
 
     @Test
     fun aStoredLayoutKeepsThePageJustAboveTheWideBreakpoint() = storedLayoutKeepsThePage(760.dp)
+
+    /** Home reads its sections from the layout the workspace was given, so all hosts share one path. */
+    @Test
+    fun aPageInsideTheWorkspaceReadsTheLayoutFromTheWorkspaceState() {
+        val recentsOnly = ShellLayoutConfig.Default.copy(
+            lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.HOME to listOf(ModuleSlot(HomeViews.RECENTS))),
+        )
+        listOf(360.dp, 1200.dp).forEach { width ->
+            window(width, recentsOnly) {
+                waitForIdle()
+                assertEquals(recentsOnly, pageLayout, "the page sees the workspace layout at $width")
+            }
+        }
+    }
 }
