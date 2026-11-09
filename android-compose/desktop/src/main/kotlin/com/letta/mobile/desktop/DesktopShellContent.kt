@@ -85,6 +85,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     header = header.state,
                     navigation = desktopWorkspaceNavigation(context, frame),
                     layout = ShellWorkspaceLayout(
+                        lanes = layout.controller.lanes.config.collectAsState().value,
                         sidebarVisible = layout.controller.state.isSidebarVisible,
                         reducedMotion = layout.reducedMotion,
                         forceCompact = phone != null,

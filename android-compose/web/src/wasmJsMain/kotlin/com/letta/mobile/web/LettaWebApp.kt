@@ -73,6 +73,7 @@ fun LettaWebApp() {
     val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings, pairing)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
+    val lanes by layout.lanes.config.collectAsState()
     val host = rememberShellWorkspaceHost(page, Triple(shell, chat.owner, chat.list.state)) { webWorkspaceHost(shell, it) }
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
         SharedMaterialTheme {
@@ -82,7 +83,7 @@ fun LettaWebApp() {
                 // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
                 ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
                     ReportCompositionPasses("workspace root", enabled = pagePerfRequested)
-                    LettaShellWorkspace(webWorkspaceState(shell, page, header, rememberCoarseNow().value), host)
+                    LettaShellWorkspace(webWorkspaceState(shell, page, header, rememberCoarseNow().value, lanes), host)
                 }
             }
         }

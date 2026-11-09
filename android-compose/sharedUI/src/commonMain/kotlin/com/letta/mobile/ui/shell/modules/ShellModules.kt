@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
-import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Draws one module at whatever size its place gives it; a view never knows where it sits. */
@@ -23,12 +22,12 @@ object ShellModuleTags {
 }
 
 /**
- * What the shell's lanes hold ([config]) and the views a host adds to draw them ([views]). The
- * shell's own views (the page, the side pane) are bound by the workspace and cannot be replaced here.
+ * The views added to draw the shell's lanes ([views]); what the lanes hold is the workspace layout's
+ * config. The shell's own views (the page, the side pane) are bound by the workspace and cannot be
+ * replaced here.
  */
 @Immutable
 class ShellModules(
-    val config: ShellLayoutConfig = ShellLayoutConfig.Default,
     val views: Map<RuntimeViewId, ShellModuleView> = emptyMap(),
 )
 

@@ -19,6 +19,7 @@ import com.letta.mobile.ui.shell.rail.collapsedRailEntries
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.data.lanes.ConversationLaneProjection
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 
 object LettaShellWorkspaceTags {
     const val WORKSPACE = "shell-workspace"
@@ -47,6 +48,11 @@ data class ShellWorkspaceNavigationActions(
 /** How the workspace lays itself out. */
 @Immutable
 data class ShellWorkspaceLayout(
+    /**
+     * What the shell's lanes hold: the backend's stored layout config, which a host binds from its
+     * [ShellLayoutController.lanes] collected as state so a saved layout redraws the shell at once.
+     */
+    val lanes: ShellLayoutConfig,
     /** The person's sidebar choice; below the layout's width rule the sidebar is removed anyway. */
     val sidebarVisible: Boolean = true,
     val reducedMotion: Boolean = false,
@@ -92,7 +98,7 @@ class LettaShellWorkspaceSlots(
 data class LettaShellWorkspaceState(
     val header: ShellWorkspaceHeaderState,
     val navigation: ShellWorkspaceNavigation,
-    val layout: ShellWorkspaceLayout = ShellWorkspaceLayout(),
+    val layout: ShellWorkspaceLayout,
 )
 
 /**

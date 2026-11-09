@@ -7702,9 +7702,8 @@ public final class com/letta/mobile/ui/shell/modules/ShellModuleTags {
 public final class com/letta/mobile/ui/shell/modules/ShellModules {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Ljava/util/Map;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getConfig ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public fun <init> (Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getViews ()Ljava/util/Map;
 }
 
@@ -10324,7 +10323,6 @@ public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceState {
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;
 	public final fun component2 ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
 	public final fun component3 ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
@@ -10654,16 +10652,17 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderTags 
 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout {
 	public static final field $stable I
-	public fun <init> ()V
-	public fun <init> (ZZZ)V
-	public synthetic fun <init> (ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Z
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZ)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
 	public final fun component2 ()Z
 	public final fun component3 ()Z
-	public final fun copy (ZZZ)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;ZZZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
+	public final fun component4 ()Z
+	public final fun copy (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZ)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getForceCompact ()Z
+	public final fun getLanes ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
 	public final fun getReducedMotion ()Z
 	public final fun getSidebarVisible ()Z
 	public fun hashCode ()I

@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.objectverbs.binding.withDevicePins
 
 import androidx.compose.foundation.clickable
@@ -67,7 +68,7 @@ private fun workspaceState(
 ) = LettaShellWorkspaceState(
     header = ShellWorkspaceHeaderState(title = title, sidebar = ShellSidebarControl(collapsed = false, onToggle = {}), tabs = tabs),
     navigation = navigation,
-    layout = ShellWorkspaceLayout(forceCompact = forceCompact),
+    layout = ShellWorkspaceLayout(lanes = ShellLayoutConfig.Default, forceCompact = forceCompact),
 )
 
 private fun workspaceHost(

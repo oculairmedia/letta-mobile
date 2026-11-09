@@ -57,6 +57,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceSearch
 import com.letta.mobile.ui.shell.workspace.rememberShellChatPresentation
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.web.chat.WebChatSessionPort
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import kotlin.time.Instant
 
 /**
@@ -64,11 +65,17 @@ import kotlin.time.Instant
  * the desktop window does: the shared navigation over the workspace and its roster, the shared pages
  * in the main pane, the shared overlays, and the shared agent context card with the connection's status.
  */
-internal fun webWorkspaceState(shell: WebShell, page: WebPageInputs, header: ShellWorkspaceHeaderState, now: Instant) =
+internal fun webWorkspaceState(
+    shell: WebShell,
+    page: WebPageInputs,
+    header: ShellWorkspaceHeaderState,
+    now: Instant,
+    lanes: ShellLayoutConfig,
+) =
     LettaShellWorkspaceState(
         header,
         shell.workspace.workspaceNavigation(shell.backend.roster, now, conversations = page.chat.list),
-        ShellWorkspaceLayout(sidebarVisible = shell.layout.state.isSidebarVisible),
+        ShellWorkspaceLayout(lanes = lanes, sidebarVisible = shell.layout.state.isSidebarVisible),
     )
 
 /** The web's part in the workspace, kept across passes: every slot reads the [page] as it now stands. */

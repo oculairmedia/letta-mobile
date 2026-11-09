@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
+import com.letta.mobile.data.desktopshell.ShellLayoutStore
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
@@ -52,20 +53,24 @@ private val NotesSlot = ModuleSlot(NotesView, objectRef = "project-notes")
 private val PageSlot = ModuleSlot(ShellViews.PAGE)
 
 /**
- * letta-mobile-n2stx.2: the shell draws its lanes from a layout config. The default config is the
- * shell as it was (the page, then the host's side pane) at every width; other modules share the
- * main lane where there is room and never push the page out of a narrow window.
+ * The shell draws its lanes from the layout config in the workspace state. The default config is
+ * the shell as it was (the page, then the host's side pane) at every width; other modules share the
+ * main lane where there is room and never push the page out of a narrow window; a stored config is
+ * what a restarted shell draws, and a save redraws it in place.
  */
 class ShellWorkspaceLanesTest {
-    private val state = LettaShellWorkspaceState(
+    private fun state(lanes: ShellLayoutConfig) = LettaShellWorkspaceState(
         header = ShellWorkspaceHeaderState(title = "Window title"),
         navigation = ShellWorkspaceNavigation(
             rail = ShellLibraryRailState(agents = listOf("agent-a" to "Ada"), focus = ShellRailFocus(selectedAgentId = "agent-a")),
             panel = ShellAgentPanelState(agent = ShellPanelAgent(name = "Ada", agentId = "agent-a")),
         ),
+        layout = ShellWorkspaceLayout(lanes = lanes),
     )
 
     private val notesView: ShellModuleView = { slot, modifier -> Box(modifier.testTag(Notes + ":" + slot.objectRef)) }
+
+    private val withNotes = ShellModules(mapOf(NotesView to notesView))
 
     private val host = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
@@ -83,18 +88,20 @@ class ShellWorkspaceLanesTest {
     private fun lanes(main: List<ModuleSlot> = listOf(PageSlot), side: List<ModuleSlot> = listOf(ModuleSlot(ShellViews.SIDE_PANE))) =
         ShellLayoutConfig(version = ShellLayoutConfig.VERSION, lanes = mapOf(ShellLanes.MAIN to main, ShellLanes.SIDE to side))
 
-    private fun withNotes(config: ShellLayoutConfig) = ShellModules(config, mapOf(NotesView to notesView))
-
-    /** A window exactly [width] wide showing the workspace with [modules]. */
-    private fun window(width: Dp, modules: ShellModules = ShellModules(), block: ComposeUiTest.() -> Unit) =
-        runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
-            setContent {
-                CompositionLocalProvider(LocalShellModules provides modules) {
-                    LettaShellWorkspace(state, host, Modifier.size(width = width, height = WindowHeight))
-                }
+    /** A window exactly [width] wide showing the workspace with [config] in its state and [views] added. */
+    private fun window(
+        width: Dp,
+        config: ShellLayoutConfig = ShellLayoutConfig.Default,
+        views: ShellModules = withNotes,
+        block: ComposeUiTest.() -> Unit,
+    ) = runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
+        setContent {
+            CompositionLocalProvider(LocalShellModules provides views) {
+                LettaShellWorkspace(state(config), host, Modifier.size(width = width, height = WindowHeight))
             }
-            block()
         }
+        block()
+    }
 
     private fun ComposeUiTest.bounds(tag: String): DpRect = onNodeWithTag(tag).getUnclippedBoundsInRoot()
 
@@ -123,7 +130,7 @@ class ShellWorkspaceLanesTest {
     fun theDefaultIsThePageThenTheHostPaneOnADesktop() = pageRunsToTheHostPane(1200.dp)
 
     @Test
-    fun twoMainModulesShareTheLaneInAWideWindow() = window(1440.dp, withNotes(lanes(main = listOf(PageSlot, NotesSlot)))) {
+    fun twoMainModulesShareTheLaneInAWideWindow() = window(1440.dp, lanes(main = listOf(PageSlot, NotesSlot))) {
         val page = bounds(Page)
         val notes = bounds("$Notes:project-notes")
         assertDp(page.width, notes.width, "the two modules are the same width")
@@ -132,7 +139,7 @@ class ShellWorkspaceLanesTest {
     }
 
     @Test
-    fun aWindowWithoutRoomForTwoKeepsThePage() = window(760.dp, withNotes(lanes(main = listOf(NotesSlot, PageSlot)))) {
+    fun aWindowWithoutRoomForTwoKeepsThePage() = window(760.dp, lanes(main = listOf(NotesSlot, PageSlot))) {
         onNodeWithTag(Page).assertIsDisplayed()
         onNodeWithTag("$Notes:project-notes").assertDoesNotExist()
     }
@@ -140,10 +147,7 @@ class ShellWorkspaceLanesTest {
     @Test
     fun aPhoneShowsThePageAndLeavesOtherModulesOut() = window(
         360.dp,
-        ShellModules(
-            lanes(main = listOf(NotesSlot, PageSlot), side = listOf(ModuleSlot(NotesView, "side-notes"))),
-            mapOf(NotesView to notesView),
-        ),
+        lanes(main = listOf(NotesSlot, PageSlot), side = listOf(ModuleSlot(NotesView, "side-notes"))),
     ) {
         assertDp(360.dp, bounds(Page).width, "the page has the whole phone")
         onNodeWithTag("$Notes:project-notes").assertDoesNotExist()
@@ -151,7 +155,7 @@ class ShellWorkspaceLanesTest {
     }
 
     @Test
-    fun aSideModuleSitsAfterThePageAtItsOwnWidth() = window(1440.dp, withNotes(lanes(side = listOf(ModuleSlot(NotesView, "side-notes"))))) {
+    fun aSideModuleSitsAfterThePageAtItsOwnWidth() = window(1440.dp, lanes(side = listOf(ModuleSlot(NotesView, "side-notes")))) {
         val notes = bounds("$Notes:side-notes")
         assertDp(LettaDimens.Pane.sidePanelWidth, notes.width, "a side module is a side panel wide")
         assertDp(1440.dp, notes.right, "it ends at the window edge")
@@ -160,15 +164,16 @@ class ShellWorkspaceLanesTest {
     }
 
     @Test
-    fun aViewNoHostSuppliesIsShownAsUnavailableBesideThePage() = window(1440.dp, ShellModules(lanes(main = listOf(PageSlot, NotesSlot)))) {
-        onNodeWithTag(Page).assertIsDisplayed()
-        onNodeWithTag(ShellModuleTags.UNAVAILABLE).assertIsDisplayed()
-    }
+    fun aViewNoHostSuppliesIsShownAsUnavailableBesideThePage() =
+        window(1440.dp, lanes(main = listOf(PageSlot, NotesSlot)), views = ShellModules()) {
+            onNodeWithTag(Page).assertIsDisplayed()
+            onNodeWithTag(ShellModuleTags.UNAVAILABLE).assertIsDisplayed()
+        }
 
     @Test
     fun aHostViewCannotReplaceThePage() = window(
         1440.dp,
-        ShellModules(views = mapOf(ShellViews.PAGE to { _, modifier -> Box(modifier.testTag("impostor")) })),
+        views = ShellModules(mapOf(ShellViews.PAGE to { _, modifier -> Box(modifier.testTag("impostor")) })),
     ) {
         onNodeWithTag(Page).assertIsDisplayed()
         onNodeWithTag("impostor").assertDoesNotExist()
@@ -185,8 +190,8 @@ class ShellWorkspaceLanesTest {
         val second = ModuleSlot(NotesView, "second")
         var order by mutableStateOf(listOf(PageSlot, first, second))
         setContent {
-            CompositionLocalProvider(LocalShellModules provides ShellModules(lanes(main = order), mapOf(NotesView to stateful))) {
-                LettaShellWorkspace(state, host, Modifier.size(width = 1800.dp, height = WindowHeight))
+            CompositionLocalProvider(LocalShellModules provides ShellModules(mapOf(NotesView to stateful))) {
+                LettaShellWorkspace(state(lanes(main = order)), host, Modifier.size(width = 1800.dp, height = WindowHeight))
             }
         }
         onNodeWithTag("stateful:first:1").assertIsDisplayed()
@@ -200,24 +205,30 @@ class ShellWorkspaceLanesTest {
         assertEquals(true, bounds("stateful:second:2").left < bounds("stateful:first:1").left, "the order did change")
     }
 
-    /** A layout saved by one launch and read by the next (a second store over the same settings), drawn [width] wide. */
-    private fun storedLayoutWindow(width: Dp, block: ComposeUiTest.() -> Unit) {
+    /**
+     * The path a host takes: a [ShellLayoutController] over settings that a previous launch saved
+     * [saved] into, its lanes collected as state into the workspace layout, [width] wide.
+     */
+    private fun restartedShell(width: Dp, saved: ShellLayoutConfig?, block: ComposeUiTest.(ShellLayoutController) -> Unit) {
         val settings = InMemorySecureSettingsStore()
-        ShellLayoutConfigStore.forBackend(settings, "backend-a").save(lanes(main = listOf(PageSlot, NotesSlot)))
-        val afterRestart = ShellLayoutConfigStore.forBackend(settings, "backend-a")
+        saved?.let { ShellLayoutConfigStore.forBackend(settings, "backend-a").save(it) }
+        val controller = ShellLayoutController(
+            ShellLayoutStore(settings, "layout"),
+            ShellLayoutConfigStore.forBackend(settings, "backend-a"),
+        )
         runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
             setContent {
-                val config = afterRestart.config.collectAsState().value
-                CompositionLocalProvider(LocalShellModules provides withNotes(config)) {
-                    LettaShellWorkspace(state, host, Modifier.size(width = width, height = WindowHeight))
+                val lanes by controller.lanes.config.collectAsState()
+                CompositionLocalProvider(LocalShellModules provides withNotes) {
+                    LettaShellWorkspace(state(lanes), host, Modifier.size(width = width, height = WindowHeight))
                 }
             }
-            block()
+            block(controller)
         }
     }
 
     @Test
-    fun aStoredLayoutIsWhatTheWorkspaceDrawsAfterARestart() = storedLayoutWindow(1200.dp) {
+    fun aStoredLayoutIsWhatTheWorkspaceDrawsAfterARestart() = restartedShell(1200.dp, lanes(main = listOf(PageSlot, NotesSlot))) {
         val page = bounds(Page)
         val notes = bounds("$Notes:project-notes")
         assertEquals(true, notes.left >= page.right, "the stored notes module sits after the page")
@@ -225,14 +236,29 @@ class ShellWorkspaceLanesTest {
     }
 
     @Test
-    fun aStoredLayoutKeepsThePageOnAPhone() = storedLayoutWindow(360.dp) {
-        assertDp(360.dp - HostPaneWidth, bounds(Page).right, "the page runs to the host pane")
+    fun aSaveWhileOnScreenRedrawsTheShell() = restartedShell(1200.dp, saved = null) { controller ->
+        onNodeWithTag("$Notes:side-notes").assertDoesNotExist()
+        onNodeWithTag(HostPane).assertIsDisplayed()
+
+        controller.lanes.save(lanes(side = listOf(ModuleSlot(NotesView, "side-notes"))))
+        waitForIdle()
+
+        assertDp(1200.dp, bounds("$Notes:side-notes").right, "the saved side module now ends at the window edge")
+        onNodeWithTag(HostPane).assertDoesNotExist()
+    }
+
+    private fun storedLayoutKeepsThePage(width: Dp) = restartedShell(width, lanes(main = listOf(PageSlot, NotesSlot))) {
+        assertDp(width - HostPaneWidth, bounds(Page).right, "the page runs to the host pane at $width")
+        assertDp(0.dp, bounds(Page).top, "the page starts at the top at $width")
         onNodeWithTag("$Notes:project-notes").assertDoesNotExist()
     }
 
     @Test
-    fun aStoredLayoutKeepsThePageJustAboveTheWideBreakpoint() = storedLayoutWindow(760.dp) {
-        assertDp(760.dp - HostPaneWidth, bounds(Page).right, "the page runs to the host pane")
-        onNodeWithTag("$Notes:project-notes").assertDoesNotExist()
-    }
+    fun aStoredLayoutKeepsThePageOnAPhone() = storedLayoutKeepsThePage(360.dp)
+
+    @Test
+    fun aStoredLayoutKeepsThePageJustBelowTheWideBreakpoint() = storedLayoutKeepsThePage(700.dp)
+
+    @Test
+    fun aStoredLayoutKeepsThePageJustAboveTheWideBreakpoint() = storedLayoutKeepsThePage(760.dp)
 }

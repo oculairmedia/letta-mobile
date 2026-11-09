@@ -5631,10 +5631,8 @@ final class com.letta.mobile.ui.shell.header/UnifiedSearchSources { // com.letta
 }
 
 final class com.letta.mobile.ui.shell.modules/ShellModules { // com.letta.mobile.ui.shell.modules/ShellModules|null[0]
-    constructor <init>(com.letta.mobile.data.shell.layout/ShellLayoutConfig = ..., kotlin.collections/Map<com.letta.mobile.data.model.view/RuntimeViewId, kotlin/Function4<com.letta.mobile.data.shell.layout/ModuleSlot, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>> = ...) // com.letta.mobile.ui.shell.modules/ShellModules.<init>|<init>(com.letta.mobile.data.shell.layout.ShellLayoutConfig;kotlin.collections.Map<com.letta.mobile.data.model.view.RuntimeViewId,kotlin.Function4<com.letta.mobile.data.shell.layout.ModuleSlot,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>>){}[0]
+    constructor <init>(kotlin.collections/Map<com.letta.mobile.data.model.view/RuntimeViewId, kotlin/Function4<com.letta.mobile.data.shell.layout/ModuleSlot, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>> = ...) // com.letta.mobile.ui.shell.modules/ShellModules.<init>|<init>(kotlin.collections.Map<com.letta.mobile.data.model.view.RuntimeViewId,kotlin.Function4<com.letta.mobile.data.shell.layout.ModuleSlot,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>>){}[0]
 
-    final val config // com.letta.mobile.ui.shell.modules/ShellModules.config|{}config[0]
-        final fun <get-config>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.ui.shell.modules/ShellModules.config.<get-config>|<get-config>(){}[0]
     final val views // com.letta.mobile.ui.shell.modules/ShellModules.views|{}views[0]
         final fun <get-views>(): kotlin.collections/Map<com.letta.mobile.data.model.view/RuntimeViewId, kotlin/Function4<com.letta.mobile.data.shell.layout/ModuleSlot, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>> // com.letta.mobile.ui.shell.modules/ShellModules.views.<get-views>|<get-views>(){}[0]
 }
@@ -7447,7 +7445,7 @@ final class com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceSlots { // co
 }
 
 final class com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceState { // com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceState|null[0]
-    constructor <init>(com.letta.mobile.ui.shell.workspace/ShellWorkspaceHeaderState, com.letta.mobile.ui.shell.workspace/ShellWorkspaceNavigation, com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout = ...) // com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceState.<init>|<init>(com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState;com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation;com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout){}[0]
+    constructor <init>(com.letta.mobile.ui.shell.workspace/ShellWorkspaceHeaderState, com.letta.mobile.ui.shell.workspace/ShellWorkspaceNavigation, com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout) // com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceState.<init>|<init>(com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState;com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation;com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout){}[0]
 
     final val header // com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceState.header|{}header[0]
         final fun <get-header>(): com.letta.mobile.ui.shell.workspace/ShellWorkspaceHeaderState // com.letta.mobile.ui.shell.workspace/LettaShellWorkspaceState.header.<get-header>|<get-header>(){}[0]
@@ -7754,19 +7752,22 @@ final class com.letta.mobile.ui.shell.workspace/ShellWorkspaceHeaderState { // c
 }
 
 final class com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout { // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(com.letta.mobile.data.shell.layout/ShellLayoutConfig, kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.<init>|<init>(com.letta.mobile.data.shell.layout.ShellLayoutConfig;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
     final val forceCompact // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.forceCompact|{}forceCompact[0]
         final fun <get-forceCompact>(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.forceCompact.<get-forceCompact>|<get-forceCompact>(){}[0]
+    final val lanes // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.lanes|{}lanes[0]
+        final fun <get-lanes>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.lanes.<get-lanes>|<get-lanes>(){}[0]
     final val reducedMotion // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.reducedMotion|{}reducedMotion[0]
         final fun <get-reducedMotion>(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.reducedMotion.<get-reducedMotion>|<get-reducedMotion>(){}[0]
     final val sidebarVisible // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.sidebarVisible|{}sidebarVisible[0]
         final fun <get-sidebarVisible>(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.sidebarVisible.<get-sidebarVisible>|<get-sidebarVisible>(){}[0]
 
-    final fun component1(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.component1|component1(){}[0]
+    final fun component1(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.component1|component1(){}[0]
     final fun component2(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.component3|component3(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.shell.layout/ShellLayoutConfig = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.copy|copy(com.letta.mobile.data.shell.layout.ShellLayoutConfig;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.workspace/ShellWorkspaceLayout.toString|toString(){}[0]
