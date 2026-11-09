@@ -199,4 +199,23 @@ class ActiveTurnCoordinatorTest {
         assertEquals(ActiveTurnPhase.Thinking, owner.state.value.phase)
     }
 
+
+    @Test
+    fun `submit approval with mismatched turn fails without invoking callback`() = runTest {
+        val owner = ActiveTurnCoordinator(ConversationId("c"), AgentId("a"), backgroundScope) { testScheduler.currentTime }
+        val turn1 = ActiveTurnIdentity("r1", "t1")
+        val turn2 = ActiveTurnIdentity("r2", "t2")
+        owner.start(turn1)
+        var invoked = false
+        owner.awaitApproval(turn1, ActiveTurnApproval(ToolApprovalId("req-1"), ToolCallId("call-1")) {
+            invoked = true
+            true
+        })
+        assertEquals(ActiveTurnPhase.AwaitingInput, owner.state.value.phase)
+
+        val accepted = owner.submitApproval(turn2, ToolApprovalId("req-1"), true)
+        assertEquals(false, accepted)
+        assertEquals(false, invoked)
+        assertEquals(ActiveTurnPhase.AwaitingInput, owner.state.value.phase)
+    }
 }

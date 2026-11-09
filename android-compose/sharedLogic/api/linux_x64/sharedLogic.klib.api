@@ -53903,6 +53903,7 @@ final class com.letta.mobile.data.presence/ActiveTurnCoordinator { // com.letta.
     final fun progress(com.letta.mobile.data.presence/ActiveTurnIdentity, kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/Int = ...) // com.letta.mobile.data.presence/ActiveTurnCoordinator.progress|progress(com.letta.mobile.data.presence.ActiveTurnIdentity;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.Int){}[0]
     final fun start(com.letta.mobile.data.presence/ActiveTurnIdentity) // com.letta.mobile.data.presence/ActiveTurnCoordinator.start|start(com.letta.mobile.data.presence.ActiveTurnIdentity){}[0]
     final fun terminate(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.data.presence/ActiveTurnTerminalKind) // com.letta.mobile.data.presence/ActiveTurnCoordinator.terminate|terminate(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.data.presence.ActiveTurnTerminalKind){}[0]
+    final suspend fun submitApproval(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.runtime/ToolApprovalId, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnCoordinator.submitApproval|submitApproval(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.runtime.ToolApprovalId;kotlin.Boolean){}[0]
     final suspend fun submitApproval(com.letta.mobile.runtime/ToolApprovalId, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnCoordinator.submitApproval|submitApproval(com.letta.mobile.runtime.ToolApprovalId;kotlin.Boolean){}[0]
 }
 

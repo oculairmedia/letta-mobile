@@ -42418,6 +42418,7 @@ public final class com/letta/mobile/data/presence/ActiveTurnCoordinator {
 	public final fun progress (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/util/Map;I)V
 	public static synthetic fun progress$default (Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/util/Map;IILjava/lang/Object;)V
 	public final fun start (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;)V
+	public final fun submitApproval-3ughoIs (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun submitApproval-ARNhO7s (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun terminate (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;)V
 }

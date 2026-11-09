@@ -87,11 +87,11 @@ class ActiveTurnCoordinator(
     }
 
     /** Reserve one submission; rejected answers remain parked and may be retried. */
-    suspend fun submitApproval(requestId: ToolApprovalId, answer: Boolean): Boolean {
+    suspend fun submitApproval(turn: ActiveTurnIdentity, requestId: ToolApprovalId, answer: Boolean): Boolean {
         val captured = synchronized(lock) {
-            if (state.value.phase != ActiveTurnPhase.AwaitingInput) return false
+            if (state.value.phase != ActiveTurnPhase.AwaitingInput || !state.value.matches(turn)) return false
             val request = requests.reserve(requestId) ?: return false
-            requireNotNull(state.value.identity()) to request
+            turn to request
         }
         try {
             val accepted = captured.second.submit(answer)
@@ -114,6 +114,12 @@ class ActiveTurnCoordinator(
         }
     }
 
+    /** Compatibility overload for callers holding only the request ID. */
+    suspend fun submitApproval(requestId: ToolApprovalId, answer: Boolean): Boolean {
+        val turn = synchronized(lock) { state.value.identity() } ?: return false
+        return submitApproval(turn, requestId, answer)
+    }
+
     /** Distinct stop gestures have distinct IDs; redelivery reuses the same operation ID. */
     fun interrupt(turn: ActiveTurnIdentity, operationId: String, abort: suspend () -> Boolean) {
         val requestedAt = now()
@@ -126,16 +132,18 @@ class ActiveTurnCoordinator(
             }
             publish(state.value, ActiveTurnBoundary.Interrupt)
         }
-        scope.launch {
-            delay((CANCEL_TIMEOUT_MS - (now() - requestedAt)).coerceAtLeast(0L))
-            clearCancelling(turn)
-        }
-        scope.launch {
+        val timeout = (CANCEL_TIMEOUT_MS - (now() - requestedAt)).coerceAtLeast(0L)
+        val abortJob = scope.launch {
             val stillCurrent = synchronized(lock) { active(turn) && state.value.phase == ActiveTurnPhase.Cancelling }
             if (!stillCurrent) return@launch
             val result = runCatching { abort() }
             if (!result.getOrDefault(false)) clearCancelling(turn)
             result.exceptionOrNull()?.let(::rethrowAbortFailure)
+        }
+        scope.launch {
+            delay(timeout)
+            if (abortJob.isActive) abortJob.cancel()
+            clearCancelling(turn)
         }
     }
 
