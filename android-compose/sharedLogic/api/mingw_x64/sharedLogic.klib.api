@@ -58724,6 +58724,78 @@ final class com.letta.mobile.data.settings/SettingsStatus { // com.letta.mobile.
     final fun toString(): kotlin/String // com.letta.mobile.data.settings/SettingsStatus.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.shell.layout/ModuleSlot { // com.letta.mobile.data.shell.layout/ModuleSlot|null[0]
+    constructor <init>(com.letta.mobile.data.model.view/RuntimeViewId, kotlin/String? = ...) // com.letta.mobile.data.shell.layout/ModuleSlot.<init>|<init>(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String?){}[0]
+
+    final val objectRef // com.letta.mobile.data.shell.layout/ModuleSlot.objectRef|{}objectRef[0]
+        final fun <get-objectRef>(): kotlin/String? // com.letta.mobile.data.shell.layout/ModuleSlot.objectRef.<get-objectRef>|<get-objectRef>(){}[0]
+    final val view // com.letta.mobile.data.shell.layout/ModuleSlot.view|{}view[0]
+        final fun <get-view>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ModuleSlot.view.<get-view>|<get-view>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ModuleSlot.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.shell.layout/ModuleSlot.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.model.view/RuntimeViewId = ..., kotlin/String? = ...): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout/ModuleSlot.copy|copy(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout/ModuleSlot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout/ModuleSlot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout/ModuleSlot.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.shell.layout/ModuleSlot> { // com.letta.mobile.data.shell.layout/ModuleSlot.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.shell.layout/ModuleSlot.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.shell.layout/ModuleSlot.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.shell.layout/ModuleSlot.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout/ModuleSlot.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.shell.layout/ModuleSlot) // com.letta.mobile.data.shell.layout/ModuleSlot.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.shell.layout.ModuleSlot){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.shell.layout/ModuleSlot.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ModuleSlot.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.shell.layout/ShellLayoutConfig { // com.letta.mobile.data.shell.layout/ShellLayoutConfig|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>> = ...) // com.letta.mobile.data.shell.layout/ShellLayoutConfig.<init>|<init>(kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>>){}[0]
+
+    final val lanes // com.letta.mobile.data.shell.layout/ShellLayoutConfig.lanes|{}lanes[0]
+        final fun <get-lanes>(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.lanes.<get-lanes>|<get-lanes>(){}[0]
+    final val version // com.letta.mobile.data.shell.layout/ShellLayoutConfig.version|{}version[0]
+        final fun <get-version>(): kotlin/Int // com.letta.mobile.data.shell.layout/ShellLayoutConfig.version.<get-version>|<get-version>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.shell.layout/ShellLayoutConfig.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>> = ...): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout/ShellLayoutConfig.copy|copy(kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>>){}[0]
+    final fun encode(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLayoutConfig.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout/ShellLayoutConfig.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout/ShellLayoutConfig.hashCode|hashCode(){}[0]
+    final fun lane(kotlin/String): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.lane|lane(kotlin.String){}[0]
+    final fun mainLane(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.mainLane|mainLane(){}[0]
+    final fun mainLane(kotlin/Int): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.mainLane|mainLane(kotlin.Int){}[0]
+    final fun sideLane(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.sideLane|sideLane(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLayoutConfig.toString|toString(){}[0]
+    final fun upgraded(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout/ShellLayoutConfig.upgraded|upgraded(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.shell.layout/ShellLayoutConfig> { // com.letta.mobile.data.shell.layout/ShellLayoutConfig.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.shell.layout/ShellLayoutConfig.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.shell.layout/ShellLayoutConfig.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout/ShellLayoutConfig.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.shell.layout/ShellLayoutConfig) // com.letta.mobile.data.shell.layout/ShellLayoutConfig.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion|null[0]
+        final const val VERSION // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.VERSION|{}VERSION[0]
+            final fun <get-VERSION>(): kotlin/Int // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
+
+        final val $childSerializers // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.$childSerializers|{}$childSerializers[0]
+        final val Default // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.Default.<get-Default>|<get-Default>(){}[0]
+
+        final fun decode(kotlin/String): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.decode|decode(kotlin.String){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.shell.layout/ShellLayoutConfig> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.shell/CurrentFocus { // com.letta.mobile.data.shell/CurrentFocus|null[0]
     constructor <init>(kotlin/String = ..., com.letta.mobile.data.model/AgentId? = ..., com.letta.mobile.data.model/ConversationId? = ..., com.letta.mobile.data.shell/CurrentFocusChatMode = ...) // com.letta.mobile.data.shell/CurrentFocus.<init>|<init>(kotlin.String;com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.shell.CurrentFocusChatMode){}[0]
 
@@ -73018,6 +73090,20 @@ final object com.letta.mobile.data.serialization/LettaJson { // com.letta.mobile
 
 final object com.letta.mobile.data.session.graph/SharedSessionGraph { // com.letta.mobile.data.session.graph/SharedSessionGraph|null[0]
     final fun transportBound(com.letta.mobile.data.transport.api/IChannelTransport, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.context/ContextReadingSnapshots? = ..., com.letta.mobile.data.session.graph/SubagentListing = ...): com.letta.mobile.data.session.graph/TransportBoundSessionRepositories // com.letta.mobile.data.session.graph/SharedSessionGraph.transportBound|transportBound(com.letta.mobile.data.transport.api.IChannelTransport;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.context.ContextReadingSnapshots?;com.letta.mobile.data.session.graph.SubagentListing){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile.data.shell.layout/ShellLanes|null[0]
+    final const val MAIN // com.letta.mobile.data.shell.layout/ShellLanes.MAIN|{}MAIN[0]
+        final fun <get-MAIN>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.MAIN.<get-MAIN>|<get-MAIN>(){}[0]
+    final const val SIDE // com.letta.mobile.data.shell.layout/ShellLanes.SIDE|{}SIDE[0]
+        final fun <get-SIDE>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.SIDE.<get-SIDE>|<get-SIDE>(){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile.data.shell.layout/ShellViews|null[0]
+    final val PAGE // com.letta.mobile.data.shell.layout/ShellViews.PAGE|{}PAGE[0]
+        final fun <get-PAGE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.PAGE.<get-PAGE>|<get-PAGE>(){}[0]
+    final val SIDE_PANE // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE|{}SIDE_PANE[0]
+        final fun <get-SIDE_PANE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE.<get-SIDE_PANE>|<get-SIDE_PANE>(){}[0]
 }
 
 final object com.letta.mobile.data.shell/ShellDeepLink { // com.letta.mobile.data.shell/ShellDeepLink|null[0]

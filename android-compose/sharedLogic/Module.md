@@ -545,6 +545,10 @@ Existing workspace/navigator names remain dispatch/read adapters for later consu
 
 Portable shell destinations, routes, workspace navigation and page errors. Entry points translate external navigation into these destinations instead of duplicating route policy. Keep platform navigation controllers outside portable routes; hosts map [ShellRoute](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.shell/-shell-route/index.html) and [ShellDestination](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.shell/-shell-destination/index.html) and bind chat behavior through [ShellChatPort](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.shell/-shell-chat-port/index.html).
 
+# Package com.letta.mobile.data.shell.layout
+
+What the shell's lanes hold, as data: a slot names a view and the object it shows, and a layout config lists the slots in each lane. The default config is the page with the host's side pane after it, the page is always recoverable, and a saved config gains new default modules once. Keep rendering and window sizes outside the config; it only says what is placed where.
+
 # Package com.letta.mobile.data.skills
 
 Skill catalog API, categorization and controller state. Available/installed entries and controllability come from active backend contracts, including explicit read-only/unavailable outcomes. Keep direct filesystem deletion outside catalog actions; provide supported backend operations through [SkillsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.skills/-skills-api/index.html) to [SkillsCatalogController](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.skills/-skills-catalog-controller/index.html).

@@ -49218,6 +49218,88 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceState {
 	public final fun snapshotOrPending ()Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;
 }
 
+public final class com/letta/mobile/data/shell/layout/ModuleSlot {
+	public static final field Companion Lcom/letta/mobile/data/shell/layout/ModuleSlot$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-p0dNODo ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy-OP7ibb0 (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public static synthetic fun copy-OP7ibb0$default (Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getObjectRef ()Ljava/lang/String;
+	public final fun getView-p0dNODo ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/shell/layout/ModuleSlot$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ModuleSlot$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shell/layout/ModuleSlot;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/layout/ModuleSlot$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/layout/ShellLanes {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellLanes;
+	public static final field MAIN Ljava/lang/String;
+	public static final field SIDE Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig {
+	public static final field Companion Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig$Companion;
+	public static final field VERSION I
+	public fun <init> ()V
+	public fun <init> (ILjava/util/Map;)V
+	public synthetic fun <init> (ILjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (ILjava/util/Map;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ILjava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun encode ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLanes ()Ljava/util/Map;
+	public final fun getVersion ()I
+	public fun hashCode ()I
+	public final fun lane (Ljava/lang/String;)Ljava/util/List;
+	public final fun mainLane ()Ljava/util/List;
+	public final fun mainLane (I)Ljava/util/List;
+	public final fun sideLane ()Ljava/util/List;
+	public fun toString ()Ljava/lang/String;
+	public final fun upgraded ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+}
+
+public final synthetic class com/letta/mobile/data/shell/layout/ShellLayoutConfig$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig$Companion {
+	public final fun decode (Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getDefault ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/shell/layout/ShellViews {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellViews;
+	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
+	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/skills/Skill {
 	public static final field Companion Lcom/letta/mobile/data/skills/Skill$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/List;Ljava/lang/String;Z)V
