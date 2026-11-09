@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
@@ -59,7 +64,7 @@ class ShellWorkspaceLanesTest {
 
     private val notesView: ShellModuleView = { slot, modifier -> Box(modifier.testTag(Notes + ":" + slot.objectRef)) }
 
-    private fun host(modules: ShellModules = ShellModules()) = LettaShellWorkspaceHost(
+    private val host = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
         slots = LettaShellWorkspaceSlots(
             main = { modifier -> Box(modifier.testTag(Page)) },
@@ -70,7 +75,6 @@ class ShellWorkspaceLanesTest {
         chrome = ShellWindowChrome.Hoisted {},
         drawer = ShellWorkspaceDrawer(),
         events = ShellWorkspaceEvents(),
-        modules = modules,
     )
 
     private fun lanes(main: List<ModuleSlot> = listOf(PageSlot), side: List<ModuleSlot> = listOf(ModuleSlot(ShellViews.SIDE_PANE))) =
@@ -81,7 +85,11 @@ class ShellWorkspaceLanesTest {
     /** A window exactly [width] wide showing the workspace with [modules]. */
     private fun window(width: Dp, modules: ShellModules = ShellModules(), block: ComposeUiTest.() -> Unit) =
         runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
-            setContent { LettaShellWorkspace(state, host(modules), Modifier.size(width = width, height = WindowHeight)) }
+            setContent {
+                CompositionLocalProvider(LocalShellModules provides modules) {
+                    LettaShellWorkspace(state, host, Modifier.size(width = width, height = WindowHeight))
+                }
+            }
             block()
         }
 
@@ -161,5 +169,31 @@ class ShellWorkspaceLanesTest {
     ) {
         onNodeWithTag(Page).assertIsDisplayed()
         onNodeWithTag("impostor").assertDoesNotExist()
+    }
+
+    @Test
+    fun aModuleKeepsItsStateWhenTheLaneIsReordered() = runDesktopComposeUiTest(width = 1800, height = WindowHeight.value.toInt()) {
+        var births = 0
+        val stateful: ShellModuleView = { slot, modifier ->
+            val born = remember { ++births }
+            Box(modifier.testTag("stateful:" + slot.objectRef + ":" + born))
+        }
+        val first = ModuleSlot(NotesView, "first")
+        val second = ModuleSlot(NotesView, "second")
+        var order by mutableStateOf(listOf(PageSlot, first, second))
+        setContent {
+            CompositionLocalProvider(LocalShellModules provides ShellModules(lanes(main = order), mapOf(NotesView to stateful))) {
+                LettaShellWorkspace(state, host, Modifier.size(width = 1800.dp, height = WindowHeight))
+            }
+        }
+        onNodeWithTag("stateful:first:1").assertIsDisplayed()
+        onNodeWithTag("stateful:second:2").assertIsDisplayed()
+
+        order = listOf(PageSlot, second, first)
+        waitForIdle()
+
+        onNodeWithTag("stateful:first:1").assertIsDisplayed()
+        onNodeWithTag("stateful:second:2").assertIsDisplayed()
+        assertEquals(true, bounds("stateful:second:2").left < bounds("stateful:first:1").left, "the order did change")
     }
 }

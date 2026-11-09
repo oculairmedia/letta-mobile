@@ -10296,14 +10296,13 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lcom/letta/mobile/ui/shell/modules/ShellModules;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;Lcom/letta/mobile/ui/shell/modules/ShellModules;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;Lcom/letta/mobile/data/lanes/ConversationLaneProjection;Lcom/letta/mobile/data/objectverbs/binding/PinBinding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getActions ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;
 	public final fun getChrome ()Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;
 	public final fun getConversationLanes ()Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 	public final fun getDrawer ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;
 	public final fun getEvents ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;
-	public final fun getModules ()Lcom/letta/mobile/ui/shell/modules/ShellModules;
 	public final fun getObjectPins ()Lcom/letta/mobile/data/objectverbs/binding/PinBinding;
 	public final fun getSlots ()Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;
 }

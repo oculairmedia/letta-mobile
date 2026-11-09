@@ -8,6 +8,9 @@ import kotlinx.serialization.Serializable
  * One module in the shell: which view draws, and the object it shows ([objectRef] is null for a view
  * that needs none). This is the shell's only composition unit (letta-mobile-n2stx.2): a container is
  * a view whose own document holds slots, so nesting needs no second concept.
+ *
+ * @property view the view that draws this module.
+ * @property objectRef the object the view shows, or null for a view that needs none.
  */
 @Serializable
 data class ModuleSlot(val view: RuntimeViewId, val objectRef: String? = null)
@@ -34,6 +37,9 @@ object ShellViews {
  * What is in each shell lane, in order. [Default] is the shell as it was before lanes were
  * configurable. Plain data: it grants nothing, and a view it names that no host supplies is drawn
  * as unavailable rather than failing the shell.
+ *
+ * @property version the defaults this config has already been given; see [upgraded].
+ * @property lanes the modules of each lane by lane id ([ShellLanes]), in the order they are drawn.
  */
 @Serializable
 data class ShellLayoutConfig(
@@ -72,11 +78,15 @@ data class ShellLayoutConfig(
         return ShellLayoutConfig(version = VERSION, lanes = lanes + merged)
     }
 
+    /** This config as the text that is saved; [decode] reads it back. */
     fun encode(): String = LettaJson.persisted.encodeToString(serializer(), this)
 
+    /** The default layout and reading a saved one. */
     companion object {
+        /** The current set of defaults; a config below it gains the default modules it lacks. */
         const val VERSION = 1
 
+        /** The shell as it was before lanes were configurable: the page, then the host's side pane. */
         val Default = ShellLayoutConfig(
             version = VERSION,
             lanes = mapOf(

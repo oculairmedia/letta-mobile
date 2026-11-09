@@ -6,7 +6,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -33,13 +32,14 @@ class ShellModules(
     val views: Map<RuntimeViewId, ShellModuleView> = emptyMap(),
 )
 
-/** One slot drawn by its view, or as unavailable when nothing supplies that view. */
+/**
+ * One slot drawn by its view, or as unavailable when nothing supplies that view. A caller drawing
+ * several slots wraps each call in `key(slot)` so a module keeps its state when the order changes.
+ */
 @Composable
 fun ShellModuleSlot(slot: ModuleSlot, views: Map<RuntimeViewId, ShellModuleView>, modifier: Modifier = Modifier) {
-    key(slot) {
-        val view = views[slot.view]
-        if (view != null) view(slot, modifier) else UnavailableModule(modifier)
-    }
+    val view = views[slot.view]
+    if (view != null) view(slot, modifier) else UnavailableModule(modifier)
 }
 
 @Composable

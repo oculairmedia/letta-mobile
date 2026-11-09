@@ -228,6 +228,10 @@ A TimelineConversations owner bound to the shared shell: its list in the navigat
 
 Shell header, search slot and unified results. Supply [UnifiedSearchSources](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.header/-unified-search-sources/index.html) and search-slot configuration; indexing inputs and navigation effects must come from the owning session/host rather than another repository in the header. An optional conversation-preparation callback turns a nonblank query that includes the Conversations scope into explicit demand loading, so recents-first sessions preserve title matches outside the initial window without a connect-time fleet read. Partial preparation keeps successful matches visible with a warning and retries failed reads with bounded backoff while that query remains open.
 
+# Package com.letta.mobile.ui.shell.modules
+
+The shell's unit of composition: a slot drawn by its view at whatever size its place gives it. Views are supplied by id and never know where they sit; a slot whose view is missing is shown as unavailable instead of failing the shell. Keep layout decisions (which slots, in which lane) in the layout config rather than in a view.
+
 # Package com.letta.mobile.ui.shell.nowactive
 
 The now-active conversation indicator. Supply [NowActiveBarState](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.nowactive/-now-active-bar-state/index.html) and [NowActiveBarActions](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.nowactive/-now-active-bar-actions/index.html) directly; active-run authority and conversation selection policy stay outside the indicator.
