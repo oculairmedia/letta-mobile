@@ -82,12 +82,21 @@ fun arbitrateActiveTurn(
     candidate: ActiveTurnState,
     boundary: ActiveTurnBoundary,
 ): ActiveTurnState {
+    if (boundary == ActiveTurnBoundary.Delete) {
+        return if (candidate.conversationId == current.conversationId && candidate.agentId == current.agentId) {
+            current.closed()
+        } else {
+            current
+        }
+    }
     if (!candidate.isResolvedFor(current)) return current
     return when (boundary) {
         ActiveTurnBoundary.Start -> if (current.sameTurn(candidate)) current else candidate
         ActiveTurnBoundary.Terminal -> current.terminated(candidate)
-        ActiveTurnBoundary.Delete, ActiveTurnBoundary.Interrupt,
-        ActiveTurnBoundary.Progress, ActiveTurnBoundary.ApprovalResolved -> current.withinTurn(candidate, boundary)
+        ActiveTurnBoundary.Interrupt,
+        ActiveTurnBoundary.Progress,
+        ActiveTurnBoundary.ApprovalResolved -> current.withinTurn(candidate, boundary)
+        ActiveTurnBoundary.Delete -> current.closed()
     }
 }
 
@@ -111,7 +120,10 @@ private fun ActiveTurnState.withinTurn(candidate: ActiveTurnState, boundary: Act
 }
 
 private fun ActiveTurnState.approvalResolved(candidate: ActiveTurnState): ActiveTurnState =
-    if (phase == ActiveTurnPhase.AwaitingInput) candidate.copy(startedAtEpochMs = startedAtEpochMs) else this
+    if (phase == ActiveTurnPhase.AwaitingInput) {
+        if (candidate.phase == ActiveTurnPhase.Idle) candidate.closed()
+        else candidate.copy(startedAtEpochMs = startedAtEpochMs)
+    } else this
 
 private fun ActiveTurnState.isResolvedFor(current: ActiveTurnState): Boolean =
     conversationId == current.conversationId && agentId == current.agentId && runId != null && turnId != null
@@ -127,7 +139,9 @@ private fun ActiveTurnState.progressed(candidate: ActiveTurnState): ActiveTurnSt
     ActiveTurnPhase.Idle, ActiveTurnPhase.Cancelling -> this
     ActiveTurnPhase.AwaitingInput ->
         if (candidate.phase == ActiveTurnPhase.AwaitingInput) candidate.copy(startedAtEpochMs = startedAtEpochMs) else this
-    ActiveTurnPhase.Thinking, ActiveTurnPhase.ToolExecuting -> candidate.copy(startedAtEpochMs = startedAtEpochMs)
+    ActiveTurnPhase.Thinking, ActiveTurnPhase.ToolExecuting ->
+        if (candidate.phase == ActiveTurnPhase.Idle) this
+        else candidate.copy(startedAtEpochMs = startedAtEpochMs)
 }
 
 private fun ActiveTurnState.closed(): ActiveTurnState = copy(
