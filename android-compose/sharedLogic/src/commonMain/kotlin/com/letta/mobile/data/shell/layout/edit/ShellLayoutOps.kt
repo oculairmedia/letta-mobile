@@ -77,6 +77,9 @@ enum class ShellLayoutEditRule(val code: String) {
     /** Settings would leave the side menu. */
     SETTINGS_STAYS("settings_stays"),
 
+    /** The Home button would leave the agent rail. */
+    HOME_STAYS("home_stays"),
+
     /** The slot is already in this lane, or in the other of main and side. */
     DUPLICATE_SLOT("duplicate_slot"),
 

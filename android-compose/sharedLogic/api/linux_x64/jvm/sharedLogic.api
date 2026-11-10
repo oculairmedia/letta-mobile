@@ -51355,6 +51355,7 @@ public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult
 
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule : java/lang/Enum {
 	public static final field DUPLICATE_SLOT Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field HOME_STAYS Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field INDEX_OUT_OF_RANGE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field LANE_FULL Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field MALFORMED Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;

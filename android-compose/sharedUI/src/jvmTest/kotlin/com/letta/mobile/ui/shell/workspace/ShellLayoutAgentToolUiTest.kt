@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -242,6 +243,14 @@ class ShellLayoutAgentToolUiTest {
         val refused = agentCalls("""{"action":"apply","ops":[{"op":"remove","lane":"main","view":"shell.page"}]}""")
         assertTrue("page_stays_in_main" in assertIs<ExternalToolResult.Error>(refused).error)
         onNodeWithTag(Page).assertExists()
+        onNodeWithText(Overlay.UNDO_LABEL).assertDoesNotExist()
+    }
+
+    @Test
+    fun anAgentCannotTakeHomeOffTheRail() = shell(760.dp) {
+        val refused = agentCalls("""{"action":"apply","ops":[{"op":"remove","lane":"rail","view":"rail.home"}]}""")
+        assertTrue("home_stays" in assertIs<ExternalToolResult.Error>(refused).error)
+        assertTrue(onAllNodesWithContentDescription("Home", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         onNodeWithText(Overlay.UNDO_LABEL).assertDoesNotExist()
     }
 

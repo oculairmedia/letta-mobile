@@ -14,8 +14,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * The layout edit rules: what each lane may hold, the page and Settings kept, no duplicates, the lane
- * caps, and all-or-nothing application.
+ * The layout edit rules: what each lane may hold, the page, Settings and the rail's Home kept, no
+ * duplicates, the lane caps, and all-or-nothing application.
  */
 class ShellLayoutEditsTest {
     private val default = ShellLayoutConfig.Default
@@ -73,9 +73,9 @@ class ShellLayoutEditsTest {
         val after = applied(
             changed,
             ShellLayoutOp.Reset,
-            ShellLayoutOp.Remove(ShellLanes.RAIL, ModuleSlot(RailViews.HOME)),
+            ShellLayoutOp.Remove(ShellLanes.RAIL, ModuleSlot(RailViews.AGENTS)),
         )
-        assertEquals(listOf(RailViews.AGENTS, RailViews.NEW), after.railLane().map { it.view })
+        assertEquals(listOf(RailViews.HOME, RailViews.NEW), after.railLane().map { it.view })
         assertEquals(default.homeLane(), after.homeLane())
     }
 
@@ -155,6 +155,32 @@ class ShellLayoutEditsTest {
         )
         assertEquals((0..2).map { it to ShellLayoutEditRule.SETTINGS_STAYS }, rules(errors))
         assertEquals(PanelViews.SETTINGS, applied(default, ShellLayoutOp.Move(ShellLanes.PANEL, settings, index = 0)).panelLane()[0].view)
+    }
+
+    @Test
+    fun homeNeverLeavesTheRail() {
+        val home = ModuleSlot(RailViews.HOME)
+        val errors = rejected(
+            default,
+            ShellLayoutOp.Remove(ShellLanes.RAIL, home),
+            ShellLayoutOp.Move(ShellLanes.RAIL, home, toLane = ShellLanes.PANEL),
+            ShellLayoutOp.SetLane(ShellLanes.RAIL, listOf(ModuleSlot(RailViews.AGENTS), ModuleSlot(RailViews.NEW))),
+        )
+        assertEquals((0..2).map { it to ShellLayoutEditRule.HOME_STAYS }, rules(errors))
+        assertEquals("${RailViews.HOME.value} must stay in lane ${ShellLanes.RAIL}.", errors.first().detail)
+        val reordered = applied(default, ShellLayoutOp.Move(ShellLanes.RAIL, home, index = RailViews.Default.size - 1))
+        assertEquals(listOf(RailViews.AGENTS, RailViews.NEW, RailViews.HOME), reordered.railLane().map { it.view })
+    }
+
+    @Test
+    fun anEditThatTouchesARailWithoutHomeMustPutHomeBack() {
+        val noHome = default.copy(lanes = default.lanes + (ShellLanes.RAIL to listOf(ModuleSlot(RailViews.AGENTS))))
+        val errors = rejected(noHome, ShellLayoutOp.Add(ShellLanes.RAIL, ModuleSlot(RailViews.NEW)))
+        assertEquals(listOf(null to ShellLayoutEditRule.HOME_STAYS), rules(errors))
+        // A lane the edit does not touch is not checked, and putting Home back is allowed.
+        applied(noHome, ShellLayoutOp.Remove(ShellLanes.PANEL, ModuleSlot(PanelViews.NEW_CHAT)))
+        val restored = applied(noHome, ShellLayoutOp.Add(ShellLanes.RAIL, ModuleSlot(RailViews.HOME), index = 0))
+        assertEquals(listOf(RailViews.HOME, RailViews.AGENTS), restored.railLane().map { it.view })
     }
 
     @Test

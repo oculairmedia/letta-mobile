@@ -11,6 +11,7 @@ import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.data.shell.sidemenu.PanelViews
+import com.letta.mobile.data.shell.sidemenu.RailViews
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -82,7 +83,8 @@ class ShellLayoutToolTest {
         val catalogLanes = receipt["catalog"]!!.jsonArray.map { it.jsonObject["lane"]!!.jsonPrimitive.content }
         assertEquals(ShellLayoutCatalog.lanes.map { it.lane }, catalogLanes)
         assertEquals(0, receipt["undo_steps"]!!.jsonPrimitive.int)
-        assertTrue(receipt["rules"]!!.jsonArray.isNotEmpty())
+        val rules = receipt["rules"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertTrue("${RailViews.HOME.value} stays in lane ${ShellLanes.RAIL}." in rules)
     }
 
     @Test
@@ -138,6 +140,25 @@ class ShellLayoutToolTest {
         assertEquals(listOf("settings_stays", "object_required"), errors.map { it["rule"]!!.jsonPrimitive.content })
         assertTrue("Nothing was applied" in receipt["hint"]!!.jsonPrimitive.content)
         assertEquals(ShellLayoutConfig.Default, store.config.value)
+    }
+
+    @Test
+    fun theRailKeepsItsHomeButtonButHomeMayMoveWithinIt() = runTest {
+        val receipt = error(
+            """{"action":"apply","ops":[
+                {"op":"remove","lane":"rail","view":"rail.home"},
+                {"op":"move","lane":"rail","view":"rail.home","to_lane":"panel"},
+                {"op":"set_lane","lane":"rail","slots":[{"view":"rail.agents"},{"view":"rail.new"}]}
+            ]}""",
+        )
+        val errors = receipt["errors"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf(0, 1, 2), errors.map { it["op_index"]!!.jsonPrimitive.int })
+        assertEquals(List(3) { "home_stays" }, errors.map { it["rule"]!!.jsonPrimitive.content })
+        assertEquals("rail.home must stay in lane rail.", errors.first()["detail"]!!.jsonPrimitive.content)
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+
+        success("""{"action":"apply","ops":[{"op":"move","lane":"rail","view":"rail.home","index":2}]}""")
+        assertEquals(listOf(RailViews.AGENTS, RailViews.NEW, RailViews.HOME), store.config.value.railLane().map { it.view })
     }
 
     @Test
