@@ -789,9 +789,7 @@ internal class AdminChatViewModel @Inject constructor(
                 return
             }
             stopTimelineObserverLocked()
-            if (activeTurnPresentation.value?.activeTurnCoordinator?.state?.value?.conversationId?.value != conversationId) {
-                activeTurnPresentation.value = null
-            }
+            bindActiveTurn(null, conversationId)
             val capturedRuntime = selectedRuntime
             val hostOpen = pagingHost.openCanonical
             val route = Triple(conversationId, generation, scrollToMessageId)
@@ -819,12 +817,7 @@ internal class AdminChatViewModel @Inject constructor(
                     }
                     try {
                         if (canonicalRoute != route) return@launch
-                        presentation.activeTurnCoordinator?.state?.value?.let { turn ->
-                            require(turn.conversationId.value == conversationId && turn.agentId == agentId) {
-                                "Active turn owner must match the captured Android target"
-                            }
-                            activeTurnPresentation.value = presentation
-                        }
+                        bindActiveTurn(presentation, conversationId)
                         presentation.hasBoundRoute = true
                         presentation.routeTarget = target
                         presentation.viewport = if (target == null) viewport else null
@@ -853,6 +846,17 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob?.start()
     }
 
+    private fun bindActiveTurn(presentation: ChatPagingPresentation?, conversationId: String) {
+        val turn = presentation?.activeTurnCoordinator?.state?.value
+        if (turn != null) {
+            require(turn.conversationId.value == conversationId && turn.agentId == agentId) {
+                "Active turn owner must match the captured Android target"
+            }
+            activeTurnPresentation.value = presentation
+        } else if (activeTurnPresentation.value?.activeTurnCoordinator?.state?.value?.conversationId?.value != conversationId) {
+            activeTurnPresentation.value = null
+        }
+    }
     private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }
 
     private suspend fun stopTimelineObserverLocked() {
@@ -912,14 +916,12 @@ internal class AdminChatViewModel @Inject constructor(
             routeArgs.workspace?.conversationAvailability != com.letta.mobile.data.shell.FocusAvailability.Unavailable
     val canSendMessages: Boolean
         get() = focusCanSend && ChatSessionReducer.canSend(_sessionState.value)
-
     fun onScreenPaused() {
         // Pausing (backgrounding, or another chat covering this one) does not detach: only
         // another chat's resume does, so a backgrounded chat keeps receiving its own frames.
         screenSelected = false
         if (routeArgs.isCurrent()) screenLifecycleCoordinator.onScreenPaused()
     }
-
     fun onScreenResumed() {
         if (!routeArgs.isCurrent() || replacingSendRuntime || !isRuntimeBound) return
         // letta-mobile-ztuog: the chat on screen owns the event selection; every other agent's
@@ -928,13 +930,11 @@ internal class AdminChatViewModel @Inject constructor(
         sendPipeline.wsChatSendCoordinator.selectForEvents()
         screenLifecycleCoordinator.onScreenResumed()
     }
-
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
         abandonTimelineObserver()
         if (routeArgs.isCurrent()) screenLifecycleCoordinator.onCleared()
     }
-
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
     fun selectSlashCommand(command: SlashCommand) =
