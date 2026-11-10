@@ -5,9 +5,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.round
 
 /*
  * The data kinds drawn from the board's own elements rather than written as a note (STAT,
@@ -20,7 +18,8 @@ import kotlin.math.round
  * target measures them; a long label leaves space rather than running into the next line.
  * Coordinates are whole numbers, so the frames are exact on every target.
  *
- * Written as functions over the items, not as types: the package is at its type budget.
+ * Written as functions over the items and a few value aliases, not as types: the package is at
+ * its type budget.
  */
 
 /**
@@ -29,6 +28,12 @@ import kotlin.math.round
  * emitter adds both.
  */
 internal typealias DrawnPart = Pair<String?, JsonObject>
+
+/** Where a part of a drawn item goes: its part name under the item and its box. */
+internal typealias PlacedPart = Pair<String, Slot>
+
+/** How a filled shape is painted: its colour and its stacking level. */
+internal typealias Paint = Pair<String, Int>
 
 /** A drawn item's inner padding, and the space between stacked texts. */
 internal const val DRAWING_PADDING = 16f
@@ -52,9 +57,6 @@ private const val MARK_RADIUS = 5f
 private const val AXIS_WIDTH = 1.0
 private const val LINE_WIDTH = 3.0
 private const val DOT_RADIUS = 4f
-private const val HUNDREDTHS = 100L
-private const val TENS = 10L
-private const val DIGIT_GROUP = 3
 
 /** The size [item] (a STAT, PROGRESS or CHART) is placed at: its kind's width and the height its content needs. */
 internal fun drawnSize(item: ComposeItem): Pair<Float, Float> = when (item) {
@@ -74,30 +76,32 @@ internal fun drawnParts(item: ComposeItem, slot: Slot): List<DrawnPart> = when (
 
 /** The frame every drawn item sits in: white, a light edge, rounded, under everything else in it. */
 internal fun drawnFrame(slot: Slot): DrawnPart {
-    val body = rectangle(slot, CanvasComposeColors.DRAWING_FILL, FRAME_RADIUS, DRAWING_FRAME_Z)
+    val body = rectangle(slot, CanvasComposeColors.DRAWING_FILL to DRAWING_FRAME_Z)
     return null to JsonObject(body + ("strokeColor" to JsonPrimitive(CanvasComposeColors.DRAWING_STROKE)))
 }
 
-/** A filled bar edged in its own colour, its corners rounded to at most half its short side. */
-internal fun drawnBar(part: String, box: Slot, color: String, z: Int): DrawnPart {
-    val radius = minOf(MARK_RADIUS, box.height / 2, box.width / 2).toDouble()
-    return part to rectangle(box, color, radius, z)
-}
+/** A filled bar at [placed], edged in its own colour, its corners rounded to at most half its short side. */
+internal fun drawnBar(placed: PlacedPart, paint: Paint): DrawnPart = placed.first to rectangle(placed.second, paint)
 
-private fun rectangle(box: Slot, color: String, radius: Double, z: Int): JsonObject = buildJsonObject {
+/** A frame's corners are [FRAME_RADIUS]; a mark's at most [MARK_RADIUS] and half its short side. */
+private fun cornerRadius(box: Slot, paint: Paint): Double =
+    if (paint.second == DRAWING_FRAME_Z) FRAME_RADIUS else minOf(MARK_RADIUS, box.height / 2, box.width / 2).toDouble()
+
+private fun rectangle(box: Slot, paint: Paint): JsonObject = buildJsonObject {
     put("type", "Shape")
     put("shapeType", "RECTANGLE")
     put("points", buildJsonArray { add(JsonPrimitive(box.topLeftPoint())); add(JsonPrimitive(box.bottomRightPoint())) })
-    put("strokeColor", color)
+    put("strokeColor", paint.first)
     put("strokeWidth", EDGE_WIDTH)
-    put("fillColor", color)
-    put("cornerRadius", radius)
-    put("zIndex", z)
+    put("fillColor", paint.first)
+    put("cornerRadius", cornerRadius(box, paint))
+    put("zIndex", paint.second)
 }
 
-/** A text element set at [box]'s top-left, wrapping at its width, in [look], aligned as [alignment] says. */
-internal fun drawnText(part: String, box: Slot, look: TextLook, alignment: String = CanvasComposeCompiler.TEXT_ALIGNMENT): DrawnPart =
-    part to buildJsonObject {
+/** A text element set at [placed]'s box top-left, wrapping at its width, in [look], aligned as [alignment] says. */
+internal fun drawnText(placed: PlacedPart, look: TextLook, alignment: String = CanvasComposeCompiler.TEXT_ALIGNMENT): DrawnPart {
+    val box = placed.second
+    return placed.first to buildJsonObject {
         put("type", "Text")
         put("text", look.text)
         put("textTopLeft", box.topLeftPoint())
@@ -108,12 +112,10 @@ internal fun drawnText(part: String, box: Slot, look: TextLook, alignment: Strin
         put("strokeColor", look.color)
         put("zIndex", look.z)
     }
-
-/** A drawn item's text in [color] at [font], above its marks. */
-internal fun drawnLook(text: String, font: Double, color: String): TextLook = TextLook(text, font, color, DRAWING_TEXT_Z)
+}
 
 /** A chart's baseline, a thin grey line from [from] to [to]. */
-internal fun drawnAxis(part: String, from: Pair<Float, Float>, to: Pair<Float, Float>): DrawnPart = part to buildJsonObject {
+internal fun drawnAxis(from: Pair<Float, Float>, to: Pair<Float, Float>): DrawnPart = "axis" to buildJsonObject {
     put("type", "Shape")
     put("shapeType", "LINE")
     put("points", buildJsonArray { add(JsonPrimitive(drawBoxPoint(from))); add(JsonPrimitive(drawBoxPoint(to))) })
@@ -123,7 +125,7 @@ internal fun drawnAxis(part: String, from: Pair<Float, Float>, to: Pair<Float, F
 }
 
 /** A line chart's series: a polyline through [points] in the accent colour. */
-internal fun drawnPath(part: String, points: List<Pair<Float, Float>>): DrawnPart = part to buildJsonObject {
+internal fun drawnPath(points: List<Pair<Float, Float>>): DrawnPart = "line" to buildJsonObject {
     put("type", "Path")
     val pressure = drawBoxNumber(LINE_WIDTH.toFloat())
     put("samples", buildJsonArray { points.forEach { add(JsonPrimitive(drawBoxPoint(it) + "," + pressure)) } })
@@ -132,59 +134,42 @@ internal fun drawnPath(part: String, points: List<Pair<Float, Float>>): DrawnPar
     put("zIndex", DRAWING_MARK_Z)
 }
 
-/** A line chart's point: a small accent dot centred on [centre]. */
-internal fun drawnDot(part: String, centre: Pair<Float, Float>): DrawnPart = part to buildJsonObject {
-    put("type", "Shape")
-    put("shapeType", "CIRCLE")
-    val (x, y) = centre
-    val ends = listOf(x - DOT_RADIUS to y, x + DOT_RADIUS to y)
-    put("points", buildJsonArray { ends.forEach { add(JsonPrimitive(drawBoxPoint(it))) } })
-    put("strokeColor", CanvasComposeColors.ACCENT)
-    put("strokeWidth", EDGE_WIDTH)
-    put("fillColor", CanvasComposeColors.ACCENT)
-    put("zIndex", DRAWING_MARK_Z)
+/** A line chart's points: a small accent dot centred on each of [centres], `dot0`, `dot1`, ... */
+internal fun drawnDots(centres: List<Pair<Float, Float>>): List<DrawnPart> = centres.mapIndexed { i, centre ->
+    "dot$i" to buildJsonObject {
+        put("type", "Shape")
+        put("shapeType", "CIRCLE")
+        val (x, y) = centre
+        val ends = listOf(x - DOT_RADIUS to y, x + DOT_RADIUS to y)
+        put("points", buildJsonArray { ends.forEach { add(JsonPrimitive(drawBoxPoint(it))) } })
+        put("strokeColor", CanvasComposeColors.ACCENT)
+        put("strokeWidth", EDGE_WIDTH)
+        put("fillColor", CanvasComposeColors.ACCENT)
+        put("zIndex", DRAWING_MARK_Z)
+    }
 }
 
 /** The radius of a line chart's dots, which value labels clear. */
 internal fun drawnDotRadius(): Float = DOT_RADIUS
 
-/** The height [text] takes at [font] wrapped at [width]: its worst-case lines at the reserve's line height. */
-internal fun textHeight(text: String, font: Double, width: Float): Float =
-    ceil(WorstCaseWrap(width.toDouble(), font).lines(text) * CanvasComposeReserve.LINE_HEIGHT_EM * font).toFloat()
+/** The height [look]'s text takes at its font wrapped at [width]: its worst-case lines at the reserve's line height. */
+internal fun textHeight(look: TextLook, width: Float): Float =
+    ceil(WorstCaseWrap(width.toDouble(), look.font).lines(look.text) * CanvasComposeReserve.LINE_HEIGHT_EM * look.font).toFloat()
 
-/** Whether [text] fits on one line at [font] in [width], booked at worst case. */
-internal fun fitsOneLine(text: String, font: Double, width: Float): Boolean = WorstCaseWrap(width.toDouble(), font).lines(text) == 1
+/** Whether [look]'s text fits on one line at its font in [width], booked at worst case. */
+internal fun fitsOneLine(look: TextLook, width: Float): Boolean = WorstCaseWrap(width.toDouble(), look.font).lines(look.text) == 1
 
 /** The height of [looks] stacked in a column [width] wide, [DRAWING_GAP] apart, each as tall as it books. */
 internal fun stackHeight(looks: List<TextLook>, width: Float): Float =
-    looks.sumOf { textHeight(it.text, it.font, width).toDouble() }.toFloat() + (looks.size - 1).coerceAtLeast(0) * DRAWING_GAP
+    looks.sumOf { textHeight(it, width).toDouble() }.toFloat() + (looks.size - 1).coerceAtLeast(0) * DRAWING_GAP
 
-/** [texts] (part and look) stacked as [stackHeight] measures them, the column's top-left at [topLeft]. */
-internal fun stackParts(texts: List<Pair<String, TextLook>>, width: Float, topLeft: Pair<Float, Float>): List<DrawnPart> {
-    var top = topLeft.second
+/** [texts] (part and look) stacked as [stackHeight] measures them, in [column] (its top-left and width). */
+internal fun stackParts(texts: List<Pair<String, TextLook>>, column: Slot): List<DrawnPart> {
+    var top = column.y
     return texts.map { (part, look) ->
-        val height = textHeight(look.text, look.font, width)
-        drawnText(part, Slot(topLeft.first, top, width, height), look).also { top += height + DRAWING_GAP }
+        val height = textHeight(look, column.width)
+        drawnText(part to Slot(column.x, top, column.width, height), look).also { top += height + DRAWING_GAP }
     }
-}
-
-/**
- * A number as a chart prints it, the same on every target (Kotlin/JS would print `3` where the
- * JVM prints `3.0`): at most two decimals, trailing zeros dropped, thousands grouped with commas,
- * then [unit].
- */
-internal fun formatChartValue(value: Double, unit: String? = null): String {
-    val scaled = round(value * HUNDREDTHS).toLong()
-    val magnitude = abs(scaled)
-    val whole = (magnitude / HUNDREDTHS).toString().reversed().chunked(DIGIT_GROUP).joinToString(",").reversed()
-    val fraction = magnitude % HUNDREDTHS
-    val decimals = when {
-        fraction == 0L -> ""
-        fraction % TENS == 0L -> "." + (fraction / TENS)
-        else -> "." + fraction.toString().padStart(2, '0')
-    }
-    val sign = if (scaled < 0) "-" else ""
-    return sign + whole + decimals + unit.orEmpty()
 }
 
 /** DrawBox's `"x,y"` of a point, written as [topLeftPoint] writes one. */

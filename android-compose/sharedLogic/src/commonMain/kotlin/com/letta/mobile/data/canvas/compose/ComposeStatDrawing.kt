@@ -27,43 +27,57 @@ internal const val PROGRESS_ROW_GAP = 8f
 internal const val PROGRESS_TRACK_HEIGHT = 10f
 private const val PERCENT = 100.0
 
+/** The widest percentage a PROGRESS bar shows, which its label row is booked for. */
+private const val FULL_PERCENT = "100%"
+
 private val statInner: Float get() = CanvasComposeContract.STAT_WIDTH - 2 * DRAWING_PADDING
 private val progressInner: Float get() = CanvasComposeContract.PROGRESS_WIDTH - 2 * DRAWING_PADDING
+private val progressLabelWidth: Float get() = progressInner - PROGRESS_PERCENT_WIDTH
 
 /** A STAT's texts, top to bottom, by part. */
 private fun statTexts(stat: ComposeItem.Stat): List<Pair<String, TextLook>> = buildList {
-    add("label" to drawnLook(stat.label, STAT_LABEL_FONT, CanvasComposeColors.MUTED))
-    add("value" to drawnLook(stat.value, statValueFont(stat.value), CanvasComposeColors.TEXT))
+    add("label" to TextLook(stat.label, STAT_LABEL_FONT, CanvasComposeColors.MUTED, DRAWING_TEXT_Z))
+    add("value" to TextLook(stat.value, statValueFont(stat), CanvasComposeColors.TEXT, DRAWING_TEXT_Z))
     stat.delta?.takeIf { it.isNotBlank() }?.let {
-        add("delta" to drawnLook(it, STAT_DELTA_FONT, CanvasComposeColors.tone(stat.tone, CanvasComposeColors.MUTED)))
+        val color = CanvasComposeColors.tone(stat.tone, CanvasComposeColors.MUTED)
+        add("delta" to TextLook(it, STAT_DELTA_FONT, color, DRAWING_TEXT_Z))
     }
-    stat.caption?.takeIf { it.isNotBlank() }?.let { add("caption" to drawnLook(it, STAT_CAPTION_FONT, CanvasComposeColors.MUTED)) }
+    stat.caption?.takeIf { it.isNotBlank() }?.let {
+        add("caption" to TextLook(it, STAT_CAPTION_FONT, CanvasComposeColors.MUTED, DRAWING_TEXT_Z))
+    }
 }
 
-private fun statValueFont(value: String): Double =
-    STAT_VALUE_FONTS.firstOrNull { fitsOneLine(value, it, statInner) } ?: STAT_VALUE_FONTS.last()
+private fun statValueFont(stat: ComposeItem.Stat): Double = STAT_VALUE_FONTS.firstOrNull { font ->
+    fitsOneLine(TextLook(stat.value, font, CanvasComposeColors.TEXT, DRAWING_TEXT_Z), statInner)
+} ?: STAT_VALUE_FONTS.last()
 
 /** A STAT's height: its stacked texts and the padding round them. */
 internal fun statHeight(stat: ComposeItem.Stat): Float = stackHeight(statTexts(stat).map { it.second }, statInner) + 2 * DRAWING_PADDING
 
 /** A STAT's elements in [slot]: its frame, then its texts. */
-internal fun statParts(stat: ComposeItem.Stat, slot: Slot): List<DrawnPart> =
-    listOf(drawnFrame(slot)) + stackParts(statTexts(stat), statInner, slot.x + DRAWING_PADDING to slot.y + DRAWING_PADDING)
+internal fun statParts(stat: ComposeItem.Stat, slot: Slot): List<DrawnPart> {
+    val column = Slot(slot.x + DRAWING_PADDING, slot.y + DRAWING_PADDING, statInner, 0f)
+    return listOf(drawnFrame(slot)) + stackParts(statTexts(stat), column)
+}
 
-/** The percentage a PROGRESS bar shows: its value rounded to a whole percent. */
-internal fun progressPercent(value: Double): String = "${round(value * PERCENT).toInt()}%"
+/** The percentage [progress] shows: its value rounded to a whole percent. */
+private fun progressPercent(progress: ComposeItem.Progress): String = "${round(progress.value * PERCENT).toInt()}%"
 
-private fun progressLabelWidth(): Float = progressInner - PROGRESS_PERCENT_WIDTH
+private fun progressLabel(progress: ComposeItem.Progress): TextLook =
+    TextLook(progress.label, PROGRESS_LABEL_FONT, CanvasComposeColors.TEXT, DRAWING_TEXT_Z)
 
 private fun progressRowHeight(progress: ComposeItem.Progress): Float = maxOf(
-    textHeight(progress.label, PROGRESS_LABEL_FONT, progressLabelWidth()),
-    textHeight(progressPercent(1.0), PROGRESS_LABEL_FONT, PROGRESS_PERCENT_WIDTH),
+    textHeight(progressLabel(progress), progressLabelWidth),
+    textHeight(TextLook(FULL_PERCENT, PROGRESS_LABEL_FONT, CanvasComposeColors.MUTED, DRAWING_TEXT_Z), PROGRESS_PERCENT_WIDTH),
 )
 
-private fun progressCaption(progress: ComposeItem.Progress): String? = progress.caption?.takeIf { it.isNotBlank() }
+/** [progress]'s caption as it is set, or null when it has none. */
+private fun progressCaption(progress: ComposeItem.Progress): TextLook? = progress.caption?.takeIf { it.isNotBlank() }?.let {
+    TextLook(it, PROGRESS_CAPTION_FONT, CanvasComposeColors.MUTED, DRAWING_TEXT_Z)
+}
 
 private fun progressCaptionBlock(progress: ComposeItem.Progress): Float =
-    progressCaption(progress)?.let { PROGRESS_ROW_GAP + textHeight(it, PROGRESS_CAPTION_FONT, progressInner) } ?: 0f
+    progressCaption(progress)?.let { PROGRESS_ROW_GAP + textHeight(it, progressInner) } ?: 0f
 
 /** A PROGRESS bar's height: its label row, its track, its caption and the padding round them. */
 internal fun progressHeight(progress: ComposeItem.Progress): Float =
@@ -77,18 +91,16 @@ internal fun progressParts(progress: ComposeItem.Progress, slot: Slot): List<Dra
     val trackTop = top + row + PROGRESS_ROW_GAP
     val filled = round(progressInner * progress.value.toFloat())
     val fill = CanvasComposeColors.tone(progress.tone, CanvasComposeColors.ACCENT)
-    val labelWidth = progressLabelWidth()
     return buildList {
         add(drawnFrame(slot))
-        add(drawnBar("track", Slot(left, trackTop, progressInner, PROGRESS_TRACK_HEIGHT), CanvasComposeColors.TRACK, DRAWING_BACK_Z))
-        if (filled >= 1f) add(drawnBar("fill", Slot(left, trackTop, filled, PROGRESS_TRACK_HEIGHT), fill, DRAWING_MARK_Z))
-        add(drawnText("label", Slot(left, top, labelWidth, row), drawnLook(progress.label, PROGRESS_LABEL_FONT, CanvasComposeColors.TEXT)))
-        val percent = drawnLook(progressPercent(progress.value), PROGRESS_LABEL_FONT, CanvasComposeColors.MUTED)
-        add(drawnText("percent", Slot(left + labelWidth, top, PROGRESS_PERCENT_WIDTH, row), percent, ALIGN_RIGHT))
+        add(drawnBar("track" to Slot(left, trackTop, progressInner, PROGRESS_TRACK_HEIGHT), CanvasComposeColors.TRACK to DRAWING_BACK_Z))
+        if (filled >= 1f) add(drawnBar("fill" to Slot(left, trackTop, filled, PROGRESS_TRACK_HEIGHT), fill to DRAWING_MARK_Z))
+        add(drawnText("label" to Slot(left, top, progressLabelWidth, row), progressLabel(progress)))
+        val percent = TextLook(progressPercent(progress), PROGRESS_LABEL_FONT, CanvasComposeColors.MUTED, DRAWING_TEXT_Z)
+        add(drawnText("percent" to Slot(left + progressLabelWidth, top, PROGRESS_PERCENT_WIDTH, row), percent, ALIGN_RIGHT))
         progressCaption(progress)?.let {
             val captionTop = trackTop + PROGRESS_TRACK_HEIGHT + PROGRESS_ROW_GAP
-            val look = drawnLook(it, PROGRESS_CAPTION_FONT, CanvasComposeColors.MUTED)
-            add(drawnText("caption", Slot(left, captionTop, progressInner, textHeight(it, PROGRESS_CAPTION_FONT, progressInner)), look))
+            add(drawnText("caption" to Slot(left, captionTop, progressInner, textHeight(it, progressInner)), it))
         }
     }
 }
