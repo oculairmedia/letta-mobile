@@ -80,27 +80,6 @@ internal class MdLine(val text: String, val start: Int, val indent: Int = 0, val
         val gapIsSpacing = spaces in 1..MAX_MARKER_GAP && markerLength + spaces < text.length
         return markerLength + if (gapIsSpacing) spaces else 1
     }
-
-    private companion object {
-        const val MAX_MARKER_GAP = 4
-        val ATX_HEADING = Regex("""^(#{1,6})(?:[ \t]+(.*))?$""")
-        val THEMATIC_BREAK = Regex("""^(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$""")
-        val SETEXT = Regex("""^(?:=+|-+)$""")
-        val TABLE_DELIMITER = Regex("""^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?$""")
-        val DEFINITION = Regex("""^\[[^\]]+]:""")
-        val BULLET = Regex("""^([-*+])(?:[ \t]+|$)""")
-        val ORDERED = Regex("""^(\d{1,9})[.)](?:[ \t]+|$)""")
-        val TASK = Regex("""^\[([ xX])](?:[ \t]+|$)""")
-
-        /** An optional closing sequence of #s, separated by a space (or the whole content). */
-        val CLOSING_SEQUENCE = Regex("""(^|\s)#+$""")
-
-        fun withoutClosingSequence(raw: String): String {
-            val trimmed = raw.trim()
-            val closing = CLOSING_SEQUENCE.find(trimmed) ?: return trimmed
-            return trimmed.substring(0, closing.range.first).trim()
-        }
-    }
 }
 
 /** An ATX heading: its level, and its text without the #s. */
@@ -137,4 +116,23 @@ internal class MdFence(private val char: Char, private val length: Int, private 
     }
 
     fun code(): MdBlock.Code = MdBlock.Code(lines.joinToString("\n"))
+}
+
+private const val MAX_MARKER_GAP = 4
+private val ATX_HEADING = Regex("""^(#{1,6})(?:[ \t]+(.*))?$""")
+private val THEMATIC_BREAK = Regex("""^(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$""")
+private val SETEXT = Regex("""^(?:=+|-+)$""")
+private val TABLE_DELIMITER = Regex("""^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?$""")
+private val DEFINITION = Regex("""^\[[^\]]+]:""")
+private val BULLET = Regex("""^([-*+])(?:[ \t]+|$)""")
+private val ORDERED = Regex("""^(\d{1,9})[.)](?:[ \t]+|$)""")
+private val TASK = Regex("""^\[([ xX])](?:[ \t]+|$)""")
+
+/** An optional closing sequence of #s, separated by a space (or the whole content). */
+private val CLOSING_SEQUENCE = Regex("""(^|\s)#+$""")
+
+private fun withoutClosingSequence(raw: String): String {
+    val trimmed = raw.trim()
+    val closing = CLOSING_SEQUENCE.find(trimmed) ?: return trimmed
+    return trimmed.substring(0, closing.range.first).trim()
 }

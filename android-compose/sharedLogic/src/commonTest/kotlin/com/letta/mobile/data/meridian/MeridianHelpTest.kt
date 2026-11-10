@@ -45,8 +45,8 @@ class MeridianHelpTest {
         val expected = """
             |meridian canvas: Read and change this conversation's canvas (notes, checklists, cards, diagrams).
             |
-            |  compose         Put notes, checklists, cards, text and labelled groups on the conversation canvas (or pass canvas...
-            |  guide           Describe the canvas_compose format (letta.canvas.compose version 1): the kinds and their fields,...
+            |  compose         Put notes, cards, tables, stats, charts and more on the conversation canvas in one call.
+            |  guide           Describe the canvas_compose format (letta.canvas.compose version 2): the kinds and their fields,...
             |  layout          Read a canvas's geometry without its full payloads (no canvas_id: this conversation's canvas).
             |  scene           Get a canvas's current scene (DrawBox JSON) and revision (no canvas_id: this conversation's canvas).
             |  apply-ops       Apply a sequence of canvas operations (no canvas_id: this conversation's canvas).

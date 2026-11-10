@@ -1,8 +1,8 @@
 # canvas_compose
 
 This package is the compose layer of the canvas: an agent says WHAT goes on the board (notes,
-checklists, cards, text, labelled groups) and never WHERE, and compose places it, sizes it and
-compiles it into the one canvas op log. Read this before changing the wire contract, the markdown
+checklists, cards, text, labelled groups and, since v2, tables, stats, progress bars and charts)
+and never WHERE, and compose places it, sizes it and compiles it into the one canvas op log. Read this before changing the wire contract, the markdown
 subset, placement, the receipt, or before adding a kind.
 
 The agent-facing reference is the guide `canvas_compose_guide` answers (`CanvasComposeGuide.kt`,
@@ -17,7 +17,10 @@ Authoritative implementation files (sharedLogic `commonMain`, package
 - Strict input schema (the one the model is given) and its path-carrying checker: `CanvasComposeSchema.kt`
 - Markdown subset reader: `CanvasComposeMarkdown.kt`; Cascade v2 block writer: `CanvasCascadeBlocks.kt`
 - Reserved-height estimator: `CanvasComposeReserve.kt`; placement engine: `CanvasComposePlacement.kt`
-- Compiler (request + scene -> ops + receipt, or refusal): `CanvasComposeCompiler.kt`
+- Compiler (request + scene -> ops + receipt, or refusal): `CanvasComposeCompiler.kt`; the per-item rules a
+  schema cannot say (version, table rows, bar values): `ComposeItemRules.kt`
+- Drawn kinds (STAT, PROGRESS, CHART as board elements in a frame): `CanvasComposeDrawings.kt`,
+  `ComposeStatDrawing.kt` (STAT and PROGRESS), `ComposeChartDrawing.kt`
 - The one entry point both hosts call: `CanvasComposeService.kt`
 - Ids (`cmp-<artifactId>-<key>`, derived artifact ids, SHA-256): `CanvasComposeIds.kt`; colours: `CanvasComposeColors.kt`
 - The guide: `CanvasComposeGuide.kt`
@@ -54,7 +57,9 @@ receipt JSON (tool return)  ->  persisted on the TOOL_CALL timeline event  ->  C
 ```
 
 - One op log, one validator, one document store: compose emits ordinary `set_document` (notes,
-  checklists, cards) and `add_element` (TEXT, group frames and labels) ops.
+  checklists, cards, tables) and `add_element` (TEXT, group frames and labels, and the frames, shapes,
+  paths and texts of STAT, PROGRESS and CHART) ops. No kind needs a new element type or op, so a
+  client draws every kind with the renderers it already has; only the compiling host must know it.
 - Both hosts call `CanvasComposeService.compose` and nothing else, so they cannot disagree. The
   Iroh host checks against its own scene and publishes through `HostCanvasBackend.publish`; the
   desktop app path goes through the live `CanvasSession.applyAgentBatch`, or the store at the read
@@ -76,7 +81,10 @@ receipt JSON (tool return)  ->  persisted on the TOOL_CALL timeline event  ->  C
    (`i0`, `i3-c0`); every board id `cmp-<artifactId>-<key>` must be unique, group labels included.
 3. Content: NOTE and CARD markdown through `CanvasComposeMarkdown.parse` (refusals carry the
    character offset), CHECKLIST entries to `todo` blocks, CARD title/fields to a `heading_2` and
-   bold `Label: value` paragraphs; written by `CanvasCascadeBlocks` as Cascade v2 JSON.
+   bold `Label: value` paragraphs, a TABLE to one `letta.table` custom block (the note editor's own
+   table, sharedUI `CanvasTableBlock`, header row first); written by `CanvasCascadeBlocks` as
+   Cascade v2 JSON. STAT, PROGRESS and CHART are laid out by `CanvasComposeDrawings` from their
+   content alone (texts at their worst-case wrapped height, whole-number coordinates).
 4. Placement: `CanvasComposeReserve` books a conservative height per document (world units, same
    numbers the renderer draws in), `CanvasComposePlacement.place` lays the artifact out right of
    (or below, past 2 400 wide) the board's occupied bounds, as a row-major grid.
@@ -84,7 +92,9 @@ receipt JSON (tool return)  ->  persisted on the TOOL_CALL timeline event  ->  C
    (geometry ignored) are compared: equal is a retry (no ops, `ALREADY_PUBLISHED_WARNING`),
    different is `ARTIFACT_EXISTS`.
 6. Ops: group frames, then documents (`owner: AUTO`, colour, title, `compose` provenance), then
-   texts and group labels (`_compose` on the element).
+   drawn items (each its frame, `cmp-<artifactId>-<key>`, then its parts, `cmp-<artifactId>-<key>.<part>`),
+   then texts and group labels (`_compose` on the element). Provenance carries the version that
+   introduced the kind, so a v1 artifact keeps the content signature it was published with.
 
 `CanvasComposeService` then runs the batch validator (`BOARD_REFUSED` with the board's own rule
 names at the item's path), stops for `dry_run`, and publishes; a publisher that throws
@@ -114,13 +124,28 @@ Everything on the board is in world units (density 1, no font scale), so the est
 renderer agree on every display (`CanvasNoteWorldUnitsUiTest`, the Android Robolectric gate
 `CanvasNoteAutoFitAndroidRenderTest`).
 
-## Adding a kind (v2)
+A drawn item (STAT, PROGRESS, CHART) has no auto-fit: its frame and parts are fixed when compiled,
+each text booked at its worst-case wrapped height so no two overlap however a target measures
+them (sharedUI `CanvasComposeDataKindsRenderTest` holds DrawBox's real layout of every text to its
+booking). Its parts are separate elements: a person can move one alone, as with a group's frame.
 
-A kind is a contract change: bump the catalog version, keep v1 accepted.
+## Versions
 
-1. Contract: add the kind to `ComposeKind` and a `ComposeItem` subclass with its fields; add caps as
-   constants; add `VERSION = 2` to `SUPPORTED_VERSIONS` (keep 1) and say in the `VERSION` notes
-   what v2 adds.
+v1 is NOTE, CHECKLIST, CARD, TEXT and GROUP. v2 adds TABLE, STAT, PROGRESS and CHART
+(`ComposeKind.since`). A request without `version` may use any kind this build knows; one that says
+`"version": 1` and uses a v2 kind is refused at that item's `kind` (BAD_VALUE). A receipt answers in
+the version the request needed (`ComposeRequest.requiredVersion`), so a v1 request reads exactly as
+before. A host built before v2 refuses `"version": 2` (UNSUPPORTED_VERSION) and a v2 kind
+(UNKNOWN_KIND), both structured; an app built before v2 still draws everything a v2 host writes (no
+new element or op), and reads a v2 receipt as a card named from the request, without bounds.
+
+## Adding a kind
+
+A kind is a contract change: bump the catalog version, keep the older ones accepted.
+
+1. Contract: add the kind to `ComposeKind` (with its `since`) and a `ComposeItem` subclass with its
+   fields; add caps as constants; add the new `VERSION` to `SUPPORTED_VERSIONS` and say in the
+   `VERSION` notes what it adds.
 2. Schema: add its branch to `CanvasComposeSchema` (strict, every cap as `maxItems` / `maxLength`),
    and decide whether a GROUP may hold it. `CanvasComposeSchemaTest` holds the schema and the DTOs
    together.
@@ -152,5 +177,8 @@ each other.
 - Hosts: `HostCanvasComposeToolsTest`, `HostCanvasComposeAtomicityTest`, `CanvasComposeToolTest`, `CanvasComposeHostParityTest`
 - Guide: `CanvasComposeGuideTest` (every cap, code, colour and refusal example), `CanvasComposeGuideDocTest`
 - Receipt: `CanvasArtifactReceiptsTest`, `CanvasComposeReceiptSizeTest`, `CanvasComposeReceiptEndToEndTest`
+- Data kinds (v2): `CanvasComposeDataKindsTest` (rules, what each kind draws, retries), `CanvasComposeV2FixturesTest`
+  (`v2/` request, compiled golden, receipt), desktop `CanvasCascadeBlocksOracleTest` (the table block), sharedUI
+  `CanvasComposeDataKindsRenderTest` (rendered board, real text layout within its booking, phone and desktop widths)
 - End to end: `CanvasComposeMultiCardEndToEndTest` (dispatcher, host, notebook, timeline), sharedUI
   `CanvasComposeEndToEndRenderTest` (rendered board, Show on canvas; snapshots in `sharedUI/build/canvas-compose-e2e/`)

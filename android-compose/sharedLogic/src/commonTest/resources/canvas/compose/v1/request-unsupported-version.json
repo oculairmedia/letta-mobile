@@ -1,6 +1,6 @@
 {
   "catalog": "letta.canvas.compose",
-  "version": 2,
+  "version": 3,
   "items": [
     { "kind": "NOTE", "markdown": "From a newer agent." }
   ]

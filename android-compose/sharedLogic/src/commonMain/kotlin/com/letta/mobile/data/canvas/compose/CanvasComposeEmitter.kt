@@ -21,22 +21,33 @@ internal class Emitted(val op: CanvasOp, val path: String)
 
 /**
  * The ops of [CanvasComposeCompiler]'s batch, placed by [placement]: group frames, then documents,
- * then texts (TEXT items and group labels), so what is drawn under comes first.
+ * then drawn items (each its frame, marks and texts), then texts (TEXT items and group labels), so
+ * what is drawn under comes first.
  */
 internal class ComposeEmitter(private val artifactId: CanvasArtifactId, private val placement: Placement) {
     fun emit(built: List<Built>): List<Emitted> {
         val all = built.flatMap { if (it is Built.Group) listOf(it) + it.children else listOf(it) }
         val groups = all.filterIsInstance<Built.Group>().map { Emitted(groupFrame(it), it.entry.path) }
         val documents = all.filterIsInstance<Built.Document>().map { Emitted(document(it), it.entry.path) }
+        val drawings = all.filterIsInstance<Built.Drawing>().flatMap { drawing(it) }
         val texts = all.mapNotNull { piece ->
             when (piece) {
                 is Built.Text -> Emitted(text(piece), piece.entry.path)
                 is Built.Group -> label(piece)
-                is Built.Document -> null
+                else -> null
             }
         }
-        return groups + documents + texts
+        return groups + documents + drawings + texts
     }
+
+    /** A drawn item's elements: its frame under the item's own board id, each part under `<id>.<part>`. */
+    private fun drawing(piece: Built.Drawing): List<Emitted> =
+        drawnParts(piece.entry.item, slot(piece.entry)).map { (part, element) ->
+            val key = piece.entry.key
+            val id = part?.let { CanvasComposeIds.part(artifactId, key, it) } ?: CanvasComposeIds.piece(artifactId, key)
+            val body = JsonObject(element + (ELEMENT_COMPOSE to provenanceJson(piece.entry)))
+            Emitted(element(id, body), piece.entry.path)
+        }
 
     private fun slot(entry: Entry): Slot = placement.slots.getValue(entry.key)
 
@@ -45,7 +56,9 @@ internal class ComposeEmitter(private val artifactId: CanvasArtifactId, private 
         key = entry.key,
         kind = entry.item.kind.name,
         catalog = CanvasComposeContract.CATALOG,
-        version = CanvasComposeContract.VERSION,
+        // The version that introduced the kind, not this build's: a v1 piece keeps the provenance
+        // (and so the retry signature) it was published with.
+        version = entry.item.kind.since,
     )
 
     private fun document(piece: Built.Document): CanvasOp.SetDocumentOp {
@@ -118,14 +131,12 @@ internal class ComposeEmitter(private val artifactId: CanvasArtifactId, private 
 
     private fun element(id: String, body: JsonObject) =
         CanvasOp.AddElementOp(opId = "", actorId = "", lamport = 0L, elementId = id, elementJson = body.toString())
-
-    /** A text element's words and how they are set: font size, colour and stacking. */
-    private class TextLook(val text: String, val font: Double, val color: String, val z: Int)
-
-    private companion object {
-        val json = Json { ignoreUnknownKeys = true }
-    }
 }
+
+/** A text element's words and how they are set: font size, colour and stacking. */
+internal class TextLook(val text: String, val font: Double, val color: String, val z: Int)
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * DrawBox's `"x,y"`, written the same on every target: placement hands out whole numbers, and
@@ -135,7 +146,7 @@ internal fun Slot.topLeftPoint(): String = "${drawBoxNumber(x)},${drawBoxNumber(
 
 internal fun Slot.bottomRightPoint(): String = "${drawBoxNumber(right)},${drawBoxNumber(bottom)}"
 
-private fun drawBoxNumber(value: Float): String {
+internal fun drawBoxNumber(value: Float): String {
     val whole = value.toLong()
     return if (whole.toFloat() == value) "$whole.0" else value.toString()
 }

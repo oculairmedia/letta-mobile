@@ -229,7 +229,8 @@ class CanvasComposeMultiCardEndToEndTest {
         composedDocuments.forEach { document ->
             assertEquals(CanvasGeometryOwner.AUTO, document.owner, document.id)
             assertEquals(CanvasComposeContract.CATALOG, document.compose!!.catalog)
-            assertEquals(CanvasComposeContract.VERSION, document.compose!!.version)
+            // The v1 request's pieces keep the version that introduced their kinds.
+            assertEquals(ComposeKind.valueOf(document.compose!!.kind).since, document.compose!!.version)
         }
     }
 

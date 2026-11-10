@@ -128,14 +128,12 @@ object CanvasComposePlacement {
         return maxOf(GROUP_LABEL_ROW, ceil(lines * CanvasComposeReserve.LINE_HEIGHT_EM * font).toFloat())
     }
 
-    private data class Size(val width: Float, val height: Float)
-
-    private fun sizeOf(item: SizedItem): Size = when (item) {
-        is SizedItem.Leaf -> Size(item.width, item.height)
+    private fun sizeOf(item: SizedItem): Slot = when (item) {
+        is SizedItem.Leaf -> Slot(0f, 0f, item.width, item.height)
         is SizedItem.Group -> {
-            val inner = gridSize(item.children.map { Size(it.width, it.height) })
+            val inner = gridSize(item.children.map { Slot(0f, 0f, it.width, it.height) })
             val innerWidth = maxOf(inner.width, CanvasComposeContract.NOTE_WIDTH)
-            Size(
+            Slot(0f, 0f,
                 width = innerWidth + 2 * GROUP_PADDING,
                 height = GROUP_PADDING + labelRow(item.label, innerWidth) + inner.height + GROUP_PADDING,
             )
@@ -149,12 +147,12 @@ object CanvasComposePlacement {
         if (!group.label.isNullOrBlank()) {
             labels[group.key] = Slot(frame.x + GROUP_PADDING, frame.y + GROUP_LABEL_TOP, innerWidth, row)
         }
-        val cells = grid(group.children.map { Size(it.width, it.height) }, frame.x + GROUP_PADDING to frame.y + GROUP_PADDING + row)
+        val cells = grid(group.children.map { Slot(0f, 0f, it.width, it.height) }, frame.x + GROUP_PADDING to frame.y + GROUP_PADDING + row)
         group.children.forEachIndexed { i, child -> slots[child.key] = cells[i] }
     }
 
     /** The cells of a row-major grid of [sizes] starting at [topLeft]; each cell is its item's own size. */
-    private fun grid(sizes: List<Size>, topLeft: Pair<Float, Float>): List<Slot> {
+    private fun grid(sizes: List<Slot>, topLeft: Pair<Float, Float>): List<Slot> {
         if (sizes.isEmpty()) return emptyList()
         val (x, y) = topLeft
         val columns = columns(sizes.size)
@@ -170,13 +168,13 @@ object CanvasComposePlacement {
         return cells
     }
 
-    private fun gridSize(sizes: List<Size>): Size {
-        if (sizes.isEmpty()) return Size(0f, 0f)
+    private fun gridSize(sizes: List<Slot>): Slot {
+        if (sizes.isEmpty()) return Slot(0f, 0f, 0f, 0f)
         val columns = columns(sizes.size)
         val columnWidth = sizes.maxOf { it.width }
         val rows = sizes.chunked(columns)
         val used = minOf(columns, sizes.size)
-        return Size(
+        return Slot(0f, 0f,
             width = used * columnWidth + (used - 1) * GAP,
             height = rows.sumOf { row -> row.maxOf { it.height }.toDouble() }.toFloat() + (rows.size - 1) * GAP,
         )

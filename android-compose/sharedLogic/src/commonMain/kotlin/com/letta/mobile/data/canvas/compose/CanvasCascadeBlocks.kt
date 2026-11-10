@@ -68,6 +68,18 @@ object CanvasCascadeBlocks {
     const val STYLE_LINK = "link"
     const val STYLE_STRIKETHROUGH = "strikethrough"
 
+    /**
+     * A custom block: its type carries `custom: true` and its content's `kind` is the type id, with
+     * the block's own data under `data` (cascade-editor 1.9.2 `DocumentSchema` for `CustomBlockType`
+     * and `BlockContent.Custom`).
+     */
+    const val KEY_CUSTOM = "custom"
+    const val KEY_DATA = "data"
+
+    /** The board's table block (sharedUI `CanvasTableBlock`): its cells are `data.rows`, rows of strings. */
+    const val TYPE_TABLE = "letta.table"
+    const val TABLE_ROWS = "rows"
+
     /** The card heading level (plan: a CARD is a level-2 heading, its fields, then its body). */
     const val CARD_HEADING_LEVEL = 2
 
@@ -92,6 +104,30 @@ object CanvasCascadeBlocks {
             MdBlock.Paragraph(MdText(field.label + CARD_FIELD_SEPARATOR + field.value, listOf(MdSpan(MdSpanStyle.BOLD, 0, label.length))))
         }
         return encode(listOf(heading) + rows + body)
+    }
+
+    /**
+     * A TABLE: one board table block (`letta.table`, the custom block the workspace's note editor
+     * draws and edits) whose first row is [columns], the header, and then [rows].
+     */
+    fun table(columns: List<String>, rows: List<List<String>>): String = buildJsonObject {
+        put(KEY_VERSION, DOCUMENT_VERSION)
+        put(
+            KEY_BLOCKS,
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put(KEY_ID, "b1")
+                        put(KEY_TYPE, buildJsonObject { put(KEY_TYPE_ID, TYPE_TABLE); put(KEY_CUSTOM, true) })
+                        put(KEY_CONTENT, buildJsonObject { put(KEY_KIND, TYPE_TABLE); put(KEY_DATA, tableData(listOf(columns) + rows)) })
+                    },
+                )
+            },
+        )
+    }.toString()
+
+    private fun tableData(rows: List<List<String>>): JsonObject = buildJsonObject {
+        put(TABLE_ROWS, buildJsonArray { rows.forEach { row -> add(buildJsonArray { row.forEach { add(JsonPrimitive(it)) } }) } })
     }
 
     private fun encode(blocks: List<MdBlock>): String = buildJsonObject {

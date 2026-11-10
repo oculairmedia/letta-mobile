@@ -1,6 +1,8 @@
-# canvas_compose v1 reference
+# canvas_compose reference
 
-`canvas_compose` lets an agent put notes, checklists, cards, text and labelled groups on a canvas by meaning; the board places and sizes them. `canvas_compose_guide` answers the guide below, which an agent reads once before composing. The guide is generated from the contract constants in `CanvasComposeGuide.kt` and this copy is held equal to it by `CanvasComposeGuideDocTest` (sharedLogic jvmTest); from `android-compose/`, run `./gradlew :sharedLogic:writeContractReferenceDocs` to regenerate this guide and the LCP wire tables together, or `./gradlew :sharedLogic:checkContractReferenceDocs` to reject stale sections without editing them. Both commands run offline and preserve authored text outside the markers. The standalone guide remains available at `android-compose/sharedLogic/build/canvas-compose-guide.md`.
+This file keeps its v1 name so existing links hold; it describes the current catalog version (v2, which adds TABLE, STAT, PROGRESS and CHART and still accepts every v1 request).
+
+`canvas_compose` lets an agent put notes, checklists, cards, tables, stats, progress bars, charts, text and labelled groups on a canvas by meaning; the board places and sizes them. `canvas_compose_guide` answers the guide below, which an agent reads once before composing. The guide is generated from the contract constants in `CanvasComposeGuide.kt` and this copy is held equal to it by `CanvasComposeGuideDocTest` (sharedLogic jvmTest); from `android-compose/`, run `./gradlew :sharedLogic:writeContractReferenceDocs` to regenerate this guide and the LCP wire tables together, or `./gradlew :sharedLogic:checkContractReferenceDocs` to reject stale sections without editing them. Both commands run offline and preserve authored text outside the markers. The standalone guide remains available at `android-compose/sharedLogic/build/canvas-compose-guide.md`.
 
 For how compose is built (pipeline, ids, receipt, placement, auto-fit) and how to add a kind, see the package README, `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/README.md`, and the plan with its "As built" section, `docs/design/canvas-compose-plan.md`.
 
@@ -13,7 +15,7 @@ and test-locked by `CanvasComposeGuideDocTest`; its wire examples and behavioral
 rules are preserved, not re-maintained as a Kotlin API catalog.
 
 <!-- canvas_compose_guide:start -->
-# canvas_compose (letta.canvas.compose, version 1)
+# canvas_compose (letta.canvas.compose, version 2)
 
 Read this once before composing. You say WHAT goes on the board; the board decides where and how big. A request has no coordinates, sizes or layers.
 One call makes one artifact, all or nothing: if anything is wrong, nothing is published and every problem is listed.
@@ -25,7 +27,7 @@ Use canvas_apply_ops instead to draw (shapes, arrows, paths, images), to put a n
 - title: names the artifact in the chat, at most 120 characters.
 - canvas_id: omit it for the canvas of the conversation you are in.
 - dry_run: true runs every check and answers the receipt with status "dry_run"; nothing is published.
-- catalog, version: optional; "letta.canvas.compose" and 1. The whole request is at most 64 KiB.
+- catalog, version: optional; "letta.canvas.compose" and 1 or 2; TABLE, STAT, PROGRESS and CHART need 2, so leave version out or send 2. The whole request is at most 64 KiB.
 
 ## Kinds
 Every item has a "kind" and an optional "key": lowercase letters, digits, _ and -, at most 32, unique in the request.
@@ -33,7 +35,12 @@ Every item has a "kind" and an optional "key": lowercase letters, digits, _ and 
 - CHECKLIST {items: [{text, checked?}], title?, color?}: 1 to 40 entries of up to 200 characters; checked defaults to false.
 - CARD {title, fields?: [{label, value}], markdown?, color?}: a titled note: up to 8 fields (label up to 60, value up to 200) shown as bold "label: value" lines, then up to 500 characters of markdown. Not a container.
 - TEXT {text, size: heading|body}: up to 500 characters on the board itself, outside any note.
-- GROUP {children, label?}: a labelled frame (label up to 60) around NOTE, CHECKLIST, CARD and TEXT items. Groups do not nest.
+- TABLE {columns, rows, title?, color?}: 1 to 6 column names and up to 20 rows, each row one plain-text cell per column (cells up to 60 characters, no markdown).
+- STAT {label, value, delta?, tone?, caption?}: a figure for a dashboard: the value (up to 24) shown large, the delta (e.g. "+8% vs May") in its tone, a caption up to 80.
+- PROGRESS {label, value, caption?, tone?}: a labelled bar filled to value, 0 to 1, shown as a whole percent.
+- CHART {style: bar|line, points: [{label, value}], title?, unit?}: 2 to 12 points (labels up to 16); bars need values of 0 or more; unit (up to 8) follows each printed value.
+tone is neutral|positive|negative|warning: grey, green, red, orange.
+- GROUP {children, label?}: a labelled frame (label up to 60) around other kinds.
 Titles are at most 120 characters.
 
 ## Markdown (NOTE and CARD)
@@ -44,7 +51,7 @@ Titles are at most 120 characters.
 Refused as UNSUPPORTED_MARKDOWN, with the character offset, never shown as plain text instead:
 - raw HTML and `<url>` autolinks: notes do not render HTML; write [text](url).
 - images: a note holds text only.
-- tables, footnotes, reference links, setext (underlined) headings, indented code: outside the subset; use lists, inline links, # headings and fences.
+- tables (use a TABLE item), footnotes, reference links, setext (underlined) headings, indented code: outside the subset; use lists, inline links, # headings and fences.
 - a numbered list that starts at another number: the board numbers lists from 1.
 - headings past ###; a heading, quote, fence or divider inside a list item; a block inside a quote; an unclosed fence.
 - a list nested two levels deep is NESTING_TOO_DEEP.
@@ -53,27 +60,31 @@ At most 10 problems are listed per field.
 ## Colours
 color is red (#fbcfe8), orange (#fed7aa), yellow (#fde68a), green (#bbf7d0), cyan (#bfdbfe), purple (#ddd6fe), or any #rrggbb.
 The presets are the board's note tints, so red shows as pink, cyan as blue and purple as violet. Without a colour a NOTE or CHECKLIST takes the workspace's note colour and a CARD is white (#ffffff). TEXT and GROUP take no colour.
+A TABLE takes color like a CARD. STAT, PROGRESS and CHART take none; STAT and PROGRESS take tone instead.
 
 ## Ids and retries
 - Each item is on the board as cmp-<artifact_id>-<key>; a group's label is cmp-<artifact_id>-<key>-label.
+- A STAT, PROGRESS or CHART is its frame, cmp-<artifact_id>-<key>, and the elements cmp-<artifact_id>-<key>.<part> inside it.
 - An item without a key is keyed by its 0-based place: i0, i1, and i3-c0 for the first child of the group at i3.
 - The same artifact_id and the same content is a retry: nothing is written, and the receipt warns. Moving the pieces does not change that.
 - The same artifact_id with other content is ARTIFACT_EXISTS.
 
 ## Receipt
 {"ok": true, "artifact_id", "canvas_id", "revision", "status": "published" | "dry_run", "title", "bounds": {x, y, width, height}, "items": [{key, kind, count?, frame?, children?}], "warnings", "framesOmitted?", "framesHint?"}
-bounds is the artifact's rectangle; count is a checklist's entries. frame is the reserved slot, [x, y, w, h] integers; a short note is drawn shorter inside it, so attach to its left, right or top side.
+bounds is the artifact's rectangle; count is a checklist's entries, a table's rows or a chart's points.
+frame is the reserved slot, [x, y, w, h] integers; a short note is drawn shorter inside it, so attach to its left, right or top side.
 Over 4096 bytes, frames drop from group children first, then top-level items from the end; framesOmitted is true and framesHint is "call canvas_get_layout for geometry". A retry omits frame if the board no longer stores it.
 
 ## What you will see
 The artifact goes right of what is on the board (below it once the board is wider than 2400), as a grid in reading order: 1 column for 1 item, 2 columns for 2 to 4 items, 3 columns for 5 to 9 items, 4 columns for 10 or more.
 Notes and cards are 320 wide (heading TEXT 480) and get a reserved height; the app fits each note to its content inside it and never clips it.
+A TABLE is a note 320 to 640 wide by its columns. STAT (240), PROGRESS (320) and CHART (480) are drawn on the board itself, a frame as tall as their content.
 A person may move or resize a note afterwards; it is then theirs, so do not place it again.
 
 ## Errors
 A refusal is {"ok": false, "code", "problems": [{"path", "code", "message"}], "hint"}; path is a JSON pointer into your request. Fix every problem and send the whole request again.
 - VALIDATION_FAILED: the request breaks the format; the problems below say where.
-- UNSUPPORTED_VERSION: another catalog or version, e.g. "version": 2 is refused at /version; send 1 or leave it out.
+- UNSUPPORTED_VERSION: another catalog or version, e.g. "version": 3 is refused at /version; send 1 or 2 or leave it out.
 - ARTIFACT_EXISTS: the artifact_id is on the board with other content (path /artifact_id); compose never changes an artifact, so use a new artifact_id.
 - BOARD_REFUSED: the board's own rules refused the batch: each problem's code is the rule (e.g. element.exists, an id already taken) and its path the item; publish.failed means the write did not land, so send the same request again.
 - UNAUTHORIZED: you may not write to that canvas.

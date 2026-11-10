@@ -78,22 +78,20 @@ class WorstCaseWrap(width: Double, font: Double, private val mono: Boolean = fal
             used = width
         }
     }
-
-    private companion object {
-        const val BROAD = "MWmw@%"
-
-        /** Wide characters: CJK, Hangul, fullwidth forms, and the symbol blocks emoji come from. */
-        val WIDE_RANGES = listOf(
-            0x1100..0x115F,
-            0x2E80..0xA4CF,
-            0xAC00..0xD7A3,
-            0xF900..0xFAFF,
-            0xFE30..0xFE4F,
-            0xFF00..0xFF60,
-            0xFFE0..0xFFE6,
-            0x2600..0x27BF,
-        )
-
-        fun isWide(c: Char): Boolean = WIDE_RANGES.any { c.code in it }
-    }
 }
+
+private const val BROAD = "MWmw@%"
+
+/** Wide characters: CJK, Hangul, fullwidth forms, and the symbol blocks emoji come from. */
+private val WIDE_RANGES = listOf(
+    0x1100..0x115F,
+    0x2E80..0xA4CF,
+    0xAC00..0xD7A3,
+    0xF900..0xFAFF,
+    0xFE30..0xFE4F,
+    0xFF00..0xFF60,
+    0xFFE0..0xFFE6,
+    0x2600..0x27BF,
+)
+
+private fun isWide(c: Char): Boolean = WIDE_RANGES.any { c.code in it }

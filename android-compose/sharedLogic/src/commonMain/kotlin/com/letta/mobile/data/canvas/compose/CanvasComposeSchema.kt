@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas.compose
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract as Contract
 import com.letta.mobile.data.schema.JsonSchemaCheck
+import com.letta.mobile.data.schema.SchemaProblem
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -26,6 +27,7 @@ import kotlinx.serialization.json.put
  */
 object CanvasComposeSchema {
     internal const val KIND = "kind"
+    private const val CHILD_DESCRIPTION = "An item of any kind but GROUP, as in items."
 
     private val key = StringSchema(
         pattern = Contract.KEY_PATTERN,
@@ -92,20 +94,82 @@ object CanvasComposeSchema {
         "size" to StringSchema(enum = ComposeTextSize.entries.map { it.name.lowercase() }).json(),
     )
 
+    private val tone = StringSchema(enum = ComposeTone.entries.map { it.name.lowercase() }).json()
+
+    private val table = kindSchema(
+        ComposeKind.TABLE,
+        required = listOf("columns", "rows"),
+        "key" to key,
+        "title" to title,
+        "columns" to ArraySchema(
+            StringSchema(maxLength = Contract.MAX_CELL_CHARS, minLength = 1).json(),
+            maxItems = Contract.MAX_TABLE_COLUMNS,
+        ).json(),
+        "rows" to ArraySchema(
+            ArraySchema(StringSchema(maxLength = Contract.MAX_CELL_CHARS).json(), maxItems = Contract.MAX_TABLE_COLUMNS).json(),
+            maxItems = Contract.MAX_TABLE_ROWS,
+        ).json(),
+        "color" to color,
+    )
+
+    private val stat = kindSchema(
+        ComposeKind.STAT,
+        required = listOf("label", "value"),
+        "key" to key,
+        "label" to StringSchema(maxLength = Contract.MAX_LABEL_CHARS, minLength = 1).json(),
+        "value" to StringSchema(maxLength = Contract.MAX_STAT_VALUE_CHARS, minLength = 1).json(),
+        "delta" to StringSchema(maxLength = Contract.MAX_LABEL_CHARS).json(),
+        "tone" to tone,
+        "caption" to StringSchema(maxLength = Contract.MAX_STAT_NOTE_CHARS).json(),
+    )
+
+    private val progress = kindSchema(
+        ComposeKind.PROGRESS,
+        required = listOf("label", "value"),
+        "key" to key,
+        "label" to StringSchema(maxLength = Contract.MAX_LABEL_CHARS, minLength = 1).json(),
+        "value" to numberSchema(0.0, 1.0),
+        "caption" to StringSchema(maxLength = Contract.MAX_STAT_NOTE_CHARS).json(),
+        "tone" to tone,
+    )
+
+    private val chart = kindSchema(
+        ComposeKind.CHART,
+        required = listOf("style", "points"),
+        "key" to key,
+        "title" to title,
+        "style" to StringSchema(enum = ComposeChartStyle.entries.map { it.name.lowercase() }).json(),
+        "points" to ArraySchema(
+            obj(
+                required = listOf("label", "value"),
+                "label" to StringSchema(maxLength = Contract.MAX_CHART_LABEL_CHARS, minLength = 1).json(),
+                "value" to numberSchema(-Contract.MAX_CHART_VALUE, Contract.MAX_CHART_VALUE),
+            ),
+            maxItems = Contract.MAX_CHART_POINTS,
+            minItems = Contract.MIN_CHART_POINTS,
+        ).json(),
+        "unit" to StringSchema(maxLength = Contract.MAX_CHART_UNIT_CHARS).json(),
+    )
+
     private val group = kindSchema(
         ComposeKind.GROUP,
         required = listOf("children"),
         "key" to key,
         "label" to StringSchema(maxLength = Contract.MAX_LABEL_CHARS).json(),
+        // The children's schema is [child], held to each child by [check]: written out here it
+        // would repeat every kind's schema in the definition every model request carries.
         "children" to ArraySchema(
-            anyOf(note, checklist, card, text),
+            buildJsonObject { put("description", CHILD_DESCRIPTION) },
             maxItems = Contract.MAX_ITEMS - 1,
             description = "A GROUP cannot hold a GROUP.",
         ).json(),
     )
 
-    /** The schema of one top-level item, any of the five kinds. */
-    val item: JsonObject = anyOf(note, checklist, card, text, group)
+    /** What a GROUP's child may be: any kind but GROUP, one level of nesting. */
+    val child: JsonObject = anyOf(note, checklist, card, text, table, stat, progress, chart)
+
+    /** The schema of one top-level item, any of the kinds. */
+    val item: JsonObject = anyOf(note, checklist, card, text, table, stat, progress, chart, group)
 
     /** The whole `canvas_compose` input. */
     val input: JsonObject = obj(
@@ -127,14 +191,33 @@ object CanvasComposeSchema {
     )
 
     private val checker = JsonSchemaCheck(input, discriminator = KIND, hooks = ComposeSchemaHooks)
+    private val childChecker = JsonSchemaCheck(child, discriminator = KIND, hooks = ComposeSchemaHooks)
 
-    /** Every place [instance] breaks [input], each with the JSON pointer of the offending value. */
-    fun check(instance: JsonElement): List<ComposeProblem> = checker.check(instance).map(ComposeSchemaHooks::toCompose)
+    /**
+     * Every place [instance] breaks [input], each with the JSON pointer of the offending value: the
+     * request against [input], then each GROUP's children against [child].
+     */
+    fun check(instance: JsonElement): List<ComposeProblem> =
+        (checker.check(instance) + childProblems(instance)).map(ComposeSchemaHooks::toCompose)
+
+    private fun childProblems(instance: JsonElement): List<SchemaProblem> {
+        val items = ((instance as? JsonObject)?.get("items") as? JsonArray).orEmpty()
+        return items.flatMapIndexed { i, item ->
+            val group = (item as? JsonObject)?.takeIf { it[KIND] == JsonPrimitive(ComposeKind.GROUP.name) }
+            val children = (group?.get("children") as? JsonArray).orEmpty()
+            children.flatMapIndexed { c, child -> childChecker.check(child, "/items/$i/children/$c") }
+        }
+    }
 
     // Schema builders. Every object is closed: a field the contract does not name is refused.
 
     private fun kindSchema(kind: ComposeKind, required: List<String>, vararg properties: Pair<String, JsonObject>): JsonObject =
         obj(required = listOf(KIND) + required, KIND to StringSchema(enum = listOf(kind.name)).json(), *properties)
+
+    private fun numberSchema(minimum: Double, maximum: Double): JsonObject = TypeSchema("number").json {
+        put("minimum", minimum)
+        put("maximum", maximum)
+    }
 
     private fun obj(required: List<String>, vararg properties: Pair<String, JsonObject>): JsonObject = buildJsonObject {
         put("type", "object")
