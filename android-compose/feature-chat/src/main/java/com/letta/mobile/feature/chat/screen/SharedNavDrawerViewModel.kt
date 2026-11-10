@@ -159,7 +159,7 @@ class SharedNavDrawerViewModel @Inject constructor(
     }
 
     fun deleteConversation(conversation: ConversationId, agent: AgentId) = run("Couldn't delete the chat") {
-        (it?.conversationRepository ?: sources.conversations).deleteConversation(conversation.value, agent.value)
+        (it?.conversationRepository ?: sources.conversations).deleteConversation(conversation, agent)
     }
 
     private val _failures = MutableSharedFlow<String>(extraBufferCapacity = FAILURE_BUFFER)

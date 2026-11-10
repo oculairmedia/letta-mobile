@@ -149,11 +149,11 @@ class TimelineChatSessionPort(
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
     /** Stop's lifecycle, the same shared state machine Android and desktop run. */
-    private val interrupter = ChatRunInterrupter(
+    private val interrupter = if (options.activeTurnCoordinator == null) ChatRunInterrupter(
         scope = scope,
         host = TimelineRunStopHost(updateRun = ::updateRun, onClearedLocally = ::watchClearedRunEnd),
         telemetry = ChatRunInterruptTelemetry(TIMELINE_STOP_TELEMETRY_TAG),
-    )
+    ) else null
     private var clearedRunWatch: Job? = null
 
     /** What the host's extension points add, read the way desktop's port reads them. */
@@ -286,7 +286,7 @@ class TimelineChatSessionPort(
 
     /** A new run starts clean: no earlier error, and no stop request left over from the last run. */
     private fun startCleanRun() {
-        interrupter.retire()
+        interrupter?.retire()
         clearedRunWatch?.cancel()
         run.update { it.copy(error = null, cancelling = false, clearedLocally = false) }
         local.update { it.forgetAcknowledgedOnceCleared(error = null) }
@@ -304,7 +304,7 @@ class TimelineChatSessionPort(
             return
         }
         if (!uiState.value.isRunInFlight) return
-        interrupter.request(
+        interrupter?.request(
             ChatStopRequest(
                 key = target.conversationId,
                 transport = STOP_TRANSPORT,

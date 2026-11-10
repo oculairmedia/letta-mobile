@@ -852,6 +852,7 @@ internal class AdminChatViewModel @Inject constructor(
             require(turn.conversationId.value == conversationId && turn.agentId == agentId) {
                 "Active turn owner must match the captured Android target"
             }
+            runPhases.bindActiveTurn(checkNotNull(presentation.activeTurnCoordinator))
             activeTurnPresentation.value = presentation
         } else if (activeTurnPresentation.value?.activeTurnCoordinator?.state?.value?.conversationId?.value != conversationId) {
             activeTurnPresentation.value = null
@@ -987,9 +988,10 @@ internal class AdminChatViewModel @Inject constructor(
         if (replacingSendRuntime) return
         val binding = activeTurnPresentation.value
         val owner = binding?.activeTurnCoordinator
-        if (owner != null) {
-            val turn = owner.state.value
-            val identity = com.letta.mobile.data.presence.ActiveTurnIdentity(turn.runId ?: return, turn.turnId ?: return)
+        val turn = owner?.state?.value
+        val run = turn?.runId; val turnKey = turn?.turnId
+        if (owner != null && run != null && turnKey != null) {
+            val identity = com.letta.mobile.data.presence.ActiveTurnIdentity(run, turnKey)
             val abort = binding.abortActiveTurn
             owner.interrupt(identity, java.util.UUID.randomUUID().toString()) { abort?.invoke(identity) ?: false }
             return
@@ -1107,7 +1109,6 @@ internal class AdminChatViewModel @Inject constructor(
         publishedRunKey?.let(runs::get)?.live ?: com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null
-    /** Runtime phases stay attributed to this effect target, including a not-yet-named chat. */
     private fun onRuntimeEvents(drafts: List<com.letta.mobile.runtime.RuntimeEventDraft>) {
         if (drafts.isEmpty()) return
         runPhases.onEvents(RunScope(currentRunKey(), agentId.value), drafts.map { it.payload })
@@ -1132,8 +1133,7 @@ internal class AdminChatViewModel @Inject constructor(
                 runPhases.setUserTyping(RunScope(currentRunKey(), agentId.value), composer.inputText.isNotBlank())
             }
         }
-        // letta-mobile-te3n1.1: the conversation's subagents, through the same shared path desktop
-        // uses - a tool with subagents under it is DELEGATING, a background dream makes it dream.
+        // Background dreams and roster details remain orthogonal to the foreground owner.
         viewModelScope.launch {
             activeSubagentSource.rosterEntries.collect(runPhases::setSubagents)
         }

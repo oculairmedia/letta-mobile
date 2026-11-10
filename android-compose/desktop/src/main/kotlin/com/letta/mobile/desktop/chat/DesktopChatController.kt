@@ -160,12 +160,15 @@ class DesktopChatController(
 
     /** The conversation awaiting a streamed reply; cleared on reply, failure, or timeout. */
     private val _thinkingConversationId = MutableStateFlow<String?>(null)
-    val thinkingConversationId: StateFlow<String?> = _thinkingConversationId.asStateFlow()
 
     private var thinkingGeneration = 0
 
     /** The reply's conversation until the complete stream ends, unlike the shorter thinking phase. */
-    private val activeTurns = DesktopActiveTurnBinding(scope) { forceLocalStopClear(it, "Local clear") }
+    private val activeTurns = DesktopActiveTurnBinding(scope, runRegistry) { forceLocalStopClear(it, "Local clear") }
+    val thinkingConversationId get() = activeTurns.thinkingConversationId
+
+    internal fun bindActiveTurns(sessions: StateFlow<com.letta.mobile.data.presence.ActiveTurnSession?>) =
+        activeTurns.bindSessions(sessions)
     internal val activeTurnStates get() = activeTurns.states
     val streamingConversationId: StateFlow<String?> = DerivedStateFlow(activeTurnStates.map { turns ->
         turns.values.firstOrNull { it.phase != ActiveTurnPhase.Idle }?.conversationId?.value
@@ -173,7 +176,7 @@ class DesktopChatController(
 
     internal fun activeTurnCoordinator(conversationId: String?): ActiveTurnCoordinator? {
         val conversation = state.value.conversations.firstOrNull { it.id == conversationId } ?: return null
-        return activeTurns.owner(conversation.id, conversation.agentId ?: return null)
+        return activeTurns.owner(conversation.id, conversation.agentId ?: return null).also(runPhases::bindActiveTurn)
     }
 
     private val _lastPromptedConversationId = MutableStateFlow<String?>(null)
@@ -216,16 +219,18 @@ class DesktopChatController(
             .collect { _replyPresence.value = it }
     }
 
-    // --- run phases (letta-mobile-8a3bz) --------------------------------------
 
     /** Per-conversation run phases, reduced from runtime events for shell presence. */
     val runs: StateFlow<Map<String, ConversationRunState>> = runRegistry.runs
 
     // `by lazy` so the presence collector above (which publishes into it) can never observe it
     // before construction reaches this line.
-    private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }, onRuntimeEvent = { event ->
-        if (state.value.conversations.any { it.id == event.conversationId && it.agentId == event.agentId })
+    private val runPhases: DesktopChatRunPhases by lazy {
+        DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }, onRuntimeEvent = { event ->
+        if (state.value.conversations.any { it.id == event.conversationId && it.agentId == event.agentId }) {
+            runPhases.bindActiveTurn(activeTurns.owner(event.conversationId, event.agentId))
             activeTurns.onEvent(event)
+        }
     }) }
 
     /** Publish active subagent and background-dream phases through the shared publisher. */
@@ -573,6 +578,7 @@ class DesktopChatController(
         if (closed) return
         val (listed, startedOn) = pendingDeletes.remove(conversationId) ?: (null to deletionUndo.backendGeneration)
         if (startedOn != deletionUndo.backendGeneration) return
+        if (behavior == ConversationDeleteBehavior.Permanent) activeTurns.delete(ConversationId(conversationId))
         deletionUndo.offer(conversationId, listed, behavior, startedOn)
         if (behavior == ConversationDeleteBehavior.MovesToArchived) {
             _state.update { current ->
@@ -890,14 +896,10 @@ class DesktopChatController(
     fun stopActiveRun(conversationId: String) {
         if (closed) return
         val coordinator = activeTurnCoordinator(conversationId) ?: return
-        runPhases.markInterrupting(conversationId)
         val captured = coordinator.state.value
         val turn = ActiveTurnIdentity(captured.runId ?: return, captured.turnId ?: return)
-        val aborter = gateway as? DesktopTurnAborter
         coordinator.interrupt(turn, java.util.UUID.randomUUID().toString()) {
-            if (aborter is DesktopAppServerChatGateway) aborter.abortConversationTurn(
-                ConversationId(conversationId), activeTurns.serverRunId(conversationId, turn)?.let(::DesktopRunId),
-            ) else aborter?.abortConversationTurn(conversationId) ?: false
+            activeTurns.abortCaptured(captured, turn, gateway as? DesktopTurnAborter, conversationChanges)
         }
     }
 
@@ -1018,7 +1020,7 @@ class DesktopChatController(
         beginThinking(sendingConversationId)
         val identity = "desktop-send-${java.util.UUID.randomUUID()}"
         runPhases.publish(sendingConversationId, RuntimeEventPayload.LocalUserAppend(identity, text))
-        activeTurnCoordinator(sendingConversationId)?.start(ActiveTurnIdentity(identity, "runtime:$identity"))
+        if (!activeTurns.hasSession) activeTurnCoordinator(sendingConversationId)?.start(ActiveTurnIdentity(identity, "runtime:$identity"))
         sendJob?.cancel()
         sendJob = scope.launch {
             remoteSender.runRemoteSendAttempt(
@@ -1173,9 +1175,10 @@ class DesktopChatController(
             _state.update { it.copy(errorMessage = message) }
         }
         override fun streamingConversationId(): String? = streamingConversationId.value
-        override fun thinkingConversationId(): String? = _thinkingConversationId.value
+        override fun thinkingConversationId(): String? = thinkingConversationId.value
         private var dispatchedTurn: Pair<String, ActiveTurnIdentity>? = null
         override fun setStreaming(conversationId: String?) {
+            if (activeTurns.hasSession) return
             if (conversationId == null) {
                 // Runtime-backed turns settle only on a correlated gateway terminal.
                 if (gateway !is DesktopRuntimeEventSource) dispatchedTurn?.let { (id, turn) ->
@@ -1217,6 +1220,8 @@ class DesktopChatController(
         val nextGateway = gateway ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
 
+        activeTurns.reconcile(conversation)
+        if (!isActiveSelection(generation)) return
         models.showModelOf(ConversationId(conversationId), conversation.agentId?.let(::AgentId))
 
         timelineJob?.cancel()

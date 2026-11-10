@@ -49,6 +49,55 @@ class SelectedRuntimeBindingTest {
         coVerify(exactly = 0) { old.retire() }
     }
 
+    @Test fun productionBindingRetainsOwnerAcrossSubscriberRetirementAndReconcilesTerminal() = runTest {
+        val agent = AgentId("agent")
+        val conversation = ConversationId("conversation")
+        var status = "running"
+        val turns = com.letta.mobile.data.presence.ActiveTurnSession(backgroundScope, readRuns = { c, a, run ->
+            assertEquals(conversation, c)
+            assertEquals(agent, a)
+            assertTrue(run == null || run.value == "server-run")
+            listOf(com.letta.mobile.data.model.Run("server-run", agent.value,
+                conversationId = conversation.value, status = status))
+        })
+        val graph = mockk<com.letta.mobile.data.session.SessionGraph>(relaxed = true)
+        every { graph.id } returns 7L
+        every { graph.backendDescriptor } returns mockk(relaxed = true) {
+            every { backendId } returns com.letta.mobile.runtime.BackendId("backend")
+        }
+        every { graph.scope } returns backgroundScope
+        every { graph.capturedConfig } returns mockk(relaxed = true)
+        val factory = mockk<AndroidCanonicalTimelineRuntimeFactory>()
+        val runtime = mockk<AndroidCanonicalTimelineRuntime>(relaxed = true)
+        val binding = mockk<AndroidCanonicalTimelineRuntime.Binding>()
+        every { binding.writer } returns FakeTimelineExternalTransportWriter()
+        every { binding.bindPresentation(any()) } answers {
+            (invocation.args[0] as ChatPagingHost).openCanonical = { a, c, _, _ ->
+                require(a == agent.value && c == conversation.value)
+                ChatPagingPresentation(flowOf(androidx.paging.PagingData.empty()), MutableStateFlow(emptyList()), {})
+            }
+        }
+        every { factory.captured(graph, any(), any()) } returns runtime
+        io.mockk.coEvery { runtime.bind(match {
+            it.backendId == "backend" && it.agentId == agent.value && it.conversationId == conversation.value
+        }, any()) } returns binding
+        val settings = mockk<com.letta.mobile.data.repository.api.ISettingsRepository>(relaxed = true)
+        val first = CapturedSelectedChatRuntime(graph, agent, factory, settings, turns)
+        val presentation = first.open(conversation.value, null, backgroundScope)
+        val owner = checkNotNull(presentation.activeTurnCoordinator)
+        assertEquals(com.letta.mobile.data.presence.ActiveTurnPhase.Thinking, owner.state.value.phase)
+        assertNotNull(presentation.abortActiveTurn)
+        first.retire()
+        assertEquals(com.letta.mobile.data.presence.ActiveTurnPhase.Thinking, owner.state.value.phase)
+        status = "completed" // Terminal occurs between the old and new presentation observers.
+        val second = CapturedSelectedChatRuntime(graph, agent, factory, settings, turns)
+        val recreated = second.open(conversation.value, null, backgroundScope)
+        assertSame(owner, recreated.activeTurnCoordinator)
+        assertEquals(com.letta.mobile.data.presence.ActiveTurnPhase.Idle, owner.state.value.phase)
+        second.retire()
+        turns.close()
+    }
+
     @Test fun capturedWriterRejectsForeignAgentBeforeResolution() = runTest {
         var resolutions = 0
         val writer = SelectedRuntimeWriter("agent-a") { resolutions++; error("not expected") }

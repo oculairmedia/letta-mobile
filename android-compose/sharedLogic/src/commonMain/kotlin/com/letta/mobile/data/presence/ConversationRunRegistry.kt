@@ -3,8 +3,10 @@ package com.letta.mobile.data.presence
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.letta.mobile.data.flow.DerivedStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 
 /** One conversation's run, as the screen driving it knows it. */
 data class ConversationRunState(
@@ -68,9 +70,44 @@ data class ConversationRunState(
  * from here rather than from a transport's cursor store. One instance per app (per window on
  * desktop).
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ConversationRunRegistry {
+    private val projectionLock = kotlinx.atomicfu.locks.SynchronizedObject()
+    private val owners = MutableStateFlow<Map<String, ActiveTurnCoordinator>>(emptyMap())
     private val _runs = MutableStateFlow<Map<String, ConversationRunState>>(emptyMap())
-    val runs: StateFlow<Map<String, ConversationRunState>> = _runs.asStateFlow()
+
+    internal fun ownerOf(conversation: com.letta.mobile.data.model.ConversationId): ActiveTurnCoordinator? =
+        owners.value[conversation.value]
+
+    internal fun bindActiveTurn(owner: ActiveTurnCoordinator) {
+        val key = owner.state.value.conversationId.value
+        kotlinx.atomicfu.locks.synchronized(projectionLock) {
+            if (owners.value[key] === owner) return
+            owners.update { it + (key to owner) }
+            owner.scope.coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion { unbindActiveTurn(owner) }
+        }
+    }
+
+    internal fun unbindActiveTurn(owner: ActiveTurnCoordinator) {
+        val key = owner.state.value.conversationId.value
+        kotlinx.atomicfu.locks.synchronized(projectionLock) {
+            if (owners.value[key] !== owner) return
+            owners.update { it - key }
+            clear(key)
+        }
+    }
+
+    /** Bound foreground phase is a live owner projection; detail writers cannot overwrite it. */
+    val runs: StateFlow<Map<String, ConversationRunState>> = DerivedStateFlow(
+        owners.flatMapLatest { bound ->
+            when {
+                bound.isEmpty() -> _runs
+                else -> combine(_runs, combine(bound.values.map { it.state }) { turns ->
+                    turns.associateBy { it.conversationId.value }
+                }) { details, turns -> details.withOwners(turns) }
+            }
+        },
+    ) { _runs.value.withOwners(owners.value.mapValues { it.value.state.value }) }
 
     fun publish(state: ConversationRunState) {
         _runs.update { it + (state.conversationId to state) }
@@ -118,4 +155,9 @@ fun Map<String, ConversationRunState>.presenceByAgent(): Map<String, AgentPresen
                 else -> states.firstOrNull { it.phase == RunPhase.WORKING }?.toolName
             },
         )
+    }
+
+private fun Map<String, ConversationRunState>.withOwners(turns: Map<String, ActiveTurnState>): Map<String, ConversationRunState> =
+    this + turns.mapValues { (key, turn) ->
+        (get(key) ?: ConversationRunState(key, turn.agentId.value)).fromActiveTurn(turn)
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -271,7 +272,6 @@ private fun buildDesktopChatController(
     bindings: DesktopChatControllerBindings,
 ): DesktopChatController {
     val runtime = bindings.runtime
-    // letta-mobile-by4vm.13: no agents served (no backend configured) resolves no names.
     val agentRepository = {
         runtime.dataBindings.sessionGraphProvider.current.ifSupported(SessionRoute.AGENTS) { agentRepository }
     }
@@ -284,12 +284,10 @@ private fun buildDesktopChatController(
                 IrohAdminRpcChatGateway(
                     transport,
                     deviceLabel = DESKTOP_DEVICE_ID,
-                    // letta-mobile-bzvro.40: the host's parked approvals and the permission-mode chip.
                     approvalControls = com.letta.mobile.data.runtime.IrohApprovalControls(
                         scope = runtime.chatScope,
                         transport = transport,
                         registry = runtime.dataBindings.permissionModeSettings.modes,
-                        // letta-mobile-bzvro.14: answers made offline survive a restart.
                         outboxStore = com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore(bindings.secureSettingsStore),
                     ),
                 )
@@ -309,15 +307,15 @@ private fun buildDesktopChatController(
         },
         loadArchivedConversationIds = { archived.load().mapTo(mutableSetOf()) { it.value } },
         persistArchivedConversationIds = { ids -> archived.save(ids.mapTo(mutableSetOf(), ::ConversationId)) },
-        // Conversations created or changed on another device arrive as Meridian pushes.
         conversationChanges = bindings.irohTransport,
         conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(
             bindings.secureSettingsStore, runtime.dataBindings.sessionGraphProvider.pinSource(),
         ),
-    )
+    ).also { controller ->
+        controller.bindActiveTurns(runtime.dataBindings.sessionGraphProvider.activeTurnSessions)
+    }
 }
 
-/** The subagent registry repository plus the live active-subagent list it feeds. */
 internal class DesktopSubagentRegistry(
     val repository: SubagentRepository?,
     val activeSubagents: State<List<SubagentEntry>>,

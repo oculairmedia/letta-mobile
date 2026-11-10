@@ -27,6 +27,17 @@ class ConversationRunPhasePublisher(
 ) {
     private val lock = SynchronizedObject()
     private val states = mutableMapOf<String, ConversationRunState>()
+    private val activeOwners = mutableMapOf<String, ActiveTurnCoordinator>()
+
+    /** Bound routes retain rich details but derive foreground phase only from the session owner. */
+    fun bindActiveTurn(owner: ActiveTurnCoordinator) {
+        val turn = owner.state.value
+        synchronized(lock) {
+            if (activeOwners[turn.conversationId.value] === owner) return
+            activeOwners[turn.conversationId.value] = owner
+        }
+        registry.bindActiveTurn(owner)
+    }
 
     /** The conversations the last [setSubagents] list touched, so the next one can clear those it drops. */
     private var subagentScopes: Set<RunScope> = emptySet()
@@ -64,11 +75,21 @@ class ConversationRunPhasePublisher(
             subagentScopes = byScope.keys
             gone
         }
-        stale.forEach { scope -> update(scope) { RunPhaseReducer.withSubagents(it, SubagentActivity.NONE, now()) } }
+        stale.forEach { scope -> publishSubagentActivity(scope, SubagentActivity.NONE) }
         byScope.forEach { (scope, scoped) ->
             val activity = SubagentActivity.of(scoped)
-            update(scope) { RunPhaseReducer.withSubagents(it, activity, now()) }
+            publishSubagentActivity(scope, activity)
         }
+    }
+
+    private fun publishSubagentActivity(scope: RunScope, activity: SubagentActivity) {
+        val owner = registry.ownerOf(com.letta.mobile.data.model.ConversationId(scope.conversationId))
+        val turn = owner?.state?.value
+        val identity = turn?.runId?.let { run -> turn.turnId?.let { ActiveTurnIdentity(run, it) } }
+        if (owner != null && identity != null && turn.agentId.value == scope.agentId) {
+            owner.progress(identity, subagentCount = activity.running)
+        }
+        update(scope) { RunPhaseReducer.withSubagents(it, activity, now()) }
     }
 
     /** The user asked to cancel; the terminal has not landed yet. */
@@ -92,6 +113,10 @@ class ConversationRunPhasePublisher(
     /** Forget this conversation entirely (the screen driving it is gone). */
     fun clear(conversationId: String) {
         synchronized(lock) {
+            activeOwners[conversationId]?.let { owner ->
+                setUserTyping(RunScope(conversationId, owner.state.value.agentId.value), false)
+                return
+            }
             states.remove(conversationId)
             registry.clear(conversationId)
         }
@@ -103,10 +128,29 @@ class ConversationRunPhasePublisher(
         synchronized(lock) {
             val known = states[scope.conversationId]
             val current = known ?: ConversationRunState(scope.conversationId, scope.agentId)
-            val updated = transform(current).copy(conversationId = scope.conversationId, agentId = scope.agentId)
+            val reduced = transform(current).copy(conversationId = scope.conversationId, agentId = scope.agentId)
+            val updated = activeOwners[scope.conversationId]?.state?.value?.let { reduced.fromActiveTurn(it) } ?: reduced
             if (updated == known) return // nothing changed and the registry already has it
             states[scope.conversationId] = updated
             registry.publish(updated)
         }
     }
 }
+
+internal fun ConversationRunState.fromActiveTurn(turn: ActiveTurnState): ConversationRunState = copy(
+    conversationId = turn.conversationId.value,
+    agentId = turn.agentId.value,
+    phase = when (turn.phase) {
+        ActiveTurnPhase.Idle -> RunPhase.IDLE
+        ActiveTurnPhase.Thinking -> when (phase) {
+            RunPhase.QUEUED, RunPhase.REASONING, RunPhase.RESPONDING -> phase
+            else -> RunPhase.REASONING
+        }
+        ActiveTurnPhase.ToolExecuting -> if (turn.subagentCount > 0) RunPhase.DELEGATING else RunPhase.WORKING
+        ActiveTurnPhase.AwaitingInput -> RunPhase.AWAITING_INPUT
+        ActiveTurnPhase.Cancelling -> RunPhase.INTERRUPTING
+    },
+    toolName = turn.activeTool,
+    subagentCount = turn.subagentCount,
+    phaseSinceEpochMs = turn.startedAtEpochMs ?: phaseSinceEpochMs,
+)
