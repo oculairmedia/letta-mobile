@@ -31,7 +31,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +47,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.shell.sidemenu.RailViews
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.components.lettaFadingEdges
 import com.letta.mobile.ui.host.LocalLettaHost
@@ -62,6 +68,10 @@ object ShellAgentRailTags {
  * orbs (cached mascot stills where the agent has one), and New pinned at the bottom. Expanded, the header
  * controls gain labels and [library] replaces the orb list (the desktop's names-and-spaces library);
  * the icons keep their x either way.
+ *
+ * Which parts show, and their order, is [LocalRailLane]: the workspace fills it from the shell
+ * layout's rail lane, so the wide rail and the drawer's rail follow the same lane. The rail keeps its width and expansion; the agents fill the height between
+ * the other parts. A part the rail does not know draws nothing, and a repeated part is drawn once.
  */
 @Composable
 fun ShellAgentRail(
@@ -83,21 +93,69 @@ fun ShellAgentRail(
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        RailHeaderRow(onClick = actions.onHome, label = "Home".takeIf { state.expanded }) {
-            RailActionIcon(icon = Icons.Outlined.Home, description = "Home", selected = state.homeSelected, onClick = actions.onHome)
+        val frame = remember(state, actions, library) { ShellRailFrame(state, actions, library) }
+        val lane = LocalRailLane.current
+        val parts = remember(lane) { lane.distinct().filter { it in railParts } }
+        parts.forEach { view -> key(view) { railParts.getValue(view)(this, frame) } }
+    }
+}
+
+/**
+ * The rail's parts in order ([RailViews]), provided by the workspace from its layout's rail lane.
+ * Outside a workspace it is the default rail.
+ */
+internal val LocalRailLane = compositionLocalOf { RailViews.Default }
+
+/** What every rail part draws from: the rail's state, its actions and the expanded library. */
+@Immutable
+private class ShellRailFrame(
+    val state: ShellAgentRailState,
+    val actions: ShellAgentRailActions,
+    val library: (@Composable ColumnScope.() -> Unit)?,
+)
+
+/** Draws one rail part in the rail's column. */
+private typealias ShellRailPart = @Composable ColumnScope.(frame: ShellRailFrame) -> Unit
+
+private fun railPart(part: ShellRailPart): ShellRailPart = part
+
+/** The rail's parts by view ([RailViews]). */
+private val railParts: Map<RuntimeViewId, ShellRailPart> = mapOf(
+    RailViews.HOME to railPart { RailHomePart(it) },
+    RailViews.AGENTS to railPart { RailAgentsPart(it) },
+    RailViews.NEW to railPart { RailNewPart(it) },
+)
+
+@Composable
+private fun RailHomePart(frame: ShellRailFrame) {
+    val actions = frame.actions
+    RailHeaderRow(onClick = actions.onHome, label = "Home".takeIf { frame.state.expanded }) {
+        RailActionIcon(icon = Icons.Outlined.Home, description = "Home", selected = frame.state.homeSelected, onClick = actions.onHome)
+    }
+}
+
+/**
+ * The agents, filling the rail between its other parts: the orbs, or the library while expanded.
+ * The drawer's rail has no library, so it always shows the orbs.
+ */
+@Composable
+private fun ColumnScope.RailAgentsPart(frame: ShellRailFrame) {
+    // The column's own spacing is the whole gap under Home: a spacer here would double it and
+    // detach Home from the list it heads.
+    Column(modifier = Modifier.weight(1f)) {
+        val library = frame.library
+        if (frame.state.expanded && library != null) {
+            library()
+        } else {
+            ShellRailOrbList(entries = frame.state.entries, actions = frame.actions)
         }
-        // The column's own spacing is the whole gap under Home: a spacer here would double it and
-        // detach Home from the list it heads.
-        Column(modifier = Modifier.weight(1f)) {
-            if (state.expanded && library != null) {
-                library()
-            } else {
-                ShellRailOrbList(entries = state.entries, actions = actions)
-            }
-        }
-        RailHeaderRow(onClick = actions.onNewSession, label = "New".takeIf { state.expanded }) {
-            NewSessionButton(onNewSession = actions.onNewSession)
-        }
+    }
+}
+
+@Composable
+private fun RailNewPart(frame: ShellRailFrame) {
+    RailHeaderRow(onClick = frame.actions.onNewSession, label = "New".takeIf { frame.state.expanded }) {
+        NewSessionButton(onNewSession = frame.actions.onNewSession)
     }
 }
 

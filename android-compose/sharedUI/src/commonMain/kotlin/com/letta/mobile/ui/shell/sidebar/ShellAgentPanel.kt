@@ -12,11 +12,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
@@ -32,7 +34,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.shell.sidemenu.PanelViews
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
@@ -78,6 +85,11 @@ object ShellAgentPanelTags {
  *
  * [agentCard]  is drawn under the agent's name: the host's model-and-context
  * card. Null draws nothing there; it is never drawn on the Home page.
+ *
+ * Which parts show, and their order, is [LocalPanelLane]: the workspace fills it from the shell
+ * layout's panel lane, so the sidebar and the drawer's panel follow the same lane. The panel frame keeps the agent menu's dialogs (so they open wherever the
+ * header sits), draws Settings at the bottom wherever the lane lists it, and skips parts it does
+ * not know; a repeated part is drawn once.
  */
 @Composable
 fun ShellAgentPanel(
@@ -92,16 +104,57 @@ fun ShellAgentPanel(
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
-        ShellPanelHeader(state = state, actions = actions, agentCard = agentCard)
-        ShellPanelSections(state = state, actions = actions)
-        ShellPanelLibrary(state = state, actions = actions)
-        if (state.showSettings) {
-            ShellNavRow(
-                model = ShellNavRowModel(label = "Settings", icon = Icons.Outlined.Settings, selected = state.settingsSelected),
-                onClick = actions.onOpenSettings,
-            )
+        // The agent menu lives only while an agent is open, so its dialog closes on the way Home.
+        var dialog by remember(state.home) { mutableStateOf(ShellPanelDialog.None) }
+        val frame = remember(state, actions, agentCard) { ShellPanelFrame(state, actions, agentCard, onOpenDialog = { dialog = it }) }
+        val lane = LocalPanelLane.current
+        val parts = remember(lane) { lane.distinct().filter { it in panelParts } }
+        parts.filterNot { it == PanelViews.SETTINGS }.forEach { view -> key(view) { panelParts.getValue(view)(this, frame) } }
+        if (PanelViews.SETTINGS in parts) {
+            // The library fills the height above Settings; without it a spacer keeps Settings at the bottom.
+            if (PanelViews.LIBRARY !in parts) Spacer(Modifier.weight(1f))
+            ShellPanelSettings(frame)
         }
+        ShellPanelDialogs(dialog = dialog, state = state, actions = actions, onDismiss = { dialog = ShellPanelDialog.None })
     }
+}
+
+/**
+ * The panel's parts in order ([PanelViews]), provided by the workspace from its layout's panel lane.
+ * Outside a workspace it is the default panel.
+ */
+internal val LocalPanelLane = compositionLocalOf { PanelViews.Default }
+
+/** What every panel part draws from; [onOpenDialog] opens one of the frame's dialogs. */
+@Immutable
+private class ShellPanelFrame(
+    val state: ShellAgentPanelState,
+    val actions: ShellAgentPanelActions,
+    val agentCard: (@Composable () -> Unit)?,
+    val onOpenDialog: (ShellPanelDialog) -> Unit,
+)
+
+/** Draws one panel part in the panel's column. */
+private typealias ShellPanelPart = @Composable ColumnScope.(frame: ShellPanelFrame) -> Unit
+
+private fun panelPart(part: ShellPanelPart): ShellPanelPart = part
+
+/** The panel's parts by view ([PanelViews]). */
+private val panelParts: Map<RuntimeViewId, ShellPanelPart> = mapOf(
+    PanelViews.HEADER to panelPart { ShellPanelHeader(it) },
+    PanelViews.SECTIONS to panelPart { ShellPanelSections(it.state, it.actions) },
+    PanelViews.NEW_CHAT to panelPart { ShellPanelNewChat(it.state, it.actions) },
+    PanelViews.LIBRARY to panelPart { ShellPanelLibrary(it.state, it.actions) },
+    PanelViews.SETTINGS to panelPart { ShellPanelSettings(it) },
+)
+
+@Composable
+private fun ShellPanelSettings(frame: ShellPanelFrame) {
+    if (!frame.state.showSettings) return
+    ShellNavRow(
+        model = ShellNavRowModel(label = "Settings", icon = Icons.Outlined.Settings, selected = frame.state.settingsSelected),
+        onClick = frame.actions.onOpenSettings,
+    )
 }
 
 /** The icon a section row wears in [mode]. */
@@ -154,11 +207,13 @@ fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier
  * or "Home" while the fleet page is open; the agent menu has nothing to act on then, so it hides.
  */
 @Composable
-private fun ShellPanelHeader(state: ShellAgentPanelState, actions: ShellAgentPanelActions, agentCard: (@Composable () -> Unit)?) {
+private fun ShellPanelHeader(frame: ShellPanelFrame) {
+    val state = frame.state
+    val agentCard = frame.agentCard
     Column(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.lg)) {
         Box(Modifier.fillMaxWidth()) {
-            ShellPanelTitleSlot(state = state, onEditAgent = actions.onEditAgent, modifier = Modifier.fillMaxWidth())
-            if (!state.home) Box(Modifier.align(Alignment.TopEnd)) { ShellAgentOverflowMenu(state = state, actions = actions) }
+            ShellPanelTitleSlot(state = state, onEditAgent = frame.actions.onEditAgent, modifier = Modifier.fillMaxWidth())
+            if (!state.home) Box(Modifier.align(Alignment.TopEnd)) { ShellAgentOverflowMenu(frame) }
         }
         if (agentCard != null && !state.home) {
             Box(Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm).testTag(ShellAgentPanelTags.AGENT_CARD)) { agentCard() }
@@ -235,9 +290,10 @@ private fun ShellAgentIdentity(agent: ShellPanelAgent, onEditAgent: () -> Unit) 
 }
 
 @Composable
-private fun ShellAgentOverflowMenu(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
+private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
+    val state = frame.state
+    val actions = frame.actions
     var menuOpen by remember { mutableStateOf(false) }
-    var dialog by remember { mutableStateOf(ShellPanelDialog.None) }
     Box {
         Icon(
             imageVector = Icons.Outlined.MoreVert,
@@ -255,16 +311,15 @@ private fun ShellAgentOverflowMenu(state: ShellAgentPanelState, actions: ShellAg
                 LettaMenuItem(label = "New chat", onClick = actions.onNewChat),
                 LettaMenuItem(label = "Edit agent", onClick = actions.onEditAgent),
                 LettaMenuItem(label = "Memory") { actions.onOpenSection(LensDestination.Memory) },
-                LettaMenuItem(label = "Archived chats") { dialog = ShellPanelDialog.Archived },
-                state.chatOptions?.let { LettaMenuItem(label = "Chat options") { dialog = ShellPanelDialog.ChatOptions } },
+                LettaMenuItem(label = "Archived chats") { frame.onOpenDialog(ShellPanelDialog.Archived) },
+                state.chatOptions?.let { LettaMenuItem(label = "Chat options") { frame.onOpenDialog(ShellPanelDialog.ChatOptions) } },
                 LettaMenuItem(label = "Settings", onClick = actions.onOpenSettings),
             ),
         )
     }
-    ShellPanelDialogs(dialog = dialog, state = state, actions = actions, onDismiss = { dialog = ShellPanelDialog.None })
 }
 
-/** The dialog the agent menu has open, if any. */
+/** The dialog the agent menu has open, if any; the panel frame holds it. */
 private enum class ShellPanelDialog { None, Archived, ChatOptions }
 
 @Composable
@@ -291,7 +346,7 @@ private fun ShellPanelDialogs(
     }
 }
 
-/** The per-agent section rows for the lens, then New chat. */
+/** The per-agent section rows for the lens. */
 @Composable
 private fun ShellPanelSections(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
     WorkPlayLens.navDestinations(state.mode).filterNot { it in state.hiddenSections }.forEach { destination ->
@@ -304,6 +359,11 @@ private fun ShellPanelSections(state: ShellAgentPanelState, actions: ShellAgentP
             onClick = { actions.onOpenSection(destination) },
         )
     }
+}
+
+/** The New chat row. */
+@Composable
+private fun ShellPanelNewChat(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
     ShellNavRow(
         model = ShellNavRowModel(label = WorkPlayLens.newConversationLabel(state.mode), icon = Icons.Outlined.Edit, selected = false),
         onClick = actions.onNewChat,
