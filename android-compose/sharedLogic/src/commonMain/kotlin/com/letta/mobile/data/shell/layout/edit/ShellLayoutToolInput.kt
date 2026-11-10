@@ -51,19 +51,11 @@ object ShellLayoutToolInput {
 
     /** The call [input] makes, or every problem with it. */
     fun read(input: JsonObject): ShellLayoutReading {
-        val reader = Reader()
-        reader.onlyKeys(input, setOf(ACTION, OPS, DRY_RUN), null)
-        val actionName = reader.string(input, ACTION, null, required = true)
-        val action = ShellLayoutAction.entries.firstOrNull { it.wire == actionName }
-        if (actionName != null && action == null) {
-            reader.problem(null, "action must be one of ${ShellLayoutAction.entries.joinToString { it.wire }}.")
-        }
-        val isApply = action == ShellLayoutAction.APPLY
-        if (!isApply && (OPS in input || DRY_RUN in input)) reader.problem(null, "ops and dry_run belong to action apply only.")
-        val ops = if (isApply) reader.ops(input[OPS]) else emptyList()
-        val dryRun = if (isApply) reader.boolean(input, DRY_RUN) else false
-        val request = ShellLayoutRequest(action ?: ShellLayoutAction.GET, ops, dryRun).takeIf { reader.errors.isEmpty() && action != null }
-        return ShellLayoutReading(request, reader.errors.toList())
+        val fields = InputObject(input)
+        fields.onlyKeys(setOf(InputKey.ACTION, InputKey.OPS, InputKey.DRY_RUN))
+        val action = fields.action()
+        val request = if (action == ShellLayoutAction.APPLY) fields.applyRequest() else fields.plainRequest(action)
+        return ShellLayoutReading(request.takeIf { fields.errors.isEmpty() }, fields.errors.toList())
     }
 
     internal const val ACTION = "action"
@@ -83,98 +75,157 @@ object ShellLayoutToolInput {
     internal const val RESET = "reset"
 }
 
-/** Collects every problem while reading one input. */
-private class Reader {
-    val errors = mutableListOf<ShellLayoutEditError>()
+/** A field of the input, by its JSON name. */
+private enum class InputKey(val wire: String) {
+    ACTION(ShellLayoutToolInput.ACTION),
+    OPS(ShellLayoutToolInput.OPS),
+    DRY_RUN(ShellLayoutToolInput.DRY_RUN),
+    OP(ShellLayoutToolInput.OP),
+    LANE(ShellLayoutToolInput.LANE),
+    TO_LANE(ShellLayoutToolInput.TO_LANE),
+    VIEW(ShellLayoutToolInput.VIEW),
+    OBJECT(ShellLayoutToolInput.OBJECT),
+    INDEX(ShellLayoutToolInput.INDEX),
+    SLOTS(ShellLayoutToolInput.SLOTS),
+}
 
-    fun problem(op: Int?, detail: String) {
+/** The fields an add, remove or move always allows. */
+private val laneSlotKeys = setOf(InputKey.OP, InputKey.LANE, InputKey.VIEW, InputKey.OBJECT)
+
+/**
+ * One JSON object of the input, read field by field: [op] is the op it is in (null for the input itself),
+ * and every problem found is added to [errors], which all objects of one input share.
+ */
+private class InputObject(
+    private val obj: JsonObject,
+    private val op: Int? = null,
+    val errors: MutableList<ShellLayoutEditError> = mutableListOf(),
+) {
+    fun problem(detail: String) {
         errors += ShellLayoutEditError(op, ShellLayoutEditRule.MALFORMED, detail)
     }
 
-    fun onlyKeys(obj: JsonObject, allowed: Set<String>, op: Int?) {
-        (obj.keys - allowed).forEach { problem(op, "Unknown field $it; allowed: ${allowed.sorted().joinToString()}.") }
+    operator fun get(key: InputKey): JsonElement? = obj[key.wire]
+
+    fun has(key: InputKey): Boolean = key.wire in obj
+
+    fun onlyKeys(allowed: Set<InputKey>) {
+        val names = allowed.map { it.wire }.toSet()
+        (obj.keys - names).forEach { problem("Unknown field $it; allowed: ${names.sorted().joinToString()}.") }
     }
 
-    fun string(obj: JsonObject, key: String, op: Int?, required: Boolean = false): String? {
-        val value = obj[key]
-        val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
-        if (value != null && text == null) problem(op, "$key must be a string.")
-        if (value == null && required) problem(op, "$key is required.")
-        return text
+    /** [key] as a string, or null (and a problem) when it is missing. */
+    fun required(key: InputKey): String? {
+        if (!has(key)) problem("${key.wire} is required.")
+        return optional(key)
     }
 
-    fun boolean(obj: JsonObject, key: String): Boolean {
-        val value = obj[key] ?: return false
-        return (value as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull
-            ?: false.also { problem(null, "$key must be true or false.") }
+    /** [key] as a string, or null when it is missing (or, with a problem, not a string). */
+    fun optional(key: InputKey): String? = typed(key, "a string") { value -> value.takeIf { it.isString }?.content }
+
+    /** [key] as true or false; false when it is missing (or, with a problem, not a boolean). */
+    fun flag(key: InputKey): Boolean = typed(key, "true or false") { value -> value.takeUnless { it.isString }?.booleanOrNull } ?: false
+
+    /** [key] as an integer, or null when it is missing (or, with a problem, not an integer). */
+    fun int(key: InputKey): Int? = typed(key, "an integer") { value -> value.takeUnless { it.isString }?.intOrNull }
+
+    /** The object [child] in this one, read as part of the same op. */
+    fun nested(child: JsonObject): InputObject = InputObject(child, op, errors)
+
+    /** One entry of the ops, read as that op, or null (and a problem) when it is not an object. */
+    fun opAt(entry: IndexedValue<JsonElement>): InputObject? {
+        val opObject = entry.value as? JsonObject
+        if (opObject == null) errors += ShellLayoutEditError(entry.index, ShellLayoutEditRule.MALFORMED, "Each op must be an object.")
+        return opObject?.let { InputObject(it, entry.index, errors) }
     }
 
-    private fun index(obj: JsonObject, op: Int): Int? {
-        val value = obj[ShellLayoutToolInput.INDEX] ?: return null
-        return (value as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull ?: null.also { problem(op, "index must be an integer.") }
+    /** [key] read by [read] when present, or null and a problem saying it must be [expected]. */
+    private fun <T : Any> typed(key: InputKey, expected: String, read: (JsonPrimitive) -> T?): T? {
+        val value = get(key) ?: return null
+        return (value as? JsonPrimitive)?.let(read) ?: null.also { problem("${key.wire} must be $expected.") }
     }
+}
 
-    fun ops(value: JsonElement?): List<ShellLayoutOp> {
-        val array = value as? JsonArray ?: return emptyList<ShellLayoutOp>().also { problem(null, "ops must be an array of op objects.") }
-        return array.mapIndexedNotNull { index, element ->
-            val obj = element as? JsonObject ?: return@mapIndexedNotNull null.also { problem(index, "Each op must be an object.") }
-            op(obj, index)
-        }
-    }
+private fun InputObject.action(): ShellLayoutAction? {
+    val name = required(InputKey.ACTION) ?: return null
+    return ShellLayoutAction.entries.firstOrNull { it.wire == name }
+        ?: null.also { problem("action must be one of ${ShellLayoutAction.entries.joinToString { it.wire }}.") }
+}
 
-    private fun op(obj: JsonObject, index: Int): ShellLayoutOp? = when (
-        val name = string(obj, ShellLayoutToolInput.OP, index, required = true)
-    ) {
-        null -> null
-        ShellLayoutToolInput.SET_LANE -> setLane(obj, index)
-        ShellLayoutToolInput.ADD -> add(obj, index)
-        ShellLayoutToolInput.REMOVE -> remove(obj, index)
-        ShellLayoutToolInput.MOVE -> move(obj, index)
-        ShellLayoutToolInput.RESET -> ShellLayoutOp.Reset.also { onlyKeys(obj, setOf(ShellLayoutToolInput.OP), index) }
-        else -> null.also { problem(index, "Unknown op $name; ops are ${ShellLayoutToolInput.opNames.joinToString()}.") }
-    }
+private fun InputObject.applyRequest(): ShellLayoutRequest = ShellLayoutRequest(ShellLayoutAction.APPLY, ops(), flag(InputKey.DRY_RUN))
 
-    private fun setLane(obj: JsonObject, index: Int): ShellLayoutOp? {
-        onlyKeys(obj, setOf(ShellLayoutToolInput.OP, ShellLayoutToolInput.LANE, ShellLayoutToolInput.SLOTS), index)
-        val lane = string(obj, ShellLayoutToolInput.LANE, index, required = true)
-        val array = obj[ShellLayoutToolInput.SLOTS] as? JsonArray
-        if (array == null) problem(index, "slots must be an array of {view, object?}.")
-        val slots = array.orEmpty().map { element ->
-            (element as? JsonObject)?.let { slot(it, index, setOf(ShellLayoutToolInput.VIEW, ShellLayoutToolInput.OBJECT)) }
-                ?: null.also { problem(index, "Each slot must be an object {view, object?}.") }
-        }
-        return if (lane == null || array == null || null in slots) null else ShellLayoutOp.SetLane(lane, slots.filterNotNull())
-    }
+/** The request of any [action] but apply (none when it is null), refusing the fields only apply takes. */
+private fun InputObject.plainRequest(action: ShellLayoutAction?): ShellLayoutRequest? {
+    val hasApplyFields = has(InputKey.OPS) || has(InputKey.DRY_RUN)
+    if (hasApplyFields) problem("ops and dry_run belong to action apply only.")
+    return action?.let { ShellLayoutRequest(it) }
+}
 
-    private fun add(obj: JsonObject, index: Int): ShellLayoutOp? {
-        val fields = laneSlot(obj, index, setOf(ShellLayoutToolInput.INDEX)) ?: return null
-        return ShellLayoutOp.Add(fields.first, fields.second, index(obj, index))
-    }
+private fun InputObject.ops(): List<ShellLayoutOp> {
+    val array = get(InputKey.OPS) as? JsonArray
+        ?: return emptyList<ShellLayoutOp>().also { problem("ops must be an array of op objects.") }
+    return array.withIndex().mapNotNull { opAt(it)?.op() }
+}
 
-    private fun remove(obj: JsonObject, index: Int): ShellLayoutOp? =
-        laneSlot(obj, index, emptySet())?.let { (lane, slot) -> ShellLayoutOp.Remove(lane, slot) }
+private fun InputObject.op(): ShellLayoutOp? = when (val name = required(InputKey.OP)) {
+    null -> null
+    ShellLayoutToolInput.SET_LANE -> setLane()
+    ShellLayoutToolInput.ADD -> add()
+    ShellLayoutToolInput.REMOVE -> remove()
+    ShellLayoutToolInput.MOVE -> move()
+    ShellLayoutToolInput.RESET -> ShellLayoutOp.Reset.also { onlyKeys(setOf(InputKey.OP)) }
+    else -> null.also { problem("Unknown op $name; ops are ${ShellLayoutToolInput.opNames.joinToString()}.") }
+}
 
-    private fun move(obj: JsonObject, index: Int): ShellLayoutOp? {
-        val (lane, slot) = laneSlot(obj, index, setOf(ShellLayoutToolInput.TO_LANE, ShellLayoutToolInput.INDEX)) ?: return null
-        val toLane = string(obj, ShellLayoutToolInput.TO_LANE, index) ?: lane
-        return ShellLayoutOp.Move(lane, slot, toLane, index(obj, index))
-    }
+private fun InputObject.setLane(): ShellLayoutOp? {
+    onlyKeys(setOf(InputKey.OP, InputKey.LANE, InputKey.SLOTS))
+    val lane = required(InputKey.LANE)
+    val slots = slotList()
+    return if (lane == null || slots == null) null else ShellLayoutOp.SetLane(lane, slots)
+}
 
-    /** The lane and slot an add, remove or move names, reading [extra] fields as allowed too. */
-    private fun laneSlot(obj: JsonObject, index: Int, extra: Set<String>): Pair<String, ModuleSlot>? {
-        val base = setOf(ShellLayoutToolInput.OP, ShellLayoutToolInput.LANE, ShellLayoutToolInput.VIEW, ShellLayoutToolInput.OBJECT)
-        onlyKeys(obj, base + extra, index)
-        val lane = string(obj, ShellLayoutToolInput.LANE, index, required = true)
-        val slot = slot(obj, index, null)
-        return if (lane == null || slot == null) null else lane to slot
-    }
+/** The slots of a set_lane op, or null when the array or any slot in it has a problem. */
+private fun InputObject.slotList(): List<ModuleSlot>? {
+    val array = get(InputKey.SLOTS) as? JsonArray ?: return null.also { problem("slots must be an array of {view, object?}.") }
+    val slots = array.map { slotIn(it) }
+    return if (null in slots) null else slots.filterNotNull()
+}
 
-    /** The slot {view, object?} in [obj]; with [allowed], other fields are refused. */
-    private fun slot(obj: JsonObject, index: Int, allowed: Set<String>?): ModuleSlot? {
-        allowed?.let { onlyKeys(obj, it, index) }
-        val view = string(obj, ShellLayoutToolInput.VIEW, index, required = true)
-        val ref = string(obj, ShellLayoutToolInput.OBJECT, index)
-        if (view != null && view.isBlank()) problem(index, "view must not be blank.")
-        return view?.takeIf { it.isNotBlank() }?.let { ModuleSlot(RuntimeViewId(it), ref) }
-    }
+/** One slot of a set_lane op's array, or null (and a problem) when it is not a valid slot object. */
+private fun InputObject.slotIn(element: JsonElement): ModuleSlot? =
+    (element as? JsonObject)?.let { nested(it).slotObject() } ?: null.also { problem("Each slot must be an object {view, object?}.") }
+
+/** This object as a slot {view, object?} with no other fields. */
+private fun InputObject.slotObject(): ModuleSlot? {
+    onlyKeys(setOf(InputKey.VIEW, InputKey.OBJECT))
+    return slot()
+}
+
+private fun InputObject.add(): ShellLayoutOp? {
+    val (lane, slot) = laneSlot(setOf(InputKey.INDEX)) ?: return null
+    return ShellLayoutOp.Add(lane, slot, int(InputKey.INDEX))
+}
+
+private fun InputObject.remove(): ShellLayoutOp? = laneSlot(emptySet())?.let { (lane, slot) -> ShellLayoutOp.Remove(lane, slot) }
+
+private fun InputObject.move(): ShellLayoutOp? {
+    val (lane, slot) = laneSlot(setOf(InputKey.TO_LANE, InputKey.INDEX)) ?: return null
+    val toLane = optional(InputKey.TO_LANE) ?: lane
+    return ShellLayoutOp.Move(lane, slot, toLane, int(InputKey.INDEX))
+}
+
+/** The lane and slot an add, remove or move names, allowing its [extra] fields too. */
+private fun InputObject.laneSlot(extra: Set<InputKey>): Pair<String, ModuleSlot>? {
+    onlyKeys(laneSlotKeys + extra)
+    val lane = required(InputKey.LANE)
+    val slot = slot()
+    return if (lane == null || slot == null) null else lane to slot
+}
+
+/** The slot {view, object?} this object names. */
+private fun InputObject.slot(): ModuleSlot? {
+    val view = required(InputKey.VIEW)
+    val ref = optional(InputKey.OBJECT)
+    if (view?.isBlank() == true) problem("view must not be blank.")
+    return view?.takeIf { it.isNotBlank() }?.let { ModuleSlot(RuntimeViewId(it), ref) }
 }

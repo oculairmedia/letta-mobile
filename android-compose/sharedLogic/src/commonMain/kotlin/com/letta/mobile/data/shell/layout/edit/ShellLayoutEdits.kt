@@ -53,14 +53,14 @@ private typealias Problem = Pair<ShellLayoutEditRule, String>
 
 /** The layout being edited: each catalog lane's slots, and which lanes the ops wrote. */
 private class Draft(private var base: ShellLayoutConfig) {
-    private val lanes = mutableMapOf<String, List<ModuleSlot>>()
-    private val touched = mutableSetOf<String>()
+    private val lanes = mutableMapOf<ShellLayoutLaneSpec, List<ModuleSlot>>()
+    private val touched = mutableSetOf<ShellLayoutLaneSpec>()
 
-    private fun slots(lane: String): List<ModuleSlot> = lanes.getOrPut(lane) { ShellLayoutEdits.slots(base, lane) }
+    private fun slots(spec: ShellLayoutLaneSpec): List<ModuleSlot> = lanes.getOrPut(spec) { ShellLayoutEdits.slots(base, spec.lane) }
 
-    private fun write(lane: String, slots: List<ModuleSlot>) {
-        lanes[lane] = slots
-        touched += lane
+    private fun write(spec: ShellLayoutLaneSpec, slots: List<ModuleSlot>) {
+        lanes[spec] = slots
+        touched += spec
     }
 
     /** Applies [op] when it is valid; otherwise leaves the draft as it was and returns why not. */
@@ -75,90 +75,105 @@ private class Draft(private var base: ShellLayoutConfig) {
     private fun reset(): List<Problem> {
         base = ShellLayoutConfig.Default
         lanes.clear()
-        touched += ShellLayoutCatalog.lanes.map { it.lane }
+        touched += ShellLayoutCatalog.lanes
         return emptyList()
     }
 
     private fun setLane(op: ShellLayoutOp.SetLane): List<Problem> {
         val spec = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
         val problems = op.slots.mapNotNull { slotProblem(spec, it) } +
-            op.slots.groupBy { it }.filterValues { it.size > 1 }.keys.map { duplicate(it, op.lane) } +
-            op.slots.mapNotNull { elsewhere(op.lane, it) } +
-            keepsRequired(op.lane, op.slots)
-        if (problems.isEmpty()) write(op.lane, op.slots)
+            op.slots.groupBy { it }.filterValues { it.size > 1 }.keys.map { duplicate(it, spec) } +
+            op.slots.mapNotNull { elsewhere(spec, it) } +
+            keepsRequired(spec, op.slots)
+        if (problems.isEmpty()) write(spec, op.slots)
         return problems
     }
 
     private fun add(op: ShellLayoutOp.Add): List<Problem> {
         val spec = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
-        val current = slots(op.lane)
+        val current = slots(spec)
         val problem = slotProblem(spec, op.slot)
-            ?: duplicate(op.slot, op.lane).takeIf { op.slot in current }
-            ?: elsewhere(op.lane, op.slot)
-            ?: indexProblem(op.index, current.size)
-        if (problem == null) write(op.lane, current.inserted(op.slot, op.index))
-        return listOfNotNull(problem)
+            ?: duplicate(op.slot, spec).takeIf { op.slot in current }
+            ?: elsewhere(spec, op.slot)
+            ?: indexProblem(op.index, current)
+        return applied(problem) { write(spec, current.inserted(op.slot, op.index)) }
     }
 
     private fun remove(op: ShellLayoutOp.Remove): List<Problem> {
-        if (ShellLayoutCatalog.lane(op.lane) == null) return listOf(unknownLane(op.lane))
-        val current = slots(op.lane)
-        val problem = notFound(op.slot, op.lane).takeIf { op.slot !in current } ?: leavingProblem(op.lane, op.slot)
-        if (problem == null) write(op.lane, current - op.slot)
-        return listOfNotNull(problem)
+        val spec = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
+        val current = slots(spec)
+        val problem = notFound(op.slot, spec).takeIf { op.slot !in current } ?: leavingProblem(spec, op.slot)
+        return applied(problem) { write(spec, current - op.slot) }
     }
 
     private fun move(op: ShellLayoutOp.Move): List<Problem> {
-        if (ShellLayoutCatalog.lane(op.lane) == null) return listOf(unknownLane(op.lane))
+        val from = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
         val target = ShellLayoutCatalog.lane(op.toLane) ?: return listOf(unknownLane(op.toLane))
-        if (op.slot !in slots(op.lane)) return listOf(notFound(op.slot, op.lane))
-        val within = op.lane == op.toLane
-        val remaining = slots(op.lane) - op.slot
-        val destination = if (within) remaining else slots(op.toLane)
-        val problem = (if (within) null else leavingProblem(op.lane, op.slot) ?: slotProblem(target, op.slot))
-            ?: duplicate(op.slot, op.toLane).takeIf { !within && op.slot in destination }
-            ?: indexProblem(op.index, destination.size)
-        if (problem == null) {
-            write(op.lane, remaining)
-            write(op.toLane, destination.inserted(op.slot, op.index))
+        if (op.slot !in slots(from)) return listOf(notFound(op.slot, from))
+        return if (from == target) moveWithin(from, op) else moveAcross(from, target, op)
+    }
+
+    /** [op] moving its slot to another place in [lane], the lane it is already in. */
+    private fun moveWithin(lane: ShellLayoutLaneSpec, op: ShellLayoutOp.Move): List<Problem> {
+        val remaining = slots(lane) - op.slot
+        return applied(indexProblem(op.index, remaining)) { write(lane, remaining.inserted(op.slot, op.index)) }
+    }
+
+    /** [op] moving its slot out of [from] into [target], another lane. */
+    private fun moveAcross(from: ShellLayoutLaneSpec, target: ShellLayoutLaneSpec, op: ShellLayoutOp.Move): List<Problem> {
+        val destination = slots(target)
+        val problem = leavingProblem(from, op.slot)
+            ?: slotProblem(target, op.slot)
+            ?: duplicate(op.slot, target).takeIf { op.slot in destination }
+            ?: indexProblem(op.index, destination)
+        return applied(problem) {
+            write(from, slots(from) - op.slot)
+            write(target, destination.inserted(op.slot, op.index))
         }
-        return listOfNotNull(problem)
     }
 
     /** What the edit breaks as a whole, in the lanes it wrote: a lane past its cap, or a protected slot gone. */
-    fun finalProblems(): List<Problem> = touched.flatMap { lane ->
-        val spec = ShellLayoutCatalog.lane(lane) ?: return@flatMap emptyList()
-        val count = slots(lane).size
+    fun finalProblems(): List<Problem> = touched.flatMap { spec ->
+        val count = slots(spec).size
         val full = ShellLayoutEditRule.LANE_FULL to "Lane ${spec.lane} would hold $count slots; it takes at most ${spec.maxSlots}."
-        listOfNotNull(full.takeIf { count > spec.maxSlots }) + keepsRequired(lane, slots(lane))
+        listOfNotNull(full.takeIf { count > spec.maxSlots }) + keepsRequired(spec, slots(spec))
     }
 
     /** The edited layout: the base with each lane the ops wrote replaced. */
-    fun build(): ShellLayoutConfig = base.copy(lanes = base.lanes + touched.associateWith { slots(it) })
-
-    /** Why [slot] cannot stay in, or go from, the lane it would leave. */
-    private fun leavingProblem(lane: String, slot: ModuleSlot): Problem? = when {
-        lane == ShellLanes.MAIN && slot.view == ShellViews.PAGE -> pageStays()
-        lane == ShellLanes.PANEL && slot.view == PanelViews.SETTINGS -> settingsStays()
-        else -> null
-    }
+    fun build(): ShellLayoutConfig = base.copy(lanes = base.lanes + touched.associate { it.lane to slots(it) })
 
     /** A main or side slot that is already in the other of the two. */
-    private fun elsewhere(lane: String, slot: ModuleSlot): Problem? {
-        val other = when (lane) {
-            ShellLanes.MAIN -> ShellLanes.SIDE
-            ShellLanes.SIDE -> ShellLanes.MAIN
-            else -> return null
-        }
-        return (ShellLayoutEditRule.DUPLICATE_SLOT to "${slot.describe()} is already in lane $other; move it from there instead.")
+    private fun elsewhere(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? {
+        val other = otherOf(spec) ?: return null
+        return (ShellLayoutEditRule.DUPLICATE_SLOT to "${slot.describe()} is already in lane ${other.lane}; move it from there instead.")
             .takeIf { slot in slots(other) }
     }
-
-    private fun keepsRequired(lane: String, slots: List<ModuleSlot>): List<Problem> = listOfNotNull(
-        pageStays().takeIf { lane == ShellLanes.MAIN && slots.none { it.view == ShellViews.PAGE } },
-        settingsStays().takeIf { lane == ShellLanes.PANEL && slots.none { it.view == PanelViews.SETTINGS } },
-    )
 }
+
+/** [problem] as an op's result, making the op's [change] only when there is none. */
+private inline fun applied(problem: Problem?, change: () -> Unit): List<Problem> {
+    if (problem == null) change()
+    return listOfNotNull(problem)
+}
+
+/** The other of the main and side lanes, or null for any other lane. */
+private fun otherOf(spec: ShellLayoutLaneSpec): ShellLayoutLaneSpec? = when (spec.lane) {
+    ShellLanes.MAIN -> ShellLayoutCatalog.lane(ShellLanes.SIDE)
+    ShellLanes.SIDE -> ShellLayoutCatalog.lane(ShellLanes.MAIN)
+    else -> null
+}
+
+/** Why [slot] cannot stay in, or go from, the lane [spec] it would leave. */
+private fun leavingProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? = when {
+    spec.lane == ShellLanes.MAIN && slot.view == ShellViews.PAGE -> pageStays()
+    spec.lane == ShellLanes.PANEL && slot.view == PanelViews.SETTINGS -> settingsStays()
+    else -> null
+}
+
+private fun keepsRequired(spec: ShellLayoutLaneSpec, slots: List<ModuleSlot>): List<Problem> = listOfNotNull(
+    pageStays().takeIf { spec.lane == ShellLanes.MAIN && slots.none { it.view == ShellViews.PAGE } },
+    settingsStays().takeIf { spec.lane == ShellLanes.PANEL && slots.none { it.view == PanelViews.SETTINGS } },
+)
 
 private fun slotProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? {
     val view = spec.view(slot.view)
@@ -174,17 +189,20 @@ private fun slotProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? {
     }
 }
 
-private fun indexProblem(index: Int?, size: Int): Problem? =
-    (ShellLayoutEditRule.INDEX_OUT_OF_RANGE to "index $index is outside 0..$size.").takeIf { index != null && index !in 0..size }
+/** An [index] that is not a place in [slots]: 0 is first, and their size is just past the last. */
+private fun indexProblem(index: Int?, slots: List<ModuleSlot>): Problem? {
+    val size = slots.size
+    return (ShellLayoutEditRule.INDEX_OUT_OF_RANGE to "index $index is outside 0..$size.").takeIf { index != null && index !in 0..size }
+}
 
 private fun unknownLane(lane: String): Problem =
     ShellLayoutEditRule.UNKNOWN_LANE to "No lane $lane; lanes are ${ShellLayoutCatalog.lanes.joinToString { it.lane }}."
 
-private fun duplicate(slot: ModuleSlot, lane: String): Problem =
-    ShellLayoutEditRule.DUPLICATE_SLOT to "${slot.describe()} is already in lane $lane."
+private fun duplicate(slot: ModuleSlot, spec: ShellLayoutLaneSpec): Problem =
+    ShellLayoutEditRule.DUPLICATE_SLOT to "${slot.describe()} is already in lane ${spec.lane}."
 
-private fun notFound(slot: ModuleSlot, lane: String): Problem =
-    ShellLayoutEditRule.SLOT_NOT_FOUND to "${slot.describe()} is not in lane $lane."
+private fun notFound(slot: ModuleSlot, spec: ShellLayoutLaneSpec): Problem =
+    ShellLayoutEditRule.SLOT_NOT_FOUND to "${slot.describe()} is not in lane ${spec.lane}."
 
 private fun pageStays(): Problem =
     ShellLayoutEditRule.PAGE_STAYS_IN_MAIN to "${ShellViews.PAGE.value} must stay in lane ${ShellLanes.MAIN}."
