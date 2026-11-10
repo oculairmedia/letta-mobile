@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.shell.layout.edit.ShellLayoutTool
 import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.reconnect.SessionSurvivingReconnectListener
@@ -280,7 +281,7 @@ internal fun desktopCanvasToolRegistry(
     agentToolsModes: AgentToolsModePolicy = desktopAgentToolsModePolicy(),
 ): ExternalToolRegistry = agentToolsModes.withoutCli().apply(
     ExternalToolRegistry.hostTools(
-        if (isIroh) emptyList() else CanvasExternalTools.all(DesktopNotebookCanvasStore.documents, canvasSessions),
+        if (isIroh) emptyList() else CanvasExternalTools.all(DesktopNotebookCanvasStore.documents, canvasSessions) + ShellLayoutTool(),
     ),
 )
 

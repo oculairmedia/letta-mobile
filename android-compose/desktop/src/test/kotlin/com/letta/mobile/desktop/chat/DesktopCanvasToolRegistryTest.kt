@@ -2,12 +2,16 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.CanvasToolContract
+import com.letta.mobile.data.shell.layout.edit.ShellLayoutTool
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** One owner for canvas_* on a runtime: the Iroh host there, the desktop against a direct App Server (letta-mobile-aknkw.4). */
 class DesktopCanvasToolRegistryTest {
+    /** Every tool the desktop itself answers against a direct App Server: canvas_* and the shell layout tool. */
+    private val ownTools = CanvasToolContract.all.map { it.name }.toSet() + ShellLayoutTool.NAME
+
     @Test
     fun onIrohTheDesktopOffersNoCanvasToolsOfItsOwn() {
         assertTrue(desktopCanvasToolRegistry(isIroh = true, canvasSessions = CanvasSessionRegistry()).listAdvertisedTools().isEmpty())
@@ -16,7 +20,7 @@ class DesktopCanvasToolRegistryTest {
     @Test
     fun againstADirectAppServerItOffersEveryCanvasTool() {
         val names = desktopCanvasToolRegistry(isIroh = false, canvasSessions = CanvasSessionRegistry()).listAdvertisedTools().map { it.name }
-        assertEquals(CanvasToolContract.all.map { it.name }.toSet(), names.toSet())
+        assertEquals(ownTools, names.toSet())
         // letta-mobile-bglj6.12: canvas_compose and its guide among them.
         assertTrue(CanvasToolContract.COMPOSE in names && CanvasToolContract.COMPOSE_GUIDE in names, "$names")
     }
@@ -31,8 +35,8 @@ class DesktopCanvasToolRegistryTest {
         ).offeredTools().map { it.name }
 
         assertEquals(listOf("meridian"), offered("meta"))
-        assertEquals(CanvasToolContract.all.map { it.name }.toSet(), offered("cli").toSet())
-        assertEquals(CanvasToolContract.all.map { it.name }.toSet(), offered("native").toSet())
-        assertEquals(CanvasToolContract.all.map { it.name }.toSet(), offered("bogus").toSet(), "an invalid value stays native")
+        assertEquals(ownTools, offered("cli").toSet())
+        assertEquals(ownTools, offered("native").toSet())
+        assertEquals(ownTools, offered("bogus").toSet(), "an invalid value stays native")
     }
 }
