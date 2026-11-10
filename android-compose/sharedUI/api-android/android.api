@@ -716,6 +716,14 @@ public final class com/letta/mobile/ui/canvas/WheelZoomRegionsKt {
 	public static final fun getLocalWheelZoomRegions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
+public abstract interface class com/letta/mobile/ui/canvas/boards/CanvasBoardSource {
+	public abstract fun open (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSourceKt {
+	public static final fun getLocalCanvasBoardSource ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 	public static final fun CanvasLibraryNotice (Lcom/letta/mobile/data/canvas/library/CanvasLibraryController;Landroidx/compose/runtime/Composer;I)V
 }
@@ -10304,6 +10312,12 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellSidebarOverflowMenuKt;
 	public fun <init> ()V
 	public final fun getLambda$1386838707$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellWorkspaceLanesKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellWorkspaceLanesKt;
+	public fun <init> ()V
+	public final fun getLambda$-2099437955$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
