@@ -1,6 +1,7 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.canvas.library.CanvasBoardSessions
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -34,6 +35,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyConversationRunRegistry: Lazy<ConversationRunRegistry>,
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
     private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
+    private val lazyCanvasBoards: Lazy<CanvasBoardSessions>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
 
@@ -49,4 +51,7 @@ class MainActivityDependencies @Inject constructor(
 
     /** letta-mobile-k5nbq.9: per-agent default cwd, the store the Iroh turn engine also reads. */
     val agentDefaults: AgentDefaultsRepository get() = lazyAgentDefaults.get()
+
+    /** The window's one live session per stored board, where its canvas modules open boards by id. */
+    val canvasBoards: CanvasBoardSessions get() = lazyCanvasBoards.get()
 }

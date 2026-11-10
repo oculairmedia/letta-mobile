@@ -97,6 +97,20 @@ abstract class AppModule {
             com.letta.mobile.data.canvas.CanvasSessionRegistry()
 
         /**
+         * One live session per stored board for the activity that asks (its canvas modules open
+         * boards through it); unscoped, so each owner gets its own table and its holds die with it.
+         */
+        @Provides
+        fun provideCanvasBoardSessions(
+            store: CanvasDocumentStore,
+            opLog: com.letta.mobile.data.canvas.CanvasOpLog,
+            syncTransport: com.letta.mobile.data.canvas.CanvasSyncTransport,
+        ): com.letta.mobile.data.canvas.library.CanvasBoardSessions = com.letta.mobile.data.canvas.library.CanvasBoardSessions(
+            store,
+            com.letta.mobile.data.canvas.CanvasConversationOptions(opLog = opLog, syncTransport = syncTransport),
+        )
+
+        /**
          * Shares canvases through the Iroh host every session graph connects to (attached by
          * SessionChannelTransportFactory). Edits are queued durably in the app's files until the
          * host acknowledges them; without a host every canvas reports itself local-only.

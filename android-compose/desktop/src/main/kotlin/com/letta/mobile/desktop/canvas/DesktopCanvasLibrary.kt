@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.canvas
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.library.CanvasLibraryController
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +16,7 @@ internal fun rememberDesktopCanvasLibrary(
         store,
         scope,
         DesktopCanvasArchiveStore(),
-        CanvasConversationOptions(opLog = DesktopCanvasHostSync.opLog, syncTransport = DesktopCanvasHostSync.syncTransport),
+        DesktopCanvasHostSync.options,
     )
 }
 

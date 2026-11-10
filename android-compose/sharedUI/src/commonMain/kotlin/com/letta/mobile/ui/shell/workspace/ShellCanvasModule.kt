@@ -42,8 +42,11 @@ private sealed interface ModuleBoard {
  * The board [board] as a shell module, at whatever size its place gives it; the board's own
  * chrome follows that size, not the window's. A board already live in this window (open in the
  * page, say) is shown through that same session, so the two never hold diverging copies; any
- * other is opened through the host's [LocalCanvasBoardSource]. No board, one no store holds, or a
- * host that cannot open boards shows the shell's unavailable module.
+ * other is opened through the host's [LocalCanvasBoardSource], which hands the module a hold it
+ * gives back when it leaves. No board, one no store holds, or a host that cannot open boards shows
+ * the shell's unavailable module. The board is looked up when the module appears: on a host
+ * without a source, a board that becomes live in the window only later is not picked up until the
+ * module is shown again.
  */
 @Composable
 internal fun ShellCanvasModule(board: CanvasId?, modifier: Modifier) {
@@ -66,7 +69,11 @@ private fun rememberModuleBoard(id: CanvasId?, registry: CanvasSessionRegistry?,
     val initial = remember(id, registry, source) { liveBoard(id, registry, source) }
     val board by produceState(initial, initial, source) {
         value = initial
-        if (initial is ModuleBoard.Opening) value = openBoard(initial.source, initial.id)
+        if (initial !is ModuleBoard.Opening) return@produceState
+        val opened = openBoard(initial.source, initial.id)
+        value = opened
+        // The source's session is held for this module until it leaves or shows another board.
+        if (opened is ModuleBoard.Open) awaitDispose { initial.source.release(opened.session) }
     }
     return board
 }

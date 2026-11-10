@@ -718,10 +718,28 @@ public final class com/letta/mobile/ui/canvas/WheelZoomRegionsKt {
 
 public abstract interface class com/letta/mobile/ui/canvas/boards/CanvasBoardSource {
 	public abstract fun open (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun release (Lcom/letta/mobile/data/canvas/CanvasSession;)V
+}
+
+public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSource$DefaultImpls {
+	public static fun release (Lcom/letta/mobile/ui/canvas/boards/CanvasBoardSource;Lcom/letta/mobile/data/canvas/CanvasSession;)V
 }
 
 public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSourceKt {
+	public static final fun ProvideCanvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ProvideCanvasHostWithBoards (Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun canvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;)Lcom/letta/mobile/ui/canvas/boards/CanvasBoardSource;
 	public static final fun getLocalCanvasBoardSource ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/canvas/boards/CanvasPageBoard {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;)V
+	public final fun getSession ()Lcom/letta/mobile/data/canvas/CanvasSession;
+	public final fun getValue (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lcom/letta/mobile/data/canvas/CanvasSession;
+	public final fun setSession (Lcom/letta/mobile/data/canvas/CanvasSession;)V
+	public final fun setValue (Ljava/lang/Object;Lkotlin/reflect/KProperty;Lcom/letta/mobile/data/canvas/CanvasSession;)V
+	public final fun take (Lcom/letta/mobile/data/canvas/CanvasSession;)V
 }
 
 public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
