@@ -43,14 +43,16 @@ class ActiveTurnSession(
         get() = kotlinx.atomicfu.locks.synchronized(lock) { owners.mapValues { it.value.outcome.value } }
 
     /** Resolve the retained owner, rejecting ambiguous defaults and foreign agent rebinding. */
-    fun owner(conversationId: ConversationId, agentId: AgentId): ActiveTurnCoordinator = kotlinx.atomicfu.locks.synchronized(lock) {
-        check(!closed) { "Active turn session retired" }
-        require(conversationId.value != com.letta.mobile.data.model.IdFormats.DEFAULT_CONVERSATION_ID) {
-            "Default conversation requires verified resolution"
+    fun owner(conversationId: ConversationId, agentId: AgentId): ActiveTurnCoordinator {
+        return kotlinx.atomicfu.locks.synchronized(lock) {
+            check(!closed) { "Active turn session retired" }
+            require(conversationId.value != com.letta.mobile.data.model.IdFormats.DEFAULT_CONVERSATION_ID) {
+                "Default conversation requires verified resolution"
+            }
+            val known = owners[conversationId]
+            require(known == null || known.state.value.agentId == agentId) { "Conversation belongs to another agent" }
+            owners.getOrPut(conversationId) { createOwner(conversationId, agentId) }
         }
-        val known = owners[conversationId]
-        require(known == null || known.state.value.agentId == agentId) { "Conversation belongs to another agent" }
-        owners.getOrPut(conversationId) { createOwner(conversationId, agentId) }
     }
 
     private fun createOwner(conversation: ConversationId, agent: AgentId): ActiveTurnCoordinator {
@@ -73,15 +75,6 @@ class ActiveTurnSession(
         while (true) {
             kotlinx.coroutines.delay(RECONCILE_INTERVAL_MS)
             reconcileIfActive(owner)
-        }
-    }
-
-    private suspend fun reconcileIfActive(owner: ActiveTurnCoordinator) {
-        val turn = owner.state.value
-        if (turn.phase == ActiveTurnPhase.Idle) return
-        runCatching { reconcile(turn.conversationId, turn.agentId) }.onFailure {
-            // Unavailable reads are not evidence of a terminal.
-            if (it is kotlinx.coroutines.CancellationException) throw it
         }
     }
 
@@ -112,25 +105,34 @@ class ActiveTurnSession(
     }
 
     /** Uncorrelated frames never select a current identity on callback arrival. */
-    fun onEvent(event: ActiveTurnRuntimeEvent) = kotlinx.atomicfu.locks.synchronized(lock) {
-        val (conversationId, agentId, payload) = event
-        if (closed || conversationId in deleted ||
-            conversationId.value == com.letta.mobile.data.model.IdFormats.DEFAULT_CONVERSATION_ID ||
-            owners[conversationId]?.state?.value?.agentId?.let { it != agentId } == true) return
-        val run = event.runId?.value?.takeIf(String::isNotBlank) ?: return
-        // The runtime draft exposes one run identity per turn; keep its namespace distinct from local sends.
-        val turn = observedAliases[conversationId to run]
-            ?: event.serverRunId?.value?.let { observedAliases[conversationId to it] }
-            ?: ActiveTurnIdentity(run, "runtime:$run")
-        observedAliases.getOrPut(conversationId to run) { turn }
-        val owner = owner(conversationId, agentId)
-        event.serverRunId?.value?.takeIf(String::isNotBlank)?.let {
-            observedAliases.getOrPut(conversationId to it) { turn }
-            serverRuns.update { runs -> runs + ((conversationId to turn) to it) }
+    fun onEvent(event: ActiveTurnRuntimeEvent) {
+        kotlinx.atomicfu.locks.synchronized(lock) {
+            val (conversationId, agentId, payload) = event
+            if (!acceptsEventScope(event)) return
+            val run = event.runId?.value?.takeIf(String::isNotBlank) ?: return
+            // The runtime draft exposes one run identity per turn; keep its namespace distinct from local sends.
+            val turn = observedAliases[conversationId to run]
+                ?: event.serverRunId?.value?.let { observedAliases[conversationId to it] }
+                ?: ActiveTurnIdentity(run, "runtime:$run")
+            observedAliases.getOrPut(conversationId to run) { turn }
+            val owner = owner(conversationId, agentId)
+            event.serverRunId?.value?.takeIf(String::isNotBlank)?.let {
+                observedAliases.getOrPut(conversationId to it) { turn }
+                serverRuns.update { runs -> runs + ((conversationId to turn) to it) }
+            }
+            if (!acceptsProgress(owner.state.value, turn, payload)) return
+            applyEvent(event, turn, owner)
+            refresh(owner)
         }
-        if (!acceptsProgress(owner.state.value, turn, payload)) return
-        applyEvent(event, turn, owner)
-        refresh(owner)
+    }
+
+    private fun acceptsEventScope(event: ActiveTurnRuntimeEvent): Boolean {
+        return when {
+            closed -> false
+            event.conversationId in deleted -> false
+            event.conversationId.value == com.letta.mobile.data.model.IdFormats.DEFAULT_CONVERSATION_ID -> false
+            else -> owners[event.conversationId]?.state?.value?.agentId?.let { it == event.agentId } ?: true
+        }
     }
 
     private fun applyEvent(event: ActiveTurnRuntimeEvent, turn: ActiveTurnIdentity, owner: ActiveTurnCoordinator) {
@@ -185,27 +187,15 @@ class ActiveTurnSession(
         if (kotlinx.atomicfu.locks.synchronized(lock) { conversation in deleted }) return
         val owner = owner(conversation, agent)
         val captured = owner.state.value
-        val identity = captured.runId?.let { run -> captured.turnId?.let { ActiveTurnIdentity(run, it) } }
+        val identity = captured.identity()
         val server = kotlinx.atomicfu.locks.synchronized(lock) {
             identity?.takeUnless { captured.phase == ActiveTurnPhase.Idle }?.let { serverRuns.value[conversation to it] }
-        }
+        }?.let(::RunId)
         if (captured.phase != ActiveTurnPhase.Idle && server == null) return
-        val runs = read(conversation, agent, server?.let { RunId(it) })
+        val runs = read(conversation, agent, server)
         kotlinx.atomicfu.locks.synchronized(lock) {
-            // A terminal or replacement arriving while the read was in flight always wins.
-            if (owner.state.value != captured) return
-            runs.filter { it.agentId == agent.value && it.conversationId == conversation.value }.forEach { run ->
-                val status = when (run.status) {
-                    "completed" -> RuntimeRunStatus.Completed
-                    "failed" -> RuntimeRunStatus.Failed
-                    "cancelled", "canceled" -> RuntimeRunStatus.Cancelled
-                    "running", "created" -> RuntimeRunStatus.Started
-                    else -> return@forEach
-                }
-                if (server != null && run.id != server) return@forEach
-                onEvent(ActiveTurnRuntimeEvent(conversation, agent, RuntimeEventPayload.RunLifecycleChanged(status),
-                    RunId(run.id), RunId(run.id)))
-            }
+            // Progress of the same turn cannot invalidate authoritative closure; replacement identity does.
+            if (owner.state.value.identity() == captured.identity()) applyReconciledRuns(captured, server, runs)
         }
     }
 
@@ -243,11 +233,13 @@ data class ActiveTurnRuntimeEvent(
     val serverRunId: RunId? = null,
 )
 
-private fun acceptsProgress(current: ActiveTurnState, turn: ActiveTurnIdentity, payload: RuntimeEventPayload): Boolean =
-        payload is RuntimeEventPayload.RunLifecycleChanged || matchesActiveTurn(current, turn)
+private fun acceptsProgress(current: ActiveTurnState, turn: ActiveTurnIdentity, payload: RuntimeEventPayload): Boolean {
+    return payload is RuntimeEventPayload.RunLifecycleChanged || matchesActiveTurn(current, turn)
+}
 
-private fun matchesActiveTurn(current: ActiveTurnState, turn: ActiveTurnIdentity): Boolean =
-        current.runId == turn.runId && current.turnId == turn.turnId && current.startedAtEpochMs != null
+private fun matchesActiveTurn(current: ActiveTurnState, turn: ActiveTurnIdentity): Boolean {
+    return current.startedAtEpochMs != null && current.identity() == turn
+}
 
 
 private fun ActiveTurnSession.lifecycle(event: ActiveTurnRuntimeEvent, turn: ActiveTurnIdentity, status: RuntimeRunStatus) {

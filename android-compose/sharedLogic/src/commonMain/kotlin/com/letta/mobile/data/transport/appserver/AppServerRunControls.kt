@@ -32,8 +32,8 @@ class AppServerRunControls(
     private val clientLabel: String = "web client",
 ) {
     /** Asks the server to abort the conversation's active run; true when it confirmed the abort. */
-    suspend fun stop(agent: AgentId, conversation: ConversationId): Boolean {
-        val response = engine.abort(agent.value, conversation.value, runId = null)
+    suspend fun stop(agent: AgentId, conversation: ConversationId, run: com.letta.mobile.runtime.RunId? = null): Boolean {
+        val response = engine.abort(agent.value, conversation.value, runId = run?.value)
         return response.success && response.aborted
     }
 

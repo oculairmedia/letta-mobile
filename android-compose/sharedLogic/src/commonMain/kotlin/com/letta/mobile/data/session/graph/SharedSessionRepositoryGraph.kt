@@ -84,7 +84,11 @@ class SharedSessionRepositoryGraph(
 
     override val agentRepository: IAgentRepository = host.agentRepository
     override val blockRepository: IAgentBlockRepository? = host.blockRepository
-    override val conversationRepository: IConversationRepository = object : IConversationRepository by host.conversationRepository {
+    override val conversationRepository: IConversationRepository = object : IConversationRepository by host.conversationRepository,
+        com.letta.mobile.data.session.BackendScopedCache {
+        override suspend fun clearForBackendSwitch() {
+            (host.conversationRepository as? com.letta.mobile.data.session.BackendScopedCache)?.clearForBackendSwitch()
+        }
         override suspend fun deleteConversation(
             id: com.letta.mobile.data.model.ConversationId,
             agentId: com.letta.mobile.data.model.AgentId,

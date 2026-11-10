@@ -83,12 +83,12 @@ class ConversationRunPhasePublisher(
     }
 
     private fun publishSubagentActivity(scope: RunScope, activity: SubagentActivity) {
-        val owner = registry.ownerOf(com.letta.mobile.data.model.ConversationId(scope.conversationId))
-        val turn = owner?.state?.value
-        val identity = turn?.runId?.let { run -> turn.turnId?.let { ActiveTurnIdentity(run, it) } }
-        if (owner != null && identity != null && turn.agentId.value == scope.agentId) {
-            owner.progress(identity, subagentCount = activity.running)
-        }
+        registry.ownerOf(com.letta.mobile.data.model.ConversationId(scope.conversationId))
+            ?.takeIf { it.state.value.agentId.value == scope.agentId }
+            ?.let { owner ->
+                val identity = owner.state.value.identity() ?: return@let
+                owner.progress(identity, subagentCount = activity.running)
+            }
         update(scope) { RunPhaseReducer.withSubagents(it, activity, now()) }
     }
 

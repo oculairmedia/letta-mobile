@@ -12,6 +12,7 @@ import com.letta.mobile.data.presence.ActiveTurnTerminalKind
 import com.letta.mobile.runtime.RunId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -22,9 +23,10 @@ import com.letta.mobile.data.flow.DerivedStateFlow
 internal class DesktopActiveTurnBinding(
     private val scope: CoroutineScope,
     private val registry: com.letta.mobile.data.presence.ConversationRunRegistry?,
+    private val thinking: StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
     onLocalClear: (String) -> Unit,
 ) : AutoCloseable {
-    constructor(scope: CoroutineScope, onLocalClear: (String) -> Unit) : this(scope, null, onLocalClear)
+    constructor(scope: CoroutineScope, onLocalClear: (String) -> Unit) : this(scope, null, onLocalClear = onLocalClear)
     private val sessions = kotlinx.coroutines.flow.MutableStateFlow<ActiveTurnSession?>(null)
     private var sessionJob: kotlinx.coroutines.Job? = null
     val hasSession get() = sessions.value != null
@@ -40,11 +42,25 @@ internal class DesktopActiveTurnBinding(
     ) {
         session.states.value.mapKeys { it.key.value }
     }
-    val thinkingConversationId = DerivedStateFlow(states.map { turns ->
-        turns.values.firstOrNull { it.phase == com.letta.mobile.data.presence.ActiveTurnPhase.Thinking }?.conversationId?.value
-    }) { states.value.values.firstOrNull {
-        it.phase == com.letta.mobile.data.presence.ActiveTurnPhase.Thinking
-    }?.conversationId?.value }
+    val streamingConversationId = foregroundConversation { it.phase != com.letta.mobile.data.presence.ActiveTurnPhase.Idle }
+    val cancellingConversationId = foregroundConversation { it.phase == com.letta.mobile.data.presence.ActiveTurnPhase.Cancelling }
+    private fun foregroundConversation(
+        accept: (com.letta.mobile.data.presence.ActiveTurnState) -> Boolean,
+    ): StateFlow<String?> {
+        return DerivedStateFlow(states.map { turns -> turns.values.firstOrNull(accept)?.conversationId?.value }) {
+            states.value.values.firstOrNull(accept)?.conversationId?.value
+        }
+    }
+    val thinkingConversationId = DerivedStateFlow(combine(states, thinking) { turns, candidate ->
+        projectThinking(turns, candidate?.let(::ConversationId))
+    }) { projectThinking(states.value, thinking.value?.let(::ConversationId)) }
+    private fun projectThinking(
+        turns: Map<String, com.letta.mobile.data.presence.ActiveTurnState>,
+        candidate: ConversationId?,
+    ): String? {
+        if (!hasSession) return candidate?.value
+        return candidate?.takeIf { turns[it.value]?.phase == com.letta.mobile.data.presence.ActiveTurnPhase.Thinking }?.value
+    }
     private val clearObserver = scope.launch {
         var previous = emptyMap<String, com.letta.mobile.data.presence.ActiveTurnState>()
         states.collect { turns ->
@@ -56,18 +72,22 @@ internal class DesktopActiveTurnBinding(
             previous = turns
         }
     }
-    fun owner(conversationId: String, agentId: String): ActiveTurnCoordinator =
-        session.owner(ConversationId(conversationId), AgentId(agentId))
-    fun start(conversationId: String, agentId: String, turn: ActiveTurnIdentity) =
-        session.start(ConversationId(conversationId), AgentId(agentId), turn)
-    fun terminate(conversationId: String, turn: ActiveTurnIdentity, kind: ActiveTurnTerminalKind) =
-        session.terminate(ConversationId(conversationId), turn, kind)
+    fun owner(conversationId: ConversationId, agentId: AgentId): ActiveTurnCoordinator =
+        session.owner(conversationId, agentId)
+    fun owner(conversation: DesktopConversationSummary): ActiveTurnCoordinator? {
+        val agent = conversation.agentId ?: return null
+        return owner(ConversationId(conversation.id), AgentId(agent))
+    }
+    fun start(conversationId: ConversationId, agentId: AgentId, turn: ActiveTurnIdentity) =
+        session.start(conversationId, agentId, turn)
+    fun terminate(conversationId: ConversationId, turn: ActiveTurnIdentity, kind: ActiveTurnTerminalKind) =
+        session.terminate(conversationId, turn, kind)
     fun onEvent(event: ScopedDesktopRuntimeEvent) = session.onEvent(ActiveTurnRuntimeEvent(
         ConversationId(event.conversationId), AgentId(event.agentId), event.payload,
         event.runId?.let(::RunId), event.serverRunId?.let(::RunId),
     ))
-    suspend fun serverRunId(conversationId: String, turn: ActiveTurnIdentity): String? =
-        session.serverRunId(ConversationId(conversationId), turn)
+    suspend fun serverRunId(conversationId: ConversationId, turn: ActiveTurnIdentity): String? =
+        session.serverRunId(conversationId, turn)
     suspend fun reconcile(conversation: DesktopConversationSummary) {
         val agent = conversation.agentId ?: return
         session.reconcile(ConversationId(conversation.id), AgentId(agent))
@@ -90,7 +110,9 @@ internal class DesktopActiveTurnBinding(
             else -> aborter?.abortConversationTurn(conversation.value) ?: false
         }
     }
-    fun delete(conversation: ConversationId) = session.delete(conversation)
+    fun delete(conversation: ConversationId, behavior: com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior) {
+        if (behavior == com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior.Permanent) session.delete(conversation)
+    }
     override fun close() {
         sessionJob?.cancel()
         clearObserver.cancel()

@@ -137,14 +137,10 @@ class IrohChannelTransport(
     private val transportScope: CoroutineScope =
         CoroutineScope((scope?.coroutineContext ?: Dispatchers.IO) + transportJob)
 
-    private val turnEvents = com.letta.mobile.data.transport.api.ChannelTurnEventTap(
+    private val turnEvents = com.letta.mobile.data.transport.api.ChannelTurnEventTap.fromEngine(
         logicalRun = { frame -> RunId(turnRegistry.getActiveTurn(IrohConversationId(frame.conversationId))
             ?.takeIf { it.turnId == frame.turnId }?.logicalRunId ?: frame.turnId) },
-        abort = { agent, conversation, run ->
-            val engine = supervisor.ready().turnEngine
-            val response = engine?.abort(agent.value, conversation.value, run.value)
-            response?.let { it.success && it.aborted } == true
-        },
+        engine = { supervisor.ready().turnEngine },
     )
     override val activeTurnEvents: com.letta.mobile.data.transport.api.RuntimeTurnEventSource get() = turnEvents
 
@@ -1115,8 +1111,6 @@ class IrohChannelTransport(
         onFailure = onFailure,
     )
 
-    private fun subagentListFailure(failure: ScopedRpcFailure) = IrohTransportSupport.subagentListFailure(failure)
-    private fun subagentTodosFailure(failure: ScopedRpcFailure) = IrohTransportSupport.subagentTodosFailure(failure)
     private fun cronListFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronListFailure(failure)
     private fun cronAddFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronAddFailure(failure)
     private fun cronGetFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronGetFailure(failure)

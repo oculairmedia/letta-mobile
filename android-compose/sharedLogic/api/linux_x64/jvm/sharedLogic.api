@@ -42442,6 +42442,10 @@ public final class com/letta/mobile/data/presence/ActiveTurnCoordinator {
 	public final fun terminate (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;)V
 }
 
+public final class com/letta/mobile/data/presence/ActiveTurnCoordinatorKt {
+	public static final fun identity (Lcom/letta/mobile/data/presence/ActiveTurnState;)Lcom/letta/mobile/data/presence/ActiveTurnIdentity;
+}
+
 public final class com/letta/mobile/data/presence/ActiveTurnIdentity {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -60444,11 +60448,16 @@ public final class com/letta/mobile/data/transport/api/AppServerClientChannel : 
 }
 
 public final class com/letta/mobile/data/transport/api/ChannelTurnEventTap : com/letta/mobile/data/transport/api/RuntimeTurnEventSource {
+	public static final field Companion Lcom/letta/mobile/data/transport/api/ChannelTurnEventTap$Companion;
 	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;)V
 	public fun abortExact-DITey8U (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun observeTurns (Lkotlin/jvm/functions/Function3;)Lkotlin/jvm/functions/Function0;
 	public final fun publish (Lcom/letta/mobile/data/transport/ServerFrame;)V
 	public final fun publishDraft-Ool3YKQ (Lcom/letta/mobile/runtime/RuntimeEventDraft;Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/transport/api/ChannelTurnEventTap$Companion {
+	public final fun fromEngine (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/transport/api/ChannelTurnEventTap;
 }
 
 public abstract interface class com/letta/mobile/data/transport/api/CronControlTransport {
@@ -66744,7 +66753,8 @@ public final class com/letta/mobile/data/transport/appserver/AppServerRunControl
 	public fun <init> (Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Ljava/lang/String;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun answer (Lcom/letta/mobile/data/transport/appserver/AppServerApprovalAnswer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun stop-eAxutHE (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun stop-yUha8Cg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun stop-yUha8Cg$default (Lcom/letta/mobile/data/transport/appserver/AppServerRunControls;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/appserver/AppServerRuntimeScope {

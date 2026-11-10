@@ -247,7 +247,8 @@ private class ActiveTurnRequests {
 
 private fun ActiveTurnState.matches(turn: ActiveTurnIdentity): Boolean = runId == turn.runId && turnId == turn.turnId
 
-private fun ActiveTurnState.identity(): ActiveTurnIdentity? {
+/** Exact captured identity, absent only before a turn has been established. */
+fun ActiveTurnState.identity(): ActiveTurnIdentity? {
     val run = runId ?: return null
     val turn = turnId ?: return null
     return ActiveTurnIdentity(run, turn)

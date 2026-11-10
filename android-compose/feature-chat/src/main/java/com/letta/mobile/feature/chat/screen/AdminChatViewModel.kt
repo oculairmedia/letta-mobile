@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
+import com.letta.mobile.data.presence.identity
+
 import com.letta.mobile.util.attr
 import com.letta.mobile.ui.shell.nowactive.toNowActiveStatus
 import com.letta.mobile.data.context.ContextReadingKey
@@ -988,12 +990,10 @@ internal class AdminChatViewModel @Inject constructor(
         if (replacingSendRuntime) return
         val binding = activeTurnPresentation.value
         val owner = binding?.activeTurnCoordinator
-        val turn = owner?.state?.value
-        val run = turn?.runId; val turnKey = turn?.turnId
-        if (owner != null && run != null && turnKey != null) {
-            val identity = com.letta.mobile.data.presence.ActiveTurnIdentity(run, turnKey)
-            val abort = binding.abortActiveTurn
-            owner.interrupt(identity, java.util.UUID.randomUUID().toString()) { abort?.invoke(identity) ?: false }
+        val abort = binding?.abortActiveTurn
+        owner?.let { coordinator ->
+            val identity = coordinator.state.value.identity() ?: return@let
+            coordinator.interrupt(identity, java.util.UUID.randomUUID().toString()) { abort?.invoke(identity) ?: false }
             return
         }
         runPhases.markInterrupting(RunScope(currentRunKey(), agentId.value))

@@ -85,7 +85,7 @@ class SharedNavDrawerBindingTest {
         advanceUntilIdle()
         assertEquals(ShellArchiveFilter.Archived, vm.archiveFilter.value)
         coVerify { conversations.setConversationArchived("c1", "agent-1", true) }
-        coVerify { conversations.deleteConversation("c2", "agent-1") }
+        coVerify { conversations.deleteConversation(ConversationId("c2"), AgentId("agent-1")) }
     }
 
     @Test

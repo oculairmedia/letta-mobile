@@ -13,6 +13,7 @@ class ChannelTurnEventTap(
     >()
     private val turnScopes = java.util.concurrent.ConcurrentHashMap<String, com.letta.mobile.runtime.RuntimeEventDraft>()
 
+    /** Register a session observer and return its independent detach action. */
     override fun observeTurns(
         observer: (com.letta.mobile.runtime.RuntimeEventDraft, com.letta.mobile.runtime.RunId,
             com.letta.mobile.runtime.RunId?) -> Unit,
@@ -21,6 +22,7 @@ class ChannelTurnEventTap(
         return { observers.remove(observer) }
     }
 
+    /** Abort only the supplied agent, conversation, and server run when the engine accepts it. */
     override suspend fun abortExact(
         agent: com.letta.mobile.data.model.AgentId,
         conversation: com.letta.mobile.runtime.ConversationId,
@@ -66,4 +68,21 @@ class ChannelTurnEventTap(
         val server = draft.runId?.takeUnless { it.value.startsWith("iroh-run-") }
         observers.forEach { it(draft, logical, server) }
     }
+    /** Engine-backed tap construction for channel hosts. */
+    companion object {
+        /** Bind the tap to the currently captured engine while retaining exact-run acceptance checks. */
+        fun fromEngine(
+            logicalRun: (ServerFrame.TurnStarted) -> com.letta.mobile.runtime.RunId,
+            engine: suspend () -> com.letta.mobile.data.runtime.AppServerTurnEngine?,
+        ): ChannelTurnEventTap {
+            return ChannelTurnEventTap(logicalRun, abort = { agent, conversation, run ->
+                engine()?.let { current ->
+                    com.letta.mobile.data.transport.appserver.AppServerRunControls(current).stop(
+                        agent, com.letta.mobile.data.model.ConversationId(conversation.value), run,
+                    )
+                } ?: false
+            })
+        }
+    }
+
 }

@@ -164,6 +164,28 @@ class ActiveTurnSessionTest {
         session.close()
     }
 
+    @Test
+    fun terminalReadbackClosesSameTurnAfterProgressChanges() = runTest {
+        val response = CompletableDeferred<List<Run>>()
+        val session = ActiveTurnSession(backgroundScope, readRuns = { c, a, run ->
+            assertEquals(conversation, c)
+            assertEquals(agent, a)
+            assertEquals(RunId("server-run"), run)
+            response.await()
+        })
+        session.onEvent(ActiveTurnRuntimeEvent(conversation, agent, draft(RuntimeRunStatus.Started).payload,
+            RunId("command"), RunId("server-run")))
+        val query = launch { session.reconcile(conversation, agent) }
+        runCurrent()
+        val owner = session.owner(conversation, agent)
+        owner.progress(ActiveTurnIdentity("command", "runtime:command"), mapOf("call" to "Bash"))
+        response.complete(listOf(Run("server-run", agent.value, conversationId = conversation.value, status = "completed")))
+        query.join()
+        assertEquals(ActiveTurnPhase.Idle, owner.state.value.phase,
+            "Authoritative closure of the captured turn outranks its intervening progress")
+        session.close()
+    }
+
     private fun draft(status: RuntimeRunStatus) = RuntimeEventDraft(
         BackendId("backend"), RuntimeId("runtime"), agent,
         com.letta.mobile.runtime.ConversationId(conversation.value), RunId("server-run"),

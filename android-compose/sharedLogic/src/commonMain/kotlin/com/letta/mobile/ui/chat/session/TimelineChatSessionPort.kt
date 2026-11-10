@@ -149,11 +149,15 @@ class TimelineChatSessionPort(
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
     /** Stop's lifecycle, the same shared state machine Android and desktop run. */
-    private val interrupter = if (options.activeTurnCoordinator == null) ChatRunInterrupter(
-        scope = scope,
-        host = TimelineRunStopHost(updateRun = ::updateRun, onClearedLocally = ::watchClearedRunEnd),
-        telemetry = ChatRunInterruptTelemetry(TIMELINE_STOP_TELEMETRY_TAG),
-    ) else null
+    private val interrupter = fallbackInterrupter()
+    private fun fallbackInterrupter(): ChatRunInterrupter<String>? {
+        if (options.activeTurnCoordinator != null) return null
+        return ChatRunInterrupter(
+            scope = scope,
+            host = TimelineRunStopHost(updateRun = ::updateRun, onClearedLocally = ::watchClearedRunEnd),
+            telemetry = ChatRunInterruptTelemetry(TIMELINE_STOP_TELEMETRY_TAG),
+        )
+    }
     private var clearedRunWatch: Job? = null
 
     /** What the host's extension points add, read the way desktop's port reads them. */
