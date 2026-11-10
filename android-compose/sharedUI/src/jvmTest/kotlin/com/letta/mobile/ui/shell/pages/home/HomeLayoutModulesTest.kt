@@ -14,21 +14,18 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.letta.mobile.data.home.FleetAgentStat
 import com.letta.mobile.data.home.FleetOverview
 import com.letta.mobile.data.home.FleetRecentConversation
-import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.FleetSummary
-import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageReducer
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStats
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
-import com.letta.mobile.data.shell.layout.HomeViews
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
-import com.letta.mobile.ui.shell.modules.LocalShellLayout
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,15 +64,16 @@ class HomeLayoutModulesTest {
     private fun withHomeLane(views: List<RuntimeViewId>): ShellLayoutConfig =
         ShellLayoutConfig.Default.copy(lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.HOME to views.map { ModuleSlot(it) }))
 
-    /** Home at [width] dp; a null [config] leaves the layout local unprovided, as outside a workspace. */
+    /** Home at [width] dp; a null [config] leaves the home lane unprovided, as outside a workspace. */
     private fun home(width: Int, config: ShellLayoutConfig?, check: ComposeUiTest.() -> Unit) =
         runDesktopComposeUiTest(width = width, height = HEIGHT) {
             setContent {
                 SharedMaterialTheme {
                     ProvideLettaHost(LettaHost.Pointer) {
                         Surface(Modifier.fillMaxSize()) {
-                            CompositionLocalProvider(LocalShellLayout provides (config ?: LocalShellLayout.current)) {
-                                HomePage(state = state(), callbacks = HomePageCallbacks(NoActions, navigation))
+                            val lane = config?.homeLane()?.map { it.view } ?: LocalHomeLane.current
+                            CompositionLocalProvider(LocalHomeLane provides lane) {
+                                HomePage(state = state(), callbacks = InertHomeCallbacks)
                             }
                         }
                     }
@@ -196,19 +194,6 @@ class HomeLayoutModulesTest {
             onNodeWithTag(HomePageTags.PAGE).assertExists()
             assertAbsent(HomePageTags.COMPOSER, HomePageTags.RECENTS, HomePageTags.STATS_STRIP)
         }
-    }
-
-    private val navigation = HomePageNavigation(onSubmitPrompt = {}, onOpenConversation = {}, onOpenAgent = {}, onOpenShortcut = {})
-
-    private object NoActions : HomePageActions {
-        override fun loadIfStale() = Unit
-        override fun refresh() = Unit
-        override fun updateSearchQuery(query: String) = Unit
-        override fun clearSearch() = Unit
-        override fun selectSort(key: FleetSortKey) = Unit
-        override fun reorderPins(keys: List<String>) = Unit
-        override fun setShortcutPinned(shortcut: HomeShortcut, pinned: Boolean) = Unit
-        override fun setAgentPinned(agentId: String, pinned: Boolean) = Unit
     }
 
     private companion object {

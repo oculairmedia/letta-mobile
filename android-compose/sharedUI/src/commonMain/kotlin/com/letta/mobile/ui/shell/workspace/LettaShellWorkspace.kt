@@ -66,7 +66,7 @@ import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.shell.ShellNavDrawerSheet
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.railLightDismiss
-import com.letta.mobile.ui.shell.modules.LocalShellLayout
+import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
 import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
 import com.letta.mobile.ui.a11y.accessibilityTraversal
@@ -122,7 +122,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                             CompositionLocalProvider(
                                 LocalConversationLanes provides host.conversationLanes,
                                 LocalConversationPurposes provides purposes,
-                                LocalShellLayout provides state.layout.lanes,
+                                LocalHomeLane provides state.layout.lanes.homeLane().map { it.view },
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {

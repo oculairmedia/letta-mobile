@@ -24,15 +24,15 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
 import com.letta.mobile.data.desktopshell.ShellLayoutStore
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
-import com.letta.mobile.data.shell.layout.HomeViews
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
-import com.letta.mobile.ui.shell.modules.LocalShellLayout
+import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
 import com.letta.mobile.ui.shell.modules.ShellModuleTags
 import com.letta.mobile.ui.shell.modules.ShellModuleView
 import com.letta.mobile.ui.shell.modules.ShellModules
@@ -74,14 +74,14 @@ class ShellWorkspaceLanesTest {
 
     private val withNotes = ShellModules(mapOf(NotesView to notesView))
 
-    /** The layout the page last read from the workspace it is drawn in. */
-    private var pageLayout: ShellLayoutConfig? = null
+    /** The home lane the page last read from the workspace it is drawn in. */
+    private var pageHomeLane: List<RuntimeViewId>? = null
 
     private val host = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
         slots = LettaShellWorkspaceSlots(
             main = { modifier ->
-                pageLayout = LocalShellLayout.current
+                pageHomeLane = LocalHomeLane.current
                 Box(modifier.testTag(Page))
             },
             agentCard = {},
@@ -279,7 +279,7 @@ class ShellWorkspaceLanesTest {
         listOf(360.dp, 1200.dp).forEach { width ->
             window(width, recentsOnly) {
                 waitForIdle()
-                assertEquals(recentsOnly, pageLayout, "the page sees the workspace layout at $width")
+                assertEquals(listOf(HomeViews.RECENTS), pageHomeLane, "the page sees the home lane of the workspace at $width")
             }
         }
     }

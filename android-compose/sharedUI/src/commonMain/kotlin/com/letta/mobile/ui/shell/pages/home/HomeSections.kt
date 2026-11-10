@@ -47,11 +47,10 @@ import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStatTile
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.model.view.RuntimeViewId
-import com.letta.mobile.data.shell.layout.HomeViews
-import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
@@ -59,10 +58,10 @@ import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Draws one Home section as list items for its [ModuleSlot] in the home lane. Sections stay lazy:
- * each emits keyed items into the page's list rather than drawing a composable of its own.
+ * Draws one Home section of the home lane as list items. Sections stay lazy: each emits keyed
+ * items into the page's list rather than drawing a composable of its own.
  */
-internal typealias HomeSectionView = LazyListScope.(page: HomePageScope, slot: ModuleSlot) -> Unit
+internal typealias HomeSectionView = LazyListScope.(page: HomePageScope) -> Unit
 
 /**
  * Home's sections by view. What needs the user first, then where they left off, then everything
@@ -73,13 +72,13 @@ internal typealias HomeSectionView = LazyListScope.(page: HomePageScope, slot: M
  * the list ([HomePage] does that while the lane holds it).
  */
 internal val homeSectionViews: Map<RuntimeViewId, HomeSectionView> = mapOf(
-    HomeViews.COMPOSER to section { page, _ -> if (page.wide) item { HomeComposer(page) } },
-    HomeViews.NOW to section { page, _ -> homeNowStrip(page) },
-    HomeViews.RECENTS to section { page, _ -> homeRecents(page) },
-    HomeViews.AGENTS to section { page, _ -> homeAgentAvatarRow(page) },
-    HomeViews.STATS to section { page, _ -> item(key = "stats-strip") { HomeStatsStrip(page) } },
-    HomeViews.PINNED to section { page, _ -> if (page.editingPins) homePinnedSection(page) else homePinnedShortcutRow(page) },
-    HomeViews.FLEET to section { page, _ -> if (page.wide) homeFleetSection(page) },
+    HomeViews.COMPOSER to section { page -> if (page.wide) item { HomeComposer(page) } },
+    HomeViews.NOW to section { page -> homeNowStrip(page) },
+    HomeViews.RECENTS to section { page -> homeRecents(page) },
+    HomeViews.AGENTS to section { page -> homeAgentAvatarRow(page) },
+    HomeViews.STATS to section { page -> item(key = "stats-strip") { HomeStatsStrip(page) } },
+    HomeViews.PINNED to section { page -> if (page.editingPins) homePinnedSection(page) else homePinnedShortcutRow(page) },
+    HomeViews.FLEET to section { page -> if (page.wide) homeFleetSection(page) },
 )
 
 private fun section(view: HomeSectionView): HomeSectionView = view
@@ -89,7 +88,7 @@ private fun section(view: HomeSectionView): HomeSectionView = view
  * so a layout naming one never breaks the page.
  */
 internal fun LazyListScope.homeSections(page: HomePageScope) {
-    page.lane.distinctBy { it.view }.forEach { slot -> homeSectionViews[slot.view]?.invoke(this, page, slot) }
+    page.lane.distinct().forEach { view -> homeSectionViews[view]?.invoke(this, page) }
 }
 
 // region Now

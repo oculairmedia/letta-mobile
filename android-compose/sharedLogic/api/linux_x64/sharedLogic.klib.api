@@ -71686,6 +71686,25 @@ final object com.letta.mobile.data.home/HomeUsageCalculator { // com.letta.mobil
     final fun calculate(kotlin.collections/List<com.letta.mobile.data.model/Step>, kotlin/Int = ...): com.letta.mobile.data.home/HomeUsageSummary // com.letta.mobile.data.home/HomeUsageCalculator.calculate|calculate(kotlin.collections.List<com.letta.mobile.data.model.Step>;kotlin.Int){}[0]
 }
 
+final object com.letta.mobile.data.home/HomeViews { // com.letta.mobile.data.home/HomeViews|null[0]
+    final val AGENTS // com.letta.mobile.data.home/HomeViews.AGENTS|{}AGENTS[0]
+        final fun <get-AGENTS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.AGENTS.<get-AGENTS>|<get-AGENTS>(){}[0]
+    final val COMPOSER // com.letta.mobile.data.home/HomeViews.COMPOSER|{}COMPOSER[0]
+        final fun <get-COMPOSER>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.COMPOSER.<get-COMPOSER>|<get-COMPOSER>(){}[0]
+    final val Default // com.letta.mobile.data.home/HomeViews.Default|{}Default[0]
+        final fun <get-Default>(): kotlin.collections/List<com.letta.mobile.data.model.view/RuntimeViewId> // com.letta.mobile.data.home/HomeViews.Default.<get-Default>|<get-Default>(){}[0]
+    final val FLEET // com.letta.mobile.data.home/HomeViews.FLEET|{}FLEET[0]
+        final fun <get-FLEET>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.FLEET.<get-FLEET>|<get-FLEET>(){}[0]
+    final val NOW // com.letta.mobile.data.home/HomeViews.NOW|{}NOW[0]
+        final fun <get-NOW>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.NOW.<get-NOW>|<get-NOW>(){}[0]
+    final val PINNED // com.letta.mobile.data.home/HomeViews.PINNED|{}PINNED[0]
+        final fun <get-PINNED>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.PINNED.<get-PINNED>|<get-PINNED>(){}[0]
+    final val RECENTS // com.letta.mobile.data.home/HomeViews.RECENTS|{}RECENTS[0]
+        final fun <get-RECENTS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.RECENTS.<get-RECENTS>|<get-RECENTS>(){}[0]
+    final val STATS // com.letta.mobile.data.home/HomeViews.STATS|{}STATS[0]
+        final fun <get-STATS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.home/HomeViews.STATS.<get-STATS>|<get-STATS>(){}[0]
+}
+
 final object com.letta.mobile.data.lens/WorkPlayLens { // com.letta.mobile.data.lens/WorkPlayLens|null[0]
     final fun agentNoun(com.letta.mobile.data.lens/WorkPlayMode): kotlin/String // com.letta.mobile.data.lens/WorkPlayLens.agentNoun|agentNoun(com.letta.mobile.data.lens.WorkPlayMode){}[0]
     final fun composerPlaceholder(com.letta.mobile.data.lens/WorkPlayMode, kotlin/String): kotlin/String // com.letta.mobile.data.lens/WorkPlayLens.composerPlaceholder|composerPlaceholder(com.letta.mobile.data.lens.WorkPlayMode;kotlin.String){}[0]
@@ -73104,23 +73123,6 @@ final object com.letta.mobile.data.serialization/LettaJson { // com.letta.mobile
 
 final object com.letta.mobile.data.session.graph/SharedSessionGraph { // com.letta.mobile.data.session.graph/SharedSessionGraph|null[0]
     final fun transportBound(com.letta.mobile.data.transport.api/IChannelTransport, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.context/ContextReadingSnapshots? = ..., com.letta.mobile.data.session.graph/SubagentListing = ...): com.letta.mobile.data.session.graph/TransportBoundSessionRepositories // com.letta.mobile.data.session.graph/SharedSessionGraph.transportBound|transportBound(com.letta.mobile.data.transport.api.IChannelTransport;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.context.ContextReadingSnapshots?;com.letta.mobile.data.session.graph.SubagentListing){}[0]
-}
-
-final object com.letta.mobile.data.shell.layout/HomeViews { // com.letta.mobile.data.shell.layout/HomeViews|null[0]
-    final val AGENTS // com.letta.mobile.data.shell.layout/HomeViews.AGENTS|{}AGENTS[0]
-        final fun <get-AGENTS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.AGENTS.<get-AGENTS>|<get-AGENTS>(){}[0]
-    final val COMPOSER // com.letta.mobile.data.shell.layout/HomeViews.COMPOSER|{}COMPOSER[0]
-        final fun <get-COMPOSER>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.COMPOSER.<get-COMPOSER>|<get-COMPOSER>(){}[0]
-    final val FLEET // com.letta.mobile.data.shell.layout/HomeViews.FLEET|{}FLEET[0]
-        final fun <get-FLEET>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.FLEET.<get-FLEET>|<get-FLEET>(){}[0]
-    final val NOW // com.letta.mobile.data.shell.layout/HomeViews.NOW|{}NOW[0]
-        final fun <get-NOW>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.NOW.<get-NOW>|<get-NOW>(){}[0]
-    final val PINNED // com.letta.mobile.data.shell.layout/HomeViews.PINNED|{}PINNED[0]
-        final fun <get-PINNED>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.PINNED.<get-PINNED>|<get-PINNED>(){}[0]
-    final val RECENTS // com.letta.mobile.data.shell.layout/HomeViews.RECENTS|{}RECENTS[0]
-        final fun <get-RECENTS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.RECENTS.<get-RECENTS>|<get-RECENTS>(){}[0]
-    final val STATS // com.letta.mobile.data.shell.layout/HomeViews.STATS|{}STATS[0]
-        final fun <get-STATS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/HomeViews.STATS.<get-STATS>|<get-STATS>(){}[0]
 }
 
 final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile.data.shell.layout/ShellLanes|null[0]

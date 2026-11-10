@@ -6,24 +6,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
-import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Draws one module at whatever size its place gives it; a view never knows where it sits. */
 typealias ShellModuleView = @Composable (slot: ModuleSlot, modifier: Modifier) -> Unit
-
-/**
- * The shell's layout config, provided by the workspace from its state's layout so a page drawn
- * inside it (Home's sections) reads the same stored config the lanes do. Outside a workspace it is
- * the default layout.
- */
-internal val LocalShellLayout = compositionLocalOf { ShellLayoutConfig.Default }
 
 object ShellModuleTags {
     /** A slot whose view no host supplies. */

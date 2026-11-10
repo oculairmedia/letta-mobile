@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout
 
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
 import kotlin.test.Test
 import kotlin.test.assertEquals

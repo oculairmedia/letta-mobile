@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,14 +30,19 @@ import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomeShortcut
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.data.shell.layout.HomeViews
-import com.letta.mobile.data.shell.layout.ModuleSlot
+import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.components.LettaRefreshable
-import com.letta.mobile.ui.shell.modules.LocalShellLayout
 import com.letta.mobile.ui.theme.LettaDimens
+
+/**
+ * The home lane's sections in order ([HomeViews]). The shell workspace provides it from its stored
+ * layout; outside a workspace it is every section in the default order.
+ */
+internal val LocalHomeLane = compositionLocalOf { HomeViews.Default }
 
 /**
  * The Home page shared by Android, desktop and web: the mobile dashboard
@@ -51,9 +57,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * chat bar. Either way the page leads with running work and recent conversations, then an agent
  * avatar row and a one-line stats strip ([homeSections]); counters never repeat.
  *
- * Which sections show, and their order, is the shell layout's home lane
- * ([com.letta.mobile.data.shell.layout.ShellLanes.HOME]), read from the workspace that draws this
- * page. The page frame keeps the header, the search results that replace the sections, refresh and
+ * Which sections show, and their order, is the shell layout's home lane, which the workspace that
+ * draws this page provides in [LocalHomeLane]. The page frame keeps the header, the search results that replace the sections, refresh and
  * the pinned-tile editor's state; a compact page docks the composer below the list whenever the
  * lane holds it, wherever the lane puts it.
  *
@@ -79,8 +84,7 @@ fun HomePage(
         return
     }
     var editingPins by remember { mutableStateOf(false) }
-    val layout = LocalShellLayout.current
-    val lane = remember(layout) { layout.homeLane() }
+    val lane = LocalHomeLane.current
     BoxWithConstraints(base) {
         val page = HomePageScope(
             state = state,
@@ -141,7 +145,7 @@ internal class HomePageScope(
     callbacks: HomePageCallbacks,
     val options: HomePageOptions,
     /** The home lane's sections in order ([homeSections] draws them). */
-    val lane: List<ModuleSlot>,
+    val lane: List<RuntimeViewId>,
     val wide: Boolean,
     val editingPins: Boolean,
     val onEditingPinsChange: (Boolean) -> Unit,
@@ -159,7 +163,7 @@ internal class HomePageScope(
 
     /** The lane holds the composer; a compact page docks it below the list. */
     val hasComposer: Boolean
-        get() = lane.any { it.view == HomeViews.COMPOSER }
+        get() = HomeViews.COMPOSER in lane
 
     fun orbIndex(agentId: String?): Int = agentId?.let { options.orbIndexByAgentId[it] } ?: 0
 

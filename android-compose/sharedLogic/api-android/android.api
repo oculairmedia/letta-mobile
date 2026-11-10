@@ -22081,6 +22081,18 @@ public final class com/letta/mobile/data/home/HomeUsageSummary {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/home/HomeViews {
+	public static final field INSTANCE Lcom/letta/mobile/data/home/HomeViews;
+	public final fun getAGENTS-p0dNODo ()Ljava/lang/String;
+	public final fun getCOMPOSER-p0dNODo ()Ljava/lang/String;
+	public final fun getDefault ()Ljava/util/List;
+	public final fun getFLEET-p0dNODo ()Ljava/lang/String;
+	public final fun getNOW-p0dNODo ()Ljava/lang/String;
+	public final fun getPINNED-p0dNODo ()Ljava/lang/String;
+	public final fun getRECENTS-p0dNODo ()Ljava/lang/String;
+	public final fun getSTATS-p0dNODo ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/home/ModelTokenUsage {
 	public fun <init> (Ljava/lang/String;II)V
 	public final fun component1 ()Ljava/lang/String;
@@ -49216,17 +49228,6 @@ public final class com/letta/mobile/data/shell/ShellWorkspaceState {
 	public final fun snapshot ()Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;
 	public final fun snapshotJson ()Ljava/lang/String;
 	public final fun snapshotOrPending ()Lcom/letta/mobile/data/shell/CurrentFocusSnapshot;
-}
-
-public final class com/letta/mobile/data/shell/layout/HomeViews {
-	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/HomeViews;
-	public final fun getAGENTS-p0dNODo ()Ljava/lang/String;
-	public final fun getCOMPOSER-p0dNODo ()Ljava/lang/String;
-	public final fun getFLEET-p0dNODo ()Ljava/lang/String;
-	public final fun getNOW-p0dNODo ()Ljava/lang/String;
-	public final fun getPINNED-p0dNODo ()Ljava/lang/String;
-	public final fun getRECENTS-p0dNODo ()Ljava/lang/String;
-	public final fun getSTATS-p0dNODo ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/shell/layout/ModuleSlot {

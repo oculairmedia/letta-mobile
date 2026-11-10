@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout
 
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.Serializable
@@ -37,34 +38,6 @@ object ShellViews {
 
     /** The host's side pane (the desktop's background tasks). */
     val SIDE_PANE = RuntimeViewId("shell.side-pane")
-}
-
-/**
- * The Home page's sections, each a view the [ShellLanes.HOME] lane can hold. The lane's order is
- * the order on a wide page; a compact page keeps the composer docked below the list wherever the
- * lane puts it, and leaves the fleet table out.
- */
-object HomeViews {
-    /** The quick-chat composer. */
-    val COMPOSER = RuntimeViewId("home.composer")
-
-    /** The one-line strip of agents running now (only while something runs). */
-    val NOW = RuntimeViewId("home.now")
-
-    /** The recent conversations, grouped by day. */
-    val RECENTS = RuntimeViewId("home.recents")
-
-    /** The agents as a row of avatars, pinned first. */
-    val AGENTS = RuntimeViewId("home.agents")
-
-    /** The one-line strip of backend counters. */
-    val STATS = RuntimeViewId("home.stats")
-
-    /** The pinned shortcuts, or the pinned-tile editor while it is open. */
-    val PINNED = RuntimeViewId("home.pinned")
-
-    /** The sortable table of every agent (wide pages only). */
-    val FLEET = RuntimeViewId("home.fleet")
 }
 
 /**
@@ -138,15 +111,7 @@ data class ShellLayoutConfig(
         private val DefaultModules: List<DefaultModule> = listOf(
             DefaultModule(ShellLanes.MAIN, ShellViews.PAGE, since = 1),
             DefaultModule(ShellLanes.SIDE, ShellViews.SIDE_PANE, since = 1),
-        ) + listOf(
-            HomeViews.COMPOSER,
-            HomeViews.NOW,
-            HomeViews.RECENTS,
-            HomeViews.AGENTS,
-            HomeViews.STATS,
-            HomeViews.PINNED,
-            HomeViews.FLEET,
-        ).map { DefaultModule(ShellLanes.HOME, it, since = 2) }
+        ) + HomeViews.Default.map { DefaultModule(ShellLanes.HOME, it, since = 2) }
 
         /**
          * The shell as it was before lanes were configurable: the page, then the host's side pane,
