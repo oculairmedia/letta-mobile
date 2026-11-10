@@ -54,7 +54,7 @@ class MeridianToolsEndpoint(
     suspend fun start(scope: CoroutineScope): Job? {
         if (!config.enabled) return null
         val listener = withContext(Dispatchers.IO) { bind() } ?: return null
-        val liveCalls = MeridianLiveCalls(nowMs, newToken = { newToken() })
+        val liveCalls = MeridianLiveCalls(nowMs, newToken = { newToken() }, log = log)
         val service = MeridianToolsService(router(), MeridianCallerBinder(config.binding, liveCalls), listener.token)
         scope.launch { frames.collect(liveCalls::observe) }
         log(

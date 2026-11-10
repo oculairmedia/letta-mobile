@@ -30,12 +30,17 @@ data class MeridianLiveCall(
  * An entry, and its token, ends with its call (`client_tool_end`, the tool return, or the turn's
  * end), and in any case after [maxAgeMs], so a lost end frame cannot keep a token alive. [nowMs] is
  * a monotonic clock; [newToken] makes an unguessable token (the wrapper's SecureRandom).
+ *
+ * Every step goes to [log] as one `[meridian-tools]` line (a call seen starting or ending, a token
+ * issued, refused or claimed), never the token itself. A refusal carries what this host has seen so
+ * far, so "the frames never arrive" can be told from "they arrive but none is a `meridian` shell call".
  */
 class MeridianLiveCalls(
     private val nowMs: () -> Long,
     private val newToken: () -> String,
     private val maxAgeMs: Long = DEFAULT_MAX_AGE_MS,
     private val maxTracked: Int = DEFAULT_MAX_TRACKED,
+    private val log: (String) -> Unit = {},
 ) {
     private data class Entry(
         val scope: AppServerRuntimeScope,
@@ -50,13 +55,19 @@ class MeridianLiveCalls(
     /** Bumped on every start, so [issueToken] can wait for a start frame still in flight. */
     private val starts = MutableStateFlow(0L)
 
+    /** What this host has seen since it started, for the refusal logs. */
+    private val seen = MeridianFramesSeen()
+
     suspend fun observe(received: AppServerReceivedFrame) {
-        val signal = MeridianShellCallSignal.of(received) ?: return
+        val startedTool = MeridianShellCallSignal.startedToolName(received)
+        val signal = MeridianShellCallSignal.of(received)
         mutex.withLock {
+            seen.frame(startedTool)
             when (signal) {
                 is MeridianShellCallSignal.Started -> start(signal).also { starts.value += 1 }
-                is MeridianShellCallSignal.Ended -> calls.remove(signal.toolCallId)
+                is MeridianShellCallSignal.Ended -> end(signal.toolCallId)
                 is MeridianShellCallSignal.TurnEnded -> calls.entries.removeAll { it.value.scope.sameRuntime(signal.scope) }
+                null -> Unit
             }
         }
     }
@@ -68,21 +79,35 @@ class MeridianLiveCalls(
      * waits up to [waitMs] for it.
      */
     suspend fun issueToken(toolCallId: String, waitMs: Long = DEFAULT_ISSUE_WAIT_MS): String? {
-        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return null
+        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(toolCallId, "call_start_not_seen")
         return mutex.withLock {
             expire()
-            val entry = calls[toolCallId]?.takeIf { it.token == null } ?: return@withLock null
+            val entry = calls[toolCallId]?.takeIf { it.token == null } ?: return@withLock refused(toolCallId, "token_already_issued")
+            log("$TAG token.issued toolCallId=$toolCallId conversationId=${entry.scope.conversationId}")
             newToken().also { calls[toolCallId] = entry.copy(token = it) }
         }
+    }
+
+    /** Logs why [toolCallId] got no token, with what this host has seen so far; always null. */
+    private fun refused(toolCallId: String, reason: String): String? {
+        log(
+            "$TAG token.refused toolCallId=$toolCallId reason=$reason framesSeen=${seen.frames} " +
+                "toolStartsSeen=${seen.toolStarts} meridianStartsSeen=${starts.value} lastToolStarted=${seen.lastTool ?: "none"}",
+        )
+        return null
     }
 
     /** Binds one CLI invocation to the live call that owns [token], counting it, or null when none does. */
     suspend fun claim(token: String): MeridianLiveCall? = mutex.withLock {
         expire()
         val match = calls.entries.firstOrNull { (_, entry) -> entry.token?.let { constantTimeEquals(it, token) } == true }
-            ?: return@withLock null
+        if (match == null) {
+            log("$TAG claim.refused reason=no_live_call_for_token tracked=${calls.size}")
+            return@withLock null
+        }
         val next = match.value.copy(invocations = match.value.invocations + 1)
         calls[match.key] = next
+        log("$TAG claim.bound toolCallId=${match.key} invocation=${next.invocations}")
         MeridianLiveCall(match.key, next.scope, next.invocations)
     }
 
@@ -102,6 +127,12 @@ class MeridianLiveCalls(
         if (calls.size >= maxTracked) calls.remove(calls.keys.first())
         calls.remove(signal.toolCallId)
         calls[signal.toolCallId] = Entry(signal.scope, nowMs(), invocations = 0)
+        log("$TAG call.started toolCallId=${signal.toolCallId} conversationId=${signal.scope.conversationId} tracked=${calls.size}")
+    }
+
+    /** Forgets [toolCallId]; only a call this host was tracking is worth a log line. */
+    private fun end(toolCallId: String) {
+        if (calls.remove(toolCallId) != null) log("$TAG call.ended toolCallId=$toolCallId")
     }
 
     private fun expire() {
@@ -113,11 +144,31 @@ class MeridianLiveCalls(
         agentId == other.agentId && conversationId == other.conversationId
 
     companion object {
+        private const val TAG = "[meridian-tools]"
+
         /** Longer than letta-code's longest shell timeout (10 minutes), so a slow call stays bound. */
         const val DEFAULT_MAX_AGE_MS: Long = 15 * 60 * 1000L
         const val DEFAULT_MAX_TRACKED: Int = 4096
 
         /** How long [issueToken] waits for the call's start frame; under the hook's 5 s timeout. */
         const val DEFAULT_ISSUE_WAIT_MS: Long = 2_000L
+    }
+}
+
+/** Counts of what reached [MeridianLiveCalls.observe]: every frame, and every tool start with the last tool started. */
+private class MeridianFramesSeen {
+    var frames: Long = 0
+        private set
+    var toolStarts: Long = 0
+        private set
+    var lastTool: String? = null
+        private set
+
+    /** One more frame; [startedTool] is the tool it starts, when it is a tool start. */
+    fun frame(startedTool: String?) {
+        frames += 1
+        if (startedTool == null) return
+        toolStarts += 1
+        lastTool = startedTool
     }
 }

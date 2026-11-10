@@ -40308,7 +40308,7 @@ final class com.letta.mobile.data.meridian.endpoint/MeridianLiveCall { // com.le
 }
 
 final class com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls { // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls|null[0]
-    constructor <init>(kotlin/Function0<kotlin/Long>, kotlin/Function0<kotlin/String>, kotlin/Long = ..., kotlin/Int = ...) // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.<init>|<init>(kotlin.Function0<kotlin.Long>;kotlin.Function0<kotlin.String>;kotlin.Long;kotlin.Int){}[0]
+    constructor <init>(kotlin/Function0<kotlin/Long>, kotlin/Function0<kotlin/String>, kotlin/Long = ..., kotlin/Int = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ...) // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.<init>|<init>(kotlin.Function0<kotlin.Long>;kotlin.Function0<kotlin.String>;kotlin.Long;kotlin.Int;kotlin.Function1<kotlin.String,kotlin.Unit>){}[0]
 
     final suspend fun claim(kotlin/String): com.letta.mobile.data.meridian.endpoint/MeridianLiveCall? // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.claim|claim(kotlin.String){}[0]
     final suspend fun issueToken(kotlin/String, kotlin/Long = ...): kotlin/String? // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.issueToken|issueToken(kotlin.String;kotlin.Long){}[0]
