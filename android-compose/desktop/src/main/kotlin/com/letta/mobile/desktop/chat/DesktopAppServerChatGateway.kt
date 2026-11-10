@@ -332,8 +332,8 @@ class DesktopAppServerChatGateway internal constructor(
             var deliveredAssistantContent = false
             var mainReplyCompleted = false
             try {
-                runtimeEventRelay.emit(conversationId.value, agentId.value,
-                    RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started), syntheticRunId.value)
+                runtimeEventRelay.emit(ScopedDesktopRuntimeEvent(conversationId.value, agentId.value,
+                    RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started), syntheticRunId.value))
                 turnEngine.runTurn(command).relayedFor(conversationId, agentId, syntheticRunId).collect { draft ->
                     draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
                         activeRunIdByConversation[conversationId] = DesktopRunId(it)
@@ -406,11 +406,15 @@ class DesktopAppServerChatGateway internal constructor(
 
     /** Every runtime event this gateway maps is republished for presence, whichever path produced it. */
     private fun Flow<RuntimeEventDraft>.relayedFor(conversationId: ConversationId, agentId: AgentId, turn: DesktopRunId): Flow<RuntimeEventDraft> =
-        onEach { draft -> runtimeEventRelay.emit(conversationId.value, agentId.value, draft.payload, turn.value, draft.runId?.value) }
+        onEach { draft ->
+            runtimeEventRelay.emit(ScopedDesktopRuntimeEvent(
+                conversationId.value, agentId.value, draft.payload, turn.value, draft.runId?.value,
+            ))
+        }
 
     /** An observed draft is scoped to what it names, else to the stream it arrived on. */
     private suspend fun relayObserved(draft: RuntimeEventDraft, conversationId: ConversationId, agentId: AgentId) {
-        runtimeEventRelay.emit(
+        runtimeEventRelay.emit(ScopedDesktopRuntimeEvent(
             draft.conversationId?.value ?: conversationId.value,
             draft.agentId?.value ?: agentId.value,
             draft.payload.let { payload ->
@@ -420,7 +424,7 @@ class DesktopAppServerChatGateway internal constructor(
             },
             draft.runId?.value,
             draft.runId?.value,
-        )
+        ))
     }
 
     // Suspending only for the relay: an externally started or background turn reaches the timeline

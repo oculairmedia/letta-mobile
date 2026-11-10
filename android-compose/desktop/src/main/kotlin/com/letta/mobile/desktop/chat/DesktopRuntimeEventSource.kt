@@ -36,14 +36,9 @@ class DesktopRuntimeEventRelay : DesktopRuntimeEventSource {
     private val _events = MutableSharedFlow<ScopedDesktopRuntimeEvent>(extraBufferCapacity = BUFFER_CAPACITY)
     override val runtimeEvents: SharedFlow<ScopedDesktopRuntimeEvent> = _events.asSharedFlow()
 
-    suspend fun emit(
-        conversationId: String, agentId: String, payload: RuntimeEventPayload,
-        runId: String? = null, serverRunId: String? = null,
-    ) {
-        _events.emit(ScopedDesktopRuntimeEvent(conversationId, agentId, payload, runId, serverRunId))
-    }
-
-    private companion object {
-        const val BUFFER_CAPACITY = 128
+    suspend fun emit(event: ScopedDesktopRuntimeEvent) {
+        _events.emit(event)
     }
 }
+
+private const val BUFFER_CAPACITY = 128

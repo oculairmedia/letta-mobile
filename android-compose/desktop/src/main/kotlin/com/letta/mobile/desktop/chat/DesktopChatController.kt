@@ -65,7 +65,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.letta.mobile.desktop.chat.active.DesktopActiveTurnBinding
 import com.letta.mobile.data.presence.ActiveTurnCoordinator
 import com.letta.mobile.data.presence.ActiveTurnIdentity
 import com.letta.mobile.data.presence.ActiveTurnPhase
@@ -226,7 +225,7 @@ class DesktopChatController(
     // before construction reaches this line.
     private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }, onRuntimeEvent = { event ->
         if (state.value.conversations.any { it.id == event.conversationId && it.agentId == event.agentId })
-            activeTurns.onEvent(event.conversationId, event.agentId, event.runId, event.payload, event.serverRunId)
+            activeTurns.onEvent(event)
     }) }
 
     /** Publish active subagent and background-dream phases through the shared publisher. */

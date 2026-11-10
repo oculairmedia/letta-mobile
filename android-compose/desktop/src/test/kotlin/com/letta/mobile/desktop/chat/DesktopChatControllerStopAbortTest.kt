@@ -340,7 +340,7 @@ private class AbortingDesktopChatGateway(
     var activeTurn = false
     suspend fun emit(runId: String, payload: RuntimeEventPayload, serverRunId: String? = null) {
         if (payload is RuntimeEventPayload.RunLifecycleChanged && payload.status == RuntimeRunStatus.Started) activeTurn = true
-        relay.emit("conv-1", "agent-0", payload, runId, serverRunId)
+        relay.emit(ScopedDesktopRuntimeEvent("conv-1", "agent-0", payload, runId, serverRunId))
     }
     val abortedConversations = mutableListOf<String>()
 
