@@ -30,7 +30,8 @@ internal const val SHELL_CANVAS_MODULE_OPENING_TAG = "shell-canvas-module-openin
 
 /** What a canvas module has of its board. */
 private sealed interface ModuleBoard {
-    data object Opening : ModuleBoard
+    /** Still to open: [id] through [source]. */
+    data class Opening(val id: CanvasId, val source: CanvasBoardSource) : ModuleBoard
 
     data object Missing : ModuleBoard
 
@@ -47,7 +48,7 @@ private sealed interface ModuleBoard {
 @Composable
 internal fun ShellCanvasModule(board: CanvasId?, modifier: Modifier) {
     when (val shown = rememberModuleBoard(board, LocalCanvasSessionRegistry.current, LocalCanvasBoardSource.current)) {
-        ModuleBoard.Opening -> Box(modifier.testTag(SHELL_CANVAS_MODULE_OPENING_TAG), contentAlignment = Alignment.Center) {
+        is ModuleBoard.Opening -> Box(modifier.testTag(SHELL_CANVAS_MODULE_OPENING_TAG), contentAlignment = Alignment.Center) {
             LettaSpinner(size = LettaDimens.Control.spinnerLg)
         }
         ModuleBoard.Missing -> UnavailableModule(modifier)
@@ -65,7 +66,7 @@ private fun rememberModuleBoard(id: CanvasId?, registry: CanvasSessionRegistry?,
     val initial = remember(id, registry, source) { liveBoard(id, registry, source) }
     val board by produceState(initial, initial, source) {
         value = initial
-        if (initial == ModuleBoard.Opening && id != null && source != null) value = openBoard(source, id)
+        if (initial is ModuleBoard.Opening) value = openBoard(initial.source, initial.id)
     }
     return board
 }
@@ -74,7 +75,7 @@ private fun rememberModuleBoard(id: CanvasId?, registry: CanvasSessionRegistry?,
 private fun liveBoard(id: CanvasId?, registry: CanvasSessionRegistry?, source: CanvasBoardSource?): ModuleBoard {
     if (id == null) return ModuleBoard.Missing
     registry?.get(id)?.let { return ModuleBoard.Open(it) }
-    return if (source == null) ModuleBoard.Missing else ModuleBoard.Opening
+    return if (source == null) ModuleBoard.Missing else ModuleBoard.Opening(id, source)
 }
 
 /** The board [source] opens; a store that fails to read it is shown like one without it. */
