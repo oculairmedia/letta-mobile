@@ -23,6 +23,7 @@ class ShellLayoutEditsTest {
     private val sidePane = ModuleSlot(ShellViews.SIDE_PANE)
     private fun canvas(id: String) = ModuleSlot(ShellViews.CANVAS, id)
     private val notes = canvas("canvas-notes")
+    private val tasks = ModuleSlot(ShellViews.TASKS)
 
     private fun applied(config: ShellLayoutConfig, vararg ops: ShellLayoutOp): ShellLayoutConfig =
         assertIs<ShellLayoutEditResult.Applied>(ShellLayoutEdits.apply(config, ops.toList())).after
@@ -84,6 +85,42 @@ class ShellLayoutEditsTest {
         assertEquals(
             listOf(0 to ShellLayoutEditRule.UNKNOWN_LANE, 1 to ShellLayoutEditRule.UNKNOWN_LANE),
             rules(rejected(default, ShellLayoutOp.Add("dock", notes), ShellLayoutOp.Move(ShellLanes.MAIN, page, toLane = "dock"))),
+        )
+    }
+
+    @Test
+    fun theTasksViewCanBeAddedToTheSideOrMainAndSnappedBetweenThem() {
+        val inSide = applied(default, ShellLayoutOp.Add(ShellLanes.SIDE, tasks, index = 0))
+        assertEquals(listOf(tasks, sidePane), inSide.sideLane())
+        assertEquals(listOf(ShellLanes.SIDE), ShellLayoutEdits.changes(default, inSide).map { it.lane })
+
+        val inMain = applied(default, ShellLayoutOp.Add(ShellLanes.MAIN, tasks))
+        assertEquals(listOf(page, tasks), inMain.mainLane())
+        val snapped = applied(inMain, ShellLayoutOp.Move(ShellLanes.MAIN, tasks, toLane = ShellLanes.SIDE))
+        assertEquals(listOf(page), snapped.mainLane())
+        assertEquals(listOf(sidePane, tasks), snapped.sideLane())
+    }
+
+    @Test
+    fun theTasksViewNamesNoObjectAppearsOnceAndStaysOutOfOtherLanes() {
+        val inSide = applied(default, ShellLayoutOp.Add(ShellLanes.SIDE, tasks))
+        val errors = rejected(
+            inSide,
+            ShellLayoutOp.Add(ShellLanes.MAIN, ModuleSlot(ShellViews.TASKS, "conversation-a")),
+            ShellLayoutOp.Add(ShellLanes.SIDE, tasks),
+            ShellLayoutOp.Add(ShellLanes.MAIN, tasks),
+            ShellLayoutOp.Add(ShellLanes.HOME, tasks),
+            ShellLayoutOp.Add(ShellLanes.PANEL, tasks),
+        )
+        assertEquals(
+            listOf(
+                0 to ShellLayoutEditRule.OBJECT_NOT_ALLOWED,
+                1 to ShellLayoutEditRule.DUPLICATE_SLOT,
+                2 to ShellLayoutEditRule.DUPLICATE_SLOT,
+                3 to ShellLayoutEditRule.VIEW_NOT_ALLOWED,
+                4 to ShellLayoutEditRule.VIEW_NOT_ALLOWED,
+            ),
+            rules(errors),
         )
     }
 
@@ -240,5 +277,8 @@ class ShellLayoutEditsTest {
         assertEquals(HomeViews.Default, ShellLayoutCatalog.lane(ShellLanes.HOME)!!.views.map { it.view })
         assertEquals(PanelViews.Default, ShellLayoutCatalog.lane(ShellLanes.PANEL)!!.views.map { it.view })
         assertEquals(RailViews.Default, ShellLayoutCatalog.lane(ShellLanes.RAIL)!!.views.map { it.view })
+        val tasksIn = ShellLayoutCatalog.lanes.filter { lane -> lane.view(ShellViews.TASKS) != null }.map { it.lane }
+        assertEquals(listOf(ShellLanes.MAIN, ShellLanes.SIDE), tasksIn, "only the main and side lanes take the tasks view")
+        assertEquals("Background tasks", ShellLayoutCatalog.label(ShellLanes.SIDE, tasks))
     }
 }

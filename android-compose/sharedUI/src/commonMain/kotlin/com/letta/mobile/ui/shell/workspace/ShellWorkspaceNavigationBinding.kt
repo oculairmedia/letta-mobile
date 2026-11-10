@@ -7,6 +7,7 @@ import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellRoute
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
@@ -69,7 +70,15 @@ fun ShellWorkspaceState.workspaceNavigation(
             homeSelected = drawer.rail.homeSelected,
         ),
         panel = drawer.panel.copy(agent = drawer.panel.agent.copy(identity = drawer.panel.agent.agentId?.let(identities::get))),
+        openConversation = openConversation(),
     )
+}
+
+/** The focused conversation as the parent of its background tasks, or null while none is open. */
+private fun ShellWorkspaceState.openConversation(): SubagentParentScope? {
+    val agent = currentFocus.agentId ?: return null
+    val conversation = currentFocus.conversationId ?: return null
+    return SubagentParentScope(agent.value, conversation.value)
 }
 
 /**

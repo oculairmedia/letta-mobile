@@ -23,8 +23,8 @@ object ShellModuleTags {
 
 /**
  * The views added to draw the shell's lanes ([views]); what the lanes hold is the workspace layout's
- * config. The shell's own views (the page, the side pane, a canvas board) are bound by the workspace
- * and cannot be replaced here.
+ * config. The shell's own views (the page, the side pane, a canvas board, the open conversation's
+ * tasks) are bound by the workspace and cannot be replaced here.
  */
 @Immutable
 class ShellModules(

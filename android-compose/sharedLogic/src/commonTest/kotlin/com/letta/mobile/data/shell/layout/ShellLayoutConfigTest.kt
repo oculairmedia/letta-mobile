@@ -24,6 +24,26 @@ class ShellLayoutConfigTest {
     }
 
     @Test
+    fun noLaneOfTheDefaultHasTasksAndUpgradingAddsNone() {
+        val views = ShellLayoutConfig.Default.lanes.values.flatten().map { it.view }
+        val upgraded = ShellLayoutConfig.decode(ShellLayoutConfig(version = 0).encode())
+
+        assertEquals(false, ShellViews.TASKS in views)
+        assertEquals(false, ShellViews.TASKS in upgraded.lanes.values.flatten().map { it.view })
+    }
+
+    @Test
+    fun aTasksModuleSurvivesSavingReadingAndUpgrading() {
+        val tasks = ModuleSlot(ShellViews.TASKS)
+        val old = ShellLayoutConfig(version = 1, lanes = mapOf(ShellLanes.SIDE to listOf(tasks, ModuleSlot(ShellViews.SIDE_PANE))))
+
+        val read = ShellLayoutConfig.decode(old.encode())
+
+        assertEquals(listOf(tasks, ModuleSlot(ShellViews.SIDE_PANE)), read.sideLane())
+        assertEquals(ShellLayoutConfig.VERSION, read.version)
+    }
+
+    @Test
     fun aCanvasModuleKeepsItsBoardThroughSavingReadingAndUpgrading() {
         val board = ModuleSlot(ShellViews.CANVAS, objectRef = "canvas-project-notes")
         val old = ShellLayoutConfig(version = 1, lanes = mapOf(ShellLanes.SIDE to listOf(board)))

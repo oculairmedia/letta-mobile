@@ -20,6 +20,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.data.lanes.ConversationLaneProjection
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
+import com.letta.mobile.data.repository.api.SubagentParentScope
 
 object LettaShellWorkspaceTags {
     const val WORKSPACE = "shell-workspace"
@@ -30,11 +31,16 @@ object LettaShellWorkspaceTags {
     const val FLOATING_HEADER = "shell-workspace-floating-header"
 }
 
-/** The workspace's navigation: the agent rail (with its library) and the focused agent's panel. */
+/**
+ * The workspace's navigation: the agent rail (with its library), the focused agent's panel and the
+ * conversation that is open ([openConversation], the parent of the background tasks a tasks module
+ * lists; null while no conversation is open).
+ */
 @Immutable
 data class ShellWorkspaceNavigation(
     val rail: ShellLibraryRailState,
     val panel: ShellAgentPanelState,
+    val openConversation: SubagentParentScope? = null,
 )
 
 /** What the rail and the panel ask the host to do. */

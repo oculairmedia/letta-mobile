@@ -180,6 +180,17 @@ class ShellLayoutToolTest {
         error(text)["errors"]!!.jsonArray.map { it.jsonObject["rule"]!!.jsonPrimitive.content }
 
     @Test
+    fun anAgentAddsTheTasksModuleAndTheReceiptNamesIt() = runTest {
+        val receipt = success("""{"action":"apply","ops":[{"op":"add","lane":"side","view":"shell.tasks","index":0}]}""")
+        assertEquals(true, receipt["ok"]!!.jsonPrimitive.boolean)
+        assertEquals("Side area: added Background tasks", receipt["summary"]!!.jsonPrimitive.content)
+        assertEquals(listOf(ModuleSlot(ShellViews.TASKS), ModuleSlot(ShellViews.SIDE_PANE)), store.config.value.sideLane())
+
+        val refused = error("""{"action":"apply","ops":[{"op":"add","lane":"main","view":"shell.tasks","object":"conv-a"}]}""")
+        assertEquals(listOf("object_not_allowed"), refused["errors"]!!.jsonArray.map { it.jsonObject["rule"]!!.jsonPrimitive.content })
+    }
+
+    @Test
     fun undoAndResetGoThroughTheHistory() = runTest {
         success(recentsFirst)
         success("""{"action":"apply","ops":[{"op":"add","lane":"side","view":"shell.canvas","object":"canvas-board","index":0}]}""")
