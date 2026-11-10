@@ -92,6 +92,21 @@ class ActiveTurnSessionTest {
     }
 
     @Test
+    fun aReadThatFailsLeavesTheTurnAsItWasAndDoesNotReachTheCaller() = runTest {
+        var reads = 0
+        val session = ActiveTurnSession(backgroundScope, readRuns = { _, _, _ ->
+            reads++
+            error("run local-run-1 not found")
+        })
+
+        session.reconcile(conversation, agent)
+
+        assertEquals(1, reads)
+        assertEquals(ActiveTurnPhase.Idle, session.owner(conversation, agent).state.value.phase)
+        session.close()
+    }
+
+    @Test
     fun terminalQueryForOldTurnCannotCloseItsReplacement() = runTest {
         val response = CompletableDeferred<List<Run>>()
         val session = ActiveTurnSession(backgroundScope, readRuns = { _, _, run ->

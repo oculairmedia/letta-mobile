@@ -192,7 +192,12 @@ class ActiveTurnSession(
             identity?.takeUnless { captured.phase == ActiveTurnPhase.Idle }?.let { serverRuns.value[conversation to it] }
         }?.let(::RunId)
         if (captured.phase != ActiveTurnPhase.Idle && server == null) return
-        val runs = read(conversation, agent, server)
+        // A read that fails (the host no longer has the run, or cannot be reached) is not evidence of
+        // a terminal, and it must not reach the caller: a presentation reconciles as it is recreated.
+        val runs = runCatching { read(conversation, agent, server) }.getOrElse { failure ->
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            return
+        }
         kotlinx.atomicfu.locks.synchronized(lock) {
             // Progress of the same turn cannot invalidate authoritative closure; replacement identity does.
             if (owner.state.value.identity() == captured.identity()) applyReconciledRuns(captured, server, runs)
