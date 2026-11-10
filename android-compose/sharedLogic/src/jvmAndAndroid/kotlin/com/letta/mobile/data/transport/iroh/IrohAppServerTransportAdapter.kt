@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.controller.extras.relay.AppToolRelayResponder
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerTransport
@@ -36,11 +37,14 @@ import kotlinx.coroutines.CoroutineScope
  *
  * @param endpoint The local iroh endpoint to use for connections (must be bound)
  * @param alpn The ALPN protocol identifier for App Server connections
+ * @param appToolRelay answers the tool calls the host relays to this app; every transport this
+ *   adapter makes uses it (null: they neither advertise nor answer relayed calls).
  */
 class IrohAppServerTransportAdapter(
     private val endpoint: Endpoint,
     private val alpn: ByteArray = DEFAULT_ALPN,
     private val onConnectionLost: (String) -> Unit = {},
+    private val appToolRelay: AppToolRelayResponder? = AppToolRelayResponder.Default,
 ) : AppServerTransportAdapter {
     override val scheme: String = "iroh"
 
@@ -65,6 +69,7 @@ class IrohAppServerTransportAdapter(
             scope = scope,
             protocol = protocol,
             onConnectionLost = onConnectionLost,
+            appToolRelay = appToolRelay,
         )
     }
 

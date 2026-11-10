@@ -75,6 +75,8 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         // before anything else so uncaught exceptions are captured from the start.
         crashReporter.install()
         setupGlobalExceptionHandler()
+        // An Iroh host relays an agent's shell_layout calls here; they change the shell on screen.
+        com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.install()
         if (isRobolectricRuntime()) {
             return
         }

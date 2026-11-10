@@ -1,6 +1,8 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.extras.relay.AppToolRelay
+import com.letta.mobile.data.controller.extras.relay.AppToolRelayResponder
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -62,16 +64,20 @@ import kotlin.time.Duration.Companion.milliseconds
  * @param alpn The ALPN protocol identifier (e.g., "/letta/appserver/0")
  * @param scope The coroutine scope for transport I/O jobs
  * @param protocol The App Server protocol codec (typically [AppServerProtocol])
+ * @param appToolRelay answers the tool calls the host relays to this app ([AppToolRelay]); null
+ *   neither advertises nor answers them.
  */
 class IrohAppServerTransport(
     private val endpoint: Endpoint,
     private val remoteAddr: EndpointAddr,
     private val alpn: ByteArray,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val protocol: AppServerProtocol = AppServerProtocol,
     private val onConnectionLost: (String) -> Unit = {},
+    private val appToolRelay: AppToolRelayResponder? = AppToolRelayResponder.Default,
 ) : AppServerTransport {
-    private val controlCommandQueue = Channel<AppServerCommand>(Channel.BUFFERED)
+    /** Encoded control frames, each with the name telemetry logs it under, in write order. */
+    private val controlCommandQueue = Channel<Pair<String, String>>(Channel.BUFFERED)
     private val controlFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
     private val streamFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
 
@@ -192,7 +198,32 @@ class IrohAppServerTransport(
 
     override suspend fun sendControl(command: AppServerCommand) {
         Telemetry.event("IrohTransport", "control.enqueue", "command" attr command::class.simpleName)
-        controlCommandQueue.send(command)
+        controlCommandQueue.send(command::class.simpleName.orEmpty() to protocol.encodeCommand(withAppToolRelay(command)))
+    }
+
+    /** The auth command also advertises [AppToolRelay.CAPABILITY] when this transport answers relayed calls. */
+    private fun withAppToolRelay(command: AppServerCommand): AppServerCommand {
+        if (appToolRelay == null || command !is AppServerCommand.Auth) return command
+        return command.copy(capabilities = (command.capabilities.orEmpty() + AppToolRelay.CAPABILITY).distinct())
+    }
+
+    /**
+     * Takes a relayed tool call off the control stream and answers it there, when the host
+     * negotiated the relay in this connection's auth. Returns false for every other frame.
+     */
+    private fun answerAppToolCall(raw: JsonObject): Boolean {
+        val relay = appToolRelay ?: return false
+        if (!relay.isRequest(raw)) return false
+        if (AppToolRelay.CAPABILITY !in authCapabilities) {
+            Telemetry.event("IrohTransport", "app_tool.unnegotiated_request_dropped", level = Telemetry.Level.WARN)
+            return true
+        }
+        scope.launch(irohExceptionHandler) {
+            val answer = relay.answer(raw) ?: return@launch
+            Telemetry.event("IrohTransport", "app_tool.answered", "bytes" attr answer.length)
+            controlCommandQueue.send(AppToolRelay.RESPONSE_TYPE to answer)
+        }
+        return true
     }
 
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
@@ -312,10 +343,9 @@ class IrohAppServerTransport(
 
         // Launch sender coroutine
         val senderJob = launch {
-            for (command in sender) {
-                val json = protocol.encodeCommand(command)
+            for ((command, json) in sender) {
                 val bytes = json.encodeToByteArray()
-                Telemetry.event("IrohTransport", "control.write", "command" attr command::class.simpleName, "bytes" attr bytes.size)
+                Telemetry.event("IrohTransport", "control.write", "command" attr command, "bytes" attr bytes.size)
                 IrohFrameCodec.write(sendStream, json, allowFrameParts = true)
             }
         }
@@ -360,7 +390,7 @@ class IrohAppServerTransport(
                 val frame = decodeFrame(json, channel)
                 Telemetry.event("IrohTransport", "frame.recv", "channel" attr channel.name, "type" attr frame.frame.type)
                 recordServerCapabilities(frame)
-                sink.emit(frame)
+                if (channel != AppServerChannel.Control || !answerAppToolCall(frame.raw)) sink.emit(frame)
             }
         } catch (error: IrohFrameCodec.ProtocolException) {
             Telemetry.event(

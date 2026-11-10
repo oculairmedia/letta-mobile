@@ -396,6 +396,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 listOfNotNull(notebookProtocol, a2a?.receiver), turnIdentity,
             )
             irohEndpoint = endpoint
+            endpoint.attachAppToolRelay(appToolRelay)
             endpoint.create()
             printDialInfo(endpoint)
             a2a?.let { publishA2aHost(it, endpoint, backendDir) }
@@ -818,7 +819,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 identityDir = a2aIdentityDir,
                 addressStore = a2aAddressBook,
                 localBackendDir = localBackendDir,
-                hostTools = hostCanvasTools,
+                hostTools = hostCanvasTools + com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.hostTools(appToolRelay),
             ),
         )
     }
@@ -855,6 +856,12 @@ class AppServerServeIrohCommand : CliktCommand(
 
     /** The canvas side plugins place through, set by [startCanvasRelay]. */
     private lateinit var pluginCanvas: PluginHostCanvas
+
+    /**
+     * Relays the tools that act on the app on screen (shell_layout) to the app viewing the caller's
+     * conversation; its tools join the host tools, and the endpoint routes their calls.
+     */
+    private val appToolRelay = com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.host()
 
     /** The host's canvas_* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()

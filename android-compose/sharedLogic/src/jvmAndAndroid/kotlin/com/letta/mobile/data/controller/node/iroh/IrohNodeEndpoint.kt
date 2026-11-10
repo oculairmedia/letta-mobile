@@ -4,6 +4,8 @@ import com.letta.mobile.data.model.AgentId
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.extras.relay.AppToolRelayHost
+import com.letta.mobile.data.controller.extras.relay.AppToolRelayLink
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.data.transport.iroh.IrohFailureLog
@@ -177,6 +179,22 @@ class IrohNodeEndpoint(
             connectionRegistry.viewersFor(conversationId).count { it.writeFrame(frame) }
         }
     }
+
+    @Volatile
+    private var appToolRelay: AppToolRelayHost? = null
+
+    /**
+     * Wires [relay] to this endpoint: every App Server connection accepted after this gets a relay
+     * link, and a relayed call goes to the connections viewing the caller's conversation (the
+     * audience of its turn stream). Call before [start].
+     */
+    fun attachAppToolRelay(relay: AppToolRelayHost) {
+        appToolRelay = relay
+        relay.bindViewers { conversation -> connectionRegistry.viewersFor(conversation).mapNotNull(::appToolRelayLinkOf) }
+    }
+
+    private fun appToolRelayLinkOf(viewer: ViewerHandle): AppToolRelayLink? =
+        appServerConnections[viewer.connectionId]?.firstOrNull { it.isViewer(viewer) }?.appToolRelayLink
 
     /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
@@ -446,6 +464,8 @@ class IrohNodeEndpoint(
             turnHost = turnHost,
             turnIdentity = turnIdentity,
         )
+        val relayLink = appToolRelay?.link(send = nodeConnection::writeAppToolFrame, ready = { nodeConnection.acceptsAppToolCalls })
+        nodeConnection.appToolRelayLink = relayLink
         val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
             java.util.concurrent.ConcurrentHashMap.newKeySet()
         }
@@ -454,6 +474,7 @@ class IrohNodeEndpoint(
             nodeConnection.serve()
         } finally {
             peerConnections.remove(nodeConnection)
+            relayLink?.close()
         }
     }
 

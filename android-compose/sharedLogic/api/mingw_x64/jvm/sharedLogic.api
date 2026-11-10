@@ -17708,6 +17708,132 @@ public final class com/letta/mobile/data/controller/extras/messaging/IrohMessage
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/controller/extras/relay/AppToolCallId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolCallRequest {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-ziPHEc0 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component4 ()Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;
+	public final fun copy-P94B9iE (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallRequest;
+	public static synthetic fun copy-P94B9iE$default (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallRequest;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCallId-ziPHEc0 ()Ljava/lang/String;
+	public final fun getInput ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getScope ()Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;
+	public final fun getToolName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolCallResponse {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-ziPHEc0 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;
+	public final fun copy-yfCVVuw (Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResponse;
+	public static synthetic fun copy-yfCVVuw$default (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResponse;Ljava/lang/String;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResponse;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCallId-ziPHEc0 ()Ljava/lang/String;
+	public final fun getResult ()Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolCallResult {
+	public fun <init> (Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/lang/String;Z)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isError ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolCallScope {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getToolCallId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelay {
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/extras/relay/AppToolRelay;
+	public static final field REQUEST_TYPE Ljava/lang/String;
+	public static final field RESPONSE_TYPE Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/controller/extras/relay/AppToolRelayAnswerer {
+	public abstract fun answer (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayFrames {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayFrames;
+	public final fun decodeRequest (Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallRequest;
+	public final fun decodeResponse (Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResponse;
+	public final fun encode (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallRequest;)Ljava/lang/String;
+	public final fun encode (Lcom/letta/mobile/data/controller/extras/relay/AppToolCallResponse;)Ljava/lang/String;
+	public final fun typeOf (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayHost {
+	public static final field Companion Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost$Companion;
+	public synthetic fun <init> (Ljava/util/Set;JLkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/Set;JLkotlin/jvm/functions/Function0;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bindViewers (Lkotlin/jvm/functions/Function2;)V
+	public final fun call (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/relay/AppToolCallScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun link (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayLink;
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayHost$Companion {
+	public final fun getDEFAULT_TIMEOUT-UwyO8pc ()J
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayLink {
+	public final fun close ()V
+	public final fun getAcceptsCalls ()Z
+	public final fun receive (Lkotlinx/serialization/json/JsonObject;)Z
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayResponder {
+	public static final field Companion Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder$Companion;
+	public fun <init> (Lkotlin/jvm/functions/Function0;)V
+	public final fun answer (Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun isRequest (Lkotlinx/serialization/json/JsonObject;)Z
+}
+
+public final class com/letta/mobile/data/controller/extras/relay/AppToolRelayResponder$Companion {
+	public final fun getDefault ()Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;
+	public final fun install (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayAnswerer;)Ljava/lang/AutoCloseable;
+}
+
 public final class com/letta/mobile/data/controller/fanout/AppServerRuntimeEventRouter {
 	public fun <init> ()V
 	public fun <init> (Lcom/letta/mobile/data/controller/fanout/InboundControlRequestRegistry;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/data/controller/fanout/ApprovalDecisionCache;Lcom/letta/mobile/data/controller/fanout/RuntimeEventFanout;)V
@@ -18934,6 +19060,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun addr ()Lcomputer/iroh/EndpointAddr;
 	public final fun agentChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeTarget;
+	public final fun attachAppToolRelay (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;)V
 	public final fun attachPendingApprovalsPublisher (Lcom/letta/mobile/data/controller/node/iroh/PendingApprovalsPublisher;)V
 	public final fun attachPermissionModePublisher (Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;)V
 	public final fun attachSubagentPublisher (Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher;)V
@@ -51509,6 +51636,27 @@ public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutReceipts {
 	public final fun summary (Ljava/util/List;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutRelay {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRelay;
+	public final fun answerer (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;)Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayAnswerer;
+	public static synthetic fun answerer$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRelay;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayAnswerer;
+	public final fun getTOOLS ()Ljava/util/Set;
+	public final fun host-LRDsOJo (J)Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;
+	public static synthetic fun host-LRDsOJo$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRelay;JILjava/lang/Object;)Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;
+	public final fun hostTools (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;)Ljava/util/List;
+	public final fun install ()Ljava/lang/AutoCloseable;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutRelayTool : com/letta/mobile/data/controller/extras/HostExternalTool {
+	public fun <init> (Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayHost;)V
+	public fun getCapability ()Lcom/letta/mobile/data/controller/capability/Capability;
+	public fun getDescription ()Ljava/lang/String;
+	public fun getInputSchema ()Lkotlinx/serialization/json/JsonObject;
+	public fun getName ()Ljava/lang/String;
+	public fun invoke (Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun invoke (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutRequest {
 	public fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;Z)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -51532,6 +51680,7 @@ public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutSchema {
 
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutTool : com/letta/mobile/data/controller/extras/HostExternalTool {
 	public static final field Companion Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutTool$Companion;
+	public static final field DESCRIPTION Ljava/lang/String;
 	public static final field NAME Ljava/lang/String;
 	public fun <init> ()V
 	public fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;)V
@@ -68519,8 +68668,8 @@ public final class com/letta/mobile/data/transport/iroh/IrohAgentMessageSender {
 }
 
 public final class com/letta/mobile/data/transport/iroh/IrohAppServerTransport : com/letta/mobile/data/transport/appserver/AppServerTransport {
-	public fun <init> (Lcomputer/iroh/Endpoint;Lcomputer/iroh/EndpointAddr;[BLkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/transport/appserver/AppServerProtocol;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lcomputer/iroh/Endpoint;Lcomputer/iroh/EndpointAddr;[BLkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/transport/appserver/AppServerProtocol;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcomputer/iroh/Endpoint;Lcomputer/iroh/EndpointAddr;[BLkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/transport/appserver/AppServerProtocol;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;)V
+	public synthetic fun <init> (Lcomputer/iroh/Endpoint;Lcomputer/iroh/EndpointAddr;[BLkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/transport/appserver/AppServerProtocol;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun adminRpc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun awaitConnectionReady (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -68535,8 +68684,8 @@ public final class com/letta/mobile/data/transport/iroh/IrohAppServerTransport :
 
 public final class com/letta/mobile/data/transport/iroh/IrohAppServerTransportAdapter : com/letta/mobile/data/transport/appserver/AppServerTransportAdapter {
 	public static final field Companion Lcom/letta/mobile/data/transport/iroh/IrohAppServerTransportAdapter$Companion;
-	public fun <init> (Lcomputer/iroh/Endpoint;[BLkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lcomputer/iroh/Endpoint;[BLkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcomputer/iroh/Endpoint;[BLkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;)V
+	public synthetic fun <init> (Lcomputer/iroh/Endpoint;[BLkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/controller/extras/relay/AppToolRelayResponder;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun createTransport (Lcom/letta/mobile/data/transport/appserver/AppServerEndpoint;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/transport/appserver/AppServerProtocol;)Lcom/letta/mobile/data/transport/appserver/AppServerTransport;
 	public fun getScheme ()Ljava/lang/String;
 }

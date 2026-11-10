@@ -4065,6 +4065,10 @@ abstract fun interface com.letta.mobile.data.context.estimate/TokenEstimator { /
     abstract fun tokensForChars(kotlin/Long): kotlin/Int // com.letta.mobile.data.context.estimate/TokenEstimator.tokensForChars|tokensForChars(kotlin.Long){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer { // com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer|null[0]
+    abstract suspend fun answer(com.letta.mobile.data.controller.extras.relay/AppToolCallRequest): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer.answer|answer(com.letta.mobile.data.controller.extras.relay.AppToolCallRequest){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.controller.extras/AgentDiscoverySource { // com.letta.mobile.data.controller.extras/AgentDiscoverySource|null[0]
     abstract suspend fun listAgents(): kotlin.collections/List<com.letta.mobile.data.controller.extras/DiscoverableAgent>? // com.letta.mobile.data.controller.extras/AgentDiscoverySource.listAgents|listAgents(){}[0]
 }
@@ -36328,6 +36332,114 @@ final class com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallRequest { // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest|null[0]
+    constructor <init>(com.letta.mobile.data.controller.extras.relay/AppToolCallId, kotlin/String, kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras.relay/AppToolCallScope) // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.<init>|<init>(com.letta.mobile.data.controller.extras.relay.AppToolCallId;kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.relay.AppToolCallScope){}[0]
+
+    final val callId // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.callId|{}callId[0]
+        final fun <get-callId>(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.callId.<get-callId>|<get-callId>(){}[0]
+    final val input // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.input|{}input[0]
+        final fun <get-input>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.input.<get-input>|<get-input>(){}[0]
+    final val scope // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.scope|{}scope[0]
+        final fun <get-scope>(): com.letta.mobile.data.controller.extras.relay/AppToolCallScope // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.scope.<get-scope>|<get-scope>(){}[0]
+    final val toolName // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.toolName|{}toolName[0]
+        final fun <get-toolName>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.toolName.<get-toolName>|<get-toolName>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component2|component2(){}[0]
+    final fun component3(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.controller.extras.relay/AppToolCallScope // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.controller.extras.relay/AppToolCallId = ..., kotlin/String = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.data.controller.extras.relay/AppToolCallScope = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallRequest // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.copy|copy(com.letta.mobile.data.controller.extras.relay.AppToolCallId;kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.relay.AppToolCallScope){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallResponse { // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse|null[0]
+    constructor <init>(com.letta.mobile.data.controller.extras.relay/AppToolCallId, com.letta.mobile.data.controller.extras.relay/AppToolCallResult) // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.<init>|<init>(com.letta.mobile.data.controller.extras.relay.AppToolCallId;com.letta.mobile.data.controller.extras.relay.AppToolCallResult){}[0]
+
+    final val callId // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.callId|{}callId[0]
+        final fun <get-callId>(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.callId.<get-callId>|<get-callId>(){}[0]
+    final val result // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.result|{}result[0]
+        final fun <get-result>(): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.result.<get-result>|<get-result>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.controller.extras.relay/AppToolCallId = ..., com.letta.mobile.data.controller.extras.relay/AppToolCallResult = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallResponse // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.copy|copy(com.letta.mobile.data.controller.extras.relay.AppToolCallId;com.letta.mobile.data.controller.extras.relay.AppToolCallResult){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallResult { // com.letta.mobile.data.controller.extras.relay/AppToolCallResult|null[0]
+    constructor <init>(kotlin/String, kotlin/Boolean = ...) // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.<init>|<init>(kotlin.String;kotlin.Boolean){}[0]
+
+    final val isError // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.isError|{}isError[0]
+        final fun <get-isError>(): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.isError.<get-isError>|<get-isError>(){}[0]
+    final val text // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.text|{}text[0]
+        final fun <get-text>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.copy|copy(kotlin.String;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallScope { // com.letta.mobile.data.controller.extras.relay/AppToolCallScope|null[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final val agentId // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversationId // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val toolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.toolCallId|{}toolCallId[0]
+        final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallScope // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolRelayHost { // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost|null[0]
+    constructor <init>(kotlin.collections/Set<kotlin/String>, kotlin.time/Duration = ..., kotlin/Function0<com.letta.mobile.data.controller.extras.relay/AppToolCallId> = ...) // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.<init>|<init>(kotlin.collections.Set<kotlin.String>;kotlin.time.Duration;kotlin.Function0<com.letta.mobile.data.controller.extras.relay.AppToolCallId>){}[0]
+
+    final fun bindViewers(kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<com.letta.mobile.data.controller.extras.relay/AppToolRelayLink>>) // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.bindViewers|bindViewers(kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<com.letta.mobile.data.controller.extras.relay.AppToolRelayLink>>){}[0]
+    final fun link(kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin/Boolean>, kotlin/Function0<kotlin/Boolean>): com.letta.mobile.data.controller.extras.relay/AppToolRelayLink // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.link|link(kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.Boolean>;kotlin.Function0<kotlin.Boolean>){}[0]
+    final suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras.relay/AppToolCallScope): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.call|call(kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.relay.AppToolCallScope){}[0]
+
+    final object Companion { // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.Companion|null[0]
+        final val DEFAULT_TIMEOUT // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.Companion.DEFAULT_TIMEOUT|{}DEFAULT_TIMEOUT[0]
+            final fun <get-DEFAULT_TIMEOUT>(): kotlin.time/Duration // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.Companion.DEFAULT_TIMEOUT.<get-DEFAULT_TIMEOUT>|<get-DEFAULT_TIMEOUT>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolRelayLink { // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink|null[0]
+    final val acceptsCalls // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.acceptsCalls|{}acceptsCalls[0]
+        final fun <get-acceptsCalls>(): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.acceptsCalls.<get-acceptsCalls>|<get-acceptsCalls>(){}[0]
+
+    final fun close() // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.close|close(){}[0]
+    final fun receive(kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.receive|receive(kotlinx.serialization.json.JsonObject){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder { // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder|null[0]
+    constructor <init>(kotlin/Function0<com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer?>) // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.<init>|<init>(kotlin.Function0<com.letta.mobile.data.controller.extras.relay.AppToolRelayAnswerer?>){}[0]
+
+    final fun isRequest(kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.isRequest|isRequest(kotlinx.serialization.json.JsonObject){}[0]
+    final suspend fun answer(kotlinx.serialization.json/JsonObject): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.answer|answer(kotlinx.serialization.json.JsonObject){}[0]
+
+    final object Companion { // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion|null[0]
+        final val Default // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion.Default.<get-Default>|<get-Default>(){}[0]
+
+        final fun install(com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer): kotlin/AutoCloseable // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion.install|install(com.letta.mobile.data.controller.extras.relay.AppToolRelayAnswerer){}[0]
+    }
+}
+
 final class com.letta.mobile.data.controller.extras/AgentDiscoveryTool : com.letta.mobile.data.controller.extras/ExternalTool { // com.letta.mobile.data.controller.extras/AgentDiscoveryTool|null[0]
     constructor <init>(com.letta.mobile.data.controller.extras/AgentDiscoverySource) // com.letta.mobile.data.controller.extras/AgentDiscoveryTool.<init>|<init>(com.letta.mobile.data.controller.extras.AgentDiscoverySource){}[0]
 
@@ -59134,6 +59246,22 @@ final class com.letta.mobile.data.shell.layout.edit/ShellLayoutReading { // com.
     final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool : com.letta.mobile.data.controller.extras/HostExternalTool { // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool|null[0]
+    constructor <init>(com.letta.mobile.data.controller.extras.relay/AppToolRelayHost) // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.<init>|<init>(com.letta.mobile.data.controller.extras.relay.AppToolRelayHost){}[0]
+
+    final val capability // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.capability|{}capability[0]
+        final fun <get-capability>(): com.letta.mobile.data.controller.capability/Capability // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.capability.<get-capability>|<get-capability>(){}[0]
+    final val description // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.description|{}description[0]
+        final fun <get-description>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.description.<get-description>|<get-description>(){}[0]
+    final val inputSchema // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.inputSchema|{}inputSchema[0]
+        final fun <get-inputSchema>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.inputSchema.<get-inputSchema>|<get-inputSchema>(){}[0]
+    final val name // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.name.<get-name>|<get-name>(){}[0]
+
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras/ExternalToolCaller): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.invoke|invoke(kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.ExternalToolCaller){}[0]
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, kotlin/String?): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.invoke|invoke(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
+}
+
 final class com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest { // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest|null[0]
     constructor <init>(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutOp> = ..., kotlin/Boolean = ...) // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.<init>|<init>(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutOp>;kotlin.Boolean){}[0]
 
@@ -59169,6 +59297,8 @@ final class com.letta.mobile.data.shell.layout.edit/ShellLayoutTool : com.letta.
     final suspend fun invoke(kotlinx.serialization.json/JsonObject, kotlin/String?): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.invoke|invoke(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
 
     final object Companion { // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion|null[0]
+        final const val DESCRIPTION // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.DESCRIPTION|{}DESCRIPTION[0]
+            final fun <get-DESCRIPTION>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.DESCRIPTION.<get-DESCRIPTION>|<get-DESCRIPTION>(){}[0]
         final const val NAME // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.NAME|{}NAME[0]
             final fun <get-NAME>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.NAME.<get-NAME>|<get-NAME>(){}[0]
     }
@@ -68677,6 +68807,17 @@ final value class com.letta.mobile.data.chat.send/QueuedSendId { // com.letta.mo
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.send/QueuedSendId.toString|toString(){}[0]
 }
 
+final value class com.letta.mobile.data.controller.extras.relay/AppToolCallId { // com.letta.mobile.data.controller.extras.relay/AppToolCallId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.controller.extras.relay/AppToolCallId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.controller.extras.relay/AppToolCallId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallId.toString|toString(){}[0]
+}
+
 final value class com.letta.mobile.data.model.provider.composer/CatalogAccountScopeId { // com.letta.mobile.data.model.provider.composer/CatalogAccountScopeId|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.model.provider.composer/CatalogAccountScopeId.<init>|<init>(kotlin.String){}[0]
 
@@ -72314,6 +72455,23 @@ final object com.letta.mobile.data.context/ContextWindowUsagePolicy { // com.let
     final fun reading(com.letta.mobile.data.context/ContextWindowUsageState, com.letta.mobile.data.context/ContextWindowUsageKey, com.letta.mobile.data.context/ContextWindowUsageKey?): com.letta.mobile.data.context/ContextWindowUsageState // com.letta.mobile.data.context/ContextWindowUsagePolicy.reading|reading(com.letta.mobile.data.context.ContextWindowUsageState;com.letta.mobile.data.context.ContextWindowUsageKey;com.letta.mobile.data.context.ContextWindowUsageKey?){}[0]
 }
 
+final object com.letta.mobile.data.controller.extras.relay/AppToolRelay { // com.letta.mobile.data.controller.extras.relay/AppToolRelay|null[0]
+    final const val CAPABILITY // com.letta.mobile.data.controller.extras.relay/AppToolRelay.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelay.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val REQUEST_TYPE // com.letta.mobile.data.controller.extras.relay/AppToolRelay.REQUEST_TYPE|{}REQUEST_TYPE[0]
+        final fun <get-REQUEST_TYPE>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelay.REQUEST_TYPE.<get-REQUEST_TYPE>|<get-REQUEST_TYPE>(){}[0]
+    final const val RESPONSE_TYPE // com.letta.mobile.data.controller.extras.relay/AppToolRelay.RESPONSE_TYPE|{}RESPONSE_TYPE[0]
+        final fun <get-RESPONSE_TYPE>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelay.RESPONSE_TYPE.<get-RESPONSE_TYPE>|<get-RESPONSE_TYPE>(){}[0]
+}
+
+final object com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames { // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames|null[0]
+    final fun decodeRequest(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.controller.extras.relay/AppToolCallRequest? // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.decodeRequest|decodeRequest(kotlinx.serialization.json.JsonObject){}[0]
+    final fun decodeResponse(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.controller.extras.relay/AppToolCallResponse? // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.decodeResponse|decodeResponse(kotlinx.serialization.json.JsonObject){}[0]
+    final fun encode(com.letta.mobile.data.controller.extras.relay/AppToolCallRequest): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.encode|encode(com.letta.mobile.data.controller.extras.relay.AppToolCallRequest){}[0]
+    final fun encode(com.letta.mobile.data.controller.extras.relay/AppToolCallResponse): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.encode|encode(com.letta.mobile.data.controller.extras.relay.AppToolCallResponse){}[0]
+    final fun typeOf(kotlinx.serialization.json/JsonObject): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.typeOf|typeOf(kotlinx.serialization.json.JsonObject){}[0]
+}
+
 final object com.letta.mobile.data.controller/AppServerApprovalDecisions { // com.letta.mobile.data.controller/AppServerApprovalDecisions|null[0]
     final fun decide(kotlin/Boolean, kotlinx.serialization.json/JsonObject?, kotlin/String?, kotlin/String, kotlin/String): com.letta.mobile.data.transport.appserver/AppServerApprovalResponseDecision // com.letta.mobile.data.controller/AppServerApprovalDecisions.decide|decide(kotlin.Boolean;kotlinx.serialization.json.JsonObject?;kotlin.String?;kotlin.String;kotlin.String){}[0]
 }
@@ -73876,6 +74034,16 @@ final object com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts { // co
     final fun noShell(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.noShell|noShell(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction){}[0]
     final fun refused(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction?, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError>): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.refused|refused(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction?;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutEditError>){}[0]
     final fun summary(kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange>): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.summary|summary(kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutLaneChange>){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay { // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay|null[0]
+    final val TOOLS // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.TOOLS|{}TOOLS[0]
+        final fun <get-TOOLS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.TOOLS.<get-TOOLS>|<get-TOOLS>(){}[0]
+
+    final fun answerer(com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort = ...): com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.answerer|answerer(com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort){}[0]
+    final fun host(kotlin.time/Duration = ...): com.letta.mobile.data.controller.extras.relay/AppToolRelayHost // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.host|host(kotlin.time.Duration){}[0]
+    final fun hostTools(com.letta.mobile.data.controller.extras.relay/AppToolRelayHost): kotlin.collections/List<com.letta.mobile.data.controller.extras/HostExternalTool> // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.hostTools|hostTools(com.letta.mobile.data.controller.extras.relay.AppToolRelayHost){}[0]
+    final fun install(): kotlin/AutoCloseable // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.install|install(){}[0]
 }
 
 final object com.letta.mobile.data.shell.layout.edit/ShellLayoutSchema { // com.letta.mobile.data.shell.layout.edit/ShellLayoutSchema|null[0]
