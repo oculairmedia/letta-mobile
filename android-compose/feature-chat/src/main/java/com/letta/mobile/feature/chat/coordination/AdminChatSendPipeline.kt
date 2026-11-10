@@ -32,6 +32,7 @@ internal data class AdminChatSendUi(
     val uiState: MutableStateFlow<ChatUiState>,
     val composerController: ChatComposerController,
     val chatBannerController: ChatBannerController,
+    val isTurnActive: () -> Boolean = { uiState.value.isStreaming },
 )
 
 /** What the pipeline asks of its screen. */
@@ -69,6 +70,7 @@ internal class AdminChatSendPipeline(
     private val wsChatBridge = sources.wsChatBridge
     private val runtimeEventOutbox = sources.runtimeEventOutbox
     private val clientVersionProvider = sources.clientVersionProvider
+    private val isTurnActive = ui.isTurnActive
     private val uiState = ui.uiState
     private val composerController = ui.composerController
     private val chatBannerController = ui.chatBannerController
@@ -111,7 +113,7 @@ internal class AdminChatSendPipeline(
                     .takeIf { it.isNotEmpty() }
                     ?.let { runtimeEventOutbox.appendAll(it) }
             },
-        )
+        ).also { it.isTurnActive = isTurnActive }
     }
 
     /**
@@ -135,7 +137,7 @@ internal class AdminChatSendPipeline(
             explicitConversationId = explicitConversationId,
             backendKind = backendKind,
             slashCommandRepository = slashCommandRepository,
-            isStreaming = { uiState.value.isStreaming },
+            isStreaming = isTurnActive,
             pendingUserInput = {
                 uiState.value.messages.asReversed().firstNotNullOfOrNull { message ->
                     val approval = message.approvalRequest ?: return@firstNotNullOfOrNull null

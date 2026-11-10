@@ -68,6 +68,10 @@ class ChatPagingPresentation(
      */
     val canonical: com.letta.mobile.data.timeline.CanonicalTimelinePresentation? = null,
 ) {
+    /** Session-owned turn; presentation disposal must never clear or retire it. */
+    var activeTurnCoordinator: com.letta.mobile.data.presence.ActiveTurnCoordinator? = null
+    /** Exact-turn abort supplied by the same captured session, returning transport acceptance. */
+    var abortActiveTurn: (suspend (com.letta.mobile.data.presence.ActiveTurnIdentity) -> Boolean)? = null
     internal var viewport: ChatPagingViewport? = null
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}
     internal var clearViewport: () -> Unit = {}

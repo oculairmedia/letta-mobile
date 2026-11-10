@@ -31,6 +31,21 @@ class AndroidShellChatPortTest {
     private val navigator = ShellWorkspaceNavigator(workspace, port)
 
     @Test
+    fun restoredConversationAdoptsIdentityWithoutReplayingSend() {
+        val restored = ShellWorkspaceState().apply {
+            selectFocus(CurrentFocus("chat", agent, ConversationId("c-old"), CurrentFocusChatMode.Exact))
+        }
+        var openings = 0
+        val recreated = AndroidShellChatPort(restored, { fleet }, { listOf(agent) }, onOpening = { openings++ })
+        val adopted = recreated.adopt(agent, ConversationId("c-old"))
+        assertEquals(ConversationId("c-old"), adopted.conversation)
+        assertNull(adopted.firstMessage)
+        assertNull(adopted.fresh)
+        assertEquals(0, openings)
+        assertNull(recreated.opening)
+    }
+
+    @Test
     fun openingAnAgentShowsItsNewestConversation() {
         navigator.openAgent(agent)
         assertEquals(ConversationId("c-new"), port.opening?.conversation)

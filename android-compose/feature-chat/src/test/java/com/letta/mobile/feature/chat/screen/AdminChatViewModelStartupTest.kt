@@ -31,6 +31,69 @@ import com.letta.mobile.feature.chat.route.ChatRouteArgs
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatViewModelStartupTest {
     @Test
+    fun `session turn survives presentation handoff and stop waits for exact terminal`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val agent = TestData.agent("agent-owner", "Owner")
+        val owner = com.letta.mobile.data.presence.ActiveTurnCoordinator(
+            ConversationId("conversation-owner"), agent.id, backgroundScope, { testScheduler.currentTime },
+        )
+        val turn = com.letta.mobile.data.presence.ActiveTurnIdentity("run-owner", "turn-owner")
+        owner.start(turn)
+        var aborts = 0; var opens = 0
+        val host = ChatPagingHost().apply {
+            openCanonical = { suppliedAgent, conversation, _, _ ->
+                require(suppliedAgent == agent.id.value && conversation == "conversation-owner")
+                opens++
+                ChatPagingPresentation(
+                    settled = flowOf(PagingData.empty()), live = MutableStateFlow(emptyList()), close = {},
+                ).apply {
+                    activeTurnCoordinator = owner
+                    abortActiveTurn = { captured ->
+                        require(captured.runId == owner.state.value.runId && captured.turnId == owner.state.value.turnId)
+                        aborts++
+                        true
+                    }
+                }
+            }
+        }
+        var model: AdminChatViewModel? = null
+        try {
+            val first = openedChatViewModel(host, agent, "conversation-owner", "owner")
+            model = first
+            assertTrue("Busy comes from the retained session, without replaying send", first.uiState.value.isStreaming)
+            first.pagingPresentation.value!!.requestTail()
+            assertEquals(2, opens)
+            assertTrue(first.uiState.value.isStreaming)
+            first.interruptRun().also { testScheduler.runCurrent() }
+            assertEquals(com.letta.mobile.data.presence.ActiveTurnPhase.Cancelling, owner.state.value.phase)
+            assertTrue(first.uiState.value.isCancelling)
+            assertEquals(1, aborts)
+            first.viewModelScope.cancel()
+            // Terminal during observer handoff must be visible to a recreated screen.
+            owner.terminate(turn, com.letta.mobile.data.presence.ActiveTurnTerminalKind.Cancelled)
+            val recreated = openedChatViewModel(host, agent, "conversation-owner", "owner")
+            model = recreated
+            assertFalse(recreated.uiState.value.isStreaming)
+            assertFalse(recreated.uiState.value.isCancelling)
+            assertEquals(1, aborts)
+            val next = com.letta.mobile.data.presence.ActiveTurnIdentity("next-run", "next-turn")
+            owner.start(next)
+            assertTrue(recreated.uiState.value.isStreaming)
+            // A second deliberate stop clears locally and never dispatches another abort.
+            recreated.interruptRun().also { testScheduler.runCurrent() }
+            assertEquals(2, aborts)
+            assertTrue(recreated.uiState.value.isCancelling)
+            recreated.interruptRun().also { testScheduler.runCurrent() }
+            assertEquals(2, aborts)
+            assertEquals(com.letta.mobile.data.presence.ActiveTurnPhase.Idle, owner.state.value.phase)
+            assertFalse(recreated.uiState.value.isStreaming)
+        } finally {
+            model?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun `immediate constructor startup opens and retains canonical presentation`() = runTest {
         // Unlike StandardTestDispatcher, Main.immediate must enter launch bodies
         // during construction, with cached repository results that never suspend.
