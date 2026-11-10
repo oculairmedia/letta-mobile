@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.extras.relay
 
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 
 /** Runs one relayed call with the app's own tool of that name, refusing every tool it does not relay. */
@@ -23,8 +24,16 @@ class AppToolRelayResponder(private val answerer: () -> AppToolRelayAnswerer?) {
     /** The answer frame to the call in [frame], or null when [frame] is not a call it can answer by id. */
     suspend fun answer(frame: JsonObject): String? {
         val request = AppToolRelayFrames.decodeRequest(frame) ?: return null
-        val result = answerer()?.answer(request) ?: AppToolCallResult(notHandled(request.toolName), isError = true)
-        return AppToolRelayFrames.encode(AppToolCallResponse(request.callId, result))
+        return AppToolRelayFrames.encode(AppToolCallResponse(request.callId, resultOf(request)))
+    }
+
+    /** The app's answer to [request]; a tool that throws is an error answer, so the host never waits out its timeout. */
+    private suspend fun resultOf(request: AppToolCallRequest): AppToolCallResult {
+        val answered = runCatching { answerer()?.answer(request) }
+        val failure = answered.exceptionOrNull()
+        if (failure is CancellationException) throw failure
+        if (failure != null) return AppToolCallResult(failed(request.toolName, failure), isError = true)
+        return answered.getOrNull() ?: AppToolCallResult(notHandled(request.toolName), isError = true)
     }
 
     /** The responder every Iroh connection of this app uses, answering with what the app [install]ed. */
@@ -44,6 +53,9 @@ class AppToolRelayResponder(private val answerer: () -> AppToolRelayAnswerer?) {
             installed = answerer
             return AutoCloseable { if (installed === answerer) installed = previous }
         }
+
+        private fun failed(toolName: String, failure: Throwable) =
+            "The app failed to run $toolName: ${failure.message ?: failure::class.simpleName}"
 
         private fun notHandled(toolName: String) = "This app does not run ${toolName.ifEmpty { "that tool" }} for its host."
     }

@@ -386,20 +386,9 @@ class IrohAppServerTransport(
                 recvStream = recvStream,
                 maxFrameBytes = MAX_FRAME_BYTES,
                 chunkBytes = READ_CHUNK_SIZE,
-            ) { json ->
-                val frame = decodeFrame(json, channel)
-                Telemetry.event("IrohTransport", "frame.recv", "channel" attr channel.name, "type" attr frame.frame.type)
-                recordServerCapabilities(frame)
-                if (channel != AppServerChannel.Control || !answerAppToolCall(frame.raw)) sink.emit(frame)
-            }
+            ) { json -> receiveFrame(decodeFrame(json, channel), sink) }
         } catch (error: IrohFrameCodec.ProtocolException) {
-            Telemetry.event(
-                "IrohTransport",
-                "frame.protocol_error",
-                attrs = arrayOf("channel" attr channel.name) +
-                    (if (::connection.isInitialized) IrohDiagnostics.closeAttributes(connection) else emptyList()).toTypedArray() +
-                    arrayOf("error" attr (error.message ?: error.toString())),
-            )
+            reportProtocolError(channel, error)
             throw error
         } catch (error: Throwable) {
             Telemetry.event(
@@ -412,6 +401,24 @@ class IrohAppServerTransport(
         } finally {
             reportReaderExit(channel, "reader_stopped:${channel.name}")
         }
+    }
+
+    /** One received frame: an app tool call on the control channel is answered here, anything else goes to [sink]. */
+    private suspend fun receiveFrame(frame: AppServerReceivedFrame, sink: MutableSharedFlow<AppServerReceivedFrame>) {
+        Telemetry.event("IrohTransport", "frame.recv", "channel" attr frame.channel.name, "type" attr frame.frame.type)
+        recordServerCapabilities(frame)
+        val answered = frame.channel == AppServerChannel.Control && answerAppToolCall(frame.raw)
+        if (!answered) sink.emit(frame)
+    }
+
+    private fun reportProtocolError(channel: AppServerChannel, error: IrohFrameCodec.ProtocolException) {
+        val closed = if (::connection.isInitialized) IrohDiagnostics.closeAttributes(connection) else emptyList()
+        Telemetry.event(
+            "IrohTransport",
+            "frame.protocol_error",
+            attrs = arrayOf("channel" attr channel.name) + closed.toTypedArray() +
+                arrayOf("error" attr (error.message ?: error.toString())),
+        )
     }
 
     private fun reportReaderExit(channel: AppServerChannel, reason: String) {

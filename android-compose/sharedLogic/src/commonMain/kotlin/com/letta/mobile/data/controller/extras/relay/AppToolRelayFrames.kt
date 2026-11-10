@@ -26,9 +26,14 @@ object AppToolRelay {
     const val RESPONSE_TYPE: String = "app_tool_call_response"
 }
 
-/** Correlates one relayed call with its answer; the host mints it, the app echoes it. */
+/**
+ * Correlates one relayed call with its answer; the host mints it, the app echoes it.
+ *
+ * @property value the id as it travels in the frames' `call_id`.
+ */
 @JvmInline
 value class AppToolCallId(val value: String) {
+    /** The id itself, so it reads plainly in logs and messages. */
     override fun toString(): String = value
 }
 

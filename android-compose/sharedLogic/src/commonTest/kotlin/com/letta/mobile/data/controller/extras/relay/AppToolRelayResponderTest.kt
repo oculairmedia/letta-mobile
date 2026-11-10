@@ -51,6 +51,16 @@ class AppToolRelayResponderTest {
     }
 
     @Test
+    fun aToolThatThrowsIsAnsweredAsAnErrorByCallId() = runTest {
+        val responder = AppToolRelayResponder { AppToolRelayAnswerer { error("layout store is gone") } }
+
+        val response = responder.answerOf(request())
+
+        assertEquals(AppToolCallId("call-1"), response.callId)
+        assertEquals(AppToolCallResult("The app failed to run shell_layout: layout store is gone", isError = true), response.result)
+    }
+
+    @Test
     fun onlyRelayRequestsAreTakenAndOnesWithoutACallIdGetNoAnswer() = runTest {
         val responder = AppToolRelayResponder { AppToolRelayAnswerer { AppToolCallResult("ran") } }
         val noId = Json.parseToJsonElement("""{"type":"app_tool_call_request","tool_name":"shell_layout"}""").jsonObject
