@@ -51186,9 +51186,17 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig$Companio
 
 public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore {
 	public static final field Companion Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Companion;
+	public static final field HISTORY_LIMIT I
+	public static final field HISTORY_SUFFIX Ljava/lang/String;
 	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Ljava/lang/String;)V
+	public final fun commit (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public static synthetic fun commit$default (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
 	public final fun getConfig ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getHistory ()Ljava/util/List;
+	public final fun resetToDefault ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
 	public final fun save (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)V
+	public final fun undo (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public static synthetic fun undo$default (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
 }
 
 public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Companion {
@@ -51200,6 +51208,367 @@ public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public final fun getCANVAS-p0dNODo ()Ljava/lang/String;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
 	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAction : java/lang/Enum {
+	public static final field APPLY Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public static final field GET Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public static final field RESET Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public static final field UNDO Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public static fun values ()[Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort {
+	public static final field Companion Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort$Companion;
+	public fun <init> ()V
+	public final fun attach (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)V
+	public final fun commit (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;
+	public final fun detach (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)V
+	public final fun getAttached ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getChanges ()Lkotlinx/coroutines/flow/SharedFlow;
+	public final fun reset (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;
+	public final fun undo (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;)Z
+	public final fun undoLatest (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort$Companion {
+	public final fun getShared ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;
+}
+
+public abstract interface class com/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor {
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor$Agent : com/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-hzr7vF4 ()Ljava/lang/String;
+	public final fun copy-XmxTwY8 (Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor$Agent;
+	public static synthetic fun copy-XmxTwY8$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor$Agent;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor$Agent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgent-hzr7vF4 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor$Person : com/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor$Person;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutCatalog {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCatalog;
+	public static final field MAX_OBJECT_LENGTH I
+	public final fun getLanes ()Ljava/util/List;
+	public final fun label (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;)Ljava/lang/String;
+	public final fun lane (Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneSpec;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutChange {
+	public final fun getAfter ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getAuthor ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;
+	public final fun getBefore ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getSummary ()Ljava/lang/String;
+	public final fun getUndoable ()Z
+}
+
+public abstract interface class com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit {
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Done : com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit {
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;)V
+	public final fun component1 ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;
+	public final fun copy (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Done;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Done;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Done;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChange ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$NoShell : com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$NoShell;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Stale : com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Stale;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Unchanged : com/letta/mobile/data/shell/layout/edit/ShellLayoutCommit {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit$Unchanged;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditError {
+	public fun <init> (Ljava/lang/Integer;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/Integer;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/Integer;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditError;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditError;Ljava/lang/Integer;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditError;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getOpIndex ()Ljava/lang/Integer;
+	public final fun getRule ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult {
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Applied : com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult {
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)V
+	public final fun component1 ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun copy (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Applied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Applied;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Applied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAfter ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getBefore ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getChanges ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Rejected : com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Rejected;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Rejected;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Rejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getErrors ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule : java/lang/Enum {
+	public static final field DUPLICATE_SLOT Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field INDEX_OUT_OF_RANGE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field LANE_FULL Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field MALFORMED Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field OBJECT_NOT_ALLOWED Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field OBJECT_REQUIRED Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field OBJECT_TOO_LONG Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field OP_COUNT Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field PAGE_STAYS_IN_MAIN Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field SETTINGS_STAYS Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field SLOT_NOT_FOUND Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field UNKNOWN_LANE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field VIEW_NOT_ALLOWED Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public final fun getCode ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static fun values ()[Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEdits {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEdits;
+	public static final field MAX_OPS I
+	public final fun apply (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Ljava/util/List;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult;
+	public final fun changes (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Ljava/util/List;
+	public final fun slots (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Ljava/lang/String;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutLaneChange {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneChange;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneChange;Ljava/lang/String;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneChange;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAfter ()Ljava/util/List;
+	public final fun getBefore ()Ljava/util/List;
+	public final fun getLane ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutLaneSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;I)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;I)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;IILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutLaneSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getMaxSlots ()I
+	public final fun getViews ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun view-u4EiHk4 (Ljava/lang/String;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutViewSpec;
+}
+
+public abstract interface class com/letta/mobile/data/shell/layout/edit/ShellLayoutOp {
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Add : com/letta/mobile/data/shell/layout/edit/ShellLayoutOp {
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/Integer;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Add;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Add;Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Add;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIndex ()Ljava/lang/Integer;
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getSlot ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Move : com/letta/mobile/data/shell/layout/edit/ShellLayoutOp {
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/String;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/String;Ljava/lang/Integer;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Move;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Move;Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Move;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIndex ()Ljava/lang/Integer;
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getSlot ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public final fun getToLane ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Remove : com/letta/mobile/data/shell/layout/edit/ShellLayoutOp {
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Remove;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Remove;Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ModuleSlot;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Remove;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getSlot ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Reset : com/letta/mobile/data/shell/layout/edit/ShellLayoutOp {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$Reset;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutOp$SetLane : com/letta/mobile/data/shell/layout/edit/ShellLayoutOp {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$SetLane;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$SetLane;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutOp$SetLane;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLane ()Ljava/lang/String;
+	public final fun getSlots ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutReading {
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;Ljava/util/List;)V
+	public final fun component1 ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;Ljava/util/List;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutReading;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutReading;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutReading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getErrors ()Ljava/util/List;
+	public final fun getRequest ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutReceipts {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutReceipts;
+	public final fun checked (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult$Applied;Z)Lcom/letta/mobile/data/controller/extras/ExternalToolResult;
+	public final fun committed (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;)Lcom/letta/mobile/data/controller/extras/ExternalToolResult;
+	public final fun current (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;I)Lcom/letta/mobile/data/controller/extras/ExternalToolResult;
+	public final fun noShell (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;)Lcom/letta/mobile/data/controller/extras/ExternalToolResult;
+	public final fun refused (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;)Lcom/letta/mobile/data/controller/extras/ExternalToolResult;
+	public final fun summary (Ljava/util/List;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutRequest {
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Z
+	public final fun copy (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;Z)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;Ljava/util/List;ZILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAction ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAction;
+	public final fun getDryRun ()Z
+	public final fun getOps ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutSchema {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutSchema;
+	public final fun getInput ()Lkotlinx/serialization/json/JsonObject;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutTool : com/letta/mobile/data/controller/extras/HostExternalTool {
+	public static final field Companion Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutTool$Companion;
+	public static final field NAME Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getCapability ()Lcom/letta/mobile/data/controller/capability/Capability;
+	public fun getDescription ()Ljava/lang/String;
+	public fun getInputSchema ()Lkotlinx/serialization/json/JsonObject;
+	public fun getName ()Ljava/lang/String;
+	public fun invoke (Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/extras/ExternalToolCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun invoke (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutTool$Companion {
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutToolInput {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutToolInput;
+	public final fun getOpNames ()Ljava/util/List;
+	public final fun read (Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutReading;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutViewSpec {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-p0dNODo ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun copy-mSGP_sg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutViewSpec;
+	public static synthetic fun copy-mSGP_sg$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutViewSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutViewSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getNeedsObject ()Z
+	public final fun getView-p0dNODo ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/shell/sidemenu/PanelViews {

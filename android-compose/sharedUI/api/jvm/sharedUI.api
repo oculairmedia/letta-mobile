@@ -6941,6 +6941,7 @@ public final class com/letta/mobile/ui/settings/SettingsCopy {
 	public final fun getPROVIDERS ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getREDUCED_MOTION ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getRESET_IDENTITY ()Lcom/letta/mobile/ui/settings/SettingsLabel;
+	public final fun getRESET_LAYOUT ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getSCAN ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getSTATUS ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getTEST ()Lcom/letta/mobile/ui/settings/SettingsLabel;
@@ -10674,6 +10675,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellLayoutController {
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellLayoutControllerKt {
+	public static final fun getLocalShellLayoutAgentPort ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun rememberShellLayoutController (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/ShellLayoutController;
 	public static final fun shellLayoutStore (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/desktopshell/ShellLayoutStore;
 }

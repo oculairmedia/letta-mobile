@@ -1,16 +1,19 @@
 package com.letta.mobile.ui.shell.workspace
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.desktopshell.ShellLayoutStore
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
+import com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort
 import com.letta.mobile.data.storage.SecureSettingsStore
 
 /**
@@ -42,11 +45,25 @@ fun shellLayoutStore(backend: LettaConfig?, preferences: SecureSettingsStore): S
     ShellLayoutStore(preferences, key = "shell.${backend?.id.orEmpty()}.layout")
 
 /**
+ * The port an agent's layout tool changes the on-screen shell through: the process-wide
+ * [ShellLayoutAgentPort.Shared] unless a test provides its own.
+ */
+val LocalShellLayoutAgentPort = staticCompositionLocalOf { ShellLayoutAgentPort.Shared }
+
+/**
  * The [ShellLayoutController] for [backend] (null before one is configured), kept while the backend
- * config is the same: its sidebar and its lanes are both that backend's.
+ * config is the same: its sidebar and its lanes are both that backend's. While it is in composition
+ * its lanes are attached to [LocalShellLayoutAgentPort], so an agent's layout tool changes this shell.
  */
 @Composable
-fun rememberShellLayoutController(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutController =
-    remember(backend?.id, preferences) {
+fun rememberShellLayoutController(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutController {
+    val controller = remember(backend?.id, preferences) {
         ShellLayoutController(shellLayoutStore(backend, preferences), ShellLayoutConfigStore.forBackend(preferences, backend))
     }
+    val port = LocalShellLayoutAgentPort.current
+    DisposableEffect(controller, port) {
+        port.attach(controller.lanes)
+        onDispose { port.detach(controller.lanes) }
+    }
+    return controller
+}
