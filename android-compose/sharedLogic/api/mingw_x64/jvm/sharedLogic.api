@@ -10309,11 +10309,20 @@ public final class com/letta/mobile/data/canvas/compose/WorstCaseWrap {
 	public final fun lines (Ljava/lang/String;)I
 }
 
+public final class com/letta/mobile/data/canvas/library/CanvasBoardSessions {
+	public fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasConversationOptions;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasConversationOptions;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun acquire (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun holds (Lcom/letta/mobile/data/model/CanvasId;)I
+	public final fun release (Lcom/letta/mobile/data/canvas/CanvasSession;)V
+}
+
 public final class com/letta/mobile/data/canvas/library/CanvasLibraryController {
 	public fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/canvas/CanvasArchiveStore;Lcom/letta/mobile/data/canvas/CanvasConversationOptions;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/canvas/CanvasArchiveStore;Lcom/letta/mobile/data/canvas/CanvasConversationOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun createNew-C7LexNE (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun open (Lcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function1;)V
 	public final fun open (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/jvm/functions/Function1;)V
 	public final fun refresh ()V
 	public final fun setArchived (Lcom/letta/mobile/data/model/CanvasId;Z)V

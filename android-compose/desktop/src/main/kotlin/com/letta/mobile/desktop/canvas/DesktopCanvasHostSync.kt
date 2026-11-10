@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.canvas
 
+import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
@@ -77,6 +78,9 @@ object DesktopCanvasHostSync {
 
     val syncTransport: CanvasSyncTransport get() = relay
     val presenceTransport: CanvasPresenceTransport get() = relay
+
+    /** The op log and transport every board the desktop opens or creates uses. */
+    val options: CanvasConversationOptions get() = CanvasConversationOptions(opLog = opLog, syncTransport = syncTransport)
 
     /** The board cursor's peer ID, shared with this installation's notebook replica. */
     val localPeerId: String get() = DesktopNotebookCanvasStore.peerId

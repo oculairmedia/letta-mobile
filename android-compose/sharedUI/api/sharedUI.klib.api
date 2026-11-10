@@ -756,6 +756,7 @@ abstract fun interface <#A: in com.letta.mobile.data.shell/ShellDestination> com
 
 abstract fun interface com.letta.mobile.ui.canvas.boards/CanvasBoardSource { // com.letta.mobile.ui.canvas.boards/CanvasBoardSource|null[0]
     abstract suspend fun open(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.ui.canvas.boards/CanvasBoardSource.open|open(com.letta.mobile.data.model.CanvasId){}[0]
+    open fun release(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.ui.canvas.boards/CanvasBoardSource.release|release(com.letta.mobile.data.canvas.CanvasSession){}[0]
 }
 
 abstract fun interface com.letta.mobile.ui.canvas.plugin/PluginAvailabilitySource { // com.letta.mobile.ui.canvas.plugin/PluginAvailabilitySource|null[0]
@@ -1851,6 +1852,18 @@ final class com.letta.mobile.ui.agenteditor/AgentEditorPanels { // com.letta.mob
         final fun <get-dreaming>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.agenteditor/AgentEditorPanels.dreaming.<get-dreaming>|<get-dreaming>(){}[0]
     final val secrets // com.letta.mobile.ui.agenteditor/AgentEditorPanels.secrets|{}secrets[0]
         final fun <get-secrets>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.agenteditor/AgentEditorPanels.secrets.<get-secrets>|<get-secrets>(){}[0]
+}
+
+final class com.letta.mobile.ui.canvas.boards/CanvasPageBoard { // com.letta.mobile.ui.canvas.boards/CanvasPageBoard|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.library/CanvasBoardSessions) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.<init>|<init>(com.letta.mobile.data.canvas.library.CanvasBoardSessions){}[0]
+
+    final var session // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.session|{}session[0]
+        final fun <get-session>(): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.session.<get-session>|<get-session>(){}[0]
+        final fun <set-session>(com.letta.mobile.data.canvas/CanvasSession?) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.session.<set-session>|<set-session>(com.letta.mobile.data.canvas.CanvasSession?){}[0]
+
+    final fun getValue(kotlin/Any?, kotlin.reflect/KProperty<*>): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.getValue|getValue(kotlin.Any?;kotlin.reflect.KProperty<*>){}[0]
+    final fun setValue(kotlin/Any?, kotlin.reflect/KProperty<*>, com.letta.mobile.data.canvas/CanvasSession?) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.setValue|setValue(kotlin.Any?;kotlin.reflect.KProperty<*>;com.letta.mobile.data.canvas.CanvasSession?){}[0]
+    final fun take(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.take|take(com.letta.mobile.data.canvas.CanvasSession){}[0]
 }
 
 final class com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer|null[0]
@@ -11523,6 +11536,7 @@ final val com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentE
 final val com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop|#static{}com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop[0]
 final val com.letta.mobile.ui.canvas.boards/LocalCanvasBoardSource // com.letta.mobile.ui.canvas.boards/LocalCanvasBoardSource|{}LocalCanvasBoardSource[0]
     final fun <get-LocalCanvasBoardSource>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas.boards/CanvasBoardSource?> // com.letta.mobile.ui.canvas.boards/LocalCanvasBoardSource.<get-LocalCanvasBoardSource>|<get-LocalCanvasBoardSource>(){}[0]
+final val com.letta.mobile.ui.canvas.boards/com_letta_mobile_ui_canvas_boards_CanvasPageBoard$stableprop // com.letta.mobile.ui.canvas.boards/com_letta_mobile_ui_canvas_boards_CanvasPageBoard$stableprop|#static{}com_letta_mobile_ui_canvas_boards_CanvasPageBoard$stableprop[0]
 final val com.letta.mobile.ui.canvas.notes/NOTEBOOK_NOTE_VIEWER_ID // com.letta.mobile.ui.canvas.notes/NOTEBOOK_NOTE_VIEWER_ID|{}NOTEBOOK_NOTE_VIEWER_ID[0]
     final fun <get-NOTEBOOK_NOTE_VIEWER_ID>(): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId // com.letta.mobile.ui.canvas.notes/NOTEBOOK_NOTE_VIEWER_ID.<get-NOTEBOOK_NOTE_VIEWER_ID>|<get-NOTEBOOK_NOTE_VIEWER_ID>(){}[0]
 final val com.letta.mobile.ui.canvas.notes/com_letta_mobile_ui_canvas_notes_NoteLookup_Failed$stableprop // com.letta.mobile.ui.canvas.notes/com_letta_mobile_ui_canvas_notes_NoteLookup_Failed$stableprop|#static{}com_letta_mobile_ui_canvas_notes_NoteLookup_Failed$stableprop[0]
@@ -12377,6 +12391,10 @@ final fun com.letta.mobile.ui.agenteditor/AgentEditorPage(com.letta.mobile.data.
 final fun com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageOptions$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageOptions$stableprop_getter|com_letta_mobile_ui_agenteditor_AgentEditorPageOptions$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageTags$stableprop_getter|com_letta_mobile_ui_agenteditor_AgentEditorPageTags$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop_getter|com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.canvas.boards/ProvideCanvasBoardSource(com.letta.mobile.data.canvas.library/CanvasBoardSessions, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.canvas.boards/ProvideCanvasBoardSource|ProvideCanvasBoardSource(com.letta.mobile.data.canvas.library.CanvasBoardSessions;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.canvas.boards/ProvideCanvasHostWithBoards(com.letta.mobile.data.canvas/CanvasSessionRegistry?, com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerRegistry?, com.letta.mobile.data.canvas.library/CanvasBoardSessions, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.canvas.boards/ProvideCanvasHostWithBoards|ProvideCanvasHostWithBoards(com.letta.mobile.data.canvas.CanvasSessionRegistry?;com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry?;com.letta.mobile.data.canvas.library.CanvasBoardSessions;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.canvas.boards/canvasBoardSource(com.letta.mobile.data.canvas.library/CanvasBoardSessions): com.letta.mobile.ui.canvas.boards/CanvasBoardSource // com.letta.mobile.ui.canvas.boards/canvasBoardSource|canvasBoardSource(com.letta.mobile.data.canvas.library.CanvasBoardSessions){}[0]
+final fun com.letta.mobile.ui.canvas.boards/com_letta_mobile_ui_canvas_boards_CanvasPageBoard$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.boards/com_letta_mobile_ui_canvas_boards_CanvasPageBoard$stableprop_getter|com_letta_mobile_ui_canvas_boards_CanvasPageBoard$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.canvas.library/CanvasLibraryNotice(com.letta.mobile.data.canvas.library/CanvasLibraryController, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.canvas.library/CanvasLibraryNotice|CanvasLibraryNotice(com.letta.mobile.data.canvas.library.CanvasLibraryController;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.canvas.notes/NotebookNoteEditor(com.letta.mobile.data.canvas.notes/NotebookNoteSession, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.canvas.notes/NotebookNoteEditor|NotebookNoteEditor(com.letta.mobile.data.canvas.notes.NotebookNoteSession;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.canvas.notes/NotebookNoteEditorContent(com.letta.mobile.data.canvas.notes/NotebookNoteSession, androidx.compose.ui/Modifier?, kotlinx.coroutines/CoroutineScope?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.canvas.notes/NotebookNoteEditorContent|NotebookNoteEditorContent(com.letta.mobile.data.canvas.notes.NotebookNoteSession;androidx.compose.ui.Modifier?;kotlinx.coroutines.CoroutineScope?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
