@@ -547,7 +547,11 @@ Portable shell destinations, routes, workspace navigation and page errors. Entry
 
 # Package com.letta.mobile.data.shell.layout
 
-What the shell's lanes hold, as data: a slot names a view and the object it shows, and a layout config lists the slots in each lane. The default config is the page with the host's side pane after it, the page is always recoverable, and a saved config gains new default modules once. Keep rendering and window sizes outside the config; it only says what is placed where. `ShellLayoutConfigStore` keeps one config per backend config in the shared settings port, reads it once so the first frame draws it, and falls back to the default when nothing readable is stored.
+What the shell's lanes hold, as data: a slot names a view and the object it shows, and a layout config lists the slots in each lane. The default config is the page with the host's side pane after it, the page is always recoverable, and a saved config gains new default modules once. Keep rendering and window sizes outside the config; it only says what is placed where. `ShellLayoutConfigStore` keeps one config per backend config in the shared settings port, reads it once so the first frame draws it, and falls back to the default when nothing readable is stored. Beside it the store keeps a bounded history of the layouts its commits replaced, so undo and reset survive a restart.
+
+# Package com.letta.mobile.data.shell.layout.edit
+
+How an agent changes the shell layout, as data. `ShellLayoutOp`s (set a lane, add, remove, move, reset) are checked by `ShellLayoutEdits` against `ShellLayoutCatalog`, which lists each lane, the views it may hold with a line on each, and its cap: the page never leaves the main lane, Settings never leaves the side menu, a slot appears once, and an edit with any invalid op applies nothing and reports every problem. `ShellLayoutTool` is the `shell_layout` host tool (get, apply with an optional dry run, undo, reset) with strict JSON input and JSON receipts. It reaches the shell on screen through `ShellLayoutAgentPort`, which a shell attaches its backend's layout store to while it is shown; every change goes through the store's bounded history, so the person can undo it, and is published so the shell can say who made it.
 
 # Package com.letta.mobile.data.shell.sidemenu
 

@@ -2,6 +2,7 @@ package com.letta.mobile.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +67,22 @@ fun AccessibilitySettingsSection(modifier: Modifier = Modifier) {
                 onChange = setHighContrast,
             ),
         )
+    }
+}
+
+/**
+ * Puts the shell's layout back to the default, or null to leave the row out (no shell layout on
+ * screen, or it already is the default). The shell workspace fills it; the page only draws the row.
+ */
+internal val LocalShellLayoutReset = compositionLocalOf<(() -> Unit)?> { null }
+
+/** Reset layout, while the shell's layout differs from the default (an agent or the person changed it). */
+@Composable
+internal fun LayoutSettingsSection(modifier: Modifier = Modifier) {
+    val reset = LocalShellLayoutReset.current ?: return
+    val label = SettingsCopy.RESET_LAYOUT
+    SettingsSection(SettingsHeader("layout", "Layout", showTitle = false), modifier) {
+        LinkRow(SettingsRow.Link(key = label.key, title = label.title, supporting = label.helper, onClick = reset))
     }
 }
 
