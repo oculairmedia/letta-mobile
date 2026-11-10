@@ -549,6 +549,10 @@ Portable shell destinations, routes, workspace navigation and page errors. Entry
 
 What the shell's lanes hold, as data: a slot names a view and the object it shows, and a layout config lists the slots in each lane. The default config is the page with the host's side pane after it, the page is always recoverable, and a saved config gains new default modules once. Keep rendering and window sizes outside the config; it only says what is placed where. `ShellLayoutConfigStore` keeps one config per backend config in the shared settings port, reads it once so the first frame draws it, and falls back to the default when nothing readable is stored.
 
+# Package com.letta.mobile.data.shell.sidemenu
+
+The side menu's parts as view ids: the agent rail's (Home, the agents, New) and the agent panel's (the header, the section rows, New chat, the conversations-and-canvases library, Settings), each with its default order. The shell layout's rail and panel lanes list these ids; the rail and panel draw the parts they know in the lane's order. Kept apart from the layout config so the rail and panel can name their parts without depending on the config itself.
+
 # Package com.letta.mobile.data.skills
 
 Skill catalog API, categorization and controller state. Available/installed entries and controllability come from active backend contracts, including explicit read-only/unavailable outcomes. Keep direct filesystem deletion outside catalog actions; provide supported backend operations through [SkillsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.skills/-skills-api/index.html) to [SkillsCatalogController](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.skills/-skills-catalog-controller/index.html).

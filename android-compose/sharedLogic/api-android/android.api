@@ -49264,6 +49264,8 @@ public final class com/letta/mobile/data/shell/layout/ShellLanes {
 	public static final field HOME Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellLanes;
 	public static final field MAIN Ljava/lang/String;
+	public static final field PANEL Ljava/lang/String;
+	public static final field RAIL Ljava/lang/String;
 	public static final field SIDE Ljava/lang/String;
 }
 
@@ -49286,6 +49288,8 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig {
 	public final fun lane (Ljava/lang/String;)Ljava/util/List;
 	public final fun mainLane ()Ljava/util/List;
 	public final fun mainLane (I)Ljava/util/List;
+	public final fun panelLane ()Ljava/util/List;
+	public final fun railLane ()Ljava/util/List;
 	public final fun sideLane ()Ljava/util/List;
 	public fun toString ()Ljava/lang/String;
 	public final fun upgraded ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
@@ -49323,6 +49327,24 @@ public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellViews;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
 	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/sidemenu/PanelViews {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/sidemenu/PanelViews;
+	public final fun getDefault ()Ljava/util/List;
+	public final fun getHEADER-p0dNODo ()Ljava/lang/String;
+	public final fun getLIBRARY-p0dNODo ()Ljava/lang/String;
+	public final fun getNEW_CHAT-p0dNODo ()Ljava/lang/String;
+	public final fun getSECTIONS-p0dNODo ()Ljava/lang/String;
+	public final fun getSETTINGS-p0dNODo ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/sidemenu/RailViews {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/sidemenu/RailViews;
+	public final fun getAGENTS-p0dNODo ()Ljava/lang/String;
+	public final fun getDefault ()Ljava/util/List;
+	public final fun getHOME-p0dNODo ()Ljava/lang/String;
+	public final fun getNEW-p0dNODo ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/skills/Skill {

@@ -64,9 +64,11 @@ import com.letta.mobile.ui.mascot.DriveMascotStage
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.shell.ShellNavDrawerSheet
+import com.letta.mobile.ui.shell.rail.LocalRailLane
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
+import com.letta.mobile.ui.shell.sidebar.LocalPanelLane
 import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
 import com.letta.mobile.ui.a11y.accessibilityTraversal
@@ -123,6 +125,8 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalConversationLanes provides host.conversationLanes,
                                 LocalConversationPurposes provides purposes,
                                 LocalHomeLane provides state.layout.lanes.homeLane().map { it.view },
+                                LocalRailLane provides remember(state.layout.lanes) { state.layout.lanes.railLane().map { it.view } },
+                                LocalPanelLane provides remember(state.layout.lanes) { state.layout.lanes.panelLane().map { it.view } },
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {

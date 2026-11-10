@@ -20,6 +20,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -109,6 +110,8 @@ class ShellLaneAffordancesTest {
             onNodeWithText("Work · View only · x60fz").assertExists()
             onNodeWithText("Work record").performClick()
             assertEquals(ConversationId("work"), rig.chat.selectedConversation, "work remains viewable")
+            // The transcript lays out off the test clock, so wait for it instead of asserting at once.
+            waitUntil(timeoutMillis = 10_000) { onAllNodesWithText("Work transcript").fetchSemanticsNodes().isNotEmpty() }
             onNodeWithText("Work transcript").assertExists()
             onNodeWithText("Work record · View only").assertExists()
             rig.navigator.sendToSelectedConversation("must not send")

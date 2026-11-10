@@ -9387,7 +9387,10 @@ public final class com/letta/mobile/ui/shell/rail/ComposableSingletons$ShellAgen
 public final class com/letta/mobile/ui/shell/rail/ComposableSingletons$ShellAgentRailKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/rail/ComposableSingletons$ShellAgentRailKt;
 	public fun <init> ()V
+	public final fun getLambda$-1750385159$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$1744046584$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$68650483$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$943511031$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/rail/ShellAgentLibraryKt {
@@ -9845,6 +9848,16 @@ public final class com/letta/mobile/ui/shell/shortcuts/ShortcutStepping {
 	public final fun getCurrent ()Lkotlin/jvm/functions/Function0;
 	public final fun getIds ()Lkotlin/jvm/functions/Function0;
 	public final fun getOpen ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellAgentPanelKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellAgentPanelKt;
+	public fun <init> ()V
+	public final fun getLambda$-1604565396$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$-671211059$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$1195497615$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$1757047563$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$262143278$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellArchivedChatsDialogKt {

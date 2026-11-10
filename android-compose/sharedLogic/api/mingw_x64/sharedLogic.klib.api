@@ -58771,6 +58771,8 @@ final class com.letta.mobile.data.shell.layout/ShellLayoutConfig { // com.letta.
     final fun lane(kotlin/String): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.lane|lane(kotlin.String){}[0]
     final fun mainLane(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.mainLane|mainLane(){}[0]
     final fun mainLane(kotlin/Int): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.mainLane|mainLane(kotlin.Int){}[0]
+    final fun panelLane(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.panelLane|panelLane(){}[0]
+    final fun railLane(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.railLane|railLane(){}[0]
     final fun sideLane(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout/ShellLayoutConfig.sideLane|sideLane(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLayoutConfig.toString|toString(){}[0]
     final fun upgraded(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout/ShellLayoutConfig.upgraded|upgraded(){}[0]
@@ -73130,6 +73132,10 @@ final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile
         final fun <get-HOME>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.HOME.<get-HOME>|<get-HOME>(){}[0]
     final const val MAIN // com.letta.mobile.data.shell.layout/ShellLanes.MAIN|{}MAIN[0]
         final fun <get-MAIN>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.MAIN.<get-MAIN>|<get-MAIN>(){}[0]
+    final const val PANEL // com.letta.mobile.data.shell.layout/ShellLanes.PANEL|{}PANEL[0]
+        final fun <get-PANEL>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.PANEL.<get-PANEL>|<get-PANEL>(){}[0]
+    final const val RAIL // com.letta.mobile.data.shell.layout/ShellLanes.RAIL|{}RAIL[0]
+        final fun <get-RAIL>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.RAIL.<get-RAIL>|<get-RAIL>(){}[0]
     final const val SIDE // com.letta.mobile.data.shell.layout/ShellLanes.SIDE|{}SIDE[0]
         final fun <get-SIDE>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.SIDE.<get-SIDE>|<get-SIDE>(){}[0]
 }
@@ -73139,6 +73145,32 @@ final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile
         final fun <get-PAGE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.PAGE.<get-PAGE>|<get-PAGE>(){}[0]
     final val SIDE_PANE // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE|{}SIDE_PANE[0]
         final fun <get-SIDE_PANE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE.<get-SIDE_PANE>|<get-SIDE_PANE>(){}[0]
+}
+
+final object com.letta.mobile.data.shell.sidemenu/PanelViews { // com.letta.mobile.data.shell.sidemenu/PanelViews|null[0]
+    final val Default // com.letta.mobile.data.shell.sidemenu/PanelViews.Default|{}Default[0]
+        final fun <get-Default>(): kotlin.collections/List<com.letta.mobile.data.model.view/RuntimeViewId> // com.letta.mobile.data.shell.sidemenu/PanelViews.Default.<get-Default>|<get-Default>(){}[0]
+    final val HEADER // com.letta.mobile.data.shell.sidemenu/PanelViews.HEADER|{}HEADER[0]
+        final fun <get-HEADER>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/PanelViews.HEADER.<get-HEADER>|<get-HEADER>(){}[0]
+    final val LIBRARY // com.letta.mobile.data.shell.sidemenu/PanelViews.LIBRARY|{}LIBRARY[0]
+        final fun <get-LIBRARY>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/PanelViews.LIBRARY.<get-LIBRARY>|<get-LIBRARY>(){}[0]
+    final val NEW_CHAT // com.letta.mobile.data.shell.sidemenu/PanelViews.NEW_CHAT|{}NEW_CHAT[0]
+        final fun <get-NEW_CHAT>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/PanelViews.NEW_CHAT.<get-NEW_CHAT>|<get-NEW_CHAT>(){}[0]
+    final val SECTIONS // com.letta.mobile.data.shell.sidemenu/PanelViews.SECTIONS|{}SECTIONS[0]
+        final fun <get-SECTIONS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/PanelViews.SECTIONS.<get-SECTIONS>|<get-SECTIONS>(){}[0]
+    final val SETTINGS // com.letta.mobile.data.shell.sidemenu/PanelViews.SETTINGS|{}SETTINGS[0]
+        final fun <get-SETTINGS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/PanelViews.SETTINGS.<get-SETTINGS>|<get-SETTINGS>(){}[0]
+}
+
+final object com.letta.mobile.data.shell.sidemenu/RailViews { // com.letta.mobile.data.shell.sidemenu/RailViews|null[0]
+    final val AGENTS // com.letta.mobile.data.shell.sidemenu/RailViews.AGENTS|{}AGENTS[0]
+        final fun <get-AGENTS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/RailViews.AGENTS.<get-AGENTS>|<get-AGENTS>(){}[0]
+    final val Default // com.letta.mobile.data.shell.sidemenu/RailViews.Default|{}Default[0]
+        final fun <get-Default>(): kotlin.collections/List<com.letta.mobile.data.model.view/RuntimeViewId> // com.letta.mobile.data.shell.sidemenu/RailViews.Default.<get-Default>|<get-Default>(){}[0]
+    final val HOME // com.letta.mobile.data.shell.sidemenu/RailViews.HOME|{}HOME[0]
+        final fun <get-HOME>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/RailViews.HOME.<get-HOME>|<get-HOME>(){}[0]
+    final val NEW // com.letta.mobile.data.shell.sidemenu/RailViews.NEW|{}NEW[0]
+        final fun <get-NEW>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.sidemenu/RailViews.NEW.<get-NEW>|<get-NEW>(){}[0]
 }
 
 final object com.letta.mobile.data.shell/ShellDeepLink { // com.letta.mobile.data.shell/ShellDeepLink|null[0]

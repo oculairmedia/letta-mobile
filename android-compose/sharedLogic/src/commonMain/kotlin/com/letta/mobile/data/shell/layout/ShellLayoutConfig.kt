@@ -3,6 +3,8 @@ package com.letta.mobile.data.shell.layout
 import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.serialization.LettaJson
+import com.letta.mobile.data.shell.sidemenu.PanelViews
+import com.letta.mobile.data.shell.sidemenu.RailViews
 import kotlinx.serialization.Serializable
 
 /**
@@ -29,6 +31,18 @@ object ShellLanes {
      * refresh around them, and decides per width where a section goes (see [HomeViews]).
      */
     const val HOME = "home"
+
+    /**
+     * The agent rail's parts, top to bottom (see [RailViews]). The rail decides its width, whether
+     * it is expanded, and that its agents fill the height between the others.
+     */
+    const val RAIL = "rail"
+
+    /**
+     * The agent panel's parts, top to bottom (see [PanelViews]). The panel keeps its dialogs and the
+     * library's filter, and keeps Settings at its bottom wherever the lane lists it.
+     */
+    const val PANEL = "panel"
 }
 
 /** The views the shell itself supplies; every host binds them, so they are always available. */
@@ -74,7 +88,15 @@ data class ShellLayoutConfig(
      * than read through [decode], which upgrades it) shows Home's default sections; an emptied lane
      * stays empty.
      */
-    fun homeLane(): List<ModuleSlot> = if (ShellLanes.HOME in lanes) lane(ShellLanes.HOME) else Default.lane(ShellLanes.HOME)
+    fun homeLane(): List<ModuleSlot> = laneOrDefault(ShellLanes.HOME)
+
+    /** The agent rail's parts, each once; like [homeLane], a config without the lane shows the default parts. */
+    fun railLane(): List<ModuleSlot> = laneOrDefault(ShellLanes.RAIL)
+
+    /** The agent panel's parts, each once; like [homeLane], a config without the lane shows the default parts. */
+    fun panelLane(): List<ModuleSlot> = laneOrDefault(ShellLanes.PANEL)
+
+    private fun laneOrDefault(id: String): List<ModuleSlot> = if (id in lanes) lane(id) else Default.lane(id)
 
     /** The side lane, without anything the main lane already shows: a module is drawn once. */
     fun sideLane(): List<ModuleSlot> = lane(ShellLanes.SIDE) - mainLane().toSet()
@@ -100,7 +122,7 @@ data class ShellLayoutConfig(
     /** The default layout and reading a saved one. */
     companion object {
         /** The current set of defaults; a config below it gains the default modules it lacks. */
-        const val VERSION = 2
+        const val VERSION = 3
 
         /** One default module: the [lane] it belongs to, its [slot], and the config version that added it. */
         private class DefaultModule(val lane: String, view: RuntimeViewId, val since: Int) {
@@ -111,11 +133,13 @@ data class ShellLayoutConfig(
         private val DefaultModules: List<DefaultModule> = listOf(
             DefaultModule(ShellLanes.MAIN, ShellViews.PAGE, since = 1),
             DefaultModule(ShellLanes.SIDE, ShellViews.SIDE_PANE, since = 1),
-        ) + HomeViews.Default.map { DefaultModule(ShellLanes.HOME, it, since = 2) }
+        ) + HomeViews.Default.map { DefaultModule(ShellLanes.HOME, it, since = 2) } +
+            RailViews.Default.map { DefaultModule(ShellLanes.RAIL, it, since = 3) } +
+            PanelViews.Default.map { DefaultModule(ShellLanes.PANEL, it, since = 3) }
 
         /**
          * The shell as it was before lanes were configurable: the page, then the host's side pane,
-         * and Home's sections in their wide order.
+         * Home's sections in their wide order, and the rail's and the agent panel's parts top to bottom.
          */
         val Default = ShellLayoutConfig(
             version = VERSION,

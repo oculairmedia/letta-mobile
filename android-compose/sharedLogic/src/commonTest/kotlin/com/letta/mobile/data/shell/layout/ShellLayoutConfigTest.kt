@@ -2,6 +2,8 @@ package com.letta.mobile.data.shell.layout
 
 import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
+import com.letta.mobile.data.shell.sidemenu.PanelViews
+import com.letta.mobile.data.shell.sidemenu.RailViews
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -156,5 +158,90 @@ class ShellLayoutConfigTest {
 
         assertEquals(homeDefaults, noHomeLane.homeLane())
         assertEquals(emptyList(), emptied.homeLane())
+    }
+
+    private val railDefaults = listOf(RailViews.HOME, RailViews.AGENTS, RailViews.NEW).map { ModuleSlot(it) }
+    private val panelDefaults = listOf(
+        PanelViews.HEADER,
+        PanelViews.SECTIONS,
+        PanelViews.NEW_CHAT,
+        PanelViews.LIBRARY,
+        PanelViews.SETTINGS,
+    ).map { ModuleSlot(it) }
+
+    @Test
+    fun theDefaultRailAndPanelLanesAreTodaysOrder() {
+        assertEquals(railDefaults, ShellLayoutConfig.Default.lane(ShellLanes.RAIL))
+        assertEquals(panelDefaults, ShellLayoutConfig.Default.lane(ShellLanes.PANEL))
+        assertEquals(listOf("rail.home", "rail.agents", "rail.new"), railDefaults.map { it.view.value })
+        assertEquals(
+            listOf("panel.header", "panel.sections", "panel.newChat", "panel.library", "panel.settings"),
+            panelDefaults.map { it.view.value },
+        )
+    }
+
+    @Test
+    fun aVersionTwoConfigGainsTheRailAndPanelLanesOnce() {
+        val v2 = ShellLayoutConfig(
+            version = 2,
+            lanes = mapOf(
+                ShellLanes.MAIN to listOf(ModuleSlot(ShellViews.PAGE)),
+                ShellLanes.SIDE to listOf(ModuleSlot(ShellViews.SIDE_PANE)),
+                ShellLanes.HOME to homeDefaults,
+            ),
+        )
+
+        val upgraded = ShellLayoutConfig.decode(v2.encode())
+
+        assertEquals(ShellLayoutConfig.Default, upgraded)
+        assertEquals(upgraded, ShellLayoutConfig.decode(upgraded.encode()))
+        assertEquals(railDefaults, upgraded.upgraded().lane(ShellLanes.RAIL))
+        assertEquals(panelDefaults, upgraded.upgraded().lanes.getValue(ShellLanes.PANEL))
+    }
+
+    @Test
+    fun aRailOrPanelPartRemovedAfterTheUpgradeStaysRemoved() {
+        val upgraded = ShellLayoutConfig(version = 2).upgraded()
+        val noNewChat = panelDefaults - ModuleSlot(PanelViews.NEW_CHAT)
+        val noHome = railDefaults - ModuleSlot(RailViews.HOME)
+        val edited = upgraded.copy(lanes = upgraded.lanes + (ShellLanes.PANEL to noNewChat) + (ShellLanes.RAIL to noHome))
+
+        val reread = ShellLayoutConfig.decode(edited.encode())
+
+        assertEquals(noNewChat, reread.panelLane())
+        assertEquals(noHome, reread.railLane())
+    }
+
+    @Test
+    fun earlierRemovalsStayRemovedWhenTheRailAndPanelArrive() {
+        val noStats = homeDefaults - ModuleSlot(HomeViews.STATS)
+        val v2 = ShellLayoutConfig(
+            version = 2,
+            lanes = mapOf(
+                ShellLanes.MAIN to listOf(ModuleSlot(ShellViews.PAGE)),
+                ShellLanes.SIDE to emptyList(),
+                ShellLanes.HOME to noStats,
+            ),
+        )
+
+        val upgraded = ShellLayoutConfig.decode(v2.encode())
+
+        assertEquals(emptyList(), upgraded.lane(ShellLanes.SIDE))
+        assertEquals(noStats, upgraded.homeLane())
+        assertEquals(railDefaults, upgraded.railLane())
+        assertEquals(panelDefaults, upgraded.panelLane())
+    }
+
+    @Test
+    fun aConfigWithoutRailOrPanelLanesShowsTheirDefaultsAndEmptiedOnesShowNone() {
+        val noLanes = ShellLayoutConfig(version = ShellLayoutConfig.VERSION, lanes = mapOf(ShellLanes.MAIN to listOf(notes)))
+        val emptied = ShellLayoutConfig.Default.copy(
+            lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.RAIL to emptyList()) + (ShellLanes.PANEL to emptyList()),
+        )
+
+        assertEquals(railDefaults, noLanes.railLane())
+        assertEquals(panelDefaults, noLanes.panelLane())
+        assertEquals(emptyList(), emptied.railLane())
+        assertEquals(emptyList(), emptied.panelLane())
     }
 }
