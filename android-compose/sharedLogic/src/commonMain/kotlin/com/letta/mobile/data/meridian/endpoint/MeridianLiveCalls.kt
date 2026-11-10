@@ -80,15 +80,15 @@ class MeridianLiveCalls(
     suspend fun issueToken(toolCallId: String, waitMs: Long = DEFAULT_ISSUE_WAIT_MS): String? {
         // Logs why this call got no token, with what this host has seen so far; always null.
         fun refused(reason: TokenRefusal): String? {
-            log("$TAG token.refused toolCallId=$toolCallId reason=${reason.wire} ${seen.summary(starts.value)}")
+            log("$TAG token.refused toolCallId=${toolCallId.logSafe()} reason=${reason.wire} ${seen.summary(starts.value)}")
             return null
         }
-        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(TokenRefusal.CALL_START_NOT_SEEN)
+        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(TokenRefusal.CALL_NOT_LIVE)
         return mutex.withLock {
             expire()
             val entry = calls[toolCallId] ?: return@withLock refused(TokenRefusal.CALL_ENDED)
             if (entry.token != null) return@withLock refused(TokenRefusal.TOKEN_ALREADY_ISSUED)
-            log("$TAG token.issued toolCallId=$toolCallId conversationId=${entry.scope.conversationId}")
+            log("$TAG token.issued toolCallId=${toolCallId.logSafe()} conversationId=${entry.scope.conversationId.logSafe()}")
             newToken().also { calls[toolCallId] = entry.copy(token = it) }
         }
     }
@@ -103,7 +103,7 @@ class MeridianLiveCalls(
         }
         val next = match.value.copy(invocations = match.value.invocations + 1)
         calls[match.key] = next
-        log("$TAG claim.bound toolCallId=${match.key} invocation=${next.invocations}")
+        log("$TAG claim.bound toolCallId=${match.key.logSafe()} invocation=${next.invocations}")
         MeridianLiveCall(match.key, next.scope, next.invocations)
     }
 
@@ -123,12 +123,13 @@ class MeridianLiveCalls(
         if (calls.size >= maxTracked) calls.remove(calls.keys.first())
         calls.remove(signal.toolCallId)
         calls[signal.toolCallId] = Entry(signal.scope, nowMs(), invocations = 0)
-        log("$TAG call.started toolCallId=${signal.toolCallId} conversationId=${signal.scope.conversationId} tracked=${calls.size}")
+        val conversation = signal.scope.conversationId.logSafe()
+        log("$TAG call.started toolCallId=${signal.toolCallId.logSafe()} conversationId=$conversation tracked=${calls.size}")
     }
 
     /** Forgets the call [signal] ends; only a call this host was tracking is worth a log line. */
     private fun end(signal: MeridianShellCallSignal.Ended) {
-        if (calls.remove(signal.toolCallId) != null) log("$TAG call.ended toolCallId=${signal.toolCallId}")
+        if (calls.remove(signal.toolCallId) != null) log("$TAG call.ended toolCallId=${signal.toolCallId.logSafe()}")
     }
 
     /** Forgets every call of the turn that ended in [scope], each with its own line (its end frame was lost). */
@@ -167,7 +168,7 @@ private class MeridianFramesSeen {
 
     /** These counts as log fields, with [meridianStarts] (the `meridian` shell calls seen starting) among them. */
     fun summary(meridianStarts: Long): String =
-        "framesSeen=$frames toolStartsSeen=$toolStarts meridianStartsSeen=$meridianStarts lastToolStarted=${lastTool ?: "none"}"
+        "framesSeen=$frames toolStartsSeen=$toolStarts meridianStartsSeen=$meridianStarts lastToolStarted=${lastTool?.logSafe() ?: "none"}"
 
     /** One more frame; when it is a tool start, that tool becomes the last one started. */
     fun frame(received: AppServerReceivedFrame) {
@@ -180,12 +181,25 @@ private class MeridianFramesSeen {
 
 /** Why a call got no token, as its `reason=` in the log. */
 private enum class TokenRefusal(val wire: String) {
-    /** The host never saw the call start (within the wait). */
-    CALL_START_NOT_SEEN("call_start_not_seen"),
+    /**
+     * No such call is running (after the wait): the host never saw it start, or it had already
+     * ended. `meridianStartsSeen` on the same line says whether any start has reached this host.
+     */
+    CALL_NOT_LIVE("call_not_live"),
 
-    /** The call was seen but ended before its token was asked for. */
+    /** The call was running when the wait ended but was gone a moment later. */
     CALL_ENDED("call_ended"),
 
     /** The call's one token was handed out already. */
     TOKEN_ALREADY_ISSUED("token_already_issued"),
 }
+
+/**
+ * This value as one log field: ids and tool names come from the App Server and the agent's shell,
+ * so anything that could break the line or forge another (control characters, spaces) becomes `_`,
+ * and an over-long value is cut.
+ */
+private fun String.logSafe(): String =
+    take(MAX_LOGGED_FIELD).map { if (it.isLetterOrDigit() || it in "-_.:/") it else '_' }.joinToString("")
+
+private const val MAX_LOGGED_FIELD = 96

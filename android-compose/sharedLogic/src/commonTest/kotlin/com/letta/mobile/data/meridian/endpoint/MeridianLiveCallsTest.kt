@@ -30,7 +30,7 @@ class MeridianLiveCallsTest {
 
         val refusal = lines.single { "token.refused" in it }
         listOf(
-            "toolCallId=call-1", "reason=call_start_not_seen", "framesSeen=1", "toolStartsSeen=1",
+            "toolCallId=call-1", "reason=call_not_live", "framesSeen=1", "toolStartsSeen=1",
             "meridianStartsSeen=0", "lastToolStarted=Bash",
         ).forEach { assertTrue(it in refusal, "$it missing from: $refusal") }
     }
@@ -44,6 +44,15 @@ class MeridianLiveCallsTest {
 
         assertEquals(listOf("[meridian-tools] call.ended toolCallId=call-1"), lines.filter { "call.ended" in it })
         assertEquals(1, calls.size())
+    }
+
+    @Test
+    fun anIdThatCouldBreakTheLogLineIsWrittenAsOneSafeField() = runTest {
+        assertNull(calls.issueToken("call-1\n[meridian-tools] token.issued toolCallId=forged", waitMs = 0))
+
+        val refusal = lines.single()
+        assertFalse("\n" in refusal, refusal)
+        assertTrue("toolCallId=call-1__meridian-tools__token.issued_toolCallId_forged reason=call_not_live" in refusal, refusal)
     }
 
     @Test
