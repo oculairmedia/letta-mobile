@@ -59,13 +59,12 @@ class MeridianLiveCalls(
     private val seen = MeridianFramesSeen()
 
     suspend fun observe(received: AppServerReceivedFrame) {
-        val startedTool = MeridianShellCallSignal.startedToolName(received)
         val signal = MeridianShellCallSignal.of(received)
         mutex.withLock {
-            seen.frame(startedTool)
+            seen.frame(received)
             when (signal) {
                 is MeridianShellCallSignal.Started -> start(signal).also { starts.value += 1 }
-                is MeridianShellCallSignal.Ended -> end(signal.toolCallId)
+                is MeridianShellCallSignal.Ended -> end(signal)
                 is MeridianShellCallSignal.TurnEnded -> endTurn(signal.scope)
                 null -> Unit
             }
@@ -79,20 +78,20 @@ class MeridianLiveCalls(
      * waits up to [waitMs] for it.
      */
     suspend fun issueToken(toolCallId: String, waitMs: Long = DEFAULT_ISSUE_WAIT_MS): String? {
-        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(toolCallId, "call_start_not_seen")
+        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(toolCallId, TokenRefusal.CALL_START_NOT_SEEN)
         return mutex.withLock {
             expire()
-            val entry = calls[toolCallId] ?: return@withLock refused(toolCallId, "call_ended")
-            if (entry.token != null) return@withLock refused(toolCallId, "token_already_issued")
+            val entry = calls[toolCallId] ?: return@withLock refused(toolCallId, TokenRefusal.CALL_ENDED)
+            if (entry.token != null) return@withLock refused(toolCallId, TokenRefusal.TOKEN_ALREADY_ISSUED)
             log("$TAG token.issued toolCallId=$toolCallId conversationId=${entry.scope.conversationId}")
             newToken().also { calls[toolCallId] = entry.copy(token = it) }
         }
     }
 
     /** Logs why [toolCallId] got no token, with what this host has seen so far; always null. */
-    private fun refused(toolCallId: String, reason: String): String? {
+    private fun refused(toolCallId: String, reason: TokenRefusal): String? {
         log(
-            "$TAG token.refused toolCallId=$toolCallId reason=$reason framesSeen=${seen.frames} " +
+            "$TAG token.refused toolCallId=$toolCallId reason=${reason.wire} framesSeen=${seen.frames} " +
                 "toolStartsSeen=${seen.toolStarts} meridianStartsSeen=${starts.value} lastToolStarted=${seen.lastTool ?: "none"}",
         )
         return null
@@ -131,14 +130,14 @@ class MeridianLiveCalls(
         log("$TAG call.started toolCallId=${signal.toolCallId} conversationId=${signal.scope.conversationId} tracked=${calls.size}")
     }
 
-    /** Forgets [toolCallId]; only a call this host was tracking is worth a log line. */
-    private fun end(toolCallId: String) {
-        if (calls.remove(toolCallId) != null) log("$TAG call.ended toolCallId=$toolCallId")
+    /** Forgets the call [signal] ends; only a call this host was tracking is worth a log line. */
+    private fun end(signal: MeridianShellCallSignal.Ended) {
+        if (calls.remove(signal.toolCallId) != null) log("$TAG call.ended toolCallId=${signal.toolCallId}")
     }
 
     /** Forgets every call of the turn that ended in [scope], each with its own line (its end frame was lost). */
     private fun endTurn(scope: AppServerRuntimeScope) {
-        calls.filterValues { it.scope.sameRuntime(scope) }.keys.toList().forEach(::end)
+        calls.filterValues { it.scope.sameRuntime(scope) }.keys.toList().forEach { end(MeridianShellCallSignal.Ended(it)) }
     }
 
     private fun expire() {
@@ -170,11 +169,23 @@ private class MeridianFramesSeen {
     var lastTool: String? = null
         private set
 
-    /** One more frame; [startedTool] is the tool it starts, when it is a tool start. */
-    fun frame(startedTool: String?) {
+    /** One more frame; when it is a tool start, that tool becomes the last one started. */
+    fun frame(received: AppServerReceivedFrame) {
         frames += 1
-        if (startedTool == null) return
+        val startedTool = MeridianShellCallSignal.startedToolName(received) ?: return
         toolStarts += 1
         lastTool = startedTool
     }
+}
+
+/** Why a call got no token, as its `reason=` in the log. */
+private enum class TokenRefusal(val wire: String) {
+    /** The host never saw the call start (within the wait). */
+    CALL_START_NOT_SEEN("call_start_not_seen"),
+
+    /** The call was seen but ended before its token was asked for. */
+    CALL_ENDED("call_ended"),
+
+    /** The call's one token was handed out already. */
+    TOKEN_ALREADY_ISSUED("token_already_issued"),
 }
