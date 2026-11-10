@@ -7,7 +7,10 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -129,5 +132,23 @@ class CanvasBoardSessionsTest {
 
         assertSame(module, page, "the page shows the module's session, not a second copy")
         assertEquals(2, boards.holds(notes))
+    }
+
+    @Test
+    fun aLibraryOpenCancelledBeforeThePageTakesItGivesTheHoldBack() = runTest {
+        val backing = storeWithNotes()
+        val owner = CoroutineScope(StandardTestDispatcher(testScheduler))
+        // The library's owner goes away while the board is being read, so the page never takes it.
+        val store = object : CanvasDocumentStore by backing {
+            override suspend fun get(id: CanvasId): CanvasDocument? = backing.get(id).also { owner.cancel() }
+        }
+        val boards = CanvasBoardSessions(store)
+        var page: CanvasSession? = null
+
+        CanvasLibraryController(store, owner).open(notes, boards) { page = it }
+        runCurrent()
+
+        assertNull(page)
+        assertEquals(0, boards.holds(notes), "a hold nobody received is given back")
     }
 }

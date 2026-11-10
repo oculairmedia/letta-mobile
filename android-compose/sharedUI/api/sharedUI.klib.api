@@ -1861,8 +1861,8 @@ final class com.letta.mobile.ui.canvas.boards/CanvasPageBoard { // com.letta.mob
         final fun <get-session>(): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.session.<get-session>|<get-session>(){}[0]
         final fun <set-session>(com.letta.mobile.data.canvas/CanvasSession?) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.session.<set-session>|<set-session>(com.letta.mobile.data.canvas.CanvasSession?){}[0]
 
-    final fun getValue(kotlin/Any?, kotlin.reflect/KProperty<*>): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.getValue|getValue(kotlin.Any?;kotlin.reflect.KProperty<*>){}[0]
-    final fun setValue(kotlin/Any?, kotlin.reflect/KProperty<*>, com.letta.mobile.data.canvas/CanvasSession?) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.setValue|setValue(kotlin.Any?;kotlin.reflect.KProperty<*>;com.letta.mobile.data.canvas.CanvasSession?){}[0]
+    final fun <#A1: kotlin/Any?> getValue(#A1, kotlin.reflect/KProperty<*>): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.getValue|getValue(0:0;kotlin.reflect.KProperty<*>){0§<kotlin.Any?>}[0]
+    final fun <#A1: kotlin/Any?> setValue(#A1, kotlin.reflect/KProperty<*>, com.letta.mobile.data.canvas/CanvasSession?) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.setValue|setValue(0:0;kotlin.reflect.KProperty<*>;com.letta.mobile.data.canvas.CanvasSession?){0§<kotlin.Any?>}[0]
     final fun take(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.ui.canvas.boards/CanvasPageBoard.take|take(com.letta.mobile.data.canvas.CanvasSession){}[0]
 }
 

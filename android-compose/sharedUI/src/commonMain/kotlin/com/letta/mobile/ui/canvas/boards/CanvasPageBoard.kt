@@ -37,10 +37,10 @@ class CanvasPageBoard(private val boards: CanvasBoardSessions) {
     }
 
     /** [session], for a host property delegated to this page board. */
-    operator fun getValue(thisRef: Any?, property: KProperty<*>): CanvasSession? = session
+    operator fun <T> getValue(thisRef: T, property: KProperty<*>): CanvasSession? = session
 
     /** Sets [session], for a host property delegated to this page board. */
-    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: CanvasSession?) {
+    operator fun <T> setValue(thisRef: T, property: KProperty<*>, value: CanvasSession?) {
         session = value
     }
 }
