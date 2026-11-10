@@ -218,18 +218,16 @@ class CanvasComposeDataKindsRenderTest {
                     screen.left >= -1f && screen.top >= -1f && screen.right <= size.width + 1f && screen.bottom <= size.height + 1f,
                     "the dashboard $bounds is at $screen on a $size board (scale ${view.scale})",
                 )
-                val table = onNodeWithContentDescription("Note $TABLE_ID").fetchSemanticsNode().boundsInRoot
+                val tableNode = onNodeWithContentDescription("Note $TABLE_ID").fetchSemanticsNode()
+                val table = tableNode.boundsInRoot
                 val frame = assertNotNull(session.documents().single { it.id == TABLE_ID }.frame)
                 val expected = view.worldToScreen(Offset(frame.x, frame.y))
-                println("canvas-compose-e2e $snapshot table at $table, frame on screen at $expected")
+                println("canvas-compose-e2e $snapshot table at ${tableNode.positionInRoot}, frame on screen at $expected")
                 assertTrue(table.left >= -1f && table.right <= size.width + 1f, "the table is drawn at $table on a $size board")
-                // On the desktop board the card is exactly where the camera puts its frame. At phone
-                // width every note card (a plain NOTE as much as a TABLE) is drawn left of its frame
-                // by the workspace today, so only "on screen" is held there.
-                if (size == DESKTOP) {
-                    assertEquals(expected.x, table.left, 2f, "the table card's left on a $size board")
-                    assertEquals(expected.y, table.top, 2f, "the table card's top on a $size board")
-                }
+                // The card is exactly where the camera puts its frame, on the phone board as on the
+                // desktop one, though the card is wider than the phone's screen in world units.
+                assertEquals(expected.x, tableNode.positionInRoot.x, 2f, "the table card's left on a $size board")
+                assertEquals(expected.y, tableNode.positionInRoot.y, 2f, "the table card's top on a $size board")
                 println("canvas-compose-e2e $snapshot: scale ${view.scale}")
                 snapshot(snapshot)
             }

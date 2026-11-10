@@ -34,6 +34,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasDocumentWrite
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
@@ -302,6 +303,57 @@ class CanvasNoteWorldUnitsUiTest {
         assertEquals(vp.worldToScreen(atOne.topLeft).x, now.left, 1.5f)
     }
 
+    /**
+     * A card sits on its frame, where the drawing puts that frame (`screen = world * scale + offset`),
+     * at every board width and zoom, however much wider or taller than the screen it is in world
+     * units. A card bigger than the board was drawn left of and above its frame by half the overflow,
+     * which is what "Show on canvas" zoomed out on a phone-width board made of every wide note.
+     */
+    @Test
+    fun aCardSitsOnItsFrameAtEveryBoardWidthAndZoom() {
+        val misplaced = PLACEMENT_WIDTHS.flatMap { width ->
+            PLACEMENT_SCALES.flatMap { scale -> misplacedCards(IntSize(width, PLACEMENT_HEIGHT), desktop, scale) }
+        }
+        assertTrue(misplaced.isEmpty(), "cards off their frames:\n${misplaced.joinToString("\n")}")
+    }
+
+    /**
+     * The same on a real phone's terms: a 360 x 780 dp screen at density 2.75 is 990 x 2145 px, and
+     * a card's world units are px before the zoom, so it is a card wider than that (or a zoom far
+     * enough out that the chrome's margin, divided by it, makes it so) that left its frame there.
+     */
+    @Test
+    fun aCardSitsOnItsFrameOnAPhoneScreenAtAPhonesDensity() {
+        val misplaced = listOf(0.12f, 0.3f, 1f).flatMap { scale -> misplacedCards(PHONE_BOARD, Display(2.75f, 1f), scale) }
+        assertTrue(misplaced.isEmpty(), "cards off their frames:\n${misplaced.joinToString("\n")}")
+    }
+
+    /** Each card of the [board]'s frames, drawn on that board at [display] and zoom [scale], when it is not on its frame. */
+    private fun misplacedCards(board: IntSize, display: Display, scale: Float): List<String> {
+        val frames = if (board == PHONE_BOARD) PHONE_FRAMES else PLACEMENT_FRAMES
+        val misplaced = mutableListOf<String>()
+        runDesktopComposeUiTest(width = board.width, height = board.height) {
+            val session = session()
+            frames.forEach { (id, frame) ->
+                val color = PLAIN_TEXT_COLOR.takeIf { id == PLACEMENT_LABEL }
+                val json = CanvasNoteAutoFitFixtures.document(B("paragraph", "Card $id"))
+                session.put(WorldNote(id, json, frame, CanvasGeometryOwner.EXPLICIT, color))
+            }
+            val viewport = Viewport(offset = Offset(12f, 16f), scale = scale)
+            showNotes(session, display, viewport = mutableStateOf(viewport))
+            frames.forEach { (id, frame) ->
+                val node = card(id)
+                val at = node.positionInRoot
+                val expected = viewport.worldToScreen(Offset(frame.x, frame.y))
+                val widthPx = node.size.width
+                val line = "$id, $board px at $display, zoom $scale: at $at, frame at $expected, $widthPx of ${frame.width} wide"
+                val off = (at - expected).getDistance() > 1.5f
+                if (off || kotlin.math.abs(widthPx - frame.width) > 1f) misplaced += line
+            }
+        }
+        return misplaced
+    }
+
     /** A picture for a reviewer: the board at a phone's density and an enlarged font setting looks like the desktop's. */
     @Test
     fun snapshotAtAPhonesDensity() = runDesktopComposeUiTest(width = 1500, height = 700) {
@@ -377,6 +429,27 @@ class CanvasNoteWorldUnitsUiTest {
     private companion object {
         const val BOARD = 2_400
         const val FRAMES = 24
+        const val PLACEMENT_HEIGHT = 780
+        val PLACEMENT_WIDTHS = listOf(320, 360, 411, 700, 1280)
+        val PLACEMENT_SCALES = listOf(0.3f, 0.6f, 1f, 1.5f)
+        val PLACEMENT_LABEL = CanvasShapeLabels.labelIdOf("shape-1")
+
+        /** A card wider than a phone, one taller than a desktop window, and a shape's label as wide. */
+        val PLACEMENT_FRAMES = mapOf(
+            "wide" to CanvasDocumentFrame(100f, 60f, 900f, 260f),
+            "tall" to CanvasDocumentFrame(1100f, 60f, 300f, 1800f),
+            PLACEMENT_LABEL to CanvasDocumentFrame(100f, 400f, 900f, 200f),
+        )
+
+        /** A 360 x 780 dp phone screen at density 2.75, in px. */
+        val PHONE_BOARD = IntSize(990, 2145)
+
+        /** On [PHONE_BOARD]: an ordinary note, and a dashboard-wide one and label wider than its 990 px. */
+        val PHONE_FRAMES = mapOf(
+            "note" to CanvasDocumentFrame(100f, 60f, 320f, 240f),
+            "wide" to CanvasDocumentFrame(500f, 60f, 1200f, 260f),
+            PLACEMENT_LABEL to CanvasDocumentFrame(100f, 400f, 1200f, 200f),
+        )
     }
 }
 
