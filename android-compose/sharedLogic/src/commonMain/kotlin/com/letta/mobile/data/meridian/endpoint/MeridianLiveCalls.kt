@@ -78,23 +78,19 @@ class MeridianLiveCalls(
      * waits up to [waitMs] for it.
      */
     suspend fun issueToken(toolCallId: String, waitMs: Long = DEFAULT_ISSUE_WAIT_MS): String? {
-        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(toolCallId, TokenRefusal.CALL_START_NOT_SEEN)
+        // Logs why this call got no token, with what this host has seen so far; always null.
+        fun refused(reason: TokenRefusal): String? {
+            log("$TAG token.refused toolCallId=$toolCallId reason=${reason.wire} ${seen.summary(starts.value)}")
+            return null
+        }
+        withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(TokenRefusal.CALL_START_NOT_SEEN)
         return mutex.withLock {
             expire()
-            val entry = calls[toolCallId] ?: return@withLock refused(toolCallId, TokenRefusal.CALL_ENDED)
-            if (entry.token != null) return@withLock refused(toolCallId, TokenRefusal.TOKEN_ALREADY_ISSUED)
+            val entry = calls[toolCallId] ?: return@withLock refused(TokenRefusal.CALL_ENDED)
+            if (entry.token != null) return@withLock refused(TokenRefusal.TOKEN_ALREADY_ISSUED)
             log("$TAG token.issued toolCallId=$toolCallId conversationId=${entry.scope.conversationId}")
             newToken().also { calls[toolCallId] = entry.copy(token = it) }
         }
-    }
-
-    /** Logs why [toolCallId] got no token, with what this host has seen so far; always null. */
-    private fun refused(toolCallId: String, reason: TokenRefusal): String? {
-        log(
-            "$TAG token.refused toolCallId=$toolCallId reason=${reason.wire} framesSeen=${seen.frames} " +
-                "toolStartsSeen=${seen.toolStarts} meridianStartsSeen=${starts.value} lastToolStarted=${seen.lastTool ?: "none"}",
-        )
-        return null
     }
 
     /** Binds one CLI invocation to the live call that owns [token], counting it, or null when none does. */
@@ -168,6 +164,10 @@ private class MeridianFramesSeen {
         private set
     var lastTool: String? = null
         private set
+
+    /** These counts as log fields, with [meridianStarts] (the `meridian` shell calls seen starting) among them. */
+    fun summary(meridianStarts: Long): String =
+        "framesSeen=$frames toolStartsSeen=$toolStarts meridianStartsSeen=$meridianStarts lastToolStarted=${lastTool ?: "none"}"
 
     /** One more frame; when it is a tool start, that tool becomes the last one started. */
     fun frame(received: AppServerReceivedFrame) {
