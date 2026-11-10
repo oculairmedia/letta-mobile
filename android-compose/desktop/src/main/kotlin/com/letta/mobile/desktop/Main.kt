@@ -52,6 +52,8 @@ fun main(args: Array<String>) {
     com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
         LinuxAwtScale().run()
         DesktopCrashReporter.installGlobalHandler()
+        // An Iroh host relays an agent's shell_layout calls here; they change the shell on screen.
+        com.letta.mobile.data.shell.layout.edit.ShellLayoutRelay.install()
         com.letta.mobile.desktop.startup.DesktopStartupPrewarm(
             { desktopConfigStore }, { com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost.appServer },
             { com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore.documents },
