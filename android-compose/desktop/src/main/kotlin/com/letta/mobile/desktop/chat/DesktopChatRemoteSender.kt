@@ -12,7 +12,7 @@ internal data class RemoteSendAttempt(
     val attachments: List<MessageContentPart.Image>,
     val conversationId: String?,
     val titleToPersist: String?,
-    val streamGen: Int,
+    val localMessageId: LocalMessageId,
 )
 
 /**
@@ -32,6 +32,7 @@ internal class DesktopChatRemoteSender(
                 DesktopTimelineSendRequest(
                     content = MessageBody(attempt.text),
                     attachments = attempt.attachments,
+                    localMessageId = attempt.localMessageId,
                 ),
             )
             val conversationId = attempt.conversationId

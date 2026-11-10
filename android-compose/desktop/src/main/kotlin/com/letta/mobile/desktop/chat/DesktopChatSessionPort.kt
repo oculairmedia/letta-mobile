@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.flow.DerivedStateFlow
+import com.letta.mobile.data.presence.ActiveTurnPhase
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
@@ -68,11 +69,7 @@ internal class DesktopChatSessionPort(
             { controller.state.value.projectWorkspace(owner, controller.isTargetCurrent()) })
     } ?: controller.state
 
-    /**
-     * by4vm.98: the selected conversation's extension points, the shared bindings
-     * TimelineChatSessionPort reads too (chips, queue, composer host inputs, A2UI, branching,
-     * `/recompile` and the live status from the window's run registry).
-     */
+    /** Shared conversation extensions, including the window-retained active-turn owner. */
     private val options = TimelineChatSessionOptions(
         workingDirectory = controller.workingDirectory,
         permissionModes = GatewayPermissionModes(
@@ -88,6 +85,7 @@ internal class DesktopChatSessionPort(
         recompile = controller.conversationManagement.recompile,
         liveStatus = runLiveStatus(controller.runs, surface.map { it.selectedConversationId }),
         attachmentLimits = controller.attachmentLimits,
+        activeTurnCoordinator = controller.activeTurnCoordinator(surface.value.selectedConversationId),
     )
     private val extensions = ChatSessionExtensions(options, scope)
 
@@ -154,7 +152,9 @@ internal class DesktopChatSessionPort(
     private fun currentTimelineInputs() = DesktopChatTimelineInputs(
         surface = surface.value,
         presence = if (controller.isSelectionCurrent()) controller.replyPresence.value else ChatStreamingPresence(false, false),
-        cancellingConversationId = controller.cancellingConversationId.value.takeIf { controller.isSelectionCurrent() },
+        cancellingConversationId = surface.value.selectedConversationId.takeIf {
+            controller.isSelectionCurrent() && controller.activeTurnStates.value[it]?.phase == ActiveTurnPhase.Cancelling
+        },
         sendQueue = ConversationSendQueue(),
         local = localTimeline.value,
         approvals = if (controller.isSelectionCurrent()) controller.approvals.currentHostApprovals() else TimelineHostApprovals(),
@@ -163,10 +163,11 @@ internal class DesktopChatSessionPort(
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
         surface,
         controller.replyPresence,
-        controller.cancellingConversationId,
+        controller.activeTurnStates,
         controller.sendQueue.queue,
         combine(localTimeline, controller.approvals.hostApprovals(), ::Pair),
-    ) { surface, presence, cancelling, queue, (local, approvals) ->
+    ) { surface, presence, turns, queue, (local, approvals) ->
+        val cancelling = surface.selectedConversationId.takeIf { turns[it]?.phase == ActiveTurnPhase.Cancelling }
         if (controller.workspaceOwner != null && !controller.isSelectionCurrent()) {
             DesktopChatTimelineInputs(surface, ChatStreamingPresence(false, false), null, ConversationSendQueue(), local,
                 TimelineHostApprovals())

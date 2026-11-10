@@ -33,6 +33,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -191,6 +192,24 @@ class DesktopAppServerChatGatewayTest {
     @Test
     fun gateway_isChatGatewayExtras_overTheAppServerSession() {
         assertIs<ChatGatewayExtras>(gateway(FakeTurnEngine { flowOf() }))
+    }
+
+    @Test
+    fun exactAbortRejectsMissingCorrelationAndPreservesTheCapturedRunAfterReconnect() = runTest {
+        val client = FakeAppServerClient()
+        val gw = DesktopAppServerChatGateway(
+            turnEngine = com.letta.mobile.data.runtime.AppServerTurnEngine(client),
+            client = client,
+            agentIdResolver = { "agent-1" },
+        )
+        assertFalse(gw.abortConversationTurn(ConversationId("conv-1"), null))
+        assertTrue(client.abortCommands.isEmpty())
+        // This gateway has no local active-run cache after reconnect. The old captured
+        // identity must reach the server, whose current lease belongs to run-current.
+        assertFalse(gw.abortConversationTurn(ConversationId("conv-1"), DesktopRunId("run-old")))
+        assertEquals(listOf("run-old"), client.abortCommands.map { it.runId })
+        assertEquals("conv-1", client.abortCommands.single().runtime.conversationId)
+        gw.close()
     }
 
     @Test
@@ -521,8 +540,18 @@ class DesktopAppServerChatGatewayTest {
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
             error("not needed for App Server gateway tests")
 
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("not needed for App Server gateway tests")
+        val abortCommands = mutableListOf<AppServerCommand.AbortMessage>()
+        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse {
+            val requestId = requireNotNull(command.requestId)
+            require(requestId.isNotBlank())
+            abortCommands += command
+            // The simulated listener has exactly this loaded runtime and current lease.
+            val active = connected.value && command.runtime.agentId == "agent-1" && command.runtime.conversationId == "conv-1"
+            return AppServerInboundFrame.AbortMessageResponse(
+                requestId = requestId, runtime = command.runtime, success = active,
+                aborted = active && (command.runId == null || command.runId == "run-current"),
+            )
+        }
 
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
             error("not needed for App Server gateway tests")

@@ -5,6 +5,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.letta.mobile.data.chat.runtime.nowActiveStatus
+import com.letta.mobile.data.presence.ActiveTurnState
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.ui.shell.nowactive.toNowActiveStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -46,6 +50,7 @@ internal fun deriveNowActiveBarPin(
     cancellingId: String?,
     chatState: DesktopChatSurfaceState,
     host: NowActiveBarHostState,
+    activeTurn: ActiveTurnState? = null,
 ): NowActiveBarPin? {
     val barConversation = chatState.conversations.firstOrNull { it.id == ownerConversationId?.value } ?: return null
     return NowActiveBarPin(
@@ -54,7 +59,10 @@ internal fun deriveNowActiveBarPin(
             conversationTitle = barConversation.title,
             agentName = barConversation.agentName,
             agentId = barConversation.agentId,
-            status = nowActiveStatus(
+            status = activeTurn?.takeIf { it.conversationId.value == barConversation.id &&
+                it.agentId.value == barConversation.agentId }?.toNowActiveStatus(
+                hasError = chatState.selectedConversationId == barConversation.id && chatState.errorMessage != null,
+            ) ?: nowActiveStatus(
                 isThinking = host.thinkingConversationId == barConversation.id,
                 isStreaming = host.isStreamingReplySelected && streamingId == barConversation.id,
                 hasError = chatState.selectedConversationId == barConversation.id && chatState.errorMessage != null,
@@ -87,19 +95,24 @@ internal fun DesktopNowActiveBarHost(
     host: NowActiveBarHostState,
     actions: NowActiveBarHostActions,
 ): DesktopHeaderIdentity {
-    val streamingId by chatController.streamingConversationId.collectAsState()
-    // letta-mobile-lgns8.19: an abort was sent but the terminal frame hasn't
-    // landed — the run is still live, so the header says "stopping…" and the
-    // stop button stays available as the local force-clear escape hatch.
-    val cancellingId by chatController.cancellingConversationId.collectAsState()
-    val pin = deriveNowActiveBarPin(ownerConversationId, streamingId, cancellingId, chatState, host)
+    val turns by chatController.activeTurnStates.collectAsState()
+    val backgroundHint = host.thinkingConversationId
+    val selected = chatState.conversations.firstOrNull { it.id == ownerConversationId?.value }
+    val turn = turns[ownerConversationId?.value] ?: selected?.agentId?.let { agent ->
+        ActiveTurnState(ConversationId(selected.id), AgentId(agent))
+    }
+    val background = turns.values.firstOrNull {
+        it.phase != ActiveTurnPhase.Idle && it.conversationId != ownerConversationId
+    }?.conversationId?.value ?: backgroundHint?.takeIf { turns[it]?.phase != null && turns[it]?.phase != ActiveTurnPhase.Idle }
+    val pin = deriveNowActiveBarPin(ownerConversationId, null, null, chatState,
+        NowActiveBarHostState(background, false), turn)
         ?: return DesktopHeaderIdentity(state = null, actions = NowActiveBarActions.None)
     return DesktopHeaderIdentity(
         state = pin.state,
         actions = NowActiveBarActions(
             onOpenConversation = { actions.onOpenConversation(pin.conversationId) },
             onJumpToBackgroundWork = {
-                host.thinkingConversationId?.let(actions.onOpenConversation)
+                background?.let(actions.onOpenConversation)
             },
             // Scoped to the pinned conversation so an unrelated in-flight
             // send can never be cancelled by mistake.
