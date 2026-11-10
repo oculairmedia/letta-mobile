@@ -193,7 +193,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 ### reference
 
-- [canvas\_compose v1 reference](reference/canvas-compose-v1.md)
+- [canvas\_compose reference](reference/canvas-compose-v1.md)
 - [LCP wire v1: the canvas plugin protocol](reference/canvas-plugin-wire-v1.md)
 - [Current App Server protocol and admin ownership reference](reference/current-app-server-protocol.md)
 - [Documentation source audit — 2026-10-18](reference/documentation-audit-2026-10-18.md)

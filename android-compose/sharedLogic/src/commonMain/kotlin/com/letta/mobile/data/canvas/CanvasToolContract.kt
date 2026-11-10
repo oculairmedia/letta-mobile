@@ -185,18 +185,18 @@ object CanvasToolContract {
     )
 
     /**
-     * Canvas_compose v1: notes, checklists, cards, text and groups by
+     * Canvas_compose: notes, checklists, cards, tables, stats, progress bars, charts, text and groups by
      * meaning, placed and sized by the board. Its input is [CanvasComposeSchema.input], strict at
      * every level, so a refusal's JSON-pointer path names a place in the schema the model saw.
      */
     val compose = CanvasToolDefinition(
         COMPOSE,
-        "Put notes, checklists, cards, text and labelled groups on the conversation canvas (or pass canvas_id) in one call. " +
-            "Read $COMPOSE_GUIDE once: format, caps, markdown, errors. kind is NOTE {markdown}, CHECKLIST " +
-            "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
+        "Put notes, cards, tables, stats, charts and more on the conversation canvas in one call. " +
+            "Read $COMPOSE_GUIDE once: format, caps, markdown, errors. kind is NOTE {markdown}, " +
+            "CHECKLIST {items: [{text, checked?}]}, CARD {title, fields?, markdown?}, TABLE {columns, rows}, " +
+            "STAT {label, value}, PROGRESS {label, value 0-1}, CHART {style: bar|line, points: [{label, value}]}, TEXT " +
             "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes everything. " +
-            "All or nothing: a refusal lists each problem at a JSON-pointer path (e.g. /items/2/markdown) and publishes nothing. " +
-            "dry_run: true returns the receipt only. " +
+            "All or nothing: a refusal lists each problem at a JSON-pointer path and publishes nothing. " +
             "Items carry frame [x, y, w, h]; framesOmitted means call canvas_get_layout. To draw, use $APPLY_OPS.",
         CanvasComposeSchema.input,
     )

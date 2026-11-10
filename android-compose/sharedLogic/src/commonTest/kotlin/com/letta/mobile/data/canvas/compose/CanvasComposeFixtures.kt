@@ -76,6 +76,22 @@ object CanvasComposeFixtures {
         }.toString()
     }
 
+    /** A TABLE as the compiler writes it: the board table block, the header row first. */
+    val TWO_COLUMN_TABLE: String = CanvasCascadeBlocks.table(
+        listOf("Area", "Owner"),
+        listOf(listOf("Sync", "Ana"), listOf("Search", "Ben"), listOf("Billing", "Chloe")),
+    )
+
+    /** A wider TABLE whose long cells wrap in their column. */
+    val FOUR_COLUMN_TABLE: String = CanvasCascadeBlocks.table(
+        listOf("Area", "Owner", "Status", "Next step"),
+        listOf(
+            listOf("Sync", "Ana", "On track", "Ship the retry queue"),
+            listOf("Search", "Ben", "At risk", "Profile the slow index rebuild on large boards"),
+            listOf("Billing", "Chloe", "Blocked", "Waiting on the tax provider"),
+        ),
+    )
+
     private const val LOREM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
 
     val notes: List<NoteCase> = listOf(
@@ -128,6 +144,8 @@ object CanvasComposeFixtures {
             387f,
         ),
         NoteCase("cap", ComposeKind.NOTE, document(*Array(60) { B("paragraph", LOREM) }), 320f, 1200f),
+        NoteCase("two-column table", ComposeKind.TABLE, TWO_COLUMN_TABLE, 320f, 209f),
+        NoteCase("four-column table", ComposeKind.TABLE, FOUR_COLUMN_TABLE, 480f, 333f),
     )
 
     val texts: List<TextCase> = listOf(

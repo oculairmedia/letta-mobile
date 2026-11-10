@@ -9,6 +9,8 @@ import com.letta.mobile.data.canvas.compose.MdParse
 import com.letta.mobile.data.canvas.compose.MdSpan
 import com.letta.mobile.data.canvas.compose.MdSpanStyle
 import com.letta.mobile.data.canvas.compose.MdText
+import com.letta.mobile.ui.canvas.CanvasTableBlock
+import com.letta.mobile.ui.canvas.TableBlockType
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.core.BlockAttributes
 import io.github.linreal.cascade.editor.core.BlockContent
@@ -143,6 +145,33 @@ class CanvasCascadeBlocksOracleTest {
             MdBlock.Paragraph(MdText("Where: Park", listOf(MdSpan(MdSpanStyle.BOLD, 0, 6)))),
         ) + body
         assertOracle(expected, json)
+    }
+
+    /**
+     * A TABLE is the board's own table block, exactly as the library writes the custom block the
+     * note editor inserts, and it reads back as that block's cells and survives an editor's save.
+     */
+    @Test
+    fun aTableIsTheBoardTableBlockAsTheLibraryWritesIt() {
+        val rows = listOf(listOf("Area", "Owner"), listOf("Sync", "Ana"), listOf("Search", ""))
+        val json = CanvasCascadeBlocks.table(rows.first(), rows.drop(1))
+        val library = Block(BlockId("b1"), TableBlockType, CanvasTableBlock.content(rows))
+        assertEquals(canonical(DocumentSchema.encodeToString(listOf(library))), canonical(json), "the library writes the table differently")
+
+        val decoded = DocumentSchema.decodeFromStringWithReport(json).blocks.single()
+        assertEquals(CanvasTableBlock.TYPE_ID, decoded.type.typeId)
+        assertEquals(rows, CanvasTableBlock.rowsOf(decoded))
+
+        val holder = EditorStateHolder()
+        val textStates = BlockTextStates()
+        val spanStates = BlockSpanStates()
+        holder.loadFromJson(json, textStates, spanStates)
+        // The editor keeps the table block as written; it adds an empty paragraph after a last block
+        // that holds no text, so there is a line to type on.
+        val saved = Json.parseToJsonElement(holder.toJson(textStates, spanStates)) as JsonObject
+        val written = Json.parseToJsonElement(json) as JsonObject
+        val firstWritten = canonical((written.getValue("blocks") as JsonArray)[0])
+        assertEquals(firstWritten, canonical((saved.getValue("blocks") as JsonArray)[0]), "an editor saves the table differently")
     }
 
     @Test

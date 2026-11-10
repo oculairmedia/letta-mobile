@@ -8,12 +8,16 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
-/** What the estimator needs of one block: its type, its words, its heading level and nesting depth. */
+/**
+ * What the estimator needs of one block: its type, its words, its heading level and nesting depth;
+ * a table's [cells] (header row first) instead of words.
+ */
 data class ReserveBlock(
     val type: ReserveBlockType,
     val text: String,
     val level: Int = 1,
     val depth: Int = 0,
+    val cells: List<List<String>> = emptyList(),
 )
 
 /** The Cascade block types the estimator tells apart (plan section 3.2). */
@@ -26,6 +30,7 @@ enum class ReserveBlockType {
     QUOTE,
     CODE,
     DIVIDER,
+    TABLE,
     ;
 
     companion object {
@@ -54,6 +59,7 @@ enum class ReserveBlockType {
             "quote" -> QUOTE
             "code" -> CODE
             "divider" -> DIVIDER
+            CanvasCascadeBlocks.TYPE_TABLE -> TABLE
             else -> PARAGRAPH
         }
     }
@@ -94,8 +100,16 @@ internal object ReserveDocument {
         val type = block["type"] as? JsonObject
         val typeId = (type?.get("typeId") as? JsonPrimitive)?.contentOrNull
         val level = ReserveBlockType.headingLevel(typeId) ?: (type?.get("level") as? JsonPrimitive)?.intOrNull ?: 1
-        val text = ((block["content"] as? JsonObject)?.get("text") as? JsonPrimitive)?.contentOrNull.orEmpty()
-        return ReserveBlock(ReserveBlockType.of(typeId), text, level, depth + indentationOf(block))
+        val content = block["content"] as? JsonObject
+        val text = (content?.get("text") as? JsonPrimitive)?.contentOrNull.orEmpty()
+        return ReserveBlock(ReserveBlockType.of(typeId), text, level, depth + indentationOf(block), cellsOf(content))
+    }
+
+    /** A table block's `content.data.rows`, rows of cell texts; empty for any other block. */
+    private fun cellsOf(content: JsonObject?): List<List<String>> {
+        val rows = ((content?.get(CanvasCascadeBlocks.KEY_DATA) as? JsonObject)?.get(CanvasCascadeBlocks.TABLE_ROWS) as? JsonArray)
+            ?: return emptyList()
+        return rows.map { row -> (row as? JsonArray).orEmpty().map { (it as? JsonPrimitive)?.contentOrNull.orEmpty() } }
     }
 
     /** A block's `attributes.indentationLevel`, 0 when absent or unreadable. */

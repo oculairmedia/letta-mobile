@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.data.canvas.compose.CanvasCascadeBlocks
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -126,6 +127,28 @@ internal object CanvasNoteAutoFitFixtures {
             387f,
         ),
         NoteCase(CAP_CASE, document(List(60) { B("paragraph", LOREM) }), 320f, 1200f),
+        NoteCase(
+            "two-column table",
+            CanvasCascadeBlocks.table(
+                listOf("Area", "Owner"),
+                listOf(listOf("Sync", "Ana"), listOf("Search", "Ben"), listOf("Billing", "Chloe")),
+            ),
+            320f,
+            209f,
+        ),
+        NoteCase(
+            "four-column table",
+            CanvasCascadeBlocks.table(
+                listOf("Area", "Owner", "Status", "Next step"),
+                listOf(
+                    listOf("Sync", "Ana", "On track", "Ship the retry queue"),
+                    listOf("Search", "Ben", "At risk", "Profile the slow index rebuild on large boards"),
+                    listOf("Billing", "Chloe", "Blocked", "Waiting on the tax provider"),
+                ),
+            ),
+            480f,
+            333f,
+        ),
     )
 
     /** letta-mobile-8tlf9's first shape: a 12-item shopping checklist that clipped at 480x500. */

@@ -79,7 +79,8 @@ class CanvasComposeCompilerTest {
             assertEquals("cmp-weekend-plan-${document.compose?.key}", document.documentId)
         }
         assertEquals(
-            CanvasComposeProvenance("weekend-plan", "shopping", "CHECKLIST", CanvasComposeContract.CATALOG, CanvasComposeContract.VERSION),
+            // A v1 kind keeps version 1 in its provenance, whatever this build speaks.
+            CanvasComposeProvenance("weekend-plan", "shopping", "CHECKLIST", CanvasComposeContract.CATALOG, ComposeKind.CHECKLIST.since),
             documents.first().compose,
         )
         assertEquals(listOf("Shopping", "Meals", "Walk", null), documents.map { it.title })
@@ -259,7 +260,7 @@ class CanvasComposeCompilerTest {
 
     @Test
     fun anotherVersionIsUnsupported() {
-        val refusal = refusedOf(compileText("""{"version":2,"items":[{"kind":"NOTE","markdown":"x"}]}"""))
+        val refusal = refusedOf(compileText("""{"version":3,"items":[{"kind":"NOTE","markdown":"x"}]}"""))
         assertEquals(ComposeErrorCode.UNSUPPORTED_VERSION, refusal.code)
         assertSingleProblem(refusal, "/version", ComposeProblemCode.BAD_VALUE)
     }

@@ -58,6 +58,27 @@ class CanvasArtifactReceiptsTest {
     }
 
     @Test
+    fun aReceiptOfDataKindsProjectsWithEachKindAndEveryDrawnFrame() {
+        val receipt = checkNotNull(javaClass.getResource("/canvas/compose/v2/receipt.json")).readText()
+        val pending = checkNotNull(javaClass.getResource("/canvas/compose/v2/request-data-kinds.json")).readText()
+        val events = listOf(call(Call("t1", result = receipt)), assistant(Said("a1", "Done.")))
+        val part = CanvasArtifactReceipts.attach(events).values.single().single()
+        assertEquals(CanvasArtifactStatus.Published, part.status)
+        assertEquals("sprint-dashboard", part.artifactId)
+        assertEquals(
+            listOf(ComposeKind.TEXT, ComposeKind.GROUP, ComposeKind.STAT, ComposeKind.PROGRESS, ComposeKind.TABLE, ComposeKind.CHART),
+            part.kinds,
+        )
+        assertEquals(9, part.itemCount)
+        assertTrue("cmp-sprint-dashboard-burndown" in part.pieceIds, "a chart is shown by its frame: ${part.pieceIds}")
+        assertTrue(part.canShowOnCanvas)
+        // While the call is pending, the card names the same kinds from the request.
+        val pendingEvents = listOf(call(Call("t2", result = null, arguments = pending)), assistant(Said("a2", "Wait.")))
+        val waiting = CanvasArtifactReceipts.attach(pendingEvents)
+        assertEquals(part.kinds.toSet(), waiting.values.single().single().kinds.toSet())
+    }
+
+    @Test
     fun theFixtureReceiptStaysUnderTheWireProjectionThreshold() {
         // A return above this is shipped as a preview on hydrate (pointer diet) and degrades.
         val compact = CanvasComposeContract.json.encodeToString(
@@ -190,7 +211,7 @@ class CanvasArtifactReceiptsTest {
         val part = CanvasArtifactReceipts.attach(events).values.single().single()
         assertEquals(CanvasArtifactStatus.Failed, part.status)
         assertEquals("VALIDATION_FAILED", part.error?.code)
-        assertEquals("'STICKY' is not a kind; use NOTE, CHECKLIST, CARD, TEXT or GROUP", part.error?.message)
+        assertEquals("'STICKY' is not a kind; use NOTE, CHECKLIST, CARD, TEXT, TABLE, STAT, PROGRESS, CHART or GROUP", part.error?.message)
         assertEquals(3, part.error?.problemCount)
         assertNull(part.bounds)
         assertFalse(part.canShowOnCanvas)

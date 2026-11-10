@@ -26,10 +26,13 @@ sealed interface ComposeCompilation {
         val items: List<ComposeReceiptItem>,
         val dryRun: Boolean,
         val alreadyPublished: Boolean = false,
+        /** The catalog version the receipt answers in: [ComposeRequest.requiredVersion], so a v1 request reads as before. */
+        val version: Int = CanvasComposeContract.VERSION,
     ) : ComposeCompilation {
         fun receipt(canvasId: CanvasId, status: ComposeStatus, revision: Long?, warnings: List<String> = emptyList()): ComposeReceipt =
             ComposeReceiptFrames.fit(
                 ComposeReceipt(
+                    version = version,
                     artifactId = artifactId,
                     canvasId = canvasId.value,
                     revision = revision,
@@ -100,8 +103,9 @@ object CanvasComposeCompiler {
             bounds = placement.bounds,
             items = built.map { receiptItem(it, placement) },
             dryRun = request.dryRun == true,
+            version = request.requiredVersion(),
         )
-        val existing = ExistingArtifact.of(sceneJson, artifactId)
+        val existing = existingArtifact(sceneJson, artifactId)
         return when {
             existing.isEmpty() -> ready
             existing.matches(emitted) -> retryOf(ready, existing)
@@ -184,10 +188,13 @@ object CanvasComposeCompiler {
     internal sealed interface Built {
         val entry: Entry
 
-        /** A NOTE, CHECKLIST or CARD: a block document. */
+        /** A NOTE, CHECKLIST, CARD or TABLE: a block document. */
         class Document(override val entry: Entry, val documentJson: String, val color: String?, val title: String?) : Built
 
         class Text(override val entry: Entry, val text: String, val size: ComposeTextSize) : Built
+
+        /** A STAT, PROGRESS or CHART: board elements in a frame ([drawnParts]). */
+        class Drawing(override val entry: Entry) : Built
 
         class Group(override val entry: Entry, val label: String?, val children: List<Built>) : Built
     }
@@ -209,6 +216,13 @@ object CanvasComposeCompiler {
                 item.title,
             )
         }
+        is ComposeItem.Table -> Built.Document(
+            entry,
+            CanvasCascadeBlocks.table(item.columns, item.rows),
+            CanvasComposeColors.of(item.color, CanvasComposeColors.CARD_DEFAULT),
+            item.title,
+        )
+        is ComposeItem.Stat, is ComposeItem.Progress, is ComposeItem.Chart -> Built.Drawing(entry)
         is ComposeItem.Text -> Built.Text(entry, item.text, item.size)
         is ComposeItem.Group -> Built.Group(entry, item.label?.takeIf { it.isNotBlank() }, entry.children.map { build(it, problems) })
     }
@@ -228,8 +242,12 @@ object CanvasComposeCompiler {
 
     private fun leaf(built: Built): SizedItem.Leaf = when (built) {
         is Built.Document -> {
-            val width = CanvasComposeContract.width(built.entry.item.kind)
+            val width = CanvasComposeContract.widthOf(built.entry.item)
             SizedItem.Leaf(built.entry.key, width, CanvasComposeReserve.reserveDocument(built.documentJson, width))
+        }
+        is Built.Drawing -> {
+            val (width, height) = drawnSize(built.entry.item)
+            SizedItem.Leaf(built.entry.key, width, height)
         }
         is Built.Text -> SizedItem.Leaf(
             built.entry.key,
@@ -243,8 +261,16 @@ object CanvasComposeCompiler {
     private fun receiptItem(built: Built, placement: Placement): ComposeReceiptItem = ComposeReceiptItem(
         key = built.entry.key,
         kind = built.entry.item.kind,
-        count = (built.entry.item as? ComposeItem.Checklist)?.items?.size,
+        count = countOf(built.entry.item),
         frame = placement.slots.getValue(built.entry.key).frameInts(),
         children = (built as? Built.Group)?.children?.map { receiptItem(it, placement) },
     )
+
+    /** What a receipt counts: a checklist's entries, a table's rows, a chart's points. */
+    private fun countOf(item: ComposeItem): Int? = when (item) {
+        is ComposeItem.Checklist -> item.items.size
+        is ComposeItem.Table -> item.rows.size
+        is ComposeItem.Chart -> item.points.size
+        else -> null
+    }
 }

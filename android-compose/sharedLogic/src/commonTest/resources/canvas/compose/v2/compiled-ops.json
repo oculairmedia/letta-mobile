@@ -1,0 +1,522 @@
+[
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-kpis",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"816.0,80.0\",\"1528.0,433.0\"],\"strokeColor\":\"#9e9e9eff\",\"strokeWidth\":1.0,\"fillColor\":\"#f5f5f5ff\",\"cornerRadius\":16.0,\"zIndex\":0,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"kpis\",\"kind\":\"GROUP\",\"catalog\":\"letta.canvas.compose\",\"version\":1}}"
+    },
+    {
+        "type": "set_document",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "documentId": "cmp-sprint-dashboard-owners",
+        "documentJson": "{\"version\":2,\"blocks\":[{\"id\":\"b1\",\"type\":{\"typeId\":\"letta.table\",\"custom\":true},\"content\":{\"kind\":\"letta.table\",\"data\":{\"rows\":[[\"Area\",\"Owner\",\"Status\",\"Next step\"],[\"Sync\",\"Ana\",\"On track\",\"Ship the retry queue\"],[\"Search\",\"Ben\",\"At risk\",\"Profile the slow index rebuild on large boards\"],[\"Billing\",\"Chloe\",\"Blocked\",\"Waiting on the tax provider\"]]}}}]}",
+        "frame": {
+            "x": 1552.0,
+            "y": 80.0,
+            "width": 480.0,
+            "height": 333.0
+        },
+        "color": "#ffffff",
+        "title": "Owners",
+        "owner": "auto",
+        "compose": {
+            "artifactId": "sprint-dashboard",
+            "key": "owners",
+            "kind": "TABLE",
+            "catalog": "letta.canvas.compose",
+            "version": 2
+        }
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-velocity",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"840.0,136.0\",\"1080.0,266.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#ffffffff\",\"cornerRadius\":12.0,\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"velocity\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-velocity.label",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Velocity\",\"textTopLeft\":\"856.0,152.0\",\"wrapWidth\":208.0,\"fontSize\":14.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"velocity\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-velocity.value",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"42 pts\",\"textTopLeft\":\"856.0,177.0\",\"wrapWidth\":208.0,\"fontSize\":32.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"velocity\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-velocity.delta",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"+8% vs last sprint\",\"textTopLeft\":\"856.0,229.0\",\"wrapWidth\":208.0,\"fontSize\":14.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#2e7d32ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"velocity\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-bugs",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"1184.0,136.0\",\"1424.0,288.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#ffffffff\",\"cornerRadius\":12.0,\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"bugs\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-bugs.label",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Open bugs\",\"textTopLeft\":\"1200.0,152.0\",\"wrapWidth\":208.0,\"fontSize\":14.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"bugs\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-bugs.value",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"17\",\"textTopLeft\":\"1200.0,177.0\",\"wrapWidth\":208.0,\"fontSize\":32.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"bugs\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-bugs.delta",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"+5 since Monday\",\"textTopLeft\":\"1200.0,229.0\",\"wrapWidth\":208.0,\"fontSize\":14.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#c62828ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"bugs\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-bugs.caption",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"3 of them block the release\",\"textTopLeft\":\"1200.0,254.0\",\"wrapWidth\":208.0,\"fontSize\":12.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"bugs\",\"kind\":\"STAT\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-release",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"840.0,312.0\",\"1160.0,409.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#ffffffff\",\"cornerRadius\":12.0,\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"release\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-release.track",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"856.0,357.0\",\"1144.0,367.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#e0e0e0ff\",\"cornerRadius\":5.0,\"zIndex\":2,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"release\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-release.fill",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"856.0,357.0\",\"1035.0,367.0\"],\"strokeColor\":\"#e65100ff\",\"strokeWidth\":1.0,\"fillColor\":\"#e65100ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"release\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-release.label",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Release 2.4\",\"textTopLeft\":\"856.0,328.0\",\"wrapWidth\":232.0,\"fontSize\":14.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"release\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-release.percent",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"62%\",\"textTopLeft\":\"1088.0,328.0\",\"wrapWidth\":56.0,\"fontSize\":14.0,\"alignment\":\"RIGHT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"release\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-release.caption",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"31 of 50 stories done\",\"textTopLeft\":\"856.0,375.0\",\"wrapWidth\":288.0,\"fontSize\":12.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"release\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-docs",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"1184.0,312.0\",\"1504.0,383.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#ffffffff\",\"cornerRadius\":12.0,\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"docs\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-docs.track",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"1200.0,357.0\",\"1488.0,367.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#e0e0e0ff\",\"cornerRadius\":5.0,\"zIndex\":2,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"docs\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-docs.fill",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"1200.0,357.0\",\"1488.0,367.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"docs\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-docs.label",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Docs review\",\"textTopLeft\":\"1200.0,328.0\",\"wrapWidth\":232.0,\"fontSize\":14.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"docs\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-docs.percent",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"100%\",\"textTopLeft\":\"1432.0,328.0\",\"wrapWidth\":56.0,\"fontSize\":14.0,\"alignment\":\"RIGHT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"docs\",\"kind\":\"PROGRESS\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"80.0,457.0\",\"560.0,730.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#ffffffff\",\"cornerRadius\":12.0,\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.axis",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"LINE\",\"points\":[\"96.0,690.0\",\"544.0,690.0\"],\"strokeColor\":\"#9e9e9eff\",\"strokeWidth\":1.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.line",
+        "elementJson": "{\"type\":\"Path\",\"samples\":[\"141.0,530.0,3.0\",\"230.0,549.0,3.0\",\"320.0,564.0,3.0\",\"410.0,591.0,3.0\",\"499.0,629.0,3.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":3.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.dot0",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"CIRCLE\",\"points\":[\"137.0,530.0\",\"145.0,530.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.dot1",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"CIRCLE\",\"points\":[\"226.0,549.0\",\"234.0,549.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.dot2",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"CIRCLE\",\"points\":[\"316.0,564.0\",\"324.0,564.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.dot3",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"CIRCLE\",\"points\":[\"406.0,591.0\",\"414.0,591.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.dot4",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"CIRCLE\",\"points\":[\"495.0,629.0\",\"503.0,629.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.title",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Points left\",\"textTopLeft\":\"96.0,473.0\",\"wrapWidth\":448.0,\"fontSize\":18.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.value0",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"50\",\"textTopLeft\":\"96.0,508.0\",\"wrapWidth\":90.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.value1",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"44\",\"textTopLeft\":\"186.0,527.0\",\"wrapWidth\":89.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.value2",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"39.5\",\"textTopLeft\":\"275.0,542.0\",\"wrapWidth\":90.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.value3",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"31\",\"textTopLeft\":\"365.0,569.0\",\"wrapWidth\":89.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.value4",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"19\",\"textTopLeft\":\"454.0,607.0\",\"wrapWidth\":90.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.label0",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Mon\",\"textTopLeft\":\"96.0,696.0\",\"wrapWidth\":90.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.label1",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Tue\",\"textTopLeft\":\"186.0,696.0\",\"wrapWidth\":89.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.label2",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Wed\",\"textTopLeft\":\"275.0,696.0\",\"wrapWidth\":90.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.label3",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Thu\",\"textTopLeft\":\"365.0,696.0\",\"wrapWidth\":89.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-burndown.label4",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Fri\",\"textTopLeft\":\"454.0,696.0\",\"wrapWidth\":90.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"burndown\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"816.0,457.0\",\"1296.0,730.0\"],\"strokeColor\":\"#e0e0e0ff\",\"strokeWidth\":1.0,\"fillColor\":\"#ffffffff\",\"cornerRadius\":12.0,\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.axis",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"LINE\",\"points\":[\"832.0,690.0\",\"1280.0,690.0\"],\"strokeColor\":\"#9e9e9eff\",\"strokeWidth\":1.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.bar0",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"847.0,610.0\",\"892.0,690.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.bar1",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"922.0,564.0\",\"967.0,690.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.bar2",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"997.0,587.0\",\"1042.0,690.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.bar4",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"1146.0,530.0\",\"1191.0,690.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.bar5",
+        "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"1221.0,553.0\",\"1266.0,690.0\"],\"strokeColor\":\"#1e88e5ff\",\"strokeWidth\":1.0,\"fillColor\":\"#1e88e5ff\",\"cornerRadius\":5.0,\"zIndex\":3,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.title",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Stories closed per week\",\"textTopLeft\":\"832.0,473.0\",\"wrapWidth\":448.0,\"fontSize\":18.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.value0",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"7\",\"textTopLeft\":\"832.0,588.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.value1",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"11\",\"textTopLeft\":\"907.0,542.0\",\"wrapWidth\":74.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.value2",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"9\",\"textTopLeft\":\"981.0,565.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.value3",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"0\",\"textTopLeft\":\"1056.0,668.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.value4",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"14\",\"textTopLeft\":\"1131.0,508.0\",\"wrapWidth\":74.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.value5",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"12\",\"textTopLeft\":\"1205.0,531.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.label0",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"W9\",\"textTopLeft\":\"832.0,696.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.label1",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"W10\",\"textTopLeft\":\"907.0,696.0\",\"wrapWidth\":74.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.label2",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"W11\",\"textTopLeft\":\"981.0,696.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.label3",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"W12\",\"textTopLeft\":\"1056.0,696.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.label4",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"W13\",\"textTopLeft\":\"1131.0,696.0\",\"wrapWidth\":74.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-throughput.label5",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"This week\",\"textTopLeft\":\"1205.0,696.0\",\"wrapWidth\":75.0,\"fontSize\":12.0,\"alignment\":\"CENTER\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#616161ff\",\"zIndex\":4,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"throughput\",\"kind\":\"CHART\",\"catalog\":\"letta.canvas.compose\",\"version\":2}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-heading",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"Sprint 14\",\"textTopLeft\":\"80.0,80.0\",\"wrapWidth\":480.0,\"fontSize\":36.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":2,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"heading\",\"kind\":\"TEXT\",\"catalog\":\"letta.canvas.compose\",\"version\":1}}"
+    },
+    {
+        "type": "add_element",
+        "opId": "",
+        "actorId": "",
+        "lamport": 0,
+        "elementId": "cmp-sprint-dashboard-kpis-label",
+        "elementJson": "{\"type\":\"Text\",\"text\":\"This week\",\"textTopLeft\":\"840.0,96.0\",\"wrapWidth\":664.0,\"fontSize\":18.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#424242ff\",\"zIndex\":1,\"_compose\":{\"artifactId\":\"sprint-dashboard\",\"key\":\"kpis\",\"kind\":\"GROUP\",\"catalog\":\"letta.canvas.compose\",\"version\":1}}"
+    }
+]

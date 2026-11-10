@@ -52,6 +52,18 @@ class ChatRowCanvasArtifactUiTest {
     }
 
     @Test
+    fun aCardOfDataKindsNamesEachKind() = runComposeUiTest {
+        val dashboard = published.copy(
+            title = "Sprint 14 dashboard",
+            kinds = listOf(ComposeKind.TABLE, ComposeKind.STAT, ComposeKind.PROGRESS, ComposeKind.CHART),
+            itemCount = 4,
+        )
+        setContent { MaterialTheme { RenderRow(single(narration(dashboard))) } }
+        onNodeWithText("Sprint 14 dashboard").assertExists()
+        onNodeWithText("4 items · Table, Stat, Progress, Chart").assertExists()
+    }
+
+    @Test
     fun withoutAFramingHostShowOnCanvasFallsBackToOpenCanvas() = runComposeUiTest {
         var opened = 0
         setContent {

@@ -17,8 +17,11 @@ import com.letta.mobile.data.model.CanvasArtifactId
  * at that path. docs/reference/canvas-compose-v1.md carries a copy, held equal by a jvmTest.
  */
 object CanvasComposeGuide {
-    /** The guide is read once per session; it has to stay a short read. */
-    const val MAX_CHARS = 8_000
+    /**
+     * The guide is read once per session; it has to stay a short read. Raised from 8 000 when v2
+     * added four kinds, each with its fields, caps and how it is drawn.
+     */
+    const val MAX_CHARS = 10_000
 
     /** The worked example, the same request as the v1 `request.json` fixture. */
     const val EXAMPLE_REQUEST = """{
@@ -82,7 +85,8 @@ object CanvasComposeGuide {
     private fun meaning(code: ComposeErrorCode): String = when (code) {
         ComposeErrorCode.VALIDATION_FAILED -> "the request breaks the format; the problems below say where."
         ComposeErrorCode.UNSUPPORTED_VERSION ->
-            "another catalog or version, e.g. \"version\": 2 is refused at /version; send ${Contract.VERSION} or leave it out."
+            "another catalog or version, e.g. \"version\": ${Contract.VERSION + 1} is refused at /version; " +
+                "send ${Contract.SUPPORTED_VERSIONS.joinToString(" or ")} or leave it out."
         ComposeErrorCode.ARTIFACT_EXISTS ->
             "the artifact_id is on the board with other content (path /artifact_id); compose never changes an artifact, so use a new artifact_id."
         ComposeErrorCode.BOARD_REFUSED ->
@@ -109,7 +113,11 @@ object CanvasComposeGuide {
             appendLine("- title: names the artifact in the chat, at most ${Contract.MAX_TITLE_CHARS} characters.")
             appendLine("- canvas_id: omit it for the canvas of the conversation you are in.")
             appendLine("- dry_run: true runs every check and answers the receipt with status \"dry_run\"; nothing is published.")
-            appendLine("- catalog, version: optional; \"${Contract.CATALOG}\" and ${Contract.VERSION}. The whole request is at most ${Contract.MAX_REQUEST_BYTES / 1024} KiB.")
+            appendLine(
+                "- catalog, version: optional; \"${Contract.CATALOG}\" and ${Contract.SUPPORTED_VERSIONS.joinToString(" or ")}; " +
+                    "TABLE, STAT, PROGRESS and CHART need ${Contract.VERSION}, so leave version out or send ${Contract.VERSION}. " +
+                    "The whole request is at most ${Contract.MAX_REQUEST_BYTES / 1024} KiB.",
+            )
             appendLine()
             appendLine("## Kinds")
             appendLine("Every item has a \"kind\" and an optional \"key\": lowercase letters, digits, _ and -, at most $keyMax, unique in the request.")
@@ -117,7 +125,8 @@ object CanvasComposeGuide {
             appendLine("- CHECKLIST {items: [{text, checked?}], title?, color?}: 1 to ${Contract.MAX_CHECKLIST_ITEMS} entries of up to ${Contract.MAX_VALUE_CHARS} characters; checked defaults to false.")
             appendLine("- CARD {title, fields?: [{label, value}], markdown?, color?}: a titled note: up to ${Contract.MAX_CARD_FIELDS} fields (label up to ${Contract.MAX_LABEL_CHARS}, value up to ${Contract.MAX_VALUE_CHARS}) shown as bold \"label: value\" lines, then up to ${Contract.MAX_CARD_BODY_CHARS} characters of markdown. Not a container.")
             appendLine("- TEXT {text, size: heading|body}: up to ${Contract.MAX_TEXT_CHARS} characters on the board itself, outside any note.")
-            appendLine("- GROUP {children, label?}: a labelled frame (label up to ${Contract.MAX_LABEL_CHARS}) around NOTE, CHECKLIST, CARD and TEXT items. Groups do not nest.")
+            kindLines().forEach(::appendLine)
+            appendLine("- GROUP {children, label?}: a labelled frame (label up to ${Contract.MAX_LABEL_CHARS}) around other kinds.")
             appendLine("Titles are at most ${Contract.MAX_TITLE_CHARS} characters.")
             appendLine()
             appendLine("## Markdown (NOTE and CARD)")
@@ -128,7 +137,10 @@ object CanvasComposeGuide {
             appendLine("Refused as UNSUPPORTED_MARKDOWN, with the character offset, never shown as plain text instead:")
             appendLine("- raw HTML and `<url>` autolinks: notes do not render HTML; write [text](url).")
             appendLine("- images: a note holds text only.")
-            appendLine("- tables, footnotes, reference links, setext (underlined) headings, indented code: outside the subset; use lists, inline links, # headings and fences.")
+            appendLine(
+                "- tables (use a TABLE item), footnotes, reference links, setext (underlined) headings, indented code: " +
+                    "outside the subset; use lists, inline links, # headings and fences.",
+            )
             appendLine("- a numbered list that starts at another number: the board numbers lists from 1.")
             appendLine("- headings past ${"#".repeat(CanvasComposeMarkdown.MAX_HEADING_LEVEL)}; a heading, quote, fence or divider inside a list item; a block inside a quote; an unclosed fence.")
             appendLine("- a list nested two levels deep is NESTING_TOO_DEEP.")
@@ -137,21 +149,33 @@ object CanvasComposeGuide {
             appendLine("## Colours")
             appendLine("color is ${CanvasComposeColors.PRESETS.entries.joinToString { (name, hex) -> "$name ($hex)" }}, or any #rrggbb.")
             appendLine("The presets are the board's note tints, so red shows as pink, cyan as blue and purple as violet. Without a colour a NOTE or CHECKLIST takes the workspace's note colour and a CARD is white (${CanvasComposeColors.CARD_DEFAULT}). TEXT and GROUP take no colour.")
+            appendLine("A TABLE takes color like a CARD. STAT, PROGRESS and CHART take none; STAT and PROGRESS take tone instead.")
             appendLine()
             appendLine("## Ids and retries")
             appendLine("- Each item is on the board as $piece; a group's label is $piece${CanvasComposeIds.LABEL_SUFFIX}.")
+            val part = CanvasComposeIds.part(CanvasArtifactId("<artifact_id>"), "<key>", "<part>")
+            appendLine("- A STAT, PROGRESS or CHART is its frame, $piece, and the elements $part inside it.")
             appendLine("- An item without a key is keyed by its 0-based place: ${CanvasComposeIds.defaultKey(0)}, ${CanvasComposeIds.defaultKey(1)}, and ${CanvasComposeIds.defaultKey(3, 0)} for the first child of the group at ${CanvasComposeIds.defaultKey(3)}.")
             appendLine("- The same artifact_id and the same content is a retry: nothing is written, and the receipt warns. Moving the pieces does not change that.")
             appendLine("- The same artifact_id with other content is ARTIFACT_EXISTS.")
             appendLine()
             appendLine("## Receipt")
             appendLine("{\"ok\": true, \"artifact_id\", \"canvas_id\", \"revision\", \"status\": \"published\" | \"dry_run\", \"title\", \"bounds\": {x, y, width, height}, \"items\": [{key, kind, count?, frame?, children?}], \"warnings\", \"framesOmitted?\", \"framesHint?\"}")
-            appendLine("bounds is the artifact's rectangle; count is a checklist's entries. frame is the reserved slot, [x, y, w, h] integers; a short note is drawn shorter inside it, so attach to its left, right or top side.")
+            appendLine("bounds is the artifact's rectangle; count is a checklist's entries, a table's rows or a chart's points.")
+            appendLine(
+                "frame is the reserved slot, [x, y, w, h] integers; a short note is drawn shorter inside it, " +
+                    "so attach to its left, right or top side.",
+            )
             appendLine("Over ${Contract.MAX_RECEIPT_BYTES} bytes, frames drop from group children first, then top-level items from the end; framesOmitted is true and framesHint is \"${ComposeReceiptFrames.HINT}\". A retry omits frame if the board no longer stores it.")
             appendLine()
             appendLine("## What you will see")
             appendLine("The artifact goes right of what is on the board (below it once the board is wider than ${CanvasComposePlacement.WIDE_CONTENT.toInt()}), as a grid in reading order: ${gridRule()}.")
             appendLine("Notes and cards are ${Contract.NOTE_WIDTH.toInt()} wide (heading TEXT ${Contract.TEXT_HEADING_WIDTH.toInt()}) and get a reserved height; the app fits each note to its content inside it and never clips it.")
+            appendLine(
+                "A TABLE is a note ${Contract.tableWidth(1).toInt()} to ${Contract.tableWidth(Contract.MAX_TABLE_COLUMNS).toInt()} wide " +
+                    "by its columns. STAT (${Contract.STAT_WIDTH.toInt()}), PROGRESS (${Contract.PROGRESS_WIDTH.toInt()}) and " +
+                    "CHART (${Contract.CHART_WIDTH.toInt()}) are drawn on the board itself, a frame as tall as their content.",
+            )
             appendLine("A person may move or resize a note afterwards; it is then theirs, so do not place it again.")
             appendLine()
             appendLine("## Errors")
@@ -166,6 +190,19 @@ object CanvasComposeGuide {
             append("```")
         }
     }
+
+    /** The v2 data kinds, one line each. */
+    private fun kindLines(): List<String> = listOf(
+        "- TABLE {columns, rows, title?, color?}: 1 to ${Contract.MAX_TABLE_COLUMNS} column names and up to ${Contract.MAX_TABLE_ROWS} " +
+            "rows, each row one plain-text cell per column (cells up to ${Contract.MAX_CELL_CHARS} characters, no markdown).",
+        "- STAT {label, value, delta?, tone?, caption?}: a figure for a dashboard: the value (up to ${Contract.MAX_STAT_VALUE_CHARS}) " +
+            "shown large, the delta (e.g. \"+8% vs May\") in its tone, a caption up to ${Contract.MAX_STAT_NOTE_CHARS}.",
+        "- PROGRESS {label, value, caption?, tone?}: a labelled bar filled to value, 0 to 1, shown as a whole percent.",
+        "- CHART {style: bar|line, points: [{label, value}], title?, unit?}: ${Contract.MIN_CHART_POINTS} to " +
+            "${Contract.MAX_CHART_POINTS} points (labels up to ${Contract.MAX_CHART_LABEL_CHARS}); bars need values of 0 or more; " +
+            "unit (up to ${Contract.MAX_CHART_UNIT_CHARS}) follows each printed value.",
+        "tone is ${ComposeTone.entries.joinToString("|") { it.name.lowercase() }}: grey, green, red, orange.",
+    )
 
     private fun gridRule(): String {
         val ranges = mutableListOf<String>()

@@ -78,14 +78,28 @@ class CanvasComposeSchemaTest {
         assertAgrees(branch(ComposeKind.CARD), ComposeItem.Card.serializer().descriptor, setOf("kind"))
         assertAgrees(branch(ComposeKind.TEXT), ComposeItem.Text.serializer().descriptor, setOf("kind"))
         assertAgrees(branch(ComposeKind.GROUP), ComposeItem.Group.serializer().descriptor, setOf("kind"))
+        assertAgrees(branch(ComposeKind.TABLE), ComposeItem.Table.serializer().descriptor, setOf("kind"))
+        assertAgrees(branch(ComposeKind.STAT), ComposeItem.Stat.serializer().descriptor, setOf("kind"))
+        assertAgrees(branch(ComposeKind.PROGRESS), ComposeItem.Progress.serializer().descriptor, setOf("kind"))
+        assertAgrees(branch(ComposeKind.CHART), ComposeItem.Chart.serializer().descriptor, setOf("kind"))
+        assertAgrees(branch(ComposeKind.CHART).property("points")["items"]!!.jsonObject, ComposeChartPoint.serializer().descriptor)
         assertAgrees(branch(ComposeKind.CHECKLIST).property("items")["items"]!!.jsonObject, ComposeChecklistItem.serializer().descriptor)
         assertAgrees(branch(ComposeKind.CARD).property("fields")["items"]!!.jsonObject, ComposeCardField.serializer().descriptor)
         assertEquals(
             ComposeKind.entries.map { it.name }.toSet(),
-            setOf(ComposeItem.Note.serializer(), ComposeItem.Checklist.serializer(), ComposeItem.Card.serializer(),
-                ComposeItem.Text.serializer(), ComposeItem.Group.serializer()).map { it.descriptor.serialName }.toSet(),
+            setOf(
+                ComposeItem.Note.serializer(), ComposeItem.Checklist.serializer(), ComposeItem.Card.serializer(),
+                ComposeItem.Text.serializer(), ComposeItem.Group.serializer(), ComposeItem.Table.serializer(),
+                ComposeItem.Stat.serializer(), ComposeItem.Progress.serializer(), ComposeItem.Chart.serializer(),
+            ).map { it.descriptor.serialName }.toSet(),
         )
         assertEquals(listOf("heading", "body"), branch(ComposeKind.TEXT).property("size")["enum"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertEquals(
+            listOf("neutral", "positive", "negative", "warning"),
+            branch(ComposeKind.STAT).property("tone")["enum"]!!.jsonArray.map { it.jsonPrimitive.content },
+        )
+        val styles = branch(ComposeKind.CHART).property("style")["enum"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("bar", "line"), styles)
     }
 
     @Test
@@ -99,10 +113,18 @@ class CanvasComposeSchemaTest {
         assertEquals(CanvasComposeContract.KEY_PATTERN, branch(ComposeKind.NOTE).property("key").getValue("pattern").jsonPrimitive.content)
         assertEquals(CanvasComposeContract.ARTIFACT_ID_PATTERN, schema.property("artifact_id").getValue("pattern").jsonPrimitive.content)
         assertEquals(CanvasComposeContract.COLOR_PATTERN, branch(ComposeKind.CARD).property("color").getValue("pattern").jsonPrimitive.content)
+        assertEquals(CanvasComposeContract.MAX_TABLE_COLUMNS, branch(ComposeKind.TABLE).property("columns").int("maxItems"))
+        assertEquals(CanvasComposeContract.MAX_TABLE_ROWS, branch(ComposeKind.TABLE).property("rows").int("maxItems"))
+        val column = branch(ComposeKind.TABLE).property("columns")["items"]!!.jsonObject
+        assertEquals(CanvasComposeContract.MAX_CELL_CHARS, column.int("maxLength"))
+        assertEquals(CanvasComposeContract.MAX_STAT_VALUE_CHARS, branch(ComposeKind.STAT).property("value").int("maxLength"))
+        assertEquals(CanvasComposeContract.MAX_CHART_POINTS, branch(ComposeKind.CHART).property("points").int("maxItems"))
+        assertEquals(CanvasComposeContract.MIN_CHART_POINTS, branch(ComposeKind.CHART).property("points").int("minItems"))
+        assertEquals(1.0, branch(ComposeKind.PROGRESS).property("value").getValue("maximum").jsonPrimitive.content.toDouble())
         // A group holds every kind but GROUP: one level of nesting.
-        val children = branch(ComposeKind.GROUP).property("children")["items"]!!.jsonObject["anyOf"]!!.jsonArray
+        val children = CanvasComposeSchema.child["anyOf"]!!.jsonArray
         assertEquals(
-            listOf("NOTE", "CHECKLIST", "CARD", "TEXT"),
+            listOf("NOTE", "CHECKLIST", "CARD", "TEXT", "TABLE", "STAT", "PROGRESS", "CHART"),
             children.map { it.jsonObject.property("kind")["enum"]!!.jsonArray.single().jsonPrimitive.content },
         )
     }

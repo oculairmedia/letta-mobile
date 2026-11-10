@@ -35,6 +35,15 @@ object CanvasComposeIds {
     /** The board id of the piece [key] of [artifactId]: `cmp-<artifactId>-<key>`. */
     fun piece(artifactId: CanvasArtifactId, key: String): String = "$PREFIX-${artifactId.value}-$key"
 
+    /**
+     * Separates a drawn item's board id from one of its parts (`cmp-<artifactId>-<key>.bar0`). Keys
+     * and artifact ids cannot hold it, so a part's id never equals another item's.
+     */
+    const val PART_SEPARATOR = "."
+
+    /** The board id of the element [part] of the drawn item [key] (a STAT, PROGRESS or CHART). */
+    fun part(artifactId: CanvasArtifactId, key: String, part: String): String = piece(artifactId, key) + PART_SEPARATOR + part
+
     /** The board id of a GROUP's label text. */
     fun label(artifactId: CanvasArtifactId, key: String): String = piece(artifactId, key) + LABEL_SUFFIX
 

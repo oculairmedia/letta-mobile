@@ -1,0 +1,114 @@
+{
+    "ok": true,
+    "catalog": "letta.canvas.compose",
+    "version": 2,
+    "artifact_id": "sprint-dashboard",
+    "canvas_id": "canvas-conversation-conv-123",
+    "revision": 8,
+    "status": "published",
+    "title": "Sprint 14 dashboard",
+    "bounds": {
+        "x": 80.0,
+        "y": 80.0,
+        "width": 1952.0,
+        "height": 650.0
+    },
+    "items": [
+        {
+            "key": "heading",
+            "kind": "TEXT",
+            "frame": [
+                80,
+                80,
+                480,
+                63
+            ]
+        },
+        {
+            "key": "kpis",
+            "kind": "GROUP",
+            "frame": [
+                816,
+                80,
+                712,
+                353
+            ],
+            "children": [
+                {
+                    "key": "velocity",
+                    "kind": "STAT",
+                    "frame": [
+                        840,
+                        136,
+                        240,
+                        130
+                    ]
+                },
+                {
+                    "key": "bugs",
+                    "kind": "STAT",
+                    "frame": [
+                        1184,
+                        136,
+                        240,
+                        152
+                    ]
+                },
+                {
+                    "key": "release",
+                    "kind": "PROGRESS",
+                    "frame": [
+                        840,
+                        312,
+                        320,
+                        97
+                    ]
+                },
+                {
+                    "key": "docs",
+                    "kind": "PROGRESS",
+                    "frame": [
+                        1184,
+                        312,
+                        320,
+                        71
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "owners",
+            "kind": "TABLE",
+            "count": 3,
+            "frame": [
+                1552,
+                80,
+                480,
+                333
+            ]
+        },
+        {
+            "key": "burndown",
+            "kind": "CHART",
+            "count": 5,
+            "frame": [
+                80,
+                457,
+                480,
+                273
+            ]
+        },
+        {
+            "key": "throughput",
+            "kind": "CHART",
+            "count": 6,
+            "frame": [
+                816,
+                457,
+                480,
+                273
+            ]
+        }
+    ],
+    "warnings": []
+}

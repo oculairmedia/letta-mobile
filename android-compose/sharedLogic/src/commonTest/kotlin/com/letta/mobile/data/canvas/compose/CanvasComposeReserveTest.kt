@@ -257,6 +257,7 @@ class CanvasComposeReserveTest {
     fun textAndGroupAreNotNotes() {
         assertFailsWith<IllegalArgumentException> { CanvasComposeReserve.reserve(ComposeKind.TEXT, emptyList()) }
         assertFailsWith<IllegalArgumentException> { CanvasComposeReserve.reserve(ComposeKind.GROUP, emptyList(), 320f) }
+        assertFailsWith<IllegalArgumentException> { CanvasComposeReserve.reserve(ComposeKind.CHART, emptyList()) }
     }
 
     @Test

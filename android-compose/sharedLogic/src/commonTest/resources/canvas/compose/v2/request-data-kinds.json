@@ -1,0 +1,34 @@
+{
+  "catalog": "letta.canvas.compose",
+  "version": 2,
+  "artifact_id": "sprint-dashboard",
+  "title": "Sprint 14 dashboard",
+  "items": [
+    { "kind": "TEXT", "key": "heading", "text": "Sprint 14", "size": "heading" },
+    { "kind": "GROUP", "key": "kpis", "label": "This week",
+      "children": [
+        { "kind": "STAT", "key": "velocity", "label": "Velocity", "value": "42 pts", "delta": "+8% vs last sprint", "tone": "positive" },
+        { "kind": "STAT", "key": "bugs", "label": "Open bugs", "value": "17", "delta": "+5 since Monday", "tone": "negative",
+          "caption": "3 of them block the release" },
+        { "kind": "PROGRESS", "key": "release", "label": "Release 2.4", "value": 0.62, "caption": "31 of 50 stories done", "tone": "warning" },
+        { "kind": "PROGRESS", "key": "docs", "label": "Docs review", "value": 1.0 }
+      ] },
+    { "kind": "TABLE", "key": "owners", "title": "Owners",
+      "columns": [ "Area", "Owner", "Status", "Next step" ],
+      "rows": [
+        [ "Sync", "Ana", "On track", "Ship the retry queue" ],
+        [ "Search", "Ben", "At risk", "Profile the slow index rebuild on large boards" ],
+        [ "Billing", "Chloe", "Blocked", "Waiting on the tax provider" ]
+      ] },
+    { "kind": "CHART", "key": "burndown", "title": "Points left", "style": "line",
+      "points": [
+        { "label": "Mon", "value": 50.0 }, { "label": "Tue", "value": 44.0 }, { "label": "Wed", "value": 39.5 },
+        { "label": "Thu", "value": 31.0 }, { "label": "Fri", "value": 19.0 }
+      ] },
+    { "kind": "CHART", "key": "throughput", "title": "Stories closed per week", "style": "bar",
+      "points": [
+        { "label": "W9", "value": 7.0 }, { "label": "W10", "value": 11.0 }, { "label": "W11", "value": 9.0 },
+        { "label": "W12", "value": 0.0 }, { "label": "W13", "value": 14.0 }, { "label": "This week", "value": 12.0 }
+      ] }
+  ]
+}

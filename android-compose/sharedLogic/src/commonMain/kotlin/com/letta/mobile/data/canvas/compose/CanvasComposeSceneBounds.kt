@@ -38,11 +38,9 @@ internal class SceneBounds(private val sceneJson: String) {
         }
         return CanvasComposePlacement.union(rects)
     }
-
-    private companion object {
-        val json = Json { ignoreUnknownKeys = true }
-    }
 }
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * DrawBox `Element.bounds()` of one serialized element; when [conservative], grown to what it can

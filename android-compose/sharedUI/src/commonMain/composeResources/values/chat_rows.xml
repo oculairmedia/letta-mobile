@@ -211,6 +211,10 @@
     <string name="rows_canvas_kind_card">Card</string>
     <string name="rows_canvas_kind_text">Text</string>
     <string name="rows_canvas_kind_group">Group</string>
+    <string name="rows_canvas_kind_table">Table</string>
+    <string name="rows_canvas_kind_stat">Stat</string>
+    <string name="rows_canvas_kind_progress">Progress</string>
+    <string name="rows_canvas_kind_chart">Chart</string>
     <string name="rows_canvas_summary">%1$s · %2$s</string>
     <plurals name="rows_canvas_items">
         <item quantity="one">%1$d item</item>
