@@ -58,9 +58,11 @@ internal class WsChatSendCoordinator(
     private val runtimeEventSink: suspend (List<RuntimeEventDraft>) -> Unit = {},
     prepareConversation: suspend (String) -> Unit = {},
 ) {
+    var isTurnActive: () -> Boolean = { uiState.value.isStreaming }
+
     private val uiSink = object : ChatSendUiSink {
         override fun currentError(): String? = uiState.value.error
-        override fun isStreaming(): Boolean = uiState.value.isStreaming
+        override fun isStreaming(): Boolean = isTurnActive()
         override fun isAgentTyping(): Boolean = uiState.value.isAgentTyping
 
         override fun onSendDispatched(conversationId: String?) {

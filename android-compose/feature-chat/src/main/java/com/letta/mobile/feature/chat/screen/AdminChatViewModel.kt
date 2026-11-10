@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.ui.shell.nowactive.toNowActiveStatus
 import com.letta.mobile.data.context.ContextReadingKey
 import com.letta.mobile.data.presence.RunScope
 import androidx.compose.runtime.Composable
@@ -226,6 +227,7 @@ internal class AdminChatViewModel @Inject constructor(
         ChatUiState(agentName = initialAgentName.orEmpty(), agentId = agentId.value.takeIf { it.isNotBlank() })
     )
 
+    private val activeTurnPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
     private val _sessionState = MutableStateFlow(ChatSessionState())
 
     private fun updateSessionState(reducerUpdate: (ChatSessionState) -> ChatSessionState) {
@@ -257,7 +259,18 @@ internal class AdminChatViewModel @Inject constructor(
         // the Iroh host parked draw as cards, queued answers are marked, the answering row disables.
         val source = chatApprovalController.approvals
         val approvals by androidx.compose.runtime.remember(source) { source.hostApprovals() }.collectAsState(source.currentHostApprovals())
-        return androidx.compose.runtime.remember(state, approvals) { state.withHostApprovals(approvals) }
+        val binding by activeTurnPresentation.collectAsState()
+        val owner = binding?.activeTurnCoordinator
+        val projected = if (owner == null) state else {
+            val turn by owner.state.collectAsState()
+            val status = turn.toNowActiveStatus()
+            state.copy(
+                isStreaming = status != com.letta.mobile.data.chat.runtime.NowActiveStatus.Idle,
+                isAgentTyping = state.isAgentTyping && turn.phase != com.letta.mobile.data.presence.ActiveTurnPhase.Idle,
+                isCancelling = status == com.letta.mobile.data.chat.runtime.NowActiveStatus.Stopping,
+            )
+        }
+        return projected.withHostApprovals(approvals)
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
@@ -301,6 +314,7 @@ internal class AdminChatViewModel @Inject constructor(
     /** Retires the current send generation and builds the next one on [next]. */
     private suspend fun replaceSendRuntime(next: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime?) {
         replacingSendRuntime = true
+        activeTurnPresentation.value = null
         retireSelectedGeneration(
             stopPresentation = ::stopTimelineObserver,
             pipeline = pipelineLifetime,
@@ -359,7 +373,11 @@ internal class AdminChatViewModel @Inject constructor(
                 runtimeEventOutbox = runtimeEventOutbox,
                 clientVersionProvider = clientVersionProvider,
             ),
-            ui = com.letta.mobile.feature.chat.coordination.AdminChatSendUi(_uiState, composerController, chatBannerController),
+            ui = com.letta.mobile.feature.chat.coordination.AdminChatSendUi(_uiState, composerController, chatBannerController) {
+                activeTurnPresentation.value?.activeTurnCoordinator?.state?.value?.let {
+                    it.phase != com.letta.mobile.data.presence.ActiveTurnPhase.Idle
+                } ?: _uiState.value.isStreaming
+            },
             hooks = com.letta.mobile.feature.chat.coordination.AdminChatSendHooks(
                 submitApproval = chatApprovalController::submitApproval,
                 // lgns8.10.4.1: config truth, classified once by routedBackendKind().
@@ -771,6 +789,7 @@ internal class AdminChatViewModel @Inject constructor(
                 return
             }
             stopTimelineObserverLocked()
+            bindActiveTurn(null, conversationId)
             val capturedRuntime = selectedRuntime
             val hostOpen = pagingHost.openCanonical
             val route = Triple(conversationId, generation, scrollToMessageId)
@@ -798,6 +817,7 @@ internal class AdminChatViewModel @Inject constructor(
                     }
                     try {
                         if (canonicalRoute != route) return@launch
+                        bindActiveTurn(presentation, conversationId)
                         presentation.hasBoundRoute = true
                         presentation.routeTarget = target
                         presentation.viewport = if (target == null) viewport else null
@@ -826,6 +846,17 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob?.start()
     }
 
+    private fun bindActiveTurn(presentation: ChatPagingPresentation?, conversationId: String) {
+        val turn = presentation?.activeTurnCoordinator?.state?.value
+        if (turn != null) {
+            require(turn.conversationId.value == conversationId && turn.agentId == agentId) {
+                "Active turn owner must match the captured Android target"
+            }
+            activeTurnPresentation.value = presentation
+        } else if (activeTurnPresentation.value?.activeTurnCoordinator?.state?.value?.conversationId?.value != conversationId) {
+            activeTurnPresentation.value = null
+        }
+    }
     private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }
 
     private suspend fun stopTimelineObserverLocked() {
@@ -885,14 +916,12 @@ internal class AdminChatViewModel @Inject constructor(
             routeArgs.workspace?.conversationAvailability != com.letta.mobile.data.shell.FocusAvailability.Unavailable
     val canSendMessages: Boolean
         get() = focusCanSend && ChatSessionReducer.canSend(_sessionState.value)
-
     fun onScreenPaused() {
         // Pausing (backgrounding, or another chat covering this one) does not detach: only
         // another chat's resume does, so a backgrounded chat keeps receiving its own frames.
         screenSelected = false
         if (routeArgs.isCurrent()) screenLifecycleCoordinator.onScreenPaused()
     }
-
     fun onScreenResumed() {
         if (!routeArgs.isCurrent() || replacingSendRuntime || !isRuntimeBound) return
         // letta-mobile-ztuog: the chat on screen owns the event selection; every other agent's
@@ -901,40 +930,29 @@ internal class AdminChatViewModel @Inject constructor(
         sendPipeline.wsChatSendCoordinator.selectForEvents()
         screenLifecycleCoordinator.onScreenResumed()
     }
-
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
         abandonTimelineObserver()
         if (routeArgs.isCurrent()) screenLifecycleCoordinator.onCleared()
     }
-
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
-
     fun selectSlashCommand(command: SlashCommand) =
         slashCommandsCoordinator.selectSlashCommand(command)
-
     fun uninstallSlashCommand(command: SlashCommand) =
         slashCommandsCoordinator.uninstallSlashCommand(command)
-
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
         if (replacingSendRuntime || !focusCanSend) null else composerCoordinator.submitComposer(text)
-
     fun sendMessage(text: String) {
         if (!focusCanSend) return
         if (!replacingSendRuntime) composerCoordinator.sendMessage(text)
     }
-
     fun refreshGoalStatus() = goalCoordinator.refreshGoalStatus()
-
     fun sendGoalCommand(command: String) = goalCoordinator.sendGoalCommand(command)
-
     fun continueGoal() = goalCoordinator.continueGoal(::sendMessage)
-
     fun rerunMessage(message: UiMessage) {
         if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
     }
-
     // letta-mobile-bzvro.15 / .16 / 7mys7: fork from a message, edit-and-resend and rerun, opening the fork.
     private val conversationBranching by lazy(LazyThreadSafetyMode.NONE) {
         com.letta.mobile.feature.chat.coordination.ChatConversationBranching(
@@ -945,9 +963,7 @@ internal class AdminChatViewModel @Inject constructor(
             lineage = conversationLineage,
         )
     }
-
     private var branchOpener: ((AgentId, ConversationId) -> Unit)? = null
-
     fun branching(open: (agentId: String, conversationId: String) -> Unit) =
         conversationBranching.Page { view ->
             val token = routeArgs.requestToken()
@@ -961,21 +977,26 @@ internal class AdminChatViewModel @Inject constructor(
                 )
             }
         }
-
     /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */
     private fun applyBranchDraft(pending: com.letta.mobile.data.chat.branch.PendingDraft) {
         handleComposerTextChanged(pending.draft.text)
         pending.draft.images.forEach(::addAttachment)
         if (pending.sendNow) submitComposer(pending.draft.text)
     }
-
     fun interruptRun() {
         if (replacingSendRuntime) return
-        // The cancel is asked for; the run reads INTERRUPTING until its terminal lands (te3n1.1).
+        val binding = activeTurnPresentation.value
+        val owner = binding?.activeTurnCoordinator
+        if (owner != null) {
+            val turn = owner.state.value
+            val identity = com.letta.mobile.data.presence.ActiveTurnIdentity(turn.runId ?: return, turn.turnId ?: return)
+            val abort = binding.abortActiveTurn
+            owner.interrupt(identity, java.util.UUID.randomUUID().toString()) { abort?.invoke(identity) ?: false }
+            return
+        }
         runPhases.markInterrupting(RunScope(currentRunKey(), agentId.value))
         composerCoordinator.interruptRun()
     }
-
     val sendQueue: com.letta.mobile.ui.chat.session.ChatSendQueueSource by lazy(LazyThreadSafetyMode.NONE) {
         object : com.letta.mobile.ui.chat.session.ChatSendQueueSource {
             override val queue = uiState.map { it.sendQueue }
@@ -984,37 +1005,28 @@ internal class AdminChatViewModel @Inject constructor(
                 uiState.map { true },
                 { true },
             )
-
             override fun cancel(id: QueuedSendId) {
                 if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id)
             }
-
             override fun sendNow(id: QueuedSendId) = startQueuedTurn { sendNow(id) }
-
             override fun resume() {
                 uiState.value.sendQueue.items.firstOrNull()?.conversationId?.let { id -> startQueuedTurn { resume(id) } }
             }
         }
     }
-
     private fun startQueuedTurn(action: com.letta.mobile.data.chat.send.ChatSendQueueControls.() -> Unit) {
         if (replacingSendRuntime) return
         composerCoordinator.beginQueuedTurn()
         sendPipeline.wsChatSendCoordinator.sendQueue.action()
     }
-
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
-
     fun submitA2uiAction(action: A2uiAction) = adminChatA2uiCoordinator.submitA2uiAction(action)
-
     fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
-
     // Main.immediate can resolve and observe synchronously: start after all backing fields.
     private var sessionStarted = false
     private var workspaceEntry: com.letta.mobile.data.shell.CurrentFocusRequest? = null
     internal fun acceptWorkspaceMessage(message: String? = null) =
         routeArgs.takeWorkspaceMessage(message, !replacingSendRuntime && focusCanSend)?.let(::sendInitialMessage)
-
     internal fun bindWorkspace(
         workspace: com.letta.mobile.data.shell.ShellWorkspaceState,
         open: ((AgentId, ConversationId) -> Unit)? = null,
@@ -1039,7 +1051,6 @@ internal class AdminChatViewModel @Inject constructor(
         if (routeArgs.isCurrent()) startSession()
         acceptWorkspaceMessage()
     }
-
     private fun reconcileSavedPendingFocus(owner: com.letta.mobile.data.shell.ShellWorkspaceState) {
         val old = routeArgs.workspace ?: return
         val entry = workspaceEntry ?: return
@@ -1052,7 +1063,6 @@ internal class AdminChatViewModel @Inject constructor(
             old.currentFocus.conversationId?.let { owner.completeFocus(owner.requestToken(), it, agentId) }
         }
     }
-
     private fun startSession() {
         if (sessionStarted) return
         sessionStarted = true
@@ -1068,12 +1078,9 @@ internal class AdminChatViewModel @Inject constructor(
         // letta-mobile-dxz5s: the host's per-conversation model and window, from cache and refreshes.
         modelCoordinator.followHostModels { conversationRepository.getConversations(agentId) }
     }
-
     init { if (!routeArgs.workspaceOwned) startSession() }
-
     val canvasShareRecipient: com.letta.mobile.data.canvas.CanvasConversationTarget =
         com.letta.mobile.data.canvas.CanvasConversationTarget("chat-screen-${java.util.UUID.randomUUID()}")
-
     private fun observeCanvasShareAttachments() {
         viewModelScope.launch {
             com.letta.mobile.data.canvas.CanvasShare.stagedAttachmentEvents
@@ -1083,34 +1090,28 @@ internal class AdminChatViewModel @Inject constructor(
                 }
         }
     }
-
     /** Drain only accepted images; count/byte overflow stays staged until the composer has room. */
     private suspend fun drainStagedCanvasAttachments() {
         com.letta.mobile.data.canvas.CanvasShare.consumeStagedAttachments(canvasShareRecipient) { image ->
             addAttachment(image)
         }
     }
-
     private fun createLiveStatusFlow(): StateFlow<com.letta.mobile.data.runtime.RuntimeLiveStatus> =
         runRegistry.runs
             .map(::liveStatusIn)
             .distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(LIVE_STATUS_STOP_TIMEOUT_MS), com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle)
-
     private fun liveStatusIn(
         runs: Map<String, com.letta.mobile.data.presence.ConversationRunState>,
     ): com.letta.mobile.data.runtime.RuntimeLiveStatus =
         publishedRunKey?.let(runs::get)?.live ?: com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle
-
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null
-
     /** Runtime phases stay attributed to this effect target, including a not-yet-named chat. */
     private fun onRuntimeEvents(drafts: List<com.letta.mobile.runtime.RuntimeEventDraft>) {
         if (drafts.isEmpty()) return
         runPhases.onEvents(RunScope(currentRunKey(), agentId.value), drafts.map { it.payload })
     }
-
     /** Carries the in-flight run to its server-assigned conversation. */
     @Synchronized
     private fun currentRunKey(): String {
@@ -1120,7 +1121,6 @@ internal class AdminChatViewModel @Inject constructor(
         publishedRunKey = key
         return key
     }
-
     /**
      * Keeps the orthogonal facts (who the conversation is, whether the user is composing to it)
      * in step with the reduced phase. The conversation's id can arrive after its first events, so
