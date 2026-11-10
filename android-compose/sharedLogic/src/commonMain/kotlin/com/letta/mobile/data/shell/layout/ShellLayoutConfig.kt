@@ -45,13 +45,19 @@ object ShellLanes {
     const val PANEL = "panel"
 }
 
-/** The views the shell itself supplies; every host binds them, so they are always available. */
+/** The views the shell itself supplies; the shell binds them on every host, so they are always available. */
 object ShellViews {
     /** The current shell page (home, a chat, a library page). */
     val PAGE = RuntimeViewId("shell.page")
 
     /** The host's side pane (the desktop's background tasks). */
     val SIDE_PANE = RuntimeViewId("shell.side-pane")
+
+    /**
+     * One canvas board, named by the slot's object (its canvas id), drawn at the size its lane gives
+     * it. A board the host cannot open is shown as unavailable. Not part of the default layout.
+     */
+    val CANVAS = RuntimeViewId("shell.canvas")
 }
 
 /**

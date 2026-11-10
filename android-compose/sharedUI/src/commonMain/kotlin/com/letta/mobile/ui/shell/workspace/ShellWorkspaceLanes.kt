@@ -13,6 +13,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
@@ -79,8 +80,12 @@ private fun MainLane(slots: List<ModuleSlot>, views: Map<RuntimeViewId, ShellMod
     }
 }
 
-/** The added views with the shell's own bound over them: the page and the side pane are never replaced. */
+/**
+ * The added views with the shell's own bound over them: the page, the side pane and a canvas board
+ * are never replaced.
+ */
 private fun LettaShellWorkspaceHost.moduleViews(modules: ShellModules): Map<RuntimeViewId, ShellModuleView> = modules.views + mapOf(
     ShellViews.PAGE to { _, modifier -> slots.main(modifier) },
     ShellViews.SIDE_PANE to { _, _ -> slots.sidePane() },
+    ShellViews.CANVAS to { slot, modifier -> ShellCanvasModule(slot.objectRef?.takeIf { it.isNotBlank() }?.let(::CanvasId), modifier) },
 )

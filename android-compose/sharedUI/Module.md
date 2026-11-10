@@ -28,6 +28,10 @@ Agent-editor page, identity section and adaptive panes. Supply the editor contro
 
 Interactive canvas layers, gestures, cameras, selection, notes, formatting and synchronization status. Compose CanvasWorkspace around a supplied CanvasSession and asset/image bindings; durable document storage and replication belong to sharedLogic rather than gesture handlers.
 
+# Package com.letta.mobile.ui.canvas.boards
+
+How a view that shows one board wherever it is placed (the shell's canvas module) opens a stored board by its id. A host that can open boards by id provides a `CanvasBoardSource` through `LocalCanvasBoardSource`; null is a host that cannot, whose such views show only boards already live in `LocalCanvasSessionRegistry`. The source decides the store; it holds no sessions or rendering of its own.
+
 # Package com.letta.mobile.ui.canvas.library
 
 Canvas-library status presented through the shared overlay host. `CanvasLibraryNotice` keeps storage failures visible, offers reload-only retry, and withdraws the notice after recovery. Hosts supply the shared library controller; keep persistence and retry policy in sharedLogic rather than the composable.
@@ -230,7 +234,7 @@ Shell header, search slot and unified results. Supply [UnifiedSearchSources](htt
 
 # Package com.letta.mobile.ui.shell.modules
 
-The shell's unit of composition: a slot drawn by its view at whatever size its place gives it. Views are supplied by id and never know where they sit; a slot whose view is missing is shown as unavailable instead of failing the shell. Keep layout decisions (which slots, in which lane) in the layout config rather than in a view.
+The shell's unit of composition: a slot drawn by its view at whatever size its place gives it. Views are supplied by id and never know where they sit; a slot whose view is missing is shown as unavailable instead of failing the shell. Keep layout decisions (which slots, in which lane) in the layout config rather than in a view. The workspace binds the shell's own views over any added ones: the page, the host's side pane, and a canvas board named by the slot's object.
 
 # Package com.letta.mobile.ui.shell.nowactive
 

@@ -17,6 +17,25 @@ class ShellLayoutConfigTest {
     }
 
     @Test
+    fun noLaneOfTheDefaultHasACanvas() {
+        val views = ShellLayoutConfig.Default.lanes.values.flatten().map { it.view }
+
+        assertEquals(false, ShellViews.CANVAS in views)
+    }
+
+    @Test
+    fun aCanvasModuleKeepsItsBoardThroughSavingReadingAndUpgrading() {
+        val board = ModuleSlot(ShellViews.CANVAS, objectRef = "canvas-project-notes")
+        val old = ShellLayoutConfig(version = 1, lanes = mapOf(ShellLanes.SIDE to listOf(board)))
+
+        val read = ShellLayoutConfig.decode(old.encode())
+
+        assertEquals(listOf(board), read.lane(ShellLanes.SIDE), "a version 1 config gains no side pane and keeps its board")
+        assertEquals(listOf(ModuleSlot(ShellViews.PAGE)), read.mainLane())
+        assertEquals(ShellLayoutConfig.VERSION, read.version)
+    }
+
+    @Test
     fun aConfigSurvivesSavingAndReading() {
         val config = ShellLayoutConfig.Default.copy(lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.SIDE to listOf(notes)))
 

@@ -23,8 +23,8 @@ object ShellModuleTags {
 
 /**
  * The views added to draw the shell's lanes ([views]); what the lanes hold is the workspace layout's
- * config. The shell's own views (the page, the side pane) are bound by the workspace and cannot be
- * replaced here.
+ * config. The shell's own views (the page, the side pane, a canvas board) are bound by the workspace
+ * and cannot be replaced here.
  */
 @Immutable
 class ShellModules(
@@ -41,8 +41,9 @@ fun ShellModuleSlot(slot: ModuleSlot, views: Map<RuntimeViewId, ShellModuleView>
     if (view != null) view(slot, modifier) else UnavailableModule(modifier)
 }
 
+/** A module whose view cannot draw here: no host supplies it, or its object cannot be opened. */
 @Composable
-private fun UnavailableModule(modifier: Modifier) {
+internal fun UnavailableModule(modifier: Modifier) {
     Box(modifier.testTag(ShellModuleTags.UNAVAILABLE), contentAlignment = Alignment.Center) {
         Text(
             "This view isn't available here",
