@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.transport.teardown.TransportTeardown
+import com.letta.mobile.data.presence.ActiveTurnIdentity
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.presence.ActiveTurnTerminalKind
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.AssistantMessage
@@ -11,6 +14,7 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
@@ -33,6 +37,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -47,6 +52,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -64,6 +70,72 @@ import kotlinx.serialization.json.put
  * (RuntimeEventServerFrameMapper + WsFrameMapper).
  */
 class DesktopAppServerChatGatewayTest {
+
+    @Test
+    fun stopBeforeServerRunIdWaitsThenAbortsOnlyTheCapturedTurn() = runTest {
+        val client = FakeAppServerClient()
+        val cleared = mutableListOf<String>()
+        val binding = startStoppingTurn(client, cleared)
+        val owner = binding.owner("conv-1", "agent-1")
+        runCurrent()
+        assertEquals(ActiveTurnPhase.Cancelling, owner.state.value.phase)
+        assertTrue(cleared.isEmpty(), "Missing correlation must not clear locally")
+        assertTrue(client.abortCommands.isEmpty())
+        binding.onEvent(ScopedDesktopRuntimeEvent(
+            "conv-2", "agent-1", RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started), "command-1", "run-other",
+        ))
+        binding.onEvent(ScopedDesktopRuntimeEvent(
+            "conv-1", "agent-1", RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Running), "command-other", "run-other",
+        ))
+        runCurrent()
+        assertTrue(client.abortCommands.isEmpty(), "Another conversation or turn must not release this stop")
+        binding.onEvent(ScopedDesktopRuntimeEvent(
+            "conv-1", "agent-1", RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Running), "command-1", "run-current",
+        ))
+        runCurrent()
+        assertEquals(listOf("run-current"), client.abortCommands.map { it.runId })
+        assertEquals(ActiveTurnPhase.Cancelling, owner.state.value.phase)
+        assertTrue(cleared.isEmpty())
+        binding.close()
+    }
+
+    @Test
+    fun stopWithoutServerRunIdClearsAtTheExistingDeadlineWithoutAbort() = runTest {
+        val client = FakeAppServerClient()
+        val cleared = mutableListOf<String>()
+        val binding = startStoppingTurn(client, cleared)
+        val owner = binding.owner("conv-1", "agent-1")
+        runCurrent()
+        advanceTimeBy(29_999)
+        runCurrent()
+        assertEquals(ActiveTurnPhase.Cancelling, owner.state.value.phase)
+        assertTrue(cleared.isEmpty())
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(ActiveTurnPhase.Idle, owner.state.value.phase)
+        assertEquals(ActiveTurnTerminalKind.LocalClear, owner.outcome.value)
+        assertEquals(listOf("conv-1"), cleared)
+        binding.onEvent(ScopedDesktopRuntimeEvent(
+            "conv-1", "agent-1", RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Running), "command-1", "run-current",
+        ))
+        runCurrent()
+        assertTrue(client.abortCommands.isEmpty(), "Correlation arriving after the deadline must not dispatch abort")
+        binding.close()
+    }
+
+    private fun TestScope.startStoppingTurn(client: FakeAppServerClient, cleared: MutableList<String>): DesktopActiveTurnBinding {
+        val gateway = DesktopAppServerChatGateway(
+            turnEngine = AppServerTurnEngine(client),
+            client = client, agentIdResolver = { "agent-1" },
+        )
+        val binding = DesktopActiveTurnBinding(backgroundScope, cleared::add)
+        val turn = ActiveTurnIdentity("command-1", "runtime:command-1")
+        binding.start("conv-1", "agent-1", turn)
+        binding.owner("conv-1", "agent-1").interrupt(turn, "stop-1") {
+            gateway.abortConversationTurn(ConversationId("conv-1"), binding.serverRunId("conv-1", turn)?.let(::DesktopRunId))
+        }
+        return binding
+    }
 
     private fun gateway(
         turnEngine: FakeTurnEngine,
@@ -191,6 +263,24 @@ class DesktopAppServerChatGatewayTest {
     @Test
     fun gateway_isChatGatewayExtras_overTheAppServerSession() {
         assertIs<ChatGatewayExtras>(gateway(FakeTurnEngine { flowOf() }))
+    }
+
+    @Test
+    fun exactAbortRejectsMissingCorrelationAndPreservesTheCapturedRunAfterReconnect() = runTest {
+        val client = FakeAppServerClient()
+        val gw = DesktopAppServerChatGateway(
+            turnEngine = AppServerTurnEngine(client),
+            client = client,
+            agentIdResolver = { "agent-1" },
+        )
+        assertFalse(gw.abortConversationTurn(ConversationId("conv-1"), null))
+        assertTrue(client.abortCommands.isEmpty())
+        // This gateway has no local active-run cache after reconnect. The old captured
+        // identity must reach the server, whose current lease belongs to run-current.
+        assertFalse(gw.abortConversationTurn(ConversationId("conv-1"), DesktopRunId("run-old")))
+        assertEquals(listOf("run-old"), client.abortCommands.map { it.runId })
+        assertEquals("conv-1", client.abortCommands.single().runtime.conversationId)
+        gw.close()
     }
 
     @Test
@@ -521,8 +611,18 @@ class DesktopAppServerChatGatewayTest {
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
             error("not needed for App Server gateway tests")
 
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("not needed for App Server gateway tests")
+        val abortCommands = mutableListOf<AppServerCommand.AbortMessage>()
+        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse {
+            val requestId = requireNotNull(command.requestId)
+            require(requestId.isNotBlank())
+            abortCommands += command
+            // The simulated listener has exactly this loaded runtime and current lease.
+            val active = connected.value && command.runtime.agentId == "agent-1" && command.runtime.conversationId == "conv-1"
+            return AppServerInboundFrame.AbortMessageResponse(
+                requestId = requestId, runtime = command.runtime, success = active,
+                aborted = active && (command.runId == null || command.runId == "run-current"),
+            )
+        }
 
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
             error("not needed for App Server gateway tests")

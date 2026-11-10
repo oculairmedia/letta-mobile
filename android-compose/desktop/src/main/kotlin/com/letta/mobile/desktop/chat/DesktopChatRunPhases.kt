@@ -23,6 +23,7 @@ internal class DesktopChatRunPhases(
     private val state: StateFlow<DesktopChatSurfaceState>,
     private val registry: ConversationRunRegistry,
     private val closed: () -> Boolean,
+    private val onRuntimeEvent: (ScopedDesktopRuntimeEvent) -> Unit = {},
 ) {
     private val publisher = ConversationRunPhasePublisher(registry)
     private var runtimeEventsJob: Job? = null
@@ -80,6 +81,7 @@ internal class DesktopChatRunPhases(
             source.runtimeEvents.collect { event ->
                 if (closed()) return@collect
                 val agent = event.agentId.takeIf { it.isNotBlank() } ?: agentIdFor(event.conversationId) ?: return@collect
+                onRuntimeEvent(event)
                 publisher.onEvent(RunScope(event.conversationId, agent), event.payload)
             }
         }

@@ -53,6 +53,27 @@ class DesktopNowActiveBarTest {
     )
 
     @Test
+    fun activeTurnOverridesStaleHostIndicatorsForToolCancellationAndLocalClear() {
+        val conversation = conversation("c1")
+        val turn = com.letta.mobile.data.presence.ActiveTurnState(
+            ConversationId("c1"), com.letta.mobile.data.model.AgentId("agent-c1"), "run-1", "turn-1",
+            com.letta.mobile.data.presence.ActiveTurnPhase.ToolExecuting, activeTool = "Bash",
+        )
+        val surface = surfaceState(listOf(conversation), "c1")
+        assertEquals(NowActiveStatus.Thinking, deriveNowActiveBarPin(
+            ConversationId("c1"), null, null, surface, host(), turn,
+        )?.state?.status)
+        assertEquals(NowActiveStatus.Stopping, deriveNowActiveBarPin(
+            ConversationId("c1"), null, null, surface, host(),
+            turn.copy(phase = com.letta.mobile.data.presence.ActiveTurnPhase.Cancelling),
+        )?.state?.status)
+        assertEquals(NowActiveStatus.Idle, deriveNowActiveBarPin(
+            ConversationId("c1"), "c1", "c1", surface, host("c1", true),
+            turn.copy(phase = com.letta.mobile.data.presence.ActiveTurnPhase.Idle, activeTool = null),
+        )?.state?.status)
+    }
+
+    @Test
     fun noConversationAtAllReturnsNull() {
         val pin = deriveNowActiveBarPin(
             ownerConversationId = null,

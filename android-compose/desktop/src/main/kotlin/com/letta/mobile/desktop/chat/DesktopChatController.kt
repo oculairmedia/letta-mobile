@@ -10,16 +10,10 @@ import com.letta.mobile.data.chat.conversations.OpenedBranch
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
-import com.letta.mobile.data.chat.runtime.ChatRunInterruptHost
-import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
-import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
-import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
-import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
-import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
@@ -71,6 +65,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.letta.mobile.data.presence.ActiveTurnCoordinator
+import com.letta.mobile.data.presence.ActiveTurnIdentity
+import com.letta.mobile.data.presence.ActiveTurnPhase
+import com.letta.mobile.data.presence.ActiveTurnTerminalKind
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.presence.ConversationRunState
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -164,31 +162,27 @@ class DesktopChatController(
     private val _thinkingConversationId = MutableStateFlow<String?>(null)
     val thinkingConversationId: StateFlow<String?> = _thinkingConversationId.asStateFlow()
 
-    // Bumped on every send so a stale safety-timeout can't clear the indicator
-    // for a newer send in the same conversation.
     private var thinkingGeneration = 0
 
     /** The reply's conversation until the complete stream ends, unlike the shorter thinking phase. */
-    private val _streamingConversationId = MutableStateFlow<String?>(null)
-    val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
+    private val activeTurns = DesktopActiveTurnBinding(scope) { forceLocalStopClear(it, "Local clear") }
+    internal val activeTurnStates get() = activeTurns.states
+    val streamingConversationId: StateFlow<String?> = DerivedStateFlow(activeTurnStates.map { turns ->
+        turns.values.firstOrNull { it.phase != ActiveTurnPhase.Idle }?.conversationId?.value
+    }) { activeTurnStates.value.values.firstOrNull { it.phase != ActiveTurnPhase.Idle }?.conversationId?.value }
 
-    // The conversation the user last SENT a prompt into ("now playing" for the
-    // bottom bar): sticky across selection changes so jumping back is one click.
+    internal fun activeTurnCoordinator(conversationId: String?): ActiveTurnCoordinator? {
+        val conversation = state.value.conversations.firstOrNull { it.id == conversationId } ?: return null
+        return activeTurns.owner(conversation.id, conversation.agentId ?: return null)
+    }
+
     private val _lastPromptedConversationId = MutableStateFlow<String?>(null)
     val lastPromptedConversationId: StateFlow<String?> = _lastPromptedConversationId.asStateFlow()
 
-    // Same stale-guard rationale as thinkingGeneration.
-    private var streamingGeneration = 0
-
-    /** letta-mobile-by4vm.14: Stop's lifecycle, the same shared state machine Android's composer runs. */
-    private val interrupter = ChatRunInterrupter(
-        scope = scope,
-        host = ChatRunInterruptHost(::forceLocalStopClear),
-        telemetry = ChatRunInterruptTelemetry(TELEMETRY_TAG),
-    )
-
-    /** The aborting conversation; sends stay blocked until the stream actually ends. */
-    val cancellingConversationId: StateFlow<String?> = interrupter.cancelling
+    /** Cancellation is projected from the same owner as streaming and header activity. */
+    val cancellingConversationId: StateFlow<String?> = DerivedStateFlow(activeTurnStates.map { turns ->
+        turns.values.firstOrNull { it.phase == ActiveTurnPhase.Cancelling }?.conversationId?.value
+    }) { activeTurnStates.value.values.firstOrNull { it.phase == ActiveTurnPhase.Cancelling }?.conversationId?.value }
 
     /** The shared timeline presenter is stateful per conversation and resets on rebind. */
     private val timelinePresenter = ChatTimelinePresenter()
@@ -208,14 +202,12 @@ class DesktopChatController(
     private val presenceJob: Job = scope.launch {
         combine(
             _boundProjection,
-            _streamingConversationId,
+            activeTurnStates,
             state.map { it.selectedConversationId },
-        ) { bound, streamingConversationId, selectedConversationId ->
+        ) { bound, turns, selectedConversationId ->
             derivePresence(
                 projection = bound.projection?.takeIf { bound.conversationId != null && bound.conversationId == selectedConversationId },
-                // The send job spans send -> terminal across every tool round: it is desktop's
-                // in-flight turn, the same fact Android reads from the transport.
-                turnInFlight = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                turnInFlight = turns[selectedConversationId]?.phase?.let { it != ActiveTurnPhase.Idle } == true,
             )
         }
             // Tokens arriving for the selected conversation are the one phase this controller
@@ -231,30 +223,18 @@ class DesktopChatController(
 
     // `by lazy` so the presence collector above (which publishes into it) can never observe it
     // before construction reaches this line.
-    private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }) }
+    private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }, onRuntimeEvent = { event ->
+        if (state.value.conversations.any { it.id == event.conversationId && it.agentId == event.agentId })
+            activeTurns.onEvent(event)
+    }) }
 
     /** Publish active subagent and background-dream phases through the shared publisher. */
     internal fun publishSubagents(entries: List<com.letta.mobile.data.model.SubagentEntry>) = runPhases.publishSubagents(entries)
 
-    /** Selected conversation streaming and typing through the shared presenter. */
-    private fun derivePresence(
-        projection: TimelineProjection?,
-        turnInFlight: Boolean,
-    ): ChatStreamingPresence {
-        if (projection == null) {
-            // Nothing projected for this conversation yet: only the in-flight turn can say it works.
-            return ChatStreamingPresencePolicy.derive(
-                inputs = ChatStreamInputs(
-                    anyServerLocalPending = false,
-                    tailIsAssistant = false,
-                    replyStreaming = turnInFlight,
-                    a2uiThinkingActive = false,
-                    duplicateInitialMessageInFlight = false,
-                    turnInFlight = turnInFlight,
-                ),
-            )
-        }
-        // Desktop has no A2UI-thinking or duplicate-initial signals, so those are inert here.
+    /** Timeline details refine animation only while the shared owner says a turn is active. */
+    private fun derivePresence(projection: TimelineProjection?, turnInFlight: Boolean): ChatStreamingPresence {
+        if (!turnInFlight) return ChatStreamingPresence(false, false)
+        if (projection == null) return ChatStreamingPresence(true, true)
         val presentation = timelinePresenter.present(
             projection = projection,
             signals = ChatPresenceSignals(
@@ -264,7 +244,7 @@ class DesktopChatController(
                 turnInFlight = turnInFlight,
             ),
         )
-        return ChatStreamingPresence(isStreaming = presentation.isStreaming, isAgentTyping = presentation.isAgentTyping)
+        return ChatStreamingPresence(presentation.isStreaming, presentation.isAgentTyping)
     }
 
     private var gateway: DesktopChatGateway? = null
@@ -346,18 +326,23 @@ class DesktopChatController(
      * turn's own terminal frame arrives, never optimistically when stop was pressed.
      */
     private fun onRemoteSendAttemptCompleted(attempt: RemoteSendAttempt, outcome: RemoteSendOutcome) {
-        if (attempt.isTheLiveStream()) _streamingConversationId.value = null
+        if (outcome != RemoteSendOutcome.Cancelled) attempt.conversationId?.let { id ->
+            activeTurns.terminate(id, attempt.turnIdentity(), when (outcome) {
+                RemoteSendOutcome.Completed -> ActiveTurnTerminalKind.Finished
+                RemoteSendOutcome.Failed -> ActiveTurnTerminalKind.Failed
+                RemoteSendOutcome.Cancelled -> error("Cancellation is not terminal evidence")
+            })
+        }
         // A failed attempt already published its FAILED terminal and a cancelled one publishes
         // CANCELLED when the turn's own terminal lands. Only a run that finished is COMPLETED.
         if (outcome == RemoteSendOutcome.Completed) {
             runPhases.publish(attempt.conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed))
         }
         val conversationId = attempt.conversationId ?: return
-        if (interrupter.settle(conversationId)) _thinkingConversationId.compareAndSet(conversationId, null)
+        if (outcome == RemoteSendOutcome.Failed) _thinkingConversationId.compareAndSet(conversationId, null)
     }
 
-    private fun RemoteSendAttempt.isTheLiveStream(): Boolean =
-        streamGen == streamingGeneration && _streamingConversationId.value == conversationId
+    private fun RemoteSendAttempt.turnIdentity() = ActiveTurnIdentity(localMessageId.value, "runtime:${localMessageId.value}")
 
 
     private fun bindGateway(next: DesktopChatGateway?) {
@@ -443,6 +428,7 @@ class DesktopChatController(
         presenceJob.cancel()
         conversationPushJob?.cancel()
         runPhases.close()
+        activeTurns.close()
         connectionWatcher.stop()
         loadJob?.cancel()
         selectJob?.cancel()
@@ -903,24 +889,23 @@ class DesktopChatController(
 
     fun stopActiveRun(conversationId: String) {
         if (closed) return
-        // Only the conversation whose run is live can be stopped from here.
-        val active = _streamingConversationId.value ?: _thinkingConversationId.value
-        if (active != null && active != conversationId) return
-        val aborter = gateway as? DesktopTurnAborter
-        val abort: (suspend () -> Boolean)? = aborter?.let { target -> suspend { target.abortConversationTurn(conversationId) } }
-        // INTERRUPTING first: a stop that lands its terminal at once must not be overwritten by it.
+        val coordinator = activeTurnCoordinator(conversationId) ?: return
         runPhases.markInterrupting(conversationId)
-        interrupter.request(ChatStopRequest(key = conversationId, transport = "appServer", abort = abort))
+        val captured = coordinator.state.value
+        val turn = ActiveTurnIdentity(captured.runId ?: return, captured.turnId ?: return)
+        val aborter = gateway as? DesktopTurnAborter
+        coordinator.interrupt(turn, java.util.UUID.randomUUID().toString()) {
+            if (aborter is DesktopAppServerChatGateway) aborter.abortConversationTurn(
+                ConversationId(conversationId), activeTurns.serverRunId(conversationId, turn)?.let(::DesktopRunId),
+            ) else aborter?.abortConversationTurn(conversationId) ?: false
+        }
     }
 
-    /**
-     * Local escape hatch: drop the streaming UI without a terminal frame. The interrupter has
-     * already left CANCELLING and telemeters the clear.
-     */
+    /** Releases local send resources after the shared owner records LocalClear. */
     private fun forceLocalStopClear(conversationId: String, reason: String) {
-        sendJob?.cancel()
+        if (streamingConversationId.value == null || streamingConversationId.value == conversationId) sendJob?.cancel()
         _state.update {
-            if (it.runtimeState.isSending) {
+            if (it.selectedConversationId == conversationId && it.runtimeState.isSending) {
                 it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
             } else {
                 it
@@ -928,9 +913,6 @@ class DesktopChatController(
         }
         if (_thinkingConversationId.value == conversationId) {
             _thinkingConversationId.value = null
-        }
-        if (_streamingConversationId.value == conversationId) {
-            _streamingConversationId.value = null
         }
         runPhases.publish(conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason))
     }
@@ -969,10 +951,8 @@ class DesktopChatController(
             workspaceOwner?.currentFocus?.chatMode == com.letta.mobile.data.shell.CurrentFocusChatMode.New &&
             workspaceOwner?.page?.kind == com.letta.mobile.data.shell.ShellPageKind.Chat)
 
-    private fun stopBlocksSend(): Boolean {
-        val cancelling = cancellingConversationId.value ?: return false
-        return cancelling == _state.value.selectedConversationId
-    }
+    private fun stopBlocksSend(): Boolean =
+        activeTurnStates.value[_state.value.selectedConversationId]?.phase == ActiveTurnPhase.Cancelling
 
     /** [draft]'s nextState is the composer after the send: emptied by [send], untouched by [sendText]. */
     private fun dispatchSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit, onNotConnected: () -> Unit) {
@@ -1036,9 +1016,9 @@ class DesktopChatController(
         clearUnsentIfMatching(sendingConversationId)
         _state.update { it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft)) }
         beginThinking(sendingConversationId)
-        _streamingConversationId.value = sendingConversationId
-        runPhases.publish(sendingConversationId, RuntimeEventPayload.LocalUserAppend("desktop-send-$streamingGeneration", text))
-        val streamGen = ++streamingGeneration
+        val identity = "desktop-send-${java.util.UUID.randomUUID()}"
+        runPhases.publish(sendingConversationId, RuntimeEventPayload.LocalUserAppend(identity, text))
+        activeTurnCoordinator(sendingConversationId)?.start(ActiveTurnIdentity(identity, "runtime:$identity"))
         sendJob?.cancel()
         sendJob = scope.launch {
             remoteSender.runRemoteSendAttempt(
@@ -1048,7 +1028,7 @@ class DesktopChatController(
                     attachments = attachments,
                     conversationId = sendingConversationId,
                     titleToPersist = titleToPersist,
-                    streamGen = streamGen,
+                    localMessageId = LocalMessageId(identity),
                 ),
             )
         }
@@ -1192,9 +1172,24 @@ class DesktopChatController(
         override fun setError(message: String?) {
             _state.update { it.copy(errorMessage = message) }
         }
-        override fun streamingConversationId(): String? = _streamingConversationId.value
+        override fun streamingConversationId(): String? = streamingConversationId.value
         override fun thinkingConversationId(): String? = _thinkingConversationId.value
-        override fun setStreaming(conversationId: String?) { _streamingConversationId.value = conversationId }
+        private var dispatchedTurn: Pair<String, ActiveTurnIdentity>? = null
+        override fun setStreaming(conversationId: String?) {
+            if (conversationId == null) {
+                // Runtime-backed turns settle only on a correlated gateway terminal.
+                if (gateway !is DesktopRuntimeEventSource) dispatchedTurn?.let { (id, turn) ->
+                    activeTurns.terminate(id, turn, ActiveTurnTerminalKind.Finished)
+                }
+                return
+            }
+            val owner = activeTurnCoordinator(conversationId) ?: return
+            if (owner.state.value.phase != ActiveTurnPhase.Idle) return
+            val identity = java.util.UUID.randomUUID().toString()
+            val turn = ActiveTurnIdentity(identity, identity)
+            dispatchedTurn = conversationId to turn
+            owner.start(turn)
+        }
         override fun setThinking(conversationId: String?) { _thinkingConversationId.value = conversationId }
         override fun selectedConversationId(): String? = _state.value.selectedConversationId
         override fun settleSend(failed: Boolean) {
@@ -1333,7 +1328,7 @@ class DesktopChatController(
             timeline = timeline,
             prefix = timelinePresenter.olderPrefixFor(conversationId),
             previousState = ChatUiState(),
-            isActiveRunStreaming = _streamingConversationId.value == conversationId,
+            isActiveRunStreaming = activeTurnStates.value[conversationId]?.phase?.let { it != ActiveTurnPhase.Idle } == true,
             ownAgentId = _state.value.conversations.firstOrNull { it.id == conversationId }?.agentId,
         )
         _boundProjection.value = BoundProjection(conversationId = conversationId, projection = projection)

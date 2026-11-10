@@ -215,6 +215,15 @@ class DesktopAppServerChatGateway internal constructor(
         return response.success && response.aborted
     }
 
+    /** Exact captured-run abort; missing correlation never falls back to the server's current turn. */
+    internal suspend fun abortConversationTurn(conversationId: ConversationId, expectedRunId: DesktopRunId?): Boolean {
+        val run = expectedRunId ?: return false
+        val engine = turnEngine as? AppServerTurnEngine ?: return false
+        val agentId = runCatching { agentIdFor(conversationId) }.getOrNull() ?: return false
+        val response = engine.abort(agentId.value, conversationId.value, run.value)
+        return response.success && response.aborted
+    }
+
     override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
         val agentId = AgentId(submission.agentId)
         val conversationId = ConversationId(submission.conversationId)
@@ -304,7 +313,7 @@ class DesktopAppServerChatGateway internal constructor(
         val agentId = agentIdFor(conversationId)
         val outbound = OutboundMessageCreate.decode(request)
         val turnId = DesktopTurnId("desktop-turn-${UUID.randomUUID()}")
-        val syntheticRunId = DesktopRunId("desktop-run-${UUID.randomUUID()}")
+        val syntheticRunId = DesktopRunId(outbound.otid ?: "desktop-run-${UUID.randomUUID()}")
         val localMsgId = outbound.otid?.let(::LocalMessageId)
             ?: LocalMessageId("desktop-local-${UUID.randomUUID()}")
         val command = TurnCommand(
@@ -323,7 +332,9 @@ class DesktopAppServerChatGateway internal constructor(
             var deliveredAssistantContent = false
             var mainReplyCompleted = false
             try {
-                turnEngine.runTurn(command).relayedFor(conversationId, agentId).collect { draft ->
+                runtimeEventRelay.emit(ScopedDesktopRuntimeEvent(conversationId.value, agentId.value,
+                    RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started), syntheticRunId.value))
+                turnEngine.runTurn(command).relayedFor(conversationId, agentId, syntheticRunId).collect { draft ->
                     draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
                         activeRunIdByConversation[conversationId] = DesktopRunId(it)
                     }
@@ -394,16 +405,26 @@ class DesktopAppServerChatGateway internal constructor(
     }
 
     /** Every runtime event this gateway maps is republished for presence, whichever path produced it. */
-    private fun Flow<RuntimeEventDraft>.relayedFor(conversationId: ConversationId, agentId: AgentId): Flow<RuntimeEventDraft> =
-        onEach { draft -> runtimeEventRelay.emit(conversationId.value, agentId.value, draft.payload) }
+    private fun Flow<RuntimeEventDraft>.relayedFor(conversationId: ConversationId, agentId: AgentId, turn: DesktopRunId): Flow<RuntimeEventDraft> =
+        onEach { draft ->
+            runtimeEventRelay.emit(ScopedDesktopRuntimeEvent(
+                conversationId.value, agentId.value, draft.payload, turn.value, draft.runId?.value,
+            ))
+        }
 
     /** An observed draft is scoped to what it names, else to the stream it arrived on. */
     private suspend fun relayObserved(draft: RuntimeEventDraft, conversationId: ConversationId, agentId: AgentId) {
-        runtimeEventRelay.emit(
+        runtimeEventRelay.emit(ScopedDesktopRuntimeEvent(
             draft.conversationId?.value ?: conversationId.value,
             draft.agentId?.value ?: agentId.value,
-            draft.payload,
-        )
+            draft.payload.let { payload ->
+                // An authoritative active-run query is restoration evidence, not arbitrary progress.
+                if (payload is RuntimeEventPayload.RunLifecycleChanged && payload.status == RuntimeRunStatus.Running)
+                    RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started) else payload
+            },
+            draft.runId?.value,
+            draft.runId?.value,
+        ))
     }
 
     // Suspending only for the relay: an externally started or background turn reaches the timeline
