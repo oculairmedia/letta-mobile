@@ -41,6 +41,7 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.ui.canvas.boards.ProvideCanvasBoardSource
+import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
 import com.letta.mobile.ui.common.toOverlay
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
                 LocalWindowSizeClass provides windowSizeClass,
                 LocalAttentionPrefs provides deps.attentionPrefs,
                 LocalAgentDefaults provides deps.agentDefaults,
+                LocalShellTaskRegistry provides deps.subagentRepository,
             ) {
                 LettaTheme(
                     appTheme = appThemeState.value,

@@ -7,23 +7,18 @@ import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Constructor-injected Activity collaborators for [MainActivity].
- *
- * `@AndroidEntryPoint` activities cannot use constructor injection on the
- * Activity itself (letta-mobile-l2ew9.2).
- *
- * letta-mobile-wyo3p: the settings/secure-store/agent graph is held behind
- * [Lazy]. Building it constructs the Keystore-backed EncryptedSharedPreferences,
- * which `AppStartupCoordinator` already warms on IO at process start; eager
- * injection made `MainActivity.onCreate` wait ~100 ms on that singleton's lock
- * before it could call `setContent`. Resolved lazily, the first read happens in
- * first composition, by which point the warm-up has normally finished.
+ * Constructor-injected Activity collaborators for [MainActivity] (an `@AndroidEntryPoint` activity cannot
+ * use constructor injection itself). The settings / secure-store / agent graph is held behind [Lazy]:
+ * building it constructs the Keystore-backed EncryptedSharedPreferences, which `AppStartupCoordinator`
+ * warms on IO at process start, and eager injection made `onCreate` wait ~100 ms on that singleton's lock
+ * before `setContent`. Read lazily, in first composition, the warm-up has normally finished.
  * [crashReporter] stays eager: the Application already built it.
  */
 @Singleton
@@ -36,6 +31,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
     private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
     private val lazyCanvasBoards: Lazy<CanvasBoardSessions>,
+    private val lazySubagentRepository: Lazy<ISubagentRepository>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
 
@@ -54,4 +50,7 @@ class MainActivityDependencies @Inject constructor(
 
     /** The window's one live session per stored board, where its canvas modules open boards by id. */
     val canvasBoards: CanvasBoardSessions get() = lazyCanvasBoards.get()
+
+    /** The current session's subagent registry, where the shell's tasks modules list background tasks. */
+    val subagentRepository: ISubagentRepository get() = lazySubagentRepository.get()
 }

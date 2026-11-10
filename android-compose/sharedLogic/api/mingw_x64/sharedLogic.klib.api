@@ -73911,6 +73911,8 @@ final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile
         final fun <get-PAGE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.PAGE.<get-PAGE>|<get-PAGE>(){}[0]
     final val SIDE_PANE // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE|{}SIDE_PANE[0]
         final fun <get-SIDE_PANE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE.<get-SIDE_PANE>|<get-SIDE_PANE>(){}[0]
+    final val TASKS // com.letta.mobile.data.shell.layout/ShellViews.TASKS|{}TASKS[0]
+        final fun <get-TASKS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.TASKS.<get-TASKS>|<get-TASKS>(){}[0]
 }
 
 final object com.letta.mobile.data.shell.sidemenu/PanelViews { // com.letta.mobile.data.shell.sidemenu/PanelViews|null[0]

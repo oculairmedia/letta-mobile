@@ -58,6 +58,13 @@ object ShellViews {
      * it. A board the host cannot open is shown as unavailable. Not part of the default layout.
      */
     val CANVAS = RuntimeViewId("shell.canvas")
+
+    /**
+     * The open conversation's background tasks (its subagent runs), each dismissable, drawn at the
+     * size its lane gives it. It names no object: it follows whichever conversation is open. A host
+     * that cannot list tasks shows it as unavailable. Not part of the default layout.
+     */
+    val TASKS = RuntimeViewId("shell.tasks")
 }
 
 /**

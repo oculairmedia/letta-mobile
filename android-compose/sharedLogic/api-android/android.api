@@ -49602,6 +49602,7 @@ public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public final fun getCANVAS-p0dNODo ()Ljava/lang/String;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
 	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
+	public final fun getTASKS-p0dNODo ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAction : java/lang/Enum {
