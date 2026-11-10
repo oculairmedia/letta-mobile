@@ -11,11 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,11 +30,19 @@ import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomeShortcut
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
+
+/**
+ * The home lane's sections in order ([HomeViews]). The shell workspace provides it from its stored
+ * layout; outside a workspace it is every section in the default order.
+ */
+internal val LocalHomeLane = compositionLocalOf { HomeViews.Default }
 
 /**
  * The Home page shared by Android, desktop and web: the mobile dashboard
@@ -48,6 +56,11 @@ import com.letta.mobile.ui.theme.LettaDimens
  * composer up top and the full fleet table; below it the composer docks at the bottom like a phone
  * chat bar. Either way the page leads with running work and recent conversations, then an agent
  * avatar row and a one-line stats strip ([homeSections]); counters never repeat.
+ *
+ * Which sections show, and their order, is the shell layout's home lane, which the workspace that
+ * draws this page provides in [LocalHomeLane]. The page frame keeps the header, the search results that replace the sections, refresh and
+ * the pinned-tile editor's state; a compact page docks the composer below the list whenever the
+ * lane holds it, wherever the lane puts it.
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.
@@ -71,11 +84,13 @@ fun HomePage(
         return
     }
     var editingPins by remember { mutableStateOf(false) }
+    val lane = LocalHomeLane.current
     BoxWithConstraints(base) {
         val page = HomePageScope(
             state = state,
             callbacks = callbacks,
             options = options,
+            lane = lane,
             wide = maxWidth >= LettaDimens.Pane.wideBreakpoint,
             editingPins = editingPins,
             onEditingPinsChange = { editingPins = it },
@@ -129,6 +144,8 @@ internal class HomePageScope(
     val state: HomePageState,
     callbacks: HomePageCallbacks,
     val options: HomePageOptions,
+    /** The home lane's sections in order ([homeSections] draws them). */
+    val lane: List<RuntimeViewId>,
     val wide: Boolean,
     val editingPins: Boolean,
     val onEditingPinsChange: (Boolean) -> Unit,
@@ -143,6 +160,10 @@ internal class HomePageScope(
 
     private val drawsHeaderControls: Boolean
         get() = options.showTitle || options.showSearch
+
+    /** The lane holds the composer; a compact page docks it below the list. */
+    val hasComposer: Boolean
+        get() = HomeViews.COMPOSER in lane
 
     fun orbIndex(agentId: String?): Int = agentId?.let { options.orbIndexByAgentId[it] } ?: 0
 
@@ -171,12 +192,7 @@ private fun WideHomeList(page: HomePageScope) {
         contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.xl),
     ) {
         item { HomeHeader(page) }
-        if (page.state.search.isActive) {
-            homeSearchResults(page)
-        } else {
-            item { HomeComposer(page) }
-            homeDashboard(page)
-        }
+        if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
     }
 }
 
@@ -193,14 +209,8 @@ private fun CompactHomeLayout(page: HomePageScope) {
                 if (page.state.search.isActive) homeSearchResults(page) else homeSections(page)
             }
         }
-        if (!page.state.search.isActive) {
+        if (!page.state.search.isActive && page.hasComposer) {
             HomeComposer(page, Modifier.padding(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.sm))
         }
     }
-}
-
-/** Wide: the phone's sections (work in flight, recents, agents, counters, pins), then the full fleet table. */
-private fun LazyListScope.homeDashboard(page: HomePageScope) {
-    homeSections(page)
-    homeFleetSection(page)
 }

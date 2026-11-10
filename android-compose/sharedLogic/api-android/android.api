@@ -22081,6 +22081,18 @@ public final class com/letta/mobile/data/home/HomeUsageSummary {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/home/HomeViews {
+	public static final field INSTANCE Lcom/letta/mobile/data/home/HomeViews;
+	public final fun getAGENTS-p0dNODo ()Ljava/lang/String;
+	public final fun getCOMPOSER-p0dNODo ()Ljava/lang/String;
+	public final fun getDefault ()Ljava/util/List;
+	public final fun getFLEET-p0dNODo ()Ljava/lang/String;
+	public final fun getNOW-p0dNODo ()Ljava/lang/String;
+	public final fun getPINNED-p0dNODo ()Ljava/lang/String;
+	public final fun getRECENTS-p0dNODo ()Ljava/lang/String;
+	public final fun getSTATS-p0dNODo ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/home/ModelTokenUsage {
 	public fun <init> (Ljava/lang/String;II)V
 	public final fun component1 ()Ljava/lang/String;
@@ -49249,6 +49261,7 @@ public final class com/letta/mobile/data/shell/layout/ModuleSlot$Companion {
 }
 
 public final class com/letta/mobile/data/shell/layout/ShellLanes {
+	public static final field HOME Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellLanes;
 	public static final field MAIN Ljava/lang/String;
 	public static final field SIDE Ljava/lang/String;
@@ -49269,6 +49282,7 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig {
 	public final fun getLanes ()Ljava/util/Map;
 	public final fun getVersion ()I
 	public fun hashCode ()I
+	public final fun homeLane ()Ljava/util/List;
 	public final fun lane (Ljava/lang/String;)Ljava/util/List;
 	public final fun mainLane ()Ljava/util/List;
 	public final fun mainLane (I)Ljava/util/List;

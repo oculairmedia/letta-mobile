@@ -47,8 +47,10 @@ import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStatTile
+import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
+import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
@@ -56,19 +58,37 @@ import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Home's sections, the same order at every width: what needs the user first, then where they
- * left off, then everything else small. A one-line "running now" strip (only while something
- * runs), the recent conversations ([homeRecents]), the agents as a row of avatars (pinned first),
- * the stats strip whose overflow opens the pinned-tile editor, and the pinned shortcuts the strip
- * does not already open. A wide window adds the fleet table below; the composer sits above these
- * there and docks below them on a phone.
+ * Draws one Home section of the home lane as list items. Sections stay lazy: each emits keyed
+ * items into the page's list rather than drawing a composable of its own.
+ */
+internal typealias HomeSectionView = LazyListScope.(page: HomePageScope) -> Unit
+
+/**
+ * Home's sections by view. What needs the user first, then where they left off, then everything
+ * else small: a one-line "running now" strip (only while something runs), the recent conversations
+ * ([homeRecents]), the agents as a row of avatars (pinned first), the stats strip whose overflow
+ * opens the pinned-tile editor, and the pinned shortcuts the strip does not already open; a wide
+ * window adds the fleet table. The composer is an item only on a wide page: a phone docks it below
+ * the list ([HomePage] does that while the lane holds it).
+ */
+internal val homeSectionViews: Map<RuntimeViewId, HomeSectionView> = mapOf(
+    HomeViews.COMPOSER to section { page -> if (page.wide) item { HomeComposer(page) } },
+    HomeViews.NOW to section { page -> homeNowStrip(page) },
+    HomeViews.RECENTS to section { page -> homeRecents(page) },
+    HomeViews.AGENTS to section { page -> homeAgentAvatarRow(page) },
+    HomeViews.STATS to section { page -> item(key = "stats-strip") { HomeStatsStrip(page) } },
+    HomeViews.PINNED to section { page -> if (page.editingPins) homePinnedSection(page) else homePinnedShortcutRow(page) },
+    HomeViews.FLEET to section { page -> if (page.wide) homeFleetSection(page) },
+)
+
+private fun section(view: HomeSectionView): HomeSectionView = view
+
+/**
+ * The home lane's sections in its order, each view once. A view Home does not know draws nothing,
+ * so a layout naming one never breaks the page.
  */
 internal fun LazyListScope.homeSections(page: HomePageScope) {
-    homeNowStrip(page)
-    homeRecents(page)
-    homeAgentAvatarRow(page)
-    item(key = "stats-strip") { HomeStatsStrip(page) }
-    if (page.editingPins) homePinnedSection(page) else homePinnedShortcutRow(page)
+    page.lane.distinct().forEach { view -> homeSectionViews[view]?.invoke(this, page) }
 }
 
 // region Now

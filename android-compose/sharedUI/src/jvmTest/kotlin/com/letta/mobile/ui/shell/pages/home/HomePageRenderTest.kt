@@ -15,12 +15,9 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.letta.mobile.data.home.FleetAgentStat
 import com.letta.mobile.data.home.FleetOverview
 import com.letta.mobile.data.home.FleetRecentConversation
-import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.FleetSummary
-import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageReducer
 import com.letta.mobile.data.home.HomePageState
-import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStats
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
@@ -72,7 +69,7 @@ class HomePageRenderTest {
             SharedMaterialTheme(darkTheme = true) {
                 ProvideLettaHost(LettaHost.Pointer) {
                     Surface(Modifier.fillMaxSize()) {
-                        HomePage(state = state(), callbacks = HomePageCallbacks(NoActions, navigation))
+                        HomePage(state = state(), callbacks = InertHomeCallbacks)
                     }
                 }
             }
@@ -117,19 +114,6 @@ class HomePageRenderTest {
 
     private fun conversation(id: String, at: Instant?) =
         FleetRecentConversation(id, "a-1", "Scout", id, "", at, at?.toString() ?: "Queued")
-
-    private val navigation = HomePageNavigation(onSubmitPrompt = {}, onOpenConversation = {}, onOpenAgent = {}, onOpenShortcut = {})
-
-    private object NoActions : HomePageActions {
-        override fun loadIfStale() = Unit
-        override fun refresh() = Unit
-        override fun updateSearchQuery(query: String) = Unit
-        override fun clearSearch() = Unit
-        override fun selectSort(key: FleetSortKey) = Unit
-        override fun reorderPins(keys: List<String>) = Unit
-        override fun setShortcutPinned(shortcut: HomeShortcut, pinned: Boolean) = Unit
-        override fun setAgentPinned(agentId: String, pinned: Boolean) = Unit
-    }
 
     private companion object {
         const val WIDE_PX = 1200
