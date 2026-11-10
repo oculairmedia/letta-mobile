@@ -324,18 +324,13 @@ class CanvasNoteWorldUnitsUiTest {
      */
     @Test
     fun aCardSitsOnItsFrameOnAPhoneScreenAtAPhonesDensity() {
-        val phone = IntSize(990, 2145)
-        val misplaced = listOf(0.12f, 0.3f, 1f).flatMap { scale -> misplacedCards(phone, Display(2.75f, 1f), scale, PHONE_FRAMES) }
+        val misplaced = listOf(0.12f, 0.3f, 1f).flatMap { scale -> misplacedCards(PHONE_BOARD, Display(2.75f, 1f), scale) }
         assertTrue(misplaced.isEmpty(), "cards off their frames:\n${misplaced.joinToString("\n")}")
     }
 
-    /** Each of [frames] drawn on a [board]-px board at [display] and zoom [scale], when it is not on its frame. */
-    private fun misplacedCards(
-        board: IntSize,
-        display: Display,
-        scale: Float,
-        frames: Map<String, CanvasDocumentFrame> = PLACEMENT_FRAMES,
-    ): List<String> {
+    /** Each card of the [board]'s frames, drawn on that board at [display] and zoom [scale], when it is not on its frame. */
+    private fun misplacedCards(board: IntSize, display: Display, scale: Float): List<String> {
+        val frames = if (board == PHONE_BOARD) PHONE_FRAMES else PLACEMENT_FRAMES
         val misplaced = mutableListOf<String>()
         runDesktopComposeUiTest(width = board.width, height = board.height) {
             val session = session()
@@ -352,7 +347,6 @@ class CanvasNoteWorldUnitsUiTest {
                 val expected = viewport.worldToScreen(Offset(frame.x, frame.y))
                 val widthPx = node.size.width
                 val line = "$id, $board px at $display, zoom $scale: at $at, frame at $expected, $widthPx of ${frame.width} wide"
-                println("note-placement $line")
                 val off = (at - expected).getDistance() > 1.5f
                 if (off || kotlin.math.abs(widthPx - frame.width) > 1f) misplaced += line
             }
@@ -447,7 +441,10 @@ class CanvasNoteWorldUnitsUiTest {
             PLACEMENT_LABEL to CanvasDocumentFrame(100f, 400f, 900f, 200f),
         )
 
-        /** An ordinary note, and a dashboard-wide one and label wider than a phone's 990 px. */
+        /** A 360 x 780 dp phone screen at density 2.75, in px. */
+        val PHONE_BOARD = IntSize(990, 2145)
+
+        /** On [PHONE_BOARD]: an ordinary note, and a dashboard-wide one and label wider than its 990 px. */
         val PHONE_FRAMES = mapOf(
             "note" to CanvasDocumentFrame(100f, 60f, 320f, 240f),
             "wide" to CanvasDocumentFrame(500f, 60f, 1200f, 260f),
