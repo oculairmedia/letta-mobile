@@ -66,7 +66,7 @@ class MeridianLiveCalls(
             when (signal) {
                 is MeridianShellCallSignal.Started -> start(signal).also { starts.value += 1 }
                 is MeridianShellCallSignal.Ended -> end(signal.toolCallId)
-                is MeridianShellCallSignal.TurnEnded -> calls.entries.removeAll { it.value.scope.sameRuntime(signal.scope) }
+                is MeridianShellCallSignal.TurnEnded -> endTurn(signal.scope)
                 null -> Unit
             }
         }
@@ -82,7 +82,8 @@ class MeridianLiveCalls(
         withTimeoutOrNull(waitMs) { starts.first { isLive(toolCallId) } } ?: return refused(toolCallId, "call_start_not_seen")
         return mutex.withLock {
             expire()
-            val entry = calls[toolCallId]?.takeIf { it.token == null } ?: return@withLock refused(toolCallId, "token_already_issued")
+            val entry = calls[toolCallId] ?: return@withLock refused(toolCallId, "call_ended")
+            if (entry.token != null) return@withLock refused(toolCallId, "token_already_issued")
             log("$TAG token.issued toolCallId=$toolCallId conversationId=${entry.scope.conversationId}")
             newToken().also { calls[toolCallId] = entry.copy(token = it) }
         }
@@ -133,6 +134,11 @@ class MeridianLiveCalls(
     /** Forgets [toolCallId]; only a call this host was tracking is worth a log line. */
     private fun end(toolCallId: String) {
         if (calls.remove(toolCallId) != null) log("$TAG call.ended toolCallId=$toolCallId")
+    }
+
+    /** Forgets every call of the turn that ended in [scope], each with its own line (its end frame was lost). */
+    private fun endTurn(scope: AppServerRuntimeScope) {
+        calls.filterValues { it.scope.sameRuntime(scope) }.keys.toList().forEach(::end)
     }
 
     private fun expire() {

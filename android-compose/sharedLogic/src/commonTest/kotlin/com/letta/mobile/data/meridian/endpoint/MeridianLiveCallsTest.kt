@@ -36,6 +36,17 @@ class MeridianLiveCallsTest {
     }
 
     @Test
+    fun aCallWhoseEndFrameWasLostIsLoggedAsEndedWhenItsTurnEnds() = runTest {
+        calls.observe(started(list))
+        calls.observe(started(ShellCall("call-2", "meridian canvas list", scope = OTHER_CONVERSATION)))
+
+        calls.observe(turnFinished(SCOPE))
+
+        assertEquals(listOf("[meridian-tools] call.ended toolCallId=call-1"), lines.filter { "call.ended" in it })
+        assertEquals(1, calls.size())
+    }
+
+    @Test
     fun aCallIsLoggedFromItsStartToItsEndAndTheTokenNeverIs() = runTest {
         calls.observe(started(list))
         val token = calls.issueToken("call-1")
