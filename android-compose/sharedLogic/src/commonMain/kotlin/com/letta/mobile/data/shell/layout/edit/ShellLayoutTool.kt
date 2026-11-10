@@ -11,8 +11,8 @@ import kotlinx.serialization.json.JsonObject
 /**
  * The `shell_layout` tool: lets an agent read and change the shell layout of the app it is talking
  * to, through [port] (the shell on screen). A change applies at once and the shell shows the person
- * a notice with Undo; the page never leaves the main lane and Settings never leaves the side menu
- * ([ShellLayoutEdits]). Every answer is a JSON receipt ([ShellLayoutReceipts]); a refusal lists each
+ * a notice with Undo; the page never leaves the main lane, Settings never leaves the side menu and
+ * Home never leaves the agent rail ([ShellLayoutEdits]). Every answer is a JSON receipt ([ShellLayoutReceipts]); a refusal lists each
  * problem so the agent can correct itself in the same turn. Data only: the ops name catalog views.
  *
  * @param port the shell this tool changes; [ShellLayoutAgentPort.Shared] in the app.
@@ -27,8 +27,8 @@ class ShellLayoutTool(private val port: ShellLayoutAgentPort = ShellLayoutAgentP
             "action: get (current lanes and the views each may hold), apply (ops, all or nothing; dry_run: true checks " +
             "without applying), undo (the last change), reset (the default layout). Ops: set_lane {lane, slots}, " +
             "add {lane, view, object?, index?}, remove {lane, view, object?}, move {lane, view, object?, to_lane?, index?}, " +
-            "reset. The page stays in the main lane and Settings in the side menu. A refusal lists each problem " +
-            "(op_index, rule, detail) and applies nothing."
+            "reset. The page stays in the main lane, Settings in the side menu and Home in the agent rail. " +
+            "A refusal lists each problem (op_index, rule, detail) and applies nothing."
 
     override val inputSchema: JsonObject = ShellLayoutSchema.input
 

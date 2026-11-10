@@ -3024,6 +3024,7 @@ final enum class com.letta.mobile.data.shell.layout.edit/ShellLayoutAction : kot
 
 final enum class com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule : kotlin/Enum<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule> { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule|null[0]
     enum entry DUPLICATE_SLOT // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.DUPLICATE_SLOT|null[0]
+    enum entry HOME_STAYS // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.HOME_STAYS|null[0]
     enum entry INDEX_OUT_OF_RANGE // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.INDEX_OUT_OF_RANGE|null[0]
     enum entry LANE_FULL // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.LANE_FULL|null[0]
     enum entry MALFORMED // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.MALFORMED|null[0]

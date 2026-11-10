@@ -1,15 +1,18 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.data.shell.sidemenu.PanelViews
+import com.letta.mobile.data.shell.sidemenu.RailViews
 
 /**
  * Applies [ShellLayoutOp]s to a [ShellLayoutConfig] under the [ShellLayoutCatalog]'s rules: a lane
  * holds only the views it may hold, a slot appears once (and in only one of main and side), the page
- * never leaves the main lane, Settings never leaves the side menu, and no lane grows past its cap.
+ * never leaves the main lane, Settings never leaves the side menu, the rail keeps its Home button, and
+ * no lane grows past its cap.
  * Every op is checked; when any is invalid nothing is applied and every problem is reported.
  */
 object ShellLayoutEdits {
@@ -163,17 +166,29 @@ private fun otherOf(spec: ShellLayoutLaneSpec): ShellLayoutLaneSpec? = when (spe
     else -> null
 }
 
-/** Why [slot] cannot stay in, or go from, the lane [spec] it would leave. */
-private fun leavingProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? = when {
-    spec.lane == ShellLanes.MAIN && slot.view == ShellViews.PAGE -> pageStays()
-    spec.lane == ShellLanes.PANEL && slot.view == PanelViews.SETTINGS -> settingsStays()
-    else -> null
+/** A view that must stay in [lane]: it may move within the lane but never leave it, breaking [rule] if it would. */
+private class Protection(private val lane: String, val view: RuntimeViewId, rule: ShellLayoutEditRule) {
+    /** The problem reported when [view] would leave [lane]. */
+    val problem: Problem = rule to "${view.value} must stay in lane $lane."
+
+    /** Whether this protection holds in the lane [spec]. */
+    fun guards(spec: ShellLayoutLaneSpec): Boolean = spec.lane == lane
 }
 
-private fun keepsRequired(spec: ShellLayoutLaneSpec, slots: List<ModuleSlot>): List<Problem> = listOfNotNull(
-    pageStays().takeIf { spec.lane == ShellLanes.MAIN && slots.none { it.view == ShellViews.PAGE } },
-    settingsStays().takeIf { spec.lane == ShellLanes.PANEL && slots.none { it.view == PanelViews.SETTINGS } },
+/** The protected slots, in the order their problems are reported. */
+private val protections = listOf(
+    Protection(ShellLanes.MAIN, ShellViews.PAGE, ShellLayoutEditRule.PAGE_STAYS_IN_MAIN),
+    Protection(ShellLanes.PANEL, PanelViews.SETTINGS, ShellLayoutEditRule.SETTINGS_STAYS),
+    Protection(ShellLanes.RAIL, RailViews.HOME, ShellLayoutEditRule.HOME_STAYS),
 )
+
+/** Why [slot] cannot stay in, or go from, the lane [spec] it would leave. */
+private fun leavingProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? =
+    protections.firstOrNull { it.guards(spec) && it.view == slot.view }?.problem
+
+/** Each protected view of the lane [spec] that [slots] would leave out. */
+private fun keepsRequired(spec: ShellLayoutLaneSpec, slots: List<ModuleSlot>): List<Problem> =
+    protections.filter { protection -> protection.guards(spec) && slots.none { it.view == protection.view } }.map { it.problem }
 
 private fun slotProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? {
     val view = spec.view(slot.view)
@@ -203,12 +218,6 @@ private fun duplicate(slot: ModuleSlot, spec: ShellLayoutLaneSpec): Problem =
 
 private fun notFound(slot: ModuleSlot, spec: ShellLayoutLaneSpec): Problem =
     ShellLayoutEditRule.SLOT_NOT_FOUND to "${slot.describe()} is not in lane ${spec.lane}."
-
-private fun pageStays(): Problem =
-    ShellLayoutEditRule.PAGE_STAYS_IN_MAIN to "${ShellViews.PAGE.value} must stay in lane ${ShellLanes.MAIN}."
-
-private fun settingsStays(): Problem =
-    ShellLayoutEditRule.SETTINGS_STAYS to "${PanelViews.SETTINGS.value} must stay in lane ${ShellLanes.PANEL}."
 
 private fun ModuleSlot.describe(): String = objectRef?.let { "${view.value} ($it)" } ?: view.value
 

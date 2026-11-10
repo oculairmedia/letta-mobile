@@ -6,6 +6,7 @@ import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.data.shell.sidemenu.PanelViews
+import com.letta.mobile.data.shell.sidemenu.RailViews
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -28,6 +29,7 @@ object ShellLayoutReceipts {
     private val rules = listOf(
         "${ShellViews.PAGE.value} stays in lane ${ShellLanes.MAIN}.",
         "${PanelViews.SETTINGS.value} stays in lane ${ShellLanes.PANEL}.",
+        "${RailViews.HOME.value} stays in lane ${ShellLanes.RAIL}.",
         "A slot appears once, and in only one of ${ShellLanes.MAIN} and ${ShellLanes.SIDE}.",
         "Each lane holds only its listed views, at most max_slots of them.",
     )
