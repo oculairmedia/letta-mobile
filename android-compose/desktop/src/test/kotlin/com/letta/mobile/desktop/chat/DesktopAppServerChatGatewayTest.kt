@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -73,18 +74,9 @@ class DesktopAppServerChatGatewayTest {
     @Test
     fun stopBeforeServerRunIdWaitsThenAbortsOnlyTheCapturedTurn() = runTest {
         val client = FakeAppServerClient()
-        val gateway = DesktopAppServerChatGateway(
-            turnEngine = AppServerTurnEngine(client),
-            client = client, agentIdResolver = { "agent-1" },
-        )
         val cleared = mutableListOf<String>()
-        val binding = DesktopActiveTurnBinding(backgroundScope, cleared::add)
-        val turn = ActiveTurnIdentity("command-1", "runtime:command-1")
-        binding.start("conv-1", "agent-1", turn)
+        val binding = startStoppingTurn(client, cleared)
         val owner = binding.owner("conv-1", "agent-1")
-        owner.interrupt(turn, "stop-1") {
-            gateway.abortConversationTurn(ConversationId("conv-1"), binding.serverRunId("conv-1", turn)?.let(::DesktopRunId))
-        }
         runCurrent()
         assertEquals(ActiveTurnPhase.Cancelling, owner.state.value.phase)
         assertTrue(cleared.isEmpty(), "Missing correlation must not clear locally")
@@ -110,18 +102,9 @@ class DesktopAppServerChatGatewayTest {
     @Test
     fun stopWithoutServerRunIdClearsAtTheExistingDeadlineWithoutAbort() = runTest {
         val client = FakeAppServerClient()
-        val gateway = DesktopAppServerChatGateway(
-            turnEngine = AppServerTurnEngine(client),
-            client = client, agentIdResolver = { "agent-1" },
-        )
         val cleared = mutableListOf<String>()
-        val binding = DesktopActiveTurnBinding(backgroundScope, cleared::add)
-        val turn = ActiveTurnIdentity("command-1", "runtime:command-1")
-        binding.start("conv-1", "agent-1", turn)
+        val binding = startStoppingTurn(client, cleared)
         val owner = binding.owner("conv-1", "agent-1")
-        owner.interrupt(turn, "stop-1") {
-            gateway.abortConversationTurn(ConversationId("conv-1"), binding.serverRunId("conv-1", turn)?.let(::DesktopRunId))
-        }
         runCurrent()
         advanceTimeBy(29_999)
         runCurrent()
@@ -138,6 +121,20 @@ class DesktopAppServerChatGatewayTest {
         runCurrent()
         assertTrue(client.abortCommands.isEmpty(), "Correlation arriving after the deadline must not dispatch abort")
         binding.close()
+    }
+
+    private fun TestScope.startStoppingTurn(client: FakeAppServerClient, cleared: MutableList<String>): DesktopActiveTurnBinding {
+        val gateway = DesktopAppServerChatGateway(
+            turnEngine = AppServerTurnEngine(client),
+            client = client, agentIdResolver = { "agent-1" },
+        )
+        val binding = DesktopActiveTurnBinding(backgroundScope, cleared::add)
+        val turn = ActiveTurnIdentity("command-1", "runtime:command-1")
+        binding.start("conv-1", "agent-1", turn)
+        binding.owner("conv-1", "agent-1").interrupt(turn, "stop-1") {
+            gateway.abortConversationTurn(ConversationId("conv-1"), binding.serverRunId("conv-1", turn)?.let(::DesktopRunId))
+        }
+        return binding
     }
 
     private fun gateway(
