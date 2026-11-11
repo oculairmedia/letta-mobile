@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutAuthor
@@ -13,6 +14,8 @@ import com.letta.mobile.data.shell.layout.edit.ShellLayoutChange
 import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.Overlay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onSubscription
@@ -31,9 +34,13 @@ internal fun ShellLayoutChangeNotices(agents: List<Pair<String, String>>) {
     val names by rememberUpdatedState(agents)
     LaunchedEffect(port, overlays) {
         port.changes.onSubscription {
-            port.claimUnseenChange()?.let { overlays.show(shellLayoutChangeNotice(it, names, port)) }
-        }.collect { change ->
-            port.claimUnseenChange(change)?.let { overlays.show(shellLayoutChangeNotice(it, names, port)) }
+            port.peekUnseenChange()?.let { emit(it) }
+        }.collectLatest { change ->
+            if (port.peekUnseenChange() === change) {
+                val handle = overlays.show(shellLayoutChangeNotice(change, names, port))
+                snapshotFlow { overlays.snackbar?.id }.first { it == handle.id }
+                port.claimUnseenChange(change)
+            }
         }
     }
 }

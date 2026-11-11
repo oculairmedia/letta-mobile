@@ -85,20 +85,28 @@ class ShellLayoutAgentPort {
     /** Every change made through this port, as it is made. */
     val changes: SharedFlow<ShellLayoutChange> = published.asSharedFlow()
 
+    /** The latest unseen change, if it still describes the attached layout, without acknowledging it. */
+    fun peekUnseenChange(): ShellLayoutChange? = synchronized(lock) { validUnseenChange() }
+
     /**
      * Claims the latest unseen change, if it still describes the attached layout. When [expected]
      * is supplied, only that exact change may be claimed. A claim acknowledges delivery; changes
      * are retained in memory only and a later change replaces an unseen one.
      */
     fun claimUnseenChange(expected: ShellLayoutChange? = null): ShellLayoutChange? = synchronized(lock) {
-        val change = unseen ?: return@synchronized null
-        if (change.store !== attachedStore.value || change.store.config.value != change.after) {
-            unseen = null
-            return@synchronized null
-        }
+        val change = validUnseenChange() ?: return@synchronized null
         if (expected != null && expected !== change) return@synchronized null
         unseen = null
         change
+    }
+
+    private fun validUnseenChange(): ShellLayoutChange? {
+        val change = unseen ?: return null
+        if (change.store !== attachedStore.value || change.store.config.value != change.after) {
+            unseen = null
+            return null
+        }
+        return change
     }
 
     /** Makes [store] the one changes go to, until [detach]. */

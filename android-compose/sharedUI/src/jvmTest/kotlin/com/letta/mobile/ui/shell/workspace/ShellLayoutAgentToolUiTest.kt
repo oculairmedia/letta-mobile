@@ -67,7 +67,10 @@ import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSource
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.OverlayHandle
 import com.letta.mobile.ui.host.OverlayHostRoot
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayPriority
 import com.letta.mobile.ui.host.rememberOverlayHost
 import kotlin.test.assertSame
 import com.letta.mobile.ui.settings.LocalShellLayoutReset
@@ -283,6 +286,35 @@ class ShellLayoutAgentToolUiTest {
         }
         waitForIdle()
         applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        runOnIdle { visible.value = true }
+        awaitText("Layout changed by Ada")
+        undo()
+        assertEquals(HomeViews.Default, pageHomeLane)
+    }
+
+    @Test
+    fun aQueuedNoticeRemainsUnseenUntilItReachesTheScreen() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        val visible = mutableStateOf(true)
+        val overlayHost = OverlayHost()
+        val host = host()
+        setContent {
+            OverlayHostRoot(overlayHost) {
+                CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                    val controller = rememberShellLayoutController(null, settings)
+                    if (visible.value) {
+                        LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+                    }
+                }
+            }
+        }
+        waitForIdle()
+        lateinit var blocker: OverlayHandle
+        runOnIdle { blocker = overlayHost.show(Overlay.Snackbar("Important", presentation = OverlayPresentation(OverlayPriority.Critical, null))) }
+        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        assertEquals("Important", overlayHost.snackbar?.overlay?.message)
+        assertTrue(port.peekUnseenChange() != null)
+        runOnIdle { visible.value = false; blocker.dismiss() }
         runOnIdle { visible.value = true }
         awaitText("Layout changed by Ada")
         undo()
