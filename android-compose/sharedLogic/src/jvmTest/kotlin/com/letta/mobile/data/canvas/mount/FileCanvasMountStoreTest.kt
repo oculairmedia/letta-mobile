@@ -94,7 +94,8 @@ class FileCanvasMountStoreTest {
             """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":"x","canv\u0061s":"y"}],"bindings":[]}""",
             """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":12}],"bindings":[]}""",
             """{"version":1,"host":"host-one","defaults":[{"agent":"","canvas":"x"}],"bindings":[]}""",
-            """{"version":1,"host":"host-one","defaults":[],"bindings":[{"agent":"a","conversation":"c","canvas":"x"},{"agent":"a","conversation":"c","canvas":"y"}]}""", 
+            """{"version":1,"host":"host-one","defaults":[],"bindings":[{"agent":"a","conversation":"c","canvas":"x"},""" +
+                """{"agent":"a","conversation":"c","canvas":"y"}]}""",
             """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":"x"},{"agent":"a","canvas":"y"}],"bindings":[]}""",
         )
         for (text in fixtures) {
@@ -227,6 +228,45 @@ class FileCanvasMountStoreTest {
         assertEquals(first, FileCanvasMountStore(directory, host).readDefault(agent))
     }
 
+    @Test
+    fun transactionLockExcludesAnotherJvmProcess() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-process-lock")
+        val file = DurableHostFile(directory.resolve("canvas-mounts.json")) { }
+        val classpath = listOf(FileCanvasMountStoreTest::class.java, Unit::class.java)
+            .map { Path.of(it.protectionDomain.codeSource.location.toURI()).toString() }
+            .joinToString(java.io.File.pathSeparator)
+        val executable = Path.of(System.getProperty("java.home"), "bin", if (isWindows()) "java.exe" else "java")
+        file.locked {
+            val process = ProcessBuilder(
+                executable.toString(), "-cp", classpath, CanvasMountLockProbe::class.java.name,
+                directory.resolve("canvas-mounts.json.lock").toString(),
+            ).redirectErrorStream(true).start()
+            try {
+                assertTrue(process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS), "Lock probe must terminate")
+                val output = process.inputStream.bufferedReader().readText()
+                assertEquals(0, process.exitValue(), output)
+                assertTrue(output.contains("mount-lock-blocked"), output)
+            } finally {
+                process.destroyForcibly()
+            }
+        }
+    }
+
     private fun isWindows() = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
     private fun forceDirectory(directory: Path) = FileChannel.open(directory).use { it.force(true) }
+}
+
+/** A separate JVM proves the lock is not merely a coroutine or process-local mutex. */
+object CanvasMountLockProbe {
+    @JvmStatic
+    fun main(arguments: Array<String>) {
+        FileChannel.open(Path.of(arguments.single()), java.nio.file.StandardOpenOption.WRITE).use { channel ->
+            val lock = channel.tryLock()
+            if (lock != null) {
+                lock.release()
+                error("Mount transaction did not exclude another process")
+            }
+            println("mount-lock-blocked")
+        }
+    }
 }
