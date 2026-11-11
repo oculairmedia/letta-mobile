@@ -73,7 +73,7 @@ class MainActivityDependenciesTest {
         assertSame(conversationRunRegistry.value, dependencies.conversationRunRegistry)
         assertSame(attentionPrefs.value, dependencies.attentionPrefs)
         assertSame(agentDefaults.value, dependencies.agentDefaults)
-        assertSame(boardTable, dependencies.canvasBoards)
+        assertSame(boardTable, dependencies.canvasOwner.boards.value)
         assertSame(canvasBoards.value, dependencies.canvasOwner)
         assertSame(canvasViewers.value, dependencies.canvasViewers)
         assertSame(subagentRepository.value, dependencies.subagentRepository)
@@ -93,9 +93,9 @@ class MainActivityDependenciesTest {
             return newDependencies(Lazy { owner })
         }
         val dependencies = window()
-        val first = dependencies.canvasBoards
-        val second = window().canvasBoards
-        assertSame(first, dependencies.canvasBoards)
+        val first = dependencies.canvasOwner.boards.value
+        val second = window().canvasOwner.boards.value
+        assertSame(first, dependencies.canvasOwner.boards.value)
         org.junit.Assert.assertNotSame(first, second)
         org.junit.Assert.assertNotSame(first.registry, second.registry)
         val page = com.letta.mobile.data.canvas.CanvasSession.create(store)

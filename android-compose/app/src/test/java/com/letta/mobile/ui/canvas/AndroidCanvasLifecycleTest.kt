@@ -5,6 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.letta.mobile.ui.test.setLettaTestContent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -25,7 +28,7 @@ import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSessions
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.ui.screens.canvas.AndroidCanvasHost
 import com.letta.mobile.ui.screens.canvas.CanvasViewModel
-import com.letta.mobile.ui.screens.canvas.rememberCanvasPageSession
+import com.letta.mobile.ui.screens.canvas.rememberCanvasPageState
 import dagger.Lazy
 import io.mockk.mockk
 import javax.inject.Provider
@@ -47,8 +50,13 @@ class AndroidCanvasLifecycleTest {
 
     private val backing = InMemoryCanvasDocumentStore()
     private var reads = 0
+    private var failReads = false
     private val store = object : CanvasDocumentStore by backing {
-        override suspend fun get(id: CanvasId): CanvasDocument? = backing.get(id).also { reads++ }
+        override suspend fun get(id: CanvasId): CanvasDocument? {
+            reads++
+            check(!failReads) { "Temporary canvas read failure" }
+            return backing.get(id)
+        }
     }
     private val factory = Provider { CanvasBoardSessions(store) }
     private val retained = com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards(factory, mockk(relaxed = true))
@@ -112,6 +120,71 @@ class AndroidCanvasLifecycleTest {
         org.junit.Assert.assertTrue(exerciseRetainedPage(null).canvasId.value.isNotBlank())
     }
 
+    @Test
+    fun acquisitionFailureShowsTheSharedRetrySurfaceAndRetries() {
+        val page = runBlocking { CanvasSession.create(backing, CanvasCreateOptions()) }
+        val viewModels = ViewModelStore()
+        val model = ViewModelProvider(viewModels, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = modelClass.cast(
+                CanvasViewModel(mockk(relaxed = true), mockk(), mockk(), CanvasDocumentViewerRegistry(), retained),
+            )!!
+        })[CanvasViewModel::class.java]
+        failReads = true
+        compose.setLettaTestContent {
+            AndroidCanvasHost(deps, backend()) {
+                com.letta.mobile.ui.screens.canvas.CanvasScreen(page.canvasId.value, onNavigateBack = null, viewModel = model)
+            }
+        }
+        compose.waitUntil { reads == 1 }
+        compose.waitForIdle()
+        compose.onNodeWithText("Retry").assertExists().performClick()
+        compose.waitUntil { reads == 2 }
+        compose.waitForIdle()
+        compose.onNodeWithText("Retry").assertExists()
+        assertEquals(0, retained.boards.value.holds(page.canvasId))
+        compose.runOnIdle { viewModels.clear() }
+    }
+
+    @Test
+    fun aClosedFullscreenPagePopsWithoutRebuildingNavigation() {
+        val page = runBlocking { CanvasSession.create(backing, CanvasCreateOptions()) }
+        val viewModels = ViewModelStore()
+        val model = ViewModelProvider(viewModels, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = modelClass.cast(
+                CanvasViewModel(mockk(relaxed = true), mockk(), mockk(), CanvasDocumentViewerRegistry(), retained),
+            )!!
+        })[CanvasViewModel::class.java]
+        var config by mutableStateOf(backend())
+        var navigation: NavHostController? = null
+        failReads = true
+        compose.setLettaTestContent {
+            AndroidCanvasHost(deps, config) {
+                val controller = rememberNavController()
+                SideEffect { navigation = controller }
+                NavHost(controller, startDestination = FirstPage) {
+                    composable(FirstPage) {}
+                    composable(SecondPage) {
+                        com.letta.mobile.ui.screens.canvas.CanvasScreen(
+                            page.canvasId.value, onNavigateBack = { controller.popBackStack() }, viewModel = model,
+                        )
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val firstNavigation = navigation
+        compose.runOnIdle { navigation!!.navigate(SecondPage) }
+        compose.waitUntil { reads == 1 }
+        config = backend().copy(id = OtherBackend)
+        compose.waitForIdle()
+        assertSame(com.letta.mobile.data.canvas.library.CanvasPageState.Closed, model.state.value)
+        compose.waitUntil(timeoutMillis = NavigationTimeoutMillis) { navigation!!.currentDestination?.route == FirstPage }
+        assertSame(firstNavigation, navigation)
+        assertEquals("the old page must not acquire under the new backend", 1, reads)
+        assertEquals(0, retained.boards.value.holds(page.canvasId))
+        compose.runOnIdle { viewModels.clear() }
+    }
+
     private fun exerciseRetainedPage(canvasId: CanvasId?): CanvasSession {
         val owner = factory.get()
         val retainedOwner = com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards(Provider { owner }, mockk(relaxed = true))
@@ -126,8 +199,8 @@ class AndroidCanvasLifecycleTest {
         var shown: CanvasSession? = null
         compose.setContent {
             if (mounted) {
-                val session = rememberCanvasPageSession(currentBoards, model, canvasId, null, null)
-                SideEffect { shown = session }
+                val session = rememberCanvasPageState(currentBoards, model, canvasId, null, null)
+                SideEffect { shown = (session as? com.letta.mobile.data.canvas.library.CanvasPageState.Ready)?.session }
             }
         }
         compose.waitUntil { shown != null }
@@ -155,6 +228,7 @@ class AndroidCanvasLifecycleTest {
     private fun backend() = LettaConfig(Backend, LettaConfig.Mode.SELF_HOSTED, "https://backend.invalid")
 }
 
+private const val NavigationTimeoutMillis = 10_000L
 private const val FirstPage = "canvas-lifecycle-first"
 private const val SecondPage = "canvas-lifecycle-second"
 private const val Backend = "canvas-lifecycle-backend"

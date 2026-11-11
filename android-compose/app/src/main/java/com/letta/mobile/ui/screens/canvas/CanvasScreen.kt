@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.library.CanvasPageState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -39,21 +39,21 @@ internal fun AndroidCanvasHost(
 }
 
 @Composable
-internal fun rememberCanvasPageSession(
+internal fun rememberCanvasPageState(
     boards: com.letta.mobile.data.canvas.library.CanvasBoardSessions,
     viewModel: CanvasViewModel,
     canvasId: CanvasId?,
     conversationId: ConversationId?,
     agentId: AgentId?,
-): CanvasSession? {
+): CanvasPageState {
     LaunchedEffect(boards, viewModel, canvasId, conversationId, agentId) {
         viewModel.open(canvasId, conversationId, agentId)
     }
-    val session by viewModel.session.collectAsStateWithLifecycle()
-    return session?.takeIf { viewModel.owns(boards, it) }
+    val observed by viewModel.state.collectAsStateWithLifecycle()
+    return viewModel.stateFor(boards, observed)
 }
 
-/** Production Android host observing a destination-retained [CanvasSession] in [CanvasWorkspace]. */
+/** Android host observing the shared destination lifecycle and rendering [CanvasWorkspace] when ready. */
 @Composable
 fun CanvasScreen(
     canvasId: String,
@@ -70,33 +70,35 @@ fun CanvasScreen(
     cameraRequest: com.letta.mobile.ui.canvas.CanvasCameraRequest? = null,
 ) {
     val boards = checkNotNull(LocalCanvasBoardSessions.current)
-    val activeSession = rememberCanvasPageSession(
+    val state = rememberCanvasPageState(
         boards, viewModel, canvasId.takeIf(String::isNotBlank)?.let(::CanvasId),
         conversationId?.takeIf(String::isNotBlank)?.let(::ConversationId), agentId?.let(::AgentId),
     )
-    if (activeSession != null) {
-        // Live plugin pages (letta-mobile-s416w.13): the WebView host, with the host's enabled
-        // plugins and view transport from the shared model (letta-mobile-cdgpr.8). With live views
-        // off on this device, or no plugins on the host, every plugin element keeps its fallback card.
-        // The view model's scope outlives a removed element, so a page's teardown can finish.
-        val pluginHost = remember(viewModel) { WebViewPluginViewHost(viewModel.viewModelScope) }
-        ProvidePluginViews(viewModel.pluginViews, pluginHost, activeSession.canvasId.value, ViewPlatform.ANDROID) {
-          ProvideCanvasDocumentViewerRegistry(viewModel.viewers) {
-            CanvasWorkspace(
-                session = activeSession,
-                presenceTransport = viewModel.presenceTransport,
-                assets = viewModel.assets,
-                onNavigateBack = onNavigateBack,
-                onShareToChat = onShareToChat,
-                showTitle = showTitle,
-                chromeTopInset = chromeTopInset,
-                cameraRequest = cameraRequest,
-            )
-          }
+    when (state) {
+        is CanvasPageState.Ready -> {
+            val activeSession = state.session
+            // The ViewModel's scope lets live plugin teardown finish after a page is removed.
+            val pluginHost = remember(viewModel) { WebViewPluginViewHost(viewModel.viewModelScope) }
+            ProvidePluginViews(viewModel.pluginViews, pluginHost, activeSession.canvasId.value, ViewPlatform.ANDROID) {
+                ProvideCanvasDocumentViewerRegistry(viewModel.viewers) {
+                    CanvasWorkspace(
+                        session = activeSession,
+                        presenceTransport = viewModel.presenceTransport,
+                        assets = viewModel.assets,
+                        onNavigateBack = onNavigateBack,
+                        onShareToChat = onShareToChat,
+                        showTitle = showTitle,
+                        chromeTopInset = chromeTopInset,
+                        cameraRequest = cameraRequest,
+                    )
+                }
+            }
         }
-    } else {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        is CanvasPageState.Failed -> com.letta.mobile.ui.canvas.CanvasWorkspaceLoadFailure(Modifier.fillMaxSize(), viewModel::retry)
+        CanvasPageState.Closed -> {
+            LaunchedEffect(Unit) { onNavigateBack?.invoke() }
+            com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder()
         }
+        CanvasPageState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
     }
 }
