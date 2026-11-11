@@ -28,30 +28,30 @@ reset() { rm -f "$work/count" "$work/calls" "$work/rcount"; }
 
 # 1. Healthy runner: one update and one install naming every package.
 reset; export COUNT CALLS RCOUNT
-run env APT_RESOLVE="$work/resolve-ok" "$script" gcc xvfb >/dev/null 2>&1 || fail "healthy run failed"
+run env APT_RESOLVE="$work/resolve-ok" bash "$script" gcc xvfb >/dev/null 2>&1 || fail "healthy run failed"
 grep -q " update$" "$work/calls" || fail "update was not run"
 grep -q "install -y gcc xvfb$" "$work/calls" || fail "install did not name every package"
 
 # 2. apt fails twice (the observed DNS failure), then succeeds: the step recovers.
 reset
-run env FAIL_FIRST=2 APT_RESOLVE="$work/resolve-ok" "$script" gcc >/dev/null 2>&1 || fail "did not recover after transient apt failures"
+run env FAIL_FIRST=2 APT_RESOLVE="$work/resolve-ok" bash "$script" gcc >/dev/null 2>&1 || fail "did not recover after transient apt failures"
 grep -q "install -y gcc$" "$work/calls" || fail "install missing after recovery"
 
 # 3. The resolver is not ready for the first two attempts: apt is not called until it is.
 reset
-run env RESOLVE_FAIL_FIRST=2 APT_RESOLVE="$work/resolve-after" "$script" gcc >/dev/null 2>&1 || fail "did not wait for the resolver"
+run env RESOLVE_FAIL_FIRST=2 APT_RESOLVE="$work/resolve-after" bash "$script" gcc >/dev/null 2>&1 || fail "did not wait for the resolver"
 [ "$(cat "$work/rcount")" -ge 3 ] || fail "resolver was not retried"
 grep -q "install -y gcc$" "$work/calls" || fail "install missing after the resolver came up"
 
 # 4. Mirrors never come back: the step FAILS (never a false success) after the configured attempts.
 reset
-if run env FAIL_FIRST=99 APT_RETRY_ATTEMPTS=3 APT_RESOLVE="$work/resolve-ok" "$script" gcc >/dev/null 2>&1; then
+if run env FAIL_FIRST=99 APT_RETRY_ATTEMPTS=3 APT_RESOLVE="$work/resolve-ok" bash "$script" gcc >/dev/null 2>&1; then
   fail "reported success although apt never succeeded"
 fi
 [ "$(cat "$work/count")" -eq 3 ] || fail "expected exactly 3 attempts, got $(cat "$work/count")"
 [ ! -s "$work/calls" ] || fail "an install was recorded although every attempt failed"
 
 # 5. No packages is a usage error, not a silent success.
-if "$script" >/dev/null 2>&1; then fail "accepted an empty package list"; fi
+if bash "$script" >/dev/null 2>&1; then fail "accepted an empty package list"; fi
 
 echo "apt-install-retry-test: ok"
