@@ -161,10 +161,12 @@ class ShellLayoutAgentPort {
     fun undo(change: ShellLayoutChange): Boolean = change.undoable && change.store.undo(ifCurrent = change.after) != null
 
     private fun publish(change: ShellLayoutChange): ShellLayoutCommit {
+        // Emitted under the lock that orders [unseen]: two callers publishing at once cannot deliver
+        // their events in the opposite order to the one that decided which change is unseen.
         synchronized(lock) {
             if (change.store === attachedStore.value && change.store.config.value == change.after) unseen = change
+            published.tryEmit(change)
         }
-        published.tryEmit(change)
         return ShellLayoutCommit.Done(change)
     }
 

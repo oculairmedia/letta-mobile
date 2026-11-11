@@ -53,6 +53,7 @@ import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.LocalCanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry
 import com.letta.mobile.ui.host.InspectorHost
+import com.letta.mobile.ui.host.LocalOverlaySnackbarSlotCovered
 import com.letta.mobile.ui.host.LocalPaneWindowClass
 import com.letta.mobile.ui.host.OverlayHostRoot
 import com.letta.mobile.ui.host.PaneWindowClass
@@ -324,6 +325,11 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floati
         snapshotFlow { drawerState.targetValue == DrawerValue.Open }.drop(1).collect { drawer.open = it }
     }
     val slots = frame.host.slots
+    // Under the open drawer's scrim nothing in the page can be pressed: a snackbar slot there stands
+    // down and the window draws the notice (and its Undo) over the drawer.
+    val covered = remember(drawerState) {
+        { drawerState.targetValue == DrawerValue.Open || drawerState.currentValue == DrawerValue.Open }
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -338,11 +344,13 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floati
         // The page under the floating header, inside the drawer's content so the open drawer covers both.
         // The page takes the top inset as consumed (it gets the floating band instead); the drawer is
         // not under that, so its sheet still pads its rail and panel below the status bar.
-        Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
-            Row(Modifier.fillMaxSize()) {
-                ShellWorkspaceLanes(frame.host, frame.state, inspectors, compact = true)
+        CompositionLocalProvider(LocalOverlaySnackbarSlotCovered provides covered) {
+            Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
+                Row(Modifier.fillMaxSize()) {
+                    ShellWorkspaceLanes(frame.host, frame.state, inspectors, compact = true)
+                }
+                floating?.let { ShellFloatingHeader(it) }
             }
-            floating?.let { ShellFloatingHeader(it) }
         }
     }
 }

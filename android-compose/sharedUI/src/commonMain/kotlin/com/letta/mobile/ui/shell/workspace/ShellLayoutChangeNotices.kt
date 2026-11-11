@@ -35,8 +35,9 @@ internal fun ShellLayoutChangeNotices(agents: List<Pair<String, String>>) {
     LaunchedEffect(port, overlays) {
         port.changes.onSubscription {
             port.peekUnseenChange()?.let { emit(it) }
-        }.collectLatest { change ->
-            if (port.peekUnseenChange() === change) {
+        }.collectLatest {
+            // Whatever event arrived (they can arrive out of order), offer the change that is unseen now.
+            port.peekUnseenChange()?.let { change ->
                 val handle = overlays.show(shellLayoutChangeNotice(change, names, port))
                 var acknowledged = false
                 try {

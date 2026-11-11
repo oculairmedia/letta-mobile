@@ -272,6 +272,36 @@ class ShellLayoutAgentToolUiTest {
     }
 
     @Test
+    fun noticeIsDrawnOverAnOpenCompactDrawerAndItsUndoCanBePressed() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        val chat = object : ChatSessionPort {
+            override val uiState = MutableStateFlow(ChatUiState(conversationState = ConversationState.Ready("conv-1"), agentName = "Ada"))
+            override val composer = MutableStateFlow(ChatComposerUiState())
+            override val actions = RecordingChatActions()
+        }
+        // The compact shell with its drawer open over a chat page whose composer holds a snackbar slot.
+        val host = host(drawerOpen = true, androidStyle = true) {
+            ProvideLettaHost(LettaHost.Touch) {
+                ChatSurface(port = chat, presentation = ChatSurfacePresentation.ChatFirst, onIntent = {}, host = ChatSurfaceHost())
+            }
+        }
+        setContent {
+            CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                val controller = rememberShellLayoutController(null, settings)
+                LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+            }
+        }
+        waitForIdle()
+        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        awaitText("Layout changed by Ada")
+        waitForIdle()
+        // A real press at the button's place: the drawer's scrim takes it unless the notice is above it.
+        onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
+        waitForIdle()
+        assertEquals(HomeViews.Default, pageHomeLane, "Undo under the open drawer could not be pressed")
+    }
+
+    @Test
     fun changeWhileWorkspaceIsAbsentIsOfferedWhenItReturns() = runDesktopComposeUiTest(width = 360, height = 800) {
         val settings = InMemorySecureSettingsStore()
         val visible = mutableStateOf(false)
