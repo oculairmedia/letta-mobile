@@ -10604,13 +10604,180 @@ public final class com/letta/mobile/data/canvas/library/CanvasLibraryState {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/canvas/mount/FileCanvasMountStore {
-	public synthetic fun <init> (Ljava/nio/file/Path;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun bindIfAbsent-Bhp5Npc (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun readBinding-eAxutHE (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun readDefault-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun replaceBinding-Bhp5Npc (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun setDefault-mT_9V4Y (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+public final class com/letta/mobile/data/canvas/mount/AuthorizedCanvasMounts {
+	public static final field Companion Lcom/letta/mobile/data/canvas/mount/AuthorizedCanvasMounts$Companion;
+	public static final field MAX_ID_BYTES I
+	public synthetic fun <init> (Ljava/nio/file/Path;Ljava/lang/String;Lcom/letta/mobile/data/canvas/mount/CanvasMountAuthority;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bindIfAbsent (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun read (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun replaceBinding (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setDefault (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/mount/AuthorizedCanvasMounts$Companion {
+}
+
+public abstract interface class com/letta/mobile/data/canvas/mount/CanvasMountAuthority {
+	public abstract fun mayAddress (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun mayPropose (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun maySee (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountDecision : java/lang/Enum {
+	public static final field ABSTAIN Lcom/letta/mobile/data/canvas/mount/CanvasMountDecision;
+	public static final field ALLOW Lcom/letta/mobile/data/canvas/mount/CanvasMountDecision;
+	public static final field DENY Lcom/letta/mobile/data/canvas/mount/CanvasMountDecision;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/mount/CanvasMountDecision;
+	public static fun values ()[Lcom/letta/mobile/data/canvas/mount/CanvasMountDecision;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountFailure : java/lang/Enum {
+	public static final field INVALID_STATE Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public static final field IO_FAILURE Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public static final field UNEXPECTED Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public static final field UNSUPPORTED Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public static fun values ()[Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountPrincipal {
+	public static final field Companion Lcom/letta/mobile/data/canvas/mount/CanvasMountPrincipal$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/mount/CanvasMountPrincipal;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getEndpoint ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountPrincipal$Companion {
+	public final fun fromVerifiedConnection-EvRsPss (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountRequest {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/canvas/mount/CanvasMountScope;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-hGADxl0 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/canvas/mount/CanvasMountScope;
+	public final fun copy-8DLQGUA (Ljava/lang/String;Lcom/letta/mobile/data/canvas/mount/CanvasMountScope;)Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;
+	public static synthetic fun copy-8DLQGUA$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;Ljava/lang/String;Lcom/letta/mobile/data/canvas/mount/CanvasMountScope;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPrincipal-hGADxl0 ()Ljava/lang/String;
+	public final fun getScope ()Lcom/letta/mobile/data/canvas/mount/CanvasMountScope;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/mount/CanvasMountResult {
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$Bound : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Bound;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Bound;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Bound;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvas ()Lcom/letta/mobile/data/model/CanvasId;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$DefaultSet : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$DefaultSet;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$DefaultSet;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$DefaultSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvas ()Lcom/letta/mobile/data/model/CanvasId;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$Denied : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$Found : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Found;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Found;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Found;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvas ()Lcom/letta/mobile/data/model/CanvasId;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$InvalidInput : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$InvalidInput;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$None : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$None;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$Replaced : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Replaced;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Replaced;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$Replaced;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvas ()Lcom/letta/mobile/data/model/CanvasId;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$StorageFailure : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public fun <init> (Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;)V
+	public final fun component1 ()Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public final fun copy (Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$StorageFailure;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$StorageFailure;Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$StorageFailure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/letta/mobile/data/canvas/mount/CanvasMountFailure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/mount/CanvasMountScope {
+	public abstract fun getAgent-zqmzO_A ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountScope$AgentDefault : com/letta/mobile/data/canvas/mount/CanvasMountScope {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun copy-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/mount/CanvasMountScope$AgentDefault;
+	public static synthetic fun copy-qkT7gGE$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountScope$AgentDefault;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountScope$AgentDefault;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAgent-zqmzO_A ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/CanvasMountScope$Conversation : com/letta/mobile/data/canvas/mount/CanvasMountScope {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun component2-nFOXY6g ()Ljava/lang/String;
+	public final fun copy-A7_tNwo (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/canvas/mount/CanvasMountScope$Conversation;
+	public static synthetic fun copy-A7_tNwo$default (Lcom/letta/mobile/data/canvas/mount/CanvasMountScope$Conversation;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/CanvasMountScope$Conversation;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAgent-zqmzO_A ()Ljava/lang/String;
+	public final fun getConversation-nFOXY6g ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/canvas/names/CanvasToolNames {
