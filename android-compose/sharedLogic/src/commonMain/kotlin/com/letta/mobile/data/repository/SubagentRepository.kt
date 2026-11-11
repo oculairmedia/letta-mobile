@@ -153,10 +153,14 @@ open class SubagentRepository(
             } while (true)
         }
 
-    /** Scoped panel snapshot, including finished history when requested by this repository. */
+    /**
+     * Scoped panel snapshot, including finished history when requested by this repository. A running
+     * entry the host stopped reporting leaves once its absence window ends, as it does from the active
+     * projection; finished history is never expired here.
+     */
     override fun subagentsWithHistoryFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
         state.asStateFlow()
-            .map { entries -> entries.inParentScope(scope) }
+            .map { entries -> entries.inParentScope(scope).withoutExpiredRunning(clock()) }
             .onStart {
                 scopeFetches.collectionStarted(scope)
                 fetchScopeOnce(scope)
@@ -203,7 +207,7 @@ open class SubagentRepository(
 
     /** Current panel snapshot, deliberately independent of the active chip linger. */
     override fun currentSubagentsWithHistory(scope: SubagentParentScope): List<SubagentEntry> =
-        state.value.inParentScope(scope)
+        state.value.inParentScope(scope).withoutExpiredRunning(clock())
 
     /**
      * Force a fresh `subagent_list` round-trip. Parallel callers (e.g. the
@@ -589,13 +593,16 @@ open class SubagentRepository(
     }
 
     private fun List<SubagentEntry>.filterNotExpired(now: Long): List<SubagentEntry> =
+        withoutExpiredRunning(now).filter { entry ->
+            entry.status !in TERMINAL_STATUSES ||
+                entry.terminalAtEpochMs?.let { now - it in 0 until TERMINAL_LINGER_MS } == true
+        }
+
+    /** Drops running entries whose absence from the host's snapshots has outlasted the linger. */
+    private fun List<SubagentEntry>.withoutExpiredRunning(now: Long): List<SubagentEntry> =
         filter { entry ->
-            when (entry.status) {
-                in TERMINAL_STATUSES -> entry.terminalAtEpochMs?.let { now - it in 0 until TERMINAL_LINGER_MS } == true
-                SubagentStatus.RUNNING ->
-                    runningAbsentSince.value[entry.cacheKey()]?.let { now - it < RUNNING_ABSENCE_LINGER_MS } != false
-                else -> true
-            }
+            entry.status != SubagentStatus.RUNNING ||
+                runningAbsentSince.value[entry.cacheKey()]?.let { now - it < RUNNING_ABSENCE_LINGER_MS } != false
         }
 
     private suspend fun observeReconnects() {

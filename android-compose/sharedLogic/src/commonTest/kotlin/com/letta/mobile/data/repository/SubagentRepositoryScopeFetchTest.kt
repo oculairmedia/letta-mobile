@@ -185,6 +185,37 @@ class SubagentRepositoryScopeFetchTest {
     }
 
     @Test
+    fun historyDropsARunningEntryTheHostStoppedReportingButKeepsFinishedOnes() = runTest {
+        val live = running("toolu_a", CONVERSATION_A)
+        val finished = live.copy(toolCallId = "toolu_done", status = "failed", terminalAgeMs = 3_600_000L)
+        transport.entriesByConversation[CONVERSATION_A] = listOf(finished, live)
+        val repo = SubagentRepository(transport, backgroundScope, includeAll = true, clock = { now })
+        var history = emptyList<com.letta.mobile.data.model.SubagentEntry>()
+        backgroundScope.launch { repo.subagentsWithHistoryFlow(scopeA).collect { history = it } }
+        backgroundScope.launch { repo.subagentsWithHistoryFlow(scopeB).collect {} }
+        runCurrent()
+        assertEquals(setOf("toolu_done", "toolu_a"), history.map { it.toolCallId }.toSet())
+
+        // The host's pushes for this conversation stop mentioning the running entry.
+        suspend fun push(conversation: String, entries: List<com.letta.mobile.data.model.SubagentEntry>) =
+            transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+                id = "push-$conversation-$now", ts = "t", reason = "registry", subagentsActive = entries,
+                parentAgentId = PARENT_AGENT, parentConversationId = conversation,
+            ))
+        push(CONVERSATION_A, emptyList())
+        runCurrent()
+        assertEquals(setOf("toolu_done", "toolu_a"), history.map { it.toolCallId }.toSet(), "still inside the absence window")
+
+        now += RUNNING_ABSENCE_LINGER_PLUS_ONE_MS
+        assertEquals(listOf("toolu_done"), repo.currentSubagentsWithHistory(scopeA).map { it.toolCallId })
+        // An update for ANOTHER conversation is enough for the panel's flow to drop it too.
+        push(CONVERSATION_B, listOf(running("toolu_b", CONVERSATION_B)))
+        runCurrent()
+        assertEquals(listOf("toolu_done"), history.map { it.toolCallId })
+        repo.close()
+    }
+
+    @Test
     fun secondConversationIsFetchedWhenFirstRequested() = runTest {
         val repo = repository(backgroundScope)
 
