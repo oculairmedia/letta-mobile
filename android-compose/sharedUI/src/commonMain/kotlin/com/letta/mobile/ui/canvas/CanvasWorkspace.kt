@@ -138,8 +138,9 @@ fun CanvasWorkspace(
     }
 }
 
+/** Shared failure/retry surface for both workspace loading and initial page-session acquisition. */
 @Composable
-private fun CanvasWorkspaceLoadFailure(modifier: Modifier, onRetry: () -> Unit) {
+fun CanvasWorkspaceLoadFailure(modifier: Modifier, onRetry: () -> Unit) {
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp).testTag(CANVAS_WORKSPACE_LOAD_FAILURE_TAG),

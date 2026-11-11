@@ -4476,6 +4476,16 @@ abstract interface com.letta.mobile.data.canvas.authority/NotebookGrantStore { /
     abstract suspend fun <#A1: kotlin/Any?> withGrant(kotlin/String, com.letta.mobile.data.canvas/NotebookDocumentId, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.canvas/NotebookPeerGrant?, #A1>): #A1 // com.letta.mobile.data.canvas.authority/NotebookGrantStore.withGrant|withGrant(kotlin.String;com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.canvas.NotebookPeerGrant?,0:0>){0§<kotlin.Any?>}[0]
 }
 
+abstract interface com.letta.mobile.data.canvas.library/CanvasPage { // com.letta.mobile.data.canvas.library/CanvasPage|null[0]
+    abstract val state // com.letta.mobile.data.canvas.library/CanvasPage.state|{}state[0]
+        abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.library/CanvasPageState> // com.letta.mobile.data.canvas.library/CanvasPage.state.<get-state>|<get-state>(){}[0]
+
+    abstract fun close() // com.letta.mobile.data.canvas.library/CanvasPage.close|close(){}[0]
+    abstract fun open(com.letta.mobile.data.model/CanvasId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.canvas.library/CanvasPage.open|open(com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.model.AgentId?){}[0]
+    abstract fun retry() // com.letta.mobile.data.canvas.library/CanvasPage.retry|retry(){}[0]
+    abstract fun stateFor(com.letta.mobile.data.canvas.library/CanvasBoardSessions, com.letta.mobile.data.canvas.library/CanvasPageState): com.letta.mobile.data.canvas.library/CanvasPageState // com.letta.mobile.data.canvas.library/CanvasPage.stateFor|stateFor(com.letta.mobile.data.canvas.library.CanvasBoardSessions;com.letta.mobile.data.canvas.library.CanvasPageState){}[0]
+}
+
 abstract interface com.letta.mobile.data.canvas.notes/NotebookNoteBackend { // com.letta.mobile.data.canvas.notes/NotebookNoteBackend|null[0]
     abstract suspend fun flush(com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot): com.letta.mobile.data.canvas.notes/NotebookNoteSave // com.letta.mobile.data.canvas.notes/NotebookNoteBackend.flush|flush(com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot){}[0]
     abstract suspend fun load(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.canvas.notes/NotebookNoteLoad // com.letta.mobile.data.canvas.notes/NotebookNoteBackend.load|load(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
@@ -7420,6 +7430,46 @@ sealed interface com.letta.mobile.data.canvas.compose/SizedItem { // com.letta.m
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/SizedItem.Leaf.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/SizedItem.Leaf.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/SizedItem.Leaf.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.canvas.library/CanvasPageState { // com.letta.mobile.data.canvas.library/CanvasPageState|null[0]
+    final class Failed : com.letta.mobile.data.canvas.library/CanvasPageState { // com.letta.mobile.data.canvas.library/CanvasPageState.Failed|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.<init>|<init>(kotlin.String){}[0]
+
+        final val message // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.message.<get-message>|<get-message>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.canvas.library/CanvasPageState.Failed // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasPageState.Failed.toString|toString(){}[0]
+    }
+
+    final class Ready : com.letta.mobile.data.canvas.library/CanvasPageState { // com.letta.mobile.data.canvas.library/CanvasPageState.Ready|null[0]
+        constructor <init>(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.<init>|<init>(com.letta.mobile.data.canvas.CanvasSession){}[0]
+
+        final val session // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.session|{}session[0]
+            final fun <get-session>(): com.letta.mobile.data.canvas/CanvasSession // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.session.<get-session>|<get-session>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.canvas/CanvasSession // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.canvas/CanvasSession = ...): com.letta.mobile.data.canvas.library/CanvasPageState.Ready // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.copy|copy(com.letta.mobile.data.canvas.CanvasSession){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasPageState.Ready.toString|toString(){}[0]
+    }
+
+    final object Closed : com.letta.mobile.data.canvas.library/CanvasPageState { // com.letta.mobile.data.canvas.library/CanvasPageState.Closed|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasPageState.Closed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasPageState.Closed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasPageState.Closed.toString|toString(){}[0]
+    }
+
+    final object Loading : com.letta.mobile.data.canvas.library/CanvasPageState { // com.letta.mobile.data.canvas.library/CanvasPageState.Loading|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasPageState.Loading.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasPageState.Loading.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasPageState.Loading.toString|toString(){}[0]
     }
 }
 
@@ -29346,12 +29396,33 @@ final class com.letta.mobile.data.canvas.compose/WorstCaseWrap { // com.letta.mo
     final fun lines(kotlin/String): kotlin/Int // com.letta.mobile.data.canvas.compose/WorstCaseWrap.lines|lines(kotlin.String){}[0]
 }
 
+final class com.letta.mobile.data.canvas.library/CanvasBoardContext { // com.letta.mobile.data.canvas.library/CanvasBoardContext|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.library/CanvasBoardSessions, kotlin/Long) // com.letta.mobile.data.canvas.library/CanvasBoardContext.<init>|<init>(com.letta.mobile.data.canvas.library.CanvasBoardSessions;kotlin.Long){}[0]
+
+    final val boards // com.letta.mobile.data.canvas.library/CanvasBoardContext.boards|{}boards[0]
+        final fun <get-boards>(): com.letta.mobile.data.canvas.library/CanvasBoardSessions // com.letta.mobile.data.canvas.library/CanvasBoardContext.boards.<get-boards>|<get-boards>(){}[0]
+    final val generation // com.letta.mobile.data.canvas.library/CanvasBoardContext.generation|{}generation[0]
+        final fun <get-generation>(): kotlin/Long // com.letta.mobile.data.canvas.library/CanvasBoardContext.generation.<get-generation>|<get-generation>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas.library/CanvasBoardSessions // com.letta.mobile.data.canvas.library/CanvasBoardContext.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.canvas.library/CanvasBoardContext.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.library/CanvasBoardSessions = ..., kotlin/Long = ...): com.letta.mobile.data.canvas.library/CanvasBoardContext // com.letta.mobile.data.canvas.library/CanvasBoardContext.copy|copy(com.letta.mobile.data.canvas.library.CanvasBoardSessions;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasBoardContext.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasBoardContext.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasBoardContext.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.canvas.library/CanvasBoardSessions { // com.letta.mobile.data.canvas.library/CanvasBoardSessions|null[0]
     constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, com.letta.mobile.data.canvas/CanvasConversationOptions = ..., com.letta.mobile.data.canvas/CanvasSessionRegistry? = ...) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasConversationOptions;com.letta.mobile.data.canvas.CanvasSessionRegistry?){}[0]
 
+    final val registry // com.letta.mobile.data.canvas.library/CanvasBoardSessions.registry|{}registry[0]
+        final fun <get-registry>(): com.letta.mobile.data.canvas/CanvasSessionRegistry // com.letta.mobile.data.canvas.library/CanvasBoardSessions.registry.<get-registry>|<get-registry>(){}[0]
+
+    final fun clear() // com.letta.mobile.data.canvas.library/CanvasBoardSessions.clear|clear(){}[0]
     final fun holds(com.letta.mobile.data.model/CanvasId): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasBoardSessions.holds|holds(com.letta.mobile.data.model.CanvasId){}[0]
     final fun release(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.release|release(com.letta.mobile.data.canvas.CanvasSession){}[0]
     final suspend fun acquire(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.data.canvas.library/CanvasBoardSessions.acquire|acquire(com.letta.mobile.data.model.CanvasId){}[0]
+    final suspend fun acquirePage(com.letta.mobile.data.model/CanvasId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.model/AgentId?): com.letta.mobile.data.canvas/CanvasSession // com.letta.mobile.data.canvas.library/CanvasBoardSessions.acquirePage|acquirePage(com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.model.AgentId?){}[0]
 }
 
 final class com.letta.mobile.data.canvas.library/CanvasLibraryController { // com.letta.mobile.data.canvas.library/CanvasLibraryController|null[0]
@@ -29387,6 +29458,18 @@ final class com.letta.mobile.data.canvas.library/CanvasLibraryState { // com.let
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasLibraryState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasLibraryState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasLibraryState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.library/CanvasPageHold : com.letta.mobile.data.canvas.library/CanvasPage { // com.letta.mobile.data.canvas.library/CanvasPageHold|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.library/CanvasBoardOwner, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.canvas.library/CanvasPageHold.<init>|<init>(com.letta.mobile.data.canvas.library.CanvasBoardOwner;kotlinx.coroutines.CoroutineScope){}[0]
+
+    final val state // com.letta.mobile.data.canvas.library/CanvasPageHold.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.library/CanvasPageState> // com.letta.mobile.data.canvas.library/CanvasPageHold.state.<get-state>|<get-state>(){}[0]
+
+    final fun close() // com.letta.mobile.data.canvas.library/CanvasPageHold.close|close(){}[0]
+    final fun open(com.letta.mobile.data.model/CanvasId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.canvas.library/CanvasPageHold.open|open(com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.model.AgentId?){}[0]
+    final fun retry() // com.letta.mobile.data.canvas.library/CanvasPageHold.retry|retry(){}[0]
+    final fun stateFor(com.letta.mobile.data.canvas.library/CanvasBoardSessions, com.letta.mobile.data.canvas.library/CanvasPageState): com.letta.mobile.data.canvas.library/CanvasPageState // com.letta.mobile.data.canvas.library/CanvasPageHold.stateFor|stateFor(com.letta.mobile.data.canvas.library.CanvasBoardSessions;com.letta.mobile.data.canvas.library.CanvasPageState){}[0]
 }
 
 final class com.letta.mobile.data.canvas.notes/NotebookNoteSession { // com.letta.mobile.data.canvas.notes/NotebookNoteSession|null[0]
@@ -69671,6 +69754,18 @@ open class com.letta.mobile.data.api/ApiException : kotlin/Exception { // com.le
 
     final val code // com.letta.mobile.data.api/ApiException.code|{}code[0]
         final fun <get-code>(): kotlin/Int // com.letta.mobile.data.api/ApiException.code.<get-code>|<get-code>(){}[0]
+}
+
+open class com.letta.mobile.data.canvas.library/CanvasBoardOwner { // com.letta.mobile.data.canvas.library/CanvasBoardOwner|null[0]
+    constructor <init>(kotlin/Function0<com.letta.mobile.data.canvas.library/CanvasBoardSessions>) // com.letta.mobile.data.canvas.library/CanvasBoardOwner.<init>|<init>(kotlin.Function0<com.letta.mobile.data.canvas.library.CanvasBoardSessions>){}[0]
+
+    final val boards // com.letta.mobile.data.canvas.library/CanvasBoardOwner.boards|{}boards[0]
+        final fun <get-boards>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.library/CanvasBoardSessions> // com.letta.mobile.data.canvas.library/CanvasBoardOwner.boards.<get-boards>|<get-boards>(){}[0]
+    final val context // com.letta.mobile.data.canvas.library/CanvasBoardOwner.context|{}context[0]
+        final fun <get-context>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.library/CanvasBoardContext> // com.letta.mobile.data.canvas.library/CanvasBoardOwner.context.<get-context>|<get-context>(){}[0]
+
+    final fun close() // com.letta.mobile.data.canvas.library/CanvasBoardOwner.close|close(){}[0]
+    final fun updateBackend(com.letta.mobile.data.model/LettaConfig?) // com.letta.mobile.data.canvas.library/CanvasBoardOwner.updateBackend|updateBackend(com.letta.mobile.data.model.LettaConfig?){}[0]
 }
 
 open class com.letta.mobile.data.controller.fanout/RuntimeStreamDetachedCancellation : kotlin.coroutines.cancellation/CancellationException { // com.letta.mobile.data.controller.fanout/RuntimeStreamDetachedCancellation|null[0]
