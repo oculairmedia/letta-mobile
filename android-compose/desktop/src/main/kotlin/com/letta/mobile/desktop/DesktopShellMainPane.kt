@@ -292,7 +292,7 @@ private fun DesktopShellSharedChatPage(
 private fun rememberDesktopChatSubagents(context: DesktopShellContext, frame: DesktopShellFrame): DesktopChatSubagents? {
     val repository = context.panels.subagents.repository
     val loader = remember(repository) { repository?.let { repo -> SubagentTodoLoader { target -> repo.todos(target.toolCallId) } } }
-    return loader?.let { DesktopChatSubagents(frame.lists.activeSubagents, it, frame.subagentViews) }
+    return loader?.let { DesktopChatSubagents(frame.lists.activeSubagents, it, frame.lists.subagentsWithHistory, frame.subagentViews) }
 }
 
 /**

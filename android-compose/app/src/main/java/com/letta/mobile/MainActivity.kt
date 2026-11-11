@@ -40,7 +40,6 @@ import android.os.Build
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
-import com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards
 import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
@@ -90,6 +89,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
+            val canvasOwner = settingsRepository.activeConfig.collectAsStateWithLifecycle().value
             val snackbarDispatcher = remember { SnackbarDispatcher() }
             val overlays = rememberOverlayHost()
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
@@ -120,11 +120,9 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Surface(modifier = debugRootPointerObserver(), color = MaterialTheme.colorScheme.background) {
                             OverlayHostRoot(overlays) {
-                                // Every seated mascot draws here, over the app, and hops between
-                                // seats (letta-mobile-te3n1.8); overlays stay above it.
+                                // Mascots move between seats below the app's overlays (letta-mobile-te3n1.8).
                                 MascotTransportLayer {
-                                    // A canvas module in any shell lane opens its board by id here.
-                                    ProvideCanvasHostWithBoards(null, remember { deps.canvasViewers }, remember { deps.canvasBoards }) {
+                                    com.letta.mobile.ui.screens.canvas.AndroidCanvasHost(deps, canvasOwner) {
                                         val navController = rememberNavController()
                                         AppNavGraph(
                                             navController = navController,

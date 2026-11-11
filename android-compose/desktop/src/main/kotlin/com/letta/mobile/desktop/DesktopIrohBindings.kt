@@ -319,6 +319,7 @@ private fun buildDesktopChatController(
 internal class DesktopSubagentRegistry(
     val repository: SubagentRepository?,
     val activeSubagents: State<List<SubagentEntry>>,
+    val subagentsWithHistory: State<List<SubagentEntry>>,
 )
 
 /** Inputs for the active-subagent registry. */
@@ -348,34 +349,28 @@ internal fun rememberSubagentRegistry(request: SubagentRegistryRequest): Desktop
     DisposableEffect(ownedRepository) {
         onDispose { ownedRepository?.close() }
     }
-    val activeSubagents = produceState(
-        initialValue = emptyList(),
-        subagentRepository,
-        parentScope,
-    ) {
-        collectScopedActiveSubagents(subagentRepository, parentScope) { value = it }
+    val activeSubagents = produceState(initialValue = emptyList(), subagentRepository, parentScope) {
+        collectScopedSubagents(parentScope?.let { subagentRepository?.activeSubagentsFlow(it) }) { value = it }
     }
-    return DesktopSubagentRegistry(subagentRepository, activeSubagents)
+    val subagentsWithHistory = produceState(initialValue = emptyList(), subagentRepository, parentScope) {
+        collectScopedSubagents(parentScope?.let { subagentRepository?.subagentsWithHistoryFlow(it) }) { value = it }
+    }
+    return DesktopSubagentRegistry(subagentRepository, activeSubagents, subagentsWithHistory)
 }
 
 /** Resolve parent scope only when both conversation coordinates are present. */
 internal fun subagentParentScope(parentAgentId: String?, parentConversationId: String?): SubagentParentScope? =
     if (parentAgentId != null && parentConversationId != null) SubagentParentScope(parentAgentId, parentConversationId) else null
 
-private suspend fun collectScopedActiveSubagents(
-    repository: SubagentRepository?,
-    parentScope: SubagentParentScope?,
+private suspend fun collectScopedSubagents(
+    entries: kotlinx.coroutines.flow.Flow<List<SubagentEntry>>?,
     emit: (List<SubagentEntry>) -> Unit,
 ) {
-    val scopedRepository = repository ?: run {
+    if (entries == null) {
         emit(emptyList())
         return
     }
-    val scope = parentScope ?: run {
-        emit(emptyList())
-        return
-    }
-    scopedRepository.activeSubagentsFlow(scope).collect { emit(it) }
+    entries.collect { emit(it) }
 }
 
 /** Sent in the handshake so a shim log can tell a desktop canonical client from the Android one. */

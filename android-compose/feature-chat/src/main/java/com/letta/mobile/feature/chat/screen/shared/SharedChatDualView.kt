@@ -20,7 +20,7 @@ internal fun SharedChatPageParams.fullSubagentView(): ((SubagentView) -> Unit)? 
 
 /** The page's navigation with "view conversation" (rings, todo sheet, roster) opening [dualView], when there is one. */
 internal fun SharedChatPageParams.dualNavigation(dualView: SubagentDualViewBinding?): ChatScreenNavigationCallbacks {
-    val open = dualView?.holder?.conversationOpener { subagents.source.rosterEntries.value } ?: return navigation
+    val open = dualView?.holder?.conversationOpener { subagents.source.rosterEntriesWithHistory.value } ?: return navigation
     return navigation.copy(onViewSubagentConversation = open)
 }
 

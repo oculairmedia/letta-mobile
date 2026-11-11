@@ -1,7 +1,6 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
-import com.letta.mobile.data.canvas.library.CanvasBoardSessions
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
@@ -12,17 +11,15 @@ import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import dagger.Lazy
 import javax.inject.Inject
-import javax.inject.Singleton
+import dagger.hilt.android.scopes.ActivityScoped
+import com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards
 
 /**
- * Constructor-injected Activity collaborators for [MainActivity] (an `@AndroidEntryPoint` activity cannot
- * use constructor injection itself). The settings / secure-store / agent graph is held behind [Lazy]:
- * building it constructs the Keystore-backed EncryptedSharedPreferences, which `AppStartupCoordinator`
- * warms on IO at process start, and eager injection made `onCreate` wait ~100 ms on that singleton's lock
- * before `setContent`. Read lazily, in first composition, the warm-up has normally finished.
- * [crashReporter] stays eager: the Application already built it.
+ * Activity collaborators deferred behind [Lazy] so first composition shares the IO-warmed
+ * settings/Keystore/agent graph instead of blocking on it during onCreate.
+ * [crashReporter] is eager because the Application already constructed it.
  */
-@Singleton
+@ActivityScoped
 class MainActivityDependencies @Inject constructor(
     private val lazySettingsRepository: Lazy<ISettingsRepository>,
     val crashReporter: CrashReporter,
@@ -31,7 +28,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyConversationRunRegistry: Lazy<ConversationRunRegistry>,
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
     private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
-    private val lazyCanvasBoards: Lazy<CanvasBoardSessions>,
+    private val lazyCanvasBoards: Lazy<AndroidCanvasBoards>,
     private val lazyCanvasViewers: Lazy<CanvasDocumentViewerRegistry>,
     private val lazySubagentRepository: Lazy<ISubagentRepository>,
 ) {
@@ -42,12 +39,10 @@ class MainActivityDependencies @Inject constructor(
     val conversationRunRegistry: ConversationRunRegistry get() = lazyConversationRunRegistry.get()
     /** letta-mobile-bzvro.27: per-agent notification mutes, for the drawer card's switch. */
     val attentionPrefs: AttentionPrefsRepository get() = lazyAttentionPrefs.get()
-
     /** letta-mobile-k5nbq.9: per-agent default cwd, the store the Iroh turn engine also reads. */
     val agentDefaults: AgentDefaultsRepository get() = lazyAgentDefaults.get()
-
-    /** The window's one live session per stored board, where its canvas modules open boards by id. */
-    val canvasBoards: CanvasBoardSessions get() = lazyCanvasBoards.get()
+    /** The window's activity-retained owner, shared with its navigation destination ViewModels. */
+    val canvasOwner: AndroidCanvasBoards get() = lazyCanvasBoards.get()
 
     /** The same trusted notebook viewers used by canvas pages and shell note modules. */
     val canvasViewers: CanvasDocumentViewerRegistry get() = lazyCanvasViewers.get()

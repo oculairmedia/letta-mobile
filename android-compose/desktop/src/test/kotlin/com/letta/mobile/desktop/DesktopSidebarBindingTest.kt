@@ -54,7 +54,7 @@ class DesktopSidebarBindingTest {
             com.letta.mobile.data.schedules.ScheduleLibraryState(), com.letta.mobile.data.channel.ChannelsPageState(),
             com.letta.mobile.data.tools.ToolLibraryState())
         val lists = DesktopShellLists(emptyList(), ConversationArchiveFilter.Active, rows, mentionables = emptyList(),
-            search = com.letta.mobile.ui.shell.header.UnifiedSearchSources())
+            search = com.letta.mobile.ui.shell.header.UnifiedSearchSources(), subagentsWithHistory = emptyList())
         val frame = DesktopShellFrame(chat, focus, activity, libraries, lists)
         val inputs = DesktopSidebarInputs(DesktopSidebarMarks(), emptyList(), emptySet(), null, null)
 

@@ -32,8 +32,8 @@ import kotlinx.serialization.Transient
  * exposes the documented vocabulary as constants without forcing a closed
  * enum (forward-compat with future shim additions).
  *
- * Timestamps are ISO-8601 strings on the wire; mobile does not parse them
- * eagerly at this layer.
+ * Start/activity timestamps are ISO-8601 strings. Optional terminal timing uses
+ * epoch milliseconds plus a host-computed age so clients need not share the host clock.
  */
 /**
  * Wire shape of the shim's per-subagent
@@ -72,8 +72,10 @@ data class SubagentEntry(
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
     /** Host-provided reason for a terminal registry transition, if known. */
     @SerialName("terminal_reason") val terminalReason: String? = null,
-    /** Client-owned lifecycle timestamp; never encoded onto the wire. */
-    @Transient val terminalAtEpochMs: Long? = null,
+    /** Host terminal time on the wire; normalized to the client clock by the repository. */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("terminalAtEpochMs") val terminalAtEpochMs: Long? = null,
     /**  AC#4 (stream-timeout watchdog): last observed progress
      *  timestamp (any push mentioning this entry counts as progress). Used by
      *  SubagentRepository to flip running entries to FAILED with failureReason =
@@ -99,6 +101,10 @@ data class SubagentEntry(
     @SerialName("totalTokens") val totalTokens: Long? = null,
     @SerialName("durationMs") val durationMs: Long? = null,
     @SerialName("isBackground") val isBackground: Boolean? = null,
+    /** Age at host send time, avoiding any dependence on host/client wall-clock agreement. */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("terminalAgeMs") val terminalAgeMs: Long? = null,
 )
 
 object SubagentStatus {

@@ -92,12 +92,6 @@ abstract class AppModule {
             runner: DeviceActionCommandRunner,
         ): ExternalToolRegistry = ExternalToolRegistry.hostTools(listOf(DeviceActionExternalTool(runner), ShellLayoutTool()))
 
-        /** One registry per process here, but owned by the graph so it dies with it. */
-        @Provides
-        @Singleton
-        fun provideCanvasSessionRegistry(): com.letta.mobile.data.canvas.CanvasSessionRegistry =
-            com.letta.mobile.data.canvas.CanvasSessionRegistry()
-
         /**
          * One live session per stored board for the activity that asks (its canvas modules open
          * boards through it); unscoped, so each owner gets its own table and its holds die with it.

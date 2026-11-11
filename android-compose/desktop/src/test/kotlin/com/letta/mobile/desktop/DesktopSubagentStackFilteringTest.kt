@@ -19,6 +19,39 @@ import kotlin.test.assertTrue
  */
 class DesktopSubagentStackFilteringTest {
 
+    @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+    @Test
+    fun taskPaneKeepsFinishedHistoryWhileRingInputStaysActiveOnly() = androidx.compose.ui.test.runComposeUiTest {
+        val scope = com.letta.mobile.data.repository.api.SubagentParentScope("parent", "pane-parent")
+        val live = SubagentEntry(toolCallId = "live", status = SubagentStatus.RUNNING,
+            parentAgentId = scope.parentAgentId, parentConversationId = scope.parentConversationId)
+        val history = (1..5).map { live.copy(toolCallId = "old-$it", status = SubagentStatus.FAILED) }
+        val transport = object : com.letta.mobile.data.transport.api.NoOpChannelTransport() {
+            override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long) =
+                com.letta.mobile.data.transport.ServerFrame.SubagentListResponse(
+                    id = "pane-list", ts = "t", success = true, subagents = if (all) history + live else listOf(live))
+        }
+        val repository = com.letta.mobile.data.repository.SubagentRepository(transport, includeAll = true)
+        var binding: DesktopSubagentRegistry? = null
+        try {
+            kotlinx.coroutines.runBlocking { repository.refresh().getOrThrow() }
+            setContent {
+                val registry = rememberSubagentRegistry(SubagentRegistryRequest(scope, graphSubagentRepository = repository))
+                androidx.compose.runtime.SideEffect { binding = registry }
+            }
+            waitUntil { binding?.subagentsWithHistory?.value?.isNotEmpty() == true &&
+                binding?.activeSubagents?.value?.isNotEmpty() == true }
+            runOnIdle {
+                val current = checkNotNull(binding)
+                assertEquals((history + live).map { it.toolCallId }, current.subagentsWithHistory.value.map { it.toolCallId })
+                assertEquals(5, current.subagentsWithHistory.value.count { it.status == SubagentStatus.FAILED })
+                assertEquals(listOf("live"), current.activeSubagents.value.map { it.toolCallId })
+            }
+        } finally {
+            repository.close()
+        }
+    }
+
     private fun conversation(
         id: String,
         agentId: String,

@@ -90,37 +90,33 @@ class WsActiveSubagentSource(
         }
     }
 
-    /** letta-mobile-ulcg6 (PR4): the parent conversation's entries, for the shared roster. */
+    /** Active registry entries for the parent's run phases; the sheet uses the history feed below. */
     override val rosterEntries: StateFlow<List<SubagentEntry>> =
-        parentConversationId
-            .filterNotNull()
+        parentConversationId.filterNotNull()
             .flatMapLatest { conversationId ->
                 repository.activeSubagentsFlow(SubagentParentScope(parentAgentId, conversationId))
             }
-            .stateIn(
-                scope = scope,
-                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
                 initialValue = parentConversationId.value?.let { conversationId ->
                     repository.currentActiveSubagents(SubagentParentScope(parentAgentId, conversationId))
                 }.orEmpty(),
             )
 
-    override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
-        parentConversationId
-            .filterNotNull()
+    override val rosterEntriesWithHistory: StateFlow<List<SubagentEntry>> =
+        parentConversationId.filterNotNull()
             .flatMapLatest { conversationId ->
-                repository.activeSubagentsFlow(SubagentParentScope(parentAgentId, conversationId))
+                repository.subagentsWithHistoryFlow(SubagentParentScope(parentAgentId, conversationId))
             }
-            .map { entries -> entries.map { it.toActiveSubagent() }.toImmutableList() }
-            .stateIn(
-                scope = scope,
-                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-                initialValue = parentConversationId.value?.let { conversationId ->
-                    repository.currentActiveSubagents(SubagentParentScope(parentAgentId, conversationId))
-                        .map { it.toActiveSubagent() }
-                        .toImmutableList()
-                } ?: persistentListOf(),
-            )
+            // The page owns the history subscription; conversation openers read its latest .value.
+            .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                parentConversationId.value?.let { conversationId ->
+                    repository.currentSubagentsWithHistory(SubagentParentScope(parentAgentId, conversationId))
+                }.orEmpty())
+
+    override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
+        rosterEntries.map { entries -> entries.map { it.toActiveSubagent() }.toImmutableList() }
+            .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                initialValue = rosterEntries.value.map { it.toActiveSubagent() }.toImmutableList())
 
     /**
      * letta-mobile-29h9u: immutable diff accumulator that stamps freshly

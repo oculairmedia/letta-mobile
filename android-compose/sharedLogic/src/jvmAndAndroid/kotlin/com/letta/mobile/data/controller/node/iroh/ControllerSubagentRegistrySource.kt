@@ -44,12 +44,13 @@ import kotlinx.serialization.json.contentOrNull
  */
 class ControllerSubagentRegistrySource(
     val registry: DurableSubagentRegistry = DurableSubagentRegistry(),
+    private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 ) : SubagentRegistrySource {
 
     override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> =
         registry.snapshot(conversationId, includeTerminal = true)
             .filter { includeTerminal || !it.state.isTerminal || it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
-            .map { it.toEntry() }
+            .map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())) }
 
     /** Dismiss one exact record and notify viewers only after its durable write succeeds. */
     internal fun dismiss(key: SubagentChipKey): List<SubagentEntry> {
@@ -57,13 +58,13 @@ class ControllerSubagentRegistrySource(
         if (changed.isNotEmpty()) {
             changeListener?.onConversationChanged(SubagentConversationKey(requireNotNull(key.agentId), key.conversationId))
         }
-        return changed.map { it.toEntry() }
+        return changed.map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())) }
     }
 
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
         val record = registry.findByToolCall(conversationId, toolCallId) ?: return null
         return SubagentTodosSnapshot(
-            subagent = record.toEntry(),
+            subagent = record.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())),
             todos = record.todos.orEmpty(),
             todosFound = record.todos != null,
         )
@@ -120,7 +121,7 @@ class ControllerSubagentRegistrySource(
         registry.replaySnapshot(key.conversationId)
             .filter { key.agentId == null || it.agentId == key.agentId }
             .filter { !it.state.isTerminal || now - (it.terminalAtEpochMs ?: 0L) < PUSH_TERMINAL_LINGER_MS }
-            .map { it.toEntry() }
+            .map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(now)) }
 
     private fun ingestParentDelta(frame: AppServerInboundFrame.StreamDelta) {
         if (!frame.subagentId.isNullOrBlank()) return
@@ -307,7 +308,7 @@ class ControllerSubagentRegistrySource(
      * keyed, so replaying repeatedly converges instead of duplicating.
      */
     fun replaySnapshot(conversationId: String): List<SubagentEntry> =
-        registry.replaySnapshot(conversationId).map { it.toEntry() }
+        registry.replaySnapshot(conversationId).map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())) }
 
     /** Test / bootstrap hook. */
     fun replaceConversation(conversationId: String, entries: List<SubagentEntry>) {

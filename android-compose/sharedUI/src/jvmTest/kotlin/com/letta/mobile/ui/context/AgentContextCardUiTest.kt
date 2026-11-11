@@ -84,9 +84,50 @@ class AgentContextCardUiTest {
         setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
-        onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total")
-        onNodeWithText("Unclassified / estimation gap").assertExists()
+        onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total; split is approximate")
+        onNodeWithText("Other").assertExists()
         onNodeWithText("Memory blocks").assertExists()
+    }
+
+    @Test
+    fun usageAndOverheadOnlyBreakdownsNameToolsWithHonestCaptions() {
+        val overview = ContextWindowOverview(
+            contextWindowSizeMax = 200_000,
+            contextWindowSizeCurrent = 84_000,
+            numTokensSystem = 4_000,
+            numTokensCoreMemory = 2_000,
+            numTokensMessages = 60_000,
+            numTokensFunctionsDefinitions = 18_000,
+            numTokensToolsAndHarness = 18_000,
+            calibrationSource = "conversation_usage",
+            messageCharsPerToken = 2.16,
+            source = "estimate",
+            calibrated = true,
+        )
+        val overheadOnly = overview.copy(
+            numTokensMessages = 540,
+            numTokensFunctionsDefinitions = 77_460,
+            numTokensToolsAndHarness = 77_460,
+            calibrationSource = null,
+            messageCharsPerToken = null,
+            overheadSource = "recorded_usage",
+        )
+        val cases = listOf(
+            overview to "Measured from this conversation's usage",
+            overview.copy(calibrationApproximate = true) to "Measured from this conversation's usage; split is approximate",
+            overheadOnly to "Overhead measured; messages estimated; split is approximate",
+        )
+        cases.forEach { (reading, caption) ->
+            runComposeUiTest {
+                val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { reading }, compaction = null)
+                setContent { PointerCard(deps, focus) }
+                onNodeWithTag(AgentContextTags.CARD).performClick()
+                waitForIdle()
+                onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals(caption)
+                onNodeWithText("Tools and harness").assertExists()
+                onNodeWithText("Other").assertDoesNotExist()
+            }
+        }
     }
 
     @Test

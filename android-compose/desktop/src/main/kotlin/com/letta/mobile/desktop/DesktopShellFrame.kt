@@ -86,6 +86,7 @@ internal data class DesktopShellLists(
     val archivedAgentConversations: List<DesktopConversationSummary> = emptyList(),
     val mentionables: List<Mentionable>,
     val search: UnifiedSearchSources,
+    val subagentsWithHistory: List<SubagentEntry>,
 )
 
 /** letta-mobile-bglj6.1.10: the state the shell derives on each composition, for its pieces to draw. */
@@ -262,9 +263,10 @@ private fun rememberDesktopShellLists(
     // For a "Letta Code" subagent stack this is its same-PROVENANCE spawns (grouped by
     // authoritative parent identity via the shared model, so unrelated same-name agents are NOT
     // merged); for a normal agent it is its display-name convs, unchanged.
+    val subagentsWithHistory = context.panels.subagents.subagentsWithHistory.value
     val stack = FilterStackConversationsParams(
         conversations = conversations,
-        activeSubagents = activeSubagents,
+        activeSubagents = subagentsWithHistory,
         selectedAgentName = focus.selectedAgentName,
         selectedAgentId = focus.selectedAgentId,
         selectedConversationId = selectedConversationId,
@@ -284,6 +286,7 @@ private fun rememberDesktopShellLists(
         },
         // The window's one unified search: the header, the command palette and the quick-query bar.
         search = rememberDesktopSearchSources(context, conversations, focus),
+        subagentsWithHistory = subagentsWithHistory,
     )
 }
 
@@ -308,8 +311,7 @@ internal fun rememberDesktopHomeHost(context: DesktopShellContext, frame: Deskto
         ),
     )
     val homeOrbIndexes = remember(focus.railAgents, focus.avatarStyleByAgentId) {
-        focus.railAgents
-            .mapIndexed { index, (id, _) -> id to (focus.avatarStyleByAgentId[id] ?: index) }
+        focus.railAgents.mapIndexed { index, (id, _) -> id to (focus.avatarStyleByAgentId[id] ?: index) }
             .toMap()
     }
     return ShellHomeHost(
