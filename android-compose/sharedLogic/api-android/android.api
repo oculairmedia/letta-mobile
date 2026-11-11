@@ -49808,10 +49808,13 @@ public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort 
 	public static final field Companion Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort$Companion;
 	public fun <init> ()V
 	public final fun attach (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)V
+	public final fun claimUnseenChange (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;
+	public static synthetic fun claimUnseenChange$default (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAgentPort;Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;ILjava/lang/Object;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;
 	public final fun commit (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;Ljava/lang/String;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;
 	public final fun detach (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)V
 	public final fun getAttached ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getChanges ()Lkotlinx/coroutines/flow/SharedFlow;
+	public final fun peekUnseenChange ()Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;
 	public final fun reset (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;
 	public final fun undo (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutChange;)Z
 	public final fun undoLatest (Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutAuthor;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutCommit;
