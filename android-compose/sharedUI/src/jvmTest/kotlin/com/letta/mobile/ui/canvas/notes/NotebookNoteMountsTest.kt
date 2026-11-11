@@ -5,10 +5,14 @@ package com.letta.mobile.ui.canvas.notes
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasNotebookIdentity
@@ -27,12 +31,7 @@ class NotebookNoteMountsTest {
     fun remountReauthorizesARetainedDraftBeforeDisplayingIt() = runComposeUiTest {
         val shown = mutableStateOf(true)
         val backend = Backend()
-        val viewer = notebookNoteViewer(Identity, backend)
-        setContent {
-            MaterialTheme {
-                if (shown.value) viewer.render(Context, Modifier)
-            }
-        }
+        mount(backend, shown)
         onNodeWithTag(Markdown).performTextReplacement("private draft")
         runOnIdle { shown.value = false }
         runOnIdle { backend.allowed = false; shown.value = true }
@@ -67,6 +66,47 @@ class NotebookNoteMountsTest {
     @Test
     fun unknownShellNoteUsesTheExistingMissingState() = shellFallback(true, CanvasId("unknown"), NOTEBOOK_NOTE_MISSING_TAG)
 
+    @Test
+    fun retryAfterFailedAuthorizationRestoresTheRetainedDirtyDraft() = retryFailedCheck(allowedOnRetry = true)
+
+    @Test
+    fun retryThatIsDeniedKeepsTheDraftHiddenAndReadsNoStorage() = retryFailedCheck(allowedOnRetry = false)
+
+    private fun retryFailedCheck(allowedOnRetry: Boolean) = runComposeUiTest {
+        val shown = mutableStateOf(true)
+        val backend = Backend()
+        mount(backend, shown)
+        onNodeWithTag(Markdown).performTextReplacement("retained dirty draft")
+        runOnIdle { shown.value = false }
+        runOnIdle { backend.failNextLoad = true; shown.value = true }
+        onNodeWithTag(NOTEBOOK_NOTE_FAILED_TAG).assertExists()
+        onNodeWithTag(Markdown).assertDoesNotExist()
+        val readsBeforeRetry = runOnIdle {
+            backend.allowed = allowedOnRetry
+            backend.storageReads
+        }
+        onNodeWithText("Retry").performClick()
+        if (allowedOnRetry) {
+            onNodeWithTag(Markdown).assertTextContains("retained dirty draft")
+            onNodeWithText("Unsaved changes").assertExists()
+            runOnIdle { assertEquals(readsBeforeRetry + 1, backend.storageReads) }
+        } else {
+            onNodeWithTag("notebook-note-denied").assertExists()
+            onNodeWithTag(Markdown).assertDoesNotExist()
+            onNodeWithText("Retry").assertDoesNotExist()
+            runOnIdle { assertEquals(readsBeforeRetry, backend.storageReads) }
+        }
+    }
+
+    private fun ComposeUiTest.mount(backend: Backend, shown: State<Boolean>) {
+        val viewer = notebookNoteViewer(Identity, backend)
+        setContent {
+            MaterialTheme {
+                if (shown.value) viewer.render(Context, Modifier)
+            }
+        }
+    }
+
     private fun shellFallback(allowed: Boolean, canvas: CanvasId, tag: String) = runComposeUiTest {
         val backend = Backend().also { it.allowed = allowed }
         val registry = notebookCanvasViewers(Identity, backend)
@@ -84,10 +124,15 @@ class NotebookNoteMountsTest {
 
     private class Backend : NotebookNoteBackend {
         var allowed = true
+        var failNextLoad = false
         var storageReads = 0
         override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad {
             if (!allowed) return NotebookNoteLoad.Denied
             storageReads++
+            if (failNextLoad) {
+                failNextLoad = false
+                return NotebookNoteLoad.Unavailable("Transient storage failure")
+            }
             return NotebookNoteLoad.Found(NotebookNoteSnapshot(id, "Note", "original"))
         }
         override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave =

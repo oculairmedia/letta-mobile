@@ -97,12 +97,7 @@ private fun NotebookNoteView(
         NoteLookup.Missing -> Centered(modifier) {
             Text(stringResource(Res.string.canvas_viewer_note_missing), Modifier.testTag(NOTEBOOK_NOTE_MISSING_TAG))
         }
-        NoteLookup.Failed -> Centered(modifier) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                Text(stringResource(Res.string.canvas_viewer_note_failed), Modifier.testTag(NOTEBOOK_NOTE_FAILED_TAG))
-                TextButton(onClick = { attempt++ }) { Text(stringResource(Res.string.canvas_viewer_retry)) }
-            }
-        }
+        NoteLookup.Failed -> FailedNote(modifier) { attempt++ }
         is NoteLookup.Found -> {
             val session = remember(canvasId, found.notebook, sessions) { sessions.acquire(canvasId, found.notebook) }
             DisposableEffect(session) { onDispose { sessions.release(canvasId, session) } }
@@ -115,7 +110,9 @@ private fun NotebookNoteView(
 @Composable
 private fun AuthorizedNote(session: NotebookNoteSession, modifier: Modifier) {
     // A retained draft is not a retained grant. Hide it until this mount has reauthorized.
-    val checked by produceState<NoteLookup>(NoteLookup.Resolving, session) {
+    var attempt by remember(session) { mutableIntStateOf(0) }
+    val checked by produceState<NoteLookup>(NoteLookup.Resolving, session, attempt) {
+        value = NoteLookup.Resolving
         session.refresh()
         value = if (session.state.value.error != null) NoteLookup.Failed else NoteLookup.Found(session.id)
     }
@@ -125,10 +122,18 @@ private fun AuthorizedNote(session: NotebookNoteSession, modifier: Modifier) {
         state.denied -> Centered(modifier) {
             Text(stringResource(Res.string.document_workspace_denied), Modifier.testTag("notebook-note-denied"))
         }
-        checked == NoteLookup.Failed -> Centered(modifier) {
-            Text(stringResource(Res.string.canvas_viewer_note_failed), Modifier.testTag(NOTEBOOK_NOTE_FAILED_TAG))
-        }
+        checked == NoteLookup.Failed -> FailedNote(modifier) { attempt++ }
         else -> NotebookNoteEditorContent(session, modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun FailedNote(modifier: Modifier, onRetry: () -> Unit) {
+    Centered(modifier) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            Text(stringResource(Res.string.canvas_viewer_note_failed), Modifier.testTag(NOTEBOOK_NOTE_FAILED_TAG))
+            TextButton(onClick = onRetry) { Text(stringResource(Res.string.canvas_viewer_retry)) }
+        }
     }
 }
 

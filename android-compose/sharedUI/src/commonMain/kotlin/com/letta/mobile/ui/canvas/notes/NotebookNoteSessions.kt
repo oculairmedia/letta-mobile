@@ -23,6 +23,10 @@ internal class NotebookNoteSessions(private val backend: NotebookNoteBackend) {
         else held[canvasId] = session to holds
     }
 
+    /**
+     * Saves each retained draft, then checks again: a note edited while another was saving,
+     * or opened meanwhile, is still unsaved and must hold the quit.
+     */
     suspend fun prepareClose(): Boolean {
         val saved = held.values.map { it.first }.toList().map { !it.state.value.dirty || it.prepareClose() }.all { it }
         return saved && held.values.none { it.first.state.value.dirty }
