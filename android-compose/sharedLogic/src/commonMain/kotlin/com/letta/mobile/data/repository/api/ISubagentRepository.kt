@@ -43,10 +43,10 @@ interface ISubagentRepository {
     fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>>
 
     /** Full task snapshot including finished history; never use this projection for active chrome. */
-    fun subagentsWithHistoryFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> = activeSubagentsFlow(scope)
+    fun subagentsWithHistoryFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>>
 
     /** Synchronous full task snapshot for the Background tasks panel's initial state. */
-    fun currentSubagentsWithHistory(scope: SubagentParentScope): List<SubagentEntry> = currentActiveSubagents(scope)
+    fun currentSubagentsWithHistory(scope: SubagentParentScope): List<SubagentEntry>
 
     /** Synchronous cache projection used to avoid an empty initial emission. */
     fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry>

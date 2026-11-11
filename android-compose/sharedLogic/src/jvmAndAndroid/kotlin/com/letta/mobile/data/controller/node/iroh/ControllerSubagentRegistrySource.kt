@@ -50,7 +50,7 @@ class ControllerSubagentRegistrySource(
     override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> =
         registry.snapshot(conversationId, includeTerminal = true)
             .filter { includeTerminal || !it.state.isTerminal || it.terminalReason == SubagentChipRecord.TERMINAL_REASON_USER_DISMISSED }
-            .map { it.wireEntry(clock()) }
+            .map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())) }
 
     /** Dismiss one exact record and notify viewers only after its durable write succeeds. */
     internal fun dismiss(key: SubagentChipKey): List<SubagentEntry> {
@@ -58,13 +58,13 @@ class ControllerSubagentRegistrySource(
         if (changed.isNotEmpty()) {
             changeListener?.onConversationChanged(SubagentConversationKey(requireNotNull(key.agentId), key.conversationId))
         }
-        return changed.map { it.wireEntry(clock()) }
+        return changed.map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())) }
     }
 
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
         val record = registry.findByToolCall(conversationId, toolCallId) ?: return null
         return SubagentTodosSnapshot(
-            subagent = record.wireEntry(clock()),
+            subagent = record.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())),
             todos = record.todos.orEmpty(),
             todosFound = record.todos != null,
         )
@@ -121,7 +121,7 @@ class ControllerSubagentRegistrySource(
         registry.replaySnapshot(key.conversationId)
             .filter { key.agentId == null || it.agentId == key.agentId }
             .filter { !it.state.isTerminal || now - (it.terminalAtEpochMs ?: 0L) < PUSH_TERMINAL_LINGER_MS }
-            .map { it.wireEntry(now) }
+            .map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(now)) }
 
     private fun ingestParentDelta(frame: AppServerInboundFrame.StreamDelta) {
         if (!frame.subagentId.isNullOrBlank()) return
@@ -308,7 +308,7 @@ class ControllerSubagentRegistrySource(
      * keyed, so replaying repeatedly converges instead of duplicating.
      */
     fun replaySnapshot(conversationId: String): List<SubagentEntry> =
-        registry.replaySnapshot(conversationId).map { it.wireEntry(clock()) }
+        registry.replaySnapshot(conversationId).map { it.toEntry(kotlin.time.Instant.fromEpochMilliseconds(clock())) }
 
     /** Test / bootstrap hook. */
     fun replaceConversation(conversationId: String, entries: List<SubagentEntry>) {
@@ -337,13 +337,6 @@ class ControllerSubagentRegistrySource(
         const val PUSH_TERMINAL_LINGER_MS: Long = 60_000L
     }
 }
-
-// A host clock rollback must not make an old terminal look newly completed.
-private fun SubagentChipRecord.wireEntry(now: Long): SubagentEntry = toEntry().copy(
-    terminalAtEpochMs = terminalAtEpochMs.takeIf { state.isTerminal },
-    terminalAgeMs = terminalAtEpochMs?.takeIf { state.isTerminal }
-        ?.let { if (now >= it) now - it else Long.MAX_VALUE },
-)
 
 /** Hears every registry mutation, per parent conversation. */
 fun interface SubagentRegistryChangeListener {

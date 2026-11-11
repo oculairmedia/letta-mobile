@@ -294,9 +294,10 @@ open class SubagentRepository(
             ?.takeUnless { it.dismissalKey() in dismissedKeys }
             ?.takeIf { it.status in TERMINAL_STATUSES }
 
-        val (cached, untouched) = state.value.filterNot { it.dismissalKey() in dismissedKeys }
+        // Preserve prior running observations for legacy completion timing, not for cache retention.
+        val cachedByKey = state.value.associateBy { it.cacheKey() }
+        val (cached, untouched) = state.value.filterNot { it.dismissalKey() in dismissedKeys || it.isRetiredRunning() }
             .partition { it.isInOptionalScope(scope) }
-        val cachedByKey = cached.associateBy { it.cacheKey() }
         val completeIncoming = keepTerminalOutcomes(
             incoming = (if (stampedTerminal == null) visibleIncoming else visibleIncoming + stampedTerminal)
                 .map { entry -> entry.markSeen(now, cachedByKey[entry.cacheKey()]) },

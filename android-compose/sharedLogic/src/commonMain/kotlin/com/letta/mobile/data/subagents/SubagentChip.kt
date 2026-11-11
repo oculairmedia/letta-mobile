@@ -191,7 +191,8 @@ data class SubagentChipRecord(
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
-    fun toEntry(): SubagentEntry = SubagentEntry(
+    /** Project a record; [sentAt] adds clock-independent terminal age for wire responses. */
+    fun toEntry(sentAt: kotlin.time.Instant? = null): SubagentEntry = SubagentEntry(
         toolCallId = toolCallId,
         description = description,
         subagentType = subagentType,
@@ -205,7 +206,13 @@ data class SubagentChipRecord(
         startedAt = startedAt,
         activity = activity,
         todoProgress = todos?.todoProgress()?.takeIf { it.total > 0 },
-        terminalAtEpochMs = terminalAtEpochMs,
+        terminalAtEpochMs = terminalAtEpochMs.takeIf { state.isTerminal },
+        terminalAgeMs = sentAt?.let { at ->
+            terminalAtEpochMs?.takeIf { state.isTerminal }?.let { ended ->
+                // A host clock rollback must not make an old terminal look newly completed.
+                if (at.toEpochMilliseconds() >= ended) at.toEpochMilliseconds() - ended else Long.MAX_VALUE
+            }
+        },
         terminalReason = terminalReason,
         toolCallCount = progress.toolCallCount,
         lastActivityAtMs = lastActivityEpochMs,

@@ -43571,17 +43571,15 @@ public final class com/letta/mobile/data/repository/api/IStepRepository$DefaultI
 public abstract interface class com/letta/mobile/data/repository/api/ISubagentRepository {
 	public abstract fun activeSubagentsFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun currentActiveSubagents (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
-	public fun currentSubagentsWithHistory (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
+	public abstract fun currentSubagentsWithHistory (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
 	public fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refresh-IoAF18A (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun subagentsWithHistoryFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun subagentsWithHistoryFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun todos-gIAlu-s (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/ISubagentRepository$DefaultImpls {
-	public static fun currentSubagentsWithHistory (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
 	public static fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun subagentsWithHistoryFlow (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 }
 
 public final class com/letta/mobile/data/repository/api/ISubagentRepositoryKt {
@@ -50795,7 +50793,8 @@ public final class com/letta/mobile/data/subagents/SubagentChipRecord {
 	public final fun getTodos ()Ljava/util/List;
 	public final fun getToolCallId ()Ljava/lang/String;
 	public fun hashCode ()I
-	public final fun toEntry ()Lcom/letta/mobile/data/model/SubagentEntry;
+	public final fun toEntry (Lkotlin/time/Instant;)Lcom/letta/mobile/data/model/SubagentEntry;
+	public static synthetic fun toEntry$default (Lcom/letta/mobile/data/subagents/SubagentChipRecord;Lkotlin/time/Instant;ILjava/lang/Object;)Lcom/letta/mobile/data/model/SubagentEntry;
 	public fun toString ()Ljava/lang/String;
 }
 

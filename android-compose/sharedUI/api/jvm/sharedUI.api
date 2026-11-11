@@ -1774,7 +1774,7 @@ public final class com/letta/mobile/ui/chat/subagents/SubagentDualViewTags {
 }
 
 public final class com/letta/mobile/ui/chat/subagents/SubagentRingsOverlayKt {
-	public static final fun SubagentRingsOverlay (Ljava/util/List;Lcom/letta/mobile/ui/chat/subagents/SubagentTodoLoader;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun SubagentRingsOverlay (Ljava/util/List;Lcom/letta/mobile/ui/chat/subagents/SubagentTodoLoader;Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun conversation (Lcom/letta/mobile/ui/chat/subagents/SubagentTodoSheetTarget;)Lkotlin/Pair;
 	public static final fun rememberSubagentRingsState (Lkotlinx/collections/immutable/ImmutableList;Lcom/letta/mobile/ui/chat/subagents/ActiveSubagent;Landroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/chat/subagents/SubagentRingsState;
 }

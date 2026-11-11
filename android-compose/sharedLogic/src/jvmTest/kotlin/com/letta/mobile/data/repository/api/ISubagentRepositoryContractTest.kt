@@ -7,6 +7,19 @@ import kotlin.test.assertTrue
 
 class ISubagentRepositoryContractTest {
     @Test
+    fun historyProjectionsRequireExplicitImplementations() {
+        val historyMethods = setOf("subagentsWithHistoryFlow", "currentSubagentsWithHistory")
+        val methods = ISubagentRepository::class.java.methods.filter { it.name in historyMethods }
+        assertEquals(2, methods.size)
+        methods.forEach { method ->
+            assertTrue(java.lang.reflect.Modifier.isAbstract(method.modifiers))
+            assertEquals(listOf(SubagentParentScope::class.java), method.parameterTypes.toList())
+        }
+        val defaults = Class.forName(ISubagentRepository::class.java.name + "\$DefaultImpls").declaredMethods
+        assertFalse(defaults.any { it.name in historyMethods })
+    }
+
+    @Test
     fun `active subagent projection requires an explicit parent scope`() {
         val overloads = ISubagentRepository::class.java.methods
             .filter { it.name == "activeSubagentsFlow" }
