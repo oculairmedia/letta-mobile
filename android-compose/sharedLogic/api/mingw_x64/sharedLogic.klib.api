@@ -29352,6 +29352,7 @@ final class com.letta.mobile.data.canvas.library/CanvasBoardSessions { // com.le
     final val registry // com.letta.mobile.data.canvas.library/CanvasBoardSessions.registry|{}registry[0]
         final fun <get-registry>(): com.letta.mobile.data.canvas/CanvasSessionRegistry // com.letta.mobile.data.canvas.library/CanvasBoardSessions.registry.<get-registry>|<get-registry>(){}[0]
 
+    final fun clear() // com.letta.mobile.data.canvas.library/CanvasBoardSessions.clear|clear(){}[0]
     final fun holds(com.letta.mobile.data.model/CanvasId): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasBoardSessions.holds|holds(com.letta.mobile.data.model.CanvasId){}[0]
     final fun release(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.release|release(com.letta.mobile.data.canvas.CanvasSession){}[0]
     final suspend fun acquire(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.data.canvas.library/CanvasBoardSessions.acquire|acquire(com.letta.mobile.data.model.CanvasId){}[0]

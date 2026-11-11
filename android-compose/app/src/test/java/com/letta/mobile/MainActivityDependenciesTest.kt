@@ -26,11 +26,16 @@ class MainActivityDependenciesTest {
     private val conversationRunRegistry = CountingLazy(mockk<ConversationRunRegistry>())
     private val attentionPrefs = CountingLazy(mockk<AttentionPrefsRepository>())
     private val agentDefaults = CountingLazy(mockk<AgentDefaultsRepository>())
-    private val canvasBoards = CountingLazy(mockk<CanvasBoardSessions>())
+    private val boardTable = mockk<CanvasBoardSessions>()
+    private val canvasBoards = CountingLazy(mockk<com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards> {
+        io.mockk.every { boards } returns kotlinx.coroutines.flow.MutableStateFlow(boardTable)
+    })
     private val canvasViewers = CountingLazy(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry())
     private val subagentRepository = CountingLazy(mockk<ISubagentRepository>())
 
-    private fun newDependencies(boardProvider: javax.inject.Provider<CanvasBoardSessions> = canvasBoards) = MainActivityDependencies(
+    private fun newDependencies(
+        boardProvider: Lazy<com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards> = canvasBoards,
+    ) = MainActivityDependencies(
         lazySettingsRepository = settingsRepository,
         crashReporter = mockk<CrashReporter>(),
         lazyAgentRepository = agentRepository,
@@ -68,7 +73,8 @@ class MainActivityDependenciesTest {
         assertSame(conversationRunRegistry.value, dependencies.conversationRunRegistry)
         assertSame(attentionPrefs.value, dependencies.attentionPrefs)
         assertSame(agentDefaults.value, dependencies.agentDefaults)
-        assertSame(canvasBoards.value, dependencies.canvasBoards)
+        assertSame(boardTable, dependencies.canvasBoards)
+        assertSame(canvasBoards.value, dependencies.canvasOwner)
         assertSame(canvasViewers.value, dependencies.canvasViewers)
         assertSame(subagentRepository.value, dependencies.subagentRepository)
         assertEquals(1, settingsRepository.resolutions)
@@ -79,11 +85,17 @@ class MainActivityDependenciesTest {
         val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val opLog = com.letta.mobile.data.canvas.InMemoryCanvasOpLog()
         val transport = mockk<com.letta.mobile.data.canvas.CanvasSyncTransport>()
-        val dependencies = newDependencies(javax.inject.Provider {
+        val factory = javax.inject.Provider {
             com.letta.mobile.di.AppModule.provideCanvasBoardSessions(store, opLog, transport)
-        })
+        }
+        fun window(): MainActivityDependencies {
+            val owner = com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards(factory, mockk(relaxed = true))
+            return newDependencies(Lazy { owner })
+        }
+        val dependencies = window()
         val first = dependencies.canvasBoards
-        val second = dependencies.canvasBoards
+        val second = window().canvasBoards
+        assertSame(first, dependencies.canvasBoards)
         org.junit.Assert.assertNotSame(first, second)
         org.junit.Assert.assertNotSame(first.registry, second.registry)
         val page = com.letta.mobile.data.canvas.CanvasSession.create(store)

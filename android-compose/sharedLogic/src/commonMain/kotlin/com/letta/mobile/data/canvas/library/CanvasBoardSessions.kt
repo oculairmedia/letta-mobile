@@ -93,6 +93,15 @@ class CanvasBoardSessions(
         }
     }
 
+    /**
+     * Forgets this owner's holds and live mounts when its window finishes or its backend changes.
+     * Later disposers/releases from the old views are harmless; sync remains owned by those views.
+     */
+    fun clear() {
+        update { emptyMap() }
+        registry.clear()
+    }
+
     /** The number of holds on [canvasId]'s session; zero when it is not held. */
     fun holds(canvasId: CanvasId): Int = held.value[canvasId]?.second ?: 0
 

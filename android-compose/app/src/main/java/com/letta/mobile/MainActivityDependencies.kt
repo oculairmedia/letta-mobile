@@ -12,7 +12,8 @@ import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import dagger.Lazy
 import javax.inject.Inject
-import javax.inject.Singleton
+import dagger.hilt.android.scopes.ActivityScoped
+import com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards
 
 /**
  * Constructor-injected Activity collaborators for [MainActivity] (an `@AndroidEntryPoint` activity cannot
@@ -22,7 +23,7 @@ import javax.inject.Singleton
  * before `setContent`. Read lazily, in first composition, the warm-up has normally finished.
  * [crashReporter] stays eager: the Application already built it.
  */
-@Singleton
+@ActivityScoped
 class MainActivityDependencies @Inject constructor(
     private val lazySettingsRepository: Lazy<ISettingsRepository>,
     val crashReporter: CrashReporter,
@@ -31,7 +32,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyConversationRunRegistry: Lazy<ConversationRunRegistry>,
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
     private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
-    private val lazyCanvasBoards: javax.inject.Provider<CanvasBoardSessions>,
+    private val lazyCanvasBoards: Lazy<AndroidCanvasBoards>,
     private val lazyCanvasViewers: Lazy<CanvasDocumentViewerRegistry>,
     private val lazySubagentRepository: Lazy<ISubagentRepository>,
 ) {
@@ -46,8 +47,11 @@ class MainActivityDependencies @Inject constructor(
     /** letta-mobile-k5nbq.9: per-agent default cwd, the store the Iroh turn engine also reads. */
     val agentDefaults: AgentDefaultsRepository get() = lazyAgentDefaults.get()
 
-    /** A fresh window/account board owner; the Activity remembers it only for its active config. */
-    val canvasBoards: CanvasBoardSessions get() = lazyCanvasBoards.get()
+    /** The window's activity-retained owner, shared with its navigation destination ViewModels. */
+    val canvasOwner: AndroidCanvasBoards get() = lazyCanvasBoards.get()
+
+    /** The current backend's table; rotation retains it and a backend identity change replaces it. */
+    val canvasBoards: CanvasBoardSessions get() = canvasOwner.boards.value
 
     /** The same trusted notebook viewers used by canvas pages and shell note modules. */
     val canvasViewers: CanvasDocumentViewerRegistry get() = lazyCanvasViewers.get()

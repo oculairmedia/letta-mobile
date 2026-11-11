@@ -165,6 +165,22 @@ class CanvasBoardSessionsTest {
     }
 
     @Test
+    fun retiringAnOwnerForgetsHoldsAndMountsAndIgnoresTheirLateDisposers() = runTest {
+        val boards = CanvasBoardSessions(storeWithNotes())
+        val page = assertNotNull(boards.acquire(notes))
+        boards.acquire(notes)
+        val dispose = boards.registry.registerMount(page)
+        boards.clear()
+        assertEquals(0, boards.holds(notes))
+        assertNull(boards.registry.get(notes))
+        boards.release(page)
+        dispose()
+        assertEquals(0, boards.holds(notes))
+        assertNull(boards.registry.get(notes))
+        assertNotSame(page, boards.acquire(notes))
+    }
+
+    @Test
     fun aStoreFailurePropagatesAndHoldsNothing() = runTest {
         val backing = storeWithNotes()
         val store = object : CanvasDocumentStore by backing {

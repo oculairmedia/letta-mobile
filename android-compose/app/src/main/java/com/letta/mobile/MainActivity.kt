@@ -40,7 +40,6 @@ import android.os.Build
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
-import com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards
 import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
@@ -123,16 +122,13 @@ class MainActivity : ComponentActivity() {
                             OverlayHostRoot(overlays) {
                                 // Mascots move between seats below the app's overlays (letta-mobile-te3n1.8).
                                 MascotTransportLayer {
-                                    // Replacing credentials or backend disposes every old canvas mount and hold.
-                                    androidx.compose.runtime.key(canvasOwner) {
-                                        ProvideCanvasHostWithBoards(remember { deps.canvasViewers }, remember { deps.canvasBoards }) {
-                                            val navController = rememberNavController()
-                                            AppNavGraph(
-                                                navController = navController,
-                                                notificationTarget = launchTarget.value,
-                                                onNotificationTargetConsumed = { launchTarget.value = null },
-                                            )
-                                        }
+                                    com.letta.mobile.ui.screens.canvas.AndroidCanvasHost(deps, canvasOwner) {
+                                        val navController = rememberNavController()
+                                        AppNavGraph(
+                                            navController = navController,
+                                            notificationTarget = launchTarget.value,
+                                            onNotificationTargetConsumed = { launchTarget.value = null },
+                                        )
                                     }
                                 }
                             }
