@@ -10,6 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -47,6 +50,55 @@ import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 class ObjectIdentityAcrossViewsTest {
+    @Test
+    fun pageAndModuleRenderEditsThroughTheSameSession() = runDesktopComposeUiTest(width = 1800, height = 800) {
+        val fixture = AcceptanceWorkspace()
+        val session = runBlocking { CanvasSession.open(fixture.store, fixture.id) }!!
+        var config by mutableStateOf(fixture.lanes())
+        val host = LettaShellWorkspaceHost(
+            actions = ShellWorkspaceNavigationActions(),
+            slots = LettaShellWorkspaceSlots(main = { modifier ->
+                com.letta.mobile.ui.canvas.CanvasWorkspace(modifier, session = session)
+            }, agentCard = {}, sidePane = {}, overlays = {}),
+            chrome = ShellWindowChrome.Hoisted {}, drawer = ShellWorkspaceDrawer(), events = ShellWorkspaceEvents(),
+        )
+        setContent {
+            CompositionLocalProvider(LocalCanvasSessionRegistry provides fixture.registry) {
+                ProvideCanvasBoardSource(fixture.boards) {
+                    LettaShellWorkspace(fixture.state(config), host, Modifier.size(1800.dp, 800.dp))
+                }
+            }
+        }
+        waitUntil(AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) === session }
+        runOnIdle { config = fixture.lanes(side = listOf(fixture.canvas)) }
+        waitUntil(AcceptanceWorkspace.TIMEOUT) {
+            onAllNodesWithTag(shellCanvasModuleTag(fixture.id)).fetchSemanticsNodes().size == 1
+        }
+        assertSame(session, fixture.registry.get(fixture.id))
+        assertEquals(0, fixture.boards.holds(fixture.id), "a live page session needs no source hold")
+        runBlocking { session.updateTitle("Shared edit") }
+        waitUntil(AcceptanceWorkspace.TIMEOUT) { onAllNodes(hasText("Shared edit", substring = true)).fetchSemanticsNodes().size >= 2 }
+        assertEquals("Shared edit", runBlocking { fixture.store.get(fixture.id) }!!.title)
+    }
+
+    @Test
+    fun textAndCanvasViewersKeepTheLiveSceneAndSession() = runDesktopComposeUiTest(width = 1200, height = 800) {
+        val fixture = AcceptanceWorkspace()
+        val session = runBlocking { CanvasSession.open(fixture.store, fixture.id) }!!
+        setContent {
+            CompositionLocalProvider(LocalCanvasSessionRegistry provides fixture.registry) {
+                com.letta.mobile.ui.canvas.CanvasWorkspace(session = session)
+            }
+        }
+        waitUntil(AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) === session }
+        runBlocking { session.setBackgroundPattern(com.letta.mobile.data.canvas.CanvasBackgroundPattern(kind = "grid")) }
+        onNodeWithTag(com.letta.mobile.ui.canvas.canvasViewerOptionTag(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId.TEXT)).performClick()
+        onNodeWithTag(com.letta.mobile.ui.canvas.viewer.CANVAS_TEXT_VIEWER_CONTENT_TAG).assertTextEquals(session.document.value!!.sceneJson)
+        onNodeWithTag(com.letta.mobile.ui.canvas.canvasViewerOptionTag(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId.CANVAS)).performClick()
+        assertSame(session, fixture.registry.get(fixture.id))
+        assertEquals("grid", session.backgroundPattern()?.kind)
+    }
+
     @Test
     fun duplicateSlotAcrossLanesIsDrawnOnceAndRemainsWhenMainIsRemoved() = runDesktopComposeUiTest(width = 1800, height = 800) {
         val id = CanvasId("shared-board")
