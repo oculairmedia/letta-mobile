@@ -12,8 +12,8 @@ import com.letta.mobile.data.shell.sidemenu.RailViews
 /**
  * Applies [ShellLayoutOp]s to a [ShellLayoutConfig] under the [ShellLayoutCatalog]'s rules: a lane
  * holds only the views it may hold, a slot appears once (and in only one of main and side), the page
- * never leaves the main lane, Settings never leaves the side menu, the rail keeps its Home button, and
- * no lane grows past its cap.
+ * never leaves the main lane, Settings never leaves the side menu, the rail keeps its Home button, a
+ * view only the shell mounts (the secret request card) is never named, and no lane grows past its cap.
  * Every op is checked; when any is invalid nothing is applied and every problem is reported.
  */
 object ShellLayoutEdits {
@@ -107,13 +107,16 @@ private class Draft(private var base: ShellLayoutConfig) {
     private fun remove(op: ShellLayoutOp.Remove): List<Problem> {
         val spec = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
         val current = slots(spec)
-        val problem = notFound(op.slot, spec).takeIf { op.slot !in current } ?: leavingProblem(spec, op.slot)
+        val problem = hostOwnedProblem(op.slot)
+            ?: notFound(op.slot, spec).takeIf { op.slot !in current }
+            ?: leavingProblem(spec, op.slot)
         return applied(problem) { write(spec, current - op.slot) }
     }
 
     private fun move(op: ShellLayoutOp.Move): List<Problem> {
         val from = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
         val target = ShellLayoutCatalog.lane(op.toLane) ?: return listOf(unknownLane(op.toLane))
+        hostOwnedProblem(op.slot)?.let { return listOf(it) }
         if (op.slot !in slots(from)) return listOf(notFound(op.slot, from))
         return if (from == target) moveWithin(from, op) else moveAcross(from, target, op)
     }
@@ -186,6 +189,18 @@ private val protections = listOf(
     Protection(ShellLanes.CHAT, ChatViews.COMPOSER, ShellLayoutEditRule.CHAT_READ_SEND_STAYS),
 )
 
+/**
+ * The views only the shell mounts ([ShellViews.HostOwned]: the pending secret request card), with
+ * the problem any op naming one reports. A layout never holds them (see [ShellLayoutConfig.lane]), so
+ * an agent cannot place, move, remove, reorder around or cover one through an edit.
+ */
+private val hostOwnedProtections: Map<RuntimeViewId, Problem> = ShellViews.HostOwned.associateWith { view ->
+    ShellLayoutEditRule.HOST_OWNED_VIEW to "${view.value} is mounted by the shell itself; a layout edit cannot place, move or remove it."
+}
+
+/** The problem of an op naming [slot] when its view is one only the shell mounts. */
+private fun hostOwnedProblem(slot: ModuleSlot): Problem? = hostOwnedProtections[slot.view]
+
 /** Why [slot] cannot stay in, or go from, the lane [spec] it would leave. */
 private fun leavingProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? =
     protections.firstOrNull { it.guards(spec) && it.view == slot.view }?.problem
@@ -195,6 +210,7 @@ private fun keepsRequired(spec: ShellLayoutLaneSpec, slots: List<ModuleSlot>): L
     protections.filter { protection -> protection.guards(spec) && slots.none { it.view == protection.view } }.map { it.problem }
 
 private fun slotProblem(spec: ShellLayoutLaneSpec, slot: ModuleSlot): Problem? {
+    hostOwnedProblem(slot)?.let { return it }
     val view = spec.view(slot.view)
         ?: return ShellLayoutEditRule.VIEW_NOT_ALLOWED to
             "Lane ${spec.lane} cannot hold ${slot.view.value}; it takes ${spec.views.joinToString { it.view.value }}."
