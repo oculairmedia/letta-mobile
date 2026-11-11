@@ -1,5 +1,14 @@
 package com.letta.mobile.ui.shell.acceptance
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import io.ak1.drawbox.domain.model.DrawingSerializer
+import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.PayLoad
+import io.ak1.drawbox.domain.model.ShapeType
+import io.ak1.drawbox.domain.model.translate
+import io.ak1.drawbox.domain.model.withBounds
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasOp
@@ -16,6 +25,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class GeometryDoesNotMutateObjectTest {
+    @Test
+    fun drawingMoveAndResizeKeepEveryNonGeometryFieldExceptTheDocumentedTouchTimestamp() = runBlocking {
+        val fixture = AcceptanceWorkspace()
+        val session = assertNotNull(fixture.boards.acquire(fixture.id))
+        val shape = Element.Shape(id = "shape", shapeType = ShapeType.RECTANGLE,
+            points = listOf(Offset(10f, 20f), Offset(110f, 120f)), strokeColor = Color.Red,
+            fillColor = Color.Blue, strokeWidth = 3f, zIndex = 7, rotation = 15f, cornerRadius = 4f,
+            createdAt = 10L, modifiedAt = 20L, text = "Keep content", fontSize = 18f)
+        session.applyLocalScene(DrawingSerializer.serialize(PayLoad(Color.White, listOf(shape))))
+        val translated = shape.translate(Offset(30f, 40f)) as Element.Shape
+        val resized = translated.withBounds(Rect(40f, 60f, 240f, 260f)) as Element.Shape
+        listOf(translated, resized).forEach { changed ->
+            session.applyLocalScene(DrawingSerializer.serialize(PayLoad(Color.White, listOf(changed))))
+            val stored = DrawingSerializer.deserialize(session.document.value!!.sceneJson).elements.single() as Element.Shape
+            assertEquals(changed.points, stored.points)
+            assertEquals(shape, stored.copy(points = shape.points, modifiedAt = shape.modifiedAt), "geometry preserves drawing content and style")
+        }
+        fixture.boards.release(session)
+    }
+
     @Test
     fun movingAndResizingDocumentsAndPluginsOnlyChangesGeometryRegisters() = runBlocking {
         val fixture = AcceptanceWorkspace()
