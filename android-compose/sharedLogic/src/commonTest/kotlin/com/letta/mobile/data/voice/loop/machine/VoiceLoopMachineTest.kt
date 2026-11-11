@@ -21,32 +21,32 @@ class VoiceLoopMachineTest {
 
     private val activate = LoopInput.Activate(VoiceActivationKind.TAP)
 
-    private fun endOfTurn(words: String) = LoopInput.FromEar(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText(words))))
+    private fun endOfTurn(words: VoiceText) = LoopInput.FromEar(VoiceEarEvent.EndOfTurn(VoiceUtterance(words)))
 
     @Test
     fun earEventsWhileIdleChangeNothing() {
-        val step = idle.then(endOfTurn("hello"), LoopInput.FromEar(VoiceEarEvent.SpeechStarted))
+        val step = idle.then(endOfTurn(VoiceText("hello")), LoopInput.FromEar(VoiceEarEvent.SpeechStarted))
         assertEquals(VoicePhase.IDLE, step.model.phase)
         assertTrue(step.effects.isEmpty())
     }
 
     @Test
     fun emptyTurnKeepsListening() {
-        val step = idle.then(activate, endOfTurn("  "))
+        val step = idle.then(activate, endOfTurn(VoiceText("  ")))
         assertEquals(VoicePhase.LISTENING, step.model.phase)
         assertTrue(step.effects.none { it is LoopEffect.Respond })
     }
 
     @Test
     fun tapWhileThinkingInterruptsEvenWithoutBargeIn() {
-        val step = idle.copy(config = VoiceLoopConfig(bargeIn = false)).then(activate, endOfTurn("hi"), activate)
+        val step = idle.copy(config = VoiceLoopConfig(bargeIn = false)).then(activate, endOfTurn(VoiceText("hi")), activate)
         assertEquals(VoicePhase.LISTENING, step.model.phase)
         assertTrue(step.effects.any { it is LoopEffect.RequestInterrupt })
     }
 
     @Test
     fun replyWithAnUnknownGenerationIsDropped() {
-        val thinking = idle.then(activate, endOfTurn("hi")).model
+        val thinking = idle.then(activate, endOfTurn(VoiceText("hi"))).model
         val step = thinking.then(LoopInput.FromReply(TurnKey(99), ReplySignal.Segment(VoiceText("stale"))))
         assertEquals(VoicePhase.THINKING, step.model.phase)
         assertTrue(step.effects.isEmpty())
@@ -54,7 +54,7 @@ class VoiceLoopMachineTest {
 
     @Test
     fun finishOfAnUnknownSegmentIsIgnored() {
-        val thinking = idle.then(activate, endOfTurn("hi")).model
+        val thinking = idle.then(activate, endOfTurn(VoiceText("hi"))).model
         val step = thinking.then(LoopInput.FromMouth(VoiceMouthEvent.Finished(SpeechSegmentId(42))))
         assertEquals(thinking, step.model)
     }
@@ -69,7 +69,7 @@ class VoiceLoopMachineTest {
     fun microphoneIsWantedOnlyWhileListeningOrForBargeIn() {
         val listening = idle.then(activate).model
         assertTrue(listening.micWanted)
-        val thinkingNoBargeIn = listening.copy(config = VoiceLoopConfig(bargeIn = false)).then(endOfTurn("hi")).model
+        val thinkingNoBargeIn = listening.copy(config = VoiceLoopConfig(bargeIn = false)).then(endOfTurn(VoiceText("hi"))).model
         assertEquals(false, thinkingNoBargeIn.micWanted)
         assertEquals(false, thinkingNoBargeIn.view.micOpen)
     }

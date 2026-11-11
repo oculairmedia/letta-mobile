@@ -80,7 +80,7 @@ value class SpeechLanguage(
 
 /**
  * Where the endpoint engines send audio and text. The API key is not here: it lives in the secure
- * store, and destination consent lives in [VoiceEndpointGrants], each in its own stored value.
+ * store, and destination consent lives in [com.letta.mobile.data.voice.consent.VoiceEndpointGrants], each in its own stored value.
  */
 data class VoiceEndpointSettings(
     /** The speech server; null until the person configures one. */

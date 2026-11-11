@@ -86,8 +86,8 @@ data class WakePhrase(
         const val MAX_LENGTH: Int = 64
 
         private val bidiControls: Set<Char> = setOf(
-            '‎', '‏', '؜', '‪', '‫', '‬', '‭', '‮',
-            '⁦', '⁧', '⁨', '⁩',
+            '\u200E', '\u200F', '\u061C', '\u202A', '\u202B', '\u202C', '\u202D', '\u202E',
+            '\u2066', '\u2067', '\u2068', '\u2069',
         )
 
         /** What is wrong with [raw] as a phrase, or null when it is acceptable. */
@@ -97,11 +97,11 @@ data class WakePhrase(
                 text.isEmpty() -> WakePhraseProblem.EMPTY
                 text.length < MIN_LENGTH -> WakePhraseProblem.TOO_SHORT
                 text.length > MAX_LENGTH -> WakePhraseProblem.TOO_LONG
-                text.any(::isForbidden) -> WakePhraseProblem.FORBIDDEN_CHARACTER
+                text.any { it.isForbidden() } -> WakePhraseProblem.FORBIDDEN_CHARACTER
                 else -> null
             }
         }
 
-        private fun isForbidden(char: Char): Boolean = char.isISOControl() || char in bidiControls
+        private fun Char.isForbidden(): Boolean = isISOControl() || this in bidiControls
     }
 }

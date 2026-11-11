@@ -65,10 +65,9 @@ class ChatSessionVoiceResponderTest {
     private val session = ScriptedChatSession()
     private val responder = ChatSessionVoiceResponder(session)
 
-    private fun user(id: String) = UiMessage(id = id, role = "user", content = "spoken", timestamp = "t")
+    private val userRow = UiMessage(id = "", role = "user", content = "spoken", timestamp = "t")
 
-    private fun assistant(id: String, text: String, run: String = "r1") =
-        UiMessage(id = id, role = "assistant", content = text, timestamp = "t", runId = run)
+    private val assistantRow = UiMessage(id = "", role = "assistant", content = "", timestamp = "t", runId = "r1")
 
     private fun TestScope.collect(reply: VoiceReply): MutableList<VoiceReplyEvent> {
         val events = mutableListOf<VoiceReplyEvent>()
@@ -77,10 +76,10 @@ class ChatSessionVoiceResponderTest {
         return events
     }
 
-    private fun ask(words: String = "what time is it"): VoiceReply = responder.respond(VoiceUtterance(VoiceText(words)))
+    private fun ask(words: VoiceText = VoiceText("what time is it")): VoiceReply = responder.respond(VoiceUtterance(words))
 
     private fun TestScope.startRun() {
-        session.append(user("u1"))
+        session.append(userRow.copy(id = "u1"))
         session.update { copy(isAgentTyping = true) }
         runCurrent()
     }
@@ -97,9 +96,9 @@ class ChatSessionVoiceResponderTest {
         val events = collect(ask())
         assertEquals(listOf("what time is it"), session.sent)
         startRun()
-        session.append(assistant("m1", "It is"))
+        session.append(assistantRow.copy(id = "m1", content = "It is"))
         runCurrent()
-        session.replace(assistant("m1", "It is noon."))
+        session.replace(assistantRow.copy(id = "m1", content = "It is noon."))
         runCurrent()
         endRun()
         assertEquals(listOf("It is", " noon."), texts(events))
@@ -108,13 +107,13 @@ class ChatSessionVoiceResponderTest {
 
     @Test
     fun ignoresReasoningToolRowsAndOlderMessages() = runTest {
-        session.append(assistant("old", "Earlier answer."))
+        session.append(assistantRow.copy(id = "old", content = "Earlier answer."))
         val events = collect(ask())
         startRun()
         session.append(
-            assistant("think", "pondering").copy(isReasoning = true),
-            assistant("tool", "").copy(toolCalls = listOf(UiToolCall(name = "search", arguments = "{}", result = null))),
-            assistant("m1", "Found it."),
+            assistantRow.copy(id = "think", content = "pondering", isReasoning = true),
+            assistantRow.copy(id = "tool", toolCalls = listOf(UiToolCall(name = "search", arguments = "{}", result = null))),
+            assistantRow.copy(id = "m1", content = "Found it."),
         )
         runCurrent()
         endRun()
@@ -125,7 +124,7 @@ class ChatSessionVoiceResponderTest {
     fun separatesSuccessiveAssistantMessages() = runTest {
         val events = collect(ask())
         startRun()
-        session.append(assistant("m1", "First."), assistant("m2", "Second."))
+        session.append(assistantRow.copy(id = "m1", content = "First."), assistantRow.copy(id = "m2", content = "Second."))
         runCurrent()
         endRun()
         assertEquals(listOf("First.\nSecond."), texts(events))
@@ -167,15 +166,15 @@ class ChatSessionVoiceResponderTest {
 
     @Test
     fun secondUtteranceStopsTheFirstRunBeforeSending() = runTest {
-        val first = collect(ask("first"))
+        val first = collect(ask(VoiceText("first")))
         startRun()
-        session.append(assistant("m1", "Partial"))
+        session.append(assistantRow.copy(id = "m1", content = "Partial"))
         runCurrent()
-        val second = collect(ask("second"))
+        val second = collect(ask(VoiceText("second")))
         assertEquals(1, session.stops)
         assertEquals(listOf("first", "second"), session.sent)
-        session.append(assistant("m2", "Late words from the first run", run = "r1"))
-        session.append(user("u2"), assistant("m3", "Answer two.", run = "r2"))
+        session.append(assistantRow.copy(id = "m2", content = "Late words from the first run", runId = "r1"))
+        session.append(userRow.copy(id = "u2"), assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
         runCurrent()
         endRun()
         assertEquals(listOf("Partial"), texts(first))
@@ -197,7 +196,7 @@ class ChatSessionVoiceResponderTest {
         val stopped = ask()
         collect(stopped)
         session.endRunOnStop = true
-        session.append(user("u9"))
+        session.append(userRow.copy(id = "u9"))
         runCurrent()
         assertEquals(VoiceCancelOutcome.STOPPED, stopped.cancel())
     }

@@ -45,10 +45,10 @@ class VoiceLoopTest {
         h.listening()
         assertEquals(VoicePhase.LISTENING, h.state.phase)
         assertTrue(h.state.microphoneOpen)
-        h.turn("what time is it")
+        h.turn(VoiceText("what time is it"))
         assertEquals(VoicePhase.THINKING, h.state.phase)
         assertEquals("what time is it", h.responder.last.utterance.text.value)
-        h.replyText("It is noon. And sunny")
+        h.replyText(VoiceText("It is noon. And sunny"))
         assertEquals(VoicePhase.SPEAKING, h.state.phase)
         assertEquals(listOf("It is noon."), h.mouth.spokenTexts)
         h.reply(VoiceReplyEvent.Completed)
@@ -89,7 +89,7 @@ class VoiceLoopTest {
         assertEquals(1, h.mouth.stops)
         assertEquals(1, h.responder.last.cancels)
         assertEquals(InterruptStatus.NONE, h.state.interrupt)
-        h.replyText("More words. ")
+        h.replyText(VoiceText("More words. "))
         assertEquals(listOf("It is noon."), h.mouth.spokenTexts)
     }
 
@@ -120,13 +120,13 @@ class VoiceLoopTest {
         val h = LoopHarness(this)
         h.speaking()
         val first = h.responder.last
-        h.turn("never mind, what day is it")
+        h.turn(VoiceText("never mind, what day is it"))
         assertEquals(2, h.responder.replies.size)
         assertEquals(VoicePhase.THINKING, h.state.phase)
         first.text("Stale words. ")
         h.settle()
         assertEquals(listOf("It is noon."), h.mouth.spokenTexts)
-        h.replyText("Tuesday. ")
+        h.replyText(VoiceText("Tuesday. "))
         assertEquals(listOf("It is noon.", "Tuesday."), h.mouth.spokenTexts)
     }
 
@@ -139,7 +139,7 @@ class VoiceLoopTest {
         h.ear.hear(VoiceEarEvent.SpeechStarted)
         h.settle()
         assertEquals(InterruptStatus.UNRESPONSIVE, h.state.interrupt)
-        h.replyText("Still talking. ")
+        h.replyText(VoiceText("Still talking. "))
         assertTrue(h.mouth.spokenTexts.isEmpty())
         h.reply(VoiceReplyEvent.Completed)
         assertEquals(InterruptStatus.NONE, h.state.interrupt)
@@ -248,12 +248,12 @@ class VoiceLoopTest {
     @Test
     fun lateReplyIsSpokenWhenItLandsWhileListening() = runTest {
         val h = LoopHarness(this)
-        h.speaking("On it. ")
+        h.speaking(VoiceText("On it. "))
         h.reply(VoiceReplyEvent.AwaitingLateReply)
         h.finishSpeech()
         assertEquals(VoicePhase.LISTENING, h.state.phase)
         assertTrue(h.state.awaitingLateReply)
-        h.replyText("Research done. ")
+        h.replyText(VoiceText("Research done. "))
         assertEquals(VoicePhase.SPEAKING, h.state.phase)
         h.reply(VoiceReplyEvent.Completed)
         h.finishSpeech()
@@ -265,7 +265,7 @@ class VoiceLoopTest {
     @Test
     fun lateReplyIsHeldWhileThePersonSpeaksAndSpokenAfterTheNextAnswer() = runTest {
         val h = LoopHarness(this)
-        h.speaking("On it. ")
+        h.speaking(VoiceText("On it. "))
         val delegated = h.responder.last
         h.reply(VoiceReplyEvent.AwaitingLateReply)
         h.finishSpeech()
@@ -284,10 +284,10 @@ class VoiceLoopTest {
     @Test
     fun discardPolicyNeverSpeaksLateReplies() = runTest {
         val h = LoopHarness(this, VoiceLoopConfig(lateReplies = LateReplyPolicy.DISCARD))
-        h.speaking("On it. ")
+        h.speaking(VoiceText("On it. "))
         h.reply(VoiceReplyEvent.AwaitingLateReply)
         h.finishSpeech()
-        h.replyText("Research done. ")
+        h.replyText(VoiceText("Research done. "))
         assertEquals(VoicePhase.LISTENING, h.state.phase)
         assertEquals(listOf("On it."), h.mouth.spokenTexts)
     }
@@ -295,7 +295,7 @@ class VoiceLoopTest {
     @Test
     fun conversationChangeDropsLateReplies() = runTest {
         val h = LoopHarness(this)
-        h.speaking("On it. ")
+        h.speaking(VoiceText("On it. "))
         val delegated = h.responder.last
         h.reply(VoiceReplyEvent.AwaitingLateReply)
         h.finishSpeech()

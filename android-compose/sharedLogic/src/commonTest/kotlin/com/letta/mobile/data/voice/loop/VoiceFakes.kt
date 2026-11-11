@@ -59,9 +59,9 @@ internal class FakeEar(private val log: EngineLog) : VoiceEar {
 
     suspend fun hear(event: VoiceEarEvent) = heard.emit(event)
 
-    suspend fun say(words: String) {
+    suspend fun say(words: VoiceText) {
         hear(VoiceEarEvent.SpeechStarted)
-        hear(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText(words))))
+        hear(VoiceEarEvent.EndOfTurn(VoiceUtterance(words)))
     }
 
     override fun commitTurn() {

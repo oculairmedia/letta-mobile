@@ -18,6 +18,7 @@ class SentenceChunker(
 ) {
     private val pending = StringBuilder()
     private var inCodeBlock = false
+    private val softCut = SoftCut(maxSegmentLength)
 
     init {
         require(maxSegmentLength >= MIN_SEGMENT_LENGTH) { "maxSegmentLength too small" }
@@ -26,12 +27,12 @@ class SentenceChunker(
     /** Appends [delta] and returns every segment that is now complete. */
     fun push(delta: VoiceText): List<VoiceText> {
         pending.append(delta.value)
-        return drain(final = false)
+        return Drain(ScanMode.PARTIAL).run()
     }
 
     /** Returns every remaining segment, including an unfinished sentence, and resets. */
     fun flush(): List<VoiceText> {
-        val segments = drain(final = true)
+        val segments = Drain(ScanMode.FINAL).run()
         reset()
         return segments
     }
@@ -42,76 +43,76 @@ class SentenceChunker(
         inCodeBlock = false
     }
 
-    private fun drain(final: Boolean): List<VoiceText> {
-        val out = mutableListOf<VoiceText>()
-        while (step(final, out)) Unit
-        return out
-    }
+    /** The first [length] buffered characters become a segment; [skip] more after them are dropped. */
+    private data class Cut(val length: Int, val skip: Int = 0)
 
-    /** One unit of progress; false when nothing more can be decided now. */
-    private fun step(final: Boolean, out: MutableList<VoiceText>): Boolean =
-        if (inCodeBlock) skipCode(final) else splitProse(final, out)
+    /** One pass over the buffer, collecting every segment that can be decided in [mode]. */
+    private inner class Drain(private val mode: ScanMode) {
+        private val out = mutableListOf<VoiceText>()
 
-    private fun skipCode(final: Boolean): Boolean {
-        val close = pending.indexOf(FENCE)
-        if (close < 0) {
-            keepTail(if (final) 0 else FENCE.length - 1)
-            if (final) inCodeBlock = false
+        fun run(): List<VoiceText> {
+            do {
+                val progressed = if (inCodeBlock) skipCode() else splitProse()
+            } while (progressed)
+            return out
+        }
+
+        private fun skipCode(): Boolean {
+            val close = pending.indexOf(FENCE)
+            if (close >= 0) {
+                pending.deleteRange(0, close + FENCE.length)
+                inCodeBlock = false
+                return true
+            }
+            val keep = if (mode == ScanMode.FINAL) 0 else FENCE.length - 1
+            if (pending.length > keep) pending.deleteRange(0, pending.length - keep)
+            if (mode == ScanMode.FINAL) inCodeBlock = false
             return false
         }
-        pending.deleteRange(0, close + FENCE.length)
-        inCodeBlock = false
-        return true
-    }
 
-    private fun keepTail(count: Int) {
-        if (pending.length > count) pending.deleteRange(0, pending.length - count)
-    }
-
-    private fun splitProse(final: Boolean, out: MutableList<VoiceText>): Boolean {
-        val fence = pending.indexOf(FENCE)
-        val limit = if (fence < 0) pending.length else fence
-        val end = SentenceBoundaries.find(pending, limit, final)
-        return when {
-            end > 0 -> take(end, 0, out)
-            fence >= 0 -> openCodeBlock(fence, out)
-            pending.length > maxSegmentLength -> take(softCut(pending, maxSegmentLength), 0, out)
-            final -> emitAll(out)
-            else -> false
+        private fun splitProse(): Boolean {
+            val fence = pending.indexOf(FENCE)
+            val limit = if (fence < 0) pending.length else fence
+            val end = SentenceScan(pending, limit, mode).firstEnd()
+            return when {
+                end != null -> take(Cut(end.value))
+                fence >= 0 -> openCodeBlock(Cut(fence, FENCE.length))
+                pending.length > maxSegmentLength -> take(Cut(softCut.indexIn(pending)))
+                mode == ScanMode.FINAL -> emitAll()
+                else -> false
+            }
         }
-    }
 
-    private fun openCodeBlock(fence: Int, out: MutableList<VoiceText>): Boolean {
-        take(fence, FENCE.length, out)
-        inCodeBlock = true
-        return true
-    }
-
-    private fun emitAll(out: MutableList<VoiceText>): Boolean {
-        if (pending.isEmpty()) return false
-        take(pending.length, 0, out)
-        return false
-    }
-
-    /** Emits the first [length] characters as a segment and also drops [skip] more after them. */
-    private fun take(length: Int, skip: Int, out: MutableList<VoiceText>): Boolean {
-        val raw = pending.substring(0, length)
-        pending.deleteRange(0, length + skip)
-        val spoken = SpeakableText.clean(raw)
-        if (spoken.isNotEmpty()) out += splitLong(spoken).map(::VoiceText)
-        return true
-    }
-
-    private fun splitLong(text: String): List<String> {
-        val parts = mutableListOf<String>()
-        var rest = text
-        while (rest.length > maxSegmentLength) {
-            val cut = softCut(rest, maxSegmentLength)
-            parts += rest.substring(0, cut).trim()
-            rest = rest.substring(cut).trim()
+        private fun openCodeBlock(cut: Cut): Boolean {
+            take(cut)
+            inCodeBlock = true
+            return true
         }
-        if (rest.isNotEmpty()) parts += rest
-        return parts
+
+        private fun emitAll(): Boolean {
+            if (pending.isNotEmpty()) take(Cut(pending.length))
+            return false
+        }
+
+        private fun take(cut: Cut): Boolean {
+            val raw = pending.substring(0, cut.length)
+            pending.deleteRange(0, cut.length + cut.skip)
+            val spoken = SpeakableText.clean(raw)
+            if (spoken.isNotEmpty()) out += splitLong(spoken).map(::VoiceText)
+            return true
+        }
+
+        private fun splitLong(text: String): List<String> {
+            val parts = mutableListOf<String>()
+            var rest = text
+            while (rest.length > maxSegmentLength) {
+                val cut = softCut.indexIn(rest)
+                parts += rest.substring(0, cut).trim()
+                rest = rest.substring(cut).trim()
+            }
+            if (rest.isNotEmpty()) parts += rest
+            return parts
+        }
     }
 
     /** Defaults. */

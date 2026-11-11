@@ -36,7 +36,7 @@ internal class LoopHarness(private val test: TestScope, config: VoiceLoopConfig 
         settle()
     }
 
-    suspend fun turn(words: String = "what time is it") {
+    suspend fun turn(words: VoiceText = VoiceText("what time is it")) {
         ear.say(words)
         settle()
     }
@@ -46,10 +46,10 @@ internal class LoopHarness(private val test: TestScope, config: VoiceLoopConfig 
         settle()
     }
 
-    fun replyText(words: String) = reply(VoiceReplyEvent.Text(VoiceText(words)))
+    fun replyText(words: VoiceText) = reply(VoiceReplyEvent.Text(words))
 
     /** Listening, one turn, and the first spoken sentence queued. */
-    suspend fun speaking(words: String = "It is noon. ") {
+    suspend fun speaking(words: VoiceText = VoiceText("It is noon. ")) {
         listening()
         turn()
         replyText(words)

@@ -679,7 +679,7 @@ Releasing a transport's resources (a QUIC endpoint and its transport, a WebSocke
 
 # Package com.letta.mobile.data.voice
 
-Shared vocabulary of the hands-free voice loop: spoken text that never prints its words, audio levels, the utterance an ear produces (text, an optional immediate reply and an optional structured action decision), tagged errors with a suggested user action, the person's voice settings and the loop's phases and configuration. Destination consent for remote speech endpoints is a separate stored value, [VoiceEndpointGrants](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice/-voice-endpoint-grants/index.html), so a settings export never carries it. Nothing here is wired to a page or a platform yet.
+Shared vocabulary of the hands-free voice loop: spoken text that never prints its words, audio levels, the utterance an ear produces (text, an optional immediate reply and an optional structured action decision), tagged errors with a suggested user action, the person's voice settings and the loop's phases and configuration. Destination consent for remote speech endpoints is a separate stored value, [VoiceEndpointGrants](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.consent/-voice-endpoint-grants/index.html), so a settings export never carries it. Nothing here is wired to a page or a platform yet.
 
 # Package com.letta.mobile.data.voice.activation
 

@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
 
 class ActivationTest {
-    private fun at(millis: Int) = KeyTime(millis.milliseconds)
+    private val Int.atMs: KeyTime get() = KeyTime(milliseconds)
 
     private fun decisions(mode: ActivationKeyMode, vararg gestures: KeyGesture): List<KeyDecision> {
         val classifier = ActivationKeyClassifier(mode)
@@ -15,20 +15,20 @@ class ActivationTest {
 
     @Test
     fun autoTapTogglesAndHoldIsPushToTalk() {
-        val tap = decisions(ActivationKeyMode.AUTO, KeyGesture.Press(at(0)), KeyGesture.Release(at(120)))
+        val tap = decisions(ActivationKeyMode.AUTO, KeyGesture.Press(0.atMs), KeyGesture.Release(120.atMs))
         assertEquals(listOf(KeyDecision.START, KeyDecision.NONE), tap)
         val toggleOff = decisions(
             ActivationKeyMode.AUTO,
-            KeyGesture.Press(at(0)), KeyGesture.Release(at(100)), KeyGesture.Press(at(900)), KeyGesture.Release(at(950)),
+            KeyGesture.Press(0.atMs), KeyGesture.Release(100.atMs), KeyGesture.Press(900.atMs), KeyGesture.Release(950.atMs),
         )
         assertEquals(listOf(KeyDecision.START, KeyDecision.NONE, KeyDecision.END_TURN, KeyDecision.NONE), toggleOff)
-        val hold = decisions(ActivationKeyMode.AUTO, KeyGesture.Press(at(0)), KeyGesture.Release(at(300)))
+        val hold = decisions(ActivationKeyMode.AUTO, KeyGesture.Press(0.atMs), KeyGesture.Release(300.atMs))
         assertEquals(listOf(KeyDecision.START, KeyDecision.END_TURN), hold)
     }
 
     @Test
     fun holdModeEndsOnEveryRelease() {
-        val gestures = decisions(ActivationKeyMode.HOLD, KeyGesture.Press(at(0)), KeyGesture.Release(at(50)))
+        val gestures = decisions(ActivationKeyMode.HOLD, KeyGesture.Press(0.atMs), KeyGesture.Release(50.atMs))
         assertEquals(listOf(KeyDecision.START, KeyDecision.END_TURN), gestures)
     }
 
@@ -36,7 +36,7 @@ class ActivationTest {
     fun toggleModeIgnoresReleases() {
         val gestures = decisions(
             ActivationKeyMode.TOGGLE,
-            KeyGesture.Press(at(0)), KeyGesture.Release(at(2000)), KeyGesture.Press(at(3000)),
+            KeyGesture.Press(0.atMs), KeyGesture.Release(2000.atMs), KeyGesture.Press(3000.atMs),
         )
         assertEquals(listOf(KeyDecision.START, KeyDecision.NONE, KeyDecision.END_TURN), gestures)
     }
@@ -44,7 +44,7 @@ class ActivationTest {
     @Test
     fun cancelDiscardsOnlyWhenActive() {
         assertEquals(listOf(KeyDecision.NONE), decisions(ActivationKeyMode.AUTO, KeyGesture.Cancel))
-        val discarded = decisions(ActivationKeyMode.HOLD, KeyGesture.Press(at(0)), KeyGesture.Cancel, KeyGesture.Release(at(10)))
+        val discarded = decisions(ActivationKeyMode.HOLD, KeyGesture.Press(0.atMs), KeyGesture.Cancel, KeyGesture.Release(10.atMs))
         assertEquals(listOf(KeyDecision.START, KeyDecision.DISCARD, KeyDecision.NONE), discarded)
     }
 }

@@ -64,17 +64,16 @@ internal class FakeWakeWordSession(
     override suspend fun setPhrases(phrases: List<WakePhrase>): List<PhraseOutcome> {
         val outcomes = mutableListOf<PhraseOutcome>()
         phrases.forEach { phrase ->
-            val accepts = outcomes.count { it is PhraseOutcome.Accepted }
-            outcomes += rejection(phrase, accepts)?.let { PhraseOutcome.Rejected(phrase, it) } ?: PhraseOutcome.Accepted(phrase)
+            outcomes += rejection(phrase, outcomes)?.let { PhraseOutcome.Rejected(phrase, it) } ?: PhraseOutcome.Accepted(phrase)
         }
         accepted = outcomes.filterIsInstance<PhraseOutcome.Accepted>().map { it.phrase }
         return outcomes
     }
 
-    private fun rejection(phrase: WakePhrase, accepts: Int): PhraseRejection? = when {
+    private fun rejection(phrase: WakePhrase, earlier: List<PhraseOutcome>): PhraseRejection? = when {
         phrase.language !in descriptor.languages -> PhraseRejection.UNSUPPORTED_LANGUAGE
         phrase.text in script.unpronounceable -> PhraseRejection.UNPRONOUNCEABLE
-        accepts >= descriptor.maxPhrases -> PhraseRejection.TOO_MANY
+        earlier.count { it is PhraseOutcome.Accepted } >= descriptor.maxPhrases -> PhraseRejection.TOO_MANY
         else -> null
     }
 
@@ -95,8 +94,11 @@ internal class FakeWakeWordSession(
 }
 
 /** Frame [index] in the fake format. */
-internal fun frameAt(index: Int, samples: Int = FakeFormat.samplesPerFrame): AudioFrame =
-    AudioFrame(ShortArray(samples), SamplePosition(index.toLong() * FakeFormat.frameSamples))
+internal fun frameAt(index: Int, size: FrameSize = FrameSize.EXACT): AudioFrame =
+    AudioFrame(ShortArray(FakeFormat.samplesPerFrame + size.extraSamples), SamplePosition(index.toLong() * FakeFormat.frameSamples))
+
+/** Whether a test frame matches the fake format's size. */
+internal enum class FrameSize(val extraSamples: Int) { EXACT(0), OVERSIZED(1) }
 
 /** A frame source emitting [count] frames; [beforeFrame] runs before each; [hold] keeps it open after. */
 internal class FakeFrameSource(

@@ -108,5 +108,5 @@ class FakeWakeWordEngineContractTest : WakeWordEngineContract() {
 
     override fun utterance(phrase: WakePhrase): List<AudioFrame> = (0..(at.getValue(phrase.text).toInt())).map { frameAt(it) }
 
-    override fun wrongSizeFrame(): AudioFrame = frameAt(3, samples = FakeFormat.samplesPerFrame + 1)
+    override fun wrongSizeFrame(): AudioFrame = frameAt(3, FrameSize.OVERSIZED)
 }

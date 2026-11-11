@@ -48,7 +48,7 @@ class WakeGatesTest {
             "   " to WakePhraseProblem.EMPTY,
             "hi" to WakePhraseProblem.TOO_SHORT,
             "a".repeat(WakePhrase.MAX_LENGTH + 1) to WakePhraseProblem.TOO_LONG,
-            "hey‮letta" to WakePhraseProblem.FORBIDDEN_CHARACTER,
+            "hey\u202Eletta" to WakePhraseProblem.FORBIDDEN_CHARACTER,
             "hey\u0007letta" to WakePhraseProblem.FORBIDDEN_CHARACTER,
         )
         cases.forEach { (text, problem) -> assertEquals(problem, WakePhrase.problemWith(text), text) }
