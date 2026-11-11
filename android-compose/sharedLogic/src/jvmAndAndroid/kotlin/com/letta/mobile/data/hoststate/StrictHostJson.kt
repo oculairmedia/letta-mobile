@@ -12,11 +12,15 @@ internal object StrictHostJson {
                 '{' -> { require(scopes.size < MAX_JSON_DEPTH); scopes.addLast(JsonScope(mutableSetOf(), true)); cursor++ }
                 '[' -> { require(scopes.size < MAX_JSON_DEPTH); scopes.addLast(JsonScope(null, false)); cursor++ }
                 '}', ']' -> { scopes.removeLast(); cursor++ }
-                ',' -> { scopes.lastOrNull()?.let { if (it.keys != null) it.expectKey = true }; cursor++ }
+                ',' -> { expectNextKey(scopes.lastOrNull()); cursor++ }
                 '"' -> cursor = readJsonString(text, cursor, scopes.lastOrNull())
                 else -> cursor++
             }
         }
+    }
+
+    private fun expectNextKey(scope: JsonScope?) {
+        if (scope?.keys != null) scope.expectKey = true
     }
 
     private fun readJsonString(text: String, start: Int, scope: JsonScope?): Int {
