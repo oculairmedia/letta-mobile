@@ -23,6 +23,7 @@ class NotebookGrantCommand : CliktCommand(name = "notebook-grant") {
     private val revoke by option("--revoke", help = "Remove this principal/document grant.").flag()
 
     override fun run() = runBlocking {
+        requireNotebookHostDurability()
         val path = grantPath()
         val peer = grantPrincipal()
         val id = grantDocument()

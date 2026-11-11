@@ -22606,6 +22606,14 @@ public final class com/letta/mobile/data/home/shortcut/HomeShortcut$Group : java
 	public static fun values ()[Lcom/letta/mobile/data/home/shortcut/HomeShortcut$Group;
 }
 
+public final class com/letta/mobile/data/hoststate/HostDirectoryDurability {
+	public static final field INSTANCE Lcom/letta/mobile/data/hoststate/HostDirectoryDurability;
+	public final fun requireNotebookSharing (Z)V
+	public static synthetic fun requireNotebookSharing$default (Lcom/letta/mobile/data/hoststate/HostDirectoryDurability;ZILjava/lang/Object;)V
+	public final fun supported (Ljava/lang/String;)Z
+	public static synthetic fun supported$default (Lcom/letta/mobile/data/hoststate/HostDirectoryDurability;Ljava/lang/String;ILjava/lang/Object;)Z
+}
+
 public final class com/letta/mobile/data/lanes/ConversationLane {
 	public static final field Companion Lcom/letta/mobile/data/lanes/ConversationLane$Companion;
 	public fun <init> (Lcom/letta/mobile/data/lanes/ConversationPurpose;Ljava/util/List;Ljava/util/List;)V

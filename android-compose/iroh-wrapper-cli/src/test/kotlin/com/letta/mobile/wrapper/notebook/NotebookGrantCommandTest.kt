@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 class NotebookGrantCommandTest {
     @Test
     fun provisionAndRevokeUseRealHostFile() {
+        assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grant-cli").resolve("grants.json")
         val principal = "a".repeat(64)
         val id = NotebookDocumentId("b".repeat(32))

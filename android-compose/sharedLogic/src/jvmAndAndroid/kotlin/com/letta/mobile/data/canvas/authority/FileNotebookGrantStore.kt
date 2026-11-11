@@ -3,10 +3,10 @@ package com.letta.mobile.data.canvas.authority
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookPeerGrant
 import com.letta.mobile.data.hoststate.DurableHostFile
+import com.letta.mobile.data.hoststate.HostDirectoryDurability
 import com.letta.mobile.data.hoststate.StrictHostJson
 import java.io.IOException
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -22,13 +22,15 @@ import kotlinx.serialization.json.JsonPrimitive
  * Transactions hold the OS lock throughout [NotebookGrantStore.withGrant]'s action.
  * Administration requires directory synchronization. A failure after replacement leaves its
  * durability unconfirmed and must be reported, even when the new record is already visible.
+ * Windows administration refuses before locking or touching files; existing grants remain readable.
  */
 class FileNotebookGrantStore internal constructor(
     file: Path,
+    private val directoryDurabilitySupported: Boolean = HostDirectoryDurability.supported(),
     private val directorySync: (Path) -> Unit,
 ) : NotebookGrantStore {
     /** Use the host filesystem's directory durability barrier for administration. */
-    constructor(file: Path) : this(file, { directory -> FileChannel.open(directory).use { it.force(true) } })
+    constructor(file: Path) : this(file, HostDirectoryDurability.supported(), HostDirectoryDurability::sync)
 
     private val path = file.toAbsolutePath().normalize()
 
@@ -43,7 +45,7 @@ class FileNotebookGrantStore internal constructor(
     }
 
     /** Add or replace one pair. These capabilities do not authorize plugin or agent-tool use. */
-    suspend fun provision(documentId: NotebookDocumentId, grant: NotebookPeerGrant) = locked {
+    suspend fun provision(documentId: NotebookDocumentId, grant: NotebookPeerGrant) = administration {
         validateKey(grant.peerId, documentId)
         require(!grant.mayExecutePlugins && !grant.mayUseAgentTools) { "Unsupported notebook grant capability" }
         val current = read()
@@ -52,13 +54,18 @@ class FileNotebookGrantStore internal constructor(
     }
 
     /** Revoke one pair; completion is serialized after any earlier protected operation. */
-    suspend fun revoke(principal: String, documentId: NotebookDocumentId) = locked {
+    suspend fun revoke(principal: String, documentId: NotebookDocumentId) = administration {
         validateKey(principal, documentId)
         val current = read()
         write(current.copy(grants = current.grants.filterNot { it.principal == principal && it.documentId == documentId.value }))
     }
 
     private val file = DurableHostFile(path) { confirmDirectorySync() }
+
+    private suspend fun <T> administration(action: suspend () -> T): T {
+        HostDirectoryDurability.requireNotebookSharing(directoryDurabilitySupported)
+        return locked(action)
+    }
 
     private suspend fun <T> locked(action: suspend () -> T): T = file.locked(action)
 

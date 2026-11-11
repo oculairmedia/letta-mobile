@@ -42,6 +42,19 @@ class FileCanvasMountStoreTest {
     private val second = CanvasId("semantic-board-two")
 
     @Test
+    fun unsupportedDirectoryDurabilityStillPersistsMounts() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-unsupported")
+        val unsupportedSync: (Path) -> Unit = {}
+        val store = FileCanvasMountStore(directory, host, unsupportedSync)
+        assertEquals(first, store.bindIfAbsent(agent, conversation, first))
+        store.replaceBinding(agent, conversation, second)
+        store.setDefault(agent, first)
+        val reopened = FileCanvasMountStore(directory, host, unsupportedSync)
+        assertEquals(second, reopened.readBinding(agent, conversation))
+        assertEquals(first, reopened.readDefault(agent))
+    }
+
+    @Test
     fun reopeningPreservesDefaultsAndIndependentOverrides() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts")
         val store = FileCanvasMountStore(directory, host)

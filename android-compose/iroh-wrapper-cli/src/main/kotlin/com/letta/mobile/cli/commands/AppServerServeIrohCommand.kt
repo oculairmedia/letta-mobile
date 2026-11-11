@@ -350,6 +350,7 @@ class AppServerServeIrohCommand : CliktCommand(
 
     @Suppress("NoDetachedCoroutineLifecycle")
     override fun run() = runBlocking {
+        if (notebookGrantsFile != null) com.letta.mobile.wrapper.notebook.requireNotebookHostDurability()
         val scope = CoroutineScope(Dispatchers.IO)
         var irohEndpoint: IrohNodeEndpoint? = null
         var notebookStore: NotebookLocalStore? = null

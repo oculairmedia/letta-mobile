@@ -48,6 +48,7 @@ class NotebookNativeCallerTest {
     @Test
     @Timeout(90)
     fun authenticatedEndpointOwnsGrantDespitePayloadClaimsAndActiveConnectionRevocation() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-native-caller")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val alice = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))

@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test
 class NotebookAdminRoutesTest {
     @Test
     fun successfulFlushReturnsTheStoredTitleInsteadOfTheCallerClaim() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-flush-title")
         NotebookLocalStore(root.resolve("notebooks"), "host").use { store ->
             val storageId = store.create("Stored title")
@@ -52,6 +53,7 @@ class NotebookAdminRoutesTest {
 
     @Test
     fun transportPrincipalCannotBeSelectedByRequestAndRevocationStopsSave() = runBlocking {
+        assumeDurableGrantHost()
         val fixture = requireNotNull(javaClass.getResourceAsStream("/notebook-authority/requests-v1.json"))
             .use { Json.parseToJsonElement(it.readBytes().decodeToString()).jsonObject }
         val referenceMethod = fixture.getValue("reference").jsonObject.getValue("method").jsonPrimitive.content

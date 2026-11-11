@@ -35,6 +35,7 @@ class NotebookQueuedMutationTest {
     }
 
     private fun queuedMutation(cancel: Boolean) = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-queued-grant")
         NotebookLocalStore(root.resolve("notebooks"), "host").use { notebooks ->
             val storageId = notebooks.create("Note")
