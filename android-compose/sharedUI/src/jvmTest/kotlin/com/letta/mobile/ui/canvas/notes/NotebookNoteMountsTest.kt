@@ -62,33 +62,23 @@ class NotebookNoteMountsTest {
     }
 
     @Test
-    fun deniedShellNoteReadsNoStorage() = runComposeUiTest {
-        val backend = Backend().apply { allowed = false }
-        val registry = notebookCanvasViewers(Identity, backend)
-        setContent {
-            MaterialTheme {
-                com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry(registry) {
-                    com.letta.mobile.ui.shell.workspace.ShellNoteModule(Canvas, Modifier)
-                }
-            }
-        }
-        onNodeWithTag("notebook-note-denied").assertExists()
-        onNodeWithTag(Markdown).assertDoesNotExist()
-        runOnIdle { assertEquals(0, backend.storageReads) }
-    }
+    fun deniedShellNoteReadsNoStorage() = shellFallback(false, Canvas, "notebook-note-denied")
 
     @Test
-    fun unknownShellNoteUsesTheExistingMissingState() = runComposeUiTest {
-        val backend = Backend()
+    fun unknownShellNoteUsesTheExistingMissingState() = shellFallback(true, CanvasId("unknown"), NOTEBOOK_NOTE_MISSING_TAG)
+
+    private fun shellFallback(allowed: Boolean, canvas: CanvasId, tag: String) = runComposeUiTest {
+        val backend = Backend().also { it.allowed = allowed }
         val registry = notebookCanvasViewers(Identity, backend)
         setContent {
             MaterialTheme {
                 com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry(registry) {
-                    com.letta.mobile.ui.shell.workspace.ShellNoteModule(CanvasId("unknown"), Modifier)
+                    com.letta.mobile.ui.shell.workspace.ShellNoteModule(canvas, Modifier)
                 }
             }
         }
-        onNodeWithTag(NOTEBOOK_NOTE_MISSING_TAG).assertExists()
+        onNodeWithTag(tag).assertExists()
+        onNodeWithTag(Markdown).assertDoesNotExist()
         runOnIdle { assertEquals(0, backend.storageReads) }
     }
 
