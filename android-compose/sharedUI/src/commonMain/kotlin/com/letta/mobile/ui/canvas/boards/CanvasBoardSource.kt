@@ -5,7 +5,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.canvas.CanvasSession
-import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.library.CanvasBoardSessions
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.ProvideCanvasHost
@@ -33,6 +32,9 @@ fun interface CanvasBoardSource {
  */
 val LocalCanvasBoardSource = staticCompositionLocalOf<CanvasBoardSource?> { null }
 
+/** The window's board owner, including serialized host-specific session creation. */
+val LocalCanvasBoardSessions = staticCompositionLocalOf<CanvasBoardSessions?> { null }
+
 /** A source opening boards through the window's [sessions], one live session per board. */
 fun canvasBoardSource(sessions: CanvasBoardSessions): CanvasBoardSource = object : CanvasBoardSource {
     override suspend fun open(canvasId: CanvasId): CanvasSession? = sessions.acquire(canvasId)
@@ -56,10 +58,13 @@ fun ProvideCanvasBoardSource(sessions: CanvasBoardSessions, content: @Composable
  */
 @Composable
 fun ProvideCanvasHostWithBoards(
-    sessions: CanvasSessionRegistry?,
     viewers: CanvasDocumentViewerRegistry?,
     boards: CanvasBoardSessions,
     content: @Composable () -> Unit,
 ) {
-    ProvideCanvasHost(sessions, viewers) { ProvideCanvasBoardSource(boards, content) }
+    ProvideCanvasHost(boards.registry, viewers) {
+        CompositionLocalProvider(LocalCanvasBoardSessions provides boards) {
+            ProvideCanvasBoardSource(boards, content)
+        }
+    }
 }

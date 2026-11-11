@@ -30,7 +30,7 @@ class MainActivityDependenciesTest {
     private val canvasViewers = CountingLazy(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry())
     private val subagentRepository = CountingLazy(mockk<ISubagentRepository>())
 
-    private fun newDependencies() = MainActivityDependencies(
+    private fun newDependencies(boardProvider: javax.inject.Provider<CanvasBoardSessions> = canvasBoards) = MainActivityDependencies(
         lazySettingsRepository = settingsRepository,
         crashReporter = mockk<CrashReporter>(),
         lazyAgentRepository = agentRepository,
@@ -38,7 +38,7 @@ class MainActivityDependenciesTest {
         lazyConversationRunRegistry = conversationRunRegistry,
         lazyAttentionPrefs = attentionPrefs,
         lazyAgentDefaults = agentDefaults,
-        lazyCanvasBoards = canvasBoards,
+        lazyCanvasBoards = boardProvider,
         lazyCanvasViewers = canvasViewers,
         lazySubagentRepository = subagentRepository,
     )
@@ -74,7 +74,29 @@ class MainActivityDependenciesTest {
         assertEquals(1, settingsRepository.resolutions)
     }
 
-    private class CountingLazy<T>(val value: T) : Lazy<T> {
+    @Test
+    fun boardOwnersAreFreshForEachWindowOrAccountAndAdoptTheirOwnMounts() = kotlinx.coroutines.runBlocking {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        val opLog = com.letta.mobile.data.canvas.InMemoryCanvasOpLog()
+        val transport = mockk<com.letta.mobile.data.canvas.CanvasSyncTransport>()
+        val dependencies = newDependencies(javax.inject.Provider {
+            com.letta.mobile.di.AppModule.provideCanvasBoardSessions(store, opLog, transport)
+        })
+        val first = dependencies.canvasBoards
+        val second = dependencies.canvasBoards
+        org.junit.Assert.assertNotSame(first, second)
+        org.junit.Assert.assertNotSame(first.registry, second.registry)
+        val page = com.letta.mobile.data.canvas.CanvasSession.create(store)
+        val dispose = first.registry.registerMount(page)
+        assertSame(page, first.acquire(page.canvasId))
+        assertEquals(null, second.registry.get(page.canvasId))
+        first.release(page)
+        dispose()
+        assertEquals(0, first.holds(page.canvasId))
+        assertEquals(null, first.registry.get(page.canvasId))
+    }
+
+    private class CountingLazy<T>(val value: T) : Lazy<T>, javax.inject.Provider<T> {
         var resolutions = 0
             private set
 

@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -13,13 +13,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
-import com.letta.mobile.data.canvas.CanvasSyncTransport
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.plugin.view.PluginViewsModel
@@ -30,58 +27,22 @@ import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSessions
+import kotlinx.coroutines.awaitCancellation
 import javax.inject.Inject
 
-/**
- * ViewModel managing the lifecycle and collaborative [CanvasSession] for [CanvasScreen].
- */
+/** Android services used by each [CanvasScreen] mount's window-owned [CanvasSession]. */
 @HiltViewModel
 class CanvasViewModel @Inject constructor(
-    private val store: CanvasDocumentStore,
-    val syncTransport: CanvasSyncTransport,
     val presenceTransport: CanvasPresenceTransport,
-    private val opLog: CanvasOpLog,
     /** The app's canvas assets, shared with the relay (see AppModule.provideCanvasAssetStore). */
     val assets: com.letta.mobile.data.storage.AssetStore,
     /** The host's enabled plugins, their view transport and this device's live-views switch (letta-mobile-cdgpr.8). */
     val pluginViews: PluginViewsModel,
     val viewers: CanvasDocumentViewerRegistry,
-) : ViewModel() {
-    private val _session = MutableStateFlow<CanvasSession?>(null)
-    val session: StateFlow<CanvasSession?> = _session.asStateFlow()
+) : ViewModel()
 
-    fun initSession(canvasId: String, conversationId: String?, agentId: String? = null) {
-        if (_session.value != null) return
-        viewModelScope.launch {
-            val canvasSession = if (!conversationId.isNullOrBlank() && canvasId.isBlank()) {
-                CanvasSession.getOrCreateForConversation(
-                    store = store,
-                    conversationId = ConversationId(conversationId),
-                    options = com.letta.mobile.data.canvas.CanvasConversationOptions(
-                        agentId = agentId,
-                        title = "Conversation Canvas",
-                        opLog = opLog,
-                        syncTransport = syncTransport,
-                    ),
-                )
-            } else {
-                val effectiveId = if (canvasId.isNotBlank()) CanvasId(canvasId) else CanvasId.generate()
-                val s = CanvasSession(canvasId = effectiveId, store = store, opLog = opLog, syncTransport = syncTransport)
-                s.load()
-                s
-            }
-            _session.value = canvasSession
-        }
-    }
-}
-
-/**
- * Production Android screen hosting [CanvasWorkspace] bound to a persistent [CanvasSession].
- */
+/** Production Android host of a mount-held, persistent [CanvasSession] in [CanvasWorkspace]. */
 @Composable
 fun CanvasScreen(
     canvasId: String,
@@ -97,11 +58,21 @@ fun CanvasScreen(
     /** The shared chat's "Show on canvas" camera requests (letta-mobile-bglj6.13); null elsewhere. */
     cameraRequest: com.letta.mobile.ui.canvas.CanvasCameraRequest? = null,
 ) {
-    LaunchedEffect(canvasId, conversationId, agentId) {
-        viewModel.initSession(canvasId, conversationId, agentId)
+    val boards = checkNotNull(LocalCanvasBoardSessions.current)
+    val session by produceState<CanvasSession?>(null, boards, canvasId, conversationId, agentId) {
+        value = null
+        val opened = boards.acquirePage(
+            canvasId.takeIf(String::isNotBlank)?.let(::CanvasId),
+            conversationId?.takeIf(String::isNotBlank)?.let(::ConversationId),
+            agentId?.let(::AgentId),
+        )
+        try {
+            value = opened
+            awaitCancellation()
+        } finally {
+            boards.release(opened)
+        }
     }
-
-    val session by viewModel.session.collectAsStateWithLifecycle()
     val activeSession = session
     if (activeSession != null) {
         // Live plugin pages (letta-mobile-s416w.13): the WebView host, with the host's enabled

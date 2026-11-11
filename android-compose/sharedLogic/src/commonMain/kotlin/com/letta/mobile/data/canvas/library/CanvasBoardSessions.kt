@@ -4,7 +4,9 @@ import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,13 +23,17 @@ import kotlinx.coroutines.sync.withLock
  * afresh instead of a copy that may have gone stale while nothing showed it. A board already live
  * in [live] (mounted by a view that opened it some other way) is adopted rather than opened again.
  *
- * Owned by the window, like [live]; it must not be shared across authentication contexts.
+ * Owned by the window, like [live]; it must not be shared across authentication contexts. When
+ * [live] is omitted this owner creates [registry]; hosts publish that same registry to their views.
  */
 class CanvasBoardSessions(
     private val store: CanvasDocumentStore,
     private val options: CanvasConversationOptions = CanvasConversationOptions(),
-    private val live: CanvasSessionRegistry? = null,
+    live: CanvasSessionRegistry? = null,
 ) {
+    /** The window's live mounts, shared by its composition, table and external tools. */
+    val registry: CanvasSessionRegistry = live ?: CanvasSessionRegistry()
+
     /** Only one open at a time, so two asks for one board never open it twice. */
     private val opening = Mutex()
 
@@ -39,11 +45,40 @@ class CanvasBoardSessions(
      * has it yet; null, and no hold, when the store has no such board. A store failure propagates.
      */
     suspend fun acquire(canvasId: CanvasId): CanvasSession? =
+        acquireOrOpen(canvasId) { CanvasSession.open(store, canvasId, options) }
+
+    /**
+     * Acquires [canvasId], invoking the host's existing [open] path only when neither a holder nor
+     * a live mount has it. Serializes creation too, so conversation pages and by-id modules cannot
+     * race into separate sessions. The returned session must identify [canvasId].
+     */
+    private suspend fun acquireOrOpen(canvasId: CanvasId, open: suspend () -> CanvasSession?): CanvasSession? =
         holdExisting(canvasId) ?: opening.withLock {
-            holdExisting(canvasId) ?: openNew(canvasId)?.also { session ->
+            holdExisting(canvasId) ?: (registry.get(canvasId) ?: open())?.also { session ->
+                require(session.canvasId == canvasId) { "Opened canvas does not match the requested board" }
                 update { it + (canvasId to (session to 1)) }
             }
         }
+
+    /**
+     * Acquires a page's explicit board or its conversation board, creating through the existing
+     * session APIs only when no live session exists. A page without either gets a new board.
+     * The page releases this hold when its mount leaves, independently of its navigation owner.
+     */
+    suspend fun acquirePage(canvasId: CanvasId?, conversationId: ConversationId?, agentId: AgentId?): CanvasSession {
+        val conversation = conversationId.takeIf { canvasId == null }
+        val resolved = when {
+            canvasId != null -> canvasId
+            conversation != null -> store.getForConversation(conversation)?.id ?: CanvasId.forConversation(conversation)
+            else -> CanvasId.generate()
+        }
+        return checkNotNull(acquireOrOpen(resolved) {
+            when (conversation) {
+                null -> CanvasSession(resolved, store, opLog = options.opLog, syncTransport = options.syncTransport).also { it.load() }
+                else -> CanvasSession.getOrCreateForConversation(store, conversation, options.copy(agentId = agentId?.value))
+            }
+        })
+    }
 
     /** Gives back one hold on [session]; one this table does not hold is ignored. */
     fun release(session: CanvasSession) {
@@ -60,9 +95,6 @@ class CanvasBoardSessions(
 
     /** The number of holds on [canvasId]'s session; zero when it is not held. */
     fun holds(canvasId: CanvasId): Int = held.value[canvasId]?.second ?: 0
-
-    private suspend fun openNew(canvasId: CanvasId): CanvasSession? =
-        live?.get(canvasId) ?: CanvasSession.open(store, canvasId, options)
 
     /** One more hold on [canvasId]'s session when it is already held, else null. */
     private fun holdExisting(canvasId: CanvasId): CanvasSession? {

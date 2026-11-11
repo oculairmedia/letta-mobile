@@ -29349,9 +29349,13 @@ final class com.letta.mobile.data.canvas.compose/WorstCaseWrap { // com.letta.mo
 final class com.letta.mobile.data.canvas.library/CanvasBoardSessions { // com.letta.mobile.data.canvas.library/CanvasBoardSessions|null[0]
     constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, com.letta.mobile.data.canvas/CanvasConversationOptions = ..., com.letta.mobile.data.canvas/CanvasSessionRegistry? = ...) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasConversationOptions;com.letta.mobile.data.canvas.CanvasSessionRegistry?){}[0]
 
+    final val registry // com.letta.mobile.data.canvas.library/CanvasBoardSessions.registry|{}registry[0]
+        final fun <get-registry>(): com.letta.mobile.data.canvas/CanvasSessionRegistry // com.letta.mobile.data.canvas.library/CanvasBoardSessions.registry.<get-registry>|<get-registry>(){}[0]
+
     final fun holds(com.letta.mobile.data.model/CanvasId): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasBoardSessions.holds|holds(com.letta.mobile.data.model.CanvasId){}[0]
     final fun release(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.release|release(com.letta.mobile.data.canvas.CanvasSession){}[0]
     final suspend fun acquire(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.data.canvas.library/CanvasBoardSessions.acquire|acquire(com.letta.mobile.data.model.CanvasId){}[0]
+    final suspend fun acquirePage(com.letta.mobile.data.model/CanvasId?, com.letta.mobile.data.model/ConversationId?, com.letta.mobile.data.model/AgentId?): com.letta.mobile.data.canvas/CanvasSession // com.letta.mobile.data.canvas.library/CanvasBoardSessions.acquirePage|acquirePage(com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.ConversationId?;com.letta.mobile.data.model.AgentId?){}[0]
 }
 
 final class com.letta.mobile.data.canvas.library/CanvasLibraryController { // com.letta.mobile.data.canvas.library/CanvasLibraryController|null[0]

@@ -31,7 +31,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyConversationRunRegistry: Lazy<ConversationRunRegistry>,
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
     private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
-    private val lazyCanvasBoards: Lazy<CanvasBoardSessions>,
+    private val lazyCanvasBoards: javax.inject.Provider<CanvasBoardSessions>,
     private val lazyCanvasViewers: Lazy<CanvasDocumentViewerRegistry>,
     private val lazySubagentRepository: Lazy<ISubagentRepository>,
 ) {
@@ -46,7 +46,7 @@ class MainActivityDependencies @Inject constructor(
     /** letta-mobile-k5nbq.9: per-agent default cwd, the store the Iroh turn engine also reads. */
     val agentDefaults: AgentDefaultsRepository get() = lazyAgentDefaults.get()
 
-    /** The window's one live session per stored board, where its canvas modules open boards by id. */
+    /** A fresh window/account board owner; the Activity remembers it only for its active config. */
     val canvasBoards: CanvasBoardSessions get() = lazyCanvasBoards.get()
 
     /** The same trusted notebook viewers used by canvas pages and shell note modules. */

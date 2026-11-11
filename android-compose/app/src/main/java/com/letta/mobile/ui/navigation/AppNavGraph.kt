@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
  */
 private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset ->
     // No board for a chat without a conversation yet; once the first send creates one, the
-    // board is that conversation's own, in a ViewModel keyed by it (CanvasViewModel binds once).
+    // board is that conversation's own, held by its canvas mount through the window's board owner.
     val canvasKey = com.letta.mobile.ui.chat.surface.chatCanvasKey(target.conversationId)
     if (canvasKey == null) {
         com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder()

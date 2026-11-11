@@ -58,7 +58,7 @@ class ShellWorkspaceNoteModuleTest {
                                 listOf(ModuleSlot(RuntimeViewId("shell.note"), id.value))
                             } else emptyList(),
                         ))
-                        ProvideCanvasHostWithBoards(live, viewers, boards) {
+                        ProvideCanvasHostWithBoards(viewers, boards) {
                             LettaShellWorkspace(
                                 LettaShellWorkspaceState(
                                     header = ShellWorkspaceHeaderState(title = "Notes"),
