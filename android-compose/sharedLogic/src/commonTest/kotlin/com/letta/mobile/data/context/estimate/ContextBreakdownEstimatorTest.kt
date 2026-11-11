@@ -103,7 +103,7 @@ class ContextBreakdownEstimatorTest {
     }
 
     @Test
-    fun aShortLatestRunReusesTheEarlierDensityWithoutInflatingOverhead() {
+    fun aShortNewModelRunReusesEarlierDensityButLeavesItsOverheadUnnamed() {
         for (turns in listOf(1, 2)) {
             val messages = denseHistory().toMutableList()
             repeat(turns) { turn ->
@@ -115,8 +115,9 @@ class ContextBreakdownEstimatorTest {
             val result = denseEstimate(messages)
             assertEquals(2.16, result.messageCharsPerToken)
             assertEquals(765_000 + turns * 100, result.sections.messages)
-            assertEquals(0, result.tools!! - result.toolsAndHarness!!)
-            assertTrue((result.toolsAndHarness ?: 0) in 54_000..58_000, "Overhead must not absorb message estimation error")
+            assertNull(result.toolsAndHarness)
+            assertEquals(56_000, result.tools)
+            assertNull(result.toAgentContextJson()["overhead_source"])
             assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
             assertEquals(result.total, result.sections.total + result.tools!!)
         }
@@ -145,13 +146,13 @@ class ContextBreakdownEstimatorTest {
     }
 
     @Test
-    fun boundedSinglePointOverheadPrefersTheEarliestUsablePoint() {
+    fun boundedSinglePointOverheadDoesNotLookOutsideTheCurrentRun() {
         val messages = denseHistory().dropLast(1) + obj(
             """{"role":"assistant","model":"new-model","content":"","usage":{"input":830000}}""",
         )
         val result = denseEstimate(messages)
         assertNull(result.messageCharsPerToken)
-        assertTrue((result.toolsAndHarness ?: 0) in 54_000..58_000)
+        assertNull(result.toolsAndHarness)
     }
 
     @Test
@@ -172,7 +173,8 @@ class ContextBreakdownEstimatorTest {
         val result = denseEstimate(messages)
         assertEquals(4.0, result.messageCharsPerToken)
         assertEquals(423_208, result.sections.messages)
-        assertEquals(56_000, result.toolsAndHarness)
+        assertNull(result.toolsAndHarness)
+        assertEquals(56_000, result.tools)
         assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
     }
 
@@ -182,6 +184,49 @@ class ContextBreakdownEstimatorTest {
         obj("""{"role":"user","content":"${"x".repeat(40_000)}"}"""),
         obj("""{"role":"assistant","model":"new-model","content":"","usage":{"input":488154}}"""),
     )
+
+    @Test
+    fun overheadCannotComeFromAnEarlierModelPoint() {
+        val points = twoModelPoints()
+        val messages = listOf(points.first(), obj("""{"role":"user","content":"${"x".repeat(20_000)}"}"""), points.last())
+        val inputs = LocalContextInputs(null, obj("{}"), null, LocalTranscriptContext(null, messages, 0), null)
+        val result = ContextBreakdownEstimator.estimate(inputs)
+        assertNull(result.toolsAndHarness, "Old-model overhead must not be normalized into a new-model answer")
+    }
+
+    @Test
+    fun anOldModelPromptCannotTurnTheKnownCurrentSystemIntoPhantomTools() {
+        val sidecar = obj("""{"content":"${"s".repeat(20_000)}"}""")
+        val transcript = LocalTranscriptContext(null, twoModelPoints(), 0)
+        val result = ContextBreakdownEstimator.estimate(LocalContextInputs(sidecar, obj("{}"), null, transcript, null))
+        assertEquals(5_000, result.sections.system)
+        assertEquals(0, result.toolsAndHarness)
+        assertEquals(5_000, result.total)
+    }
+
+    private fun twoModelPoints(): List<JsonObject> = listOf(
+        obj("""{"role":"assistant","model":"old-model","content":"","usage":{"input":50000}}"""),
+        obj("""{"role":"assistant","model":"new-model","content":"","usage":{"input":5000}}"""),
+    )
+
+    @Test
+    fun anEarlierModelFitSuppliesDensityButNotItsOverhead() {
+        val result = denseEstimate(denseHistory() + obj(
+            """{"role":"assistant","model":"new-model","content":"","usage":{"input":830000}}""",
+        ))
+        assertEquals(2.16, result.messageCharsPerToken)
+        assertNull(result.toolsAndHarness)
+        assertEquals(true, result.calibrationApproximate)
+    }
+
+    @Test
+    fun scalingAFittedBreakdownMarksItsProvenanceApproximate() {
+        val input = LocalContextInputs(null, obj("{}"), null, LocalTranscriptContext(null, denseHistory(), 0), 400_000)
+        val result = ContextBreakdownEstimator.estimate(input)
+        assertTrue(result.scaledDown)
+        assertTrue(result.calibrationApproximate)
+        assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
+    }
 
     private fun denseHistory(): List<JsonObject> = listOf(
         obj("""{"role":"user","content":"${"x".repeat(2_160)}"}"""),

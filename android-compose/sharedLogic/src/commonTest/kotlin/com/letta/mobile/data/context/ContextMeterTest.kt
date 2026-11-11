@@ -105,6 +105,20 @@ class ContextMeterTest {
     }
 
     @Test
+    fun rematchingAScaledFitIsApproximateAndNeverPromotesAnApproximateHostSplit() {
+        val measured = estimate.copy(
+            numTokensToolsAndHarness = 2_500,
+            calibrationSource = "conversation_usage",
+            messageCharsPerToken = 2.16,
+        )
+        val scaled = ContextMeter.of(20_000, 200_000, measured)!!
+        assertEquals(ContextProvenance.ConversationUsageApproximate, scaled.provenance)
+        val fromScaledHost = measured.copy(calibrationApproximate = true)
+        val rematched = ContextMeter.of(40_000, 200_000, fromScaledHost)!!
+        assertEquals(ContextProvenance.ConversationUsageApproximate, rematched.provenance)
+    }
+
+    @Test
     fun afterACompactionTheBreakdownIsOnlyEstimated() {
         val uncalibrated = estimate.copy(calibrated = false, toolsDerived = false, numTokensFunctionsDefinitions = 0, contextWindowSizeCurrent = 37_000)
         val meter = ContextMeter.of(streamedTotal = 30_000, windowTokens = 200_000, breakdown = uncalibrated, totalIsEstimate = true)!!

@@ -65,26 +65,26 @@ data class LocalTranscriptContext(
     }
 
     private fun boundedOverhead(run: UsageRun, estimator: TokenEstimator): MessageCalibration {
-        val point = run.earliest ?: return MessageCalibration(run.fallback)
+        val point = run.first ?: return MessageCalibration(run.fallback)
         val preceding = estimator.tokensForChars(point.chars)
         // Limit the assumed-density prefix to 10% of prompt; a long prefix can turn message error into named overhead.
         if (preceding > point.prompt * MAX_SINGLE_POINT_PREFIX_SHARE) return MessageCalibration(run.fallback)
         return MessageCalibration(run.fallback, fixed = (point.prompt - preceding).toInt())
     }
 
-    private data class UsageFit(val density: Double, val fixed: Int) {
-        fun project(run: UsageRun, reused: Boolean): MessageCalibration = MessageCalibration(
-            kotlin.math.ceil(run.chars / density).toInt(), density, fixed, reused,
-        )
+    private data class UsageFit(val density: Double, val fixed: Int, val model: String?) {
+        fun project(run: UsageRun, reused: Boolean): MessageCalibration {
+            val namedFixed = fixed.takeIf { model != null && model == run.first?.model }
+            return MessageCalibration(kotlin.math.ceil(run.chars / density).toInt(), density, namedFixed, reused)
+        }
     }
 
-    /** Immutable, constant-space fold: latest candidate, earliest point, and most recent sufficient completed fit. */
+    /** Immutable, constant-space fold: current candidate and most recent sufficient completed fit. */
     private data class UsageRun(
         val chars: Long = 0L,
         val fallback: Int = 0,
         val first: UsagePoint? = null,
         val last: UsagePoint? = null,
-        val earliest: UsagePoint? = null,
         val previousFit: UsageFit? = null,
     ) {
         fun append(message: JsonObject, estimator: TokenEstimator, point: UsagePoint?): UsageRun {
@@ -98,7 +98,6 @@ data class LocalTranscriptContext(
             else -> copy(
                 first = point,
                 last = point,
-                earliest = earliest ?: point,
                 previousFit = measuredFit() ?: previousFit,
             )
         }
@@ -116,7 +115,7 @@ data class LocalTranscriptContext(
         fun fitTo(next: UsagePoint): UsageFit? {
             val density = densityTo(next) ?: return null
             val fixed = prompt - chars / density
-            return fixed.takeIf { it >= 0 }?.let { UsageFit(density, it.toInt()) }
+            return fixed.takeIf { it >= 0 }?.let { UsageFit(density, it.toInt(), model) }
         }
 
         private fun densityTo(next: UsagePoint): Double? {

@@ -24,7 +24,7 @@ enum class ContextProvenance {
     /** Message density and fixed overhead measured from this conversation's recorded usage. */
     ConversationUsage,
 
-    /** Usage-calibrated, but an earlier run supplied the fit or more than 10% remains unexplained. */
+    /** Usage-calibrated, but prior density, scaling, or unexplained content makes the split approximate. */
     ConversationUsageApproximate,
 
     /** Recorded overhead, but message density is still estimated and the split is approximate. */
@@ -123,6 +123,7 @@ private fun ContextWindowOverview.calibratedTo(total: Int): ContextWindowOvervie
     val values = sections.asList() + (numTokensToolsAndHarness ?: 0)
     val scaled = if (values.sum() > target) ContextBreakdownEstimator.scaleTo(values, target) else values
     val matched = ContextBreakdownEstimator.calibrate(ContextSections.of(scaled), target)
+    val scaledDown = matched.scaledDown || scaled != values
     return copy(
         contextWindowSizeCurrent = matched.total,
         numTokensSystem = matched.sections.system,
@@ -133,6 +134,7 @@ private fun ContextWindowOverview.calibratedTo(total: Int): ContextWindowOvervie
         calibrated = true,
         toolsDerived = true,
         numTokensToolsAndHarness = numTokensToolsAndHarness?.let { scaled.last() },
+        calibrationApproximate = calibrationApproximate == true || scaledDown,
     )
 }
 

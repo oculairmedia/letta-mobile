@@ -60,7 +60,7 @@ data class ContextBreakdownEstimate(
     val toolsAndHarness: Int? = null,
     /** Message density fitted within the current in-context span; null on fallback. */
     val messageCharsPerToken: Double? = null,
-    /** True when a sufficient earlier run supplied the fit because the latest run was insufficient. */
+    /** True when an earlier run supplied density or matching to the provider total required scaling. */
     val calibrationApproximate: Boolean = false,
 ) {
     val calibrated: Boolean get() = totalSource != null
@@ -96,12 +96,13 @@ object ContextBreakdownEstimator {
         val values = sections.asList() + (harness ?: 0)
         val scaled = if (total != null && values.sum() > total) scaleTo(values, total) else values
         val calibrated = calibrate(ContextSections.of(scaled), total)
+        val scaledDown = calibrated.scaledDown || scaled != values
         return ContextBreakdownEstimate(
             sections = calibrated.sections,
             tools = calibrated.tools,
             total = calibrated.total,
             totalSource = source.takeIf { total != null },
-            scaledDown = calibrated.scaledDown || scaled != values,
+            scaledDown = scaledDown,
             window = windowOf(inputs.agent, inputs.conversation),
             messageCount = transcript.messages.size + (if (transcript.summary != null) 1 else 0),
             memorySplit = prompt.memorySplit,
@@ -109,7 +110,7 @@ object ContextBreakdownEstimator {
             coreMemory = prompt.coreMemory,
             toolsAndHarness = harness?.let { scaled.last() },
             messageCharsPerToken = messageCalibration.charsPerToken,
-            calibrationApproximate = messageCalibration.reusedFit,
+            calibrationApproximate = messageCalibration.reusedFit || scaledDown,
         )
     }
 
