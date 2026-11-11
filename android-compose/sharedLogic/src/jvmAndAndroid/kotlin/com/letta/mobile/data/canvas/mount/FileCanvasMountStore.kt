@@ -6,33 +6,41 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.HostId
+import com.letta.mobile.data.storage.sha256Hex
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
-import java.nio.file.Path
 import java.nio.file.NoSuchFileException
+import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Trusted host-administration storage, NOT an authenticated remote authority. The runtime owns one
- * instance under its existing protected product-state directory; independent instances/processes
- * share its transaction lock. The directory must already exist and be administrator-owned.
+ * Trusted host-administration storage, NOT an authenticated remote authority. The existing protected
+ * product-state directory must already exist and be administrator-owned. All writers must use this
+ * store. Each default or agent/conversation binding owns one hashed file beneath `canvas-mounts/`.
+ * Operations read/validate only that key, never enumerate the population or rewrite another key.
  *
- * Keys are host + agent + conversation (including agent-scoped default-conversation aliases).
- * Values are semantic [CanvasId]s, never notebook generation IDs. No document or client preferences
- * are changed. There is deliberately no RPC registration, principal inference or client fallback.
- * S2 must bind verified principals and authorize scope, proposal AND stored winner before exposure.
+ * The shared canonical-path runtime owner and OS lock serialize each key's read/check/write across
+ * instances and processes. Independent keys cannot lose each other's changes: they replace distinct
+ * files. Each record validates version, host and exact key, including a misplaced/hash-collision file.
+ * Values are semantic [CanvasId]s, never notebook generation IDs. Existing winners are directory-synced
+ * without replacing already-forced contents. No document, provenance or client preferences change.
+ * No RPC, principal inference or fallback is supplied; S2 must authorize scope, proposal AND winner.
  */
 class FileCanvasMountStore internal constructor(
     productStateDirectory: Path,
     private val hostId: HostId,
-    directorySync: (Path) -> Unit,
+    private val directorySync: (Path) -> Unit,
 ) {
     /** Directory syncing is required except on Windows, whose directory channels are unsupported. */
     constructor(productStateDirectory: Path, hostId: HostId) : this(productStateDirectory, hostId, { directory ->
@@ -41,99 +49,113 @@ class FileCanvasMountStore internal constructor(
         }
     })
 
-    private val file = DurableHostFile(productStateDirectory.resolve(FILE_NAME), directorySync)
+    private val parent = productStateDirectory.toAbsolutePath().normalize()
+    private val directory = parent.resolve("canvas-mounts")
 
     init { require(hostId.value.isNotBlank()) { "Empty mount host" } }
 
-    /** Reads an explicit binding. Null means absent; corrupt/unreadable state throws. */
-    suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId? = file.locked {
-        validate(agentId, conversationId)
-        read().bindings.singleOrNull { it.agent == agentId && it.conversation == conversationId }?.canvas?.let(::CanvasId)
+    /** Reads only this explicit binding. Null means absent; corrupt/unreadable state throws. */
+    suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId? =
+        transaction(agentId, conversationId) { file -> read(file, agentId, conversationId)?.canvas?.let(::CanvasId) }
+
+    /** Reads only this agent's default, without granting canvas access or creating a binding. */
+    suspend fun readDefault(agentId: AgentId): CanvasId? =
+        transaction(agentId, null) { file -> read(file, agentId, null)?.canvas?.let(::CanvasId) }
+
+    /** Atomically inserts only when absent, returning the durable winner without rewriting it. */
+    suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId =
+        transaction(agentId, conversationId, proposed) { file ->
+            val winner = read(file, agentId, conversationId)
+            // Reconfirm the root's own directory entry on every mutation/retry, including creation
+            // whose previous parent-directory sync may have failed. No unrelated data file is read.
+            directorySync(parent)
+            when (winner) {
+                null -> {
+                    write(file, Record(VERSION, hostId, agentId, conversationId, proposed.value))
+                    proposed
+                }
+                else -> {
+                    // Contents were forced before rename; only its directory entry may be unconfirmed.
+                    directorySync(directory)
+                    CanvasId(winner.canvas)
+                }
+            }
+        }
+
+    /** Durably replaces only this conversation's binding, leaving all other key files untouched. */
+    suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId) =
+        transaction(agentId, conversationId, canvasId) { file ->
+            read(file, agentId, conversationId)
+            directorySync(parent)
+            write(file, Record(VERSION, hostId, agentId, conversationId, canvasId.value))
+        }
+
+    /** Durably sets only this default. Existing conversation bindings are neither read nor rewritten. */
+    suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) = transaction(agentId, null, canvasId) { file ->
+        read(file, agentId, null)
+        directorySync(parent)
+        write(file, Record(VERSION, hostId, agentId, null, canvasId.value))
     }
 
-    /** Reads an agent default; it neither grants canvas access nor creates a conversation binding. */
-    suspend fun readDefault(agentId: AgentId): CanvasId? = file.locked {
-        validate(agentId)
-        read().defaults.singleOrNull { it.agent == agentId }?.canvas?.let(::CanvasId)
+    private suspend fun <T> transaction(
+        agent: AgentId,
+        conversation: ConversationId?,
+        canvas: CanvasId? = null,
+        action: suspend (DurableHostFile) -> T,
+    ): T = withContext(Dispatchers.IO) {
+        validate(agent, conversation, canvas)
+        ensureDirectory()
+        val identity = JsonArray(listOf(JsonPrimitive(agent.value), conversation?.let { JsonPrimitive(it.value) } ?: JsonNull))
+        val kind = if (conversation == null) "default" else "binding"
+        val file = DurableHostFile(directory.resolve("$kind-${sha256Hex(identity.toString().encodeToByteArray())}.json"), directorySync)
+        file.locked { action(file) }
     }
 
-    /** Atomically inserts only if absent and returns the durable stored winner. */
-    suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId = file.locked {
-        validate(agentId, conversationId, proposed)
-        val current = read()
-        val winner = current.bindings.singleOrNull { it.agent == agentId && it.conversation == conversationId }?.canvas?.let(::CanvasId)
-        if (winner != null) {
-            // Reconfirm durability after an earlier ambiguous replacement before acknowledging it.
-            write(current)
-            winner
-        } else {
-            write(current.copy(bindings = current.bindings + Binding(agentId, conversationId, proposed.value)))
-            proposed
+    private fun ensureDirectory() {
+        try {
+            Files.createDirectory(directory)
+        } catch (_: FileAlreadyExistsException) {
+            // Existing directories are validated without following a substituted symlink.
+        }
+        require(Files.readAttributes(directory, BasicFileAttributes::class.java, NOFOLLOW_LINKS).isDirectory) {
+            "Mount directory is not a directory"
         }
     }
 
-    /** Explicitly replaces only this conversation's binding, with durable acknowledgement. */
-    suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId) = file.locked {
-        validate(agentId, conversationId, canvasId)
-        val current = read()
-        val others = current.bindings.filterNot { it.agent == agentId && it.conversation == conversationId }
-        write(current.copy(bindings = others + Binding(agentId, conversationId, canvasId.value)))
-    }
-
-    /** Explicitly sets only the agent default. Existing conversation bindings remain untouched. */
-    suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) = file.locked {
-        validate(agentId, canvas = canvasId)
-        val current = read()
-        write(current.copy(defaults = current.defaults.filterNot { it.agent == agentId } + Default(agentId, canvasId.value)))
-    }
-
-    private fun read(): Table {
-        val path = file.path
+    private fun read(file: DurableHostFile, agent: AgentId, conversation: ConversationId?): Record? {
         val attributes = try {
-            Files.readAttributes(path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+            Files.readAttributes(file.path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
         } catch (_: NoSuchFileException) {
-            return Table(VERSION, hostId, emptyList(), emptyList())
+            return null
         }
-        require(attributes.isRegularFile) { "Mount store is not a regular file" }
-        require(attributes.size() <= MAX_BYTES) { "Mount store is too large" }
-        val text = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Files.readAllBytes(path))).toString()
+        require(attributes.isRegularFile) { "Mount record is not a regular file" }
+        require(attributes.size() <= MAX_RECORD_BYTES) { "Mount record is too large" }
+        val text = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Files.readAllBytes(file.path))).toString()
         StrictHostJson.requireUniqueKeys(text)
         requireStrictFormat(text)
-        val table = Json.decodeFromString<Table>(text)
-        require(table.version == VERSION) { "Unsupported mount store version" }
-        require(table.host == hostId) { "Mount store belongs to a different host" }
-        table.defaults.forEach { validate(it.agent, canvas = CanvasId(it.canvas)) }
-        table.bindings.forEach { validate(it.agent, it.conversation, CanvasId(it.canvas)) }
-        require(table.defaults.map { it.agent }.distinct().size == table.defaults.size) { "Duplicate mount default" }
-        require(table.bindings.map { it.agent to it.conversation }.distinct().size == table.bindings.size) { "Duplicate mount binding" }
-        return table
+        val record = Json.decodeFromString<Record>(text)
+        require(record.version == VERSION) { "Unsupported mount record version" }
+        require(record.host == hostId) { "Mount record belongs to a different host" }
+        require(record.agent == agent && record.conversation == conversation) { "Misplaced mount record key" }
+        validate(record.agent, record.conversation, CanvasId(record.canvas))
+        return record
     }
 
     private fun requireStrictFormat(text: String) {
-        val root = Json.parseToJsonElement(text) as? JsonObject ?: error("Mount store must be an object")
-        require(root.keys == setOf("version", "host", "defaults", "bindings")) { "Invalid mount store fields" }
-        val version = root["version"] as? JsonPrimitive ?: error("Invalid mount store version")
-        require(!version.isString && version.content == VERSION.toString()) { "Unsupported mount store version" }
-        requireStringFields(root, setOf("host"))
-        requireEntries(root["defaults"] as? JsonArray, setOf("agent", "canvas"))
-        requireEntries(root["bindings"] as? JsonArray, setOf("agent", "conversation", "canvas"))
-    }
-
-    private fun requireEntries(entries: JsonArray?, keys: Set<String>) {
-        requireNotNull(entries) { "Invalid mount list" }.forEach { value ->
-            val entry = value as? JsonObject ?: error("Invalid mount entry")
-            require(entry.keys == keys) { "Invalid mount fields" }
-            requireStringFields(entry, keys)
+        val root = Json.parseToJsonElement(text) as? JsonObject ?: error("Mount record must be an object")
+        require(root.keys == setOf("version", "host", "agent", "conversation", "canvas")) { "Invalid mount record fields" }
+        val version = root["version"] as? JsonPrimitive ?: error("Invalid mount record version")
+        require(!version.isString && version.content == VERSION.toString()) { "Unsupported mount record version" }
+        listOf("host", "agent", "canvas").forEach { key ->
+            require((root[key] as? JsonPrimitive)?.isString == true) { "Invalid mount key" }
         }
+        val conversation = root["conversation"]
+        require(conversation == JsonNull || (conversation as? JsonPrimitive)?.isString == true) { "Invalid mount conversation" }
     }
 
-    private fun requireStringFields(entry: JsonObject, keys: Set<String>) {
-        keys.forEach { key -> require((entry[key] as? JsonPrimitive)?.isString == true) { "Invalid mount key" } }
-    }
-
-    private fun write(table: Table) {
-        val text = Json.encodeToString(Table.serializer(), table)
-        require(text.encodeToByteArray().size <= MAX_BYTES) { "Mount store is too large" }
+    private fun write(file: DurableHostFile, record: Record) {
+        val text = Json.encodeToString(Record.serializer(), record)
+        require(text.encodeToByteArray().size <= MAX_RECORD_BYTES) { "Mount record is too large" }
         file.write(text)
     }
 
@@ -143,20 +165,18 @@ class FileCanvasMountStore internal constructor(
         require(canvas == null || canvas.value.isNotBlank()) { "Empty mount canvas" }
     }
 
+    // The sidecar stores the semantic string, not CanvasId's document-metadata object serializer.
     @Serializable
-    private data class Table(val version: Int, val host: HostId, val defaults: List<Default>, val bindings: List<Binding>)
-
-    // CanvasId is a data class whose document-metadata serializer emits an object. This separate
-    // versioned sidecar stores only its semantic value, not notebook/document serialization shape.
-    @Serializable
-    private data class Default(val agent: AgentId, val canvas: String)
-
-    @Serializable
-    private data class Binding(val agent: AgentId, val conversation: ConversationId, val canvas: String)
+    private data class Record(
+        val version: Int,
+        val host: HostId,
+        val agent: AgentId,
+        val conversation: ConversationId?,
+        val canvas: String,
+    )
 
     private companion object {
         const val VERSION = 1
-        const val MAX_BYTES = 1024 * 1024
-        const val FILE_NAME = "canvas-mounts.json"
+        const val MAX_RECORD_BYTES = 1024 * 1024
     }
 }

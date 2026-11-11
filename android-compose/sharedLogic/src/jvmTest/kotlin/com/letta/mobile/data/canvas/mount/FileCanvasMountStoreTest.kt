@@ -84,12 +84,13 @@ class FileCanvasMountStoreTest {
     @Test
     fun versionOneFixtureUsesSemanticStringsNotDocumentMetadataObjects() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-v1-fixture")
-        Files.writeString(
-            directory.resolve("canvas-mounts.json"),
-            """{"version":1,"host":"host-one","defaults":[{"agent":"agent-one","canvas":"default-board"}],""" +
-                """"bindings":[{"agent":"agent-one","conversation":"conversation-one","canvas":"override-board"}]}""",
-        )
         val store = FileCanvasMountStore(directory, host)
+        store.readDefault(agent)
+        store.readBinding(agent, conversation)
+        Files.writeString(recordPath(directory, "default"),
+            """{"version":1,"host":"host-one","agent":"agent-one","conversation":null,"canvas":"default-board"}""")
+        Files.writeString(recordPath(directory, "binding"),
+            """{"version":1,"host":"host-one","agent":"agent-one","conversation":"conversation-one","canvas":"override-board"}""")
         assertEquals(CanvasId("default-board"), store.readDefault(agent))
         assertEquals(CanvasId("override-board"), store.readBinding(agent, conversation))
     }
@@ -97,29 +98,41 @@ class FileCanvasMountStoreTest {
     @Test
     fun malformedAndUnsupportedFilesNeverResetOrMutate() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-invalid")
-        val file = directory.resolve("canvas-mounts.json")
+        val store = FileCanvasMountStore(directory, host)
+        store.readBinding(agent, conversation)
+        store.readDefault(agent)
+        val file = recordPath(directory, "binding")
+        val defaultFile = recordPath(directory, "default")
+        val fields = """"host":"host-one","agent":"agent-one","conversation":"conversation-one","canvas":"x"}"""
+        val prefix = """{"version":1,"host":"host-one","agent":"agent-one","conversation":"conversation-one","""
         val fixtures = listOf(
             "not-json", "", "{}",
-            """{"version":2,"host":"host-one","defaults":[],"bindings":[]}""",
-            """{"version":1,"host":"other","defaults":[],"bindings":[]}""",
-            """{"version":1,"version":1,"host":"host-one","defaults":[],"bindings":[]}""",
-            """{"version":"1","host":"host-one","defaults":[],"bindings":[]}""",
-            """{"version":1,"host":"host-one","defaults":[],"bindings":[],"extra":true}""",
-            """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":"x","canv\u0061s":"y"}],"bindings":[]}""",
-            """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":12}],"bindings":[]}""",
-            """{"version":1,"host":"host-one","defaults":[{"agent":"","canvas":"x"}],"bindings":[]}""",
-            """{"version":1,"host":"host-one","defaults":[],"bindings":[{"agent":"a","conversation":"c","canvas":"x"},""" +
-                """{"agent":"a","conversation":"c","canvas":"y"}]}""",
-            """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":"x"},{"agent":"a","canvas":"y"}],"bindings":[]}""",
+            """{"version":2,""" + fields,
+            """{"version":"1",""" + fields,
+            """{"version":1,"version":1,""" + fields,
+            prefix + """"canvas":"x","canv\u0061s":"y"}""",
+            prefix + """"canvas":12}""",
+            prefix + """"canvas":""}""",
+            prefix + """"canvas":"x","extra":true}""",
+            """{"version":1,"host":"other","agent":"agent-one","conversation":"conversation-one","canvas":"x"}""",
+            """{"version":1,"host":"host-one","agent":"other","conversation":"conversation-one","canvas":"x"}""",
+            """{"version":1,"host":"host-one","agent":"agent-one","conversation":"other","canvas":"x"}""",
+            """{"version":1,"host":"host-one","defaults":[],"bindings":[]}""",
         )
         for (text in fixtures) {
             Files.writeString(file, text)
-            val store = FileCanvasMountStore(directory, host)
-            assertFailsWith<Exception> { store.readDefault(agent) }
+            assertFailsWith<Exception> { store.readBinding(agent, conversation) }
             assertFailsWith<Exception> { store.bindIfAbsent(agent, conversation, first) }
             assertFailsWith<Exception> { store.replaceBinding(agent, conversation, first) }
-            assertFailsWith<Exception> { store.setDefault(agent, first) }
             assertEquals(text, Files.readString(file))
+            // A corrupt binding does not poison an independent default, or vice versa.
+            Files.deleteIfExists(defaultFile)
+            store.setDefault(agent, first)
+            assertEquals(first, store.readDefault(agent))
+            Files.writeString(defaultFile, text)
+            assertFailsWith<Exception> { store.readDefault(agent) }
+            assertFailsWith<Exception> { store.setDefault(agent, first) }
+            assertEquals(text, Files.readString(defaultFile))
         }
     }
 
@@ -140,7 +153,7 @@ class FileCanvasMountStoreTest {
     fun unsupportedDirectorySyncFailsVisiblyWithoutChangingExistingState(): Unit = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-unsupported-sync")
         FileCanvasMountStore(directory, host).setDefault(agent, first)
-        val file = directory.resolve("canvas-mounts.json")
+        val file = recordPath(directory, "default")
         val before = Files.readAllBytes(file)
         val failing = FileCanvasMountStore(directory, host) { throw UnsupportedOperationException("injected unsupported sync") }
         assertFailsWith<UnsupportedOperationException> { failing.setDefault(agent, second) }
@@ -153,16 +166,16 @@ class FileCanvasMountStoreTest {
         val directory = Files.createTempDirectory("canvas-mounts-after-replace")
         val syncs = AtomicInteger()
         val failing = FileCanvasMountStore(directory, host) { parent ->
-            if (syncs.incrementAndGet() == 2) throw IOException("after replacement")
+            if (syncs.incrementAndGet() == 3) throw IOException("after replacement")
             forceDirectory(parent)
         }
         assertFailsWith<IOException> { failing.bindIfAbsent(agent, conversation, first) }
-        assertTrue(Files.exists(directory.resolve("canvas-mounts.json")), "Real replacement must have happened")
+        assertTrue(Files.exists(recordPath(directory, "binding")), "Real replacement must have happened")
         val other = FileCanvasMountStore(directory, host)
         other.setDefault(AgentId("other"), second)
         assertEquals(first, failing.bindIfAbsent(agent, conversation, second))
         assertEquals(second, other.readDefault(AgentId("other")))
-        assertTrue(syncs.get() >= 4, "Returning a winner must reconfirm its durability")
+        assertTrue(syncs.get() >= 5, "Returning a winner must reconfirm parent and entry durability")
     }
 
     @Test
@@ -176,22 +189,25 @@ class FileCanvasMountStoreTest {
     @Test
     fun cancellationWhileWaitingForProcessLockReleasesRuntimeOwner() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-cancellation")
-        val lockPath = directory.resolve("canvas-mounts.json.lock")
+        val store = FileCanvasMountStore(directory, host)
+        store.readBinding(agent, conversation)
+        val file = recordPath(directory, "binding")
+        val lockPath = file.resolveSibling("${file.fileName}.lock")
         FileChannel.open(lockPath, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE).use { channel ->
             val lock = channel.lock()
             val started = kotlinx.coroutines.CompletableDeferred<Unit>()
             val waiting = launch(Dispatchers.Default) {
                 started.complete(Unit)
-                FileCanvasMountStore(directory, host).setDefault(agent, first)
+                FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, first)
             }
             started.await()
             yield()
             waiting.cancelAndJoin()
-            assertFalse(Files.exists(directory.resolve("canvas-mounts.json")))
+            assertFalse(Files.exists(file))
             lock.release()
         }
-        withTimeout(5_000) { FileCanvasMountStore(directory, host).setDefault(agent, second) }
-        assertEquals(second, FileCanvasMountStore(directory, host).readDefault(agent))
+        withTimeout(5_000) { FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, second) }
+        assertEquals(second, FileCanvasMountStore(directory, host).readBinding(agent, conversation))
     }
 
     @Test
@@ -223,12 +239,14 @@ class FileCanvasMountStoreTest {
     @Test
     fun cancellationInsideTransactionReleasesBothLocks() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-owner-cancellation")
-        val file = DurableHostFile(directory.resolve("canvas-mounts.json")) { }
+        FileCanvasMountStore(directory, host).readDefault(agent)
+        val path = recordPath(directory, "default")
+        val file = DurableHostFile(path) { }
         val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
         val owner = launch {
             file.locked {
                 FileChannel.open(
-                    directory.resolve("canvas-mounts.json.lock"), java.nio.file.StandardOpenOption.WRITE,
+                    path.resolveSibling("${path.fileName}.lock"), java.nio.file.StandardOpenOption.WRITE,
                 ).use { competing ->
                     assertFailsWith<java.nio.channels.OverlappingFileLockException> { competing.tryLock() }
                 }
@@ -245,7 +263,9 @@ class FileCanvasMountStoreTest {
     @Test
     fun transactionLockExcludesAnotherJvmProcess() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-process-lock")
-        val file = DurableHostFile(directory.resolve("canvas-mounts.json")) { }
+        FileCanvasMountStore(directory, host).readDefault(agent)
+        val path = recordPath(directory, "default")
+        val file = DurableHostFile(path) { }
         val classpath = listOf(FileCanvasMountStoreTest::class.java, Unit::class.java)
             .map { Path.of(it.protectionDomain.codeSource.location.toURI()).toString() }
             .joinToString(java.io.File.pathSeparator)
@@ -253,7 +273,7 @@ class FileCanvasMountStoreTest {
         file.locked {
             val process = ProcessBuilder(
                 executable.toString(), "-cp", classpath, CanvasMountLockProbe::class.java.name,
-                directory.resolve("canvas-mounts.json.lock").toString(),
+                path.resolveSibling("${path.fileName}.lock").toString(),
             ).redirectErrorStream(true).start()
             try {
                 assertTrue(process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS), "Lock probe must terminate")
@@ -264,6 +284,12 @@ class FileCanvasMountStoreTest {
                 process.destroyForcibly()
             }
         }
+    }
+
+    private fun recordPath(root: Path, kind: String): Path = Files.list(root.resolve("canvas-mounts")).use { paths ->
+        paths.filter { it.fileName.toString().startsWith("$kind-") }
+            .map { it.resolveSibling(it.fileName.toString().removeSuffix(".lock")) }
+            .distinct().toList().single()
     }
 
     private fun isWindows() = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
