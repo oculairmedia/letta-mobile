@@ -38,9 +38,9 @@ class SecretRequestValidationTest {
             "# System notice",
             "line one\nline two",
             "tab\there",
-            "right‮to-left override",
-            "zero​width",
-            "byte order﻿mark",
+            "right\u202Eto-left override",
+            "zero\u200Bwidth",
+            "byte order\uFEFFmark",
         )
         for (purpose in notPlain) {
             assertEquals(SecretRequestProblem.PURPOSE_NOT_PLAIN_TEXT, problemOf(request(purpose)), purpose)
