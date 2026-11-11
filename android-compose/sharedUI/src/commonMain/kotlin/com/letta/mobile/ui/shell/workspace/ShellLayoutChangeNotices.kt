@@ -38,8 +38,13 @@ internal fun ShellLayoutChangeNotices(agents: List<Pair<String, String>>) {
         }.collectLatest { change ->
             if (port.peekUnseenChange() === change) {
                 val handle = overlays.show(shellLayoutChangeNotice(change, names, port))
-                snapshotFlow { overlays.snackbar?.id }.first { it == handle.id }
-                port.claimUnseenChange(change)
+                var acknowledged = false
+                try {
+                    snapshotFlow { overlays.snackbar?.id }.first { it == handle.id }
+                    acknowledged = port.claimUnseenChange(change) != null
+                } finally {
+                    if (!acknowledged) handle.withdraw()
+                }
             }
         }
     }

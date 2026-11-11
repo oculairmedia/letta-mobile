@@ -314,8 +314,10 @@ class ShellLayoutAgentToolUiTest {
         applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
         assertEquals("Important", overlayHost.snackbar?.overlay?.message)
         assertTrue(port.peekUnseenChange() != null)
-        runOnIdle { visible.value = false; blocker.dismiss() }
-        runOnIdle { visible.value = true }
+        runOnIdle { visible.value = false }
+        waitForIdle()
+        assertTrue(overlayHost.waiting.isEmpty(), "the hidden workspace withdraws its queued notice")
+        runOnIdle { blocker.dismiss(); visible.value = true }
         awaitText("Layout changed by Ada")
         undo()
         assertEquals(HomeViews.Default, pageHomeLane)
