@@ -48,6 +48,16 @@ sealed interface MeridianShellCallSignal {
             else -> null
         }
 
+        /**
+         * The tool a `client_tool_start` in [received] names, or null for any other frame (and for a
+         * subagent's). Diagnostics only: it says a tool start reached this host, whatever the tool.
+         */
+        internal fun startedToolName(received: AppServerReceivedFrame): String? {
+            val frame = received.frame as? AppServerInboundFrame.StreamDelta ?: return null
+            val delta = (frame.delta as? JsonObject)?.takeIf { frame.subagentId == null } ?: return null
+            return delta.string("tool_name").takeIf { delta.string("message_type") == "client_tool_start" }
+        }
+
         /** True when [command] runs the `meridian` program (as a word, any path prefix). */
         fun runsMeridian(command: String): Boolean = MERIDIAN_WORD.containsMatchIn(command)
 

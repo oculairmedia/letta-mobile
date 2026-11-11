@@ -718,10 +718,28 @@ public final class com/letta/mobile/ui/canvas/WheelZoomRegionsKt {
 
 public abstract interface class com/letta/mobile/ui/canvas/boards/CanvasBoardSource {
 	public abstract fun open (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun release (Lcom/letta/mobile/data/canvas/CanvasSession;)V
+}
+
+public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSource$DefaultImpls {
+	public static fun release (Lcom/letta/mobile/ui/canvas/boards/CanvasBoardSource;Lcom/letta/mobile/data/canvas/CanvasSession;)V
 }
 
 public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSourceKt {
+	public static final fun ProvideCanvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ProvideCanvasHostWithBoards (Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun canvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;)Lcom/letta/mobile/ui/canvas/boards/CanvasBoardSource;
 	public static final fun getLocalCanvasBoardSource ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/canvas/boards/CanvasPageBoard {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;)V
+	public final fun getSession ()Lcom/letta/mobile/data/canvas/CanvasSession;
+	public final fun getValue (Ljava/lang/Object;Lkotlin/reflect/KProperty;)Lcom/letta/mobile/data/canvas/CanvasSession;
+	public final fun setSession (Lcom/letta/mobile/data/canvas/CanvasSession;)V
+	public final fun setValue (Ljava/lang/Object;Lkotlin/reflect/KProperty;Lcom/letta/mobile/data/canvas/CanvasSession;)V
+	public final fun take (Lcom/letta/mobile/data/canvas/CanvasSession;)V
 }
 
 public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
@@ -6923,6 +6941,7 @@ public final class com/letta/mobile/ui/settings/SettingsCopy {
 	public final fun getPROVIDERS ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getREDUCED_MOTION ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getRESET_IDENTITY ()Lcom/letta/mobile/ui/settings/SettingsLabel;
+	public final fun getRESET_LAYOUT ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getSCAN ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getSTATUS ()Lcom/letta/mobile/ui/settings/SettingsLabel;
 	public final fun getTEST ()Lcom/letta/mobile/ui/settings/SettingsLabel;
@@ -10448,7 +10467,7 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellWorkspaceLanesKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellWorkspaceLanesKt;
 	public fun <init> ()V
-	public final fun getLambda$-2099437955$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$-301314359$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
@@ -10656,6 +10675,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellLayoutController {
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellLayoutControllerKt {
+	public static final fun getLocalShellLayoutAgentPort ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun rememberShellLayoutController (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/ShellLayoutController;
 	public static final fun shellLayoutStore (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/desktopshell/ShellLayoutStore;
 }
@@ -10720,6 +10740,11 @@ public final class com/letta/mobile/ui/shell/workspace/ShellSidebarOverflow {
 
 public final class com/letta/mobile/ui/shell/workspace/ShellSidebarOverflowMenuKt {
 	public static final fun ShellSidebarOverflowMenu (Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ShellTasksModuleKt {
+	public static final fun ProvideShellTaskRegistry (Lcom/letta/mobile/data/repository/api/ISubagentRepository;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalShellTaskRegistry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public abstract interface class com/letta/mobile/ui/shell/workspace/ShellWindowChrome {
@@ -10830,12 +10855,15 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout {
 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;)V
+	public fun <init> (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;Lcom/letta/mobile/data/repository/api/SubagentParentScope;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;
 	public final fun component2 ()Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;
-	public final fun copy (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
+	public final fun component3 ()Lcom/letta/mobile/data/repository/api/SubagentParentScope;
+	public final fun copy (Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;Lcom/letta/mobile/data/repository/api/SubagentParentScope;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOpenConversation ()Lcom/letta/mobile/data/repository/api/SubagentParentScope;
 	public final fun getPanel ()Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;
 	public final fun getRail ()Lcom/letta/mobile/ui/shell/rail/ShellLibraryRailState;
 	public fun hashCode ()I

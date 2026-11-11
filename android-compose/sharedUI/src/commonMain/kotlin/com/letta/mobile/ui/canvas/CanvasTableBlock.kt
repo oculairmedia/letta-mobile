@@ -42,6 +42,7 @@ import io.github.linreal.cascade.editor.registry.BlockRegistry
 import io.github.linreal.cascade.editor.ui.createEditorRegistry
 import io.github.linreal.cascade.editor.registry.BlockRenderScope
 import io.github.linreal.cascade.editor.registry.ScopedBlockRenderer
+import com.letta.mobile.data.canvas.compose.CanvasCascadeBlocks
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -60,8 +61,9 @@ object TableBlockType : CustomBlockType {
 }
 
 object CanvasTableBlock {
-    const val TYPE_ID = "letta.table"
-    const val ROWS = "rows"
+    /** The block's type id, the one canvas_compose writes for a TABLE ([CanvasCascadeBlocks.TYPE_TABLE]). */
+    const val TYPE_ID = CanvasCascadeBlocks.TYPE_TABLE
+    const val ROWS = CanvasCascadeBlocks.TABLE_ROWS
     private const val DEFAULT_ROWS = 2
     private const val DEFAULT_COLUMNS = 2
 

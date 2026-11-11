@@ -42,6 +42,7 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
+import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
 import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
@@ -77,6 +78,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
         LocalAttentionPrefs provides context.core.attentionPrefs,
         com.letta.mobile.ui.runtime.LocalAgentDefaults provides context.core.agentDefaults,
         LocalReducedMotion provides layout.reducedMotion,
+        LocalShellTaskRegistry provides context.panels.subagents.repository,
     ) {
         ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {
             LettaShellWorkspace(
@@ -188,6 +190,7 @@ private fun desktopWorkspaceNavigation(context: DesktopShellContext, frame: Desk
             homeSelected = navigator.selectedDestination == DesktopDestination.Home,
         ),
         panel = desktopSidebarPanelState(navigator, frame, rememberDesktopSidebarInputs(context, frame)),
+        openConversation = subagentParentScope(frame.chatState.selectedConversation?.agentId, frame.chatState.selectedConversationId),
     )
 }
 

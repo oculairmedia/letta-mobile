@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import io.ak1.drawbox.domain.model.Viewport
 import kotlin.math.roundToInt
 
@@ -23,7 +25,7 @@ private fun Viewport.safeScale(): Float = if (scale <= 0f) 1f else scale
  * and draw phases only, so a pan or zoom re-places and re-scales the card without recomposing it.
  */
 internal fun Modifier.onBoard(viewport: () -> Viewport, topLeft: () -> Offset, screenInset: Float = 0f): Modifier =
-    offset {
+    freeOfTheLayerBounds().offset {
         val at = viewport().worldToScreen(topLeft())
         IntOffset((at.x - screenInset).roundToInt(), (at.y - screenInset).roundToInt())
     }.graphicsLayer {
@@ -31,6 +33,22 @@ internal fun Modifier.onBoard(viewport: () -> Viewport, topLeft: () -> Offset, s
         scaleX = scale
         scaleY = scale
         transformOrigin = TransformOrigin(0f, 0f)
+    }
+
+/**
+ * Measures this box free of the bounds of the layer it sits in and places it at the layer's origin,
+ * at the size it asks for. A card is sized in world units before the zoom, so on a board narrower
+ * (or shorter) than the card, or zoomed far enough out that the chrome's margin grows past the
+ * screen, it is bigger than the layer; held to the layer's bounds, Compose centres the oversized box
+ * on them and the card is drawn left of (and above) its frame by half the overflow. The size this
+ * reports stays within the layer's bounds, so nothing above it is re-centred either.
+ */
+private fun Modifier.freeOfTheLayerBounds(): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(Constraints())
+        layout(constraints.constrainWidth(placeable.width), constraints.constrainHeight(placeable.height)) {
+            placeable.place(0, 0)
+        }
     }
 
 /**

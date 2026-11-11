@@ -50,8 +50,12 @@ internal class ExistingArtifact(
     private fun elementSlot(element: JsonObject): Slot? = when (kindOf(element)) {
         ComposeKind.GROUP.name -> groupFrameSlot(element)
         ComposeKind.TEXT.name -> textSlot(element)
-        else -> null
+        else -> drawnFrameSlot(element)
     }
+
+    /** A drawn item's frame, the element with the item's own id; its parts sit inside it and are not counted. */
+    private fun drawnFrameSlot(element: JsonObject): Slot? =
+        element.takeIf { it.string("id")?.contains(CanvasComposeIds.PART_SEPARATOR) == false }?.let(::groupFrameSlot)
 
     private fun slotOf(frame: CanvasDocumentFrame): Slot = Slot(frame.x, frame.y, frame.width, frame.height)
 
@@ -69,70 +73,62 @@ internal class ExistingArtifact(
         val width = element.number("wrapWidth")?.toFloat() ?: CanvasComposeContract.width(ComposeKind.TEXT, size)
         return Slot(x, y, width, CanvasComposeReserve.reserveText(element.string("text").orEmpty(), size, width))
     }
+}
 
-    companion object {
-        /** What an element's content is made of; position and DrawBox defaults are not content. */
-        private val ELEMENT_CONTENT = listOf("type", "shapeType", "text", "fontSize", ELEMENT_COMPOSE)
+/**
+ * What an element's content is made of; position and DrawBox defaults are not content. The
+ * colours are, so a drawn item whose tone changed is other content, not a retry.
+ */
+private val ELEMENT_CONTENT = listOf("type", "shapeType", "text", "fontSize", "strokeColor", "fillColor", ELEMENT_COMPOSE)
 
-        private val json = Json { ignoreUnknownKeys = true }
+private val json = Json { ignoreUnknownKeys = true }
 
-        fun of(sceneJson: String, artifactId: CanvasArtifactId): ExistingArtifact {
-            val documents = CanvasOpProjector.documentsOf(sceneJson).filter { it.compose?.artifactId == artifactId.value }
-            val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() as? JsonObject
-            val elements = (root?.get("elements") as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-                .filter { artifactOf(it) == artifactId.value }
-            val signatures = documents.associate { it.id to DocumentContent(it.json, it.color, it.title, it.compose).signature() } +
-                elements.mapNotNull { element -> element.string("id")?.let { it to elementSignature(element) } }
-            return ExistingArtifact(signatures, documents, elements)
-        }
+/** The pieces of [artifactId] on the board [sceneJson]. */
+internal fun existingArtifact(sceneJson: String, artifactId: CanvasArtifactId): ExistingArtifact {
+    val documents = CanvasOpProjector.documentsOf(sceneJson).filter { it.compose?.artifactId == artifactId.value }
+    val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() as? JsonObject
+    val elements = (root?.get("elements") as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+        .filter { artifactOf(it) == artifactId.value }
+    val signatures = documents.associate { it.id to documentSignature(it.json, it.color, it.title, it.compose) } +
+        elements.mapNotNull { element -> element.string("id")?.let { it to elementSignature(element) } }
+    return ExistingArtifact(signatures, documents, elements)
+}
 
-        private fun idOf(op: CanvasOp): String = when (op) {
-            is CanvasOp.SetDocumentOp -> op.documentId
-            is CanvasOp.AddElementOp -> op.elementId
-            else -> error("compose emits no ${op::class.simpleName}")
-        }
+private fun idOf(op: CanvasOp): String = when (op) {
+    is CanvasOp.SetDocumentOp -> op.documentId
+    is CanvasOp.AddElementOp -> op.elementId
+    else -> error("compose emits no ${op::class.simpleName}")
+}
 
-        private fun signature(op: CanvasOp): JsonObject = when (op) {
-            is CanvasOp.SetDocumentOp -> DocumentContent(op.documentJson, op.color, op.title, op.compose).signature()
-            is CanvasOp.AddElementOp -> elementSignature(json.parseToJsonElement(op.elementJson) as JsonObject)
-            else -> error("compose emits no ${op::class.simpleName}")
-        }
+private fun signature(op: CanvasOp): JsonObject = when (op) {
+    is CanvasOp.SetDocumentOp -> documentSignature(op.documentJson, op.color, op.title, op.compose)
+    is CanvasOp.AddElementOp -> elementSignature(json.parseToJsonElement(op.elementJson) as JsonObject)
+    else -> error("compose emits no ${op::class.simpleName}")
+}
 
-        private fun elementSignature(element: JsonObject) = buildJsonObject {
-            ELEMENT_CONTENT.forEach { key ->
-                val value = element[key] ?: return@forEach
-                val number = (value as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
-                put(key, if (number != null) JsonPrimitive(number) else value)
-            }
-        }
-
-        private fun composeOf(element: JsonObject): JsonObject? = element[ELEMENT_COMPOSE] as? JsonObject
-
-        private fun artifactOf(element: JsonObject): String? = composeOf(element)?.string("artifactId")
-
-        private fun kindOf(element: JsonObject): String? = composeOf(element)?.string("kind")
-
-        private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
-
-        private fun JsonObject.number(key: String): Double? = (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
+private fun elementSignature(element: JsonObject) = buildJsonObject {
+    ELEMENT_CONTENT.forEach { key ->
+        val value = element[key] ?: return@forEach
+        val number = (value as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
+        put(key, if (number != null) JsonPrimitive(number) else value)
     }
 }
 
 /** A document piece's content, as stored on the board or as a `set_document` would write it. */
-private class DocumentContent(
-    private val documentJson: String,
-    private val color: String?,
-    private val title: String?,
-    private val compose: CanvasComposeProvenance?,
-) {
-    fun signature(): JsonObject = buildJsonObject {
+private fun documentSignature(documentJson: String, color: String?, title: String?, compose: CanvasComposeProvenance?): JsonObject =
+    buildJsonObject {
         put("document", runCatching { json.parseToJsonElement(documentJson) }.getOrElse { JsonPrimitive(documentJson) })
         put("color", color?.lowercase())
         put("title", title?.takeIf { it.isNotBlank() })
         put("compose", compose?.let { json.encodeToJsonElement(CanvasComposeProvenance.serializer(), it) } ?: JsonNull)
     }
 
-    private companion object {
-        val json = Json { ignoreUnknownKeys = true }
-    }
-}
+private fun composeOf(element: JsonObject): JsonObject? = element[ELEMENT_COMPOSE] as? JsonObject
+
+private fun artifactOf(element: JsonObject): String? = composeOf(element)?.string("artifactId")
+
+private fun kindOf(element: JsonObject): String? = composeOf(element)?.string("kind")
+
+private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+private fun JsonObject.number(key: String): Double? = (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull

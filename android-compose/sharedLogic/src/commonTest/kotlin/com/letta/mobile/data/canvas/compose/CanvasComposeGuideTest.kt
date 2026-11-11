@@ -61,6 +61,17 @@ class CanvasComposeGuideTest {
         assertEquals(CanvasComposeContract.MAX_TEXT_CHARS, stated("""size: heading\|body\}: up to (\d+) characters"""))
         assertEquals(CanvasComposeContract.MAX_LABEL_CHARS, stated("""a labelled frame \(label up to (\d+)\)"""))
         assertEquals(CanvasComposeMarkdown.MAX_PROBLEMS, stated("""At most (\d+) problems are listed per field"""))
+        assertEquals(CanvasComposeContract.MAX_TABLE_COLUMNS, stated("""title\?, color\?\}: 1 to (\d+) column names"""))
+        assertEquals(CanvasComposeContract.MAX_TABLE_ROWS, stated("""column names and up to (\d+) rows"""))
+        assertEquals(CanvasComposeContract.MAX_CELL_CHARS, stated("""cells up to (\d+) characters"""))
+        assertEquals(CanvasComposeContract.MAX_STAT_VALUE_CHARS, stated("""the value \(up to (\d+)\)"""))
+        assertEquals(CanvasComposeContract.MAX_STAT_NOTE_CHARS, stated("""a caption up to (\d+)"""))
+        assertEquals(CanvasComposeContract.MIN_CHART_POINTS, stated("""title\?, unit\?\}: (\d+) to"""))
+        assertEquals(CanvasComposeContract.MAX_CHART_POINTS, stated("""unit\?\}: \d+ to (\d+) points"""))
+        assertEquals(CanvasComposeContract.MAX_CHART_LABEL_CHARS, stated("""points \(labels up to (\d+)\)"""))
+        assertEquals(CanvasComposeContract.MAX_CHART_UNIT_CHARS, stated("""unit \(up to (\d+)\)"""))
+        assertEquals(CanvasComposeContract.STAT_WIDTH.toInt(), stated("""STAT \((\d+)\)"""))
+        assertEquals(CanvasComposeContract.CHART_WIDTH.toInt(), stated("""CHART \((\d+)\)"""))
         assertEquals(CanvasComposeIds.DERIVED_HEX, stated("""\(a- and (\d+) hex digits\)"""))
         assertEquals(CanvasComposeContract.NOTE_WIDTH.toInt(), stated("""Notes and cards are (\d+) wide"""))
         assertEquals(CanvasComposeContract.TEXT_HEADING_WIDTH.toInt(), stated("""heading TEXT (\d+)\)"""))
@@ -94,7 +105,9 @@ class CanvasComposeGuideTest {
             assertTrue("- ${example.code.name} at ${example.path}: ${example.shown}" in prose, example.code.name)
         }
         // UNSUPPORTED_VERSION, as the guide says.
-        val version = refusedOf(compileText("""{"version":2,"items":[{"kind":"NOTE","markdown":"x"}]}"""))
+        val next = CanvasComposeContract.VERSION + 1
+        val version = refusedOf(compileText("""{"version":$next,"items":[{"kind":"NOTE","markdown":"x"}]}"""))
+        assertTrue("\"version\": $next is refused at /version" in prose)
         assertEquals(ComposeErrorCode.UNSUPPORTED_VERSION, version.code)
         assertEquals("/version", version.problems.single().path)
         assertEquals(ComposeProblemCode.BAD_VALUE.name, version.problems.single().code)

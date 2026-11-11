@@ -217,6 +217,22 @@ final enum class com.letta.mobile.data.beads/BeadsOperation : kotlin/Enum<com.le
     final fun values(): kotlin/Array<com.letta.mobile.data.beads/BeadsOperation> // com.letta.mobile.data.beads/BeadsOperation.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.canvas.compose/ComposeChartStyle : kotlin/Enum<com.letta.mobile.data.canvas.compose/ComposeChartStyle> { // com.letta.mobile.data.canvas.compose/ComposeChartStyle|null[0]
+    enum entry BAR // com.letta.mobile.data.canvas.compose/ComposeChartStyle.BAR|null[0]
+    enum entry LINE // com.letta.mobile.data.canvas.compose/ComposeChartStyle.LINE|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.compose/ComposeChartStyle.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.compose/ComposeChartStyle> // com.letta.mobile.data.canvas.compose/ComposeChartStyle.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.compose/ComposeChartStyle // com.letta.mobile.data.canvas.compose/ComposeChartStyle.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.compose/ComposeChartStyle> // com.letta.mobile.data.canvas.compose/ComposeChartStyle.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.canvas.compose/ComposeChartStyle.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeChartStyle> // com.letta.mobile.data.canvas.compose/ComposeChartStyle.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.canvas.compose/ComposeChartStyle.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.canvas.compose/ComposeErrorCode : kotlin/Enum<com.letta.mobile.data.canvas.compose/ComposeErrorCode> { // com.letta.mobile.data.canvas.compose/ComposeErrorCode|null[0]
     enum entry ARTIFACT_EXISTS // com.letta.mobile.data.canvas.compose/ComposeErrorCode.ARTIFACT_EXISTS|null[0]
     enum entry BOARD_REFUSED // com.letta.mobile.data.canvas.compose/ComposeErrorCode.BOARD_REFUSED|null[0]
@@ -239,13 +255,21 @@ final enum class com.letta.mobile.data.canvas.compose/ComposeErrorCode : kotlin/
 
 final enum class com.letta.mobile.data.canvas.compose/ComposeKind : kotlin/Enum<com.letta.mobile.data.canvas.compose/ComposeKind> { // com.letta.mobile.data.canvas.compose/ComposeKind|null[0]
     enum entry CARD // com.letta.mobile.data.canvas.compose/ComposeKind.CARD|null[0]
+    enum entry CHART // com.letta.mobile.data.canvas.compose/ComposeKind.CHART|null[0]
     enum entry CHECKLIST // com.letta.mobile.data.canvas.compose/ComposeKind.CHECKLIST|null[0]
     enum entry GROUP // com.letta.mobile.data.canvas.compose/ComposeKind.GROUP|null[0]
     enum entry NOTE // com.letta.mobile.data.canvas.compose/ComposeKind.NOTE|null[0]
+    enum entry PROGRESS // com.letta.mobile.data.canvas.compose/ComposeKind.PROGRESS|null[0]
+    enum entry STAT // com.letta.mobile.data.canvas.compose/ComposeKind.STAT|null[0]
+    enum entry TABLE // com.letta.mobile.data.canvas.compose/ComposeKind.TABLE|null[0]
     enum entry TEXT // com.letta.mobile.data.canvas.compose/ComposeKind.TEXT|null[0]
 
+    final val document // com.letta.mobile.data.canvas.compose/ComposeKind.document|{}document[0]
+        final fun <get-document>(): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeKind.document.<get-document>|<get-document>(){}[0]
     final val entries // com.letta.mobile.data.canvas.compose/ComposeKind.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.compose/ComposeKind> // com.letta.mobile.data.canvas.compose/ComposeKind.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val since // com.letta.mobile.data.canvas.compose/ComposeKind.since|{}since[0]
+        final fun <get-since>(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeKind.since.<get-since>|<get-since>(){}[0]
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.compose/ComposeKind // com.letta.mobile.data.canvas.compose/ComposeKind.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.canvas.compose/ComposeKind> // com.letta.mobile.data.canvas.compose/ComposeKind.values|values#static(){}[0]
@@ -309,6 +333,24 @@ final enum class com.letta.mobile.data.canvas.compose/ComposeTextSize : kotlin/E
     }
 }
 
+final enum class com.letta.mobile.data.canvas.compose/ComposeTone : kotlin/Enum<com.letta.mobile.data.canvas.compose/ComposeTone> { // com.letta.mobile.data.canvas.compose/ComposeTone|null[0]
+    enum entry NEGATIVE // com.letta.mobile.data.canvas.compose/ComposeTone.NEGATIVE|null[0]
+    enum entry NEUTRAL // com.letta.mobile.data.canvas.compose/ComposeTone.NEUTRAL|null[0]
+    enum entry POSITIVE // com.letta.mobile.data.canvas.compose/ComposeTone.POSITIVE|null[0]
+    enum entry WARNING // com.letta.mobile.data.canvas.compose/ComposeTone.WARNING|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.compose/ComposeTone.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.compose/ComposeTone> // com.letta.mobile.data.canvas.compose/ComposeTone.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.compose/ComposeTone // com.letta.mobile.data.canvas.compose/ComposeTone.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.compose/ComposeTone> // com.letta.mobile.data.canvas.compose/ComposeTone.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.canvas.compose/ComposeTone.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeTone> // com.letta.mobile.data.canvas.compose/ComposeTone.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.canvas.compose/ComposeTone.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.canvas.compose/MdSpanStyle : kotlin/Enum<com.letta.mobile.data.canvas.compose/MdSpanStyle> { // com.letta.mobile.data.canvas.compose/MdSpanStyle|null[0]
     enum entry BOLD // com.letta.mobile.data.canvas.compose/MdSpanStyle.BOLD|null[0]
     enum entry INLINE_CODE // com.letta.mobile.data.canvas.compose/MdSpanStyle.INLINE_CODE|null[0]
@@ -331,6 +373,7 @@ final enum class com.letta.mobile.data.canvas.compose/ReserveBlockType : kotlin/
     enum entry NUMBERED // com.letta.mobile.data.canvas.compose/ReserveBlockType.NUMBERED|null[0]
     enum entry PARAGRAPH // com.letta.mobile.data.canvas.compose/ReserveBlockType.PARAGRAPH|null[0]
     enum entry QUOTE // com.letta.mobile.data.canvas.compose/ReserveBlockType.QUOTE|null[0]
+    enum entry TABLE // com.letta.mobile.data.canvas.compose/ReserveBlockType.TABLE|null[0]
     enum entry TODO // com.letta.mobile.data.canvas.compose/ReserveBlockType.TODO|null[0]
 
     final val entries // com.letta.mobile.data.canvas.compose/ReserveBlockType.entries|#static{}entries[0]
@@ -2964,6 +3007,46 @@ final enum class com.letta.mobile.data.settings/SettingsTone : kotlin/Enum<com.l
     final fun values(): kotlin/Array<com.letta.mobile.data.settings/SettingsTone> // com.letta.mobile.data.settings/SettingsTone.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.shell.layout.edit/ShellLayoutAction : kotlin/Enum<com.letta.mobile.data.shell.layout.edit/ShellLayoutAction> { // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction|null[0]
+    enum entry APPLY // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.APPLY|null[0]
+    enum entry GET // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.GET|null[0]
+    enum entry RESET // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.RESET|null[0]
+    enum entry UNDO // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.UNDO|null[0]
+
+    final val entries // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shell.layout.edit/ShellLayoutAction> // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val wire // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.shell.layout.edit/ShellLayoutAction // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.shell.layout.edit/ShellLayoutAction> // com.letta.mobile.data.shell.layout.edit/ShellLayoutAction.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule : kotlin/Enum<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule> { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule|null[0]
+    enum entry DUPLICATE_SLOT // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.DUPLICATE_SLOT|null[0]
+    enum entry HOME_STAYS // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.HOME_STAYS|null[0]
+    enum entry INDEX_OUT_OF_RANGE // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.INDEX_OUT_OF_RANGE|null[0]
+    enum entry LANE_FULL // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.LANE_FULL|null[0]
+    enum entry MALFORMED // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.MALFORMED|null[0]
+    enum entry OBJECT_NOT_ALLOWED // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.OBJECT_NOT_ALLOWED|null[0]
+    enum entry OBJECT_REQUIRED // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.OBJECT_REQUIRED|null[0]
+    enum entry OBJECT_TOO_LONG // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.OBJECT_TOO_LONG|null[0]
+    enum entry OP_COUNT // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.OP_COUNT|null[0]
+    enum entry PAGE_STAYS_IN_MAIN // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.PAGE_STAYS_IN_MAIN|null[0]
+    enum entry SETTINGS_STAYS // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.SETTINGS_STAYS|null[0]
+    enum entry SLOT_NOT_FOUND // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.SLOT_NOT_FOUND|null[0]
+    enum entry UNKNOWN_LANE // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.UNKNOWN_LANE|null[0]
+    enum entry VIEW_NOT_ALLOWED // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.VIEW_NOT_ALLOWED|null[0]
+
+    final val code // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.code|{}code[0]
+        final fun <get-code>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.code.<get-code>|<get-code>(){}[0]
+    final val entries // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.shell/CurrentFocusChatMode : kotlin/Enum<com.letta.mobile.data.shell/CurrentFocusChatMode> { // com.letta.mobile.data.shell/CurrentFocusChatMode|null[0]
     enum entry Exact // com.letta.mobile.data.shell/CurrentFocusChatMode.Exact|null[0]
     enum entry New // com.letta.mobile.data.shell/CurrentFocusChatMode.New|null[0]
@@ -3981,6 +4064,10 @@ abstract fun interface com.letta.mobile.data.chat.branch/BranchOpener { // com.l
 
 abstract fun interface com.letta.mobile.data.context.estimate/TokenEstimator { // com.letta.mobile.data.context.estimate/TokenEstimator|null[0]
     abstract fun tokensForChars(kotlin/Long): kotlin/Int // com.letta.mobile.data.context.estimate/TokenEstimator.tokensForChars|tokensForChars(kotlin.Long){}[0]
+}
+
+abstract fun interface com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer { // com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer|null[0]
+    abstract suspend fun answer(com.letta.mobile.data.controller.extras.relay/AppToolCallRequest): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer.answer|answer(com.letta.mobile.data.controller.extras.relay.AppToolCallRequest){}[0]
 }
 
 abstract fun interface com.letta.mobile.data.controller.extras/AgentDiscoverySource { // com.letta.mobile.data.controller.extras/AgentDiscoverySource|null[0]
@@ -7033,7 +7120,7 @@ sealed interface com.letta.mobile.data.agenteditor/AgentStarter { // com.letta.m
 
 sealed interface com.letta.mobile.data.canvas.compose/ComposeCompilation { // com.letta.mobile.data.canvas.compose/ComposeCompilation|null[0]
     final class Ready : com.letta.mobile.data.canvas.compose/ComposeCompilation { // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready|null[0]
-        constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, kotlin.collections/List<kotlin/String>, kotlin/String, kotlin/String?, com.letta.mobile.data.canvas.compose/ComposeBounds?, kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeReceiptItem>, kotlin/Boolean, kotlin/Boolean = ...) // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeBounds?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeReceiptItem>;kotlin.Boolean;kotlin.Boolean){}[0]
+        constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, kotlin.collections/List<kotlin/String>, kotlin/String, kotlin/String?, com.letta.mobile.data.canvas.compose/ComposeBounds?, kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeReceiptItem>, kotlin/Boolean, kotlin/Boolean = ..., kotlin/Int = ...) // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeBounds?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeReceiptItem>;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
 
         final val alreadyPublished // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.alreadyPublished|{}alreadyPublished[0]
             final fun <get-alreadyPublished>(): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.alreadyPublished.<get-alreadyPublished>|<get-alreadyPublished>(){}[0]
@@ -7051,6 +7138,8 @@ sealed interface com.letta.mobile.data.canvas.compose/ComposeCompilation { // co
             final fun <get-ops>(): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp> // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.ops.<get-ops>|<get-ops>(){}[0]
         final val title // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.title|{}title[0]
             final fun <get-title>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.title.<get-title>|<get-title>(){}[0]
+        final val version // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.version|{}version[0]
+            final fun <get-version>(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.version.<get-version>|<get-version>(){}[0]
 
         final fun component1(): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp> // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.component1|component1(){}[0]
         final fun component2(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.component2|component2(){}[0]
@@ -7060,7 +7149,8 @@ sealed interface com.letta.mobile.data.canvas.compose/ComposeCompilation { // co
         final fun component6(): kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeReceiptItem> // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.component6|component6(){}[0]
         final fun component7(): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.component7|component7(){}[0]
         final fun component8(): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.component8|component8(){}[0]
-        final fun copy(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeBounds? = ..., kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeReceiptItem> = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.copy|copy(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeBounds?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeReceiptItem>;kotlin.Boolean;kotlin.Boolean){}[0]
+        final fun component9(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.component9|component9(){}[0]
+        final fun copy(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeBounds? = ..., kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeReceiptItem> = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.copy|copy(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeBounds?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeReceiptItem>;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.hashCode|hashCode(){}[0]
         final fun receipt(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.canvas.compose/ComposeStatus, kotlin/Long?, kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.canvas.compose/ComposeReceipt // com.letta.mobile.data.canvas.compose/ComposeCompilation.Ready.receipt|receipt(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.canvas.compose.ComposeStatus;kotlin.Long?;kotlin.collections.List<kotlin.String>){}[0]
@@ -14003,6 +14093,174 @@ sealed interface com.letta.mobile.data.settings/SettingsRow { // com.letta.mobil
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.settings/SettingsRow.Toggle.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.settings/SettingsRow.Toggle.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.settings/SettingsRow.Toggle.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor { // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor|null[0]
+    final class Agent : com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor { // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent|null[0]
+        constructor <init>(com.letta.mobile.data.model/AgentId?) // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.<init>|<init>(com.letta.mobile.data.model.AgentId?){}[0]
+
+        final val agent // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.agent|{}agent[0]
+            final fun <get-agent>(): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.agent.<get-agent>|<get-agent>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.model/AgentId? // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.model/AgentId? = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.copy|copy(com.letta.mobile.data.model.AgentId?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Agent.toString|toString(){}[0]
+    }
+
+    final object Person : com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor { // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Person|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Person.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Person.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor.Person.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit|null[0]
+    final class Done : com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done|null[0]
+        constructor <init>(com.letta.mobile.data.shell.layout.edit/ShellLayoutChange) // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.<init>|<init>(com.letta.mobile.data.shell.layout.edit.ShellLayoutChange){}[0]
+
+        final val change // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.change|{}change[0]
+            final fun <get-change>(): com.letta.mobile.data.shell.layout.edit/ShellLayoutChange // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.change.<get-change>|<get-change>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.shell.layout.edit/ShellLayoutChange // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.shell.layout.edit/ShellLayoutChange = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.copy|copy(com.letta.mobile.data.shell.layout.edit.ShellLayoutChange){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Done.toString|toString(){}[0]
+    }
+
+    final object NoShell : com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.NoShell|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.NoShell.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.NoShell.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.NoShell.toString|toString(){}[0]
+    }
+
+    final object Stale : com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Stale|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Stale.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Stale.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Stale.toString|toString(){}[0]
+    }
+
+    final object Unchanged : com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Unchanged|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Unchanged.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Unchanged.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit.Unchanged.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult|null[0]
+    final class Applied : com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied|null[0]
+        constructor <init>(com.letta.mobile.data.shell.layout/ShellLayoutConfig, com.letta.mobile.data.shell.layout/ShellLayoutConfig) // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.<init>|<init>(com.letta.mobile.data.shell.layout.ShellLayoutConfig;com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+
+        final val after // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.after|{}after[0]
+            final fun <get-after>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.after.<get-after>|<get-after>(){}[0]
+        final val before // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.before|{}before[0]
+            final fun <get-before>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.before.<get-before>|<get-before>(){}[0]
+        final val changes // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.changes|{}changes[0]
+            final fun <get-changes>(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.changes.<get-changes>|<get-changes>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.component1|component1(){}[0]
+        final fun component2(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.component2|component2(){}[0]
+        final fun copy(com.letta.mobile.data.shell.layout/ShellLayoutConfig = ..., com.letta.mobile.data.shell.layout/ShellLayoutConfig = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.copy|copy(com.letta.mobile.data.shell.layout.ShellLayoutConfig;com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied.toString|toString(){}[0]
+    }
+
+    final class Rejected : com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected|null[0]
+        constructor <init>(kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError>) // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutEditError>){}[0]
+
+        final val errors // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.errors|{}errors[0]
+            final fun <get-errors>(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.errors.<get-errors>|<get-errors>(){}[0]
+
+        final fun component1(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError> = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.copy|copy(kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutEditError>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Rejected.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.shell.layout.edit/ShellLayoutOp { // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp|null[0]
+    final class Add : com.letta.mobile.data.shell.layout.edit/ShellLayoutOp { // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add|null[0]
+        constructor <init>(kotlin/String, com.letta.mobile.data.shell.layout/ModuleSlot, kotlin/Int? = ...) // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.<init>|<init>(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot;kotlin.Int?){}[0]
+
+        final val index // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.index|{}index[0]
+            final fun <get-index>(): kotlin/Int? // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.index.<get-index>|<get-index>(){}[0]
+        final val lane // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.lane|{}lane[0]
+            final fun <get-lane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.lane.<get-lane>|<get-lane>(){}[0]
+        final val slot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.slot|{}slot[0]
+            final fun <get-slot>(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.slot.<get-slot>|<get-slot>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.component1|component1(){}[0]
+        final fun component2(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.component2|component2(){}[0]
+        final fun component3(): kotlin/Int? // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.component3|component3(){}[0]
+        final fun copy(kotlin/String = ..., com.letta.mobile.data.shell.layout/ModuleSlot = ..., kotlin/Int? = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.copy|copy(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot;kotlin.Int?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Add.toString|toString(){}[0]
+    }
+
+    final class Move : com.letta.mobile.data.shell.layout.edit/ShellLayoutOp { // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move|null[0]
+        constructor <init>(kotlin/String, com.letta.mobile.data.shell.layout/ModuleSlot, kotlin/String = ..., kotlin/Int? = ...) // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.<init>|<init>(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot;kotlin.String;kotlin.Int?){}[0]
+
+        final val index // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.index|{}index[0]
+            final fun <get-index>(): kotlin/Int? // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.index.<get-index>|<get-index>(){}[0]
+        final val lane // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.lane|{}lane[0]
+            final fun <get-lane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.lane.<get-lane>|<get-lane>(){}[0]
+        final val slot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.slot|{}slot[0]
+            final fun <get-slot>(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.slot.<get-slot>|<get-slot>(){}[0]
+        final val toLane // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.toLane|{}toLane[0]
+            final fun <get-toLane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.toLane.<get-toLane>|<get-toLane>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.component1|component1(){}[0]
+        final fun component2(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.component2|component2(){}[0]
+        final fun component3(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.component3|component3(){}[0]
+        final fun component4(): kotlin/Int? // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.component4|component4(){}[0]
+        final fun copy(kotlin/String = ..., com.letta.mobile.data.shell.layout/ModuleSlot = ..., kotlin/String = ..., kotlin/Int? = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.copy|copy(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot;kotlin.String;kotlin.Int?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Move.toString|toString(){}[0]
+    }
+
+    final class Remove : com.letta.mobile.data.shell.layout.edit/ShellLayoutOp { // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove|null[0]
+        constructor <init>(kotlin/String, com.letta.mobile.data.shell.layout/ModuleSlot) // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.<init>|<init>(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot){}[0]
+
+        final val lane // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.lane|{}lane[0]
+            final fun <get-lane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.lane.<get-lane>|<get-lane>(){}[0]
+        final val slot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.slot|{}slot[0]
+            final fun <get-slot>(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.slot.<get-slot>|<get-slot>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.component1|component1(){}[0]
+        final fun component2(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., com.letta.mobile.data.shell.layout/ModuleSlot = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.copy|copy(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Remove.toString|toString(){}[0]
+    }
+
+    final class SetLane : com.letta.mobile.data.shell.layout.edit/ShellLayoutOp { // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane|null[0]
+        constructor <init>(kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>) // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.<init>|<init>(kotlin.String;kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>){}[0]
+
+        final val lane // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.lane|{}lane[0]
+            final fun <get-lane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.lane.<get-lane>|<get-lane>(){}[0]
+        final val slots // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.slots|{}slots[0]
+            final fun <get-slots>(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.slots.<get-slots>|<get-slots>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.component1|component1(){}[0]
+        final fun component2(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.copy|copy(kotlin.String;kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.SetLane.toString|toString(){}[0]
+    }
+
+    final object Reset : com.letta.mobile.data.shell.layout.edit/ShellLayoutOp { // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Reset|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Reset.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Reset.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutOp.Reset.toString|toString(){}[0]
     }
 }
 
@@ -28643,6 +28901,35 @@ final class com.letta.mobile.data.canvas.compose/ComposeCardField { // com.letta
     }
 }
 
+final class com.letta.mobile.data.canvas.compose/ComposeChartPoint { // com.letta.mobile.data.canvas.compose/ComposeChartPoint|null[0]
+    constructor <init>(kotlin/String, kotlin/Double) // com.letta.mobile.data.canvas.compose/ComposeChartPoint.<init>|<init>(kotlin.String;kotlin.Double){}[0]
+
+    final val label // com.letta.mobile.data.canvas.compose/ComposeChartPoint.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeChartPoint.label.<get-label>|<get-label>(){}[0]
+    final val value // com.letta.mobile.data.canvas.compose/ComposeChartPoint.value|{}value[0]
+        final fun <get-value>(): kotlin/Double // com.letta.mobile.data.canvas.compose/ComposeChartPoint.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeChartPoint.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // com.letta.mobile.data.canvas.compose/ComposeChartPoint.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Double = ...): com.letta.mobile.data.canvas.compose/ComposeChartPoint // com.letta.mobile.data.canvas.compose/ComposeChartPoint.copy|copy(kotlin.String;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeChartPoint.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeChartPoint.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeChartPoint.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.canvas.compose/ComposeChartPoint> { // com.letta.mobile.data.canvas.compose/ComposeChartPoint.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.canvas.compose/ComposeChartPoint.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.canvas.compose/ComposeChartPoint.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.canvas.compose/ComposeChartPoint.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.canvas.compose/ComposeChartPoint // com.letta.mobile.data.canvas.compose/ComposeChartPoint.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.canvas.compose/ComposeChartPoint) // com.letta.mobile.data.canvas.compose/ComposeChartPoint.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.canvas.compose.ComposeChartPoint){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.canvas.compose/ComposeChartPoint.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeChartPoint> // com.letta.mobile.data.canvas.compose/ComposeChartPoint.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.canvas.compose/ComposeChecklistItem { // com.letta.mobile.data.canvas.compose/ComposeChecklistItem|null[0]
     constructor <init>(kotlin/String, kotlin/Boolean? = ...) // com.letta.mobile.data.canvas.compose/ComposeChecklistItem.<init>|<init>(kotlin.String;kotlin.Boolean?){}[0]
 
@@ -28882,6 +29169,7 @@ final class com.letta.mobile.data.canvas.compose/ComposeRequest { // com.letta.m
     final val version // com.letta.mobile.data.canvas.compose/ComposeRequest.version|{}version[0]
         final fun <get-version>(): kotlin/Int? // com.letta.mobile.data.canvas.compose/ComposeRequest.version.<get-version>|<get-version>(){}[0]
 
+    final fun allItems(): kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeItem> // com.letta.mobile.data.canvas.compose/ComposeRequest.allItems|allItems(){}[0]
     final fun component1(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeRequest.component1|component1(){}[0]
     final fun component2(): kotlin/Int? // com.letta.mobile.data.canvas.compose/ComposeRequest.component2|component2(){}[0]
     final fun component3(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeRequest.component3|component3(){}[0]
@@ -28892,6 +29180,7 @@ final class com.letta.mobile.data.canvas.compose/ComposeRequest { // com.letta.m
     final fun copy(kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeItem> = ..., kotlin/Boolean? = ...): com.letta.mobile.data.canvas.compose/ComposeRequest // com.letta.mobile.data.canvas.compose/ComposeRequest.copy|copy(kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeItem>;kotlin.Boolean?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeRequest.hashCode|hashCode(){}[0]
+    final fun requiredVersion(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeRequest.requiredVersion|requiredVersion(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeRequest.toString|toString(){}[0]
 
     final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.canvas.compose/ComposeRequest> { // com.letta.mobile.data.canvas.compose/ComposeRequest.$serializer|null[0]
@@ -28990,8 +29279,10 @@ final class com.letta.mobile.data.canvas.compose/Placement { // com.letta.mobile
 }
 
 final class com.letta.mobile.data.canvas.compose/ReserveBlock { // com.letta.mobile.data.canvas.compose/ReserveBlock|null[0]
-    constructor <init>(com.letta.mobile.data.canvas.compose/ReserveBlockType, kotlin/String, kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.canvas.compose/ReserveBlock.<init>|<init>(com.letta.mobile.data.canvas.compose.ReserveBlockType;kotlin.String;kotlin.Int;kotlin.Int){}[0]
+    constructor <init>(com.letta.mobile.data.canvas.compose/ReserveBlockType, kotlin/String, kotlin/Int = ..., kotlin/Int = ..., kotlin.collections/List<kotlin.collections/List<kotlin/String>> = ...) // com.letta.mobile.data.canvas.compose/ReserveBlock.<init>|<init>(com.letta.mobile.data.canvas.compose.ReserveBlockType;kotlin.String;kotlin.Int;kotlin.Int;kotlin.collections.List<kotlin.collections.List<kotlin.String>>){}[0]
 
+    final val cells // com.letta.mobile.data.canvas.compose/ReserveBlock.cells|{}cells[0]
+        final fun <get-cells>(): kotlin.collections/List<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.canvas.compose/ReserveBlock.cells.<get-cells>|<get-cells>(){}[0]
     final val depth // com.letta.mobile.data.canvas.compose/ReserveBlock.depth|{}depth[0]
         final fun <get-depth>(): kotlin/Int // com.letta.mobile.data.canvas.compose/ReserveBlock.depth.<get-depth>|<get-depth>(){}[0]
     final val level // com.letta.mobile.data.canvas.compose/ReserveBlock.level|{}level[0]
@@ -29005,7 +29296,8 @@ final class com.letta.mobile.data.canvas.compose/ReserveBlock { // com.letta.mob
     final fun component2(): kotlin/String // com.letta.mobile.data.canvas.compose/ReserveBlock.component2|component2(){}[0]
     final fun component3(): kotlin/Int // com.letta.mobile.data.canvas.compose/ReserveBlock.component3|component3(){}[0]
     final fun component4(): kotlin/Int // com.letta.mobile.data.canvas.compose/ReserveBlock.component4|component4(){}[0]
-    final fun copy(com.letta.mobile.data.canvas.compose/ReserveBlockType = ..., kotlin/String = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.canvas.compose/ReserveBlock // com.letta.mobile.data.canvas.compose/ReserveBlock.copy|copy(com.letta.mobile.data.canvas.compose.ReserveBlockType;kotlin.String;kotlin.Int;kotlin.Int){}[0]
+    final fun component5(): kotlin.collections/List<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.canvas.compose/ReserveBlock.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.compose/ReserveBlockType = ..., kotlin/String = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin.collections/List<kotlin.collections/List<kotlin/String>> = ...): com.letta.mobile.data.canvas.compose/ReserveBlock // com.letta.mobile.data.canvas.compose/ReserveBlock.copy|copy(com.letta.mobile.data.canvas.compose.ReserveBlockType;kotlin.String;kotlin.Int;kotlin.Int;kotlin.collections.List<kotlin.collections.List<kotlin.String>>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ReserveBlock.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ReserveBlock.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ReserveBlock.toString|toString(){}[0]
@@ -29053,6 +29345,14 @@ final class com.letta.mobile.data.canvas.compose/WorstCaseWrap { // com.letta.mo
     final fun lines(kotlin/String): kotlin/Int // com.letta.mobile.data.canvas.compose/WorstCaseWrap.lines|lines(kotlin.String){}[0]
 }
 
+final class com.letta.mobile.data.canvas.library/CanvasBoardSessions { // com.letta.mobile.data.canvas.library/CanvasBoardSessions|null[0]
+    constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, com.letta.mobile.data.canvas/CanvasConversationOptions = ..., com.letta.mobile.data.canvas/CanvasSessionRegistry? = ...) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;com.letta.mobile.data.canvas.CanvasConversationOptions;com.letta.mobile.data.canvas.CanvasSessionRegistry?){}[0]
+
+    final fun holds(com.letta.mobile.data.model/CanvasId): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasBoardSessions.holds|holds(com.letta.mobile.data.model.CanvasId){}[0]
+    final fun release(com.letta.mobile.data.canvas/CanvasSession) // com.letta.mobile.data.canvas.library/CanvasBoardSessions.release|release(com.letta.mobile.data.canvas.CanvasSession){}[0]
+    final suspend fun acquire(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas/CanvasSession? // com.letta.mobile.data.canvas.library/CanvasBoardSessions.acquire|acquire(com.letta.mobile.data.model.CanvasId){}[0]
+}
+
 final class com.letta.mobile.data.canvas.library/CanvasLibraryController { // com.letta.mobile.data.canvas.library/CanvasLibraryController|null[0]
     constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.canvas/CanvasArchiveStore = ..., com.letta.mobile.data.canvas/CanvasConversationOptions = ...) // com.letta.mobile.data.canvas.library/CanvasLibraryController.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.canvas.CanvasArchiveStore;com.letta.mobile.data.canvas.CanvasConversationOptions){}[0]
 
@@ -29060,6 +29360,7 @@ final class com.letta.mobile.data.canvas.library/CanvasLibraryController { // co
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.library/CanvasLibraryState> // com.letta.mobile.data.canvas.library/CanvasLibraryController.state.<get-state>|<get-state>(){}[0]
 
     final fun createNew(com.letta.mobile.data.model/AgentId?, kotlin/Function1<com.letta.mobile.data.canvas/CanvasSession, kotlin/Unit>) // com.letta.mobile.data.canvas.library/CanvasLibraryController.createNew|createNew(com.letta.mobile.data.model.AgentId?;kotlin.Function1<com.letta.mobile.data.canvas.CanvasSession,kotlin.Unit>){}[0]
+    final fun open(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.canvas.library/CanvasBoardSessions, kotlin/Function1<com.letta.mobile.data.canvas/CanvasSession, kotlin/Unit>) // com.letta.mobile.data.canvas.library/CanvasLibraryController.open|open(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.canvas.library.CanvasBoardSessions;kotlin.Function1<com.letta.mobile.data.canvas.CanvasSession,kotlin.Unit>){}[0]
     final fun open(com.letta.mobile.data.model/CanvasId, kotlin/Function1<com.letta.mobile.data.canvas/CanvasSession, kotlin/Unit>) // com.letta.mobile.data.canvas.library/CanvasLibraryController.open|open(com.letta.mobile.data.model.CanvasId;kotlin.Function1<com.letta.mobile.data.canvas.CanvasSession,kotlin.Unit>){}[0]
     final fun refresh() // com.letta.mobile.data.canvas.library/CanvasLibraryController.refresh|refresh(){}[0]
     final fun setArchived(com.letta.mobile.data.model/CanvasId, kotlin/Boolean) // com.letta.mobile.data.canvas.library/CanvasLibraryController.setArchived|setArchived(com.letta.mobile.data.model.CanvasId;kotlin.Boolean){}[0]
@@ -36057,6 +36358,114 @@ final class com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions
     final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.messaging/IrohMessageOptions.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallRequest { // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest|null[0]
+    constructor <init>(com.letta.mobile.data.controller.extras.relay/AppToolCallId, kotlin/String, kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras.relay/AppToolCallScope) // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.<init>|<init>(com.letta.mobile.data.controller.extras.relay.AppToolCallId;kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.relay.AppToolCallScope){}[0]
+
+    final val callId // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.callId|{}callId[0]
+        final fun <get-callId>(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.callId.<get-callId>|<get-callId>(){}[0]
+    final val input // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.input|{}input[0]
+        final fun <get-input>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.input.<get-input>|<get-input>(){}[0]
+    final val scope // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.scope|{}scope[0]
+        final fun <get-scope>(): com.letta.mobile.data.controller.extras.relay/AppToolCallScope // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.scope.<get-scope>|<get-scope>(){}[0]
+    final val toolName // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.toolName|{}toolName[0]
+        final fun <get-toolName>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.toolName.<get-toolName>|<get-toolName>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component2|component2(){}[0]
+    final fun component3(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.controller.extras.relay/AppToolCallScope // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.controller.extras.relay/AppToolCallId = ..., kotlin/String = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.data.controller.extras.relay/AppToolCallScope = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallRequest // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.copy|copy(com.letta.mobile.data.controller.extras.relay.AppToolCallId;kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.relay.AppToolCallScope){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallRequest.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallResponse { // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse|null[0]
+    constructor <init>(com.letta.mobile.data.controller.extras.relay/AppToolCallId, com.letta.mobile.data.controller.extras.relay/AppToolCallResult) // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.<init>|<init>(com.letta.mobile.data.controller.extras.relay.AppToolCallId;com.letta.mobile.data.controller.extras.relay.AppToolCallResult){}[0]
+
+    final val callId // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.callId|{}callId[0]
+        final fun <get-callId>(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.callId.<get-callId>|<get-callId>(){}[0]
+    final val result // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.result|{}result[0]
+        final fun <get-result>(): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.result.<get-result>|<get-result>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.controller.extras.relay/AppToolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.controller.extras.relay/AppToolCallId = ..., com.letta.mobile.data.controller.extras.relay/AppToolCallResult = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallResponse // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.copy|copy(com.letta.mobile.data.controller.extras.relay.AppToolCallId;com.letta.mobile.data.controller.extras.relay.AppToolCallResult){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResponse.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallResult { // com.letta.mobile.data.controller.extras.relay/AppToolCallResult|null[0]
+    constructor <init>(kotlin/String, kotlin/Boolean = ...) // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.<init>|<init>(kotlin.String;kotlin.Boolean){}[0]
+
+    final val isError // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.isError|{}isError[0]
+        final fun <get-isError>(): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.isError.<get-isError>|<get-isError>(){}[0]
+    final val text // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.text|{}text[0]
+        final fun <get-text>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.copy|copy(kotlin.String;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallResult.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolCallScope { // com.letta.mobile.data.controller.extras.relay/AppToolCallScope|null[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final val agentId // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.agentId|{}agentId[0]
+        final fun <get-agentId>(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversationId // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val toolCallId // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.toolCallId|{}toolCallId[0]
+        final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.data.controller.extras.relay/AppToolCallScope // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallScope.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolRelayHost { // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost|null[0]
+    constructor <init>(kotlin.collections/Set<kotlin/String>, kotlin.time/Duration = ..., kotlin/Function0<com.letta.mobile.data.controller.extras.relay/AppToolCallId> = ...) // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.<init>|<init>(kotlin.collections.Set<kotlin.String>;kotlin.time.Duration;kotlin.Function0<com.letta.mobile.data.controller.extras.relay.AppToolCallId>){}[0]
+
+    final fun bindViewers(kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin.collections/List<com.letta.mobile.data.controller.extras.relay/AppToolRelayLink>>) // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.bindViewers|bindViewers(kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.collections.List<com.letta.mobile.data.controller.extras.relay.AppToolRelayLink>>){}[0]
+    final fun link(kotlin.coroutines/SuspendFunction1<kotlin/String, kotlin/Boolean>, kotlin/Function0<kotlin/Boolean>): com.letta.mobile.data.controller.extras.relay/AppToolRelayLink // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.link|link(kotlin.coroutines.SuspendFunction1<kotlin.String,kotlin.Boolean>;kotlin.Function0<kotlin.Boolean>){}[0]
+    final suspend fun call(kotlin/String, kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras.relay/AppToolCallScope): com.letta.mobile.data.controller.extras.relay/AppToolCallResult // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.call|call(kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.relay.AppToolCallScope){}[0]
+
+    final object Companion { // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.Companion|null[0]
+        final val DEFAULT_TIMEOUT // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.Companion.DEFAULT_TIMEOUT|{}DEFAULT_TIMEOUT[0]
+            final fun <get-DEFAULT_TIMEOUT>(): kotlin.time/Duration // com.letta.mobile.data.controller.extras.relay/AppToolRelayHost.Companion.DEFAULT_TIMEOUT.<get-DEFAULT_TIMEOUT>|<get-DEFAULT_TIMEOUT>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolRelayLink { // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink|null[0]
+    final val acceptsCalls // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.acceptsCalls|{}acceptsCalls[0]
+        final fun <get-acceptsCalls>(): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.acceptsCalls.<get-acceptsCalls>|<get-acceptsCalls>(){}[0]
+
+    final fun close() // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.close|close(){}[0]
+    final fun receive(kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolRelayLink.receive|receive(kotlinx.serialization.json.JsonObject){}[0]
+}
+
+final class com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder { // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder|null[0]
+    constructor <init>(kotlin/Function0<com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer?>) // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.<init>|<init>(kotlin.Function0<com.letta.mobile.data.controller.extras.relay.AppToolRelayAnswerer?>){}[0]
+
+    final fun isRequest(kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.isRequest|isRequest(kotlinx.serialization.json.JsonObject){}[0]
+    final suspend fun answer(kotlinx.serialization.json/JsonObject): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.answer|answer(kotlinx.serialization.json.JsonObject){}[0]
+
+    final object Companion { // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion|null[0]
+        final val Default // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion.Default.<get-Default>|<get-Default>(){}[0]
+
+        final fun install(com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer): kotlin/AutoCloseable // com.letta.mobile.data.controller.extras.relay/AppToolRelayResponder.Companion.install|install(com.letta.mobile.data.controller.extras.relay.AppToolRelayAnswerer){}[0]
+    }
+}
+
 final class com.letta.mobile.data.controller.extras/AgentDiscoveryTool : com.letta.mobile.data.controller.extras/ExternalTool { // com.letta.mobile.data.controller.extras/AgentDiscoveryTool|null[0]
     constructor <init>(com.letta.mobile.data.controller.extras/AgentDiscoverySource) // com.letta.mobile.data.controller.extras/AgentDiscoveryTool.<init>|<init>(com.letta.mobile.data.controller.extras.AgentDiscoverySource){}[0]
 
@@ -39924,7 +40333,7 @@ final class com.letta.mobile.data.meridian.endpoint/MeridianLiveCall { // com.le
 }
 
 final class com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls { // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls|null[0]
-    constructor <init>(kotlin/Function0<kotlin/Long>, kotlin/Function0<kotlin/String>, kotlin/Long = ..., kotlin/Int = ...) // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.<init>|<init>(kotlin.Function0<kotlin.Long>;kotlin.Function0<kotlin.String>;kotlin.Long;kotlin.Int){}[0]
+    constructor <init>(kotlin/Function0<kotlin/Long>, kotlin/Function0<kotlin/String>, kotlin/Long = ..., kotlin/Int = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ...) // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.<init>|<init>(kotlin.Function0<kotlin.Long>;kotlin.Function0<kotlin.String>;kotlin.Long;kotlin.Int;kotlin.Function1<kotlin.String,kotlin.Unit>){}[0]
 
     final suspend fun claim(kotlin/String): com.letta.mobile.data.meridian.endpoint/MeridianLiveCall? // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.claim|claim(kotlin.String){}[0]
     final suspend fun issueToken(kotlin/String, kotlin/Long = ...): kotlin/String? // com.letta.mobile.data.meridian.endpoint/MeridianLiveCalls.issueToken|issueToken(kotlin.String;kotlin.Long){}[0]
@@ -58796,6 +59205,200 @@ final class com.letta.mobile.data.settings/SettingsStatus { // com.letta.mobile.
     final fun toString(): kotlin/String // com.letta.mobile.data.settings/SettingsStatus.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort { // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort|null[0]
+    constructor <init>() // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.<init>|<init>(){}[0]
+
+    final val attached // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.attached|{}attached[0]
+        final fun <get-attached>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.shell.layout/ShellLayoutConfigStore?> // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.attached.<get-attached>|<get-attached>(){}[0]
+    final val changes // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.changes|{}changes[0]
+        final fun <get-changes>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.shell.layout.edit/ShellLayoutChange> // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.changes.<get-changes>|<get-changes>(){}[0]
+
+    final fun attach(com.letta.mobile.data.shell.layout/ShellLayoutConfigStore) // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.attach|attach(com.letta.mobile.data.shell.layout.ShellLayoutConfigStore){}[0]
+    final fun commit(com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor, kotlin/String, com.letta.mobile.data.shell.layout/ShellLayoutConfig, com.letta.mobile.data.shell.layout/ShellLayoutConfig): com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.commit|commit(com.letta.mobile.data.shell.layout.edit.ShellLayoutAuthor;kotlin.String;com.letta.mobile.data.shell.layout.ShellLayoutConfig;com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    final fun detach(com.letta.mobile.data.shell.layout/ShellLayoutConfigStore) // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.detach|detach(com.letta.mobile.data.shell.layout.ShellLayoutConfigStore){}[0]
+    final fun reset(com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor): com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.reset|reset(com.letta.mobile.data.shell.layout.edit.ShellLayoutAuthor){}[0]
+    final fun undo(com.letta.mobile.data.shell.layout.edit/ShellLayoutChange): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.undo|undo(com.letta.mobile.data.shell.layout.edit.ShellLayoutChange){}[0]
+    final fun undoLatest(com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor): com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.undoLatest|undoLatest(com.letta.mobile.data.shell.layout.edit.ShellLayoutAuthor){}[0]
+
+    final object Companion { // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.Companion|null[0]
+        final val Shared // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.Companion.Shared|{}Shared[0]
+            final fun <get-Shared>(): com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort // com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort.Companion.Shared.<get-Shared>|<get-Shared>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutChange { // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange|null[0]
+    final val after // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.after|{}after[0]
+        final fun <get-after>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.after.<get-after>|<get-after>(){}[0]
+    final val author // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.author|{}author[0]
+        final fun <get-author>(): com.letta.mobile.data.shell.layout.edit/ShellLayoutAuthor // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.author.<get-author>|<get-author>(){}[0]
+    final val before // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.before|{}before[0]
+        final fun <get-before>(): com.letta.mobile.data.shell.layout/ShellLayoutConfig // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.before.<get-before>|<get-before>(){}[0]
+    final val summary // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.summary|{}summary[0]
+        final fun <get-summary>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.summary.<get-summary>|<get-summary>(){}[0]
+    final val undoable // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.undoable|{}undoable[0]
+        final fun <get-undoable>(): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutChange.undoable.<get-undoable>|<get-undoable>(){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError|null[0]
+    constructor <init>(kotlin/Int?, com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule, kotlin/String) // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.<init>|<init>(kotlin.Int?;com.letta.mobile.data.shell.layout.edit.ShellLayoutEditRule;kotlin.String){}[0]
+
+    final val detail // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.detail|{}detail[0]
+        final fun <get-detail>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.detail.<get-detail>|<get-detail>(){}[0]
+    final val opIndex // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.opIndex|{}opIndex[0]
+        final fun <get-opIndex>(): kotlin/Int? // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.opIndex.<get-opIndex>|<get-opIndex>(){}[0]
+    final val rule // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.rule|{}rule[0]
+        final fun <get-rule>(): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.rule.<get-rule>|<get-rule>(){}[0]
+
+    final fun component1(): kotlin/Int? // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.component3|component3(){}[0]
+    final fun copy(kotlin/Int? = ..., com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule = ..., kotlin/String = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.copy|copy(kotlin.Int?;com.letta.mobile.data.shell.layout.edit.ShellLayoutEditRule;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange { // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange|null[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>, kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot>) // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.<init>|<init>(kotlin.String;kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>;kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>){}[0]
+
+    final val after // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.after|{}after[0]
+        final fun <get-after>(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.after.<get-after>|<get-after>(){}[0]
+    final val before // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.before|{}before[0]
+        final fun <get-before>(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.before.<get-before>|<get-before>(){}[0]
+    final val lane // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.lane|{}lane[0]
+        final fun <get-lane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.lane.<get-lane>|<get-lane>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> = ..., kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.copy|copy(kotlin.String;kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>;kotlin.collections.List<com.letta.mobile.data.shell.layout.ModuleSlot>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec { // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec>, kotlin/Int) // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutViewSpec>;kotlin.Int){}[0]
+
+    final val description // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.description|{}description[0]
+        final fun <get-description>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.description.<get-description>|<get-description>(){}[0]
+    final val label // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.label.<get-label>|<get-label>(){}[0]
+    final val lane // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.lane|{}lane[0]
+        final fun <get-lane>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.lane.<get-lane>|<get-lane>(){}[0]
+    final val maxSlots // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.maxSlots|{}maxSlots[0]
+        final fun <get-maxSlots>(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.maxSlots.<get-maxSlots>|<get-maxSlots>(){}[0]
+    final val views // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.views|{}views[0]
+        final fun <get-views>(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec> // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.views.<get-views>|<get-views>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec> // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.component4|component4(){}[0]
+    final fun component5(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec> = ..., kotlin/Int = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutViewSpec>;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.toString|toString(){}[0]
+    final fun view(com.letta.mobile.data.model.view/RuntimeViewId): com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec? // com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec.view|view(com.letta.mobile.data.model.view.RuntimeViewId){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutReading { // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading|null[0]
+    constructor <init>(com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest?, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError>) // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.<init>|<init>(com.letta.mobile.data.shell.layout.edit.ShellLayoutRequest?;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutEditError>){}[0]
+
+    final val errors // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.errors|{}errors[0]
+        final fun <get-errors>(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError> // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.errors.<get-errors>|<get-errors>(){}[0]
+    final val request // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.request|{}request[0]
+        final fun <get-request>(): com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest? // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.request.<get-request>|<get-request>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest? // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError> // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest? = ..., kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError> = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutReading // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.copy|copy(com.letta.mobile.data.shell.layout.edit.ShellLayoutRequest?;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutEditError>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutReading.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool : com.letta.mobile.data.controller.extras/HostExternalTool { // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool|null[0]
+    constructor <init>(com.letta.mobile.data.controller.extras.relay/AppToolRelayHost) // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.<init>|<init>(com.letta.mobile.data.controller.extras.relay.AppToolRelayHost){}[0]
+
+    final val capability // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.capability|{}capability[0]
+        final fun <get-capability>(): com.letta.mobile.data.controller.capability/Capability // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.capability.<get-capability>|<get-capability>(){}[0]
+    final val description // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.description|{}description[0]
+        final fun <get-description>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.description.<get-description>|<get-description>(){}[0]
+    final val inputSchema // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.inputSchema|{}inputSchema[0]
+        final fun <get-inputSchema>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.inputSchema.<get-inputSchema>|<get-inputSchema>(){}[0]
+    final val name // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.name.<get-name>|<get-name>(){}[0]
+
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras/ExternalToolCaller): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.invoke|invoke(kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.ExternalToolCaller){}[0]
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, kotlin/String?): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelayTool.invoke|invoke(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest { // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest|null[0]
+    constructor <init>(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutOp> = ..., kotlin/Boolean = ...) // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.<init>|<init>(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutOp>;kotlin.Boolean){}[0]
+
+    final val action // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.action|{}action[0]
+        final fun <get-action>(): com.letta.mobile.data.shell.layout.edit/ShellLayoutAction // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.action.<get-action>|<get-action>(){}[0]
+    final val dryRun // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.dryRun|{}dryRun[0]
+        final fun <get-dryRun>(): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.dryRun.<get-dryRun>|<get-dryRun>(){}[0]
+    final val ops // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.ops|{}ops[0]
+        final fun <get-ops>(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutOp> // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.ops.<get-ops>|<get-ops>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.shell.layout.edit/ShellLayoutAction // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutOp> // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction = ..., kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutOp> = ..., kotlin/Boolean = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.copy|copy(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutOp>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutRequest.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutTool : com.letta.mobile.data.controller.extras/HostExternalTool { // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool|null[0]
+    constructor <init>(com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort = ...) // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.<init>|<init>(com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort){}[0]
+
+    final val capability // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.capability|{}capability[0]
+        final fun <get-capability>(): com.letta.mobile.data.controller.capability/Capability // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.capability.<get-capability>|<get-capability>(){}[0]
+    final val description // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.description|{}description[0]
+        final fun <get-description>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.description.<get-description>|<get-description>(){}[0]
+    final val inputSchema // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.inputSchema|{}inputSchema[0]
+        final fun <get-inputSchema>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.inputSchema.<get-inputSchema>|<get-inputSchema>(){}[0]
+    final val name // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.name.<get-name>|<get-name>(){}[0]
+
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, com.letta.mobile.data.controller.extras/ExternalToolCaller): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.invoke|invoke(kotlinx.serialization.json.JsonObject;com.letta.mobile.data.controller.extras.ExternalToolCaller){}[0]
+    final suspend fun invoke(kotlinx.serialization.json/JsonObject, kotlin/String?): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.invoke|invoke(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
+
+    final object Companion { // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion|null[0]
+        final const val DESCRIPTION // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.DESCRIPTION|{}DESCRIPTION[0]
+            final fun <get-DESCRIPTION>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.DESCRIPTION.<get-DESCRIPTION>|<get-DESCRIPTION>(){}[0]
+        final const val NAME // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.NAME|{}NAME[0]
+            final fun <get-NAME>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutTool.Companion.NAME.<get-NAME>|<get-NAME>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec { // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec|null[0]
+    constructor <init>(com.letta.mobile.data.model.view/RuntimeViewId, kotlin/String, kotlin/String, kotlin/Boolean = ...) // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.<init>|<init>(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String;kotlin.String;kotlin.Boolean){}[0]
+
+    final val description // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.description|{}description[0]
+        final fun <get-description>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.description.<get-description>|<get-description>(){}[0]
+    final val label // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.label.<get-label>|<get-label>(){}[0]
+    final val needsObject // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.needsObject|{}needsObject[0]
+        final fun <get-needsObject>(): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.needsObject.<get-needsObject>|<get-needsObject>(){}[0]
+    final val view // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.view|{}view[0]
+        final fun <get-view>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.view.<get-view>|<get-view>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.model.view/RuntimeViewId = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Boolean = ...): com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.copy|copy(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String;kotlin.String;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutViewSpec.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.shell.layout/ModuleSlot { // com.letta.mobile.data.shell.layout/ModuleSlot|null[0]
     constructor <init>(com.letta.mobile.data.model.view/RuntimeViewId, kotlin/String? = ...) // com.letta.mobile.data.shell.layout/ModuleSlot.<init>|<init>(com.letta.mobile.data.model.view.RuntimeViewId;kotlin.String?){}[0]
 
@@ -58876,10 +59479,20 @@ final class com.letta.mobile.data.shell.layout/ShellLayoutConfigStore { // com.l
 
     final val config // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.config|{}config[0]
         final fun <get-config>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.shell.layout/ShellLayoutConfig> // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.config.<get-config>|<get-config>(){}[0]
+    final val history // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.history|{}history[0]
+        final fun <get-history>(): kotlin.collections/List<com.letta.mobile.data.shell.layout/ShellLayoutConfig> // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.history.<get-history>|<get-history>(){}[0]
 
+    final fun commit(com.letta.mobile.data.shell.layout/ShellLayoutConfig, com.letta.mobile.data.shell.layout/ShellLayoutConfig? = ...): com.letta.mobile.data.shell.layout/ShellLayoutConfig? // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.commit|commit(com.letta.mobile.data.shell.layout.ShellLayoutConfig;com.letta.mobile.data.shell.layout.ShellLayoutConfig?){}[0]
+    final fun resetToDefault(): com.letta.mobile.data.shell.layout/ShellLayoutConfig? // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.resetToDefault|resetToDefault(){}[0]
     final fun save(com.letta.mobile.data.shell.layout/ShellLayoutConfig) // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.save|save(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    final fun undo(com.letta.mobile.data.shell.layout/ShellLayoutConfig? = ...): com.letta.mobile.data.shell.layout/ShellLayoutConfig? // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.undo|undo(com.letta.mobile.data.shell.layout.ShellLayoutConfig?){}[0]
 
     final object Companion { // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion|null[0]
+        final const val HISTORY_LIMIT // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion.HISTORY_LIMIT|{}HISTORY_LIMIT[0]
+            final fun <get-HISTORY_LIMIT>(): kotlin/Int // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion.HISTORY_LIMIT.<get-HISTORY_LIMIT>|<get-HISTORY_LIMIT>(){}[0]
+        final const val HISTORY_SUFFIX // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion.HISTORY_SUFFIX|{}HISTORY_SUFFIX[0]
+            final fun <get-HISTORY_SUFFIX>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion.HISTORY_SUFFIX.<get-HISTORY_SUFFIX>|<get-HISTORY_SUFFIX>(){}[0]
+
         final fun forBackend(com.letta.mobile.data.storage/SecureSettingsStore, com.letta.mobile.data.model/LettaConfig?): com.letta.mobile.data.shell.layout/ShellLayoutConfigStore // com.letta.mobile.data.shell.layout/ShellLayoutConfigStore.Companion.forBackend|forBackend(com.letta.mobile.data.storage.SecureSettingsStore;com.letta.mobile.data.model.LettaConfig?){}[0]
     }
 }
@@ -68267,6 +68880,17 @@ final value class com.letta.mobile.data.chat.send/QueuedSendId { // com.letta.mo
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.send/QueuedSendId.toString|toString(){}[0]
 }
 
+final value class com.letta.mobile.data.controller.extras.relay/AppToolCallId { // com.letta.mobile.data.controller.extras.relay/AppToolCallId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.controller.extras.relay/AppToolCallId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.controller.extras.relay/AppToolCallId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.controller.extras.relay/AppToolCallId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.controller.extras.relay/AppToolCallId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolCallId.toString|toString(){}[0]
+}
+
 final value class com.letta.mobile.data.model.provider.composer/CatalogAccountScopeId { // com.letta.mobile.data.model.provider.composer/CatalogAccountScopeId|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.model.provider.composer/CatalogAccountScopeId.<init>|<init>(kotlin.String){}[0]
 
@@ -69601,6 +70225,48 @@ sealed class com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mob
         }
     }
 
+    final class Chart : com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mobile.data.canvas.compose/ComposeItem.Chart|null[0]
+        constructor <init>(kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeChartStyle, kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeChartPoint>, kotlin/String? = ...) // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.<init>|<init>(kotlin.String?;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeChartStyle;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeChartPoint>;kotlin.String?){}[0]
+
+        final val key // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.key|{}key[0]
+            final fun <get-key>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.key.<get-key>|<get-key>(){}[0]
+        final val kind // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.kind|{}kind[0]
+            final fun <get-kind>(): com.letta.mobile.data.canvas.compose/ComposeKind // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.kind.<get-kind>|<get-kind>(){}[0]
+        final val points // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.points|{}points[0]
+            final fun <get-points>(): kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeChartPoint> // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.points.<get-points>|<get-points>(){}[0]
+        final val style // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.style|{}style[0]
+            final fun <get-style>(): com.letta.mobile.data.canvas.compose/ComposeChartStyle // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.style.<get-style>|<get-style>(){}[0]
+        final val title // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.title|{}title[0]
+            final fun <get-title>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.title.<get-title>|<get-title>(){}[0]
+        final val unit // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.unit|{}unit[0]
+            final fun <get-unit>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.unit.<get-unit>|<get-unit>(){}[0]
+
+        final fun component1(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.component1|component1(){}[0]
+        final fun component2(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.component2|component2(){}[0]
+        final fun component3(): com.letta.mobile.data.canvas.compose/ComposeChartStyle // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.component3|component3(){}[0]
+        final fun component4(): kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeChartPoint> // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.component4|component4(){}[0]
+        final fun component5(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.component5|component5(){}[0]
+        final fun copy(kotlin/String? = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeChartStyle = ..., kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeChartPoint> = ..., kotlin/String? = ...): com.letta.mobile.data.canvas.compose/ComposeItem.Chart // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.copy|copy(kotlin.String?;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeChartStyle;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeChartPoint>;kotlin.String?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Chart> { // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.canvas.compose/ComposeItem.Chart // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.canvas.compose/ComposeItem.Chart) // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.canvas.compose.ComposeItem.Chart){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Chart> // com.letta.mobile.data.canvas.compose/ComposeItem.Chart.Companion.serializer|serializer(){}[0]
+        }
+    }
+
     final class Checklist : com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mobile.data.canvas.compose/ComposeItem.Checklist|null[0]
         constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeChecklistItem>, kotlin/String? = ...) // com.letta.mobile.data.canvas.compose/ComposeItem.Checklist.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeChecklistItem>;kotlin.String?){}[0]
 
@@ -69710,6 +70376,135 @@ sealed class com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mob
 
         final object Companion { // com.letta.mobile.data.canvas.compose/ComposeItem.Note.Companion|null[0]
             final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Note> // com.letta.mobile.data.canvas.compose/ComposeItem.Note.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Progress : com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mobile.data.canvas.compose/ComposeItem.Progress|null[0]
+        constructor <init>(kotlin/String? = ..., kotlin/String, kotlin/Double, kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeTone? = ...) // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.<init>|<init>(kotlin.String?;kotlin.String;kotlin.Double;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeTone?){}[0]
+
+        final val caption // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.caption|{}caption[0]
+            final fun <get-caption>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.caption.<get-caption>|<get-caption>(){}[0]
+        final val key // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.key|{}key[0]
+            final fun <get-key>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.key.<get-key>|<get-key>(){}[0]
+        final val kind // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.kind|{}kind[0]
+            final fun <get-kind>(): com.letta.mobile.data.canvas.compose/ComposeKind // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.kind.<get-kind>|<get-kind>(){}[0]
+        final val label // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.label|{}label[0]
+            final fun <get-label>(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.label.<get-label>|<get-label>(){}[0]
+        final val tone // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.tone|{}tone[0]
+            final fun <get-tone>(): com.letta.mobile.data.canvas.compose/ComposeTone? // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.tone.<get-tone>|<get-tone>(){}[0]
+        final val value // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.value|{}value[0]
+            final fun <get-value>(): kotlin/Double // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.component2|component2(){}[0]
+        final fun component3(): kotlin/Double // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.component3|component3(){}[0]
+        final fun component4(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.component4|component4(){}[0]
+        final fun component5(): com.letta.mobile.data.canvas.compose/ComposeTone? // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.component5|component5(){}[0]
+        final fun copy(kotlin/String? = ..., kotlin/String = ..., kotlin/Double = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeTone? = ...): com.letta.mobile.data.canvas.compose/ComposeItem.Progress // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.copy|copy(kotlin.String?;kotlin.String;kotlin.Double;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeTone?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Progress> { // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.canvas.compose/ComposeItem.Progress // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.canvas.compose/ComposeItem.Progress) // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.canvas.compose.ComposeItem.Progress){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Progress> // com.letta.mobile.data.canvas.compose/ComposeItem.Progress.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Stat : com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mobile.data.canvas.compose/ComposeItem.Stat|null[0]
+        constructor <init>(kotlin/String? = ..., kotlin/String, kotlin/String, kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeTone? = ..., kotlin/String? = ...) // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.<init>|<init>(kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeTone?;kotlin.String?){}[0]
+
+        final val caption // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.caption|{}caption[0]
+            final fun <get-caption>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.caption.<get-caption>|<get-caption>(){}[0]
+        final val delta // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.delta|{}delta[0]
+            final fun <get-delta>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.delta.<get-delta>|<get-delta>(){}[0]
+        final val key // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.key|{}key[0]
+            final fun <get-key>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.key.<get-key>|<get-key>(){}[0]
+        final val kind // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.kind|{}kind[0]
+            final fun <get-kind>(): com.letta.mobile.data.canvas.compose/ComposeKind // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.kind.<get-kind>|<get-kind>(){}[0]
+        final val label // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.label|{}label[0]
+            final fun <get-label>(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.label.<get-label>|<get-label>(){}[0]
+        final val tone // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.tone|{}tone[0]
+            final fun <get-tone>(): com.letta.mobile.data.canvas.compose/ComposeTone? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.tone.<get-tone>|<get-tone>(){}[0]
+        final val value // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.value|{}value[0]
+            final fun <get-value>(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.component2|component2(){}[0]
+        final fun component3(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.component3|component3(){}[0]
+        final fun component4(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.component4|component4(){}[0]
+        final fun component5(): com.letta.mobile.data.canvas.compose/ComposeTone? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.component5|component5(){}[0]
+        final fun component6(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.component6|component6(){}[0]
+        final fun copy(kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.compose/ComposeTone? = ..., kotlin/String? = ...): com.letta.mobile.data.canvas.compose/ComposeItem.Stat // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.copy|copy(kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;com.letta.mobile.data.canvas.compose.ComposeTone?;kotlin.String?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Stat> { // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.canvas.compose/ComposeItem.Stat // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.canvas.compose/ComposeItem.Stat) // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.canvas.compose.ComposeItem.Stat){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Stat> // com.letta.mobile.data.canvas.compose/ComposeItem.Stat.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Table : com.letta.mobile.data.canvas.compose/ComposeItem { // com.letta.mobile.data.canvas.compose/ComposeItem.Table|null[0]
+        constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin.collections/List<kotlin/String>>, kotlin/String? = ...) // com.letta.mobile.data.canvas.compose/ComposeItem.Table.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.collections.List<kotlin.String>>;kotlin.String?){}[0]
+
+        final val color // com.letta.mobile.data.canvas.compose/ComposeItem.Table.color|{}color[0]
+            final fun <get-color>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Table.color.<get-color>|<get-color>(){}[0]
+        final val columns // com.letta.mobile.data.canvas.compose/ComposeItem.Table.columns|{}columns[0]
+            final fun <get-columns>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.canvas.compose/ComposeItem.Table.columns.<get-columns>|<get-columns>(){}[0]
+        final val key // com.letta.mobile.data.canvas.compose/ComposeItem.Table.key|{}key[0]
+            final fun <get-key>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Table.key.<get-key>|<get-key>(){}[0]
+        final val kind // com.letta.mobile.data.canvas.compose/ComposeItem.Table.kind|{}kind[0]
+            final fun <get-kind>(): com.letta.mobile.data.canvas.compose/ComposeKind // com.letta.mobile.data.canvas.compose/ComposeItem.Table.kind.<get-kind>|<get-kind>(){}[0]
+        final val rows // com.letta.mobile.data.canvas.compose/ComposeItem.Table.rows|{}rows[0]
+            final fun <get-rows>(): kotlin.collections/List<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.canvas.compose/ComposeItem.Table.rows.<get-rows>|<get-rows>(){}[0]
+        final val title // com.letta.mobile.data.canvas.compose/ComposeItem.Table.title|{}title[0]
+            final fun <get-title>(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Table.title.<get-title>|<get-title>(){}[0]
+
+        final fun component1(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Table.component1|component1(){}[0]
+        final fun component2(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Table.component2|component2(){}[0]
+        final fun component3(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.canvas.compose/ComposeItem.Table.component3|component3(){}[0]
+        final fun component4(): kotlin.collections/List<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.canvas.compose/ComposeItem.Table.component4|component4(){}[0]
+        final fun component5(): kotlin/String? // com.letta.mobile.data.canvas.compose/ComposeItem.Table.component5|component5(){}[0]
+        final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin.collections/List<kotlin/String>> = ..., kotlin/String? = ...): com.letta.mobile.data.canvas.compose/ComposeItem.Table // com.letta.mobile.data.canvas.compose/ComposeItem.Table.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.collections.List<kotlin.String>>;kotlin.String?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.compose/ComposeItem.Table.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.compose/ComposeItem.Table.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.compose/ComposeItem.Table.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Table> { // com.letta.mobile.data.canvas.compose/ComposeItem.Table.$serializer|null[0]
+            final val descriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Table.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.canvas.compose/ComposeItem.Table.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.canvas.compose/ComposeItem.Table.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.canvas.compose/ComposeItem.Table // com.letta.mobile.data.canvas.compose/ComposeItem.Table.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.canvas.compose/ComposeItem.Table) // com.letta.mobile.data.canvas.compose/ComposeItem.Table.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.canvas.compose.ComposeItem.Table){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.data.canvas.compose/ComposeItem.Table.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.data.canvas.compose/ComposeItem.Table.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.canvas.compose/ComposeItem.Table> // com.letta.mobile.data.canvas.compose/ComposeItem.Table.Companion.serializer|serializer(){}[0]
         }
     }
 
@@ -70463,6 +71258,10 @@ final object com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks { // com.l
         final fun <get-KEY_CHECKED>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_CHECKED.<get-KEY_CHECKED>|<get-KEY_CHECKED>(){}[0]
     final const val KEY_CONTENT // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_CONTENT|{}KEY_CONTENT[0]
         final fun <get-KEY_CONTENT>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_CONTENT.<get-KEY_CONTENT>|<get-KEY_CONTENT>(){}[0]
+    final const val KEY_CUSTOM // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_CUSTOM|{}KEY_CUSTOM[0]
+        final fun <get-KEY_CUSTOM>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_CUSTOM.<get-KEY_CUSTOM>|<get-KEY_CUSTOM>(){}[0]
+    final const val KEY_DATA // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_DATA|{}KEY_DATA[0]
+        final fun <get-KEY_DATA>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_DATA.<get-KEY_DATA>|<get-KEY_DATA>(){}[0]
     final const val KEY_END // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_END|{}KEY_END[0]
         final fun <get-KEY_END>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_END.<get-KEY_END>|<get-KEY_END>(){}[0]
     final const val KEY_ID // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.KEY_ID|{}KEY_ID[0]
@@ -70505,6 +71304,8 @@ final object com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks { // com.l
         final fun <get-STYLE_LINK>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.STYLE_LINK.<get-STYLE_LINK>|<get-STYLE_LINK>(){}[0]
     final const val STYLE_STRIKETHROUGH // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.STYLE_STRIKETHROUGH|{}STYLE_STRIKETHROUGH[0]
         final fun <get-STYLE_STRIKETHROUGH>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.STYLE_STRIKETHROUGH.<get-STYLE_STRIKETHROUGH>|<get-STYLE_STRIKETHROUGH>(){}[0]
+    final const val TABLE_ROWS // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TABLE_ROWS|{}TABLE_ROWS[0]
+        final fun <get-TABLE_ROWS>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TABLE_ROWS.<get-TABLE_ROWS>|<get-TABLE_ROWS>(){}[0]
     final const val TEXT_VERSION // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TEXT_VERSION|{}TEXT_VERSION[0]
         final fun <get-TEXT_VERSION>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TEXT_VERSION.<get-TEXT_VERSION>|<get-TEXT_VERSION>(){}[0]
     final const val TYPE_BULLET_LIST // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_BULLET_LIST|{}TYPE_BULLET_LIST[0]
@@ -70521,30 +71322,46 @@ final object com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks { // com.l
         final fun <get-TYPE_PARAGRAPH>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_PARAGRAPH.<get-TYPE_PARAGRAPH>|<get-TYPE_PARAGRAPH>(){}[0]
     final const val TYPE_QUOTE // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_QUOTE|{}TYPE_QUOTE[0]
         final fun <get-TYPE_QUOTE>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_QUOTE.<get-TYPE_QUOTE>|<get-TYPE_QUOTE>(){}[0]
+    final const val TYPE_TABLE // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_TABLE|{}TYPE_TABLE[0]
+        final fun <get-TYPE_TABLE>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_TABLE.<get-TYPE_TABLE>|<get-TYPE_TABLE>(){}[0]
     final const val TYPE_TODO // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_TODO|{}TYPE_TODO[0]
         final fun <get-TYPE_TODO>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.TYPE_TODO.<get-TYPE_TODO>|<get-TYPE_TODO>(){}[0]
 
     final fun card(kotlin/String, kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeCardField>, kotlin.collections/List<com.letta.mobile.data.canvas.compose/MdBlock>): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.card|card(kotlin.String;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeCardField>;kotlin.collections.List<com.letta.mobile.data.canvas.compose.MdBlock>){}[0]
     final fun checklist(kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeChecklistItem>): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.checklist|checklist(kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeChecklistItem>){}[0]
     final fun document(kotlin.collections/List<com.letta.mobile.data.canvas.compose/MdBlock>): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.document|document(kotlin.collections.List<com.letta.mobile.data.canvas.compose.MdBlock>){}[0]
+    final fun table(kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin.collections/List<kotlin/String>>): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasCascadeBlocks.table|table(kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.collections.List<kotlin.String>>){}[0]
 }
 
 final object com.letta.mobile.data.canvas.compose/CanvasComposeColors { // com.letta.mobile.data.canvas.compose/CanvasComposeColors|null[0]
+    final const val ACCENT // com.letta.mobile.data.canvas.compose/CanvasComposeColors.ACCENT|{}ACCENT[0]
+        final fun <get-ACCENT>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.ACCENT.<get-ACCENT>|<get-ACCENT>(){}[0]
+    final const val AXIS // com.letta.mobile.data.canvas.compose/CanvasComposeColors.AXIS|{}AXIS[0]
+        final fun <get-AXIS>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.AXIS.<get-AXIS>|<get-AXIS>(){}[0]
     final const val CARD_DEFAULT // com.letta.mobile.data.canvas.compose/CanvasComposeColors.CARD_DEFAULT|{}CARD_DEFAULT[0]
         final fun <get-CARD_DEFAULT>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.CARD_DEFAULT.<get-CARD_DEFAULT>|<get-CARD_DEFAULT>(){}[0]
+    final const val DRAWING_FILL // com.letta.mobile.data.canvas.compose/CanvasComposeColors.DRAWING_FILL|{}DRAWING_FILL[0]
+        final fun <get-DRAWING_FILL>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.DRAWING_FILL.<get-DRAWING_FILL>|<get-DRAWING_FILL>(){}[0]
+    final const val DRAWING_STROKE // com.letta.mobile.data.canvas.compose/CanvasComposeColors.DRAWING_STROKE|{}DRAWING_STROKE[0]
+        final fun <get-DRAWING_STROKE>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.DRAWING_STROKE.<get-DRAWING_STROKE>|<get-DRAWING_STROKE>(){}[0]
     final const val GROUP_FILL // com.letta.mobile.data.canvas.compose/CanvasComposeColors.GROUP_FILL|{}GROUP_FILL[0]
         final fun <get-GROUP_FILL>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.GROUP_FILL.<get-GROUP_FILL>|<get-GROUP_FILL>(){}[0]
     final const val GROUP_LABEL // com.letta.mobile.data.canvas.compose/CanvasComposeColors.GROUP_LABEL|{}GROUP_LABEL[0]
         final fun <get-GROUP_LABEL>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.GROUP_LABEL.<get-GROUP_LABEL>|<get-GROUP_LABEL>(){}[0]
     final const val GROUP_STROKE // com.letta.mobile.data.canvas.compose/CanvasComposeColors.GROUP_STROKE|{}GROUP_STROKE[0]
         final fun <get-GROUP_STROKE>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.GROUP_STROKE.<get-GROUP_STROKE>|<get-GROUP_STROKE>(){}[0]
+    final const val MUTED // com.letta.mobile.data.canvas.compose/CanvasComposeColors.MUTED|{}MUTED[0]
+        final fun <get-MUTED>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.MUTED.<get-MUTED>|<get-MUTED>(){}[0]
     final const val TEXT // com.letta.mobile.data.canvas.compose/CanvasComposeColors.TEXT|{}TEXT[0]
         final fun <get-TEXT>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.TEXT.<get-TEXT>|<get-TEXT>(){}[0]
+    final const val TRACK // com.letta.mobile.data.canvas.compose/CanvasComposeColors.TRACK|{}TRACK[0]
+        final fun <get-TRACK>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.TRACK.<get-TRACK>|<get-TRACK>(){}[0]
 
     final val PRESETS // com.letta.mobile.data.canvas.compose/CanvasComposeColors.PRESETS|{}PRESETS[0]
         final fun <get-PRESETS>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.canvas.compose/CanvasComposeColors.PRESETS.<get-PRESETS>|<get-PRESETS>(){}[0]
 
     final fun of(kotlin/String?, kotlin/String? = ...): kotlin/String? // com.letta.mobile.data.canvas.compose/CanvasComposeColors.of|of(kotlin.String?;kotlin.String?){}[0]
+    final fun tone(com.letta.mobile.data.canvas.compose/ComposeTone?, kotlin/String): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeColors.tone|tone(com.letta.mobile.data.canvas.compose.ComposeTone?;kotlin.String){}[0]
 }
 
 final object com.letta.mobile.data.canvas.compose/CanvasComposeCompiler { // com.letta.mobile.data.canvas.compose/CanvasComposeCompiler|null[0]
@@ -70576,6 +71393,8 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeContract { // com
         final fun <get-CARD_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CARD_WIDTH.<get-CARD_WIDTH>|<get-CARD_WIDTH>(){}[0]
     final const val CATALOG // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CATALOG|{}CATALOG[0]
         final fun <get-CATALOG>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CATALOG.<get-CATALOG>|<get-CATALOG>(){}[0]
+    final const val CHART_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CHART_WIDTH|{}CHART_WIDTH[0]
+        final fun <get-CHART_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CHART_WIDTH.<get-CHART_WIDTH>|<get-CHART_WIDTH>(){}[0]
     final const val CHECKLIST_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CHECKLIST_WIDTH|{}CHECKLIST_WIDTH[0]
         final fun <get-CHECKLIST_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.CHECKLIST_WIDTH.<get-CHECKLIST_WIDTH>|<get-CHECKLIST_WIDTH>(){}[0]
     final const val KEY_PATTERN // com.letta.mobile.data.canvas.compose/CanvasComposeContract.KEY_PATTERN|{}KEY_PATTERN[0]
@@ -70584,6 +71403,16 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeContract { // com
         final fun <get-MAX_CARD_BODY_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CARD_BODY_CHARS.<get-MAX_CARD_BODY_CHARS>|<get-MAX_CARD_BODY_CHARS>(){}[0]
     final const val MAX_CARD_FIELDS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CARD_FIELDS|{}MAX_CARD_FIELDS[0]
         final fun <get-MAX_CARD_FIELDS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CARD_FIELDS.<get-MAX_CARD_FIELDS>|<get-MAX_CARD_FIELDS>(){}[0]
+    final const val MAX_CELL_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CELL_CHARS|{}MAX_CELL_CHARS[0]
+        final fun <get-MAX_CELL_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CELL_CHARS.<get-MAX_CELL_CHARS>|<get-MAX_CELL_CHARS>(){}[0]
+    final const val MAX_CHART_LABEL_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_LABEL_CHARS|{}MAX_CHART_LABEL_CHARS[0]
+        final fun <get-MAX_CHART_LABEL_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_LABEL_CHARS.<get-MAX_CHART_LABEL_CHARS>|<get-MAX_CHART_LABEL_CHARS>(){}[0]
+    final const val MAX_CHART_POINTS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_POINTS|{}MAX_CHART_POINTS[0]
+        final fun <get-MAX_CHART_POINTS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_POINTS.<get-MAX_CHART_POINTS>|<get-MAX_CHART_POINTS>(){}[0]
+    final const val MAX_CHART_UNIT_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_UNIT_CHARS|{}MAX_CHART_UNIT_CHARS[0]
+        final fun <get-MAX_CHART_UNIT_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_UNIT_CHARS.<get-MAX_CHART_UNIT_CHARS>|<get-MAX_CHART_UNIT_CHARS>(){}[0]
+    final const val MAX_CHART_VALUE // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_VALUE|{}MAX_CHART_VALUE[0]
+        final fun <get-MAX_CHART_VALUE>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHART_VALUE.<get-MAX_CHART_VALUE>|<get-MAX_CHART_VALUE>(){}[0]
     final const val MAX_CHECKLIST_ITEMS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHECKLIST_ITEMS|{}MAX_CHECKLIST_ITEMS[0]
         final fun <get-MAX_CHECKLIST_ITEMS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_CHECKLIST_ITEMS.<get-MAX_CHECKLIST_ITEMS>|<get-MAX_CHECKLIST_ITEMS>(){}[0]
     final const val MAX_GROUP_DEPTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_GROUP_DEPTH|{}MAX_GROUP_DEPTH[0]
@@ -70598,16 +71427,34 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeContract { // com
         final fun <get-MAX_RECEIPT_BYTES>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_RECEIPT_BYTES.<get-MAX_RECEIPT_BYTES>|<get-MAX_RECEIPT_BYTES>(){}[0]
     final const val MAX_REQUEST_BYTES // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_REQUEST_BYTES|{}MAX_REQUEST_BYTES[0]
         final fun <get-MAX_REQUEST_BYTES>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_REQUEST_BYTES.<get-MAX_REQUEST_BYTES>|<get-MAX_REQUEST_BYTES>(){}[0]
+    final const val MAX_STAT_NOTE_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_STAT_NOTE_CHARS|{}MAX_STAT_NOTE_CHARS[0]
+        final fun <get-MAX_STAT_NOTE_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_STAT_NOTE_CHARS.<get-MAX_STAT_NOTE_CHARS>|<get-MAX_STAT_NOTE_CHARS>(){}[0]
+    final const val MAX_STAT_VALUE_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_STAT_VALUE_CHARS|{}MAX_STAT_VALUE_CHARS[0]
+        final fun <get-MAX_STAT_VALUE_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_STAT_VALUE_CHARS.<get-MAX_STAT_VALUE_CHARS>|<get-MAX_STAT_VALUE_CHARS>(){}[0]
+    final const val MAX_TABLE_COLUMNS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TABLE_COLUMNS|{}MAX_TABLE_COLUMNS[0]
+        final fun <get-MAX_TABLE_COLUMNS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TABLE_COLUMNS.<get-MAX_TABLE_COLUMNS>|<get-MAX_TABLE_COLUMNS>(){}[0]
+    final const val MAX_TABLE_ROWS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TABLE_ROWS|{}MAX_TABLE_ROWS[0]
+        final fun <get-MAX_TABLE_ROWS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TABLE_ROWS.<get-MAX_TABLE_ROWS>|<get-MAX_TABLE_ROWS>(){}[0]
     final const val MAX_TEXT_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TEXT_CHARS|{}MAX_TEXT_CHARS[0]
         final fun <get-MAX_TEXT_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TEXT_CHARS.<get-MAX_TEXT_CHARS>|<get-MAX_TEXT_CHARS>(){}[0]
     final const val MAX_TITLE_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TITLE_CHARS|{}MAX_TITLE_CHARS[0]
         final fun <get-MAX_TITLE_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_TITLE_CHARS.<get-MAX_TITLE_CHARS>|<get-MAX_TITLE_CHARS>(){}[0]
     final const val MAX_VALUE_CHARS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_VALUE_CHARS|{}MAX_VALUE_CHARS[0]
         final fun <get-MAX_VALUE_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MAX_VALUE_CHARS.<get-MAX_VALUE_CHARS>|<get-MAX_VALUE_CHARS>(){}[0]
+    final const val MIN_CHART_POINTS // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MIN_CHART_POINTS|{}MIN_CHART_POINTS[0]
+        final fun <get-MIN_CHART_POINTS>(): kotlin/Int // com.letta.mobile.data.canvas.compose/CanvasComposeContract.MIN_CHART_POINTS.<get-MIN_CHART_POINTS>|<get-MIN_CHART_POINTS>(){}[0]
     final const val NOTE_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.NOTE_WIDTH|{}NOTE_WIDTH[0]
         final fun <get-NOTE_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.NOTE_WIDTH.<get-NOTE_WIDTH>|<get-NOTE_WIDTH>(){}[0]
+    final const val PROGRESS_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.PROGRESS_WIDTH|{}PROGRESS_WIDTH[0]
+        final fun <get-PROGRESS_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.PROGRESS_WIDTH.<get-PROGRESS_WIDTH>|<get-PROGRESS_WIDTH>(){}[0]
     final const val REFUSAL_HINT // com.letta.mobile.data.canvas.compose/CanvasComposeContract.REFUSAL_HINT|{}REFUSAL_HINT[0]
         final fun <get-REFUSAL_HINT>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeContract.REFUSAL_HINT.<get-REFUSAL_HINT>|<get-REFUSAL_HINT>(){}[0]
+    final const val STAT_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.STAT_WIDTH|{}STAT_WIDTH[0]
+        final fun <get-STAT_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.STAT_WIDTH.<get-STAT_WIDTH>|<get-STAT_WIDTH>(){}[0]
+    final const val TABLE_MEDIUM_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TABLE_MEDIUM_WIDTH|{}TABLE_MEDIUM_WIDTH[0]
+        final fun <get-TABLE_MEDIUM_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TABLE_MEDIUM_WIDTH.<get-TABLE_MEDIUM_WIDTH>|<get-TABLE_MEDIUM_WIDTH>(){}[0]
+    final const val TABLE_WIDE_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TABLE_WIDE_WIDTH|{}TABLE_WIDE_WIDTH[0]
+        final fun <get-TABLE_WIDE_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TABLE_WIDE_WIDTH.<get-TABLE_WIDE_WIDTH>|<get-TABLE_WIDE_WIDTH>(){}[0]
     final const val TEXT_BODY_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TEXT_BODY_WIDTH|{}TEXT_BODY_WIDTH[0]
         final fun <get-TEXT_BODY_WIDTH>(): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TEXT_BODY_WIDTH.<get-TEXT_BODY_WIDTH>|<get-TEXT_BODY_WIDTH>(){}[0]
     final const val TEXT_HEADING_WIDTH // com.letta.mobile.data.canvas.compose/CanvasComposeContract.TEXT_HEADING_WIDTH|{}TEXT_HEADING_WIDTH[0]
@@ -70630,7 +71477,9 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeContract { // com
     final fun isColor(kotlin/String): kotlin/Boolean // com.letta.mobile.data.canvas.compose/CanvasComposeContract.isColor|isColor(kotlin.String){}[0]
     final fun isKey(kotlin/String): kotlin/Boolean // com.letta.mobile.data.canvas.compose/CanvasComposeContract.isKey|isKey(kotlin.String){}[0]
     final fun refusal(com.letta.mobile.data.canvas.compose/ComposeErrorCode, kotlin.collections/List<com.letta.mobile.data.canvas.compose/ComposeProblem>): com.letta.mobile.data.canvas.compose/ComposeRefusal // com.letta.mobile.data.canvas.compose/CanvasComposeContract.refusal|refusal(com.letta.mobile.data.canvas.compose.ComposeErrorCode;kotlin.collections.List<com.letta.mobile.data.canvas.compose.ComposeProblem>){}[0]
+    final fun tableWidth(kotlin/Int): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.tableWidth|tableWidth(kotlin.Int){}[0]
     final fun width(com.letta.mobile.data.canvas.compose/ComposeKind, com.letta.mobile.data.canvas.compose/ComposeTextSize? = ...): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.width|width(com.letta.mobile.data.canvas.compose.ComposeKind;com.letta.mobile.data.canvas.compose.ComposeTextSize?){}[0]
+    final fun widthOf(com.letta.mobile.data.canvas.compose/ComposeItem): kotlin/Float // com.letta.mobile.data.canvas.compose/CanvasComposeContract.widthOf|widthOf(com.letta.mobile.data.canvas.compose.ComposeItem){}[0]
 }
 
 final object com.letta.mobile.data.canvas.compose/CanvasComposeGuide { // com.letta.mobile.data.canvas.compose/CanvasComposeGuide|null[0]
@@ -70674,12 +71523,15 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeIds { // com.lett
         final fun <get-DERIVED_PREFIX>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.DERIVED_PREFIX.<get-DERIVED_PREFIX>|<get-DERIVED_PREFIX>(){}[0]
     final const val LABEL_SUFFIX // com.letta.mobile.data.canvas.compose/CanvasComposeIds.LABEL_SUFFIX|{}LABEL_SUFFIX[0]
         final fun <get-LABEL_SUFFIX>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.LABEL_SUFFIX.<get-LABEL_SUFFIX>|<get-LABEL_SUFFIX>(){}[0]
+    final const val PART_SEPARATOR // com.letta.mobile.data.canvas.compose/CanvasComposeIds.PART_SEPARATOR|{}PART_SEPARATOR[0]
+        final fun <get-PART_SEPARATOR>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.PART_SEPARATOR.<get-PART_SEPARATOR>|<get-PART_SEPARATOR>(){}[0]
     final const val PREFIX // com.letta.mobile.data.canvas.compose/CanvasComposeIds.PREFIX|{}PREFIX[0]
         final fun <get-PREFIX>(): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.PREFIX.<get-PREFIX>|<get-PREFIX>(){}[0]
 
     final fun defaultKey(kotlin/Int, kotlin/Int? = ...): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.defaultKey|defaultKey(kotlin.Int;kotlin.Int?){}[0]
     final fun derived(com.letta.mobile.runtime/ToolCallId?): com.letta.mobile.data.model/CanvasArtifactId // com.letta.mobile.data.canvas.compose/CanvasComposeIds.derived|derived(com.letta.mobile.runtime.ToolCallId?){}[0]
     final fun label(com.letta.mobile.data.model/CanvasArtifactId, kotlin/String): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.label|label(com.letta.mobile.data.model.CanvasArtifactId;kotlin.String){}[0]
+    final fun part(com.letta.mobile.data.model/CanvasArtifactId, kotlin/String, kotlin/String): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.part|part(com.letta.mobile.data.model.CanvasArtifactId;kotlin.String;kotlin.String){}[0]
     final fun piece(com.letta.mobile.data.model/CanvasArtifactId, kotlin/String): kotlin/String // com.letta.mobile.data.canvas.compose/CanvasComposeIds.piece|piece(com.letta.mobile.data.model.CanvasArtifactId;kotlin.String){}[0]
 }
 
@@ -70764,6 +71616,16 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeReserve { // com.
         final fun <get-QUOTE_INSET>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.QUOTE_INSET.<get-QUOTE_INSET>|<get-QUOTE_INSET>(){}[0]
     final const val SAFETY_FACTOR // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.SAFETY_FACTOR|{}SAFETY_FACTOR[0]
         final fun <get-SAFETY_FACTOR>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.SAFETY_FACTOR.<get-SAFETY_FACTOR>|<get-SAFETY_FACTOR>(){}[0]
+    final const val TABLE_BLOCK_PADDING // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_BLOCK_PADDING|{}TABLE_BLOCK_PADDING[0]
+        final fun <get-TABLE_BLOCK_PADDING>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_BLOCK_PADDING.<get-TABLE_BLOCK_PADDING>|<get-TABLE_BLOCK_PADDING>(){}[0]
+    final const val TABLE_CELL_PADDING_H // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_CELL_PADDING_H|{}TABLE_CELL_PADDING_H[0]
+        final fun <get-TABLE_CELL_PADDING_H>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_CELL_PADDING_H.<get-TABLE_CELL_PADDING_H>|<get-TABLE_CELL_PADDING_H>(){}[0]
+    final const val TABLE_CELL_PADDING_V // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_CELL_PADDING_V|{}TABLE_CELL_PADDING_V[0]
+        final fun <get-TABLE_CELL_PADDING_V>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_CELL_PADDING_V.<get-TABLE_CELL_PADDING_V>|<get-TABLE_CELL_PADDING_V>(){}[0]
+    final const val TABLE_FONT // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_FONT|{}TABLE_FONT[0]
+        final fun <get-TABLE_FONT>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_FONT.<get-TABLE_FONT>|<get-TABLE_FONT>(){}[0]
+    final const val TABLE_RULE // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_RULE|{}TABLE_RULE[0]
+        final fun <get-TABLE_RULE>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TABLE_RULE.<get-TABLE_RULE>|<get-TABLE_RULE>(){}[0]
     final const val TEXT_BODY_FONT // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TEXT_BODY_FONT|{}TEXT_BODY_FONT[0]
         final fun <get-TEXT_BODY_FONT>(): kotlin/Double // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TEXT_BODY_FONT.<get-TEXT_BODY_FONT>|<get-TEXT_BODY_FONT>(){}[0]
     final const val TEXT_HEADING_FONT // com.letta.mobile.data.canvas.compose/CanvasComposeReserve.TEXT_HEADING_FONT|{}TEXT_HEADING_FONT[0]
@@ -70782,6 +71644,8 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeReserve { // com.
 }
 
 final object com.letta.mobile.data.canvas.compose/CanvasComposeSchema { // com.letta.mobile.data.canvas.compose/CanvasComposeSchema|null[0]
+    final val child // com.letta.mobile.data.canvas.compose/CanvasComposeSchema.child|{}child[0]
+        final fun <get-child>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.compose/CanvasComposeSchema.child.<get-child>|<get-child>(){}[0]
     final val input // com.letta.mobile.data.canvas.compose/CanvasComposeSchema.input|{}input[0]
         final fun <get-input>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.compose/CanvasComposeSchema.input.<get-input>|<get-input>(){}[0]
     final val item // com.letta.mobile.data.canvas.compose/CanvasComposeSchema.item|{}item[0]
@@ -71662,6 +72526,23 @@ final object com.letta.mobile.data.context/ContextWindowUsagePolicy { // com.let
     final fun readTotal(kotlin/Int, kotlin/Int?): com.letta.mobile.data.context/ContextWindowUsageState // com.letta.mobile.data.context/ContextWindowUsagePolicy.readTotal|readTotal(kotlin.Int;kotlin.Int?){}[0]
     final fun readable(com.letta.mobile.data.context/ContextWindowUsageKey): kotlin/Boolean // com.letta.mobile.data.context/ContextWindowUsagePolicy.readable|readable(com.letta.mobile.data.context.ContextWindowUsageKey){}[0]
     final fun reading(com.letta.mobile.data.context/ContextWindowUsageState, com.letta.mobile.data.context/ContextWindowUsageKey, com.letta.mobile.data.context/ContextWindowUsageKey?): com.letta.mobile.data.context/ContextWindowUsageState // com.letta.mobile.data.context/ContextWindowUsagePolicy.reading|reading(com.letta.mobile.data.context.ContextWindowUsageState;com.letta.mobile.data.context.ContextWindowUsageKey;com.letta.mobile.data.context.ContextWindowUsageKey?){}[0]
+}
+
+final object com.letta.mobile.data.controller.extras.relay/AppToolRelay { // com.letta.mobile.data.controller.extras.relay/AppToolRelay|null[0]
+    final const val CAPABILITY // com.letta.mobile.data.controller.extras.relay/AppToolRelay.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelay.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val REQUEST_TYPE // com.letta.mobile.data.controller.extras.relay/AppToolRelay.REQUEST_TYPE|{}REQUEST_TYPE[0]
+        final fun <get-REQUEST_TYPE>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelay.REQUEST_TYPE.<get-REQUEST_TYPE>|<get-REQUEST_TYPE>(){}[0]
+    final const val RESPONSE_TYPE // com.letta.mobile.data.controller.extras.relay/AppToolRelay.RESPONSE_TYPE|{}RESPONSE_TYPE[0]
+        final fun <get-RESPONSE_TYPE>(): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelay.RESPONSE_TYPE.<get-RESPONSE_TYPE>|<get-RESPONSE_TYPE>(){}[0]
+}
+
+final object com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames { // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames|null[0]
+    final fun decodeRequest(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.controller.extras.relay/AppToolCallRequest? // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.decodeRequest|decodeRequest(kotlinx.serialization.json.JsonObject){}[0]
+    final fun decodeResponse(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.controller.extras.relay/AppToolCallResponse? // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.decodeResponse|decodeResponse(kotlinx.serialization.json.JsonObject){}[0]
+    final fun encode(com.letta.mobile.data.controller.extras.relay/AppToolCallRequest): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.encode|encode(com.letta.mobile.data.controller.extras.relay.AppToolCallRequest){}[0]
+    final fun encode(com.letta.mobile.data.controller.extras.relay/AppToolCallResponse): kotlin/String // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.encode|encode(com.letta.mobile.data.controller.extras.relay.AppToolCallResponse){}[0]
+    final fun typeOf(kotlinx.serialization.json/JsonObject): kotlin/String? // com.letta.mobile.data.controller.extras.relay/AppToolRelayFrames.typeOf|typeOf(kotlinx.serialization.json.JsonObject){}[0]
 }
 
 final object com.letta.mobile.data.controller/AppServerApprovalDecisions { // com.letta.mobile.data.controller/AppServerApprovalDecisions|null[0]
@@ -73199,6 +74080,57 @@ final object com.letta.mobile.data.session.graph/SharedSessionGraph { // com.let
     final fun transportBound(com.letta.mobile.data.transport.api/IChannelTransport, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.context/ContextReadingSnapshots? = ..., com.letta.mobile.data.session.graph/SubagentListing = ...): com.letta.mobile.data.session.graph/TransportBoundSessionRepositories // com.letta.mobile.data.session.graph/SharedSessionGraph.transportBound|transportBound(com.letta.mobile.data.transport.api.IChannelTransport;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.context.ContextReadingSnapshots?;com.letta.mobile.data.session.graph.SubagentListing){}[0]
 }
 
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog|null[0]
+    final const val MAX_OBJECT_LENGTH // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.MAX_OBJECT_LENGTH|{}MAX_OBJECT_LENGTH[0]
+        final fun <get-MAX_OBJECT_LENGTH>(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.MAX_OBJECT_LENGTH.<get-MAX_OBJECT_LENGTH>|<get-MAX_OBJECT_LENGTH>(){}[0]
+
+    final val lanes // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.lanes|{}lanes[0]
+        final fun <get-lanes>(): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec> // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.lanes.<get-lanes>|<get-lanes>(){}[0]
+
+    final fun label(kotlin/String, com.letta.mobile.data.shell.layout/ModuleSlot): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.label|label(kotlin.String;com.letta.mobile.data.shell.layout.ModuleSlot){}[0]
+    final fun lane(kotlin/String): com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneSpec? // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.lane|lane(kotlin.String){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits { // com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits|null[0]
+    final const val MAX_OPS // com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits.MAX_OPS|{}MAX_OPS[0]
+        final fun <get-MAX_OPS>(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits.MAX_OPS.<get-MAX_OPS>|<get-MAX_OPS>(){}[0]
+
+    final fun apply(com.letta.mobile.data.shell.layout/ShellLayoutConfig, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutOp>): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits.apply|apply(com.letta.mobile.data.shell.layout.ShellLayoutConfig;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutOp>){}[0]
+    final fun changes(com.letta.mobile.data.shell.layout/ShellLayoutConfig, com.letta.mobile.data.shell.layout/ShellLayoutConfig): kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits.changes|changes(com.letta.mobile.data.shell.layout.ShellLayoutConfig;com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    final fun slots(com.letta.mobile.data.shell.layout/ShellLayoutConfig, kotlin/String): kotlin.collections/List<com.letta.mobile.data.shell.layout/ModuleSlot> // com.letta.mobile.data.shell.layout.edit/ShellLayoutEdits.slots|slots(com.letta.mobile.data.shell.layout.ShellLayoutConfig;kotlin.String){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts { // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts|null[0]
+    final fun checked(com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult.Applied, kotlin/Boolean): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.checked|checked(com.letta.mobile.data.shell.layout.edit.ShellLayoutEditResult.Applied;kotlin.Boolean){}[0]
+    final fun committed(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction, com.letta.mobile.data.shell.layout.edit/ShellLayoutCommit): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.committed|committed(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction;com.letta.mobile.data.shell.layout.edit.ShellLayoutCommit){}[0]
+    final fun current(com.letta.mobile.data.shell.layout/ShellLayoutConfig, kotlin/Int): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.current|current(com.letta.mobile.data.shell.layout.ShellLayoutConfig;kotlin.Int){}[0]
+    final fun noShell(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.noShell|noShell(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction){}[0]
+    final fun refused(com.letta.mobile.data.shell.layout.edit/ShellLayoutAction?, kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutEditError>): com.letta.mobile.data.controller.extras/ExternalToolResult // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.refused|refused(com.letta.mobile.data.shell.layout.edit.ShellLayoutAction?;kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutEditError>){}[0]
+    final fun summary(kotlin.collections/List<com.letta.mobile.data.shell.layout.edit/ShellLayoutLaneChange>): kotlin/String // com.letta.mobile.data.shell.layout.edit/ShellLayoutReceipts.summary|summary(kotlin.collections.List<com.letta.mobile.data.shell.layout.edit.ShellLayoutLaneChange>){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay { // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay|null[0]
+    final val TOOLS // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.TOOLS|{}TOOLS[0]
+        final fun <get-TOOLS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.TOOLS.<get-TOOLS>|<get-TOOLS>(){}[0]
+
+    final fun answerer(com.letta.mobile.data.shell.layout.edit/ShellLayoutAgentPort = ...): com.letta.mobile.data.controller.extras.relay/AppToolRelayAnswerer // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.answerer|answerer(com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort){}[0]
+    final fun host(kotlin.time/Duration = ...): com.letta.mobile.data.controller.extras.relay/AppToolRelayHost // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.host|host(kotlin.time.Duration){}[0]
+    final fun hostTools(com.letta.mobile.data.controller.extras.relay/AppToolRelayHost): kotlin.collections/List<com.letta.mobile.data.controller.extras/HostExternalTool> // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.hostTools|hostTools(com.letta.mobile.data.controller.extras.relay.AppToolRelayHost){}[0]
+    final fun install(): kotlin/AutoCloseable // com.letta.mobile.data.shell.layout.edit/ShellLayoutRelay.install|install(){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutSchema { // com.letta.mobile.data.shell.layout.edit/ShellLayoutSchema|null[0]
+    final val input // com.letta.mobile.data.shell.layout.edit/ShellLayoutSchema.input|{}input[0]
+        final fun <get-input>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.shell.layout.edit/ShellLayoutSchema.input.<get-input>|<get-input>(){}[0]
+}
+
+final object com.letta.mobile.data.shell.layout.edit/ShellLayoutToolInput { // com.letta.mobile.data.shell.layout.edit/ShellLayoutToolInput|null[0]
+    final val opNames // com.letta.mobile.data.shell.layout.edit/ShellLayoutToolInput.opNames|{}opNames[0]
+        final fun <get-opNames>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.shell.layout.edit/ShellLayoutToolInput.opNames.<get-opNames>|<get-opNames>(){}[0]
+
+    final fun read(kotlinx.serialization.json/JsonObject): com.letta.mobile.data.shell.layout.edit/ShellLayoutReading // com.letta.mobile.data.shell.layout.edit/ShellLayoutToolInput.read|read(kotlinx.serialization.json.JsonObject){}[0]
+}
+
 final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile.data.shell.layout/ShellLanes|null[0]
     final const val HOME // com.letta.mobile.data.shell.layout/ShellLanes.HOME|{}HOME[0]
         final fun <get-HOME>(): kotlin/String // com.letta.mobile.data.shell.layout/ShellLanes.HOME.<get-HOME>|<get-HOME>(){}[0]
@@ -73219,6 +74151,8 @@ final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile
         final fun <get-PAGE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.PAGE.<get-PAGE>|<get-PAGE>(){}[0]
     final val SIDE_PANE // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE|{}SIDE_PANE[0]
         final fun <get-SIDE_PANE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE.<get-SIDE_PANE>|<get-SIDE_PANE>(){}[0]
+    final val TASKS // com.letta.mobile.data.shell.layout/ShellViews.TASKS|{}TASKS[0]
+        final fun <get-TASKS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.TASKS.<get-TASKS>|<get-TASKS>(){}[0]
 }
 
 final object com.letta.mobile.data.shell.sidemenu/PanelViews { // com.letta.mobile.data.shell.sidemenu/PanelViews|null[0]

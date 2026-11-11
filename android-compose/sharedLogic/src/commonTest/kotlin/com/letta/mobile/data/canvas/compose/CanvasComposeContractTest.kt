@@ -21,7 +21,12 @@ class CanvasComposeContractTest {
     @Test
     fun theCatalogAndItsCapsAreTheOnesThePlanFixed() {
         assertEquals("letta.canvas.compose", CanvasComposeContract.CATALOG)
-        assertEquals(1, CanvasComposeContract.VERSION)
+        assertEquals(2, CanvasComposeContract.VERSION)
+        assertEquals(listOf(1, 2), CanvasComposeContract.SUPPORTED_VERSIONS)
+        assertEquals(6, CanvasComposeContract.MAX_TABLE_COLUMNS)
+        assertEquals(20, CanvasComposeContract.MAX_TABLE_ROWS)
+        assertEquals(60, CanvasComposeContract.MAX_CELL_CHARS)
+        assertEquals(12, CanvasComposeContract.MAX_CHART_POINTS)
         assertEquals(24, CanvasComposeContract.MAX_ITEMS)
         assertEquals(40, CanvasComposeContract.MAX_CHECKLIST_ITEMS)
         assertEquals(4_000, CanvasComposeContract.MAX_MARKDOWN_CHARS)
@@ -38,6 +43,10 @@ class CanvasComposeContractTest {
         assertEquals(320f, CanvasComposeContract.width(ComposeKind.CARD))
         assertEquals(480f, CanvasComposeContract.width(ComposeKind.TEXT, ComposeTextSize.HEADING))
         assertEquals(320f, CanvasComposeContract.width(ComposeKind.TEXT, ComposeTextSize.BODY))
+        assertEquals(240f, CanvasComposeContract.width(ComposeKind.STAT))
+        assertEquals(320f, CanvasComposeContract.width(ComposeKind.PROGRESS))
+        assertEquals(480f, CanvasComposeContract.width(ComposeKind.CHART))
+        assertEquals(480f, CanvasComposeContract.widthOf(ComposeItem.Table(columns = listOf("a", "b", "c"), rows = emptyList())))
     }
 
     @Test
@@ -96,17 +105,20 @@ class CanvasComposeContractTest {
         val refusal = refusalOf(CanvasComposeContract.decode(request))
         assertEquals(ComposeErrorCode.VALIDATION_FAILED, refusal.code)
         assertSingleProblem(refusal, "/items/2/kind", ComposeProblemCode.UNKNOWN_KIND)
-        assertEquals("'STICKY' is not a kind; use NOTE, CHECKLIST, CARD, TEXT or GROUP", refusal.problems.single().message)
+        assertEquals(
+            "'STICKY' is not a kind; use NOTE, CHECKLIST, CARD, TEXT, TABLE, STAT, PROGRESS, CHART or GROUP",
+            refusal.problems.single().message,
+        )
         assertFalse(refusal.ok)
         assertEquals(CanvasComposeContract.REFUSAL_HINT, refusal.hint)
     }
 
     @Test
     fun anotherVersionOrCatalogIsUnsupportedNotMalformed() {
-        val version = refusalOf(CanvasComposeContract.decode(ComposeJson.with(example, "/version", JsonPrimitive(2))))
+        val version = refusalOf(CanvasComposeContract.decode(ComposeJson.with(example, "/version", JsonPrimitive(3))))
         assertEquals(ComposeErrorCode.UNSUPPORTED_VERSION, version.code)
         assertSingleProblem(version, "/version", ComposeProblemCode.BAD_VALUE)
-        assertTrue("supported: 1" in version.problems.single().message)
+        assertTrue("supported: 1, 2" in version.problems.single().message)
 
         val catalog = refusalOf(CanvasComposeContract.decode(ComposeJson.with(example, "/catalog", JsonPrimitive("a2ui.basic"))))
         assertEquals(ComposeErrorCode.UNSUPPORTED_VERSION, catalog.code)
@@ -164,7 +176,7 @@ class CanvasComposeContractTest {
         )
         assertEquals(
             """{"artifact_id":"a","canvas_id":"c","catalog":"letta.canvas.compose","items":[{"id":"cmp-a-i1","key":"i1","kind":"NOTE"}],""" +
-                """"ok":true,"status":"dry_run","version":1,"warnings":[]}""",
+                """"ok":true,"status":"dry_run","version":2,"warnings":[]}""",
             ComposeJson.canonical(receipt),
         )
         val refusal = CanvasComposeContract.refusal(
@@ -172,7 +184,7 @@ class CanvasComposeContractTest {
         )
         assertEquals(
             """{"catalog":"letta.canvas.compose","code":"BOARD_REFUSED","hint":${JsonPrimitive(CanvasComposeContract.REFUSAL_HINT)},""" +
-                """"ok":false,"problems":[{"code":"document.size","message":"too big","path":"/items/0"}],"version":1}""",
+                """"ok":false,"problems":[{"code":"document.size","message":"too big","path":"/items/0"}],"version":2}""",
             ComposeJson.canonical(CanvasComposeContract.json.encodeToJsonElement(ComposeRefusal.serializer(), refusal)),
         )
     }

@@ -241,6 +241,7 @@ internal class StandardSectionInputs(
             SettingsGroup.Appearance -> {
                 AccessibilitySettingsSection()
                 services.appearance?.let { AppearanceSettingsSection(it) }
+                LayoutSettingsSection()
             }
             SettingsGroup.Chat -> services.chat?.let { ChatSettingsSection(it) }
             SettingsGroup.Notifications -> services.notifications?.let { NotificationSettingsSection(it) }

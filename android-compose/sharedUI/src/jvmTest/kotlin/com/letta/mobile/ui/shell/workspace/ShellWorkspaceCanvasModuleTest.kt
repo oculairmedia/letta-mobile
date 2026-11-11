@@ -31,6 +31,7 @@ import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.canvas.library.CanvasBoardSessions
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
@@ -40,6 +41,8 @@ import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.canvas.LocalCanvasSessionRegistry
 import com.letta.mobile.ui.canvas.boards.CanvasBoardSource
 import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSource
+import com.letta.mobile.ui.canvas.boards.ProvideCanvasBoardSource
+import com.letta.mobile.ui.canvas.boards.canvasBoardSource
 import com.letta.mobile.ui.shell.modules.ShellModuleTags
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
@@ -49,6 +52,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 private const val Page = "canvas-module-page"
 private const val HostPane = "canvas-module-host-pane"
@@ -295,5 +299,53 @@ class ShellWorkspaceCanvasModuleTest {
         }
         assertBoardTitled(NotesId, "Renamed notes")
         assertEquals("Renamed notes", runBlocking { store.get(CanvasId(NotesId)) }?.title, "the store holds the one board's edit")
+    }
+
+    /**
+     * Through the window's table, a board the page holds is the module's session too; the module
+     * gives its hold back when it leaves, and the page keeps the session it still shows.
+     */
+    @Test
+    fun theModuleSharesThePageHoldAndGivesItsOwnBack() = runDesktopComposeUiTest(width = 1440, height = WindowHeight.value.toInt()) {
+        val boards = CanvasBoardSessions(store)
+        val pageSession = runBlocking { boards.acquire(CanvasId(NotesId)) }!!
+        val shown = mutableListOf<CanvasSession?>()
+        val shared = canvasBoardSource(boards)
+        val recording = object : CanvasBoardSource by shared {
+            override suspend fun open(canvasId: CanvasId): CanvasSession? = shared.open(canvasId).also { shown += it }
+        }
+        var config by mutableStateOf(lanes(side = listOf(NotesSlot)))
+        setContent {
+            CompositionLocalProvider(LocalCanvasBoardSource provides recording) {
+                LettaShellWorkspace(state(config), host(), Modifier.size(width = 1440.dp, height = WindowHeight))
+            }
+        }
+        awaitBoard(NotesId)
+        assertBoardTitled(NotesId, NotesTitle)
+        assertSame(pageSession, shown.single(), "the module shows the session the page holds")
+        assertEquals(2, boards.holds(CanvasId(NotesId)))
+
+        config = lanes()
+        waitUntil(timeoutMillis = TimeoutMillis) { boards.holds(CanvasId(NotesId)) == 1 }
+        assertSame(pageSession, runBlocking { boards.acquire(CanvasId(NotesId)) }, "the page still has its session")
+    }
+
+    /** A board only the module held is forgotten once the module leaves, so it is read afresh next time. */
+    @Test
+    fun aModuleLeavingGivesBackTheOnlyHold() = runDesktopComposeUiTest(width = 1200, height = WindowHeight.value.toInt()) {
+        val boards = CanvasBoardSessions(store)
+        var config by mutableStateOf(lanes(side = listOf(PlanSlot)))
+        setContent {
+            ProvideCanvasBoardSource(boards) {
+                LettaShellWorkspace(state(config), host(), Modifier.size(width = 1200.dp, height = WindowHeight))
+            }
+        }
+        awaitBoard(PlanId)
+        assertBoardTitled(PlanId, PlanTitle)
+        assertEquals(1, boards.holds(CanvasId(PlanId)))
+
+        config = lanes()
+        waitUntil(timeoutMillis = TimeoutMillis) { boards.holds(CanvasId(PlanId)) == 0 }
+        onNodeWithTag(boardTag(PlanId)).assertDoesNotExist()
     }
 }

@@ -16,7 +16,7 @@ import com.letta.mobile.data.shell.FocusAvailability
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
-import com.letta.mobile.ui.canvas.ProvideCanvasHost
+import com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellSearchContext
@@ -65,9 +65,9 @@ internal fun LettaDesktopApp(
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
-        ProvideCanvasHost(context.core.canvasShell.sessions, context.core.canvasShell.viewers) {
+        ProvideCanvasHostWithBoards(context.core.canvasShell.sessions, context.core.canvasShell.viewers, context.core.canvasShell.boards) {
             DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
-                // Boards register where the canvas_* tools look (n2stx.2.1); the header hoists into the title bar (3arhe.1).
+                // Boards register where the canvas_* tools look and open by id for canvas modules; the header hoists into the title bar.
                 val header = DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange)
                 DesktopShellWindowContent(context, frame, header)
             }

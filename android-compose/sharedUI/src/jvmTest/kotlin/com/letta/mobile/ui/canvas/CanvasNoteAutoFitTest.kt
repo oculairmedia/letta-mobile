@@ -124,7 +124,10 @@ class CanvasNoteAutoFitTest {
             listOf("shopping" to CanvasNoteAutoFitFixtures.shoppingList, "meals" to CanvasNoteAutoFitFixtures.mealPlan)
         documents.forEach { (name, json) ->
             val report = DocumentSchema.decodeFromStringWithReport(json)
+            // The board's table block is a custom type: the library keeps it by its type id, and the
+            // board's block registry draws it (CanvasTableBlock).
             val unknown = report.warnings.filterIsInstance<DocumentDecodeWarning.UnknownBlockTypePreserved>()
+                .filter { CanvasTableBlock.TYPE_ID !in it.toString() }
             assertTrue(unknown.isEmpty(), "$name: $unknown")
         }
     }

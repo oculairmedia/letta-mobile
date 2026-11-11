@@ -69,6 +69,7 @@ import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
 import com.letta.mobile.ui.shell.sidebar.LocalPanelLane
+import com.letta.mobile.ui.settings.LocalShellLayoutReset
 import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
 import com.letta.mobile.ui.a11y.accessibilityTraversal
@@ -113,6 +114,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                         .then(rememberShellShortcuts(host.events.shortcuts))
                         .railLightDismiss(state.navigation.rail.expanded, host.actions.onRailDismiss),
                 ) {
+                    ShellLayoutChangeNotices(state.navigation.rail.agents)
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val width = maxWidth
                         LaunchedEffect(width) { host.events.onWidthChanged(width.value) }
@@ -127,6 +129,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalHomeLane provides state.layout.lanes.homeLane().map { it.view },
                                 LocalRailLane provides remember(state.layout.lanes) { state.layout.lanes.railLane().map { it.view } },
                                 LocalPanelLane provides remember(state.layout.lanes) { state.layout.lanes.panelLane().map { it.view } },
+                                LocalShellLayoutReset provides rememberShellLayoutReset(),
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {
@@ -298,7 +301,7 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
             )
             VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
-        ShellWorkspaceLanes(frame.host, frame.state.layout.lanes, inspectors, compact = false)
+        ShellWorkspaceLanes(frame.host, frame.state, inspectors, compact = false)
     }
 }
 
@@ -328,7 +331,7 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floati
         // not under that, so its sheet still pads its rail and panel below the status bar.
         Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
             Row(Modifier.fillMaxSize()) {
-                ShellWorkspaceLanes(frame.host, frame.state.layout.lanes, inspectors, compact = true)
+                ShellWorkspaceLanes(frame.host, frame.state, inspectors, compact = true)
             }
             floating?.let { ShellFloatingHeader(it) }
         }

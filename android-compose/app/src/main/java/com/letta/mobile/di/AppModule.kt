@@ -63,6 +63,7 @@ import com.letta.mobile.platform.systemaccess.SystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessEnvironment
 import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
 import com.letta.mobile.runtime.actions.DeviceActionExternalTool
+import com.letta.mobile.data.shell.layout.edit.ShellLayoutTool
 import com.letta.mobile.startup.AppStartupActions
 import com.letta.mobile.startup.DefaultAppStartupActions
 import dagger.Binds
@@ -83,18 +84,33 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        // Only device actions are this phone's to answer. canvas_* is the Iroh host's: it offers them
-        // on every runtime it serves, backed by the relay's log (letta-mobile-aknkw), and ignores
-        // any tools an app sends with runtime_start, so a copy here never reached a runtime.
+        // Only device actions and the shell layout are this phone's to answer. canvas_* is the Iroh host's: it
+        // offers them on every runtime it serves, backed by the relay's log (letta-mobile-aknkw), and ignores
+        // any tools an app sends with runtime_start, so a copy here never reached a runtime. The same holds for
+        // these two: they reach agents on a direct or on-device App Server, not through an Iroh host.
         fun provideAndroidExternalToolRegistry(
             runner: DeviceActionCommandRunner,
-        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(listOf(DeviceActionExternalTool(runner)))
+        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(listOf(DeviceActionExternalTool(runner), ShellLayoutTool()))
 
         /** One registry per process here, but owned by the graph so it dies with it. */
         @Provides
         @Singleton
         fun provideCanvasSessionRegistry(): com.letta.mobile.data.canvas.CanvasSessionRegistry =
             com.letta.mobile.data.canvas.CanvasSessionRegistry()
+
+        /**
+         * One live session per stored board for the activity that asks (its canvas modules open
+         * boards through it); unscoped, so each owner gets its own table and its holds die with it.
+         */
+        @Provides
+        fun provideCanvasBoardSessions(
+            store: CanvasDocumentStore,
+            opLog: com.letta.mobile.data.canvas.CanvasOpLog,
+            syncTransport: com.letta.mobile.data.canvas.CanvasSyncTransport,
+        ): com.letta.mobile.data.canvas.library.CanvasBoardSessions = com.letta.mobile.data.canvas.library.CanvasBoardSessions(
+            store,
+            com.letta.mobile.data.canvas.CanvasConversationOptions(opLog = opLog, syncTransport = syncTransport),
+        )
 
         /**
          * Shares canvases through the Iroh host every session graph connects to (attached by

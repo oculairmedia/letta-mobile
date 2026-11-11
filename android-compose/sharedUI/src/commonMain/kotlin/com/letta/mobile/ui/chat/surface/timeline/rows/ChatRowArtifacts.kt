@@ -51,9 +51,13 @@ import com.letta.mobile.sharedui.resources.rows_canvas_dry_run
 import com.letta.mobile.sharedui.resources.rows_canvas_failed
 import com.letta.mobile.sharedui.resources.rows_canvas_items
 import com.letta.mobile.sharedui.resources.rows_canvas_kind_card
+import com.letta.mobile.sharedui.resources.rows_canvas_kind_chart
 import com.letta.mobile.sharedui.resources.rows_canvas_kind_checklist
 import com.letta.mobile.sharedui.resources.rows_canvas_kind_group
 import com.letta.mobile.sharedui.resources.rows_canvas_kind_note
+import com.letta.mobile.sharedui.resources.rows_canvas_kind_progress
+import com.letta.mobile.sharedui.resources.rows_canvas_kind_stat
+import com.letta.mobile.sharedui.resources.rows_canvas_kind_table
 import com.letta.mobile.sharedui.resources.rows_canvas_kind_text
 import com.letta.mobile.sharedui.resources.rows_canvas_more_problems
 import com.letta.mobile.sharedui.resources.rows_canvas_pending
@@ -304,4 +308,8 @@ private fun ComposeKind.label(): StringResource = when (this) {
     ComposeKind.CARD -> Res.string.rows_canvas_kind_card
     ComposeKind.TEXT -> Res.string.rows_canvas_kind_text
     ComposeKind.GROUP -> Res.string.rows_canvas_kind_group
+    ComposeKind.TABLE -> Res.string.rows_canvas_kind_table
+    ComposeKind.STAT -> Res.string.rows_canvas_kind_stat
+    ComposeKind.PROGRESS -> Res.string.rows_canvas_kind_progress
+    ComposeKind.CHART -> Res.string.rows_canvas_kind_chart
 }

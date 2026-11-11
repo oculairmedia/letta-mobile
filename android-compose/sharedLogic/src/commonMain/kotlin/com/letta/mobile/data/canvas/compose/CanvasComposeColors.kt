@@ -28,6 +28,27 @@ object CanvasComposeColors {
     const val GROUP_STROKE = "#9e9e9eff"
     const val GROUP_FILL = "#f5f5f5ff"
 
+    /** A drawn item's frame (STAT, PROGRESS, CHART): white with a light edge, like a CARD. */
+    const val DRAWING_FILL = "#ffffffff"
+    const val DRAWING_STROKE = "#e0e0e0ff"
+
+    /** Secondary text in a drawn item: labels, captions, chart axis labels. */
+    const val MUTED = "#616161ff"
+
+    /** A progress bar's empty track, a chart's baseline, and the accent its bars, line and fill take. */
+    const val TRACK = "#e0e0e0ff"
+    const val AXIS = "#9e9e9eff"
+    const val ACCENT = "#1e88e5ff"
+
+    /** The colour of [tone]: neutral grey, positive green, negative red, warning orange; [fallback] for none. */
+    fun tone(tone: ComposeTone?, fallback: String): String = when (tone) {
+        null -> fallback
+        ComposeTone.NEUTRAL -> MUTED
+        ComposeTone.POSITIVE -> "#2e7d32ff"
+        ComposeTone.NEGATIVE -> "#c62828ff"
+        ComposeTone.WARNING -> "#e65100ff"
+    }
+
     /**
      * The stored colour for [requested] (already validated against [CanvasComposeContract.COLOR_PATTERN]):
      * a preset's tint or the hex in lower case; [fallback] when none was asked for (null is the

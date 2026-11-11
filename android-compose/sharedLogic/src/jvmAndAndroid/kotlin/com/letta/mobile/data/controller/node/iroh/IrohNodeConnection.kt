@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.extras.relay.AppToolRelay
+import com.letta.mobile.data.controller.extras.relay.AppToolRelayLink
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
@@ -153,6 +155,30 @@ class IrohNodeConnection(
 
     private fun peerSupportsFrameParts(): Boolean =
         IrohFrameCodec.FRAME_PART_CAPABILITY in peerCapabilities.get()
+
+    /**
+     * This connection's end of the app-tool relay, set by the endpoint before [serve] when the host
+     * relays app tools; null otherwise. The peer's `app_tool_call_response` frames go to it, and the
+     * host advertises [AppToolRelay.CAPABILITY] only while it is set.
+     */
+    @Volatile
+    internal var appToolRelayLink: AppToolRelayLink? = null
+
+    /** Whether the peer signed in and advertised [AppToolRelay.CAPABILITY], so relayed calls may go to it. */
+    internal val acceptsAppToolCalls: Boolean
+        get() = authenticated.get() && AppToolRelay.CAPABILITY in peerCapabilities.get()
+
+    /** Whether [viewer] is this connection's own viewer handle. */
+    internal fun isViewer(viewer: ViewerHandle): Boolean = selfViewer === viewer
+
+    /** Writes one relay frame on the control stream; false when the stream is not open or the write failed. */
+    internal suspend fun writeAppToolFrame(frame: String): Boolean {
+        if (controlSend == null) return false
+        return recoverUnlessCancelled(action = {
+            writeControl(frame)
+            true
+        }, recover = { false })
+    }
 
     /**
      * This connection's single viewer handle onto its own turn/stream
@@ -559,6 +585,10 @@ class IrohNodeConnection(
                     }
                 }
                 "admin_rpc" -> ifAuthorized(requestId) { handleControlAdminRpc(obj) }
+                AppToolRelay.RESPONSE_TYPE -> ifAuthorized(requestId) {
+                    appToolRelayLink?.receive(obj)
+                    null
+                }
                 "sync" -> ifAuthorized(requestId) {
                     ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("sync")) { handleControlSync(obj) }
                 }
@@ -668,7 +698,8 @@ class IrohNodeConnection(
             "method" attr decision.method,
             "peerCapabilities" attr advertised.sorted().joinToString(","),
         )
-        val capabilities = advertisedCapabilities(adminRpcRouter)
+        val capabilities = advertisedCapabilities(adminRpcRouter) +
+            listOfNotNull(AppToolRelay.CAPABILITY.takeIf { appToolRelayLink != null })
         return buildJsonObject {
             put("type", "auth_response")
             put("request_id", requestId)

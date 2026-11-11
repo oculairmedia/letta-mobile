@@ -62,6 +62,20 @@ class CanvasLibraryController(
         execute("open", { checkNotNull(CanvasSession.open(store, id, options)) { "Canvas is unavailable" } }, onReady)
     }
 
+    /**
+     * Opens a board through the window's [boards], so the page shares the session any other view
+     * of it holds. [onReady] receives a hold the caller gives back with [CanvasBoardSessions.release];
+     * a hold [onReady] never receives (this controller's owner went away first) is given back here.
+     */
+    fun open(id: CanvasId, boards: CanvasBoardSessions, onReady: (CanvasSession) -> Unit) {
+        var undelivered: CanvasSession? = null
+        val opening = execute("open", { checkNotNull(boards.acquire(id)) { "Canvas is unavailable" }.also { undelivered = it } }) {
+            undelivered = null
+            onReady(it)
+        }
+        opening.invokeOnCompletion { undelivered?.let(boards::release) }
+    }
+
     /** Creates a board using the host's injected sync bindings; refresh retry never creates another. */
     fun createNew(agentId: AgentId?, onReady: (CanvasSession) -> Unit) {
         execute("create", {

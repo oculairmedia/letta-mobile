@@ -15,6 +15,7 @@ import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.canvas.compose.CanvasCascadeBlocks
 import com.letta.mobile.data.canvas.compose.CanvasComposeReserve
 import com.letta.mobile.ui.test.setLettaTestContent
 import com.letta.mobile.ui.theme.LettaDimens
@@ -122,6 +123,11 @@ class CanvasNoteAutoFitAndroidRenderTest {
             B("numbered_list", "Call the plumber about the kitchen sink"),
             B("quote", "Simplicity is prerequisite for reliability."),
             B("divider"),
+        ),
+        // A TABLE as canvas_compose writes it: the board table block, the header row first.
+        "two-column table" to CanvasCascadeBlocks.table(
+            listOf("Area", "Owner"),
+            listOf(listOf("Sync", "Ana"), listOf("Search", "Ben"), listOf("Billing", "Chloe")),
         ),
     )
 

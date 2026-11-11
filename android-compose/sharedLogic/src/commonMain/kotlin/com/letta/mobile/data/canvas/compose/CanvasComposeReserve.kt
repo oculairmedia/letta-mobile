@@ -16,6 +16,11 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.MAX_RESERVE
 import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.MIN_RESERVE
 import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.QUOTE_INSET
 import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.SAFETY_FACTOR
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.TABLE_BLOCK_PADDING
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.TABLE_CELL_PADDING_H
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.TABLE_CELL_PADDING_V
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.TABLE_FONT
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.TABLE_RULE
 import kotlin.math.ceil
 
 /**
@@ -86,6 +91,18 @@ object CanvasComposeReserve {
     const val BODY_FONT = 16.0
     const val CODE_FONT = 14.0
 
+    /**
+     * A table block (sharedUI `CanvasTableBlock`): its cells are set in the theme's small body type
+     * (12 on a 17 line), booked at 12 on the reserve's 1.5 line with the worst-case advances; each
+     * cell has 8 of padding a side and 4 above and below, a hairline rule on every edge, and the
+     * block 4 above and below.
+     */
+    const val TABLE_FONT = 12.0
+    const val TABLE_CELL_PADDING_H = 8.0
+    const val TABLE_CELL_PADDING_V = 4.0
+    const val TABLE_RULE = 1.0
+    const val TABLE_BLOCK_PADDING = 8.0
+
     /** cascade-editor's heading sizes, levels 1 to 6. */
     val HEADING_FONTS: List<Double> = listOf(32.0, 28.0, 24.0, 20.0, 18.0, 16.0)
 
@@ -111,7 +128,7 @@ object CanvasComposeReserve {
      * width; [fontScale] is the document style's, 1 for anything compose writes).
      */
     fun reserve(kind: ComposeKind, blocks: List<ReserveBlock>, width: Float = CanvasComposeContract.width(kind), fontScale: Float = 1f): Float {
-        require(kind != ComposeKind.TEXT && kind != ComposeKind.GROUP) { "$kind is not a note; use reserveText or the group's children" }
+        require(kind.document) { "$kind is not a note; use reserveText, the drawing's own size or the group's children" }
         return ReserveColumn(width.toDouble(), fontScale.toDouble()).reserve(blocks)
     }
 
@@ -151,12 +168,29 @@ class ReserveColumn(private val width: Double, private val fontScale: Double = 1
     /** One block's booked height: its wrapped lines at its font, plus the block gap. */
     fun blockHeight(block: ReserveBlock): Double {
         if (block.type == ReserveBlockType.DIVIDER) return DIVIDER_HEIGHT + BLOCK_GAP
+        if (block.type == ReserveBlockType.TABLE) return tableHeight(block.cells)
         val font = fontOf(block) * fontScale
         val inner = width - 2 * HORIZONTAL_PADDING - block.depth * INDENT - insetOf(block.type)
         val code = block.type == ReserveBlockType.CODE
         val lines = WorstCaseWrap(inner, font, mono = code).lines(block.text)
         val extra = if (code) CODE_PADDING else 0.0
         return lines * LINE_HEIGHT_EM * font + BLOCK_GAP + extra
+    }
+
+    /**
+     * A table: every row as tall as its tallest cell, each cell's words wrapped in an equal share of
+     * the column (the grid weighs its columns equally), plus the rules and the block's padding.
+     */
+    private fun tableHeight(rows: List<List<String>>): Double {
+        val columns = rows.maxOfOrNull { it.size }?.coerceAtLeast(1) ?: 1
+        val font = TABLE_FONT * fontScale
+        val cellWidth = (width - 2 * HORIZONTAL_PADDING) / columns - 2 * TABLE_CELL_PADDING_H - 2 * TABLE_RULE
+        val wrap = WorstCaseWrap(cellWidth, font)
+        val body = rows.sumOf { row ->
+            val lines = row.maxOfOrNull { wrap.lines(it) } ?: 1
+            lines * LINE_HEIGHT_EM * font + 2 * TABLE_CELL_PADDING_V + TABLE_RULE
+        }
+        return body + TABLE_RULE + TABLE_BLOCK_PADDING + BLOCK_GAP
     }
 
     private fun fontOf(block: ReserveBlock): Double = when (block.type) {
