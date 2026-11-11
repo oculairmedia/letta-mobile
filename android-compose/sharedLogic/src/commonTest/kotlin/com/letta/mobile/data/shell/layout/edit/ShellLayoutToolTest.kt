@@ -56,6 +56,22 @@ class ShellLayoutToolTest {
     private val recentsFirst = """{"action":"apply","ops":[{"op":"move","lane":"home","view":"home.recents","index":0}]}"""
 
     @Test
+    fun chatDryRunApplyUndoResetAndProtectedRefusalUseTheRealPort() = runTest {
+        val op = """"ops":[{"op":"remove","lane":"chat","view":"chat.status"}]"""
+        success("""{"action":"apply","dry_run":true,$op}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+        success("""{"action":"apply",$op}""")
+        assertEquals(listOf("chat.transcript", "chat.composer"), store.config.value.chatLane().map { it.view.value })
+        success("""{"action":"undo"}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+        val refused = error("""{"action":"apply","ops":[{"op":"remove","lane":"chat","view":"chat.transcript"}]}""")
+        assertEquals("chat_read_send_stays", refused["errors"]!!.jsonArray.first().jsonObject["rule"]!!.jsonPrimitive.content)
+        success("""{"action":"apply",$op}""")
+        success("""{"action":"reset"}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+    }
+
+    @Test
     fun theSchemaIsStrictAndNamesEveryActionOpAndLane() {
         val schema = tool.inputSchema
         assertEquals("shell_layout", tool.name)

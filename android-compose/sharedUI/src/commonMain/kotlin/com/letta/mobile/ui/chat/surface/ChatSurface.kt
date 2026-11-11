@@ -616,15 +616,7 @@ private fun dockedPanelContent(
 ): DockedPanelContent {
     return DockedPanelContent(
         ambient = ambient,
-        conversation = { conversationModifier ->
-            ChatLane(
-                modifier = conversationModifier,
-                docked = true,
-                transcript = { DockedReplyCard(dockedReplyParams(frame), it) },
-                status = {},
-                composer = { _, _ -> },
-            )
-        },
+        conversation = { conversationModifier -> DockedChatLane(frame, conversationModifier) },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
         collapsed = CollapsedDockContent(
             agentId = frame.session.agentId,
@@ -635,6 +627,18 @@ private fun dockedPanelContent(
             ambient = ambient,
         ),
         recents = recents,
+    )
+}
+
+/** The same lane inside the desktop panel and the phone's canvas bubble. Their frame docks input. */
+@Composable
+internal fun DockedChatLane(frame: ChatSurfaceFrame, modifier: Modifier) {
+    ChatLane(
+        modifier = modifier,
+        docked = true,
+        transcript = { DockedReplyCard(dockedReplyParams(frame), it) },
+        status = {},
+        composer = { _, _ -> },
     )
 }
 

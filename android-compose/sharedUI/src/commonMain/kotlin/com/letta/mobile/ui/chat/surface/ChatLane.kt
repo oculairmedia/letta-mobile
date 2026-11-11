@@ -9,10 +9,11 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.chat.layout.ChatViews
+import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.ui.theme.LettaDimens
 
 // The frame projects slots rather than importing shell layout into the chat renderer (a package cycle).
-internal val LocalChatLane = compositionLocalOf { ChatViews.Default.map { it to null as String? } }
+internal val LocalChatLane = compositionLocalOf<List<Pair<RuntimeViewId, String?>>> { ChatViews.Default.map { it to null } }
 internal val LocalChatModuleContent = compositionLocalOf<@Composable (Int, Modifier) -> Unit> { { _, _ -> } }
 
 /** One content lane, reused by the full page and the dock's conversation area. */

@@ -12698,6 +12698,14 @@ public final class com/letta/mobile/data/chat/display/TranscriptMarkdown {
 	public final fun fileName (Ljava/lang/String;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/chat/layout/ChatViews {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/layout/ChatViews;
+	public final fun getCOMPOSER-p0dNODo ()Ljava/lang/String;
+	public final fun getDefault ()Ljava/util/List;
+	public final fun getSTATUS-p0dNODo ()Ljava/lang/String;
+	public final fun getTRANSCRIPT-p0dNODo ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/chat/projection/BranchActionSupport {
 	public static final field Companion Lcom/letta/mobile/data/chat/projection/BranchActionSupport$Companion;
 	public fun <init> ()V
@@ -49723,6 +49731,7 @@ public final class com/letta/mobile/data/shell/layout/ModuleSlot$Companion {
 }
 
 public final class com/letta/mobile/data/shell/layout/ShellLanes {
+	public static final field CHAT Ljava/lang/String;
 	public static final field HOME Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellLanes;
 	public static final field MAIN Ljava/lang/String;
@@ -49737,6 +49746,7 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfig {
 	public fun <init> ()V
 	public fun <init> (ILjava/util/Map;)V
 	public synthetic fun <init> (ILjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun chatLane ()Ljava/util/List;
 	public final fun component1 ()I
 	public final fun component2 ()Ljava/util/Map;
 	public final fun copy (ILjava/util/Map;)Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
@@ -49949,6 +49959,7 @@ public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult
 }
 
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule : java/lang/Enum {
+	public static final field CHAT_READ_SEND_STAYS Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field DUPLICATE_SLOT Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field HOME_STAYS Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field INDEX_OUT_OF_RANGE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;

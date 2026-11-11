@@ -32,7 +32,7 @@ internal fun rememberTouchBubble(frame: ChatSurfaceFrame, state: CanvasBubbleSta
     val recents = frame.recents
     return TouchBubble(
         state = state,
-        exchange = { modifier -> DockedReplyCard(dockedReplyParams(frame), modifier) },
+        exchange = { modifier -> DockedChatLane(frame, modifier) },
         composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
         recents = recents?.let { frame.bubbleRecents(state, it) },
         onStop = if (busy) frame.session.port.actions::stopRun else null,

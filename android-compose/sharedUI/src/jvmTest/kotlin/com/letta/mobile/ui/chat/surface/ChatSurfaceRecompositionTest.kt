@@ -137,7 +137,7 @@ class ChatSurfaceRecompositionTest {
             override val composer: StateFlow<ChatComposerUiState> = MutableStateFlow(ChatComposerUiState(canSend = true))
             override val actions: ChatActions = RecordingChatActions()
         }
-        val runs = CompositionRunCounter(PAGE_LAYERS)
+        val runs = CompositionRunCounter(PAGE_LAYERS + "DockedReplyCard")
         runs.install()
         try {
             setPointerContent {
@@ -169,7 +169,13 @@ class ChatSurfaceRecompositionTest {
                 waitForIdle()
             }
 
-            assertEquals(settled, runs.snapshot(), "streamed tokens re-ran page layers")
+            val after = runs.snapshot()
+            assertEquals(
+                settled.filterKeys { it in PAGE_LAYERS },
+                after.filterKeys { it in PAGE_LAYERS },
+                "streamed tokens re-ran page layers",
+            )
+            assertTrue(after.getValue("DockedReplyCard") > settled.getValue("DockedReplyCard"), "the transcript saw no stream")
             assertEquals(settledResolves, resolves, "a streamed token recomposed a settled timeline row")
         } finally {
             runs.uninstall()
@@ -200,6 +206,6 @@ class ChatSurfaceRecompositionTest {
         const val TOKENS = 8
 
         /** The page's layers over the canvas: none of them shows the stream. */
-        val PAGE_LAYERS = listOf("ChatSurfaceLayers", "CanvasWithChat", "CanvasChatLayers", "CompanionSeat")
+        val PAGE_LAYERS = listOf("ChatSurfaceLayers", "CanvasWithChat", "CanvasChatLayers", "CompanionSeat", "ChatLane")
     }
 }

@@ -2035,6 +2035,19 @@ public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$CanvasB
 	public final fun getLambda$266270444$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$ChatLaneKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$ChatLaneKt;
+	public fun <init> ()V
+	public final fun getLambda$-164813605$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+}
+
+public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$ChatSurfaceKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$ChatSurfaceKt;
+	public fun <init> ()V
+	public final fun getLambda$-1502964046$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1894037340$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+}
+
 public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$CollapsedDockKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$CollapsedDockKt;
 	public fun <init> ()V
