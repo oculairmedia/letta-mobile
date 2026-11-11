@@ -151,8 +151,8 @@ data class ContextWindowUsage(
             Itemised(ContextWindowSegmentKind.Messages, "Messages", overview.numTokensMessages),
             Itemised(
                 ContextWindowSegmentKind.ToolDefinitions,
-                "Tool definitions",
-                overview.numTokensFunctionsDefinitions,
+                if (overview.numTokensToolsAndHarness != null) "Tools and harness" else "Tool definitions",
+                overview.numTokensToolsAndHarness ?: overview.numTokensFunctionsDefinitions,
             ),
             Itemised(ContextWindowSegmentKind.System, "System prompt", overview.numTokensSystem),
             Itemised(ContextWindowSegmentKind.CoreMemory, "Core memory", overview.numTokensCoreMemory),

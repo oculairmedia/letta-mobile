@@ -38,10 +38,10 @@ enum class ContextTotalSource(val wire: String) {
 /**
  * An estimated breakdown of one conversation's context.
  *
- * With a [totalSource] the rows are matched to that exact total: [tools] is the residual (tool
- * schemas live only inside the running process, never on disk; section-estimation error and
- * other unmeasured prompt components also contribute), not measured tool usage. When disk sections exceed the total,
- * the sections are scaled down and [tools] is 0. Either way the five rows sum to [total] exactly.
+ * With a [totalSource] the rows are matched to that exact total: [tools] is the legacy combined
+ * residual, including [toolsAndHarness] when usage supports measuring fixed overhead. The rest
+ * is unexplained content, not measured tool usage. Sections and named overhead shrink together
+ * by Hamilton scaling when they exceed the total. The legacy five rows sum to [total] exactly.
  * Without a total [tools] is null and [total] is the partial sum of the four sections.
  */
 data class ContextBreakdownEstimate(
@@ -56,6 +56,12 @@ data class ContextBreakdownEstimate(
     val memorySplit: Boolean,
     val systemPrompt: String,
     val coreMemory: String,
+    /** Fixed prompt overhead beyond system and memory, measured from this conversation's usage. */
+    val toolsAndHarness: Int? = null,
+    /** Message density fitted within the current in-context span; null on fallback. */
+    val messageCharsPerToken: Double? = null,
+    /** True when an earlier run supplied density or matching to the provider total required scaling. */
+    val calibrationApproximate: Boolean = false,
 ) {
     val calibrated: Boolean get() = totalSource != null
 }
@@ -78,25 +84,33 @@ object ContextBreakdownEstimator {
     fun estimate(inputs: LocalContextInputs, estimator: TokenEstimator = CharsPerToken): ContextBreakdownEstimate {
         val prompt = splitPrompt(inputs)
         val transcript = inputs.transcript
+        val messageCalibration = transcript.messageCalibration(estimator)
         val sections = ContextSections(
             system = estimator.tokensForChars(prompt.systemChars),
             memory = estimator.tokensForChars(prompt.coreMemory.length.toLong()),
             summary = transcript.summary?.let { LocalMessageTokens.of(it, estimator) } ?: 0,
-            messages = LocalMessageTokens.ofAll(transcript.messages, estimator),
+            messages = messageCalibration.tokens,
         )
         val (total, source) = exactTotal(inputs, estimator)
-        val calibrated = calibrate(sections, total)
+        val harness = messageCalibration.fixed?.let { (it - sections.system - sections.memory - sections.summary).coerceAtLeast(0) }
+        val values = sections.asList() + (harness ?: 0)
+        val scaled = if (total != null && values.sum() > total) scaleTo(values, total) else values
+        val calibrated = calibrate(ContextSections.of(scaled), total)
+        val scaledDown = calibrated.scaledDown || scaled != values
         return ContextBreakdownEstimate(
             sections = calibrated.sections,
             tools = calibrated.tools,
             total = calibrated.total,
             totalSource = source.takeIf { total != null },
-            scaledDown = calibrated.scaledDown,
+            scaledDown = scaledDown,
             window = windowOf(inputs.agent, inputs.conversation),
             messageCount = transcript.messages.size + (if (transcript.summary != null) 1 else 0),
             memorySplit = prompt.memorySplit,
             systemPrompt = prompt.content,
             coreMemory = prompt.coreMemory,
+            toolsAndHarness = harness?.let { scaled.last() },
+            messageCharsPerToken = messageCalibration.charsPerToken,
+            calibrationApproximate = messageCalibration.reusedFit || scaledDown,
         )
     }
 
@@ -116,7 +130,7 @@ object ContextBreakdownEstimator {
     }
 
     /** Hamilton's method: floors first, then the leftover tokens to the largest remainders. */
-    private fun scaleTo(values: List<Int>, target: Int): List<Int> {
+    internal fun scaleTo(values: List<Int>, target: Int): List<Int> {
         val sum = values.sumOf { it.toLong() }
         if (sum == 0L) return values.map { 0 }
         val exact = values.map { it.toLong() * target }
@@ -208,6 +222,15 @@ fun ContextBreakdownEstimate.toAgentContextJson(): JsonObject = buildJsonObject 
     put("source", ESTIMATE_SOURCE)
     put("calibrated", calibrated)
     put("tools_derived", tools != null)
+    toolsAndHarness?.let {
+        put("num_tokens_tools_and_harness", it)
+        put("overhead_source", "recorded_usage")
+    }
+    messageCharsPerToken?.let {
+        put("calibration_source", "conversation_usage")
+        put("message_chars_per_token", it)
+    }
+    if (calibrationApproximate) put("calibration_approximate", true)
     totalSource?.let { put("total_source", it.wire) }
     put("scaled_down", scaledDown)
     put("memory_split", memorySplit)
