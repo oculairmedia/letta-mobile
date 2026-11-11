@@ -102,6 +102,173 @@ final enum class com.letta.mobile.plugin.api/LogLevel : kotlin/Enum<com.letta.mo
     }
 }
 
+final enum class com.letta.mobile.plugin.keystore.wire/KeystoreMethod : kotlin/Enum<com.letta.mobile.plugin.keystore.wire/KeystoreMethod> { // com.letta.mobile.plugin.keystore.wire/KeystoreMethod|null[0]
+    enum entry DELETE // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.DELETE|null[0]
+    enum entry DESCRIBE // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.DESCRIBE|null[0]
+    enum entry GET // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.GET|null[0]
+    enum entry HEALTH // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.HEALTH|null[0]
+    enum entry INITIALIZE // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.INITIALIZE|null[0]
+    enum entry LIST // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.LIST|null[0]
+    enum entry LOCK // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.LOCK|null[0]
+    enum entry PUT // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.PUT|null[0]
+    enum entry SHUTDOWN // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.SHUTDOWN|null[0]
+    enum entry UNLOCK // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.UNLOCK|null[0]
+
+    final val deadlineMillis // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.deadlineMillis|{}deadlineMillis[0]
+        final fun <get-deadlineMillis>(): kotlin/Long // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.deadlineMillis.<get-deadlineMillis>|<get-deadlineMillis>(){}[0]
+    final val entries // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore.wire/KeystoreMethod> // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val operation // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.operation|{}operation[0]
+        final fun <get-operation>(): com.letta.mobile.plugin.keystore/KeystoreOperation? // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.operation.<get-operation>|<get-operation>(){}[0]
+    final val wire // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore.wire/KeystoreMethod // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore.wire/KeystoreMethod> // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.Companion|null[0]
+        final const val KEYSTORE_ERROR_CODE // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.Companion.KEYSTORE_ERROR_CODE|{}KEYSTORE_ERROR_CODE[0]
+            final fun <get-KEYSTORE_ERROR_CODE>(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.Companion.KEYSTORE_ERROR_CODE.<get-KEYSTORE_ERROR_CODE>|<get-KEYSTORE_ERROR_CODE>(){}[0]
+
+        final val VALUE_CARRYING // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.Companion.VALUE_CARRYING|{}VALUE_CARRYING[0]
+            final fun <get-VALUE_CARRYING>(): kotlin.collections/Set<com.letta.mobile.plugin.keystore.wire/KeystoreMethod> // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.Companion.VALUE_CARRYING.<get-VALUE_CARRYING>|<get-VALUE_CARRYING>(){}[0]
+
+        final fun byWire(kotlin/String): com.letta.mobile.plugin.keystore.wire/KeystoreMethod? // com.letta.mobile.plugin.keystore.wire/KeystoreMethod.Companion.byWire|byWire(kotlin.String){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/HealthStatus : kotlin/Enum<com.letta.mobile.plugin.keystore/HealthStatus> { // com.letta.mobile.plugin.keystore/HealthStatus|null[0]
+    enum entry LOCKED // com.letta.mobile.plugin.keystore/HealthStatus.LOCKED|null[0]
+    enum entry READY // com.letta.mobile.plugin.keystore/HealthStatus.READY|null[0]
+    enum entry UNAVAILABLE // com.letta.mobile.plugin.keystore/HealthStatus.UNAVAILABLE|null[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/HealthStatus.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/HealthStatus> // com.letta.mobile.plugin.keystore/HealthStatus.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/HealthStatus // com.letta.mobile.plugin.keystore/HealthStatus.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/HealthStatus> // com.letta.mobile.plugin.keystore/HealthStatus.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/HealthStatus.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/HealthStatus> // com.letta.mobile.plugin.keystore/HealthStatus.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/HealthStatus.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/KeystoreCapability : kotlin/Enum<com.letta.mobile.plugin.keystore/KeystoreCapability> { // com.letta.mobile.plugin.keystore/KeystoreCapability|null[0]
+    enum entry DELETE // com.letta.mobile.plugin.keystore/KeystoreCapability.DELETE|null[0]
+    enum entry LIST // com.letta.mobile.plugin.keystore/KeystoreCapability.LIST|null[0]
+    enum entry READ // com.letta.mobile.plugin.keystore/KeystoreCapability.READ|null[0]
+    enum entry WRITE // com.letta.mobile.plugin.keystore/KeystoreCapability.WRITE|null[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/KeystoreCapability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/KeystoreCapability> // com.letta.mobile.plugin.keystore/KeystoreCapability.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val wire // com.letta.mobile.plugin.keystore/KeystoreCapability.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreCapability.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/KeystoreCapability // com.letta.mobile.plugin.keystore/KeystoreCapability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/KeystoreCapability> // com.letta.mobile.plugin.keystore/KeystoreCapability.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.plugin.keystore/KeystoreCapability.Companion|null[0]
+        final fun fromWire(kotlin/String): com.letta.mobile.plugin.keystore/KeystoreCapability? // com.letta.mobile.plugin.keystore/KeystoreCapability.Companion.fromWire|fromWire(kotlin.String){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/KeystoreErrorCode : kotlin/Enum<com.letta.mobile.plugin.keystore/KeystoreErrorCode> { // com.letta.mobile.plugin.keystore/KeystoreErrorCode|null[0]
+    enum entry CONFLICT // com.letta.mobile.plugin.keystore/KeystoreErrorCode.CONFLICT|null[0]
+    enum entry DENIED // com.letta.mobile.plugin.keystore/KeystoreErrorCode.DENIED|null[0]
+    enum entry INTERNAL // com.letta.mobile.plugin.keystore/KeystoreErrorCode.INTERNAL|null[0]
+    enum entry INVALID_REF // com.letta.mobile.plugin.keystore/KeystoreErrorCode.INVALID_REF|null[0]
+    enum entry INVALID_VALUE // com.letta.mobile.plugin.keystore/KeystoreErrorCode.INVALID_VALUE|null[0]
+    enum entry LOCKED // com.letta.mobile.plugin.keystore/KeystoreErrorCode.LOCKED|null[0]
+    enum entry NOT_FOUND // com.letta.mobile.plugin.keystore/KeystoreErrorCode.NOT_FOUND|null[0]
+    enum entry UNAVAILABLE // com.letta.mobile.plugin.keystore/KeystoreErrorCode.UNAVAILABLE|null[0]
+    enum entry UNSUPPORTED // com.letta.mobile.plugin.keystore/KeystoreErrorCode.UNSUPPORTED|null[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/KeystoreErrorCode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/KeystoreErrorCode> // com.letta.mobile.plugin.keystore/KeystoreErrorCode.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreErrorCode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/KeystoreErrorCode> // com.letta.mobile.plugin.keystore/KeystoreErrorCode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/KeystoreErrorCode.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreErrorCode> // com.letta.mobile.plugin.keystore/KeystoreErrorCode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/KeystoreErrorCode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/KeystoreOperation : kotlin/Enum<com.letta.mobile.plugin.keystore/KeystoreOperation> { // com.letta.mobile.plugin.keystore/KeystoreOperation|null[0]
+    enum entry DELETE // com.letta.mobile.plugin.keystore/KeystoreOperation.DELETE|null[0]
+    enum entry GET // com.letta.mobile.plugin.keystore/KeystoreOperation.GET|null[0]
+    enum entry HEALTH // com.letta.mobile.plugin.keystore/KeystoreOperation.HEALTH|null[0]
+    enum entry LIST // com.letta.mobile.plugin.keystore/KeystoreOperation.LIST|null[0]
+    enum entry LOCK // com.letta.mobile.plugin.keystore/KeystoreOperation.LOCK|null[0]
+    enum entry PUT // com.letta.mobile.plugin.keystore/KeystoreOperation.PUT|null[0]
+    enum entry UNLOCK // com.letta.mobile.plugin.keystore/KeystoreOperation.UNLOCK|null[0]
+
+    final val capability // com.letta.mobile.plugin.keystore/KeystoreOperation.capability|{}capability[0]
+        final fun <get-capability>(): com.letta.mobile.plugin.keystore/KeystoreCapability? // com.letta.mobile.plugin.keystore/KeystoreOperation.capability.<get-capability>|<get-capability>(){}[0]
+    final val entries // com.letta.mobile.plugin.keystore/KeystoreOperation.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/KeystoreOperation> // com.letta.mobile.plugin.keystore/KeystoreOperation.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/KeystoreOperation // com.letta.mobile.plugin.keystore/KeystoreOperation.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/KeystoreOperation> // com.letta.mobile.plugin.keystore/KeystoreOperation.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/KeystoreOperation.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreOperation> // com.letta.mobile.plugin.keystore/KeystoreOperation.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/KeystoreOperation.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/RefProblem : kotlin/Enum<com.letta.mobile.plugin.keystore/RefProblem> { // com.letta.mobile.plugin.keystore/RefProblem|null[0]
+    enum entry FIELD_NOT_ALLOWED // com.letta.mobile.plugin.keystore/RefProblem.FIELD_NOT_ALLOWED|null[0]
+    enum entry MALFORMED // com.letta.mobile.plugin.keystore/RefProblem.MALFORMED|null[0]
+    enum entry PROVIDER_MISMATCH // com.letta.mobile.plugin.keystore/RefProblem.PROVIDER_MISMATCH|null[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/RefProblem.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/RefProblem> // com.letta.mobile.plugin.keystore/RefProblem.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/RefProblem // com.letta.mobile.plugin.keystore/RefProblem.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/RefProblem> // com.letta.mobile.plugin.keystore/RefProblem.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/RefProblem.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/RefProblem> // com.letta.mobile.plugin.keystore/RefProblem.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/RefProblem.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/ValueProblem : kotlin/Enum<com.letta.mobile.plugin.keystore/ValueProblem> { // com.letta.mobile.plugin.keystore/ValueProblem|null[0]
+    enum entry EMPTY // com.letta.mobile.plugin.keystore/ValueProblem.EMPTY|null[0]
+    enum entry TOO_LARGE // com.letta.mobile.plugin.keystore/ValueProblem.TOO_LARGE|null[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/ValueProblem.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/ValueProblem> // com.letta.mobile.plugin.keystore/ValueProblem.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/ValueProblem // com.letta.mobile.plugin.keystore/ValueProblem.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/ValueProblem> // com.letta.mobile.plugin.keystore/ValueProblem.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/ValueProblem.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/ValueProblem> // com.letta.mobile.plugin.keystore/ValueProblem.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/ValueProblem.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.keystore/WriteMode : kotlin/Enum<com.letta.mobile.plugin.keystore/WriteMode> { // com.letta.mobile.plugin.keystore/WriteMode|null[0]
+    enum entry CREATE // com.letta.mobile.plugin.keystore/WriteMode.CREATE|null[0]
+    enum entry REPLACE // com.letta.mobile.plugin.keystore/WriteMode.REPLACE|null[0]
+    enum entry UPSERT // com.letta.mobile.plugin.keystore/WriteMode.UPSERT|null[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/WriteMode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.keystore/WriteMode> // com.letta.mobile.plugin.keystore/WriteMode.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.keystore/WriteMode // com.letta.mobile.plugin.keystore/WriteMode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.keystore/WriteMode> // com.letta.mobile.plugin.keystore/WriteMode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/WriteMode.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/WriteMode> // com.letta.mobile.plugin.keystore/WriteMode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/WriteMode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 abstract interface com.letta.mobile.plugin.api/CanvasPlugin { // com.letta.mobile.plugin.api/CanvasPlugin|null[0]
     abstract fun activate() // com.letta.mobile.plugin.api/CanvasPlugin.activate|activate(){}[0]
     abstract fun deactivate() // com.letta.mobile.plugin.api/CanvasPlugin.deactivate|deactivate(){}[0]
@@ -136,6 +303,50 @@ abstract interface com.letta.mobile.plugin.api/PluginHost { // com.letta.mobile.
 abstract interface com.letta.mobile.plugin.api/PluginHttpClient { // com.letta.mobile.plugin.api/PluginHttpClient|null[0]
     abstract suspend fun get(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.letta.mobile.plugin.api/PluginHttpResponse // com.letta.mobile.plugin.api/PluginHttpClient.get|get(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
     abstract suspend fun post(kotlin/String, kotlin/ByteArray, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.letta.mobile.plugin.api/PluginHttpResponse // com.letta.mobile.plugin.api/PluginHttpClient.post|post(kotlin.String;kotlin.ByteArray;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+}
+
+abstract interface com.letta.mobile.plugin.keystore/KeystoreProvider { // com.letta.mobile.plugin.keystore/KeystoreProvider|null[0]
+    abstract fun describe(): com.letta.mobile.plugin.keystore/KeystoreDescriptor // com.letta.mobile.plugin.keystore/KeystoreProvider.describe|describe(){}[0]
+    abstract suspend fun delete(com.letta.mobile.plugin.keystore/SecretRef): com.letta.mobile.plugin.keystore/KeystoreResult<kotlin/Unit> // com.letta.mobile.plugin.keystore/KeystoreProvider.delete|delete(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+    abstract suspend fun get(com.letta.mobile.plugin.keystore/SecretRef): com.letta.mobile.plugin.keystore/KeystoreResult<com.letta.mobile.plugin.keystore/SecretValue> // com.letta.mobile.plugin.keystore/KeystoreProvider.get|get(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+    abstract suspend fun health(): com.letta.mobile.plugin.keystore/KeystoreHealth // com.letta.mobile.plugin.keystore/KeystoreProvider.health|health(){}[0]
+    abstract suspend fun list(com.letta.mobile.plugin.keystore/SecretScope): com.letta.mobile.plugin.keystore/KeystoreResult<com.letta.mobile.plugin.keystore/SecretListing> // com.letta.mobile.plugin.keystore/KeystoreProvider.list|list(com.letta.mobile.plugin.keystore.SecretScope){}[0]
+    abstract suspend fun put(com.letta.mobile.plugin.keystore/SecretRef, com.letta.mobile.plugin.keystore/SecretValue, com.letta.mobile.plugin.keystore/PutOptions = ...): com.letta.mobile.plugin.keystore/KeystoreResult<kotlin/Unit> // com.letta.mobile.plugin.keystore/KeystoreProvider.put|put(com.letta.mobile.plugin.keystore.SecretRef;com.letta.mobile.plugin.keystore.SecretValue;com.letta.mobile.plugin.keystore.PutOptions){}[0]
+    open suspend fun lock(): com.letta.mobile.plugin.keystore/KeystoreResult<kotlin/Unit> // com.letta.mobile.plugin.keystore/KeystoreProvider.lock|lock(){}[0]
+    open suspend fun unlock(com.letta.mobile.plugin.keystore/SecretValue): com.letta.mobile.plugin.keystore/KeystoreResult<kotlin/Unit> // com.letta.mobile.plugin.keystore/KeystoreProvider.unlock|unlock(com.letta.mobile.plugin.keystore.SecretValue){}[0]
+}
+
+sealed interface <#A: out kotlin/Any?> com.letta.mobile.plugin.keystore/KeystoreResult { // com.letta.mobile.plugin.keystore/KeystoreResult|null[0]
+    final class <#A1: out kotlin/Any?> Success : com.letta.mobile.plugin.keystore/KeystoreResult<#A1> { // com.letta.mobile.plugin.keystore/KeystoreResult.Success|null[0]
+        constructor <init>(#A1) // com.letta.mobile.plugin.keystore/KeystoreResult.Success.<init>|<init>(1:0){}[0]
+
+        final val value // com.letta.mobile.plugin.keystore/KeystoreResult.Success.value|{}value[0]
+            final fun <get-value>(): #A1 // com.letta.mobile.plugin.keystore/KeystoreResult.Success.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): #A1 // com.letta.mobile.plugin.keystore/KeystoreResult.Success.component1|component1(){}[0]
+        final fun copy(#A1 = ...): com.letta.mobile.plugin.keystore/KeystoreResult.Success<#A1> // com.letta.mobile.plugin.keystore/KeystoreResult.Success.copy|copy(1:0){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreResult.Success.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreResult.Success.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreResult.Success.toString|toString(){}[0]
+    }
+
+    final class Failure : com.letta.mobile.plugin.keystore/KeystoreResult<kotlin/Nothing> { // com.letta.mobile.plugin.keystore/KeystoreResult.Failure|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/KeystoreError) // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.<init>|<init>(com.letta.mobile.plugin.keystore.KeystoreError){}[0]
+
+        final val error // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.error|{}error[0]
+            final fun <get-error>(): com.letta.mobile.plugin.keystore/KeystoreError // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.error.<get-error>|<get-error>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/KeystoreError // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/KeystoreError = ...): com.letta.mobile.plugin.keystore/KeystoreResult.Failure // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.copy|copy(com.letta.mobile.plugin.keystore.KeystoreError){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreResult.Failure.toString|toString(){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/KeystoreResult.Companion|null[0]
+        final val Done // com.letta.mobile.plugin.keystore/KeystoreResult.Companion.Done|{}Done[0]
+            final fun <get-Done>(): com.letta.mobile.plugin.keystore/KeystoreResult<kotlin/Unit> // com.letta.mobile.plugin.keystore/KeystoreResult.Companion.Done.<get-Done>|<get-Done>(){}[0]
+    }
 }
 
 sealed interface com.letta.mobile.plugin.api/ActionOrigin { // com.letta.mobile.plugin.api/ActionOrigin|null[0]
@@ -1018,6 +1229,837 @@ final class com.letta.mobile.plugin.api/UpdateElement { // com.letta.mobile.plug
     }
 }
 
+final class com.letta.mobile.plugin.keystore.wire/KeystoreGetResult { // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/SecretValue) // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.<init>|<init>(com.letta.mobile.plugin.keystore.SecretValue){}[0]
+
+    final val value // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.value|{}value[0]
+        final fun <get-value>(): com.letta.mobile.plugin.keystore/SecretValue // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.value.<get-value>|<get-value>(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreGetResult> { // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreGetResult // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreGetResult) // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreGetResult){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreGetResult> // com.letta.mobile.plugin.keystore.wire/KeystoreGetResult.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo { // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val name // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.name.<get-name>|<get-name>(){}[0]
+    final val version // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.version|{}version[0]
+        final fun <get-version>(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.version.<get-version>|<get-version>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo> { // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo) // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreHostInfo){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo> // com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams { // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/Int>, com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo, kotlinx.serialization.json/JsonObject) // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.<init>|<init>(kotlin.collections.List<kotlin.Int>;com.letta.mobile.plugin.keystore.wire.KeystoreHostInfo;kotlinx.serialization.json.JsonObject){}[0]
+
+    final val contractVersions // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.contractVersions|{}contractVersions[0]
+        final fun <get-contractVersions>(): kotlin.collections/List<kotlin/Int> // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.contractVersions.<get-contractVersions>|<get-contractVersions>(){}[0]
+    final val host // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.host|{}host[0]
+        final fun <get-host>(): com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.host.<get-host>|<get-host>(){}[0]
+    final val settings // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.settings|{}settings[0]
+        final fun <get-settings>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.settings.<get-settings>|<get-settings>(){}[0]
+
+    final fun component1(): kotlin.collections/List<kotlin/Int> // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.component2|component2(){}[0]
+    final fun component3(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.component3|component3(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/Int> = ..., com.letta.mobile.plugin.keystore.wire/KeystoreHostInfo = ..., kotlinx.serialization.json/JsonObject = ...): com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.copy|copy(kotlin.collections.List<kotlin.Int>;com.letta.mobile.plugin.keystore.wire.KeystoreHostInfo;kotlinx.serialization.json.JsonObject){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams> { // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams) // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreInitializeParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams> // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult { // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult|null[0]
+    constructor <init>(kotlin/Int) // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.<init>|<init>(kotlin.Int){}[0]
+
+    final val contractVersion // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.contractVersion|{}contractVersion[0]
+        final fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.component1|component1(){}[0]
+    final fun copy(kotlin/Int = ...): com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.copy|copy(kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult> { // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult) // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreInitializeResult){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult> // com.letta.mobile.plugin.keystore.wire/KeystoreInitializeResult.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystoreListParams { // com.letta.mobile.plugin.keystore.wire/KeystoreListParams|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/SecretScope) // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.<init>|<init>(com.letta.mobile.plugin.keystore.SecretScope){}[0]
+
+    final val scope // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.scope|{}scope[0]
+        final fun <get-scope>(): com.letta.mobile.plugin.keystore/SecretScope // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.scope.<get-scope>|<get-scope>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/SecretScope // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/SecretScope = ...): com.letta.mobile.plugin.keystore.wire/KeystoreListParams // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.copy|copy(com.letta.mobile.plugin.keystore.SecretScope){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreListParams> { // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreListParams // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreListParams) // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreListParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreListParams> // com.letta.mobile.plugin.keystore.wire/KeystoreListParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystorePutParams { // com.letta.mobile.plugin.keystore.wire/KeystorePutParams|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/SecretRef, com.letta.mobile.plugin.keystore/SecretValue, com.letta.mobile.plugin.keystore/WriteMode, com.letta.mobile.plugin.keystore/SecretMetadata? = ...) // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.<init>|<init>(com.letta.mobile.plugin.keystore.SecretRef;com.letta.mobile.plugin.keystore.SecretValue;com.letta.mobile.plugin.keystore.WriteMode;com.letta.mobile.plugin.keystore.SecretMetadata?){}[0]
+
+    final val metadata // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.metadata|{}metadata[0]
+        final fun <get-metadata>(): com.letta.mobile.plugin.keystore/SecretMetadata? // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.metadata.<get-metadata>|<get-metadata>(){}[0]
+    final val mode // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.mode|{}mode[0]
+        final fun <get-mode>(): com.letta.mobile.plugin.keystore/WriteMode // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.mode.<get-mode>|<get-mode>(){}[0]
+    final val options // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.options|{}options[0]
+        final fun <get-options>(): com.letta.mobile.plugin.keystore/PutOptions // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.options.<get-options>|<get-options>(){}[0]
+    final val ref // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.ref|{}ref[0]
+        final fun <get-ref>(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.ref.<get-ref>|<get-ref>(){}[0]
+    final val value // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.value|{}value[0]
+        final fun <get-value>(): com.letta.mobile.plugin.keystore/SecretValue // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.value.<get-value>|<get-value>(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystorePutParams> { // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystorePutParams // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystorePutParams) // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystorePutParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystorePutParams> // com.letta.mobile.plugin.keystore.wire/KeystorePutParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystoreRefParams { // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/SecretRef) // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.<init>|<init>(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+
+    final val ref // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.ref|{}ref[0]
+        final fun <get-ref>(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.ref.<get-ref>|<get-ref>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/SecretRef = ...): com.letta.mobile.plugin.keystore.wire/KeystoreRefParams // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.copy|copy(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreRefParams> { // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreRefParams // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreRefParams) // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreRefParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreRefParams> // com.letta.mobile.plugin.keystore.wire/KeystoreRefParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams { // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/SecretValue) // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.<init>|<init>(com.letta.mobile.plugin.keystore.SecretValue){}[0]
+
+    final val material // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.material|{}material[0]
+        final fun <get-material>(): com.letta.mobile.plugin.keystore/SecretValue // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.material.<get-material>|<get-material>(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams> { // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams) // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.wire.KeystoreUnlockParams){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams> // com.letta.mobile.plugin.keystore.wire/KeystoreUnlockParams.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/KeystoreDescriptor { // com.letta.mobile.plugin.keystore/KeystoreDescriptor|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/KeystoreProviderId, kotlin.collections/Set<com.letta.mobile.plugin.keystore/KeystoreCapability>, kotlin/Boolean) // com.letta.mobile.plugin.keystore/KeystoreDescriptor.<init>|<init>(com.letta.mobile.plugin.keystore.KeystoreProviderId;kotlin.collections.Set<com.letta.mobile.plugin.keystore.KeystoreCapability>;kotlin.Boolean){}[0]
+
+    final val capabilities // com.letta.mobile.plugin.keystore/KeystoreDescriptor.capabilities|{}capabilities[0]
+        final fun <get-capabilities>(): kotlin.collections/Set<com.letta.mobile.plugin.keystore/KeystoreCapability> // com.letta.mobile.plugin.keystore/KeystoreDescriptor.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
+    final val id // com.letta.mobile.plugin.keystore/KeystoreDescriptor.id|{}id[0]
+        final fun <get-id>(): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/KeystoreDescriptor.id.<get-id>|<get-id>(){}[0]
+    final val needsUnlock // com.letta.mobile.plugin.keystore/KeystoreDescriptor.needsUnlock|{}needsUnlock[0]
+        final fun <get-needsUnlock>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreDescriptor.needsUnlock.<get-needsUnlock>|<get-needsUnlock>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/KeystoreDescriptor.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Set<com.letta.mobile.plugin.keystore/KeystoreCapability> // com.letta.mobile.plugin.keystore/KeystoreDescriptor.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreDescriptor.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/KeystoreProviderId = ..., kotlin.collections/Set<com.letta.mobile.plugin.keystore/KeystoreCapability> = ..., kotlin/Boolean = ...): com.letta.mobile.plugin.keystore/KeystoreDescriptor // com.letta.mobile.plugin.keystore/KeystoreDescriptor.copy|copy(com.letta.mobile.plugin.keystore.KeystoreProviderId;kotlin.collections.Set<com.letta.mobile.plugin.keystore.KeystoreCapability>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreDescriptor.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreDescriptor.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreDescriptor.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreDescriptor> { // com.letta.mobile.plugin.keystore/KeystoreDescriptor.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/KeystoreDescriptor.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreDescriptor.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreDescriptor.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreDescriptor // com.letta.mobile.plugin.keystore/KeystoreDescriptor.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreDescriptor) // com.letta.mobile.plugin.keystore/KeystoreDescriptor.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreDescriptor){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/KeystoreDescriptor.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreDescriptor> // com.letta.mobile.plugin.keystore/KeystoreDescriptor.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/KeystoreHealth { // com.letta.mobile.plugin.keystore/KeystoreHealth|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/HealthStatus, com.letta.mobile.plugin.keystore/ProviderDiagnostic? = ...) // com.letta.mobile.plugin.keystore/KeystoreHealth.<init>|<init>(com.letta.mobile.plugin.keystore.HealthStatus;com.letta.mobile.plugin.keystore.ProviderDiagnostic?){}[0]
+
+    final val detail // com.letta.mobile.plugin.keystore/KeystoreHealth.detail|{}detail[0]
+        final fun <get-detail>(): com.letta.mobile.plugin.keystore/ProviderDiagnostic? // com.letta.mobile.plugin.keystore/KeystoreHealth.detail.<get-detail>|<get-detail>(){}[0]
+    final val status // com.letta.mobile.plugin.keystore/KeystoreHealth.status|{}status[0]
+        final fun <get-status>(): com.letta.mobile.plugin.keystore/HealthStatus // com.letta.mobile.plugin.keystore/KeystoreHealth.status.<get-status>|<get-status>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/HealthStatus // com.letta.mobile.plugin.keystore/KeystoreHealth.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.plugin.keystore/ProviderDiagnostic? // com.letta.mobile.plugin.keystore/KeystoreHealth.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/HealthStatus = ..., com.letta.mobile.plugin.keystore/ProviderDiagnostic? = ...): com.letta.mobile.plugin.keystore/KeystoreHealth // com.letta.mobile.plugin.keystore/KeystoreHealth.copy|copy(com.letta.mobile.plugin.keystore.HealthStatus;com.letta.mobile.plugin.keystore.ProviderDiagnostic?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreHealth.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreHealth.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreHealth.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreHealth> { // com.letta.mobile.plugin.keystore/KeystoreHealth.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/KeystoreHealth.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreHealth.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreHealth.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreHealth // com.letta.mobile.plugin.keystore/KeystoreHealth.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreHealth) // com.letta.mobile.plugin.keystore/KeystoreHealth.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreHealth){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/KeystoreHealth.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.keystore/KeystoreHealth.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreHealth> // com.letta.mobile.plugin.keystore/KeystoreHealth.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/PutOptions { // com.letta.mobile.plugin.keystore/PutOptions|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/WriteMode = ..., com.letta.mobile.plugin.keystore/SecretMetadata? = ...) // com.letta.mobile.plugin.keystore/PutOptions.<init>|<init>(com.letta.mobile.plugin.keystore.WriteMode;com.letta.mobile.plugin.keystore.SecretMetadata?){}[0]
+
+    final val metadata // com.letta.mobile.plugin.keystore/PutOptions.metadata|{}metadata[0]
+        final fun <get-metadata>(): com.letta.mobile.plugin.keystore/SecretMetadata? // com.letta.mobile.plugin.keystore/PutOptions.metadata.<get-metadata>|<get-metadata>(){}[0]
+    final val mode // com.letta.mobile.plugin.keystore/PutOptions.mode|{}mode[0]
+        final fun <get-mode>(): com.letta.mobile.plugin.keystore/WriteMode // com.letta.mobile.plugin.keystore/PutOptions.mode.<get-mode>|<get-mode>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/WriteMode // com.letta.mobile.plugin.keystore/PutOptions.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.plugin.keystore/SecretMetadata? // com.letta.mobile.plugin.keystore/PutOptions.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/WriteMode = ..., com.letta.mobile.plugin.keystore/SecretMetadata? = ...): com.letta.mobile.plugin.keystore/PutOptions // com.letta.mobile.plugin.keystore/PutOptions.copy|copy(com.letta.mobile.plugin.keystore.WriteMode;com.letta.mobile.plugin.keystore.SecretMetadata?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/PutOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/PutOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/PutOptions.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.plugin.keystore/SecretListing { // com.letta.mobile.plugin.keystore/SecretListing|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.plugin.keystore/SecretRef>, kotlin/Boolean) // com.letta.mobile.plugin.keystore/SecretListing.<init>|<init>(kotlin.collections.List<com.letta.mobile.plugin.keystore.SecretRef>;kotlin.Boolean){}[0]
+
+    final val entries // com.letta.mobile.plugin.keystore/SecretListing.entries|{}entries[0]
+        final fun <get-entries>(): kotlin.collections/List<com.letta.mobile.plugin.keystore/SecretRef> // com.letta.mobile.plugin.keystore/SecretListing.entries.<get-entries>|<get-entries>(){}[0]
+    final val truncated // com.letta.mobile.plugin.keystore/SecretListing.truncated|{}truncated[0]
+        final fun <get-truncated>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretListing.truncated.<get-truncated>|<get-truncated>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.plugin.keystore/SecretRef> // com.letta.mobile.plugin.keystore/SecretListing.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretListing.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.plugin.keystore/SecretRef> = ..., kotlin/Boolean = ...): com.letta.mobile.plugin.keystore/SecretListing // com.letta.mobile.plugin.keystore/SecretListing.copy|copy(kotlin.collections.List<com.letta.mobile.plugin.keystore.SecretRef>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretListing.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretListing.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretListing.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretListing> { // com.letta.mobile.plugin.keystore/SecretListing.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretListing.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretListing.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretListing.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretListing // com.letta.mobile.plugin.keystore/SecretListing.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretListing) // com.letta.mobile.plugin.keystore/SecretListing.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretListing){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretListing.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.keystore/SecretListing.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretListing> // com.letta.mobile.plugin.keystore/SecretListing.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/SecretMetadata { // com.letta.mobile.plugin.keystore/SecretMetadata|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/SecretDescription? = ...) // com.letta.mobile.plugin.keystore/SecretMetadata.<init>|<init>(com.letta.mobile.plugin.keystore.SecretDescription?){}[0]
+
+    final val description // com.letta.mobile.plugin.keystore/SecretMetadata.description|{}description[0]
+        final fun <get-description>(): com.letta.mobile.plugin.keystore/SecretDescription? // com.letta.mobile.plugin.keystore/SecretMetadata.description.<get-description>|<get-description>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/SecretDescription? // com.letta.mobile.plugin.keystore/SecretMetadata.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/SecretDescription? = ...): com.letta.mobile.plugin.keystore/SecretMetadata // com.letta.mobile.plugin.keystore/SecretMetadata.copy|copy(com.letta.mobile.plugin.keystore.SecretDescription?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretMetadata.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretMetadata.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretMetadata.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretMetadata> { // com.letta.mobile.plugin.keystore/SecretMetadata.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretMetadata.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretMetadata.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretMetadata.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretMetadata // com.letta.mobile.plugin.keystore/SecretMetadata.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretMetadata) // com.letta.mobile.plugin.keystore/SecretMetadata.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretMetadata){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretMetadata.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretMetadata> // com.letta.mobile.plugin.keystore/SecretMetadata.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/SecretRef { // com.letta.mobile.plugin.keystore/SecretRef|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/KeystoreProviderId, com.letta.mobile.plugin.keystore/SecretPath, com.letta.mobile.plugin.keystore/SecretField? = ...) // com.letta.mobile.plugin.keystore/SecretRef.<init>|<init>(com.letta.mobile.plugin.keystore.KeystoreProviderId;com.letta.mobile.plugin.keystore.SecretPath;com.letta.mobile.plugin.keystore.SecretField?){}[0]
+
+    final val field // com.letta.mobile.plugin.keystore/SecretRef.field|{}field[0]
+        final fun <get-field>(): com.letta.mobile.plugin.keystore/SecretField? // com.letta.mobile.plugin.keystore/SecretRef.field.<get-field>|<get-field>(){}[0]
+    final val isWellFormed // com.letta.mobile.plugin.keystore/SecretRef.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretRef.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val item // com.letta.mobile.plugin.keystore/SecretRef.item|{}item[0]
+        final fun <get-item>(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/SecretRef.item.<get-item>|<get-item>(){}[0]
+    final val path // com.letta.mobile.plugin.keystore/SecretRef.path|{}path[0]
+        final fun <get-path>(): com.letta.mobile.plugin.keystore/SecretPath // com.letta.mobile.plugin.keystore/SecretRef.path.<get-path>|<get-path>(){}[0]
+    final val provider // com.letta.mobile.plugin.keystore/SecretRef.provider|{}provider[0]
+        final fun <get-provider>(): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/SecretRef.provider.<get-provider>|<get-provider>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/SecretRef.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.plugin.keystore/SecretPath // com.letta.mobile.plugin.keystore/SecretRef.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.plugin.keystore/SecretField? // com.letta.mobile.plugin.keystore/SecretRef.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/KeystoreProviderId = ..., com.letta.mobile.plugin.keystore/SecretPath = ..., com.letta.mobile.plugin.keystore/SecretField? = ...): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/SecretRef.copy|copy(com.letta.mobile.plugin.keystore.KeystoreProviderId;com.letta.mobile.plugin.keystore.SecretPath;com.letta.mobile.plugin.keystore.SecretField?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretRef.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretRef.hashCode|hashCode(){}[0]
+    final fun problemFor(com.letta.mobile.plugin.keystore/KeystoreProviderId): com.letta.mobile.plugin.keystore/RefProblem? // com.letta.mobile.plugin.keystore/SecretRef.problemFor|problemFor(com.letta.mobile.plugin.keystore.KeystoreProviderId){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretRef.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretRef> { // com.letta.mobile.plugin.keystore/SecretRef.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretRef.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretRef.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretRef.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/SecretRef.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretRef) // com.letta.mobile.plugin.keystore/SecretRef.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretRef){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretRef.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretRef> // com.letta.mobile.plugin.keystore/SecretRef.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/SecretScope { // com.letta.mobile.plugin.keystore/SecretScope|null[0]
+    constructor <init>(com.letta.mobile.plugin.keystore/KeystoreProviderId, com.letta.mobile.plugin.keystore/SecretPath? = ...) // com.letta.mobile.plugin.keystore/SecretScope.<init>|<init>(com.letta.mobile.plugin.keystore.KeystoreProviderId;com.letta.mobile.plugin.keystore.SecretPath?){}[0]
+
+    final val prefix // com.letta.mobile.plugin.keystore/SecretScope.prefix|{}prefix[0]
+        final fun <get-prefix>(): com.letta.mobile.plugin.keystore/SecretPath? // com.letta.mobile.plugin.keystore/SecretScope.prefix.<get-prefix>|<get-prefix>(){}[0]
+    final val provider // com.letta.mobile.plugin.keystore/SecretScope.provider|{}provider[0]
+        final fun <get-provider>(): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/SecretScope.provider.<get-provider>|<get-provider>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/SecretScope.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.plugin.keystore/SecretPath? // com.letta.mobile.plugin.keystore/SecretScope.component2|component2(){}[0]
+    final fun contains(com.letta.mobile.plugin.keystore/SecretRef): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretScope.contains|contains(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+    final fun copy(com.letta.mobile.plugin.keystore/KeystoreProviderId = ..., com.letta.mobile.plugin.keystore/SecretPath? = ...): com.letta.mobile.plugin.keystore/SecretScope // com.letta.mobile.plugin.keystore/SecretScope.copy|copy(com.letta.mobile.plugin.keystore.KeystoreProviderId;com.letta.mobile.plugin.keystore.SecretPath?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretScope.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretScope.hashCode|hashCode(){}[0]
+    final fun problemFor(com.letta.mobile.plugin.keystore/KeystoreProviderId): com.letta.mobile.plugin.keystore/RefProblem? // com.letta.mobile.plugin.keystore/SecretScope.problemFor|problemFor(com.letta.mobile.plugin.keystore.KeystoreProviderId){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretScope.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretScope> { // com.letta.mobile.plugin.keystore/SecretScope.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretScope.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretScope.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretScope.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretScope // com.letta.mobile.plugin.keystore/SecretScope.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretScope) // com.letta.mobile.plugin.keystore/SecretScope.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretScope){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretScope.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretScope> // com.letta.mobile.plugin.keystore/SecretScope.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.keystore/SecretValue { // com.letta.mobile.plugin.keystore/SecretValue|null[0]
+    final val isWiped // com.letta.mobile.plugin.keystore/SecretValue.isWiped|{}isWiped[0]
+        final fun <get-isWiped>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretValue.isWiped.<get-isWiped>|<get-isWiped>(){}[0]
+    final val valueProblem // com.letta.mobile.plugin.keystore/SecretValue.valueProblem|{}valueProblem[0]
+        final fun <get-valueProblem>(): com.letta.mobile.plugin.keystore/ValueProblem? // com.letta.mobile.plugin.keystore/SecretValue.valueProblem.<get-valueProblem>|<get-valueProblem>(){}[0]
+
+    final fun <#A1: kotlin/Any?> revealSecretBytes(kotlin/Function1<kotlin/ByteArray, #A1>): #A1 // com.letta.mobile.plugin.keystore/SecretValue.revealSecretBytes|revealSecretBytes(kotlin.Function1<kotlin.ByteArray,0:0>){0§<kotlin.Any?>}[0]
+    final fun contentEqualsConstantTime(com.letta.mobile.plugin.keystore/SecretValue): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretValue.contentEqualsConstantTime|contentEqualsConstantTime(com.letta.mobile.plugin.keystore.SecretValue){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretValue.toString|toString(){}[0]
+    final fun wipe() // com.letta.mobile.plugin.keystore/SecretValue.wipe|wipe(){}[0]
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretValue.Companion|null[0]
+        final const val REDACTED // com.letta.mobile.plugin.keystore/SecretValue.Companion.REDACTED|{}REDACTED[0]
+            final fun <get-REDACTED>(): kotlin/String // com.letta.mobile.plugin.keystore/SecretValue.Companion.REDACTED.<get-REDACTED>|<get-REDACTED>(){}[0]
+
+        final fun ofBytes(kotlin/ByteArray): com.letta.mobile.plugin.keystore/SecretValue // com.letta.mobile.plugin.keystore/SecretValue.Companion.ofBytes|ofBytes(kotlin.ByteArray){}[0]
+    }
+}
+
+final value class com.letta.mobile.plugin.keystore/KeystoreProviderId { // com.letta.mobile.plugin.keystore/KeystoreProviderId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.plugin.keystore/KeystoreProviderId.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.plugin.keystore/KeystoreProviderId.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreProviderId.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.plugin.keystore/KeystoreProviderId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreProviderId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreProviderId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreProviderId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreProviderId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreProviderId> { // com.letta.mobile.plugin.keystore/KeystoreProviderId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/KeystoreProviderId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreProviderId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreProviderId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreProviderId // com.letta.mobile.plugin.keystore/KeystoreProviderId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreProviderId) // com.letta.mobile.plugin.keystore/KeystoreProviderId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreProviderId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/KeystoreProviderId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreProviderId> // com.letta.mobile.plugin.keystore/KeystoreProviderId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.plugin.keystore/ProviderDiagnostic { // com.letta.mobile.plugin.keystore/ProviderDiagnostic|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.plugin.keystore/ProviderDiagnostic.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.plugin.keystore/ProviderDiagnostic.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/ProviderDiagnostic.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.plugin.keystore/ProviderDiagnostic.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.plugin.keystore/ProviderDiagnostic.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/ProviderDiagnostic.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/ProviderDiagnostic.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/ProviderDiagnostic.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/ProviderDiagnostic> { // com.letta.mobile.plugin.keystore/ProviderDiagnostic.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/ProviderDiagnostic.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/ProviderDiagnostic.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/ProviderDiagnostic.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/ProviderDiagnostic // com.letta.mobile.plugin.keystore/ProviderDiagnostic.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/ProviderDiagnostic) // com.letta.mobile.plugin.keystore/ProviderDiagnostic.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.ProviderDiagnostic){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/ProviderDiagnostic.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/ProviderDiagnostic> // com.letta.mobile.plugin.keystore/ProviderDiagnostic.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.plugin.keystore/SecretDescription { // com.letta.mobile.plugin.keystore/SecretDescription|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.plugin.keystore/SecretDescription.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.plugin.keystore/SecretDescription.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretDescription.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.plugin.keystore/SecretDescription.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.plugin.keystore/SecretDescription.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretDescription.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretDescription.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretDescription.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretDescription> { // com.letta.mobile.plugin.keystore/SecretDescription.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretDescription.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretDescription.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretDescription.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretDescription // com.letta.mobile.plugin.keystore/SecretDescription.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretDescription) // com.letta.mobile.plugin.keystore/SecretDescription.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretDescription){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretDescription.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretDescription> // com.letta.mobile.plugin.keystore/SecretDescription.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.plugin.keystore/SecretField { // com.letta.mobile.plugin.keystore/SecretField|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.plugin.keystore/SecretField.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.plugin.keystore/SecretField.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretField.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.plugin.keystore/SecretField.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.plugin.keystore/SecretField.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretField.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretField.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretField.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretField> { // com.letta.mobile.plugin.keystore/SecretField.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretField.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretField.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretField.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretField // com.letta.mobile.plugin.keystore/SecretField.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretField) // com.letta.mobile.plugin.keystore/SecretField.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretField){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretField.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretField> // com.letta.mobile.plugin.keystore/SecretField.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.plugin.keystore/SecretPath { // com.letta.mobile.plugin.keystore/SecretPath|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.plugin.keystore/SecretPath.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.plugin.keystore/SecretPath.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretPath.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.plugin.keystore/SecretPath.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.plugin.keystore/SecretPath.value.<get-value>|<get-value>(){}[0]
+
+    final fun covers(com.letta.mobile.plugin.keystore/SecretPath): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretPath.covers|covers(com.letta.mobile.plugin.keystore.SecretPath){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/SecretPath.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/SecretPath.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/SecretPath.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/SecretPath> { // com.letta.mobile.plugin.keystore/SecretPath.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.keystore/SecretPath.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/SecretPath.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/SecretPath.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/SecretPath // com.letta.mobile.plugin.keystore/SecretPath.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/SecretPath) // com.letta.mobile.plugin.keystore/SecretPath.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.SecretPath){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.keystore/SecretPath.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/SecretPath> // com.letta.mobile.plugin.keystore/SecretPath.Companion.serializer|serializer(){}[0]
+    }
+}
+
+sealed class com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError|null[0]
+    abstract val code // com.letta.mobile.plugin.keystore/KeystoreError.code|{}code[0]
+        abstract fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.code.<get-code>|<get-code>(){}[0]
+    abstract val message // com.letta.mobile.plugin.keystore/KeystoreError.message|{}message[0]
+        abstract fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.message.<get-message>|<get-message>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.toString|toString(){}[0]
+
+    final class Conflict : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.Conflict|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/SecretRef) // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.<init>|<init>(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.message.<get-message>|<get-message>(){}[0]
+        final val ref // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.ref|{}ref[0]
+            final fun <get-ref>(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.ref.<get-ref>|<get-ref>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/SecretRef = ...): com.letta.mobile.plugin.keystore/KeystoreError.Conflict // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.copy|copy(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Conflict> { // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.Conflict // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.Conflict) // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.Conflict){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Conflict> // com.letta.mobile.plugin.keystore/KeystoreError.Conflict.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Denied : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.Denied|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/KeystoreOperation) // com.letta.mobile.plugin.keystore/KeystoreError.Denied.<init>|<init>(com.letta.mobile.plugin.keystore.KeystoreOperation){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.Denied.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.Denied.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.Denied.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.Denied.message.<get-message>|<get-message>(){}[0]
+        final val operation // com.letta.mobile.plugin.keystore/KeystoreError.Denied.operation|{}operation[0]
+            final fun <get-operation>(): com.letta.mobile.plugin.keystore/KeystoreOperation // com.letta.mobile.plugin.keystore/KeystoreError.Denied.operation.<get-operation>|<get-operation>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/KeystoreOperation // com.letta.mobile.plugin.keystore/KeystoreError.Denied.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/KeystoreOperation = ...): com.letta.mobile.plugin.keystore/KeystoreError.Denied // com.letta.mobile.plugin.keystore/KeystoreError.Denied.copy|copy(com.letta.mobile.plugin.keystore.KeystoreOperation){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.Denied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.Denied.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Denied> { // com.letta.mobile.plugin.keystore/KeystoreError.Denied.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.Denied.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.Denied.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.Denied.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.Denied // com.letta.mobile.plugin.keystore/KeystoreError.Denied.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.Denied) // com.letta.mobile.plugin.keystore/KeystoreError.Denied.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.Denied){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.Denied.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.plugin.keystore/KeystoreError.Denied.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Denied> // com.letta.mobile.plugin.keystore/KeystoreError.Denied.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Internal : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.Internal|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/ProviderDiagnostic? = ...) // com.letta.mobile.plugin.keystore/KeystoreError.Internal.<init>|<init>(com.letta.mobile.plugin.keystore.ProviderDiagnostic?){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.Internal.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.Internal.code.<get-code>|<get-code>(){}[0]
+        final val detail // com.letta.mobile.plugin.keystore/KeystoreError.Internal.detail|{}detail[0]
+            final fun <get-detail>(): com.letta.mobile.plugin.keystore/ProviderDiagnostic? // com.letta.mobile.plugin.keystore/KeystoreError.Internal.detail.<get-detail>|<get-detail>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.Internal.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.Internal.message.<get-message>|<get-message>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/ProviderDiagnostic? // com.letta.mobile.plugin.keystore/KeystoreError.Internal.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/ProviderDiagnostic? = ...): com.letta.mobile.plugin.keystore/KeystoreError.Internal // com.letta.mobile.plugin.keystore/KeystoreError.Internal.copy|copy(com.letta.mobile.plugin.keystore.ProviderDiagnostic?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.Internal.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.Internal.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Internal> { // com.letta.mobile.plugin.keystore/KeystoreError.Internal.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.Internal.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.Internal.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.Internal.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.Internal // com.letta.mobile.plugin.keystore/KeystoreError.Internal.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.Internal) // com.letta.mobile.plugin.keystore/KeystoreError.Internal.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.Internal){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.Internal.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Internal> // com.letta.mobile.plugin.keystore/KeystoreError.Internal.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class InvalidRef : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/RefProblem) // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.<init>|<init>(com.letta.mobile.plugin.keystore.RefProblem){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.message.<get-message>|<get-message>(){}[0]
+        final val refProblem // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.refProblem|{}refProblem[0]
+            final fun <get-refProblem>(): com.letta.mobile.plugin.keystore/RefProblem // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.refProblem.<get-refProblem>|<get-refProblem>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/RefProblem // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/RefProblem = ...): com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.copy|copy(com.letta.mobile.plugin.keystore.RefProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef> { // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef) // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.InvalidRef){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef> // com.letta.mobile.plugin.keystore/KeystoreError.InvalidRef.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class InvalidValue : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/ValueProblem) // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.<init>|<init>(com.letta.mobile.plugin.keystore.ValueProblem){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.message.<get-message>|<get-message>(){}[0]
+        final val valueProblem // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.valueProblem|{}valueProblem[0]
+            final fun <get-valueProblem>(): com.letta.mobile.plugin.keystore/ValueProblem // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.valueProblem.<get-valueProblem>|<get-valueProblem>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/ValueProblem // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/ValueProblem = ...): com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.copy|copy(com.letta.mobile.plugin.keystore.ValueProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue> { // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue) // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.InvalidValue){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue> // com.letta.mobile.plugin.keystore/KeystoreError.InvalidValue.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class NotFound : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.NotFound|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/SecretRef) // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.<init>|<init>(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.message.<get-message>|<get-message>(){}[0]
+        final val ref // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.ref|{}ref[0]
+            final fun <get-ref>(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.ref.<get-ref>|<get-ref>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/SecretRef // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/SecretRef = ...): com.letta.mobile.plugin.keystore/KeystoreError.NotFound // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.copy|copy(com.letta.mobile.plugin.keystore.SecretRef){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.NotFound> { // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.NotFound // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.NotFound) // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.NotFound){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.NotFound> // com.letta.mobile.plugin.keystore/KeystoreError.NotFound.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Unavailable : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/ProviderDiagnostic? = ...) // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.<init>|<init>(com.letta.mobile.plugin.keystore.ProviderDiagnostic?){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.code.<get-code>|<get-code>(){}[0]
+        final val detail // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.detail|{}detail[0]
+            final fun <get-detail>(): com.letta.mobile.plugin.keystore/ProviderDiagnostic? // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.detail.<get-detail>|<get-detail>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.message.<get-message>|<get-message>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/ProviderDiagnostic? // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/ProviderDiagnostic? = ...): com.letta.mobile.plugin.keystore/KeystoreError.Unavailable // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.copy|copy(com.letta.mobile.plugin.keystore.ProviderDiagnostic?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Unavailable> { // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.Unavailable // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.Unavailable) // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.Unavailable){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Unavailable> // com.letta.mobile.plugin.keystore/KeystoreError.Unavailable.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Unsupported : com.letta.mobile.plugin.keystore/KeystoreError { // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported|null[0]
+        constructor <init>(com.letta.mobile.plugin.keystore/KeystoreOperation) // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.<init>|<init>(com.letta.mobile.plugin.keystore.KeystoreOperation){}[0]
+
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.message.<get-message>|<get-message>(){}[0]
+        final val operation // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.operation|{}operation[0]
+            final fun <get-operation>(): com.letta.mobile.plugin.keystore/KeystoreOperation // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.operation.<get-operation>|<get-operation>(){}[0]
+
+        final fun component1(): com.letta.mobile.plugin.keystore/KeystoreOperation // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.plugin.keystore/KeystoreOperation = ...): com.letta.mobile.plugin.keystore/KeystoreError.Unsupported // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.copy|copy(com.letta.mobile.plugin.keystore.KeystoreOperation){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.hashCode|hashCode(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Unsupported> { // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.keystore/KeystoreError.Unsupported // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.keystore/KeystoreError.Unsupported) // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.keystore.KeystoreError.Unsupported){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.Companion|null[0]
+            final val $childSerializers // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Unsupported> // com.letta.mobile.plugin.keystore/KeystoreError.Unsupported.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/KeystoreError.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError> // com.letta.mobile.plugin.keystore/KeystoreError.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/KeystoreError.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+
+    final object Locked : com.letta.mobile.plugin.keystore/KeystoreError, kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.keystore/KeystoreError.Locked|null[0]
+        final val code // com.letta.mobile.plugin.keystore/KeystoreError.Locked.code|{}code[0]
+            final fun <get-code>(): com.letta.mobile.plugin.keystore/KeystoreErrorCode // com.letta.mobile.plugin.keystore/KeystoreError.Locked.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.keystore/KeystoreError.Locked.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.keystore/KeystoreError.Locked.message.<get-message>|<get-message>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.keystore/KeystoreError.Locked.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreError.Locked.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.keystore/KeystoreError.Locked> // com.letta.mobile.plugin.keystore/KeystoreError.Locked.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.keystore/KeystoreError.Locked.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final object com.letta.mobile.plugin.api/Base64ByteArraySerializer : kotlinx.serialization/KSerializer<kotlin/ByteArray> { // com.letta.mobile.plugin.api/Base64ByteArraySerializer|null[0]
     final val descriptor // com.letta.mobile.plugin.api/Base64ByteArraySerializer.descriptor|{}descriptor[0]
         final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/Base64ByteArraySerializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
@@ -1032,3 +2074,27 @@ final object com.letta.mobile.plugin.api/PluginApi { // com.letta.mobile.plugin.
     final const val VERSION // com.letta.mobile.plugin.api/PluginApi.VERSION|{}VERSION[0]
         final fun <get-VERSION>(): kotlin/String // com.letta.mobile.plugin.api/PluginApi.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
 }
+
+final object com.letta.mobile.plugin.keystore/KeystoreSpi { // com.letta.mobile.plugin.keystore/KeystoreSpi|null[0]
+    final const val CONTRACT_VERSION // com.letta.mobile.plugin.keystore/KeystoreSpi.CONTRACT_VERSION|{}CONTRACT_VERSION[0]
+        final fun <get-CONTRACT_VERSION>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.CONTRACT_VERSION.<get-CONTRACT_VERSION>|<get-CONTRACT_VERSION>(){}[0]
+    final const val MAX_DESCRIPTION_LENGTH // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_DESCRIPTION_LENGTH|{}MAX_DESCRIPTION_LENGTH[0]
+        final fun <get-MAX_DESCRIPTION_LENGTH>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_DESCRIPTION_LENGTH.<get-MAX_DESCRIPTION_LENGTH>|<get-MAX_DESCRIPTION_LENGTH>(){}[0]
+    final const val MAX_DIAGNOSTIC_LENGTH // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_DIAGNOSTIC_LENGTH|{}MAX_DIAGNOSTIC_LENGTH[0]
+        final fun <get-MAX_DIAGNOSTIC_LENGTH>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_DIAGNOSTIC_LENGTH.<get-MAX_DIAGNOSTIC_LENGTH>|<get-MAX_DIAGNOSTIC_LENGTH>(){}[0]
+    final const val MAX_FIELD_LENGTH // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_FIELD_LENGTH|{}MAX_FIELD_LENGTH[0]
+        final fun <get-MAX_FIELD_LENGTH>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_FIELD_LENGTH.<get-MAX_FIELD_LENGTH>|<get-MAX_FIELD_LENGTH>(){}[0]
+    final const val MAX_LIST_ENTRIES // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_LIST_ENTRIES|{}MAX_LIST_ENTRIES[0]
+        final fun <get-MAX_LIST_ENTRIES>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_LIST_ENTRIES.<get-MAX_LIST_ENTRIES>|<get-MAX_LIST_ENTRIES>(){}[0]
+    final const val MAX_PATH_LENGTH // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_PATH_LENGTH|{}MAX_PATH_LENGTH[0]
+        final fun <get-MAX_PATH_LENGTH>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_PATH_LENGTH.<get-MAX_PATH_LENGTH>|<get-MAX_PATH_LENGTH>(){}[0]
+    final const val MAX_PATH_SEGMENTS // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_PATH_SEGMENTS|{}MAX_PATH_SEGMENTS[0]
+        final fun <get-MAX_PATH_SEGMENTS>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_PATH_SEGMENTS.<get-MAX_PATH_SEGMENTS>|<get-MAX_PATH_SEGMENTS>(){}[0]
+    final const val MAX_PROVIDER_ID_LENGTH // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_PROVIDER_ID_LENGTH|{}MAX_PROVIDER_ID_LENGTH[0]
+        final fun <get-MAX_PROVIDER_ID_LENGTH>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_PROVIDER_ID_LENGTH.<get-MAX_PROVIDER_ID_LENGTH>|<get-MAX_PROVIDER_ID_LENGTH>(){}[0]
+    final const val MAX_VALUE_BYTES // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_VALUE_BYTES|{}MAX_VALUE_BYTES[0]
+        final fun <get-MAX_VALUE_BYTES>(): kotlin/Int // com.letta.mobile.plugin.keystore/KeystoreSpi.MAX_VALUE_BYTES.<get-MAX_VALUE_BYTES>|<get-MAX_VALUE_BYTES>(){}[0]
+}
+
+final fun (com.letta.mobile.plugin.keystore/KeystoreResult<*>).com.letta.mobile.plugin.keystore/errorOrNull(): com.letta.mobile.plugin.keystore/KeystoreError? // com.letta.mobile.plugin.keystore/errorOrNull|errorOrNull@com.letta.mobile.plugin.keystore.KeystoreResult<*>(){}[0]
+final fun <#A: kotlin/Any?> (com.letta.mobile.plugin.keystore/KeystoreResult<#A>).com.letta.mobile.plugin.keystore/valueOrNull(): #A? // com.letta.mobile.plugin.keystore/valueOrNull|valueOrNull@com.letta.mobile.plugin.keystore.KeystoreResult<0:0>(){0§<kotlin.Any?>}[0]

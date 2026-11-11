@@ -1,0 +1,2 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":2,"method":"keystore.describe","params":{}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":2,"result":{"id":"example.memory","capabilities":["read","write","list","delete"],"needsUnlock":true}}}

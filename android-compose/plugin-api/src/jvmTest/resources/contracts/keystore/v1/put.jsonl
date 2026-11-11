@@ -1,0 +1,10 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":14,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"},"value":"TEtTLVNFTlRJTkVMLXZhbHVlLTdmM2E5Yw==","mode":"create","metadata":{"description":"OpenAI key for the research agent"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":14,"result":{}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":15,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"},"value":"TEtTLVNFTlRJTkVMLXZhbHVlLTdmM2E5Yw==","mode":"create"}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":15,"error":{"code":-32020,"message":"A secret already exists at example.memory:team/api/openai#token","data":{"code":"conflict","ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":16,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"},"value":"TEtTLVNFTlRJTkVMLW5ldy03ZjNhOWM=","mode":"replace"}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":16,"result":{}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":17,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/anthropic"},"value":"TEtTLVNFTlRJTkVMLXZhbHVlLTdmM2E5Yw==","mode":"upsert"}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":17,"result":{}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":18,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"},"value":"","mode":"upsert"}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":18,"error":{"code":-32020,"message":"Invalid secret value: empty","data":{"code":"invalid_value","valueProblem":"empty"}}}}

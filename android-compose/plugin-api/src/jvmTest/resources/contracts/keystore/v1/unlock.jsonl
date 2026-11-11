@@ -1,0 +1,4 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":6,"method":"keystore.unlock","params":{"material":"TEtTLVNFTlRJTkVMLXdyb25nLTdmM2E5Yw=="}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":6,"error":{"code":-32020,"message":"The keystore refused unlock","data":{"code":"denied","operation":"unlock"}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":7,"method":"keystore.unlock","params":{"material":"TEtTLVNFTlRJTkVMLXVubG9jay03ZjNhOWM="}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":7,"result":{}}}
