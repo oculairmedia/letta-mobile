@@ -38,55 +38,66 @@ class AuthorizedCanvasMountsTest {
 
     private fun agentDefault() = defaultRequest(agent.value)
 
+    /** One row of an authorization matrix: whether a record exists, and the authority's three answers. */
+    private data class MatrixCase(val seeded: Boolean, val scope: Answer, val proposal: Answer, val winner: Answer) {
+        val scopeAllowed: Boolean get() = scope == Answer.ALLOW
+        val authorized: Boolean get() = scopeAllowed && proposal == Answer.ALLOW
+        val winnerAllowed: Boolean get() = winner == Answer.ALLOW
+    }
+
+    /** Every combination of record presence and the given answers. */
+    private fun matrix(proposals: List<Answer> = answers): List<MatrixCase> = listOf(false, true).flatMap { seeded ->
+        answers.flatMap { scope -> proposals.flatMap { proposal -> answers.map { MatrixCase(seeded, scope, proposal, it) } } }
+    }
+
+    private fun facadeFor(case: MatrixCase, root: Path) = facade(root, TableAuthority(case.scope, case.proposal, case.winner))
+
+    private fun expectedRead(case: MatrixCase): CanvasMountResult = when {
+        !case.scopeAllowed -> CanvasMountResult.Denied
+        !case.seeded -> CanvasMountResult.None
+        !case.winnerAllowed -> CanvasMountResult.Denied
+        else -> CanvasMountResult.Found(existing)
+    }
+
+    private fun expectedBind(case: MatrixCase): CanvasMountResult {
+        val seen = case.authorized && case.winnerAllowed
+        return if (seen) CanvasMountResult.Bound(if (case.seeded) existing else proposed) else CanvasMountResult.Denied
+    }
+
+    /** An existing record is never rewritten; an absent one holds the caller's proposal only once it was authorized. */
+    private fun storedAfterBind(case: MatrixCase): CanvasId? = if (case.seeded) existing else proposed.takeIf { case.authorized }
+
+    private fun storedAfterReplace(case: MatrixCase): CanvasId? = if (case.authorized) proposed else existing.takeIf { case.seeded }
+
     @Test
     fun readMatrix() = runBlocking {
-        for (seeded in listOf(false, true)) {
-            val root = root(seeded)
-            for (scope in answers) for (winner in answers) {
-                val mounts = facade(root, TableAuthority(scope, Answer.DENY, winner))
-                val expected = when {
-                    scope != Answer.ALLOW -> CanvasMountResult.Denied
-                    !seeded -> CanvasMountResult.None
-                    winner != Answer.ALLOW -> CanvasMountResult.Denied
-                    else -> CanvasMountResult.Found(existing)
-                }
-                val label = "seeded=$seeded scope=$scope winner=$winner"
-                assertEquals(expected, mounts.read(binding()), label)
-                assertEquals(expected, mounts.read(agentDefault()), label)
-            }
+        for (case in matrix(proposals = listOf(Answer.DENY))) {
+            val mounts = facadeFor(case, root(case.seeded))
+            assertEquals(expectedRead(case), mounts.read(binding()), "$case")
+            assertEquals(expectedRead(case), mounts.read(agentDefault()), "$case")
         }
     }
 
     @Test
     fun bindMatrix() = runBlocking {
-        for (seeded in listOf(false, true)) for (scope in answers) for (proposal in answers) for (winner in answers) {
-            val root = root(seeded)
-            val result = facade(root, TableAuthority(scope, proposal, winner)).bindIfAbsent(binding(), proposed)
-            val authorized = scope == Answer.ALLOW && proposal == Answer.ALLOW
-            val winnerId = if (seeded) existing else proposed
-            val expected = if (authorized && winner == Answer.ALLOW) CanvasMountResult.Bound(winnerId) else CanvasMountResult.Denied
-            val label = "seeded=$seeded scope=$scope proposal=$proposal winner=$winner"
-            assertEquals(expected, result, label)
-            // An existing record is never rewritten; an absent one holds the caller's proposal only once it was authorized.
-            val storedAfter = if (seeded) existing else proposed.takeIf { authorized }
-            assertEquals(storedAfter, raw(root).readBinding(agent, conversation), label)
+        for (case in matrix()) {
+            val root = root(case.seeded)
+            assertEquals(expectedBind(case), facadeFor(case, root).bindIfAbsent(binding(), proposed), "$case")
+            assertEquals(storedAfterBind(case), raw(root).readBinding(agent, conversation), "$case")
         }
     }
 
     @Test
     fun replaceAndSetMatrix() = runBlocking {
-        for (seeded in listOf(false, true)) for (scope in answers) for (proposal in answers) for (winner in answers) {
-            val root = root(seeded)
-            val mounts = facade(root, TableAuthority(scope, proposal, winner))
-            val authorized = scope == Answer.ALLOW && proposal == Answer.ALLOW
-            val label = "seeded=$seeded scope=$scope proposal=$proposal winner=$winner"
-            val replaced = if (authorized) CanvasMountResult.Replaced(proposed) else CanvasMountResult.Denied
-            val set = if (authorized) CanvasMountResult.DefaultSet(proposed) else CanvasMountResult.Denied
-            assertEquals(replaced, mounts.replaceBinding(binding(), proposed), label)
-            assertEquals(set, mounts.setDefault(agentDefault(), proposed), label)
-            val storedAfter = if (authorized) proposed else existing.takeIf { seeded }
-            assertEquals(storedAfter, raw(root).readBinding(agent, conversation), label)
-            assertEquals(storedAfter, raw(root).readDefault(agent), label)
+        for (case in matrix()) {
+            val root = root(case.seeded)
+            val mounts = facadeFor(case, root)
+            val replaced = if (case.authorized) CanvasMountResult.Replaced(proposed) else CanvasMountResult.Denied
+            val set = if (case.authorized) CanvasMountResult.DefaultSet(proposed) else CanvasMountResult.Denied
+            assertEquals(replaced, mounts.replaceBinding(binding(), proposed), "$case")
+            assertEquals(set, mounts.setDefault(agentDefault(), proposed), "$case")
+            assertEquals(storedAfterReplace(case), raw(root).readBinding(agent, conversation), "$case")
+            assertEquals(storedAfterReplace(case), raw(root).readDefault(agent), "$case")
         }
     }
 
