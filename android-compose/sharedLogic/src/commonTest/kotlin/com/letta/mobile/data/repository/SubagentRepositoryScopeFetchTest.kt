@@ -41,6 +41,108 @@ class SubagentRepositoryScopeFetchTest {
     )
 
     @Test
+    fun initialTerminalHistoryNeverBecomesActive() = runTest {
+        val live = running("toolu_live", CONVERSATION_A)
+        val history = (1..5).map { index ->
+            live.copy(toolCallId = "toolu_old_$index", status = "failed",
+                terminalAgeMs = if (index > 3) 60_000L else null)
+        }
+        transport.entriesByConversation[CONVERSATION_A] = history + live
+        val repo = SubagentRepository(transport, backgroundScope, includeAll = true, clock = { now })
+        var visible = emptyList<com.letta.mobile.data.model.SubagentEntry>()
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect { visible = it } }
+        runCurrent()
+        assertEquals(listOf("toolu_live"), visible.map { it.toolCallId })
+        reconnect()
+        assertEquals(listOf("toolu_live"), visible.map { it.toolCallId })
+        assertEquals(history.map { it.toolCallId }, repo.currentSubagentsWithHistory(scopeA)
+            .filter { it.status == "failed" }.map { it.toolCallId })
+        transport.entriesByConversation[CONVERSATION_B] = listOf(running("toolu_b", CONVERSATION_B)) +
+            history.map { it.copy(parentConversationId = CONVERSATION_B) }
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeB).collect {} }
+        runCurrent()
+        assertEquals(listOf("toolu_b"), repo.currentActiveSubagents(scopeB).map { it.toolCallId })
+        assertEquals(listOf("toolu_live"), repo.currentActiveSubagents(scopeA).map { it.toolCallId })
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "replayed-history", ts = "t", reason = "replay", subagentsActive = history + live,
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(listOf("toolu_live"), visible.map { it.toolCallId })
+        transport.entriesByConversation[CONVERSATION_A] = listOf(live)
+        reconnect()
+        assertEquals(listOf("toolu_live"), repo.currentSubagentsWithHistory(scopeA).map { it.toolCallId })
+        repo.close()
+    }
+
+    @Test
+    fun hostAgeOverridesClockSkewAndDoesNotRestartOnReplay() = runTest {
+        val live = running("toolu_a", CONVERSATION_A)
+        val repo = SubagentRepository(transport, backgroundScope, includeAll = true, clock = { now })
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        runCurrent()
+        suspend fun complete(age: Long) {
+            transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+                id = "completion", ts = "t", reason = "replay",
+                subagentsActive = listOf(live.copy(status = "failed", terminalAtEpochMs = Long.MAX_VALUE, terminalAgeMs = age)),
+                parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+            ))
+            runCurrent()
+        }
+        complete(0L)
+        assertEquals("failed", repo.currentActiveSubagents(scopeA).single().status)
+        now += 7_999L
+        complete(0L)
+        assertEquals(1, repo.currentActiveSubagents(scopeA).size)
+        now += 1L
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        complete(60_000L)
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        assertEquals(1, repo.currentSubagentsWithHistory(scopeA).size)
+        repo.close()
+    }
+
+    @Test
+    fun oldCompletionWithHostTimingNeverLingersEvenWhenPreviouslyRunning() = runTest {
+        val live = running("toolu_a", CONVERSATION_A)
+        val repo = SubagentRepository(transport, backgroundScope, includeAll = true, clock = { now })
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect {} }
+        runCurrent()
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "late-completion", ts = "t", reason = "registry",
+            subagentsActive = listOf(live.copy(status = "completed", terminalAtEpochMs = Long.MAX_VALUE, terminalAgeMs = 60_000L)),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals(emptyList(), repo.currentActiveSubagents(scopeA))
+        assertEquals("completed", repo.currentSubagentsWithHistory(scopeA).single().status)
+        repo.close()
+    }
+
+    @Test
+    fun liveLegacyCompletionExpiresWithoutAnotherPush() = runTest {
+        now = testScheduler.currentTime
+        val repo = SubagentRepository(transport, backgroundScope, clock = { testScheduler.currentTime })
+        var visible = emptyList<com.letta.mobile.data.model.SubagentEntry>()
+        backgroundScope.launch { repo.activeSubagentsFlow(scopeA).collect { visible = it } }
+        runCurrent()
+        val live = running("toolu_a", CONVERSATION_A)
+        transport.events.emit(com.letta.mobile.data.transport.ServerFrame.SubagentsUpdated(
+            id = "legacy-completion", ts = "t", reason = "registry", subagentsActive = listOf(live.copy(status = "completed")),
+            parentAgentId = PARENT_AGENT, parentConversationId = CONVERSATION_A,
+        ))
+        runCurrent()
+        assertEquals("completed", visible.single().status)
+        testScheduler.advanceTimeBy(7_999L)
+        runCurrent()
+        assertEquals(1, visible.size)
+        testScheduler.advanceTimeBy(1L)
+        runCurrent()
+        assertEquals(emptyList(), visible)
+        repo.close()
+    }
+
+    @Test
     fun secondConversationIsFetchedWhenFirstRequested() = runTest {
         val repo = repository(backgroundScope)
 

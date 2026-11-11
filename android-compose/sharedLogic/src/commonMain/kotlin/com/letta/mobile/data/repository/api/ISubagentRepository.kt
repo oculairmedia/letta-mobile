@@ -33,13 +33,20 @@ data class SubagentParentScope(
  */
 interface ISubagentRepository {
     /**
-     * Hot stream of the active-subagent snapshot for [scope]. The first
+     * Active and just-finished (eight-second linger) entries only, never terminal history.
+     * The first
      * collection of each distinct scope triggers a scoped `subagent_list`
      * round-trip; later collections of that scope share the cache so no
      * duplicate fetches fire. `subagents_updated` pushes fold in by
      * replacement.
      */
     fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>>
+
+    /** Full task snapshot including finished history; never use this projection for active chrome. */
+    fun subagentsWithHistoryFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> = activeSubagentsFlow(scope)
+
+    /** Synchronous full task snapshot for the Background tasks panel's initial state. */
+    fun currentSubagentsWithHistory(scope: SubagentParentScope): List<SubagentEntry> = currentActiveSubagents(scope)
 
     /** Synchronous cache projection used to avoid an empty initial emission. */
     fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry>

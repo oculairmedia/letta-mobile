@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -74,7 +75,7 @@ open class SubagentRepository(
     scope: CoroutineScope? = null,
     // Mobile shows only active subagents (all=false). The desktop Background
     // tasks panel also has a "Finished" section, so it requests all=true to
-    // include recently-terminal entries in the initial snapshot.
+    // include terminal history in the panel, never in active chrome.
     private val includeAll: Boolean = false,
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
     private val streamTimeoutSweepIntervalMs: Long = STREAM_TIMEOUT_SWEEP_INTERVAL_MS,
@@ -138,7 +139,22 @@ open class SubagentRepository(
      * subscribers; only the first subscription triggers the initial
      * `subagent_list` round-trip.
      */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
+        subagentsWithHistoryFlow(scope).transformLatest { entries ->
+            do {
+                val now = clock()
+                val visible = entries.filterNotExpired(now)
+                emit(visible)
+                val remaining = visible.filter { it.status in TERMINAL_STATUSES }
+                    .mapNotNull { it.terminalAtEpochMs }
+                    .minOrNull()?.let { TERMINAL_LINGER_MS - (now - it) } ?: break
+                kotlinx.coroutines.delay(remaining.coerceAtLeast(1L))
+            } while (true)
+        }
+
+    /** Scoped panel snapshot, including finished history when requested by this repository. */
+    override fun subagentsWithHistoryFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
         state.asStateFlow()
             .map { entries -> entries.inParentScope(scope) }
             .onStart {
@@ -183,7 +199,11 @@ open class SubagentRepository(
     }
 
     override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
-        state.value.inParentScope(scope).filterNotExpired(clock())
+        currentSubagentsWithHistory(scope).filterNotExpired(clock())
+
+    /** Current panel snapshot, deliberately independent of the active chip linger. */
+    override fun currentSubagentsWithHistory(scope: SubagentParentScope): List<SubagentEntry> =
+        state.value.inParentScope(scope)
 
     /**
      * Force a fresh `subagent_list` round-trip. Parallel callers (e.g. the
@@ -273,13 +293,14 @@ open class SubagentRepository(
             ?.takeIf { it.isInOptionalScope(scope) }
             ?.takeUnless { it.dismissalKey() in dismissedKeys }
             ?.takeIf { it.status in TERMINAL_STATUSES }
-            ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: now) }
-        val (cached, untouched) = state.value.filterNot { it.dismissalKey() in dismissedKeys || it.isRetiredRunning() }
+
+        val (cached, untouched) = state.value.filterNot { it.dismissalKey() in dismissedKeys }
             .partition { it.isInOptionalScope(scope) }
+        val cachedByKey = cached.associateBy { it.cacheKey() }
         val completeIncoming = keepTerminalOutcomes(
             incoming = (if (stampedTerminal == null) visibleIncoming else visibleIncoming + stampedTerminal)
-                .map { entry -> entry.markSeen(now) },
-            cached = cached,
+                .map { entry -> entry.markSeen(now, cachedByKey[entry.cacheKey()]) },
+            cached = cachedByKey,
         )
         val incomingByKey = completeIncoming.associateBy { it.cacheKey() }
         val terminalKey = stampedTerminal?.cacheKey()
@@ -305,7 +326,9 @@ open class SubagentRepository(
         // Publish the absence clock once, after every branch above has settled.
         runningAbsentSince.value = absence.toMap()
 
-        val previousTerminals = retainedTerminalEntries(cached, incomingByKey.keys, now)
+        val previousTerminals = retainedTerminalEntries(
+            cached, incomingByKey.keys, now, retainHistory = includeAll && kind == SnapshotKind.INCREMENTAL,
+        )
         return (completeIncoming + retained + previousTerminals + untouched).distinctBy { it.cacheKey() }
     }
 
@@ -313,9 +336,10 @@ open class SubagentRepository(
         cached: List<SubagentEntry>,
         incomingKeys: Set<String>,
         now: Long,
+        retainHistory: Boolean,
     ): List<SubagentEntry> = cached.filter { it.status in TERMINAL_STATUSES }
         .filterNot { it.cacheKey() in incomingKeys }
-        .filter { it.terminalAtEpochMs?.let { ended -> now - ended < TERMINAL_LINGER_MS } == true }
+        .filter { retainHistory || it.terminalAtEpochMs?.let { ended -> now - ended < TERMINAL_LINGER_MS } == true }
 
     /**
      *  (RC3): a subagent that has ended stays ended. The host
@@ -325,12 +349,10 @@ open class SubagentRepository(
      */
     private fun keepTerminalOutcomes(
         incoming: List<SubagentEntry>,
-        cached: List<SubagentEntry>,
+        cached: Map<String, SubagentEntry>,
     ): List<SubagentEntry> {
-        val endedByKey = cached.filter { it.status in TERMINAL_STATUSES }.associateBy { it.cacheKey() }
-        if (endedByKey.isEmpty()) return incoming
         return incoming.map { entry ->
-            val ended = endedByKey[entry.cacheKey()]
+            val ended = cached[entry.cacheKey()]?.takeIf { it.status in TERMINAL_STATUSES }
             if (ended == null || entry.status != SubagentStatus.RUNNING) return@map entry
             Telemetry.event(
                 "SubagentRepo",
@@ -359,10 +381,24 @@ open class SubagentRepository(
     private fun SubagentEntry.isRetiredRunning(): Boolean =
         status == SubagentStatus.RUNNING && dismissalKey()?.let { it in terminalKeys } == true
 
-    private fun SubagentEntry.markSeen(now: Long): SubagentEntry =
+    private fun SubagentEntry.markSeen(now: Long, previous: SubagentEntry?): SubagentEntry =
         when (status) {
             SubagentStatus.RUNNING -> copy(lastSeenAtMs = now)
-            in TERMINAL_STATUSES -> copy(terminalAtEpochMs = terminalAtEpochMs ?: now)
+            in TERMINAL_STATUSES -> {
+                // Age is measured on the host, then anchored once to the client's clock.
+                // Missing/invalid timing never makes first-seen history look freshly finished.
+                val hostEnded = terminalAgeMs?.takeIf { it >= 0L }
+                    ?.let { now - it.coerceAtMost(TERMINAL_LINGER_MS) }
+                val priorEnded = previous?.terminalAtEpochMs
+                val ended = when {
+                    hostEnded != null && priorEnded != null -> minOf(hostEnded, priorEnded)
+                    hostEnded != null -> hostEnded
+                    previous?.status in TERMINAL_STATUSES -> priorEnded
+                    previous?.status == SubagentStatus.RUNNING -> now
+                    else -> null
+                }
+                copy(terminalAtEpochMs = ended)
+            }
             else -> this
         }
 
@@ -553,8 +589,12 @@ open class SubagentRepository(
 
     private fun List<SubagentEntry>.filterNotExpired(now: Long): List<SubagentEntry> =
         filter { entry ->
-            entry.status != SubagentStatus.RUNNING ||
-                runningAbsentSince.value[entry.cacheKey()]?.let { now - it < RUNNING_ABSENCE_LINGER_MS } != false
+            when (entry.status) {
+                in TERMINAL_STATUSES -> entry.terminalAtEpochMs?.let { now - it in 0 until TERMINAL_LINGER_MS } == true
+                SubagentStatus.RUNNING ->
+                    runningAbsentSince.value[entry.cacheKey()]?.let { now - it < RUNNING_ABSENCE_LINGER_MS } != false
+                else -> true
+            }
         }
 
     private suspend fun observeReconnects() {
