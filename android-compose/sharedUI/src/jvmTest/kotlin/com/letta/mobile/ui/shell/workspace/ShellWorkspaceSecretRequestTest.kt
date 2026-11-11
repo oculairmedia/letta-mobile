@@ -130,7 +130,12 @@ class ShellWorkspaceSecretRequestTest {
         ),
     )
 
-    private fun window(width: Dp, client: ListingClient, config: ShellLayoutConfig = ShellLayoutConfig.Default, block: ComposeUiTest.() -> Unit) =
+    private fun window(
+        width: Dp,
+        client: ListingClient,
+        config: ShellLayoutConfig = ShellLayoutConfig.Default,
+        block: ComposeUiTest.() -> Unit,
+    ) =
         runDesktopComposeUiTest(width = width.value.toInt(), height = SecretWindowHeight.value.toInt()) {
             val host = SecretRequestHost(client, agentName = { "Ada" }, clock = fixedClock)
             setContent {

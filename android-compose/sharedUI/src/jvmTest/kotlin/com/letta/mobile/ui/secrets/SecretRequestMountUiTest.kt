@@ -24,7 +24,9 @@ import kotlin.test.assertTrue
  */
 class SecretRequestMountUiTest {
     private fun mount(client: UiFakeSecretRequestClient?, block: ComposeUiTest.() -> Unit) = runDesktopComposeUiTest {
-        val host = client?.let { SecretRequestHost(it, agentName = { SecretRequestUiFixtures.AGENT_NAME }, clock = SecretRequestUiFixtures.clock) }
+        val host = client?.let {
+            SecretRequestHost(it, agentName = { SecretRequestUiFixtures.AGENT_NAME }, clock = SecretRequestUiFixtures.clock)
+        }
         setContent {
             MaterialTheme {
                 ProvideSecretRequestHost(host) { SecretRequestMount { modifier -> SecretRequestModule(modifier) } }

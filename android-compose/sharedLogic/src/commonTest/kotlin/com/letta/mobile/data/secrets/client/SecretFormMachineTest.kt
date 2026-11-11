@@ -76,7 +76,8 @@ class SecretFormMachineTest {
             SecretClientOutcome.Settled(saved.copy(status = SecretReceiptStatus.FAILED, reason = SecretFailureReason.VERIFY_FAILED)) to
                 SecretFormState.Failed(SecretFormFailure.WriteFailed(SecretFailureReason.VERIFY_FAILED)),
             refusalOf(SecretServiceError.NOT_PENDING) to SecretFormState.Expired,
-            refusalOf(SecretServiceError.INVALID_VALUE) to SecretFormState.Failed(SecretFormFailure.Refused(SecretServiceError.INVALID_VALUE)),
+            refusalOf(SecretServiceError.INVALID_VALUE) to
+                SecretFormState.Failed(SecretFormFailure.Refused(SecretServiceError.INVALID_VALUE)),
             refusalOf(SecretServiceError.FORBIDDEN) to SecretFormState.Failed(SecretFormFailure.Refused(SecretServiceError.FORBIDDEN)),
             SecretClientOutcome.Unreachable to retryable,
         )

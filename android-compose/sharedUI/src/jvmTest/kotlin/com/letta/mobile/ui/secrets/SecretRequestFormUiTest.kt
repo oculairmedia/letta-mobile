@@ -59,7 +59,11 @@ class SecretRequestFormUiTest {
         }
     }
 
-    private fun form(client: UiFakeSecretRequestClient, record: SecretRequestRecord = SecretRequestUiFixtures.record(), block: ComposeUiTest.() -> Unit) =
+    private fun form(
+        client: UiFakeSecretRequestClient,
+        record: SecretRequestRecord = SecretRequestUiFixtures.record(),
+        block: ComposeUiTest.() -> Unit,
+    ) =
         runDesktopComposeUiTest {
             setContent { Form(client, record) }
             waitForIdle()

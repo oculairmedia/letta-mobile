@@ -116,9 +116,12 @@ private class Draft(private var base: ShellLayoutConfig) {
     private fun move(op: ShellLayoutOp.Move): List<Problem> {
         val from = ShellLayoutCatalog.lane(op.lane) ?: return listOf(unknownLane(op.lane))
         val target = ShellLayoutCatalog.lane(op.toLane) ?: return listOf(unknownLane(op.toLane))
-        hostOwnedProblem(op.slot)?.let { return listOf(it) }
-        if (op.slot !in slots(from)) return listOf(notFound(op.slot, from))
-        return if (from == target) moveWithin(from, op) else moveAcross(from, target, op)
+        val refused = hostOwnedProblem(op.slot) ?: notFound(op.slot, from).takeIf { op.slot !in slots(from) }
+        return when {
+            refused != null -> listOf(refused)
+            from == target -> moveWithin(from, op)
+            else -> moveAcross(from, target, op)
+        }
     }
 
     /** [op] moving its slot to another place in [lane], the lane it is already in. */

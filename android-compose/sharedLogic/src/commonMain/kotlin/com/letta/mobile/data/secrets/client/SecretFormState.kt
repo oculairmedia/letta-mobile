@@ -150,39 +150,41 @@ object SecretFormMachine {
     /** Whether [state] is final: nothing but closing the form follows it. */
     fun isFinal(state: SecretFormState): Boolean = !isAnswerable(state) && state != SecretFormState.Submitting
 
-    private fun open(state: SecretFormState): SecretFormState =
-        if (state == SecretFormState.Idle) SecretFormState.Editing(SecretInputPresence.EMPTY) else state
-
-    private fun input(state: SecretFormState, input: SecretInputPresence): SecretFormState =
-        if (state is SecretFormState.Editing) SecretFormState.Editing(input) else state
-
-    private fun submit(state: SecretFormState): SecretFormState = if (canSubmit(state)) SecretFormState.Submitting else state
-
-    private fun answered(state: SecretFormState, outcome: SecretClientOutcome): SecretFormState =
-        if (state == SecretFormState.Submitting) outcomeState(outcome) else state
-
-    private fun closed(state: SecretFormState, closed: SecretFormState): SecretFormState = if (isAnswerable(state)) closed else state
-
-    private fun retry(state: SecretFormState): SecretFormState =
-        if (state.isRetryable()) SecretFormState.Editing(SecretInputPresence.EMPTY) else state
-
-    private fun SecretFormState.isRetryable(): Boolean = (this as? SecretFormState.Failed)?.failure?.retryable == true
-
     /** The state a host answer leads to. */
     fun outcomeState(outcome: SecretClientOutcome): SecretFormState = when (outcome) {
         is SecretClientOutcome.Settled -> receiptState(outcome.receipt)
         is SecretClientOutcome.Refused -> refusalState(outcome.refusal.error)
         SecretClientOutcome.Unreachable -> SecretFormState.Failed(SecretFormFailure.Unreachable)
     }
-
-    private fun receiptState(receipt: SecretRequestReceipt): SecretFormState = when (receipt.status) {
-        SecretReceiptStatus.SAVED -> SecretFormState.Done(receipt)
-        SecretReceiptStatus.CANCELLED -> SecretFormState.Declined
-        SecretReceiptStatus.EXPIRED -> SecretFormState.Expired
-        SecretReceiptStatus.FAILED ->
-            SecretFormState.Failed(SecretFormFailure.WriteFailed(receipt.reason ?: SecretFailureReason.VAULT_ERROR))
-    }
-
-    private fun refusalState(error: SecretServiceError): SecretFormState =
-        if (error == SecretServiceError.NOT_PENDING) SecretFormState.Expired else SecretFormState.Failed(SecretFormFailure.Refused(error))
 }
+
+private fun open(state: SecretFormState): SecretFormState =
+    if (state == SecretFormState.Idle) SecretFormState.Editing(SecretInputPresence.EMPTY) else state
+
+private fun input(state: SecretFormState, input: SecretInputPresence): SecretFormState =
+    if (state is SecretFormState.Editing) SecretFormState.Editing(input) else state
+
+private fun submit(state: SecretFormState): SecretFormState =
+    if (SecretFormMachine.canSubmit(state)) SecretFormState.Submitting else state
+
+private fun answered(state: SecretFormState, outcome: SecretClientOutcome): SecretFormState =
+    if (state == SecretFormState.Submitting) SecretFormMachine.outcomeState(outcome) else state
+
+private fun closed(state: SecretFormState, closed: SecretFormState): SecretFormState =
+    if (SecretFormMachine.isAnswerable(state)) closed else state
+
+private fun retry(state: SecretFormState): SecretFormState =
+    if (state.isRetryable()) SecretFormState.Editing(SecretInputPresence.EMPTY) else state
+
+private fun SecretFormState.isRetryable(): Boolean = (this as? SecretFormState.Failed)?.failure?.retryable == true
+
+private fun receiptState(receipt: SecretRequestReceipt): SecretFormState = when (receipt.status) {
+    SecretReceiptStatus.SAVED -> SecretFormState.Done(receipt)
+    SecretReceiptStatus.CANCELLED -> SecretFormState.Declined
+    SecretReceiptStatus.EXPIRED -> SecretFormState.Expired
+    SecretReceiptStatus.FAILED ->
+        SecretFormState.Failed(SecretFormFailure.WriteFailed(receipt.reason ?: SecretFailureReason.VAULT_ERROR))
+}
+
+private fun refusalState(error: SecretServiceError): SecretFormState =
+    if (error == SecretServiceError.NOT_PENDING) SecretFormState.Expired else SecretFormState.Failed(SecretFormFailure.Refused(error))

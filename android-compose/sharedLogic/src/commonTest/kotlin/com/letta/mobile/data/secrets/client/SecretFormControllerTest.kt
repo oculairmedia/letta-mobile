@@ -60,7 +60,7 @@ class SecretFormControllerTest {
 
     private fun Form.type(text: String) {
         controller.open()
-        controller.edit(0 until 0, text)
+        controller.edit(at(0), text)
         observe()
     }
 
@@ -93,7 +93,8 @@ class SecretFormControllerTest {
     @Test
     fun aFailedWriteWipesEverythingAndCannotBeRetried() = runTest {
         val form = form()
-        form.client.answer = { SecretClientOutcome.Settled(FakeSecretRequestClient.receipt(SecretReceiptStatus.FAILED).copy(reason = SecretFailureReason.VAULT_LOCKED)) }
+        val locked = FakeSecretRequestClient.receipt(SecretReceiptStatus.FAILED).copy(reason = SecretFailureReason.VAULT_LOCKED)
+        form.client.answer = { SecretClientOutcome.Settled(locked) }
         form.type(SENTINEL)
         form.controller.submit()
         runCurrent()
@@ -168,11 +169,12 @@ class SecretFormControllerTest {
 
     @Test
     fun aStaleRequestCannotBeOpenedOrSubmitted() = runTest {
-        val stale = SecretRequestTestData.record().let { it.copy(timing = it.timing.copy(expiresAtMs = SecretRequestTestData.NOW.toEpochMilliseconds())) }
+        val fresh = SecretRequestTestData.record()
+        val stale = fresh.copy(timing = fresh.timing.copy(expiresAtMs = SecretRequestTestData.NOW.toEpochMilliseconds()))
         val form = form(stale)
         form.controller.open()
         assertEquals(SecretFormState.Expired, form.controller.state.value)
-        assertFalse(form.controller.edit(0 until 0, SENTINEL))
+        assertFalse(form.controller.edit(at(0), SENTINEL))
         assertFalse(form.controller.submit())
         assertTrue(form.client.inputs.isEmpty())
     }
@@ -182,7 +184,7 @@ class SecretFormControllerTest {
         val form = form()
         form.controller.open()
         assertFalse(form.controller.submit(), "an empty field cannot be submitted")
-        form.controller.edit(0 until 0, SENTINEL)
+        form.controller.edit(at(0), SENTINEL)
         assertTrue(form.controller.submit())
         assertFalse(form.controller.submit())
         form.controller.decline()

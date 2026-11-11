@@ -14,8 +14,8 @@ class SecretBufferTest {
     @Test
     fun editsInsertReplaceAndDeleteLikeAField() {
         val buffer = SecretBuffer()
-        assertTrue(buffer.replace(0 until 0, "hello"))
-        assertTrue(buffer.replace(5 until 5, " world"))
+        assertTrue(buffer.replace(at(0), "hello"))
+        assertTrue(buffer.replace(at(5), " world"))
         assertTrue(buffer.replace(0 until 5, "HELLO"))
         assertTrue(buffer.replace(5 until 11, ""))
         assertEquals("HELLO", buffer.text())
@@ -25,21 +25,21 @@ class SecretBufferTest {
     @Test
     fun outOfBoundsAndOversizedEditsChangeNothing() {
         val buffer = SecretBuffer()
-        buffer.replace(0 until 0, "abc")
+        buffer.replace(at(0), "abc")
         assertFalse(buffer.replace(2 until 5, "x"))
-        assertFalse(buffer.replace(4 until 4, "x"))
+        assertFalse(buffer.replace(at(4), "x"))
         val tooLong = CharArray(SecretBuffer.MAX_CHARS) { 'a' }.concatToString()
-        assertFalse(buffer.replace(0 until 0, tooLong))
+        assertFalse(buffer.replace(at(0), tooLong))
         assertEquals("abc", buffer.text())
     }
 
     @Test
     fun takingTheInputEncodesUtf8AndEmptiesTheBuffer() {
         // A lone surrogate becomes U+FFFD on every platform (the JVM's own encoder would write '?').
-        val rows = listOf("plain", "café", "€10", "key-🔑").map { it to it } + ("lone-\ud800-x" to "lone-�-x")
+        val rows = listOf("plain", "caf\u00e9", "\u20ac10", "key-\ud83d\udd11").map { it to it } + ("lone-\ud800-x" to "lone-\ufffd-x")
         rows.forEach { (text, expected) ->
             val buffer = SecretBuffer()
-            buffer.replace(0 until 0, text)
+            buffer.replace(at(0), text)
             val input = buffer.takeSecretInput()
             assertEquals(expected.encodeToByteArray().toList(), input.revealSecretBytes { it.toList() }, expected)
             assertTrue(buffer.isEmpty)
@@ -51,14 +51,14 @@ class SecretBufferTest {
     fun growingKeepsTheContent() {
         val buffer = SecretBuffer()
         val long = CharArray(1000) { 'a' + it % 26 }.concatToString()
-        buffer.replace(0 until 0, long)
+        buffer.replace(at(0), long)
         assertEquals(long, buffer.takeSecretInput().text())
     }
 
     @Test
     fun nothingPrintsTheContent() {
         val buffer = SecretBuffer()
-        buffer.replace(0 until 0, "SENTINEL-buffer")
+        buffer.replace(at(0), "SENTINEL-buffer")
         assertEquals(SecretBuffer.REDACTED, buffer.toString())
         assertEquals(SecretBuffer.REDACTED, buffer.revealChars { it.toString() })
         assertFailsWith<UnsupportedOperationException> { buffer.revealChars { it.subSequence(0, 1) } }
@@ -69,3 +69,6 @@ class SecretBufferTest {
         assertFailsWith<IllegalStateException> { input.text() }
     }
 }
+
+/** The empty range at [position], where an insertion goes. */
+internal fun at(position: Int): IntRange = position until position

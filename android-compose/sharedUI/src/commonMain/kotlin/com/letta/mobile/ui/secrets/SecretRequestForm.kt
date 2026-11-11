@@ -74,35 +74,8 @@ import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.seconds
 
-/** Test tags of [SecretRequestForm]. */
-object SecretRequestFormTags {
-    /** The form. */
-    const val FORM = "secret-request-form"
-
-    /** The masked value field. */
-    const val FIELD = "secret-request-form-field"
-
-    /** The explicit reveal toggle. */
-    const val REVEAL = "secret-request-form-reveal"
-
-    /** The submit button. */
-    const val SUBMIT = "secret-request-form-submit"
-
-    /** The decline button. */
-    const val DECLINE = "secret-request-form-decline"
-
-    /** The retry button shown after a retryable failure. */
-    const val RETRY = "secret-request-form-retry"
-
-    /** The close button shown once the form is finished. */
-    const val CLOSE = "secret-request-form-close"
-
-    /** The outcome message (receipt, failure, expiry or decline). */
-    const val MESSAGE = "secret-request-form-message"
-}
-
 /** What the field shows for every typed character: the field's own text never holds anything else. */
-const val SECRET_MASK_CHAR: Char = '•'
+const val SECRET_MASK_CHAR: Char = '\u2022'
 
 private val RevealDuration = 15.seconds
 
@@ -291,7 +264,9 @@ private fun Message(text: String, color: androidx.compose.ui.graphics.Color) {
 
 @Composable
 private fun CloseButton(onClose: () -> Unit) {
-    Button(onClick = onClose, modifier = Modifier.testTag(SecretRequestFormTags.CLOSE)) { Text(stringResource(Res.string.secret_form_close)) }
+    Button(onClick = onClose, modifier = Modifier.testTag(SecretRequestFormTags.CLOSE)) {
+        Text(stringResource(Res.string.secret_form_close))
+    }
 }
 
 /** The person-facing text of [failure]: fixed per code, never provider output. */
@@ -304,7 +279,8 @@ private fun failureMessage(failure: SecretFormFailure): String = when (failure) 
 
 @Composable
 private fun writeFailureMessage(reason: SecretFailureReason): String = when (reason) {
-    SecretFailureReason.ROLLBACK_FAILED, SecretFailureReason.INTERRUPTED -> stringResource(Res.string.secret_form_failed_uncertain, reason.wire())
+    SecretFailureReason.ROLLBACK_FAILED, SecretFailureReason.INTERRUPTED ->
+        stringResource(Res.string.secret_form_failed_uncertain, reason.wire())
     else -> stringResource(Res.string.secret_form_failed_write, reason.wire())
 }
 
