@@ -2967,6 +2967,181 @@ final enum class com.letta.mobile.data.search/MessageSearchRole : kotlin/Enum<co
     }
 }
 
+final enum class com.letta.mobile.data.secrets.journal/SecretJournalProblem : kotlin/Enum<com.letta.mobile.data.secrets.journal/SecretJournalProblem> { // com.letta.mobile.data.secrets.journal/SecretJournalProblem|null[0]
+    enum entry CORRUPT // com.letta.mobile.data.secrets.journal/SecretJournalProblem.CORRUPT|null[0]
+    enum entry FULL // com.letta.mobile.data.secrets.journal/SecretJournalProblem.FULL|null[0]
+    enum entry NEEDS_RECONCILIATION // com.letta.mobile.data.secrets.journal/SecretJournalProblem.NEEDS_RECONCILIATION|null[0]
+    enum entry WRITE_FAILED // com.letta.mobile.data.secrets.journal/SecretJournalProblem.WRITE_FAILED|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.journal/SecretJournalProblem.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.journal/SecretJournalProblem> // com.letta.mobile.data.secrets.journal/SecretJournalProblem.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val message // com.letta.mobile.data.secrets.journal/SecretJournalProblem.message|{}message[0]
+        final fun <get-message>(): kotlin/String // com.letta.mobile.data.secrets.journal/SecretJournalProblem.message.<get-message>|<get-message>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.journal/SecretJournalProblem // com.letta.mobile.data.secrets.journal/SecretJournalProblem.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.journal/SecretJournalProblem> // com.letta.mobile.data.secrets.journal/SecretJournalProblem.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.secrets.request/PrincipalAccess : kotlin/Enum<com.letta.mobile.data.secrets.request/PrincipalAccess> { // com.letta.mobile.data.secrets.request/PrincipalAccess|null[0]
+    enum entry ADMIN_FULL // com.letta.mobile.data.secrets.request/PrincipalAccess.ADMIN_FULL|null[0]
+    enum entry LIMITED // com.letta.mobile.data.secrets.request/PrincipalAccess.LIMITED|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/PrincipalAccess.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/PrincipalAccess> // com.letta.mobile.data.secrets.request/PrincipalAccess.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/PrincipalAccess // com.letta.mobile.data.secrets.request/PrincipalAccess.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/PrincipalAccess> // com.letta.mobile.data.secrets.request/PrincipalAccess.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.secrets.request/PrincipalOrigin : kotlin/Enum<com.letta.mobile.data.secrets.request/PrincipalOrigin> { // com.letta.mobile.data.secrets.request/PrincipalOrigin|null[0]
+    enum entry AGENT_A2A // com.letta.mobile.data.secrets.request/PrincipalOrigin.AGENT_A2A|null[0]
+    enum entry AGENT_APP_SERVER_INPUT // com.letta.mobile.data.secrets.request/PrincipalOrigin.AGENT_APP_SERVER_INPUT|null[0]
+    enum entry AGENT_TOOL_CALL // com.letta.mobile.data.secrets.request/PrincipalOrigin.AGENT_TOOL_CALL|null[0]
+    enum entry HOST_INTERNAL // com.letta.mobile.data.secrets.request/PrincipalOrigin.HOST_INTERNAL|null[0]
+    enum entry HUMAN_PAIRED_DEVICE // com.letta.mobile.data.secrets.request/PrincipalOrigin.HUMAN_PAIRED_DEVICE|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/PrincipalOrigin.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/PrincipalOrigin> // com.letta.mobile.data.secrets.request/PrincipalOrigin.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val isHuman // com.letta.mobile.data.secrets.request/PrincipalOrigin.isHuman|{}isHuman[0]
+        final fun <get-isHuman>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/PrincipalOrigin.isHuman.<get-isHuman>|<get-isHuman>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/PrincipalOrigin // com.letta.mobile.data.secrets.request/PrincipalOrigin.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/PrincipalOrigin> // com.letta.mobile.data.secrets.request/PrincipalOrigin.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.secrets.request/SecretFailureReason : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretFailureReason> { // com.letta.mobile.data.secrets.request/SecretFailureReason|null[0]
+    enum entry INTERRUPTED // com.letta.mobile.data.secrets.request/SecretFailureReason.INTERRUPTED|null[0]
+    enum entry ROLLBACK_FAILED // com.letta.mobile.data.secrets.request/SecretFailureReason.ROLLBACK_FAILED|null[0]
+    enum entry TARGET_NOT_WRITABLE // com.letta.mobile.data.secrets.request/SecretFailureReason.TARGET_NOT_WRITABLE|null[0]
+    enum entry VALUE_REJECTED // com.letta.mobile.data.secrets.request/SecretFailureReason.VALUE_REJECTED|null[0]
+    enum entry VAULT_DENIED // com.letta.mobile.data.secrets.request/SecretFailureReason.VAULT_DENIED|null[0]
+    enum entry VAULT_ERROR // com.letta.mobile.data.secrets.request/SecretFailureReason.VAULT_ERROR|null[0]
+    enum entry VAULT_LOCKED // com.letta.mobile.data.secrets.request/SecretFailureReason.VAULT_LOCKED|null[0]
+    enum entry VAULT_UNAVAILABLE // com.letta.mobile.data.secrets.request/SecretFailureReason.VAULT_UNAVAILABLE|null[0]
+    enum entry VAULT_UNSUPPORTED // com.letta.mobile.data.secrets.request/SecretFailureReason.VAULT_UNSUPPORTED|null[0]
+    enum entry VERIFY_FAILED // com.letta.mobile.data.secrets.request/SecretFailureReason.VERIFY_FAILED|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/SecretFailureReason.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/SecretFailureReason> // com.letta.mobile.data.secrets.request/SecretFailureReason.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/SecretFailureReason // com.letta.mobile.data.secrets.request/SecretFailureReason.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/SecretFailureReason> // com.letta.mobile.data.secrets.request/SecretFailureReason.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.secrets.request/SecretFailureReason.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretFailureReason> // com.letta.mobile.data.secrets.request/SecretFailureReason.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.secrets.request/SecretFailureReason.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.secrets.request/SecretReceiptStatus : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretReceiptStatus> { // com.letta.mobile.data.secrets.request/SecretReceiptStatus|null[0]
+    enum entry CANCELLED // com.letta.mobile.data.secrets.request/SecretReceiptStatus.CANCELLED|null[0]
+    enum entry EXPIRED // com.letta.mobile.data.secrets.request/SecretReceiptStatus.EXPIRED|null[0]
+    enum entry FAILED // com.letta.mobile.data.secrets.request/SecretReceiptStatus.FAILED|null[0]
+    enum entry SAVED // com.letta.mobile.data.secrets.request/SecretReceiptStatus.SAVED|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/SecretReceiptStatus.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/SecretReceiptStatus> // com.letta.mobile.data.secrets.request/SecretReceiptStatus.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/SecretReceiptStatus // com.letta.mobile.data.secrets.request/SecretReceiptStatus.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/SecretReceiptStatus> // com.letta.mobile.data.secrets.request/SecretReceiptStatus.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.secrets.request/SecretReceiptStatus.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretReceiptStatus> // com.letta.mobile.data.secrets.request/SecretReceiptStatus.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.secrets.request/SecretReceiptStatus.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.secrets.request/SecretRequestProblem : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretRequestProblem> { // com.letta.mobile.data.secrets.request/SecretRequestProblem|null[0]
+    enum entry FIELD_MALFORMED // com.letta.mobile.data.secrets.request/SecretRequestProblem.FIELD_MALFORMED|null[0]
+    enum entry ITEM_MALFORMED // com.letta.mobile.data.secrets.request/SecretRequestProblem.ITEM_MALFORMED|null[0]
+    enum entry ITEM_OUTSIDE_SCOPE // com.letta.mobile.data.secrets.request/SecretRequestProblem.ITEM_OUTSIDE_SCOPE|null[0]
+    enum entry PURPOSE_BLANK // com.letta.mobile.data.secrets.request/SecretRequestProblem.PURPOSE_BLANK|null[0]
+    enum entry PURPOSE_NOT_PLAIN_TEXT // com.letta.mobile.data.secrets.request/SecretRequestProblem.PURPOSE_NOT_PLAIN_TEXT|null[0]
+    enum entry PURPOSE_TOO_LONG // com.letta.mobile.data.secrets.request/SecretRequestProblem.PURPOSE_TOO_LONG|null[0]
+    enum entry TOO_MANY_PENDING // com.letta.mobile.data.secrets.request/SecretRequestProblem.TOO_MANY_PENDING|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/SecretRequestProblem.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/SecretRequestProblem> // com.letta.mobile.data.secrets.request/SecretRequestProblem.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/SecretRequestProblem // com.letta.mobile.data.secrets.request/SecretRequestProblem.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/SecretRequestProblem> // com.letta.mobile.data.secrets.request/SecretRequestProblem.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.secrets.request/SecretRequestProblem.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestProblem> // com.letta.mobile.data.secrets.request/SecretRequestProblem.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.secrets.request/SecretRequestProblem.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.secrets.request/SecretRequestState : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretRequestState> { // com.letta.mobile.data.secrets.request/SecretRequestState|null[0]
+    enum entry CANCELLED // com.letta.mobile.data.secrets.request/SecretRequestState.CANCELLED|null[0]
+    enum entry EXPIRED // com.letta.mobile.data.secrets.request/SecretRequestState.EXPIRED|null[0]
+    enum entry FAILED // com.letta.mobile.data.secrets.request/SecretRequestState.FAILED|null[0]
+    enum entry PENDING // com.letta.mobile.data.secrets.request/SecretRequestState.PENDING|null[0]
+    enum entry SAVED // com.letta.mobile.data.secrets.request/SecretRequestState.SAVED|null[0]
+    enum entry SUBMITTING // com.letta.mobile.data.secrets.request/SecretRequestState.SUBMITTING|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/SecretRequestState.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/SecretRequestState> // com.letta.mobile.data.secrets.request/SecretRequestState.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val isTerminal // com.letta.mobile.data.secrets.request/SecretRequestState.isTerminal|{}isTerminal[0]
+        final fun <get-isTerminal>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestState.isTerminal.<get-isTerminal>|<get-isTerminal>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/SecretRequestState // com.letta.mobile.data.secrets.request/SecretRequestState.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/SecretRequestState> // com.letta.mobile.data.secrets.request/SecretRequestState.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.secrets.request/SecretRequestState.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestState> // com.letta.mobile.data.secrets.request/SecretRequestState.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.secrets.request/SecretRequestState.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.secrets.request/SecretServiceError : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretServiceError> { // com.letta.mobile.data.secrets.request/SecretServiceError|null[0]
+    enum entry FORBIDDEN // com.letta.mobile.data.secrets.request/SecretServiceError.FORBIDDEN|null[0]
+    enum entry INVALID_REQUEST // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_REQUEST|null[0]
+    enum entry INVALID_VALUE // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_VALUE|null[0]
+    enum entry JOURNAL_UNAVAILABLE // com.letta.mobile.data.secrets.request/SecretServiceError.JOURNAL_UNAVAILABLE|null[0]
+    enum entry NOT_PENDING // com.letta.mobile.data.secrets.request/SecretServiceError.NOT_PENDING|null[0]
+    enum entry UNKNOWN_REQUEST // com.letta.mobile.data.secrets.request/SecretServiceError.UNKNOWN_REQUEST|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/SecretServiceError.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/SecretServiceError> // com.letta.mobile.data.secrets.request/SecretServiceError.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/SecretServiceError // com.letta.mobile.data.secrets.request/SecretServiceError.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/SecretServiceError> // com.letta.mobile.data.secrets.request/SecretServiceError.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.secrets.request/SecretServiceError.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretServiceError> // com.letta.mobile.data.secrets.request/SecretServiceError.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.secrets.request/SecretServiceError.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.secrets.request/TextAuthor : kotlin/Enum<com.letta.mobile.data.secrets.request/TextAuthor> { // com.letta.mobile.data.secrets.request/TextAuthor|null[0]
+    enum entry AGENT // com.letta.mobile.data.secrets.request/TextAuthor.AGENT|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/TextAuthor.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/TextAuthor> // com.letta.mobile.data.secrets.request/TextAuthor.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/TextAuthor // com.letta.mobile.data.secrets.request/TextAuthor.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/TextAuthor> // com.letta.mobile.data.secrets.request/TextAuthor.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.data.secrets.request/TextAuthor.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/TextAuthor> // com.letta.mobile.data.secrets.request/TextAuthor.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.data.secrets.request/TextAuthor.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.data.secrets.request/TransitionRefusal : kotlin/Enum<com.letta.mobile.data.secrets.request/TransitionRefusal> { // com.letta.mobile.data.secrets.request/TransitionRefusal|null[0]
+    enum entry NOT_DUE // com.letta.mobile.data.secrets.request/TransitionRefusal.NOT_DUE|null[0]
+    enum entry NOT_PENDING // com.letta.mobile.data.secrets.request/TransitionRefusal.NOT_PENDING|null[0]
+    enum entry NOT_SUBMITTING // com.letta.mobile.data.secrets.request/TransitionRefusal.NOT_SUBMITTING|null[0]
+    enum entry OVERDUE // com.letta.mobile.data.secrets.request/TransitionRefusal.OVERDUE|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.request/TransitionRefusal.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.request/TransitionRefusal> // com.letta.mobile.data.secrets.request/TransitionRefusal.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.request/TransitionRefusal // com.letta.mobile.data.secrets.request/TransitionRefusal.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.request/TransitionRefusal> // com.letta.mobile.data.secrets.request/TransitionRefusal.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.session.graph/SubagentListing : kotlin/Enum<com.letta.mobile.data.session.graph/SubagentListing> { // com.letta.mobile.data.session.graph/SubagentListing|null[0]
     enum entry ACTIVE // com.letta.mobile.data.session.graph/SubagentListing.ACTIVE|null[0]
     enum entry ALL // com.letta.mobile.data.session.graph/SubagentListing.ALL|null[0]
@@ -5921,6 +6096,11 @@ abstract interface com.letta.mobile.data.search/MessageSearchSource { // com.let
         abstract fun <get-capabilities>(): com.letta.mobile.data.search/MessageSearchCapabilities // com.letta.mobile.data.search/MessageSearchSource.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
 
     abstract suspend fun search(com.letta.mobile.data.search/MessageSearchQuery): kotlin.collections/List<com.letta.mobile.data.search/MessageSearchHit> // com.letta.mobile.data.search/MessageSearchSource.search|search(com.letta.mobile.data.search.MessageSearchQuery){}[0]
+}
+
+abstract interface com.letta.mobile.data.secrets.journal/SecretRequestJournal { // com.letta.mobile.data.secrets.journal/SecretRequestJournal|null[0]
+    abstract suspend fun read(): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.journal/SecretRequestJournal.read|read(){}[0]
+    abstract suspend fun update(kotlin/Function1<kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>>): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.journal/SecretRequestJournal.update|update(kotlin.Function1<kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>,kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>>){}[0]
 }
 
 abstract interface com.letta.mobile.data.secrets/AgentSecretsSource { // com.letta.mobile.data.secrets/AgentSecretsSource|null[0]
@@ -13861,6 +14041,112 @@ sealed interface com.letta.mobile.data.schedules/ScheduleTiming { // com.letta.m
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleTiming.Recurring.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/ScheduleTiming.Recurring.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.schedules/ScheduleTiming.Recurring.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent|null[0]
+    final class Fail : com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretFailureReason) // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.<init>|<init>(com.letta.mobile.data.secrets.request.SecretFailureReason){}[0]
+
+        final val reason // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.reason|{}reason[0]
+            final fun <get-reason>(): com.letta.mobile.data.secrets.request/SecretFailureReason // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretFailureReason // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretFailureReason = ...): com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.copy|copy(com.letta.mobile.data.secrets.request.SecretFailureReason){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestEvent.Fail.toString|toString(){}[0]
+    }
+
+    final object Cancel : com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent.Cancel|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestEvent.Cancel.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestEvent.Cancel.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestEvent.Cancel.toString|toString(){}[0]
+    }
+
+    final object Claim : com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent.Claim|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestEvent.Claim.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestEvent.Claim.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestEvent.Claim.toString|toString(){}[0]
+    }
+
+    final object Expire : com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent.Expire|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestEvent.Expire.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestEvent.Expire.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestEvent.Expire.toString|toString(){}[0]
+    }
+
+    final object Interrupt : com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent.Interrupt|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestEvent.Interrupt.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestEvent.Interrupt.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestEvent.Interrupt.toString|toString(){}[0]
+    }
+
+    final object Save : com.letta.mobile.data.secrets.request/SecretRequestEvent { // com.letta.mobile.data.secrets.request/SecretRequestEvent.Save|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestEvent.Save.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestEvent.Save.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestEvent.Save.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.request/SecretRequestTransition { // com.letta.mobile.data.secrets.request/SecretRequestTransition|null[0]
+    final class Applied : com.letta.mobile.data.secrets.request/SecretRequestTransition { // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestRecord) // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestRecord){}[0]
+
+        final val record // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.record|{}record[0]
+            final fun <get-record>(): com.letta.mobile.data.secrets.request/SecretRequestRecord // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.record.<get-record>|<get-record>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestRecord // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretRequestRecord = ...): com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestRecord){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestTransition.Applied.toString|toString(){}[0]
+    }
+
+    final class Refused : com.letta.mobile.data.secrets.request/SecretRequestTransition { // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/TransitionRefusal) // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.<init>|<init>(com.letta.mobile.data.secrets.request.TransitionRefusal){}[0]
+
+        final val refusal // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.refusal|{}refusal[0]
+            final fun <get-refusal>(): com.letta.mobile.data.secrets.request/TransitionRefusal // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.refusal.<get-refusal>|<get-refusal>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/TransitionRefusal // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/TransitionRefusal = ...): com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.copy|copy(com.letta.mobile.data.secrets.request.TransitionRefusal){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestTransition.Refused.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.request/SecretRequestValidation { // com.letta.mobile.data.secrets.request/SecretRequestValidation|null[0]
+    final class Invalid : com.letta.mobile.data.secrets.request/SecretRequestValidation { // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestProblem) // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestProblem){}[0]
+
+        final val problem // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.problem|{}problem[0]
+            final fun <get-problem>(): com.letta.mobile.data.secrets.request/SecretRequestProblem // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestProblem // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretRequestProblem = ...): com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestValidation.Invalid.toString|toString(){}[0]
+    }
+
+    final class Valid : com.letta.mobile.data.secrets.request/SecretRequestValidation { // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/AgentSecretRequest) // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.<init>|<init>(com.letta.mobile.data.secrets.request.AgentSecretRequest){}[0]
+
+        final val request // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.request|{}request[0]
+            final fun <get-request>(): com.letta.mobile.data.secrets.request/AgentSecretRequest // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.request.<get-request>|<get-request>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/AgentSecretRequest // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/AgentSecretRequest = ...): com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.copy|copy(com.letta.mobile.data.secrets.request.AgentSecretRequest){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestValidation.Valid.toString|toString(){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestValidation.Companion|null[0]
+        final fun purposeProblem(kotlin/String): com.letta.mobile.data.secrets.request/SecretRequestProblem? // com.letta.mobile.data.secrets.request/SecretRequestValidation.Companion.purposeProblem|purposeProblem(kotlin.String){}[0]
+        final fun validate(com.letta.mobile.data.secrets.request/AgentSecretRequest, com.letta.mobile.data.secrets.request/VaultItemName? = ...): com.letta.mobile.data.secrets.request/SecretRequestValidation // com.letta.mobile.data.secrets.request/SecretRequestValidation.Companion.validate|validate(com.letta.mobile.data.secrets.request.AgentSecretRequest;com.letta.mobile.data.secrets.request.VaultItemName?){}[0]
     }
 }
 
@@ -58655,6 +58941,462 @@ final class com.letta.mobile.data.search/MessageSearchSelection { // com.letta.m
     final fun toggled(com.letta.mobile.data.search/MessageSearchRole): com.letta.mobile.data.search/MessageSearchSelection // com.letta.mobile.data.search/MessageSearchSelection.toggled|toggled(com.letta.mobile.data.search.MessageSearchRole){}[0]
 }
 
+final class com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal : com.letta.mobile.data.secrets.journal/SecretRequestJournal { // com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> = ...) // com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
+
+    final suspend fun read(): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal.read|read(){}[0]
+    final suspend fun update(kotlin/Function1<kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>>): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal.update|update(kotlin.Function1<kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>,kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>>){}[0]
+}
+
+final class com.letta.mobile.data.secrets.journal/SecretRequestJournalException : kotlin/IllegalStateException { // com.letta.mobile.data.secrets.journal/SecretRequestJournalException|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.journal/SecretJournalProblem, kotlin/Throwable? = ...) // com.letta.mobile.data.secrets.journal/SecretRequestJournalException.<init>|<init>(com.letta.mobile.data.secrets.journal.SecretJournalProblem;kotlin.Throwable?){}[0]
+
+    final val problem // com.letta.mobile.data.secrets.journal/SecretRequestJournalException.problem|{}problem[0]
+        final fun <get-problem>(): com.letta.mobile.data.secrets.journal/SecretJournalProblem // com.letta.mobile.data.secrets.journal/SecretRequestJournalException.problem.<get-problem>|<get-problem>(){}[0]
+}
+
+final class com.letta.mobile.data.secrets.request/AgentSecretRequest { // com.letta.mobile.data.secrets.request/AgentSecretRequest|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretPurpose, com.letta.mobile.data.secrets.request/VaultItemName, com.letta.mobile.data.secrets.request/VaultFieldName) // com.letta.mobile.data.secrets.request/AgentSecretRequest.<init>|<init>(com.letta.mobile.data.secrets.request.SecretPurpose;com.letta.mobile.data.secrets.request.VaultItemName;com.letta.mobile.data.secrets.request.VaultFieldName){}[0]
+
+    final val fieldName // com.letta.mobile.data.secrets.request/AgentSecretRequest.fieldName|{}fieldName[0]
+        final fun <get-fieldName>(): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/AgentSecretRequest.fieldName.<get-fieldName>|<get-fieldName>(){}[0]
+    final val purpose // com.letta.mobile.data.secrets.request/AgentSecretRequest.purpose|{}purpose[0]
+        final fun <get-purpose>(): com.letta.mobile.data.secrets.request/SecretPurpose // com.letta.mobile.data.secrets.request/AgentSecretRequest.purpose.<get-purpose>|<get-purpose>(){}[0]
+    final val vaultItemName // com.letta.mobile.data.secrets.request/AgentSecretRequest.vaultItemName|{}vaultItemName[0]
+        final fun <get-vaultItemName>(): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/AgentSecretRequest.vaultItemName.<get-vaultItemName>|<get-vaultItemName>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretPurpose // com.letta.mobile.data.secrets.request/AgentSecretRequest.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/AgentSecretRequest.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/AgentSecretRequest.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretPurpose = ..., com.letta.mobile.data.secrets.request/VaultItemName = ..., com.letta.mobile.data.secrets.request/VaultFieldName = ...): com.letta.mobile.data.secrets.request/AgentSecretRequest // com.letta.mobile.data.secrets.request/AgentSecretRequest.copy|copy(com.letta.mobile.data.secrets.request.SecretPurpose;com.letta.mobile.data.secrets.request.VaultItemName;com.letta.mobile.data.secrets.request.VaultFieldName){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/AgentSecretRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/AgentSecretRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/AgentSecretRequest.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/AgentSecretRequest> { // com.letta.mobile.data.secrets.request/AgentSecretRequest.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/AgentSecretRequest.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/AgentSecretRequest.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/AgentSecretRequest.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/AgentSecretRequest // com.letta.mobile.data.secrets.request/AgentSecretRequest.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/AgentSecretRequest) // com.letta.mobile.data.secrets.request/AgentSecretRequest.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.AgentSecretRequest){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/AgentSecretRequest.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/AgentSecretRequest> // com.letta.mobile.data.secrets.request/AgentSecretRequest.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/AuthoredPurpose { // com.letta.mobile.data.secrets.request/AuthoredPurpose|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretPurpose, com.letta.mobile.data.secrets.request/TextAuthor) // com.letta.mobile.data.secrets.request/AuthoredPurpose.<init>|<init>(com.letta.mobile.data.secrets.request.SecretPurpose;com.letta.mobile.data.secrets.request.TextAuthor){}[0]
+
+    final val author // com.letta.mobile.data.secrets.request/AuthoredPurpose.author|{}author[0]
+        final fun <get-author>(): com.letta.mobile.data.secrets.request/TextAuthor // com.letta.mobile.data.secrets.request/AuthoredPurpose.author.<get-author>|<get-author>(){}[0]
+    final val text // com.letta.mobile.data.secrets.request/AuthoredPurpose.text|{}text[0]
+        final fun <get-text>(): com.letta.mobile.data.secrets.request/SecretPurpose // com.letta.mobile.data.secrets.request/AuthoredPurpose.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretPurpose // com.letta.mobile.data.secrets.request/AuthoredPurpose.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/TextAuthor // com.letta.mobile.data.secrets.request/AuthoredPurpose.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretPurpose = ..., com.letta.mobile.data.secrets.request/TextAuthor = ...): com.letta.mobile.data.secrets.request/AuthoredPurpose // com.letta.mobile.data.secrets.request/AuthoredPurpose.copy|copy(com.letta.mobile.data.secrets.request.SecretPurpose;com.letta.mobile.data.secrets.request.TextAuthor){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/AuthoredPurpose.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/AuthoredPurpose.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/AuthoredPurpose.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/AuthoredPurpose> { // com.letta.mobile.data.secrets.request/AuthoredPurpose.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/AuthoredPurpose.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/AuthoredPurpose.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/AuthoredPurpose.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/AuthoredPurpose // com.letta.mobile.data.secrets.request/AuthoredPurpose.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/AuthoredPurpose) // com.letta.mobile.data.secrets.request/AuthoredPurpose.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.AuthoredPurpose){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/AuthoredPurpose.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.secrets.request/AuthoredPurpose.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/AuthoredPurpose> // com.letta.mobile.data.secrets.request/AuthoredPurpose.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/RequestingAgent { // com.letta.mobile.data.secrets.request/RequestingAgent|null[0]
+    constructor <init>(com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.secrets.request/RequestingAgent.<init>|<init>(com.letta.mobile.data.model.AgentId){}[0]
+
+    final val agentId // com.letta.mobile.data.secrets.request/RequestingAgent.agentId|{}agentId[0]
+        final fun <get-agentId>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.request/RequestingAgent.agentId.<get-agentId>|<get-agentId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.request/RequestingAgent.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.data.model/AgentId = ...): com.letta.mobile.data.secrets.request/RequestingAgent // com.letta.mobile.data.secrets.request/RequestingAgent.copy|copy(com.letta.mobile.data.model.AgentId){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/RequestingAgent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/RequestingAgent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/RequestingAgent.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestCreated { // com.letta.mobile.data.secrets.request/SecretRequestCreated|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestId, com.letta.mobile.data.secrets.request/SecretRequestState, kotlin/Long) // com.letta.mobile.data.secrets.request/SecretRequestCreated.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.request.SecretRequestState;kotlin.Long){}[0]
+
+    final val expiresAtMs // com.letta.mobile.data.secrets.request/SecretRequestCreated.expiresAtMs|{}expiresAtMs[0]
+        final fun <get-expiresAtMs>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestCreated.expiresAtMs.<get-expiresAtMs>|<get-expiresAtMs>(){}[0]
+    final val requestId // com.letta.mobile.data.secrets.request/SecretRequestCreated.requestId|{}requestId[0]
+        final fun <get-requestId>(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestCreated.requestId.<get-requestId>|<get-requestId>(){}[0]
+    final val status // com.letta.mobile.data.secrets.request/SecretRequestCreated.status|{}status[0]
+        final fun <get-status>(): com.letta.mobile.data.secrets.request/SecretRequestState // com.letta.mobile.data.secrets.request/SecretRequestCreated.status.<get-status>|<get-status>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestCreated.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/SecretRequestState // com.letta.mobile.data.secrets.request/SecretRequestCreated.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestCreated.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretRequestId = ..., com.letta.mobile.data.secrets.request/SecretRequestState = ..., kotlin/Long = ...): com.letta.mobile.data.secrets.request/SecretRequestCreated // com.letta.mobile.data.secrets.request/SecretRequestCreated.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.request.SecretRequestState;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestCreated.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestCreated.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestCreated.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestCreated> { // com.letta.mobile.data.secrets.request/SecretRequestCreated.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestCreated.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestCreated.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestCreated.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestCreated // com.letta.mobile.data.secrets.request/SecretRequestCreated.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestCreated) // com.letta.mobile.data.secrets.request/SecretRequestCreated.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestCreated){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestCreated.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.secrets.request/SecretRequestCreated.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestCreated> // com.letta.mobile.data.secrets.request/SecretRequestCreated.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestDetails { // com.letta.mobile.data.secrets.request/SecretRequestDetails|null[0]
+    constructor <init>(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.secrets.request/SecretRequestTarget, com.letta.mobile.data.secrets.request/AuthoredPurpose) // com.letta.mobile.data.secrets.request/SecretRequestDetails.<init>|<init>(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.secrets.request.SecretRequestTarget;com.letta.mobile.data.secrets.request.AuthoredPurpose){}[0]
+
+    final val purpose // com.letta.mobile.data.secrets.request/SecretRequestDetails.purpose|{}purpose[0]
+        final fun <get-purpose>(): com.letta.mobile.data.secrets.request/AuthoredPurpose // com.letta.mobile.data.secrets.request/SecretRequestDetails.purpose.<get-purpose>|<get-purpose>(){}[0]
+    final val requestingAgent // com.letta.mobile.data.secrets.request/SecretRequestDetails.requestingAgent|{}requestingAgent[0]
+        final fun <get-requestingAgent>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.request/SecretRequestDetails.requestingAgent.<get-requestingAgent>|<get-requestingAgent>(){}[0]
+    final val target // com.letta.mobile.data.secrets.request/SecretRequestDetails.target|{}target[0]
+        final fun <get-target>(): com.letta.mobile.data.secrets.request/SecretRequestTarget // com.letta.mobile.data.secrets.request/SecretRequestDetails.target.<get-target>|<get-target>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.request/SecretRequestDetails.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/SecretRequestTarget // com.letta.mobile.data.secrets.request/SecretRequestDetails.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.secrets.request/AuthoredPurpose // com.letta.mobile.data.secrets.request/SecretRequestDetails.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.model/AgentId = ..., com.letta.mobile.data.secrets.request/SecretRequestTarget = ..., com.letta.mobile.data.secrets.request/AuthoredPurpose = ...): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.request/SecretRequestDetails.copy|copy(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.secrets.request.SecretRequestTarget;com.letta.mobile.data.secrets.request.AuthoredPurpose){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestDetails.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestDetails.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestDetails.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestDetails> { // com.letta.mobile.data.secrets.request/SecretRequestDetails.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestDetails.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestDetails.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestDetails.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.request/SecretRequestDetails.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestDetails) // com.letta.mobile.data.secrets.request/SecretRequestDetails.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestDetails){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestDetails.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestDetails> // com.letta.mobile.data.secrets.request/SecretRequestDetails.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestList { // com.letta.mobile.data.secrets.request/SecretRequestList|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>) // com.letta.mobile.data.secrets.request/SecretRequestList.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
+
+    final val requests // com.letta.mobile.data.secrets.request/SecretRequestList.requests|{}requests[0]
+        final fun <get-requests>(): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestList.requests.<get-requests>|<get-requests>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestList.component1|component1(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> = ...): com.letta.mobile.data.secrets.request/SecretRequestList // com.letta.mobile.data.secrets.request/SecretRequestList.copy|copy(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestList.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestList.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestList.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestList> { // com.letta.mobile.data.secrets.request/SecretRequestList.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestList.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestList.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestList.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestList // com.letta.mobile.data.secrets.request/SecretRequestList.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestList) // com.letta.mobile.data.secrets.request/SecretRequestList.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestList){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestList.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.secrets.request/SecretRequestList.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestList> // com.letta.mobile.data.secrets.request/SecretRequestList.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestPrincipal { // com.letta.mobile.data.secrets.request/SecretRequestPrincipal|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/VerifiedEndpointId, com.letta.mobile.data.secrets.request/PrincipalOrigin, com.letta.mobile.data.secrets.request/PrincipalAccess) // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.<init>|<init>(com.letta.mobile.data.secrets.request.VerifiedEndpointId;com.letta.mobile.data.secrets.request.PrincipalOrigin;com.letta.mobile.data.secrets.request.PrincipalAccess){}[0]
+
+    final val access // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.access|{}access[0]
+        final fun <get-access>(): com.letta.mobile.data.secrets.request/PrincipalAccess // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.access.<get-access>|<get-access>(){}[0]
+    final val endpoint // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.endpoint|{}endpoint[0]
+        final fun <get-endpoint>(): com.letta.mobile.data.secrets.request/VerifiedEndpointId // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.endpoint.<get-endpoint>|<get-endpoint>(){}[0]
+    final val mayAnswer // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.mayAnswer|{}mayAnswer[0]
+        final fun <get-mayAnswer>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.mayAnswer.<get-mayAnswer>|<get-mayAnswer>(){}[0]
+    final val origin // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.origin|{}origin[0]
+        final fun <get-origin>(): com.letta.mobile.data.secrets.request/PrincipalOrigin // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.origin.<get-origin>|<get-origin>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/VerifiedEndpointId // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/PrincipalOrigin // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.secrets.request/PrincipalAccess // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/VerifiedEndpointId = ..., com.letta.mobile.data.secrets.request/PrincipalOrigin = ..., com.letta.mobile.data.secrets.request/PrincipalAccess = ...): com.letta.mobile.data.secrets.request/SecretRequestPrincipal // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.copy|copy(com.letta.mobile.data.secrets.request.VerifiedEndpointId;com.letta.mobile.data.secrets.request.PrincipalOrigin;com.letta.mobile.data.secrets.request.PrincipalAccess){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestPrincipal.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestReceipt { // com.letta.mobile.data.secrets.request/SecretRequestReceipt|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretReceiptStatus, com.letta.mobile.data.secrets.request/VaultItemName, com.letta.mobile.data.secrets.request/VaultFieldName, com.letta.mobile.data.secrets.request/SecretFailureReason? = ...) // com.letta.mobile.data.secrets.request/SecretRequestReceipt.<init>|<init>(com.letta.mobile.data.secrets.request.SecretReceiptStatus;com.letta.mobile.data.secrets.request.VaultItemName;com.letta.mobile.data.secrets.request.VaultFieldName;com.letta.mobile.data.secrets.request.SecretFailureReason?){}[0]
+
+    final val fieldName // com.letta.mobile.data.secrets.request/SecretRequestReceipt.fieldName|{}fieldName[0]
+        final fun <get-fieldName>(): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/SecretRequestReceipt.fieldName.<get-fieldName>|<get-fieldName>(){}[0]
+    final val itemId // com.letta.mobile.data.secrets.request/SecretRequestReceipt.itemId|{}itemId[0]
+        final fun <get-itemId>(): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/SecretRequestReceipt.itemId.<get-itemId>|<get-itemId>(){}[0]
+    final val reason // com.letta.mobile.data.secrets.request/SecretRequestReceipt.reason|{}reason[0]
+        final fun <get-reason>(): com.letta.mobile.data.secrets.request/SecretFailureReason? // com.letta.mobile.data.secrets.request/SecretRequestReceipt.reason.<get-reason>|<get-reason>(){}[0]
+    final val status // com.letta.mobile.data.secrets.request/SecretRequestReceipt.status|{}status[0]
+        final fun <get-status>(): com.letta.mobile.data.secrets.request/SecretReceiptStatus // com.letta.mobile.data.secrets.request/SecretRequestReceipt.status.<get-status>|<get-status>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretReceiptStatus // com.letta.mobile.data.secrets.request/SecretRequestReceipt.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/SecretRequestReceipt.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/SecretRequestReceipt.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.secrets.request/SecretFailureReason? // com.letta.mobile.data.secrets.request/SecretRequestReceipt.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretReceiptStatus = ..., com.letta.mobile.data.secrets.request/VaultItemName = ..., com.letta.mobile.data.secrets.request/VaultFieldName = ..., com.letta.mobile.data.secrets.request/SecretFailureReason? = ...): com.letta.mobile.data.secrets.request/SecretRequestReceipt // com.letta.mobile.data.secrets.request/SecretRequestReceipt.copy|copy(com.letta.mobile.data.secrets.request.SecretReceiptStatus;com.letta.mobile.data.secrets.request.VaultItemName;com.letta.mobile.data.secrets.request.VaultFieldName;com.letta.mobile.data.secrets.request.SecretFailureReason?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestReceipt.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestReceipt.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestReceipt.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestReceipt> { // com.letta.mobile.data.secrets.request/SecretRequestReceipt.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestReceipt.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestReceipt.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestReceipt.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestReceipt // com.letta.mobile.data.secrets.request/SecretRequestReceipt.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestReceipt) // com.letta.mobile.data.secrets.request/SecretRequestReceipt.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestReceipt){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestReceipt.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.secrets.request/SecretRequestReceipt.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestReceipt> // com.letta.mobile.data.secrets.request/SecretRequestReceipt.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestReceiptResult { // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestReceipt? = ...) // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestReceipt?){}[0]
+
+    final val receipt // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.receipt|{}receipt[0]
+        final fun <get-receipt>(): com.letta.mobile.data.secrets.request/SecretRequestReceipt? // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.receipt.<get-receipt>|<get-receipt>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestReceipt? // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretRequestReceipt? = ...): com.letta.mobile.data.secrets.request/SecretRequestReceiptResult // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestReceipt?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestReceiptResult> { // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestReceiptResult // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestReceiptResult) // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestReceiptResult){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestReceiptResult> // com.letta.mobile.data.secrets.request/SecretRequestReceiptResult.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestRecord { // com.letta.mobile.data.secrets.request/SecretRequestRecord|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestId, com.letta.mobile.data.secrets.request/SecretRequestDetails, com.letta.mobile.data.secrets.request/SecretRequestTiming, com.letta.mobile.data.secrets.request/SecretRequestStatus) // com.letta.mobile.data.secrets.request/SecretRequestRecord.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.request.SecretRequestDetails;com.letta.mobile.data.secrets.request.SecretRequestTiming;com.letta.mobile.data.secrets.request.SecretRequestStatus){}[0]
+
+    final val details // com.letta.mobile.data.secrets.request/SecretRequestRecord.details|{}details[0]
+        final fun <get-details>(): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.request/SecretRequestRecord.details.<get-details>|<get-details>(){}[0]
+    final val requestId // com.letta.mobile.data.secrets.request/SecretRequestRecord.requestId|{}requestId[0]
+        final fun <get-requestId>(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestRecord.requestId.<get-requestId>|<get-requestId>(){}[0]
+    final val status // com.letta.mobile.data.secrets.request/SecretRequestRecord.status|{}status[0]
+        final fun <get-status>(): com.letta.mobile.data.secrets.request/SecretRequestStatus // com.letta.mobile.data.secrets.request/SecretRequestRecord.status.<get-status>|<get-status>(){}[0]
+    final val timing // com.letta.mobile.data.secrets.request/SecretRequestRecord.timing|{}timing[0]
+        final fun <get-timing>(): com.letta.mobile.data.secrets.request/SecretRequestTiming // com.letta.mobile.data.secrets.request/SecretRequestRecord.timing.<get-timing>|<get-timing>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestRecord.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.request/SecretRequestRecord.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.secrets.request/SecretRequestTiming // com.letta.mobile.data.secrets.request/SecretRequestRecord.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.secrets.request/SecretRequestStatus // com.letta.mobile.data.secrets.request/SecretRequestRecord.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretRequestId = ..., com.letta.mobile.data.secrets.request/SecretRequestDetails = ..., com.letta.mobile.data.secrets.request/SecretRequestTiming = ..., com.letta.mobile.data.secrets.request/SecretRequestStatus = ...): com.letta.mobile.data.secrets.request/SecretRequestRecord // com.letta.mobile.data.secrets.request/SecretRequestRecord.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.request.SecretRequestDetails;com.letta.mobile.data.secrets.request.SecretRequestTiming;com.letta.mobile.data.secrets.request.SecretRequestStatus){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestRecord.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestRecord.hashCode|hashCode(){}[0]
+    final fun receipt(): com.letta.mobile.data.secrets.request/SecretRequestReceipt? // com.letta.mobile.data.secrets.request/SecretRequestRecord.receipt|receipt(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestRecord.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestRecord> { // com.letta.mobile.data.secrets.request/SecretRequestRecord.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestRecord.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestRecord.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestRecord.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestRecord // com.letta.mobile.data.secrets.request/SecretRequestRecord.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestRecord) // com.letta.mobile.data.secrets.request/SecretRequestRecord.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestRecord){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestRecord.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestRecord.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestRef { // com.letta.mobile.data.secrets.request/SecretRequestRef|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestId) // com.letta.mobile.data.secrets.request/SecretRequestRef.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestId){}[0]
+
+    final val requestId // com.letta.mobile.data.secrets.request/SecretRequestRef.requestId|{}requestId[0]
+        final fun <get-requestId>(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestRef.requestId.<get-requestId>|<get-requestId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestRef.component1|component1(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretRequestId = ...): com.letta.mobile.data.secrets.request/SecretRequestRef // com.letta.mobile.data.secrets.request/SecretRequestRef.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestId){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestRef.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestRef.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestRef.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestRef> { // com.letta.mobile.data.secrets.request/SecretRequestRef.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestRef.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestRef.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestRef.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestRef // com.letta.mobile.data.secrets.request/SecretRequestRef.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestRef) // com.letta.mobile.data.secrets.request/SecretRequestRef.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestRef){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestRef.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestRef> // com.letta.mobile.data.secrets.request/SecretRequestRef.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestRefusal { // com.letta.mobile.data.secrets.request/SecretRequestRefusal|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretServiceError, com.letta.mobile.data.secrets.request/SecretRequestProblem? = ...) // com.letta.mobile.data.secrets.request/SecretRequestRefusal.<init>|<init>(com.letta.mobile.data.secrets.request.SecretServiceError;com.letta.mobile.data.secrets.request.SecretRequestProblem?){}[0]
+
+    final val error // com.letta.mobile.data.secrets.request/SecretRequestRefusal.error|{}error[0]
+        final fun <get-error>(): com.letta.mobile.data.secrets.request/SecretServiceError // com.letta.mobile.data.secrets.request/SecretRequestRefusal.error.<get-error>|<get-error>(){}[0]
+    final val problem // com.letta.mobile.data.secrets.request/SecretRequestRefusal.problem|{}problem[0]
+        final fun <get-problem>(): com.letta.mobile.data.secrets.request/SecretRequestProblem? // com.letta.mobile.data.secrets.request/SecretRequestRefusal.problem.<get-problem>|<get-problem>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretServiceError // com.letta.mobile.data.secrets.request/SecretRequestRefusal.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/SecretRequestProblem? // com.letta.mobile.data.secrets.request/SecretRequestRefusal.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretServiceError = ..., com.letta.mobile.data.secrets.request/SecretRequestProblem? = ...): com.letta.mobile.data.secrets.request/SecretRequestRefusal // com.letta.mobile.data.secrets.request/SecretRequestRefusal.copy|copy(com.letta.mobile.data.secrets.request.SecretServiceError;com.letta.mobile.data.secrets.request.SecretRequestProblem?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestRefusal.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestRefusal.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestRefusal.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestRefusal> { // com.letta.mobile.data.secrets.request/SecretRequestRefusal.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestRefusal.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestRefusal.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestRefusal.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestRefusal // com.letta.mobile.data.secrets.request/SecretRequestRefusal.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestRefusal) // com.letta.mobile.data.secrets.request/SecretRequestRefusal.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestRefusal){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestRefusal.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.secrets.request/SecretRequestRefusal.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestRefusal> // com.letta.mobile.data.secrets.request/SecretRequestRefusal.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestStatus { // com.letta.mobile.data.secrets.request/SecretRequestStatus|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestState, com.letta.mobile.data.secrets.request/SecretFailureReason? = ..., kotlin/Long? = ...) // com.letta.mobile.data.secrets.request/SecretRequestStatus.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestState;com.letta.mobile.data.secrets.request.SecretFailureReason?;kotlin.Long?){}[0]
+
+    final val reason // com.letta.mobile.data.secrets.request/SecretRequestStatus.reason|{}reason[0]
+        final fun <get-reason>(): com.letta.mobile.data.secrets.request/SecretFailureReason? // com.letta.mobile.data.secrets.request/SecretRequestStatus.reason.<get-reason>|<get-reason>(){}[0]
+    final val settledAtMs // com.letta.mobile.data.secrets.request/SecretRequestStatus.settledAtMs|{}settledAtMs[0]
+        final fun <get-settledAtMs>(): kotlin/Long? // com.letta.mobile.data.secrets.request/SecretRequestStatus.settledAtMs.<get-settledAtMs>|<get-settledAtMs>(){}[0]
+    final val state // com.letta.mobile.data.secrets.request/SecretRequestStatus.state|{}state[0]
+        final fun <get-state>(): com.letta.mobile.data.secrets.request/SecretRequestState // com.letta.mobile.data.secrets.request/SecretRequestStatus.state.<get-state>|<get-state>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestState // com.letta.mobile.data.secrets.request/SecretRequestStatus.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/SecretFailureReason? // com.letta.mobile.data.secrets.request/SecretRequestStatus.component2|component2(){}[0]
+    final fun component3(): kotlin/Long? // com.letta.mobile.data.secrets.request/SecretRequestStatus.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretRequestState = ..., com.letta.mobile.data.secrets.request/SecretFailureReason? = ..., kotlin/Long? = ...): com.letta.mobile.data.secrets.request/SecretRequestStatus // com.letta.mobile.data.secrets.request/SecretRequestStatus.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestState;com.letta.mobile.data.secrets.request.SecretFailureReason?;kotlin.Long?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestStatus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestStatus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestStatus.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestStatus> { // com.letta.mobile.data.secrets.request/SecretRequestStatus.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestStatus.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestStatus.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestStatus.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestStatus // com.letta.mobile.data.secrets.request/SecretRequestStatus.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestStatus) // com.letta.mobile.data.secrets.request/SecretRequestStatus.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestStatus){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestStatus.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.data.secrets.request/SecretRequestStatus.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestStatus> // com.letta.mobile.data.secrets.request/SecretRequestStatus.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestTarget { // com.letta.mobile.data.secrets.request/SecretRequestTarget|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretKeystoreName, com.letta.mobile.data.secrets.request/VaultItemName, com.letta.mobile.data.secrets.request/VaultFieldName) // com.letta.mobile.data.secrets.request/SecretRequestTarget.<init>|<init>(com.letta.mobile.data.secrets.request.SecretKeystoreName;com.letta.mobile.data.secrets.request.VaultItemName;com.letta.mobile.data.secrets.request.VaultFieldName){}[0]
+
+    final val field // com.letta.mobile.data.secrets.request/SecretRequestTarget.field|{}field[0]
+        final fun <get-field>(): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/SecretRequestTarget.field.<get-field>|<get-field>(){}[0]
+    final val item // com.letta.mobile.data.secrets.request/SecretRequestTarget.item|{}item[0]
+        final fun <get-item>(): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/SecretRequestTarget.item.<get-item>|<get-item>(){}[0]
+    final val keystore // com.letta.mobile.data.secrets.request/SecretRequestTarget.keystore|{}keystore[0]
+        final fun <get-keystore>(): com.letta.mobile.data.secrets.request/SecretKeystoreName // com.letta.mobile.data.secrets.request/SecretRequestTarget.keystore.<get-keystore>|<get-keystore>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretKeystoreName // com.letta.mobile.data.secrets.request/SecretRequestTarget.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/SecretRequestTarget.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/SecretRequestTarget.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretKeystoreName = ..., com.letta.mobile.data.secrets.request/VaultItemName = ..., com.letta.mobile.data.secrets.request/VaultFieldName = ...): com.letta.mobile.data.secrets.request/SecretRequestTarget // com.letta.mobile.data.secrets.request/SecretRequestTarget.copy|copy(com.letta.mobile.data.secrets.request.SecretKeystoreName;com.letta.mobile.data.secrets.request.VaultItemName;com.letta.mobile.data.secrets.request.VaultFieldName){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestTarget.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestTarget.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestTarget.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestTarget> { // com.letta.mobile.data.secrets.request/SecretRequestTarget.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestTarget.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestTarget.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestTarget.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestTarget // com.letta.mobile.data.secrets.request/SecretRequestTarget.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestTarget) // com.letta.mobile.data.secrets.request/SecretRequestTarget.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestTarget){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestTarget.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestTarget> // com.letta.mobile.data.secrets.request/SecretRequestTarget.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.request/SecretRequestTiming { // com.letta.mobile.data.secrets.request/SecretRequestTiming|null[0]
+    constructor <init>(kotlin/Long, kotlin/Long) // com.letta.mobile.data.secrets.request/SecretRequestTiming.<init>|<init>(kotlin.Long;kotlin.Long){}[0]
+
+    final val createdAtMs // com.letta.mobile.data.secrets.request/SecretRequestTiming.createdAtMs|{}createdAtMs[0]
+        final fun <get-createdAtMs>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestTiming.createdAtMs.<get-createdAtMs>|<get-createdAtMs>(){}[0]
+    final val expiresAtMs // com.letta.mobile.data.secrets.request/SecretRequestTiming.expiresAtMs|{}expiresAtMs[0]
+        final fun <get-expiresAtMs>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestTiming.expiresAtMs.<get-expiresAtMs>|<get-expiresAtMs>(){}[0]
+
+    final fun component1(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestTiming.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestTiming.component2|component2(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ...): com.letta.mobile.data.secrets.request/SecretRequestTiming // com.letta.mobile.data.secrets.request/SecretRequestTiming.copy|copy(kotlin.Long;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestTiming.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestTiming.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestTiming.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestTiming> { // com.letta.mobile.data.secrets.request/SecretRequestTiming.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestTiming.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestTiming.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestTiming.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestTiming // com.letta.mobile.data.secrets.request/SecretRequestTiming.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestTiming) // com.letta.mobile.data.secrets.request/SecretRequestTiming.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestTiming){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestTiming.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestTiming> // com.letta.mobile.data.secrets.request/SecretRequestTiming.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.secrets/AgentSecret { // com.letta.mobile.data.secrets/AgentSecret|null[0]
     constructor <init>(kotlin/String, com.letta.mobile.data.secrets/SecretValue) // com.letta.mobile.data.secrets/AgentSecret.<init>|<init>(kotlin.String;com.letta.mobile.data.secrets.SecretValue){}[0]
 
@@ -69435,6 +70177,168 @@ final value class com.letta.mobile.data.repository/ProjectStatusToken { // com.l
     final fun toString(): kotlin/String // com.letta.mobile.data.repository/ProjectStatusToken.toString|toString(){}[0]
 }
 
+final value class com.letta.mobile.data.secrets.request/SecretKeystoreName { // com.letta.mobile.data.secrets.request/SecretKeystoreName|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.secrets.request/SecretKeystoreName.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.data.secrets.request/SecretKeystoreName.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretKeystoreName.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.data.secrets.request/SecretKeystoreName.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretKeystoreName.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretKeystoreName.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretKeystoreName.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretKeystoreName.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretKeystoreName> { // com.letta.mobile.data.secrets.request/SecretKeystoreName.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretKeystoreName.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretKeystoreName.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretKeystoreName.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretKeystoreName // com.letta.mobile.data.secrets.request/SecretKeystoreName.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretKeystoreName) // com.letta.mobile.data.secrets.request/SecretKeystoreName.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretKeystoreName){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretKeystoreName.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretKeystoreName> // com.letta.mobile.data.secrets.request/SecretKeystoreName.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.secrets.request/SecretPurpose { // com.letta.mobile.data.secrets.request/SecretPurpose|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.secrets.request/SecretPurpose.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.secrets.request/SecretPurpose.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretPurpose.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretPurpose.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretPurpose.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretPurpose.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretPurpose> { // com.letta.mobile.data.secrets.request/SecretPurpose.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretPurpose.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretPurpose.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretPurpose.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretPurpose // com.letta.mobile.data.secrets.request/SecretPurpose.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretPurpose) // com.letta.mobile.data.secrets.request/SecretPurpose.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretPurpose){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretPurpose.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretPurpose> // com.letta.mobile.data.secrets.request/SecretPurpose.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.secrets.request/SecretRequestId { // com.letta.mobile.data.secrets.request/SecretRequestId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.secrets.request/SecretRequestId.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.data.secrets.request/SecretRequestId.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestId.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val logLabel // com.letta.mobile.data.secrets.request/SecretRequestId.logLabel|{}logLabel[0]
+        final fun <get-logLabel>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestId.logLabel.<get-logLabel>|<get-logLabel>(){}[0]
+    final val value // com.letta.mobile.data.secrets.request/SecretRequestId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/SecretRequestId> { // com.letta.mobile.data.secrets.request/SecretRequestId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/SecretRequestId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/SecretRequestId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/SecretRequestId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.request/SecretRequestId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/SecretRequestId) // com.letta.mobile.data.secrets.request/SecretRequestId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.SecretRequestId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/SecretRequestId.Companion|null[0]
+        final const val PREFIX // com.letta.mobile.data.secrets.request/SecretRequestId.Companion.PREFIX|{}PREFIX[0]
+            final fun <get-PREFIX>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestId.Companion.PREFIX.<get-PREFIX>|<get-PREFIX>(){}[0]
+        final const val RANDOM_BYTES // com.letta.mobile.data.secrets.request/SecretRequestId.Companion.RANDOM_BYTES|{}RANDOM_BYTES[0]
+            final fun <get-RANDOM_BYTES>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestId.Companion.RANDOM_BYTES.<get-RANDOM_BYTES>|<get-RANDOM_BYTES>(){}[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/SecretRequestId> // com.letta.mobile.data.secrets.request/SecretRequestId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.secrets.request/VaultFieldName { // com.letta.mobile.data.secrets.request/VaultFieldName|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.secrets.request/VaultFieldName.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.data.secrets.request/VaultFieldName.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/VaultFieldName.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.data.secrets.request/VaultFieldName.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.secrets.request/VaultFieldName.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/VaultFieldName.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/VaultFieldName.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/VaultFieldName.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/VaultFieldName> { // com.letta.mobile.data.secrets.request/VaultFieldName.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/VaultFieldName.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/VaultFieldName.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/VaultFieldName.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/VaultFieldName // com.letta.mobile.data.secrets.request/VaultFieldName.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/VaultFieldName) // com.letta.mobile.data.secrets.request/VaultFieldName.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.VaultFieldName){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/VaultFieldName.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/VaultFieldName> // com.letta.mobile.data.secrets.request/VaultFieldName.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.secrets.request/VaultItemName { // com.letta.mobile.data.secrets.request/VaultItemName|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.secrets.request/VaultItemName.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.data.secrets.request/VaultItemName.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/VaultItemName.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.data.secrets.request/VaultItemName.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.secrets.request/VaultItemName.value.<get-value>|<get-value>(){}[0]
+
+    final fun covers(com.letta.mobile.data.secrets.request/VaultItemName): kotlin/Boolean // com.letta.mobile.data.secrets.request/VaultItemName.covers|covers(com.letta.mobile.data.secrets.request.VaultItemName){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/VaultItemName.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/VaultItemName.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/VaultItemName.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/VaultItemName> { // com.letta.mobile.data.secrets.request/VaultItemName.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/VaultItemName.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/VaultItemName.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/VaultItemName.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/VaultItemName // com.letta.mobile.data.secrets.request/VaultItemName.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/VaultItemName) // com.letta.mobile.data.secrets.request/VaultItemName.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.VaultItemName){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/VaultItemName.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/VaultItemName> // com.letta.mobile.data.secrets.request/VaultItemName.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.secrets.request/VerifiedEndpointId { // com.letta.mobile.data.secrets.request/VerifiedEndpointId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.secrets.request/VerifiedEndpointId.<init>|<init>(kotlin.String){}[0]
+
+    final val isWellFormed // com.letta.mobile.data.secrets.request/VerifiedEndpointId.isWellFormed|{}isWellFormed[0]
+        final fun <get-isWellFormed>(): kotlin/Boolean // com.letta.mobile.data.secrets.request/VerifiedEndpointId.isWellFormed.<get-isWellFormed>|<get-isWellFormed>(){}[0]
+    final val value // com.letta.mobile.data.secrets.request/VerifiedEndpointId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.secrets.request/VerifiedEndpointId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.request/VerifiedEndpointId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.request/VerifiedEndpointId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.request/VerifiedEndpointId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.secrets.request/VerifiedEndpointId> { // com.letta.mobile.data.secrets.request/VerifiedEndpointId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.secrets.request/VerifiedEndpointId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.secrets.request/VerifiedEndpointId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.secrets.request/VerifiedEndpointId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.secrets.request/VerifiedEndpointId // com.letta.mobile.data.secrets.request/VerifiedEndpointId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.secrets.request/VerifiedEndpointId) // com.letta.mobile.data.secrets.request/VerifiedEndpointId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.secrets.request.VerifiedEndpointId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.secrets.request/VerifiedEndpointId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.secrets.request/VerifiedEndpointId> // com.letta.mobile.data.secrets.request/VerifiedEndpointId.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final value class com.letta.mobile.data.secrets/SecretKey { // com.letta.mobile.data.secrets/SecretKey|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.secrets/SecretKey.<init>|<init>(kotlin.String){}[0]
 
@@ -74180,6 +75084,59 @@ final object com.letta.mobile.data.schema/JsonSchemaText { // com.letta.mobile.d
 
 final object com.letta.mobile.data.search/TextMatch { // com.letta.mobile.data.search/TextMatch|null[0]
     final fun matches(kotlin/String, kotlin/Array<out kotlin/String?>...): kotlin/Boolean // com.letta.mobile.data.search/TextMatch.matches|matches(kotlin.String;kotlin.Array<out|kotlin.String?>...){}[0]
+}
+
+final object com.letta.mobile.data.secrets.journal/SecretRequestJournalRules { // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules|null[0]
+    final fun problem(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>): com.letta.mobile.data.secrets.journal/SecretJournalProblem? // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules.problem|problem(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
+    final fun require(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>) // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules.require|require(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
+}
+
+final object com.letta.mobile.data.secrets.request/SecretRequestLifecycle { // com.letta.mobile.data.secrets.request/SecretRequestLifecycle|null[0]
+    final fun apply(com.letta.mobile.data.secrets.request/SecretRequestRecord, com.letta.mobile.data.secrets.request/SecretRequestEvent, kotlin.time/Instant): com.letta.mobile.data.secrets.request/SecretRequestTransition // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.apply|apply(com.letta.mobile.data.secrets.request.SecretRequestRecord;com.letta.mobile.data.secrets.request.SecretRequestEvent;kotlin.time.Instant){}[0]
+    final fun expireDue(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, kotlin.time/Instant): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.expireDue|expireDue(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>;kotlin.time.Instant){}[0]
+    final fun isDue(com.letta.mobile.data.secrets.request/SecretRequestRecord, kotlin.time/Instant): kotlin/Boolean // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.isDue|isDue(com.letta.mobile.data.secrets.request.SecretRequestRecord;kotlin.time.Instant){}[0]
+    final fun prune(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, kotlin.time/Instant): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.prune|prune(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>;kotlin.time.Instant){}[0]
+    final fun recoverInterrupted(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, kotlin.time/Instant): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.recoverInterrupted|recoverInterrupted(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>;kotlin.time.Instant){}[0]
+}
+
+final object com.letta.mobile.data.secrets.request/SecretRequestLimits { // com.letta.mobile.data.secrets.request/SecretRequestLimits|null[0]
+    final const val DEFAULT_TTL_MS // com.letta.mobile.data.secrets.request/SecretRequestLimits.DEFAULT_TTL_MS|{}DEFAULT_TTL_MS[0]
+        final fun <get-DEFAULT_TTL_MS>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestLimits.DEFAULT_TTL_MS.<get-DEFAULT_TTL_MS>|<get-DEFAULT_TTL_MS>(){}[0]
+    final const val MAX_ENDPOINT_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ENDPOINT_LENGTH|{}MAX_ENDPOINT_LENGTH[0]
+        final fun <get-MAX_ENDPOINT_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ENDPOINT_LENGTH.<get-MAX_ENDPOINT_LENGTH>|<get-MAX_ENDPOINT_LENGTH>(){}[0]
+    final const val MAX_FIELD_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_FIELD_LENGTH|{}MAX_FIELD_LENGTH[0]
+        final fun <get-MAX_FIELD_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_FIELD_LENGTH.<get-MAX_FIELD_LENGTH>|<get-MAX_FIELD_LENGTH>(){}[0]
+    final const val MAX_ITEM_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ITEM_LENGTH|{}MAX_ITEM_LENGTH[0]
+        final fun <get-MAX_ITEM_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ITEM_LENGTH.<get-MAX_ITEM_LENGTH>|<get-MAX_ITEM_LENGTH>(){}[0]
+    final const val MAX_ITEM_SEGMENTS // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ITEM_SEGMENTS|{}MAX_ITEM_SEGMENTS[0]
+        final fun <get-MAX_ITEM_SEGMENTS>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_ITEM_SEGMENTS.<get-MAX_ITEM_SEGMENTS>|<get-MAX_ITEM_SEGMENTS>(){}[0]
+    final const val MAX_JOURNAL_RECORDS // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_JOURNAL_RECORDS|{}MAX_JOURNAL_RECORDS[0]
+        final fun <get-MAX_JOURNAL_RECORDS>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_JOURNAL_RECORDS.<get-MAX_JOURNAL_RECORDS>|<get-MAX_JOURNAL_RECORDS>(){}[0]
+    final const val MAX_KEYSTORE_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_KEYSTORE_LENGTH|{}MAX_KEYSTORE_LENGTH[0]
+        final fun <get-MAX_KEYSTORE_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_KEYSTORE_LENGTH.<get-MAX_KEYSTORE_LENGTH>|<get-MAX_KEYSTORE_LENGTH>(){}[0]
+    final const val MAX_PENDING_PER_AGENT // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PENDING_PER_AGENT|{}MAX_PENDING_PER_AGENT[0]
+        final fun <get-MAX_PENDING_PER_AGENT>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PENDING_PER_AGENT.<get-MAX_PENDING_PER_AGENT>|<get-MAX_PENDING_PER_AGENT>(){}[0]
+    final const val MAX_PURPOSE_LENGTH // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PURPOSE_LENGTH|{}MAX_PURPOSE_LENGTH[0]
+        final fun <get-MAX_PURPOSE_LENGTH>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_PURPOSE_LENGTH.<get-MAX_PURPOSE_LENGTH>|<get-MAX_PURPOSE_LENGTH>(){}[0]
+    final const val MAX_VALUE_BYTES // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_VALUE_BYTES|{}MAX_VALUE_BYTES[0]
+        final fun <get-MAX_VALUE_BYTES>(): kotlin/Int // com.letta.mobile.data.secrets.request/SecretRequestLimits.MAX_VALUE_BYTES.<get-MAX_VALUE_BYTES>|<get-MAX_VALUE_BYTES>(){}[0]
+    final const val SETTLED_RETENTION_MS // com.letta.mobile.data.secrets.request/SecretRequestLimits.SETTLED_RETENTION_MS|{}SETTLED_RETENTION_MS[0]
+        final fun <get-SETTLED_RETENTION_MS>(): kotlin/Long // com.letta.mobile.data.secrets.request/SecretRequestLimits.SETTLED_RETENTION_MS.<get-SETTLED_RETENTION_MS>|<get-SETTLED_RETENTION_MS>(){}[0]
+}
+
+final object com.letta.mobile.data.secrets.request/SecretRequestMethods { // com.letta.mobile.data.secrets.request/SecretRequestMethods|null[0]
+    final const val CANCEL // com.letta.mobile.data.secrets.request/SecretRequestMethods.CANCEL|{}CANCEL[0]
+        final fun <get-CANCEL>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.CANCEL.<get-CANCEL>|<get-CANCEL>(){}[0]
+    final const val GET // com.letta.mobile.data.secrets.request/SecretRequestMethods.GET|{}GET[0]
+        final fun <get-GET>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.GET.<get-GET>|<get-GET>(){}[0]
+    final const val LIST // com.letta.mobile.data.secrets.request/SecretRequestMethods.LIST|{}LIST[0]
+        final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.LIST.<get-LIST>|<get-LIST>(){}[0]
+    final const val REQUEST // com.letta.mobile.data.secrets.request/SecretRequestMethods.REQUEST|{}REQUEST[0]
+        final fun <get-REQUEST>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.REQUEST.<get-REQUEST>|<get-REQUEST>(){}[0]
+    final const val STATUS // com.letta.mobile.data.secrets.request/SecretRequestMethods.STATUS|{}STATUS[0]
+        final fun <get-STATUS>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.STATUS.<get-STATUS>|<get-STATUS>(){}[0]
+    final const val SUBMIT // com.letta.mobile.data.secrets.request/SecretRequestMethods.SUBMIT|{}SUBMIT[0]
+        final fun <get-SUBMIT>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.SUBMIT.<get-SUBMIT>|<get-SUBMIT>(){}[0]
 }
 
 final object com.letta.mobile.data.secrets/AgentSecretKeys { // com.letta.mobile.data.secrets/AgentSecretKeys|null[0]

@@ -48483,6 +48483,935 @@ public final class com/letta/mobile/data/secrets/VaultAgent {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/secrets/journal/FileSecretRequestJournal : com/letta/mobile/data/secrets/journal/SecretRequestJournal {
+	public static final field Companion Lcom/letta/mobile/data/secrets/journal/FileSecretRequestJournal$Companion;
+	public static final field MAX_JOURNAL_BYTES I
+	public fun <init> (Ljava/nio/file/Path;)V
+	public fun read (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun update (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/secrets/journal/FileSecretRequestJournal$Companion {
+}
+
+public final class com/letta/mobile/data/secrets/journal/InMemorySecretRequestJournal : com/letta/mobile/data/secrets/journal/SecretRequestJournal {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun read (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun update (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/secrets/journal/SecretJournalProblem : java/lang/Enum {
+	public static final field CORRUPT Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+	public static final field FULL Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+	public static final field NEEDS_RECONCILIATION Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+	public static final field WRITE_FAILED Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getMessage ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/journal/SecretRequestJournal {
+	public abstract fun read (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun update (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/secrets/journal/SecretRequestJournalException : java/lang/IllegalStateException {
+	public fun <init> (Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getProblem ()Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+}
+
+public final class com/letta/mobile/data/secrets/journal/SecretRequestJournalRules {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/journal/SecretRequestJournalRules;
+	public final fun problem (Ljava/util/List;)Lcom/letta/mobile/data/secrets/journal/SecretJournalProblem;
+	public final fun require (Ljava/util/List;)V
+}
+
+public final class com/letta/mobile/data/secrets/request/AgentSecretRequest {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/AgentSecretRequest$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-QByMrVo ()Ljava/lang/String;
+	public final fun component2-x6hRR4k ()Ljava/lang/String;
+	public final fun component3-pFqjYFs ()Ljava/lang/String;
+	public final fun copy-5WkcZEk (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;
+	public static synthetic fun copy-5WkcZEk$default (Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFieldName-pFqjYFs ()Ljava/lang/String;
+	public final fun getPurpose-QByMrVo ()Ljava/lang/String;
+	public final fun getVaultItemName-x6hRR4k ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/AgentSecretRequest$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/AgentSecretRequest$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/AgentSecretRequest$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/AuthoredPurpose {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/AuthoredPurpose$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/TextAuthor;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-QByMrVo ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/TextAuthor;
+	public final fun copy-gAaLpCM (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/TextAuthor;)Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;
+	public static synthetic fun copy-gAaLpCM$default (Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/TextAuthor;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthor ()Lcom/letta/mobile/data/secrets/request/TextAuthor;
+	public final fun getText-QByMrVo ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/AuthoredPurpose$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/AuthoredPurpose$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/AuthoredPurpose$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/PrincipalAccess : java/lang/Enum {
+	public static final field ADMIN_FULL Lcom/letta/mobile/data/secrets/request/PrincipalAccess;
+	public static final field LIMITED Lcom/letta/mobile/data/secrets/request/PrincipalAccess;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/PrincipalAccess;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/PrincipalAccess;
+}
+
+public final class com/letta/mobile/data/secrets/request/PrincipalOrigin : java/lang/Enum {
+	public static final field AGENT_A2A Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public static final field AGENT_APP_SERVER_INPUT Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public static final field AGENT_TOOL_CALL Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public static final field HOST_INTERNAL Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public static final field HUMAN_PAIRED_DEVICE Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isHuman ()Z
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+}
+
+public final class com/letta/mobile/data/secrets/request/RequestingAgent {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun copy-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/RequestingAgent;
+	public static synthetic fun copy-qkT7gGE$default (Lcom/letta/mobile/data/secrets/request/RequestingAgent;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/RequestingAgent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretFailureReason : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretFailureReason$Companion;
+	public static final field INTERRUPTED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field ROLLBACK_FAILED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field TARGET_NOT_WRITABLE Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VALUE_REJECTED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VAULT_DENIED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VAULT_ERROR Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VAULT_LOCKED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VAULT_UNAVAILABLE Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VAULT_UNSUPPORTED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static final field VERIFY_FAILED Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretFailureReason$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretKeystoreName {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretKeystoreName$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretKeystoreName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretKeystoreName$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretKeystoreName$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-ZGnGJeo (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-eNjCqGg (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretKeystoreName$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretPurpose {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretPurpose$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretPurpose;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretPurpose$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretPurpose$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-WTT3Tsk (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-8xPWCrM (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretPurpose$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretReceiptStatus : java/lang/Enum {
+	public static final field CANCELLED Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus$Companion;
+	public static final field EXPIRED Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public static final field FAILED Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public static final field SAVED Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretReceiptStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestCreated {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestCreated$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestState;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-y8m6XLE ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public final fun component3 ()J
+	public final fun copy-7DbFAfA (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestState;J)Lcom/letta/mobile/data/secrets/request/SecretRequestCreated;
+	public static synthetic fun copy-7DbFAfA$default (Lcom/letta/mobile/data/secrets/request/SecretRequestCreated;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestState;JILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestCreated;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpiresAtMs ()J
+	public final fun getRequestId-y8m6XLE ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestCreated$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestCreated$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestCreated;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestCreated;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestCreated$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestDetails {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestDetails$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;
+	public final fun component3 ()Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;
+	public final fun copy-mT_9V4Y (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;)Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;
+	public static synthetic fun copy-mT_9V4Y$default (Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPurpose ()Lcom/letta/mobile/data/secrets/request/AuthoredPurpose;
+	public final fun getRequestingAgent-zqmzO_A ()Ljava/lang/String;
+	public final fun getTarget ()Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestDetails$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestDetails$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestDetails$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/request/SecretRequestEvent {
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestEvent$Cancel : com/letta/mobile/data/secrets/request/SecretRequestEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Cancel;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestEvent$Claim : com/letta/mobile/data/secrets/request/SecretRequestEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Claim;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestEvent$Expire : com/letta/mobile/data/secrets/request/SecretRequestEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Expire;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestEvent$Fail : com/letta/mobile/data/secrets/request/SecretRequestEvent {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretFailureReason;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretFailureReason;)Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Fail;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Fail;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Fail;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestEvent$Interrupt : com/letta/mobile/data/secrets/request/SecretRequestEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Interrupt;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestEvent$Save : com/letta/mobile/data/secrets/request/SecretRequestEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestEvent$Save;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestId {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestId$Companion;
+	public static final field PREFIX Ljava/lang/String;
+	public static final field RANDOM_BYTES I
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public static final fun getLogLabel-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-zpzEJY4 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-t5Ak7u0 (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestLifecycle {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestLifecycle;
+	public final fun apply (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Lcom/letta/mobile/data/secrets/request/SecretRequestEvent;Lkotlin/time/Instant;)Lcom/letta/mobile/data/secrets/request/SecretRequestTransition;
+	public final fun expireDue (Ljava/util/List;Lkotlin/time/Instant;)Ljava/util/List;
+	public final fun isDue (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Lkotlin/time/Instant;)Z
+	public final fun prune (Ljava/util/List;Lkotlin/time/Instant;)Ljava/util/List;
+	public final fun recoverInterrupted (Ljava/util/List;Lkotlin/time/Instant;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestLimits {
+	public static final field DEFAULT_TTL_MS J
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestLimits;
+	public static final field MAX_ENDPOINT_LENGTH I
+	public static final field MAX_FIELD_LENGTH I
+	public static final field MAX_ITEM_LENGTH I
+	public static final field MAX_ITEM_SEGMENTS I
+	public static final field MAX_JOURNAL_RECORDS I
+	public static final field MAX_KEYSTORE_LENGTH I
+	public static final field MAX_PENDING_PER_AGENT I
+	public static final field MAX_PURPOSE_LENGTH I
+	public static final field MAX_VALUE_BYTES I
+	public static final field SETTLED_RETENTION_MS J
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestList {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestList$Companion;
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/secrets/request/SecretRequestList;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestList;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestList;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRequests ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestList$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestList$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestList;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestList;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestList$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestMethods {
+	public static final field CANCEL Ljava/lang/String;
+	public static final field GET Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestMethods;
+	public static final field LIST Ljava/lang/String;
+	public static final field REQUEST Ljava/lang/String;
+	public static final field STATUS Ljava/lang/String;
+	public static final field SUBMIT Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestPrincipal {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;Lcom/letta/mobile/data/secrets/request/PrincipalAccess;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-u7Kf8Gc ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public final fun component3 ()Lcom/letta/mobile/data/secrets/request/PrincipalAccess;
+	public final fun copy-fROgo6Q (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;Lcom/letta/mobile/data/secrets/request/PrincipalAccess;)Lcom/letta/mobile/data/secrets/request/SecretRequestPrincipal;
+	public static synthetic fun copy-fROgo6Q$default (Lcom/letta/mobile/data/secrets/request/SecretRequestPrincipal;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;Lcom/letta/mobile/data/secrets/request/PrincipalAccess;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestPrincipal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccess ()Lcom/letta/mobile/data/secrets/request/PrincipalAccess;
+	public final fun getEndpoint-u7Kf8Gc ()Ljava/lang/String;
+	public final fun getMayAnswer ()Z
+	public final fun getOrigin ()Lcom/letta/mobile/data/secrets/request/PrincipalOrigin;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestProblem : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestProblem$Companion;
+	public static final field FIELD_MALFORMED Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static final field ITEM_MALFORMED Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static final field ITEM_OUTSIDE_SCOPE Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static final field PURPOSE_BLANK Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static final field PURPOSE_NOT_PLAIN_TEXT Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static final field PURPOSE_TOO_LONG Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static final field TOO_MANY_PENDING Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestProblem$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestReceipt {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt$Companion;
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public final fun component2-x6hRR4k ()Ljava/lang/String;
+	public final fun component3-pFqjYFs ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public final fun copy-g_g5-ck (Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;)Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public static synthetic fun copy-g_g5-ck$default (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFieldName-pFqjYFs ()Ljava/lang/String;
+	public final fun getItemId-x6hRR4k ()Ljava/lang/String;
+	public final fun getReason ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public final fun getStatus ()Lcom/letta/mobile/data/secrets/request/SecretReceiptStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestReceipt$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestReceipt$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestReceiptResult {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult;Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReceipt ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestReceiptResult$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestReceiptResult;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestReceiptResult$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestRecord {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestRecord$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-y8m6XLE ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;
+	public final fun component3 ()Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;
+	public final fun component4 ()Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;
+	public final fun copy-FeGu3Cs (Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;)Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public static synthetic fun copy-FeGu3Cs$default (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Ljava/lang/String;Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetails ()Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;
+	public final fun getRequestId-y8m6XLE ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;
+	public final fun getTiming ()Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;
+	public fun hashCode ()I
+	public final fun receipt ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestRecord$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestRecord$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestRecord$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestRef {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestRef$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-y8m6XLE ()Ljava/lang/String;
+	public final fun copy-Xu6JFxI (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestRef;
+	public static synthetic fun copy-Xu6JFxI$default (Lcom/letta/mobile/data/secrets/request/SecretRequestRef;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRequestId-y8m6XLE ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestRef$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestRefusal {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal$Companion;
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretServiceError;Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretServiceError;Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretServiceError;Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;)Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;Lcom/letta/mobile/data/secrets/request/SecretServiceError;Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public final fun getProblem ()Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestRefusal$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestRefusal$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestState : java/lang/Enum {
+	public static final field CANCELLED Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestState$Companion;
+	public static final field EXPIRED Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static final field FAILED Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static final field PENDING Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static final field SAVED Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static final field SUBMITTING Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isTerminal ()Z
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestStatus {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestStatus$Companion;
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestState;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;Ljava/lang/Long;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestState;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public final fun component2 ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestState;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;Ljava/lang/Long;)Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;Lcom/letta/mobile/data/secrets/request/SecretRequestState;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;Ljava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public final fun getSettledAtMs ()Ljava/lang/Long;
+	public final fun getState ()Lcom/letta/mobile/data/secrets/request/SecretRequestState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestStatus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestStatus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestStatus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestTarget {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestTarget$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-eaRKGdI ()Ljava/lang/String;
+	public final fun component2-x6hRR4k ()Ljava/lang/String;
+	public final fun component3-pFqjYFs ()Ljava/lang/String;
+	public final fun copy-5u_8INI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;
+	public static synthetic fun copy-5u_8INI$default (Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getField-pFqjYFs ()Ljava/lang/String;
+	public final fun getItem-x6hRR4k ()Ljava/lang/String;
+	public final fun getKeystore-eaRKGdI ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestTarget$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestTarget$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestTarget$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestTiming {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestTiming$Companion;
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;JJILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCreatedAtMs ()J
+	public final fun getExpiresAtMs ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/SecretRequestTiming$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRequestTiming$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/secrets/request/SecretRequestTiming;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestTiming$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/request/SecretRequestTransition {
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestTransition$Applied : com/letta/mobile/data/secrets/request/SecretRequestTransition {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;)Lcom/letta/mobile/data/secrets/request/SecretRequestTransition$Applied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestTransition$Applied;Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestTransition$Applied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRecord ()Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestTransition$Refused : com/letta/mobile/data/secrets/request/SecretRequestTransition {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/TransitionRefusal;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/TransitionRefusal;)Lcom/letta/mobile/data/secrets/request/SecretRequestTransition$Refused;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestTransition$Refused;Lcom/letta/mobile/data/secrets/request/TransitionRefusal;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestTransition$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRefusal ()Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/request/SecretRequestValidation {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Companion;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestValidation$Companion {
+	public final fun purposeProblem (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public final fun validate-fGqKefY (Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestValidation;
+	public static synthetic fun validate-fGqKefY$default (Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Companion;Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestValidation;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestValidation$Invalid : com/letta/mobile/data/secrets/request/SecretRequestValidation {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;)Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Invalid;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Invalid;Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Invalid;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/letta/mobile/data/secrets/request/SecretRequestProblem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRequestValidation$Valid : com/letta/mobile/data/secrets/request/SecretRequestValidation {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;)Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Valid;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Valid;Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/request/SecretRequestValidation$Valid;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRequest ()Lcom/letta/mobile/data/secrets/request/AgentSecretRequest;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretServiceError : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretServiceError$Companion;
+	public static final field FORBIDDEN Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static final field INVALID_REQUEST Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static final field INVALID_VALUE Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static final field JOURNAL_UNAVAILABLE Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static final field NOT_PENDING Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static final field UNKNOWN_REQUEST Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretServiceError$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/TextAuthor : java/lang/Enum {
+	public static final field AGENT Lcom/letta/mobile/data/secrets/request/TextAuthor;
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/TextAuthor$Companion;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/TextAuthor;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/TextAuthor;
+}
+
+public final class com/letta/mobile/data/secrets/request/TextAuthor$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/TransitionRefusal : java/lang/Enum {
+	public static final field NOT_DUE Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public static final field NOT_PENDING Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public static final field NOT_SUBMITTING Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public static final field OVERDUE Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/request/TransitionRefusal;
+}
+
+public final class com/letta/mobile/data/secrets/request/VaultFieldName {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/VaultFieldName$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/VaultFieldName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/VaultFieldName$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/VaultFieldName$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-tHgSZHY (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-IA9awFM (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/VaultFieldName$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/VaultItemName {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/VaultItemName$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/VaultItemName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun covers-_9-LFyQ (Ljava/lang/String;Ljava/lang/String;)Z
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/VaultItemName$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/VaultItemName$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-hhmXpew (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-hpdjIek (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/VaultItemName$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/VerifiedEndpointId {
+	public static final field Companion Lcom/letta/mobile/data/secrets/request/VerifiedEndpointId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/VerifiedEndpointId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/secrets/request/VerifiedEndpointId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/VerifiedEndpointId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-W_nZSV4 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-uhfCzK4 (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/VerifiedEndpointId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/letta/mobile/data/serialization/LettaJson {
 	public static final field INSTANCE Lcom/letta/mobile/data/serialization/LettaJson;
 	public final fun getAdminRpc ()Lkotlinx/serialization/json/Json;
