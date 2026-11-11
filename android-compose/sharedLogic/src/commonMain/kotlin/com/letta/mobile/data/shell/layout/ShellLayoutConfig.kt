@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout
 
+import com.letta.mobile.data.chat.layout.ChatViews
 import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.serialization.LettaJson
@@ -43,6 +44,9 @@ object ShellLanes {
      * library's filter, and keeps Settings at its bottom wherever the lane lists it.
      */
     const val PANEL = "panel"
+
+    /** The chat page's content, top to bottom; the frame adapts the composer to its presentation. */
+    const val CHAT = "chat"
 }
 
 /** The views the shell itself supplies; the shell binds them on every host, so they are always available. */
@@ -112,6 +116,13 @@ data class ShellLayoutConfig(
     /** The agent panel's parts, each once; like [homeLane], a config without the lane shows the default parts. */
     fun panelLane(): List<ModuleSlot> = laneOrDefault(ShellLanes.PANEL)
 
+    /** Chat's content, each once; malformed persisted data cannot remove the ability to read or send. */
+    fun chatLane(): List<ModuleSlot> {
+        val saved = laneOrDefault(ShellLanes.CHAT)
+        val required = listOf(ChatViews.TRANSCRIPT, ChatViews.COMPOSER)
+        return saved + required.filter { view -> saved.none { it.view == view } }.map(::ModuleSlot)
+    }
+
     private fun laneOrDefault(id: String): List<ModuleSlot> = if (id in lanes) lane(id) else Default.lane(id)
 
     /** The side lane, without anything the main lane already shows: a module is drawn once. */
@@ -138,7 +149,7 @@ data class ShellLayoutConfig(
     /** The default layout and reading a saved one. */
     companion object {
         /** The current set of defaults; a config below it gains the default modules it lacks. */
-        const val VERSION = 3
+        const val VERSION = 4
 
         /** One default module: the [lane] it belongs to, its [slot], and the config version that added it. */
         private class DefaultModule(val lane: String, view: RuntimeViewId, val since: Int) {
@@ -151,7 +162,8 @@ data class ShellLayoutConfig(
             DefaultModule(ShellLanes.SIDE, ShellViews.SIDE_PANE, since = 1),
         ) + HomeViews.Default.map { DefaultModule(ShellLanes.HOME, it, since = 2) } +
             RailViews.Default.map { DefaultModule(ShellLanes.RAIL, it, since = 3) } +
-            PanelViews.Default.map { DefaultModule(ShellLanes.PANEL, it, since = 3) }
+            PanelViews.Default.map { DefaultModule(ShellLanes.PANEL, it, since = 3) } +
+            ChatViews.Default.map { DefaultModule(ShellLanes.CHAT, it, since = 4) }
 
         /**
          * The shell as it was before lanes were configurable: the page, then the host's side pane,

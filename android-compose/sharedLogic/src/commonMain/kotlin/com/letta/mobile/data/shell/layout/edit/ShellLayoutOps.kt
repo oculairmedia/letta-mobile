@@ -80,6 +80,9 @@ enum class ShellLayoutEditRule(val code: String) {
     /** The Home button would leave the agent rail. */
     HOME_STAYS("home_stays"),
 
+    /** The transcript or input would leave the chat lane. */
+    CHAT_READ_SEND_STAYS("chat_read_send_stays"),
+
     /** The slot is already in this lane, or in the other of main and side. */
     DUPLICATE_SLOT("duplicate_slot"),
 

@@ -616,7 +616,15 @@ private fun dockedPanelContent(
 ): DockedPanelContent {
     return DockedPanelContent(
         ambient = ambient,
-        conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
+        conversation = { conversationModifier ->
+            ChatLane(
+                modifier = conversationModifier,
+                docked = true,
+                transcript = { DockedReplyCard(dockedReplyParams(frame), it) },
+                status = {},
+                composer = { _, _ -> },
+            )
+        },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
         collapsed = CollapsedDockContent(
             agentId = frame.session.agentId,
@@ -670,10 +678,14 @@ private fun FullScreenPage(frame: ChatSurfaceFrame, modifier: Modifier) {
 @Composable
 private fun FullPageBody(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode) {
     val content: @Composable () -> Unit = {
-        Column(Modifier.fillMaxSize()) {
-            TimelineWithOverlay(frame, Modifier.weight(1f).fillMaxWidth())
-            Composer(frame, composerMode, Modifier.fillMaxWidth().reportComposerHeight(frame, composerMode))
-        }
+        ChatLane(
+            modifier = Modifier.fillMaxSize(),
+            transcript = { TimelineWithOverlay(frame, it) },
+            status = { LiveRunStatus(frame) },
+            composer = { modifier, status ->
+                Composer(frame, composerMode, modifier.reportComposerHeight(frame, composerMode), status)
+            },
+        )
     }
     val background = frame.platform.pageBackground
     if (background != null) background(content) else content()
@@ -720,11 +732,11 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
  * and, while docked (no timeline on screen), the A2UI surfaces.
  */
 @Composable
-private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
+private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier, showStatus: Boolean) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         OverlaySnackbarSlot(Modifier.fillMaxWidth())
         if (mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)
-        LiveRunStatus(frame)
+        if (showStatus) LiveRunStatus(frame)
         ComposerPanel(frame, mode, Modifier.fillMaxWidth())
     }
 }
