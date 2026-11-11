@@ -87,6 +87,16 @@ The versioned semantic canvas composer: validation, Markdown conversion, geometr
 
 Canvas library state and operations shared by hosts. `CanvasLibraryController` retains loaded boards when storage fails, reports a retryable error and serializes library operations; `CanvasLibraryState` is its observable content and loading state. Hosts supply storage, archive and synchronization bindings and present the error. Keep windowing and platform storage construction outside this package; retries reload state rather than repeating mutations.
 
+# Package com.letta.mobile.data.canvas.mount
+
+S1 trusted host-administration storage for semantic canvas mounts. `FileCanvasMountStore` owns `canvas-mounts.json` beneath the existing protected backend product-state directory (beside `host-canvases.json` / `model-exposure.json`). A versioned host stamp and agent/conversation keys isolate defaults and explicit overrides, including agent-scoped default-conversation aliases. Reads and mutations reload under the shared runtime owner and interprocess lock; acknowledgements require forced temporary contents, atomic replacement and directory synchronization where supported (Windows has no directory channel). Corrupt, unsupported, duplicate or wrong-host state fails visibly without replacement. Retry rereads disk and reconfirms a stored winner's durability; no stale cache can overwrite another writer.
+
+This is deliberately not an authenticated remote authority. No runtime route, advertised capability, client adapter, preferences, UI or deployment is added. S2 must bind verified principals, authorize agent/conversation scope and both proposed and winning canvases, and map semantic canvas identity to current notebook identity under the host's grant policy before exposing the store. A shell canvas slot's explicit object reference remains separate from a conversation default; S3 must decide their presentation precedence without rewriting shell layout or document provenance.
+
+# Package com.letta.mobile.data.hoststate
+
+Internal host-owned sidecar transaction primitives shared by notebook grants and mount storage: one canonical-path coroutine owner, cancellable interprocess locking and forced atomic file replacement. Callers own format validation and durability support policy; grant administration continues to require directory synchronization on every platform. Trusted administrators must protect the parent directory, which must already exist.
+
 # Package com.letta.mobile.data.canvas.mutations
 
 Host-side notebook mutation callback lifecycle. The internal fence serializes native callback execution with cancellation or timeout withdrawal, so a queued mutation cannot outlive the authority transaction that accepted it. Grant decisions and persistence outcomes remain with their existing owners.

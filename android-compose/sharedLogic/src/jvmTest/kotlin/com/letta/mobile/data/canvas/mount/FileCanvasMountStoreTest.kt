@@ -1,0 +1,232 @@
+package com.letta.mobile.data.canvas.mount
+
+import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
+import com.letta.mobile.data.canvas.NotebookDocumentIndex
+import com.letta.mobile.data.canvas.NotebookHistoryArchive
+import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.canvas.notes.NotebookCanvasIdentity
+import com.letta.mobile.data.hoststate.DurableHostFile
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.HostId
+import java.io.IOException
+import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class FileCanvasMountStoreTest {
+    private val host = HostId("host-one")
+    private val agent = AgentId("agent-one")
+    private val conversation = ConversationId("conversation-one")
+    private val first = CanvasId("semantic-board-one")
+    private val second = CanvasId("semantic-board-two")
+
+    @Test
+    fun reopeningPreservesDefaultsAndIndependentOverrides() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts")
+        val store = FileCanvasMountStore(directory, host)
+        assertNull(store.readBinding(agent, conversation))
+        store.setDefault(agent, first)
+        assertNull(store.readBinding(agent, conversation))
+        assertEquals(first, store.bindIfAbsent(agent, conversation, first))
+        store.replaceBinding(agent, conversation, second)
+        store.bindIfAbsent(agent, ConversationId("another"), first)
+        store.setDefault(agent, second)
+        val reopened = FileCanvasMountStore(directory, host)
+        assertEquals(second, reopened.readDefault(agent))
+        assertEquals(second, reopened.readBinding(agent, conversation))
+        assertEquals(first, reopened.readBinding(agent, ConversationId("another")))
+        assertNull(reopened.readBinding(AgentId("another-agent"), conversation))
+        assertEquals(second, reopened.bindIfAbsent(agent, conversation, first))
+    }
+
+    @Test
+    fun concurrentInstancesRetainChangesAndBindHasOneWinner() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-concurrent")
+        (1..20).map { number ->
+            async(Dispatchers.Default) {
+                FileCanvasMountStore(directory, host).setDefault(AgentId("agent-$number"), CanvasId("board-$number"))
+            }
+        }.awaitAll()
+        (1..20).forEach { number ->
+            assertEquals(CanvasId("board-$number"), FileCanvasMountStore(directory, host).readDefault(AgentId("agent-$number")))
+        }
+        val winners = (1..20).map { number ->
+            async(Dispatchers.Default) {
+                FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, CanvasId("proposal-$number"))
+            }
+        }.awaitAll()
+        assertEquals(1, winners.distinct().size)
+        assertEquals(winners.first(), FileCanvasMountStore(directory, host).readBinding(agent, conversation))
+    }
+
+    @Test
+    fun malformedAndUnsupportedFilesNeverResetOrMutate() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-invalid")
+        val file = directory.resolve("canvas-mounts.json")
+        val fixtures = listOf(
+            "not-json", "", "{}",
+            """{"version":2,"host":"host-one","defaults":[],"bindings":[]}""",
+            """{"version":1,"host":"other","defaults":[],"bindings":[]}""",
+            """{"version":1,"version":1,"host":"host-one","defaults":[],"bindings":[]}""",
+            """{"version":"1","host":"host-one","defaults":[],"bindings":[]}""",
+            """{"version":1,"host":"host-one","defaults":[],"bindings":[],"extra":true}""",
+            """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":"x","canv\u0061s":"y"}],"bindings":[]}""",
+            """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":12}],"bindings":[]}""",
+            """{"version":1,"host":"host-one","defaults":[{"agent":"","canvas":"x"}],"bindings":[]}""",
+            """{"version":1,"host":"host-one","defaults":[],"bindings":[{"agent":"a","conversation":"c","canvas":"x"},{"agent":"a","conversation":"c","canvas":"y"}]}""", 
+            """{"version":1,"host":"host-one","defaults":[{"agent":"a","canvas":"x"},{"agent":"a","canvas":"y"}],"bindings":[]}""",
+        )
+        for (text in fixtures) {
+            Files.writeString(file, text)
+            val store = FileCanvasMountStore(directory, host)
+            assertFailsWith<Exception> { store.readDefault(agent) }
+            assertFailsWith<Exception> { store.bindIfAbsent(agent, conversation, first) }
+            assertFailsWith<Exception> { store.replaceBinding(agent, conversation, first) }
+            assertFailsWith<Exception> { store.setDefault(agent, first) }
+            assertEquals(text, Files.readString(file))
+        }
+    }
+
+    @Test
+    fun failureBeforeReplaceDoesNotAcknowledgeOrEraseOtherWrites() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-before-replace")
+        val good = FileCanvasMountStore(directory, host)
+        good.setDefault(agent, first)
+        val failing = FileCanvasMountStore(directory, host) { throw IOException("before replacement") }
+        assertFailsWith<IOException> { failing.replaceBinding(agent, conversation, second) }
+        good.setDefault(AgentId("other"), second)
+        assertEquals(first, good.readDefault(agent))
+        assertEquals(second, good.readDefault(AgentId("other")))
+        assertNull(good.readBinding(agent, conversation))
+    }
+
+    @Test
+    fun unsupportedDirectorySyncFailsVisiblyWithoutChangingExistingState(): Unit = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-unsupported-sync")
+        FileCanvasMountStore(directory, host).setDefault(agent, first)
+        val file = directory.resolve("canvas-mounts.json")
+        val before = Files.readAllBytes(file)
+        val failing = FileCanvasMountStore(directory, host) { throw UnsupportedOperationException("injected unsupported sync") }
+        assertFailsWith<UnsupportedOperationException> { failing.setDefault(agent, second) }
+        assertTrue(before.contentEquals(Files.readAllBytes(file)))
+    }
+
+    @Test
+    fun ambiguousReplacementIsReadBackAndReconfirmedOnRetry() = runBlocking {
+        if (isWindows()) return@runBlocking
+        val directory = Files.createTempDirectory("canvas-mounts-after-replace")
+        val syncs = AtomicInteger()
+        val failing = FileCanvasMountStore(directory, host) { parent ->
+            if (syncs.incrementAndGet() == 2) throw IOException("after replacement")
+            forceDirectory(parent)
+        }
+        assertFailsWith<IOException> { failing.bindIfAbsent(agent, conversation, first) }
+        assertTrue(Files.exists(directory.resolve("canvas-mounts.json")), "Real replacement must have happened")
+        val other = FileCanvasMountStore(directory, host)
+        other.setDefault(AgentId("other"), second)
+        assertEquals(first, failing.bindIfAbsent(agent, conversation, second))
+        assertEquals(second, other.readDefault(AgentId("other")))
+        assertTrue(syncs.get() >= 4, "Returning a winner must reconfirm its durability")
+    }
+
+    @Test
+    fun retryCannotAcknowledgeWinnerWithoutDurabilityBarrier(): Unit = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-retry")
+        FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, first)
+        val failing = FileCanvasMountStore(directory, host) { throw IOException("durability unavailable") }
+        assertFailsWith<IOException> { failing.bindIfAbsent(agent, conversation, second) }
+    }
+
+    @Test
+    fun cancellationWhileWaitingForProcessLockReleasesRuntimeOwner() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-cancellation")
+        val lockPath = directory.resolve("canvas-mounts.json.lock")
+        FileChannel.open(lockPath, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE).use { channel ->
+            val lock = channel.lock()
+            val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val waiting = launch(Dispatchers.Default) {
+                started.complete(Unit)
+                FileCanvasMountStore(directory, host).setDefault(agent, first)
+            }
+            started.await()
+            yield()
+            waiting.cancelAndJoin()
+            assertFalse(Files.exists(directory.resolve("canvas-mounts.json")))
+            lock.release()
+        }
+        withTimeout(5_000) { FileCanvasMountStore(directory, host).setDefault(agent, second) }
+        assertEquals(second, FileCanvasMountStore(directory, host).readDefault(agent))
+    }
+
+    @Test
+    fun semanticIdsAreIndependentOfNotebookGenerationAndDefaultAliasesAreAgentScoped() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-semantic")
+        val store = FileCanvasMountStore(directory, host)
+        store.bindIfAbsent(agent, ConversationId("default"), first)
+        store.bindIfAbsent(AgentId("other"), ConversationId("default"), second)
+        val notebooksDirectory = Files.createTempDirectory("canvas-mount-notebooks")
+        val original = NotebookLocalStore(notebooksDirectory, "mount-test").use { notebooks ->
+            val documents = NotebookCanvasDocumentStore(notebooks)
+            CanvasSession.create(documents, CanvasCreateOptions(canvasId = first, title = "Mounted board"))
+            assertTrue(documents.awaitDurableSave(first))
+            assertNotNull(NotebookCanvasIdentity(notebooks).notebookOf(first))
+        }
+        val compacted = NotebookHistoryArchive(notebooksDirectory).compactToNewDocument(
+            original.value, 1_000L, NotebookDocumentIndex(notebooksDirectory), 1_024L,
+        )
+        assertNotEquals(original.value, compacted.newKey, "Actual notebook storage identity must change")
+        val reopened = FileCanvasMountStore(directory, host)
+        val mounted = assertNotNull(reopened.readBinding(agent, ConversationId("default")))
+        assertEquals(first, mounted)
+        assertEquals(second, reopened.readBinding(AgentId("other"), ConversationId("default")))
+        NotebookLocalStore(notebooksDirectory, "mount-test").use { notebooks ->
+            assertEquals("Mounted board", assertNotNull(NotebookCanvasDocumentStore(notebooks).get(mounted)).title)
+        }
+    }
+
+    @Test
+    fun cancellationInsideTransactionReleasesBothLocks() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-owner-cancellation")
+        val file = DurableHostFile(directory.resolve("canvas-mounts.json")) { }
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val owner = launch {
+            file.locked {
+                FileChannel.open(
+                    directory.resolve("canvas-mounts.json.lock"), java.nio.file.StandardOpenOption.WRITE,
+                ).use { competing ->
+                    assertFailsWith<java.nio.channels.OverlappingFileLockException> { competing.tryLock() }
+                }
+                entered.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        entered.await()
+        owner.cancelAndJoin()
+        withTimeout(5_000) { FileCanvasMountStore(directory, host).setDefault(agent, first) }
+        assertEquals(first, FileCanvasMountStore(directory, host).readDefault(agent))
+    }
+
+    private fun isWindows() = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
+    private fun forceDirectory(directory: Path) = FileChannel.open(directory).use { it.force(true) }
+}

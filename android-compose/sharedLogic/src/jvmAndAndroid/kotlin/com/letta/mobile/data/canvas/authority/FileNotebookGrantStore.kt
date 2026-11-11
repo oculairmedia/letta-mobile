@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas.authority
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookPeerGrant
 import com.letta.mobile.data.hoststate.DurableHostFile
+import com.letta.mobile.data.hoststate.StrictHostJson
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -67,7 +68,7 @@ class FileNotebookGrantStore internal constructor(
         require(Files.size(path) <= MAX_BYTES) { "Notebook grant store is too large" }
         val data = try {
             val content = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Files.readAllBytes(path))).toString()
-            requireUniqueKeys(content)
+            StrictHostJson.requireUniqueKeys(content)
             requireStrictFormat(content)
             Json.decodeFromString<FileData>(content)
         } catch (expectedFailure: Exception) {
@@ -106,38 +107,6 @@ class FileNotebookGrantStore internal constructor(
         }
     }
 
-    // The JSON tree decoder otherwise silently keeps only the last duplicate object field.
-    private fun requireUniqueKeys(text: String) {
-        val scopes = ArrayDeque<JsonScope>()
-        var cursor = 0
-        while (cursor < text.length) {
-            when (text[cursor]) {
-                '{' -> { require(scopes.size < MAX_JSON_DEPTH); scopes.addLast(JsonScope(mutableSetOf(), true)); cursor++ }
-                '[' -> { require(scopes.size < MAX_JSON_DEPTH); scopes.addLast(JsonScope(null, false)); cursor++ }
-                '}', ']' -> { scopes.removeLast(); cursor++ }
-                ',' -> { expectNextKey(scopes.lastOrNull()); cursor++ }
-                '"' -> cursor = readJsonString(text, cursor, scopes.lastOrNull())
-                else -> cursor++
-            }
-        }
-    }
-
-    private fun expectNextKey(scope: JsonScope?) {
-        if (scope?.keys != null) scope.expectKey = true
-    }
-
-    private fun readJsonString(text: String, start: Int, scope: JsonScope?): Int {
-        val end = jsonStringEnd(text, start)
-        if (scope?.expectKey == true) {
-            val key = Json.decodeFromString<String>(text.substring(start, end))
-            require(checkNotNull(scope.keys).add(key)) { "Duplicate grant field" }
-            scope.expectKey = false
-        }
-        return end
-    }
-
-    private class JsonScope(val keys: MutableSet<String>?, var expectKey: Boolean)
-
     private fun write(data: FileData) {
         val encoded = Json.encodeToString(FileData.serializer(), data)
         require(encoded.encodeToByteArray().size <= MAX_BYTES) { "Notebook grant store is too large" }
@@ -173,15 +142,5 @@ class FileNotebookGrantStore internal constructor(
     private companion object {
         const val VERSION = 1
         const val MAX_BYTES = 1024 * 1024
-        const val MAX_JSON_DEPTH = 8
-
-        private fun jsonStringEnd(text: String, start: Int): Int {
-            var cursor = start + 1
-            while (cursor < text.length) {
-                if (text[cursor] == '\\') cursor += 2
-                else if (text[cursor++] == '"') break
-            }
-            return cursor
-        }
     }
 }
