@@ -2,23 +2,13 @@ package com.letta.mobile.data.canvas.authority
 
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookPeerGrant
+import com.letta.mobile.data.hoststate.DurableHostFile
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
-import java.nio.file.StandardOpenOption.CREATE
-import java.nio.file.StandardOpenOption.WRITE
-import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -67,26 +57,9 @@ class FileNotebookGrantStore internal constructor(
         write(current.copy(grants = current.grants.filterNot { it.principal == principal && it.documentId == documentId.value }))
     }
 
-    private suspend fun <T> locked(action: suspend () -> T): T = withContext(Dispatchers.IO) {
-        val parent = requireNotNull(path.parent).toRealPath()
-        val canonical = parent.resolve(path.fileName)
-        val mutex = locks.computeIfAbsent(canonical) { Mutex() }
-        mutex.withLock {
-            val lockPath = canonical.resolveSibling("${canonical.fileName}.lock")
-            FileChannel.open(lockPath, CREATE, WRITE, NOFOLLOW_LINKS).use { channel ->
-                val lock = acquire(channel)
-                try { action() } finally { lock.release() }
-            }
-        }
-    }
+    private val file = DurableHostFile(path) { confirmDirectorySync() }
 
-    private suspend fun acquire(channel: FileChannel): java.nio.channels.FileLock {
-        while (true) {
-            val lock = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
-            if (lock != null) return lock
-            delay(LOCK_RETRY_MILLIS)
-        }
-    }
+    private suspend fun <T> locked(action: suspend () -> T): T = file.locked(action)
 
     private fun read(): FileData {
         if (!Files.exists(path, NOFOLLOW_LINKS)) return FileData(VERSION, emptyList())
@@ -168,19 +141,7 @@ class FileNotebookGrantStore internal constructor(
     private fun write(data: FileData) {
         val encoded = Json.encodeToString(FileData.serializer(), data)
         require(encoded.encodeToByteArray().size <= MAX_BYTES) { "Notebook grant store is too large" }
-        confirmDirectorySync()
-        val temp = Files.createTempFile(path.parent, ".notebook-grants-", ".tmp")
-        try {
-            FileChannel.open(temp, WRITE).use { channel ->
-                val buffer = ByteBuffer.wrap(encoded.encodeToByteArray())
-                while (buffer.hasRemaining()) channel.write(buffer)
-                channel.force(true)
-            }
-            Files.move(temp, path, ATOMIC_MOVE, REPLACE_EXISTING)
-            confirmDirectorySync()
-        } finally {
-            Files.deleteIfExists(temp)
-        }
+        file.write(encoded)
     }
 
     private fun confirmDirectorySync() = try {
@@ -213,8 +174,6 @@ class FileNotebookGrantStore internal constructor(
         const val VERSION = 1
         const val MAX_BYTES = 1024 * 1024
         const val MAX_JSON_DEPTH = 8
-        const val LOCK_RETRY_MILLIS = 10L
-        val locks = ConcurrentHashMap<Path, Mutex>()
 
         private fun jsonStringEnd(text: String, start: Int): Int {
             var cursor = start + 1
