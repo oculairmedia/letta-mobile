@@ -1,10 +1,14 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.beads.BeadsOperation
+import com.letta.mobile.data.controller.node.iroh.beads.BeadsRouteClient
+import com.letta.mobile.data.controller.node.iroh.records.FileWrapperRecordStore
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryRecorder
 import com.letta.mobile.util.TelemetryValue
 import java.nio.file.AccessDeniedException
 import java.nio.file.NoSuchFileException
+import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -81,6 +85,50 @@ class AdminRpcRouterErrorMappingTest {
         }
     }
 
+    /** One converted refusal per handler file: the client still reads the same text as before. */
+    private class RefusalCase(
+        val name: String,
+        val invocation: AdminRpcInvocation,
+        val expected: String,
+        val install: (AdminRpcRouter) -> Unit,
+    )
+
+    private val refusalCases = listOf(
+        RefusalCase("approval param", call("approval.submit", agentParams), "payload required") { router ->
+            ApprovalAdminHandlers.register(router)
+        },
+        RefusalCase("record validation", call("run.record"), "validation.invalid_params: agentId") { router ->
+            registerRunRecordHandlers(router, FileWrapperRecordStore())
+        },
+        RefusalCase("beads validation", call("beads.ready"), "validation.invalid_params: query") { router ->
+            val client = BeadsRouteClient("http://127.0.0.1:9", null)
+            router.register("beads.ready") { client.execute(BeadsOperation.LIST_READY_WORK, invalidBeadsQuery) }
+        },
+        RefusalCase("pairing service", call("pair.invite.mint"), "an invite must grant at least one capability") { router ->
+            val service = IrohPairingService(InMemoryPairedPeerStore())
+            router.register("pair.invite.mint") {
+                service.createInvite(IrohPairingService.InviteRequest(suggestedName = "phone", capabilities = emptySet()))
+                JsonPrimitive("unreachable")
+            }
+        },
+        RefusalCase("memfs segment", call("block.list_agent"), "agentId must be a single path segment, got '../escape'") { router ->
+            val store = LocalBackendAdminStore(createTempDirectory("admin-rpc-blocks").toFile())
+            router.register("block.list_agent") { store.blocksForAgentProjected("../escape") }
+        },
+    )
+
+    @Test
+    fun convertedRefusalsKeepTheirClientText() = runTest {
+        for (case in refusalCases) {
+            val router = AdminRpcRouter().also(case.install)
+
+            val response = Json.parseToJsonElement(router.dispatch(case.invocation)).jsonObject
+
+            assertEquals(false, response["success"]?.jsonPrimitive?.boolean, case.name)
+            assertEquals(case.expected, response["error"]?.jsonPrimitive?.content, case.name)
+        }
+    }
+
     @Test
     fun successfulCallsAreUnchanged() = runTest {
         val router = AdminRpcRouter()
@@ -94,4 +142,11 @@ class AdminRpcRouterErrorMappingTest {
 
     private suspend fun dispatchJson(router: AdminRpcRouter, method: String): JsonObject =
         Json.parseToJsonElement(router.dispatch(AdminRpcInvocation("req-1", method, null))).jsonObject
+
+    private companion object {
+        val invalidBeadsQuery = JsonObject(mapOf("query" to JsonPrimitive("not-an-object")))
+        val agentParams = JsonObject(mapOf("agent_id" to JsonPrimitive("agent-1")))
+
+        fun call(method: String, params: JsonObject = JsonObject(emptyMap())) = AdminRpcInvocation("req-1", method, params)
+    }
 }

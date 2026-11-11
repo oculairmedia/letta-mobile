@@ -143,9 +143,7 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
     private fun systemMemoryDir(agentId: String): File {
         // Defense in depth for RPC handlers that already validate the segment:
         // never resolve a multi-segment / traversal agentId beneath memfs.
-        require(isSafeMemfsSegment(agentId)) {
-            "agentId must be a single path segment, got '$agentId'"
-        }
+        if (!isSafeMemfsSegment(agentId)) adminError("agentId must be a single path segment, got '$agentId'")
         val memfsRoot = File(support.baseDir, "memfs").canonicalFile
         val resolved = File(File(File(memfsRoot, agentId), "memory"), "system").canonicalFile
         val prefix = memfsRoot.path.trimEnd(File.separatorChar) + File.separator

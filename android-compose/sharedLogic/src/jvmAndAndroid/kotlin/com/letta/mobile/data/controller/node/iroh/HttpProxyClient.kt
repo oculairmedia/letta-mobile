@@ -157,7 +157,7 @@ class HttpUrlConnectionAdminProxyTransport(
 
     /**
      * A success body past [maxBodyBytes] throws, since a cut JSON body cannot be parsed. An error body
-     * is only quoted in [AdminProxyHttpException], so it is cut to [MAX_ERROR_BODY_BYTES] instead.
+     * is never forwarded (the client sees only its status), so it is cut to [MAX_ERROR_BODY_BYTES] instead.
      */
     private fun readProxyBody(stream: InputStream?, statusCode: Int): String {
         if (stream == null) return "{\"error\":\"HTTP $statusCode\"}"

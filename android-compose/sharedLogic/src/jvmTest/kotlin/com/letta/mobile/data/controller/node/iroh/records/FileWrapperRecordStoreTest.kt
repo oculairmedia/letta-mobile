@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.records
 
+import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -159,8 +160,8 @@ class FileWrapperRecordStoreTest {
         val store = FileWrapperRecordStore(clock = { epoch })
         store.upsert(lease("closed", RecordedLeaseState.DONE))
         repeat(1000) { store.upsert(lease("active-$it")) }
-        assertEquals("storage.capacity: active leases", assertFailsWith<IllegalStateException> { store.upsert(lease("overflow")) }.message)
-        assertFailsWith<IllegalStateException> { store.upsert(lease("closed")) }
+        assertEquals("storage.capacity: active leases", assertFailsWith<AdminRpcClientError> { store.upsert(lease("overflow")) }.message)
+        assertFailsWith<AdminRpcClientError> { store.upsert(lease("closed")) }
         store.upsert(lease("active-0").copy(label = "updated"))
         store.upsert(lease("active-0", RecordedLeaseState.DONE))
         store.upsert(lease("closed"))
