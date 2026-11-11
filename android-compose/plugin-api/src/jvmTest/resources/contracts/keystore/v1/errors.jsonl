@@ -1,0 +1,14 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":25,"method":"keystore.get","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":25,"error":{"code":-32002,"message":"keystore.initialize has not completed"}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":26,"method":"keystore.initialize","params":{"contractVersions":[2],"host":{"name":"letta-desktop","version":"9.0.0"},"settings":{}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":26,"error":{"code":-32004,"message":"no contract version both sides speak","data":{"supported":[1]}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":27,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"},"value":"TEtTLVNFTlRJTkVMLXZhbHVlLTdmM2E5Yw==","mode":"create"}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":27,"error":{"code":-32020,"message":"The keystore provider does not support put","data":{"code":"unsupported","operation":"put"}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":28,"method":"keystore.list","params":{"scope":{"provider":"example.memory"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":28,"error":{"code":-32020,"message":"The keystore provider is unavailable","data":{"code":"unavailable","detail":"connection refused"}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":29,"method":"keystore.get","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":29,"error":{"code":-32020,"message":"The keystore provider failed","data":{"code":"internal"}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":30,"method":"keystore.put","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"},"value":"TEtTLVNFTlRJTkVMLXZhbHVlLTdmM2E5Yw==","mode":"rotate"}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":30,"error":{"code":-32602,"message":"params do not hold to the method's shape"}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":31,"method":"keystore.rotate","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":31,"error":{"code":-32601,"message":"no such method in this direction"}}}
