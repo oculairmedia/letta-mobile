@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 
 package com.letta.mobile.ui.shell.workspace
 
@@ -13,6 +13,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -42,6 +45,11 @@ import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutTool
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.host.PASTE_BLOCKED_HINT
+import com.letta.mobile.ui.settings.SettingsHeader
+import com.letta.mobile.ui.settings.SettingsSection
+import com.letta.mobile.ui.settings.SettingsSectionTags
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
@@ -50,6 +58,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.chat.surface.TOUCH_HEAD_TAG
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -181,8 +190,37 @@ class ShellLayoutAgentToolUiTest {
         assertEquals(expected.value, actual.value, absoluteTolerance = 1f, message = what)
 
     @Test
+    fun settingsPasteHintUsesTheWorkspaceHostWithOrWithoutAWindowRoot() = listOf(false, true).forEach { outer ->
+        runDesktopComposeUiTest(width = 360, height = 800) {
+            val settings = InMemorySecureSettingsStore()
+            val clipboard = object : Clipboard {
+                override suspend fun getClipEntry(): ClipEntry? = error("clipboard read refused")
+                override suspend fun setClipEntry(clipEntry: ClipEntry?) = Unit
+            }
+            val shellHost = host(drawerOpen = false, androidStyle = true) {
+                SettingsSection(SettingsHeader("backend", "Backend")) {
+                    TextFieldRow(SettingsRow.Text("server-url", "Host address"), "draft", paste = true) {}
+                }
+            }
+            setContent {
+                CompositionLocalProvider(LocalClipboard provides clipboard, LocalShellLayoutAgentPort provides port) {
+                    val controller = rememberShellLayoutController(null, settings)
+                    val workspace: @Composable () -> Unit = {
+                        LettaShellWorkspace(state(controller.workspaceLayout().lanes), shellHost, Modifier.size(360.dp, WindowHeight))
+                    }
+                    if (outer) OverlayHostRoot(rememberOverlayHost()) { workspace() } else workspace()
+                }
+            }
+            waitForIdle()
+            onNodeWithTag(SettingsSectionTags.PASTE_PREFIX + "server-url").performClick()
+            awaitText(PASTE_BLOCKED_HINT)
+        }
+    }
+
+    @Test
     fun noticeCanBeTouchedAboveFullScreenChatWithCanvas() = runDesktopComposeUiTest(width = 360, height = 800) {
         val settings = InMemorySecureSettingsStore()
+        val presentation = mutableStateOf(ChatSurfacePresentation.ChatFirst)
         val chat = object : ChatSessionPort {
             override val uiState = MutableStateFlow(ChatUiState(conversationState = ConversationState.Ready("conv-1"), agentName = "Ada"))
             override val composer = MutableStateFlow(ChatComposerUiState())
@@ -192,7 +230,7 @@ class ShellLayoutAgentToolUiTest {
             ProvideLettaHost(LettaHost.Touch) {
                 ChatSurface(
                     port = chat,
-                    presentation = ChatSurfacePresentation.ChatFirst,
+                    presentation = presentation.value,
                     onIntent = {},
                     host = ChatSurfaceHost(),
                     canvas = { Box(Modifier.size(360.dp, WindowHeight)) },
@@ -205,16 +243,29 @@ class ShellLayoutAgentToolUiTest {
                 LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
             }
         }
+        fun checkNotice() {
+            applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+            awaitText("Layout changed by Ada")
+            waitForIdle()
+            val undoBounds = onNodeWithText(Overlay.UNDO_LABEL).getUnclippedBoundsInRoot()
+            val pageBounds = onNodeWithTag(Page).getUnclippedBoundsInRoot()
+            assertTrue(undoBounds.left >= pageBounds.left && undoBounds.right <= pageBounds.right, "Undo is off screen: $undoBounds")
+            onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
+            waitForIdle()
+            assertEquals(HomeViews.Default, pageHomeLane)
+        }
         waitForIdle()
-        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
-        awaitText("Layout changed by Ada")
+        checkNotice()
+        runOnIdle { presentation.value = ChatSurfacePresentation.CanvasFirst }
         waitForIdle()
-        val undoBounds = onNodeWithText(Overlay.UNDO_LABEL).getUnclippedBoundsInRoot()
-        val pageBounds = onNodeWithTag(Page).getUnclippedBoundsInRoot()
-        assertTrue(undoBounds.left >= pageBounds.left && undoBounds.right <= pageBounds.right, "Undo is off screen: $undoBounds")
-        onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
+        checkNotice()
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
         waitForIdle()
-        assertEquals(HomeViews.Default, pageHomeLane)
+        checkNotice()
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
+        runOnIdle { presentation.value = ChatSurfacePresentation.ChatFirst }
+        waitForIdle()
+        checkNotice()
     }
 
     @Test
