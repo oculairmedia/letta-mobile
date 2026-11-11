@@ -310,7 +310,9 @@ class ShellLayoutAgentToolUiTest {
         }
         waitForIdle()
         lateinit var blocker: OverlayHandle
-        runOnIdle { blocker = overlayHost.show(Overlay.Snackbar("Important", presentation = OverlayPresentation(OverlayPriority.Critical, null))) }
+        runOnIdle {
+            blocker = overlayHost.show(Overlay.Snackbar("Important", presentation = OverlayPresentation(OverlayPriority.Critical, null)))
+        }
         applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
         assertEquals("Important", overlayHost.snackbar?.overlay?.message)
         assertTrue(port.peekUnseenChange() != null)
