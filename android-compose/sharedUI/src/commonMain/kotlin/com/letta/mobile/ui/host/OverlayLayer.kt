@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -160,9 +159,7 @@ private fun OverlaySnackbar(host: OverlayHost, modifier: Modifier) {
 private fun OverlaySnackbarCard(host: OverlayHost, entry: OverlayEntry) {
     val overlay = entry.overlay
     Snackbar(
-        // Slots may require the full width; do not pass that minimum to each snackbar action.
-        modifier = Modifier.wrapContentWidth().padding(LettaDimens.Space.md)
-            .widthIn(max = SnackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
+        modifier = Modifier.padding(LettaDimens.Space.md).widthIn(max = SnackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
         action = overlay.action?.let { action ->
             { TextButton(onClick = { host.performAction(entry.id) }, Modifier.testTag(OverlayTags.ACTION)) { Text(action.label) } }
         },

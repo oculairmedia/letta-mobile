@@ -33,20 +33,7 @@ internal fun ShellLayoutChangeNotices(agents: List<Pair<String, String>>) {
     val overlays = checkNotNull(LocalOverlayHost.current) { "Shell layout notices require an overlay host" }
     val names by rememberUpdatedState(agents)
     LaunchedEffect(port, overlays) {
-        port.changes.onSubscription {
-            port.peekUnseenChange()?.let { emit(it) }
-        }.collectLatest { change ->
-            if (port.peekUnseenChange() === change) {
-                val handle = overlays.show(shellLayoutChangeNotice(change, names, port))
-                var acknowledged = false
-                try {
-                    snapshotFlow { overlays.snackbar?.id }.first { it == handle.id }
-                    acknowledged = port.claimUnseenChange(change) != null
-                } finally {
-                    if (!acknowledged) handle.withdraw()
-                }
-            }
-        }
+        port.changes.collect { change -> overlays.show(shellLayoutChangeNotice(change, names, port)) }
     }
 }
 
