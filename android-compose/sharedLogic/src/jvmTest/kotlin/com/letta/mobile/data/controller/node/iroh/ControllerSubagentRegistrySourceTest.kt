@@ -37,6 +37,32 @@ class ControllerSubagentRegistrySourceTest {
         ownedTelemetryHistory?.close()
     }
 
+    @Test
+    fun terminalTimingSurvivesWireAndRunningOmitsIt() = runTest {
+        var now = 10_000L
+        val source = ControllerSubagentRegistrySource(DurableSubagentRegistry(clock = { now }), clock = { now })
+        val live = SubagentEntry(toolCallId = "timed-live", status = "running", parentAgentId = "parent",
+            parentConversationId = "timed-parent")
+        source.replaceConversation("timed-parent", listOf(live, live.copy(toolCallId = "timed-ended", status = "failed")))
+        now += 60_000L
+        val json = kotlinx.serialization.json.Json { encodeDefaults = true }
+        val entries = source.list("timed-parent", includeTerminal = true).map {
+            json.decodeFromString<SubagentEntry>(json.encodeToString(SubagentEntry.serializer(), it))
+        }
+        val ended = entries.single { it.status == "failed" }
+        assertEquals(10_000L, ended.terminalAtEpochMs)
+        assertEquals(60_000L, ended.terminalAgeMs)
+        val runningWire = json.encodeToString(SubagentEntry.serializer(), entries.single { it.status == "running" })
+        assertFalse(runningWire.contains("terminalAtEpochMs"))
+        assertFalse(runningWire.contains("terminalAgeMs"))
+        assertEquals(null, json.decodeFromString<SubagentEntry>("{\"toolCallId\":\"legacy\",\"status\":\"failed\"}").terminalAtEpochMs)
+        assertEquals(listOf("timed-live"), source.pushSnapshot(SubagentConversationKey("parent", "timed-parent"), now)
+            .map { it.toolCallId })
+        now = 9_000L
+        assertEquals(Long.MAX_VALUE, source.list("timed-parent", includeTerminal = true)
+            .single { it.status == "failed" }.terminalAgeMs)
+    }
+
     private val codexChild = "codex_01a1686b-8ec9-7f72-8e79-bd42f1ff3237"
 
     private fun stream(agent: String, conversation: String, raw: String) = AppServerInboundFrame.StreamDelta(

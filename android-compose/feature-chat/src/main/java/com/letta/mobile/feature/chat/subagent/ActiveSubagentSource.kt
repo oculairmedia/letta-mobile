@@ -35,12 +35,14 @@ interface ActiveSubagentSource {
     val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>>
 
     /**
-     * letta-mobile-ulcg6 (PR4): the parent conversation's registry entries, for
-     * the shared subagent roster (`SubagentRosterList`) the sheet shows. Empty
-     * by default so previews and fakes need no wiring.
+     * Active registry entries for parent run phases and presence, never finished history.
+     * Empty by default for preview sources without a registry.
      */
     val rosterEntries: StateFlow<List<com.letta.mobile.data.model.SubagentEntry>>
         get() = NO_ROSTER_ENTRIES
+
+    /** Full scoped registry for the sheet's Finished rows and historical conversation openers. */
+    val rosterEntriesWithHistory: StateFlow<List<com.letta.mobile.data.model.SubagentEntry>>
 
     /**
      * letta-mobile-73o2h.3: fetch one subagent's latest TodoWrite snapshot
@@ -94,6 +96,7 @@ class FakeActiveSubagentSource(
 ) : ActiveSubagentSource {
     private val _state = MutableStateFlow(initial.toImmutableList())
     override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> = _state.asStateFlow()
+    override val rosterEntriesWithHistory = ActiveSubagentSource.NO_ROSTER_ENTRIES
 
     /** Replace the entire active set (snapshot semantics, see contract). */
     fun setActive(subagents: List<ActiveSubagent>) {

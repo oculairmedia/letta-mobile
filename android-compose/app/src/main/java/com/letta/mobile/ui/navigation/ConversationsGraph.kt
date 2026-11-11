@@ -125,7 +125,7 @@ internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
     val conversation = workspace.selectedConversationId ?: return
     val graph by shell.drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
     val subagents by remember(graph, agent, conversation) {
-        graph.subagentRepository.activeSubagentsFlow(SubagentParentScope(agent.value, conversation.value))
+        graph.subagentRepository.subagentsWithHistoryFlow(SubagentParentScope(agent.value, conversation.value))
     }.collectAsStateWithLifecycle(emptyList())
     BackgroundTasksSidePane(
         subagents = subagents,

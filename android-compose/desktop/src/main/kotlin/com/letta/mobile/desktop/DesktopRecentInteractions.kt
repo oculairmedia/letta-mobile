@@ -18,15 +18,15 @@ import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsMapping
 internal fun rememberDesktopRecentInteractions(context: DesktopShellContext, frame: DesktopShellFrame): ChatRecentInteractions {
     val focus = frame.focus
     val chatState = frame.chatState
-    val activeSubagents = frame.lists.activeSubagents
+    val subagentsWithHistory = frame.lists.subagentsWithHistory
     val pinned by context.core.chatController.conversationManagement.pinnedConversationIds.collectAsState()
     val selectedId = chatState.selectedConversationId
-    val rows = remember(chatState.conversations, activeSubagents, focus.selectedAgentName, focus.selectedAgentId, selectedId, pinned) {
+    val rows = remember(chatState.conversations, subagentsWithHistory, focus.selectedAgentName, focus.selectedAgentId, selectedId, pinned) {
         RecentInteractionsMapping.rows(
             conversations = filterStackConversations(
                 FilterStackConversationsParams(
                     conversations = chatState.conversations,
-                    activeSubagents = activeSubagents,
+                    activeSubagents = subagentsWithHistory,
                     selectedAgentName = focus.selectedAgentName,
                     selectedAgentId = focus.selectedAgentId,
                     selectedConversationId = selectedId,

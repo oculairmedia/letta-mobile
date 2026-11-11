@@ -77,6 +77,7 @@ class BackgroundCompletionFlashTest {
     fun completedHiddenReflectionDoesNotKeepParentUiTicking() {
         compose.mainClock.autoAdvance = false
         val source = object : ActiveSubagentSource {
+            override val rosterEntriesWithHistory = ActiveSubagentSource.NO_ROSTER_ENTRIES
             override val activeSubagents = MutableStateFlow<ImmutableList<ActiveSubagent>>(
                 persistentListOf(probe("reflection").copy(
                     status = ActiveSubagent.Status.COMPLETED,

@@ -110,6 +110,77 @@ class CanvasBoardSessionsTest {
     }
 
     @Test
+    fun hostCreationAndModuleOpenShareOneHoldTable() = runTest {
+        val store = storeWithNotes()
+        val boards = CanvasBoardSessions(store)
+        val page = boards.acquirePage(notes, null, null)
+        val module = assertNotNull(boards.acquire(notes))
+        assertSame(page, module)
+        assertSame(page, boards.acquirePage(notes, null, null))
+        boards.release(page)
+        boards.release(module)
+        boards.release(page)
+        assertEquals(0, boards.holds(notes))
+        assertNotSame(page, boards.acquire(notes))
+    }
+
+    @Test
+    fun aPageUsesTheModuleSessionAndReleasesItsOwnHold() = runTest {
+        val boards = CanvasBoardSessions(storeWithNotes())
+        val module = assertNotNull(boards.acquire(notes))
+        val page = boards.acquirePage(notes, null, null)
+        assertSame(module, page)
+        boards.release(page)
+        assertEquals(1, boards.holds(notes))
+        module.updateTitle("Still mounted")
+        assertEquals("Still mounted", page.document.value?.title)
+        boards.release(module)
+        assertEquals(0, boards.holds(notes))
+    }
+
+    @Test
+    fun simultaneousConversationPagesCreateOnlyOneSession() = runTest {
+        val boards = CanvasBoardSessions(InMemoryCanvasDocumentStore())
+        val conversation = com.letta.mobile.data.model.ConversationId("board-owner-conversation")
+        val first = async { boards.acquirePage(null, conversation, null) }
+        val second = async { boards.acquirePage(null, conversation, null) }
+        val page = first.await()
+        assertSame(page, second.await())
+        assertSame(page, boards.acquire(page.canvasId))
+        repeat(3) { boards.release(page) }
+        assertEquals(0, boards.holds(page.canvasId))
+    }
+
+    @Test
+    fun theOwnedRegistryAdoptsAnOutsideMount() = runTest {
+        val store = storeWithNotes()
+        val boards = CanvasBoardSessions(store)
+        val mounted = assertNotNull(CanvasSession.open(store, notes))
+        val dispose = boards.registry.registerMount(mounted)
+        assertSame(mounted, boards.acquirePage(notes, null, null))
+        boards.release(mounted)
+        dispose()
+        assertNull(boards.registry.get(notes))
+        assertEquals(0, boards.holds(notes))
+    }
+
+    @Test
+    fun retiringAnOwnerForgetsHoldsAndMountsAndIgnoresTheirLateDisposers() = runTest {
+        val boards = CanvasBoardSessions(storeWithNotes())
+        val page = assertNotNull(boards.acquire(notes))
+        boards.acquire(notes)
+        val dispose = boards.registry.registerMount(page)
+        boards.clear()
+        assertEquals(0, boards.holds(notes))
+        assertNull(boards.registry.get(notes))
+        boards.release(page)
+        dispose()
+        assertEquals(0, boards.holds(notes))
+        assertNull(boards.registry.get(notes))
+        assertNotSame(page, boards.acquire(notes))
+    }
+
+    @Test
     fun aStoreFailurePropagatesAndHoldsNothing() = runTest {
         val backing = storeWithNotes()
         val store = object : CanvasDocumentStore by backing {

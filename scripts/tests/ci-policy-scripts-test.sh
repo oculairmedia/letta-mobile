@@ -219,6 +219,8 @@ assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test
 assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'
 # A runner whose resolver is not ready must not fail the required job on unchanged code.
 assert_contains "$test_job" 'scripts/tests/apt-install-retry-test.sh'
+# The Linux job must catch a stale mingw API dump: only api-contract-windows regenerates it.
+assert_contains "$test_job" 'bash scripts/ci/api-dump-mirror-check.sh'
 # Workspace-rooted: these jobs default to working-directory android-compose, where a relative
 # scripts/ path does not exist (the first version of this step failed with "No such file").
 assert_contains "$test_job" 'bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'

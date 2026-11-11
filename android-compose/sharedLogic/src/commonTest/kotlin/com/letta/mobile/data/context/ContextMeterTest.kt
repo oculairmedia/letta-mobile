@@ -54,7 +54,7 @@ class ContextMeterTest {
         assertEquals(50_000, meter.usage.usedTokens)
         assertEquals(50_000, meter.usage.segments.sumOf { it.tokens })
         val tools = meter.usage.segments.single { it.kind == ContextWindowSegmentKind.ToolDefinitions }
-        assertEquals("Unclassified / estimation gap", tools.label)
+        assertEquals("Other", tools.label)
         assertEquals(50_000 - 37_000, tools.tokens)
         // The host's record window wins over the catalog's.
         assertEquals(200_000, meter.usage.maxTokens)
@@ -75,12 +75,47 @@ class ContextMeterTest {
         for (streamed in listOf(null, 752_000)) {
             val meter = ContextMeter.of(streamed, 1_000_000, breakdown)!!
             val gap = meter.usage.segments.single { it.kind == ContextWindowSegmentKind.ToolDefinitions }
-            assertEquals("Unclassified / estimation gap", gap.label)
+            assertEquals("Other", gap.label)
             assertEquals(352_000, gap.tokens)
             assertEquals(752_000, meter.usage.usedTokens)
             assertEquals(752_000, meter.usage.segments.sumOf { it.tokens })
             assertEquals(350_000, meter.usage.segments.single { it.kind == ContextWindowSegmentKind.Messages }.tokens)
         }
+    }
+
+    @Test
+    fun measuredOverheadIsNamedAndOnlyTheTrueRemainderIsOther() {
+        val measured = estimate.copy(
+            numTokensToolsAndHarness = 2_500,
+            calibrationSource = "conversation_usage",
+            messageCharsPerToken = 2.16,
+        )
+        val meter = ContextMeter.of(40_000, 200_000, measured)!!
+        assertEquals(ContextProvenance.ConversationUsage, meter.provenance)
+        assertEquals(2_500, meter.usage.segments.single { it.label == "Tools and harness" }.tokens)
+        assertEquals(500, meter.usage.segments.single { it.label == "Other" }.tokens)
+        assertEquals(40_000, meter.usage.segments.sumOf { it.tokens })
+        val approximate = ContextMeter.of(50_000, 200_000, measured)!!
+        assertEquals(ContextProvenance.ConversationUsageApproximate, approximate.provenance)
+        listOf(-1, 0, 1, 5_000, 30_000, 40_000, 50_000).forEach { total ->
+            val rematched = ContextMeter.of(total, 200_000, measured)!!
+            assertEquals(total.coerceAtLeast(0), rematched.usage.usedTokens)
+            assertEquals(rematched.usage.usedTokens, rematched.usage.segments.sumOf { it.tokens })
+        }
+    }
+
+    @Test
+    fun rematchingAScaledFitIsApproximateAndNeverPromotesAnApproximateHostSplit() {
+        val measured = estimate.copy(
+            numTokensToolsAndHarness = 2_500,
+            calibrationSource = "conversation_usage",
+            messageCharsPerToken = 2.16,
+        )
+        val scaled = ContextMeter.of(20_000, 200_000, measured)!!
+        assertEquals(ContextProvenance.ConversationUsageApproximate, scaled.provenance)
+        val fromScaledHost = measured.copy(calibrationApproximate = true)
+        val rematched = ContextMeter.of(40_000, 200_000, fromScaledHost)!!
+        assertEquals(ContextProvenance.ConversationUsageApproximate, rematched.provenance)
     }
 
     @Test

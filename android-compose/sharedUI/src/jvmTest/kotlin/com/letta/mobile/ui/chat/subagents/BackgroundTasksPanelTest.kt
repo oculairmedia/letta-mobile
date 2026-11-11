@@ -74,6 +74,8 @@ class BackgroundTasksPanelTest {
         val repository = object : ISubagentRepository {
             override fun activeSubagentsFlow(scope: SubagentParentScope) = flowOf(listOf(scoped))
             override fun currentActiveSubagents(scope: SubagentParentScope) = listOf(scoped)
+            override fun subagentsWithHistoryFlow(scope: SubagentParentScope) = flowOf(listOf(scoped))
+            override fun currentSubagentsWithHistory(scope: SubagentParentScope) = listOf(scoped)
             override suspend fun refresh() = Result.success(listOf(scoped))
             override suspend fun todos(toolCallId: String) = Result.success(emptyList<SubagentTodo>())
             override suspend fun dismiss(scope: SubagentParentScope, toolCallId: ToolCallId): Result<Unit> {
