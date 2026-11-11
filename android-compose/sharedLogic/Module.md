@@ -677,6 +677,54 @@ Iroh channel/turn transport, supervision, liveness and observer ingestion, with 
 
 Releasing a transport's resources (a QUIC endpoint and its transport, a WebSocket and its HTTP client) in order, once, off the caller's thread: each step is capped and isolated, and a shutdown hook gives running teardowns a bounded wait at exit. Keep connection setup and reconnect policy outside it; hand the ordered release steps to [TransportTeardown](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.teardown/-transport-teardown/index.html) and close it from any thread, a UI thread included.
 
+# Package com.letta.mobile.data.voice
+
+Shared vocabulary of the hands-free voice loop: spoken text that never prints its words, audio levels, the utterance an ear produces (text, an optional immediate reply and an optional structured action decision), tagged errors with a suggested user action, the person's voice settings and the loop's phases and configuration. Destination consent for remote speech endpoints is a separate stored value, [VoiceEndpointGrants](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice/-voice-endpoint-grants/index.html), so a settings export never carries it. Nothing here is wired to a page or a platform yet.
+
+# Package com.letta.mobile.data.voice.activation
+
+What starts or ends a voice turn: push-to-talk, tap, hotkey and wake word as activation events, and a pure key classifier for Auto, Hold and Toggle modes. The wake word enters through an activation source wrapping the wake-word listener; an unavailable listener degrades to a notice while push-to-talk keeps working.
+
+# Package com.letta.mobile.data.voice.audio
+
+Small platform ports for capturing and playing audio, including fixed-size PCM frame sources with sample positions for wake-word engines, used by engines that handle raw audio themselves, with audio containers whose descriptions report sizes only. Platforms implement [AudioCapture](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-capture/index.html) and [AudioPlayer](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.audio/-audio-player/index.html); cancelling either must return only after the device is released.
+
+# Package com.letta.mobile.data.voice.consent
+
+Per-destination consent for remote speech endpoints: a grant names one exact origin (scheme, host and port) and what may be sent there, audio for transcription or text for synthesis. Grants are a stored value of their own, apart from the voice settings, so an export or backup never carries them; endpoint engines check them before every request.
+
+# Package com.letta.mobile.data.voice.endpoint
+
+An OpenAI-compatible speech client for `POST /v1/audio/transcriptions` (multipart) and `POST /v1/audio/speech` (JSON, streamed audio), built on a caller-supplied Ktor engine with no logging and a redacted bearer key. Failures carry fixed codes (unreachable, unauthorized, rejected, bad response, timed out); diagnostics carry operation, code and status only. The transcriber and the synthesising mouth check a destination grant for the exact endpoint and payload before every request and fail with permission required rather than falling back.
+
+# Package com.letta.mobile.data.voice.engine
+
+The three seams of the voice loop. A [VoiceEar](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-ear/index.html) owns its audio source and decides end of turn itself, so a realtime audio model can replace a speech recogniser; a [VoiceResponder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-responder/index.html) streams reply text and can delegate the rest to arrive later as a late reply; a [VoiceMouth](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.engine/-voice-mouth/index.html) speaks segments in order and stops at once for barge-in. Stops and cancels suspend until the work has actually stopped.
+
+# Package com.letta.mobile.data.voice.loop
+
+The voice loop driver: idle, listening, thinking, speaking and failed, continuous or single shot, with barge-in, a bounded thinking timeout and a late-reply policy. It serialises every input on one coroutine, drops events from stale generations, publishes a phase only after the engines have let go, never opens the microphone over its own speech unless barge-in needs it, and exposes a [VoiceLoopState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.loop/-voice-loop-state/index.html) rich enough for a page and the avatar.
+
+# Package com.letta.mobile.data.voice.loop.machine
+
+The voice loop's internal transition table: a pure function from model and input to model and effects, split into control, ear, reply and mouth rules. It reads no clock, suspends nowhere and touches no engine, so every row is tested directly.
+
+# Package com.letta.mobile.data.voice.responder
+
+The first responder: the conversation's agent answering through the chat session port. It sends the utterance, follows the assistant text of the run it started while ignoring reasoning, tool rows and errors, completes when the run ends, reports a run that never starts or fails, and stops the run when interrupted or superseded by a newer utterance.
+
+# Package com.letta.mobile.data.voice.speech
+
+Turns streamed reply text into speakable sentences so speech starts before the reply is complete. Sentence ends respect abbreviations, initials, decimals and list numbers; fenced code is skipped; markdown, links, URLs and HTML are stripped; overlong text is cut at a clause break and the remainder is flushed when the reply completes.
+
+# Package com.letta.mobile.data.voice.wake
+
+The wake-word stack. Engines implement [WakeWordEngine](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.wake/-wake-word-engine/index.html), pure signal processing over frames that never touches the microphone, files or network; a registry selects the preferred engine and falls back with reasons; [WakeWordListener](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.wake/-wake-word-listener/index.html) owns the frame source, refuses a format mismatch, applies phrase changes live and gates hits by sensitivity, cooldown, suppression while the app speaks and an optional confirmer. Audio is never stored or sent.
+
+# Package com.letta.mobile.data.voice.wake.assets
+
+Provisioning of wake-word engine model files, separate from the engines: assets are never bundled, are downloaded only after the person enables the wake word, are whitelisted, verified against a pinned size and SHA-256 and renamed into place atomically, and reach engines only as verified handles.
+
 # Package com.letta.mobile.data.workspace
 
 Workspace file search, mentions and viewer state over injected file sources. App Server retrieval stays separate from UI navigation and file presentation. Keep local filesystem assumptions and cross-backend path interpretation outside viewers; provide content through [WorkspaceFileSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.workspace/-workspace-file-source/index.html) and host opening through [WorkspaceFileOpener](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.workspace/-workspace-file-opener/index.html).
