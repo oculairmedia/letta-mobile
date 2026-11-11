@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -26,6 +27,7 @@ import com.letta.mobile.sharedui.resources.canvas_viewer_note_failed
 import com.letta.mobile.sharedui.resources.canvas_viewer_note_missing
 import com.letta.mobile.sharedui.resources.canvas_viewer_retry
 import com.letta.mobile.sharedui.resources.notebook_note_title
+import com.letta.mobile.sharedui.resources.document_workspace_denied
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
@@ -51,7 +53,7 @@ internal const val NOTEBOOK_NOTE_FAILED_TAG = "notebook-note-viewer-failed"
  * Quitting saves every retained draft first. A host registers it only where its canvases are notebooks.
  */
 fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBackend): CanvasDocumentViewer {
-    val sessions = NoteSessions(backend)
+    val sessions = NotebookNoteSessions(backend)
     return CanvasDocumentViewer(
         id = NOTEBOOK_NOTE_VIEWER_ID,
         label = { stringResource(Res.string.notebook_note_title) },
@@ -59,27 +61,6 @@ fun notebookNoteViewer(identity: CanvasNotebookIdentity, backend: NotebookNoteBa
         // Every retained note, shown or not: each dirty one saves; any that cannot holds the quit.
         prepareClose = sessions::prepareClose,
     )
-}
-
-/** Each canvas's note session. Only unsaved work outlives its view; a clean note reloads when it shows again. */
-private class NoteSessions(private val backend: NotebookNoteBackend) {
-    private val byCanvas = mutableMapOf<CanvasId, NotebookNoteSession>()
-
-    fun sessionFor(canvasId: CanvasId, notebook: NotebookDocumentId): NotebookNoteSession =
-        byCanvas.getOrPut(canvasId) { NotebookNoteSession(notebook, backend) }
-
-    fun release(canvasId: CanvasId, session: NotebookNoteSession) {
-        if (!session.state.value.dirty && byCanvas[canvasId] === session) byCanvas.remove(canvasId)
-    }
-
-    /**
-     * Saves every retained dirty note, then checks them all again: a note edited while another was
-     * saving, or opened meanwhile, is still unsaved. True when none is.
-     */
-    suspend fun prepareClose(): Boolean {
-        val saved = byCanvas.values.toList().map { !it.state.value.dirty || it.prepareClose() }.all { it }
-        return saved && byCanvas.values.none { it.state.value.dirty }
-    }
 }
 
 /** The views a host whose canvases are all notebooks offers: the core ones, and each canvas's note. */
@@ -97,7 +78,7 @@ private sealed interface NoteLookup {
 private fun NotebookNoteView(
     canvasId: CanvasId,
     identity: CanvasNotebookIdentity,
-    sessions: NoteSessions,
+    sessions: NotebookNoteSessions,
     modifier: Modifier,
 ) {
     var attempt by remember(canvasId) { mutableIntStateOf(0) }
@@ -123,11 +104,31 @@ private fun NotebookNoteView(
             }
         }
         is NoteLookup.Found -> {
-            val session = remember(found.notebook) { sessions.sessionFor(canvasId, found.notebook) }
+            val session = remember(canvasId, found.notebook, sessions) { sessions.acquire(canvasId, found.notebook) }
             DisposableEffect(session) { onDispose { sessions.release(canvasId, session) } }
             CanvasViewerLeaveCheck { !session.state.value.dirty || session.prepareClose() }
-            NotebookNoteEditorContent(session, modifier.fillMaxSize())
+            AuthorizedNote(session, modifier)
         }
+    }
+}
+
+@Composable
+private fun AuthorizedNote(session: NotebookNoteSession, modifier: Modifier) {
+    // A retained draft is not a retained grant. Hide it until this mount has reauthorized.
+    val checked by produceState<NoteLookup>(NoteLookup.Resolving, session) {
+        session.refresh()
+        value = if (session.state.value.error != null) NoteLookup.Failed else NoteLookup.Found(session.id)
+    }
+    val state by session.state.collectAsState()
+    when {
+        checked == NoteLookup.Resolving -> Centered(modifier) { LettaSpinner(size = LettaDimens.Control.spinnerLg) }
+        state.denied -> Centered(modifier) {
+            Text(stringResource(Res.string.document_workspace_denied), Modifier.testTag("notebook-note-denied"))
+        }
+        checked == NoteLookup.Failed -> Centered(modifier) {
+            Text(stringResource(Res.string.canvas_viewer_note_failed), Modifier.testTag(NOTEBOOK_NOTE_FAILED_TAG))
+        }
+        else -> NotebookNoteEditorContent(session, modifier.fillMaxSize())
     }
 }
 
