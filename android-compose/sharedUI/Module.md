@@ -345,3 +345,7 @@ Tokens for node-link graph views drawn on a Canvas (the memory graph): edge stro
 # Package com.letta.mobile.ui.document.workspace
 
 The shared DocumentWorkspace composes the existing note editor and bounded reference preview beneath one LettaPageScaffold. Compact controls and a wide presentation rail switch Note/References over one current document without saving on presentation changes. Explicit note operations use the workspace scope, which survives both presentation and compact/wide layout changes; interrupted navigation writes still use the shared session reconciliation barrier. Preview open actions always use the shared controller and its required trusted opener; absent reference support is explicit. Owners must await controller close before unmounting. This composition has no production host route yet; host authorization, browser storage interoperability and compaction raw-ID correction remain activation prerequisites.
+
+# Package com.letta.mobile.ui.secrets
+
+The request card and the secure form of the secret-input flow. The shell draws the card itself, outside every agent-editable layout, only while a request is pending. The form's text field holds mask characters only; the value stays in the controller's buffer. `SecureSurfaceEffect` is the platform binding: Android marks the hosting window secure and restores it afterwards, desktop and web guarantee only that the value never reaches field state, the clipboard or the semantics tree.
