@@ -59,6 +59,9 @@ object ShellViews {
      */
     val CANVAS = RuntimeViewId("shell.canvas")
 
+    /** The existing notebook note of a canvas id, sharing its note session; not in the default layout. */
+    val NOTE = RuntimeViewId("shell.note")
+
     /**
      * The open conversation's background tasks (its subagent runs), each dismissable, drawn at the
      * size its lane gives it. It names no object: it follows whichever conversation is open. A host

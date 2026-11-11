@@ -2,6 +2,7 @@ package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.canvas.library.CanvasBoardSessions
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -31,17 +32,14 @@ class MainActivityDependencies @Inject constructor(
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
     private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
     private val lazyCanvasBoards: Lazy<CanvasBoardSessions>,
+    private val lazyCanvasViewers: Lazy<CanvasDocumentViewerRegistry>,
     private val lazySubagentRepository: Lazy<ISubagentRepository>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
-
     /** The roster and the per-agent settings the mascot identity registry is derived from. */
     val agentRepository: IAgentRepository get() = lazyAgentRepository.get()
-
     val secureSettingsStore: SecureSettingsStore get() = lazySecureSettingsStore.get()
-
     val conversationRunRegistry: ConversationRunRegistry get() = lazyConversationRunRegistry.get()
-
     /** letta-mobile-bzvro.27: per-agent notification mutes, for the drawer card's switch. */
     val attentionPrefs: AttentionPrefsRepository get() = lazyAttentionPrefs.get()
 
@@ -50,6 +48,9 @@ class MainActivityDependencies @Inject constructor(
 
     /** The window's one live session per stored board, where its canvas modules open boards by id. */
     val canvasBoards: CanvasBoardSessions get() = lazyCanvasBoards.get()
+
+    /** The same trusted notebook viewers used by canvas pages and shell note modules. */
+    val canvasViewers: CanvasDocumentViewerRegistry get() = lazyCanvasViewers.get()
 
     /** The current session's subagent registry, where the shell's tasks modules list background tasks. */
     val subagentRepository: ISubagentRepository get() = lazySubagentRepository.get()

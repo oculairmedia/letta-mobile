@@ -63,6 +63,12 @@ object ShellLayoutCatalog {
         "One canvas board; object is its canvas id. Shown only in a wide window.",
         needsObject = true,
     )
+    private val note = ShellLayoutViewSpec(
+        ShellViews.NOTE,
+        "Note",
+        "The notebook note of a canvas board; object is the same canvas id used by shell.canvas. Shown only in a wide window.",
+        needsObject = true,
+    )
     private val tasks = ShellLayoutViewSpec(
         ShellViews.TASKS,
         "Background tasks",
@@ -101,14 +107,14 @@ object ShellLayoutCatalog {
             ShellLanes.MAIN,
             "Main area",
             "Beside the navigation; its modules share the width in a wide window, a phone shows the page alone.",
-            listOf(page, canvas, tasks),
+            listOf(page, canvas, note, tasks),
             maxSlots = 4,
         ),
         ShellLayoutLaneSpec(
             ShellLanes.SIDE,
             "Side area",
             "After the main area, each module at its own width; a canvas or tasks here shows only in a wide window.",
-            listOf(sidePane, canvas, tasks),
+            listOf(sidePane, canvas, note, tasks),
             maxSlots = 3,
         ),
         ShellLayoutLaneSpec(ShellLanes.HOME, "Home", "The Home page's sections, top to bottom.", homeViews, homeViews.size),

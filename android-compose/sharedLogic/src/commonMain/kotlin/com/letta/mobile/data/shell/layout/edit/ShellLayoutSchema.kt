@@ -39,7 +39,7 @@ object ShellLayoutSchema {
     private val slot = objectSchema(
         buildJsonObject {
             put(VIEW, stringProperty("A view id from action get's catalog."))
-            put(OBJECT, stringProperty("The object the view shows (a canvas id for shell.canvas); omit otherwise."))
+            put(OBJECT, stringProperty("The object the view shows (the same canvas id for shell.canvas or shell.note); omit otherwise."))
         },
         required = listOf(VIEW),
     )

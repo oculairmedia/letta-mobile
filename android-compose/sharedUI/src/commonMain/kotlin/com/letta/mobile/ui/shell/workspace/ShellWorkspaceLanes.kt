@@ -96,5 +96,6 @@ private fun LettaShellWorkspaceHost.moduleViews(
     ShellViews.PAGE to { _, modifier -> slots.main(modifier) },
     ShellViews.SIDE_PANE to { _, _ -> slots.sidePane() },
     ShellViews.CANVAS to { slot, modifier -> ShellCanvasModule(slot.objectRef?.takeIf { it.isNotBlank() }?.let(::CanvasId), modifier) },
+    ShellViews.NOTE to { slot, modifier -> ShellNoteModule(slot.objectRef?.takeIf { it.isNotBlank() }?.let(::CanvasId), modifier) },
     ShellViews.TASKS to { _, modifier -> ShellTasksModule(openConversation(), modifier) },
 )

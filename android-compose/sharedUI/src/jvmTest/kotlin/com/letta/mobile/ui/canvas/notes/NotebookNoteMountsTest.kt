@@ -61,6 +61,37 @@ class NotebookNoteMountsTest {
         onAllNodesWithTag(Markdown)[1].assertTextContains("same draft")
     }
 
+    @Test
+    fun deniedShellNoteReadsNoStorage() = runComposeUiTest {
+        val backend = Backend().apply { allowed = false }
+        val registry = notebookCanvasViewers(Identity, backend)
+        setContent {
+            MaterialTheme {
+                com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry(registry) {
+                    com.letta.mobile.ui.shell.workspace.ShellNoteModule(Canvas, Modifier)
+                }
+            }
+        }
+        onNodeWithTag("notebook-note-denied").assertExists()
+        onNodeWithTag(Markdown).assertDoesNotExist()
+        runOnIdle { assertEquals(0, backend.storageReads) }
+    }
+
+    @Test
+    fun unknownShellNoteUsesTheExistingMissingState() = runComposeUiTest {
+        val backend = Backend()
+        val registry = notebookCanvasViewers(Identity, backend)
+        setContent {
+            MaterialTheme {
+                com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewerRegistry(registry) {
+                    com.letta.mobile.ui.shell.workspace.ShellNoteModule(CanvasId("unknown"), Modifier)
+                }
+            }
+        }
+        onNodeWithTag(NOTEBOOK_NOTE_MISSING_TAG).assertExists()
+        runOnIdle { assertEquals(0, backend.storageReads) }
+    }
+
     private class Backend : NotebookNoteBackend {
         var allowed = true
         var storageReads = 0
@@ -70,8 +101,9 @@ class NotebookNoteMountsTest {
             return NotebookNoteLoad.Found(NotebookNoteSnapshot(id, "Note", "original"))
         }
         override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave =
-            NotebookNoteSave.Saved(NotebookNoteSnapshot(id, "Note", replacement))
-        override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave = NotebookNoteSave.Saved(applied)
+            if (!allowed) NotebookNoteSave.Denied else NotebookNoteSave.Saved(NotebookNoteSnapshot(id, "Note", replacement))
+        override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave =
+            if (!allowed) NotebookNoteSave.Denied else NotebookNoteSave.Saved(applied)
     }
 
     private companion object {
