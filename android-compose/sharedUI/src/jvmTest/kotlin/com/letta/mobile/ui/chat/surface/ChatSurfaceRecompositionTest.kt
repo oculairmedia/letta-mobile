@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -217,8 +218,8 @@ class ChatSurfaceRecompositionTest {
             }
             waitForIdle()
             val before = runs.snapshot()
-            assertTrue(before.getValue("ChatTimeline") > 0, "the real transcript must be mounted")
-            assertTrue(before.getValue("ChatLaneContent") > 0, "lane content must be counted")
+            assertNotEquals(0, before.getValue("ChatTimeline"), "the real transcript must be mounted")
+            assertNotEquals(0, before.getValue("ChatLaneContent"), "lane content must be counted")
             listOf(400.dp, 720.dp).forEach { next ->
                 runOnIdle { height = next }
                 waitForIdle()
