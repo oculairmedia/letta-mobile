@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.chat.layout.ChatViews
 import com.letta.mobile.data.home.HomeViews
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
@@ -101,6 +102,12 @@ object ShellLayoutCatalog {
         ShellLayoutViewSpec(PanelViews.SETTINGS, "Settings", "The Settings row, kept at the bottom. It cannot be removed."),
     )
 
+    private val chatViews = listOf(
+        ShellLayoutViewSpec(ChatViews.TRANSCRIPT, "Transcript", "The open conversation's transcript. It cannot be removed."),
+        ShellLayoutViewSpec(ChatViews.STATUS, "Run status", "The live run status above the input."),
+        ShellLayoutViewSpec(ChatViews.COMPOSER, "Chat composer", "The open conversation's input. It cannot be removed."),
+    )
+
     /** Every lane an agent may change, in the order the catalog describes them. */
     val lanes: List<ShellLayoutLaneSpec> = listOf(
         ShellLayoutLaneSpec(
@@ -120,6 +127,16 @@ object ShellLayoutCatalog {
         ShellLayoutLaneSpec(ShellLanes.HOME, "Home", "The Home page's sections, top to bottom.", homeViews, homeViews.size),
         ShellLayoutLaneSpec(ShellLanes.RAIL, "Agent rail", "The narrow agent rail's parts, top to bottom.", railViews, railViews.size),
         ShellLayoutLaneSpec(ShellLanes.PANEL, "Side menu", "The agent panel's parts, top to bottom.", panelViews, panelViews.size),
+        ShellLayoutLaneSpec(
+            ShellLanes.CHAT,
+            "Chat",
+            "The chat content, top to bottom; compact canvas presentations keep the input docked. " +
+                "Modules other than transcript, status and composer show on wide windows only; phones show chat content alone. " +
+                "Docked status is hidden when attached to the composer (the default), " +
+                "but shown at its position when placed elsewhere.",
+            chatViews + listOf(canvas, tasks),
+            maxSlots = 8,
+        ),
     )
 
     /** The lane [id], or null when an agent may not change it (or it does not exist). */

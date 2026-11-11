@@ -23,6 +23,10 @@ overviews describe responsibilities, not deployment health or remote-server capa
 
 Host App Server command specifications and argument validation shared by the command-line entry points. Keep process launching in host bindings; construct validated arguments with `buildAppServerServeCommand` and configure them through [AppServerServeSpec](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.appserver/-app-server-serve-spec/index.html). Smoke-run scenarios live in the separate `:appserver-testkit` module.
 
+# Package com.letta.mobile.data.chat.layout
+
+Stable view identities for the shared chat content lane. The shell layout owns their order and protects the transcript and composer; chat presentation owns responsive docking, overlays and gestures. No transient run state is persisted in the layout.
+
 # Package com.letta.mobile.data.a2ui
 
 Agent-generated UI protocol models, data bindings, action dispatch and bounded surface state. Renderers consume these surfaces while approval submission and link policy connect actions to their owning session. Keep composable painting outside protocol state; integrate navigation and permission decisions through [A2uiLinkPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.a2ui/-a2ui-link-policy/index.html) and [ToolApprovalAdmission](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.a2ui/-tool-approval-admission/index.html).

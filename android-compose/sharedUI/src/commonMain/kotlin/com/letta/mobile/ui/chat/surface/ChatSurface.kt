@@ -616,7 +616,7 @@ private fun dockedPanelContent(
 ): DockedPanelContent {
     return DockedPanelContent(
         ambient = ambient,
-        conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
+        conversation = { conversationModifier -> DockedChatLane(frame, conversationModifier) },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
         collapsed = CollapsedDockContent(
             agentId = frame.session.agentId,
@@ -627,6 +627,18 @@ private fun dockedPanelContent(
             ambient = ambient,
         ),
         recents = recents,
+    )
+}
+
+/** The same lane inside the desktop panel and the phone's canvas bubble. Their frame docks input. */
+@Composable
+internal fun DockedChatLane(frame: ChatSurfaceFrame, modifier: Modifier) {
+    ChatLane(
+        modifier = modifier,
+        docked = true,
+        transcript = { DockedReplyCard(dockedReplyParams(frame), it) },
+        status = { LiveRunStatus(frame) },
+        composer = { _, _ -> },
     )
 }
 
@@ -670,10 +682,14 @@ private fun FullScreenPage(frame: ChatSurfaceFrame, modifier: Modifier) {
 @Composable
 private fun FullPageBody(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode) {
     val content: @Composable () -> Unit = {
-        Column(Modifier.fillMaxSize()) {
-            TimelineWithOverlay(frame, Modifier.weight(1f).fillMaxWidth())
-            Composer(frame, composerMode, Modifier.fillMaxWidth().reportComposerHeight(frame, composerMode))
-        }
+        ChatLane(
+            modifier = Modifier.fillMaxSize(),
+            transcript = { TimelineWithOverlay(frame, it) },
+            status = { LiveRunStatus(frame) },
+            composer = { modifier, status ->
+                Composer(frame, composerMode, modifier.reportComposerHeight(frame, composerMode), status)
+            },
+        )
     }
     val background = frame.platform.pageBackground
     if (background != null) background(content) else content()
@@ -720,11 +736,11 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
  * and, while docked (no timeline on screen), the A2UI surfaces.
  */
 @Composable
-private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
+private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier, showStatus: Boolean) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         OverlaySnackbarSlot(Modifier.fillMaxWidth())
         if (mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)
-        LiveRunStatus(frame)
+        if (showStatus) LiveRunStatus(frame)
         ComposerPanel(frame, mode, Modifier.fillMaxWidth())
     }
 }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.chat.layout.ChatViews
 import com.letta.mobile.data.model.view.RuntimeViewId
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
@@ -26,6 +27,7 @@ object ShellLayoutEdits {
         ShellLanes.HOME -> config.homeLane()
         ShellLanes.RAIL -> config.railLane()
         ShellLanes.PANEL -> config.panelLane()
+        ShellLanes.CHAT -> config.chatLane()
         else -> config.lane(lane)
     }
 
@@ -180,6 +182,8 @@ private val protections = listOf(
     Protection(ShellLanes.MAIN, ShellViews.PAGE, ShellLayoutEditRule.PAGE_STAYS_IN_MAIN),
     Protection(ShellLanes.PANEL, PanelViews.SETTINGS, ShellLayoutEditRule.SETTINGS_STAYS),
     Protection(ShellLanes.RAIL, RailViews.HOME, ShellLayoutEditRule.HOME_STAYS),
+    Protection(ShellLanes.CHAT, ChatViews.TRANSCRIPT, ShellLayoutEditRule.CHAT_READ_SEND_STAYS),
+    Protection(ShellLanes.CHAT, ChatViews.COMPOSER, ShellLayoutEditRule.CHAT_READ_SEND_STAYS),
 )
 
 /** Why [slot] cannot stay in, or go from, the lane [spec] it would leave. */

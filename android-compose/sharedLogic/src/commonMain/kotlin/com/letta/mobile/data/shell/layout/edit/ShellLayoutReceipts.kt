@@ -30,6 +30,7 @@ object ShellLayoutReceipts {
         "${ShellViews.PAGE.value} stays in lane ${ShellLanes.MAIN}.",
         "${PanelViews.SETTINGS.value} stays in lane ${ShellLanes.PANEL}.",
         "${RailViews.HOME.value} stays in lane ${ShellLanes.RAIL}.",
+        "The transcript and composer stay in lane ${ShellLanes.CHAT}.",
         "A slot appears once, and in only one of ${ShellLanes.MAIN} and ${ShellLanes.SIDE}.",
         "Each lane holds only its listed views, at most max_slots of them.",
     )

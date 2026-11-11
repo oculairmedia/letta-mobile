@@ -270,7 +270,7 @@ class ShellLayoutEditsTest {
     @Test
     fun theCatalogDescribesEveryLaneItGuards() {
         assertEquals(
-            listOf(ShellLanes.MAIN, ShellLanes.SIDE, ShellLanes.HOME, ShellLanes.RAIL, ShellLanes.PANEL),
+            listOf(ShellLanes.MAIN, ShellLanes.SIDE, ShellLanes.HOME, ShellLanes.RAIL, ShellLanes.PANEL, ShellLanes.CHAT),
             ShellLayoutCatalog.lanes.map { it.lane },
         )
         assertTrue(ShellLayoutCatalog.lanes.all { lane -> lane.description.isNotBlank() && lane.views.all { it.description.isNotBlank() } })
@@ -278,7 +278,7 @@ class ShellLayoutEditsTest {
         assertEquals(PanelViews.Default, ShellLayoutCatalog.lane(ShellLanes.PANEL)!!.views.map { it.view })
         assertEquals(RailViews.Default, ShellLayoutCatalog.lane(ShellLanes.RAIL)!!.views.map { it.view })
         val tasksIn = ShellLayoutCatalog.lanes.filter { lane -> lane.view(ShellViews.TASKS) != null }.map { it.lane }
-        assertEquals(listOf(ShellLanes.MAIN, ShellLanes.SIDE), tasksIn, "only the main and side lanes take the tasks view")
+        assertEquals(listOf(ShellLanes.MAIN, ShellLanes.SIDE, ShellLanes.CHAT), tasksIn, "workspace and chat lanes take the tasks view")
         assertEquals("Background tasks", ShellLayoutCatalog.label(ShellLanes.SIDE, tasks))
     }
 }

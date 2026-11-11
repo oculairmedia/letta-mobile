@@ -7,6 +7,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composer
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.letta.mobile.data.shell.layout.ShellLayoutConfig
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
+import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
+import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
+import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import androidx.compose.runtime.CompositionTracer
 import androidx.compose.runtime.InternalComposeTracingApi
 import androidx.compose.runtime.collectAsState
@@ -32,6 +49,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -137,7 +155,7 @@ class ChatSurfaceRecompositionTest {
             override val composer: StateFlow<ChatComposerUiState> = MutableStateFlow(ChatComposerUiState(canSend = true))
             override val actions: ChatActions = RecordingChatActions()
         }
-        val runs = CompositionRunCounter(PAGE_LAYERS)
+        val runs = CompositionRunCounter(PAGE_LAYERS + "DockedReplyCard")
         runs.install()
         try {
             setPointerContent {
@@ -169,11 +187,104 @@ class ChatSurfaceRecompositionTest {
                 waitForIdle()
             }
 
-            assertEquals(settled, runs.snapshot(), "streamed tokens re-ran page layers")
+            val after = runs.snapshot()
+            assertEquals(
+                settled.filterKeys { it in PAGE_LAYERS },
+                after.filterKeys { it in PAGE_LAYERS },
+                "streamed tokens re-ran page layers",
+            )
+            assertTrue(after.getValue("DockedReplyCard") > settled.getValue("DockedReplyCard"), "the transcript saw no stream")
             assertEquals(settledResolves, resolves, "a streamed token recomposed a settled timeline row")
         } finally {
             runs.uninstall()
         }
+    }
+
+    @Test
+    fun defaultLaneDoesNotRecomposeForKeyboardHeightChanges() = runComposeUiTest {
+        var height by mutableStateOf(720.dp)
+        val port = TypingPort(state)
+        val host = freshHost()
+        val intent = freshIntent()
+        val runs = CompositionRunCounter(listOf("ChatLane", "ChatLaneContent", "ChatTimeline"))
+        runs.install()
+        try {
+            setPointerContent {
+                MaterialTheme {
+                    Box(Modifier.size(480.dp, height)) {
+                        ChatSurface(port, ChatSurfacePresentation.ChatFirst, intent, host)
+                    }
+                }
+            }
+            waitForIdle()
+            val before = runs.snapshot()
+            assertNotEquals(0, before.getValue("ChatTimeline"), "the real transcript must be mounted")
+            assertNotEquals(0, before.getValue("ChatLaneContent"), "lane content must be counted")
+            listOf(400.dp, 720.dp).forEach { next ->
+                runOnIdle { height = next }
+                waitForIdle()
+            }
+            val after = runs.snapshot()
+            println("KEYBOARD_HEIGHT before=$before after=$after")
+            assertEquals(before, after, "keyboard constraints recomposed default lane/transcript content")
+        } finally {
+            runs.uninstall()
+        }
+    }
+
+    @Test
+    fun equalLayoutOnUnrelatedWorkspaceRecompositionKeepsChatLocalReaders() = runComposeUiTest {
+        var title by mutableStateOf("Before")
+        var pageRuns = 0
+        val config = ShellLayoutConfig.Default
+        val port = TypingPort(state)
+        val surfaceHost = freshHost()
+        val intent = freshIntent()
+        val host = LettaShellWorkspaceHost(
+            actions = ShellWorkspaceNavigationActions(),
+            slots = LettaShellWorkspaceSlots(
+                main = { modifier ->
+                    val lane = LocalChatLane.current
+                    val content = LocalChatModuleContent.current
+                    SideEffect { pageRuns++ }
+                    Box(modifier) {
+                        // Read both locals, as a page that can draw an extra module does.
+                        if (lane.isEmpty()) content(0, Modifier)
+                        ChatSurface(port, ChatSurfacePresentation.ChatFirst, intent, surfaceHost)
+                    }
+                },
+                agentCard = {},
+                sidePane = {},
+                overlays = {},
+            ),
+            chrome = ShellWindowChrome.Hoisted {},
+            drawer = ShellWorkspaceDrawer(),
+            events = ShellWorkspaceEvents(),
+        )
+        setPointerContent {
+            MaterialTheme {
+                LettaShellWorkspace(
+                    LettaShellWorkspaceState(
+                        header = ShellWorkspaceHeaderState(title = title),
+                        navigation = ShellWorkspaceNavigation(
+                            ShellLibraryRailState(emptyList(), com.letta.mobile.ui.shell.rail.ShellRailFocus()),
+                            ShellAgentPanelState(com.letta.mobile.ui.shell.sidebar.ShellPanelAgent(name = "Ada")),
+                        ),
+                        layout = ShellWorkspaceLayout(lanes = config.copy(lanes = config.lanes.toMap())),
+                    ),
+                    host,
+                    // Unrelated host chrome consumes space; the stored layout remains equal.
+                    Modifier.size(960.dp, if (title == "Before") 720.dp else 700.dp),
+                )
+            }
+        }
+        waitForIdle()
+        val before = pageRuns
+        assertTrue(before > 0)
+        runOnIdle { title = "After" }
+        waitForIdle()
+        println("EQUAL_LAYOUT before=$before after=$pageRuns")
+        assertEquals(before, pageRuns, "equal layout invalidated the chat page local readers")
     }
 
     /** Counts how often each named composable's body runs, through the runtime's composition tracer. */
@@ -190,7 +301,12 @@ class ChatSurfaceRecompositionTest {
         override fun isTraceInProgress(): Boolean = true
 
         override fun traceEventStart(key: Int, dirty1: Int, dirty2: Int, info: String) {
-            val name = info.substringBefore(' ').substringAfterLast('.')
+            val qualified = info.substringBefore(' ')
+            val name = if (qualified.startsWith("com.letta.mobile.ui.chat.surface.ChatLane.<anonymous>")) {
+                "ChatLaneContent"
+            } else {
+                qualified.substringAfterLast('.')
+            }
             if (name in counts) synchronized(counts) { counts[name] = counts.getValue(name) + 1 }
         }
 
@@ -200,6 +316,6 @@ class ChatSurfaceRecompositionTest {
         const val TOKENS = 8
 
         /** The page's layers over the canvas: none of them shows the stream. */
-        val PAGE_LAYERS = listOf("ChatSurfaceLayers", "CanvasWithChat", "CanvasChatLayers", "CompanionSeat")
+        val PAGE_LAYERS = listOf("ChatSurfaceLayers", "CanvasWithChat", "CanvasChatLayers", "CompanionSeat", "ChatLane")
     }
 }

@@ -5,6 +5,9 @@ package com.letta.mobile.ui.shell.workspace
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import com.letta.mobile.data.chat.layout.ChatViews
+import com.letta.mobile.ui.chat.surface.ChatLane
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -162,6 +165,33 @@ class ShellWorkspaceCanvasModuleTest {
         assertDp(width, bounds(HostPane).right, "the host pane ends at the window edge at $width")
         assertNoCanvasModule()
         assertEquals(emptyList(), opened, "the default layout opens no board at $width")
+    }
+
+    @Test
+    fun chatLaneMountsTheRegisteredBoardAboveItsTranscript() = runDesktopComposeUiTest(width = 1200, height = 800) {
+        val config = ShellLayoutConfig.Default.copy(
+            lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.CHAT to (listOf(NotesSlot) + ChatViews.Default.map(::ModuleSlot))),
+        )
+        setContent {
+            CompositionLocalProvider(LocalCanvasBoardSource provides source) {
+                LettaShellWorkspace(
+                    state(config),
+                    host { modifier ->
+                        ChatLane(
+                            modifier = modifier,
+                            transcript = { Box(it.testTag(Page)) },
+                            status = {},
+                            composer = { inputModifier, _ -> Box(inputModifier.height(48.dp)) },
+                        )
+                    },
+                    Modifier.size(1200.dp, WindowHeight),
+                )
+            }
+        }
+        awaitBoard(NotesId)
+        assertBoardTitled(NotesId, NotesTitle)
+        assertEquals(listOf(NotesId), opened)
+        assertDp(bounds(boardTag(NotesId)).bottom, bounds(Page).top, "board is above the protected transcript")
     }
 
     @Test

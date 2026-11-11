@@ -56,6 +56,22 @@ class ShellLayoutToolTest {
     private val recentsFirst = """{"action":"apply","ops":[{"op":"move","lane":"home","view":"home.recents","index":0}]}"""
 
     @Test
+    fun chatDryRunApplyUndoResetAndProtectedRefusalUseTheRealPort() = runTest {
+        val op = """"ops":[{"op":"remove","lane":"chat","view":"chat.status"}]"""
+        success("""{"action":"apply","dry_run":true,$op}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+        success("""{"action":"apply",$op}""")
+        assertEquals(listOf("chat.transcript", "chat.composer"), store.config.value.chatLane().map { it.view.value })
+        success("""{"action":"undo"}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+        val refused = error("""{"action":"apply","ops":[{"op":"remove","lane":"chat","view":"chat.transcript"}]}""")
+        assertEquals("chat_read_send_stays", refused["errors"]!!.jsonArray.first().jsonObject["rule"]!!.jsonPrimitive.content)
+        success("""{"action":"apply",$op}""")
+        success("""{"action":"reset"}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+    }
+
+    @Test
     fun theSchemaIsStrictAndNamesEveryActionOpAndLane() {
         val schema = tool.inputSchema
         assertEquals("shell_layout", tool.name)
@@ -101,6 +117,12 @@ class ShellLayoutToolTest {
         assertEquals(HomeViews.Default.map { it.value }, home)
         val catalogLanes = receipt["catalog"]!!.jsonArray.map { it.jsonObject["lane"]!!.jsonPrimitive.content }
         assertEquals(ShellLayoutCatalog.lanes.map { it.lane }, catalogLanes)
+        val chat = receipt["catalog"]!!.jsonArray.single { it.jsonObject["lane"]!!.jsonPrimitive.content == "chat" }.jsonObject
+        val description = chat["description"]!!.jsonPrimitive.content
+        assertTrue("Modules other than transcript, status and composer show on wide windows only" in description)
+        assertTrue("phones show chat content alone" in description)
+        assertTrue("Docked status is hidden when attached to the composer (the default)" in description)
+        assertTrue("but shown at its position when placed elsewhere" in description)
         assertEquals(0, receipt["undo_steps"]!!.jsonPrimitive.int)
         val rules = receipt["rules"]!!.jsonArray.map { it.jsonPrimitive.content }
         assertTrue("${RailViews.HOME.value} stays in lane ${ShellLanes.RAIL}." in rules)

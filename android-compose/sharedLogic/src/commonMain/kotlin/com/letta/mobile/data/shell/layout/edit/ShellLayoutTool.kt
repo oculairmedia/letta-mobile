@@ -61,12 +61,14 @@ class ShellLayoutTool(private val port: ShellLayoutAgentPort = ShellLayoutAgentP
         /** What the model reads about the tool; the Iroh host's relayed copy advertises the same text. */
         const val DESCRIPTION: String =
             "Change how this app's shell is laid out for the person using it: reorder Home's sections, show or hide parts of " +
-                "the agent rail and side menu, or place canvas boards beside the page. A change applies immediately and the " +
+                "the agent rail and side menu, compose chat content, or place canvas boards beside the page. " +
+                "A change applies immediately and the " +
                 "person sees it at once, with Undo; change the layout only when it serves what they asked for. " +
                 "action: get (current lanes and the views each may hold), apply (ops, all or nothing; dry_run: true checks " +
                 "without applying), undo (the last change), reset (the default layout). Ops: set_lane {lane, slots}, " +
                 "add {lane, view, object?, index?}, remove {lane, view, object?}, move {lane, view, object?, to_lane?, index?}, " +
-                "reset. The page stays in the main lane, Settings in the side menu and Home in the agent rail. " +
+                "reset. The page stays in the main lane, Settings in the side menu, Home in the agent rail, " +
+                "and transcript and composer in chat. " +
                 "A refusal lists each problem (op_index, rule, detail) and applies nothing."
     }
 }

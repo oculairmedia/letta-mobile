@@ -90,7 +90,7 @@ The tool presenters the timeline draws steps with, provided per window through L
 
 # Package com.letta.mobile.ui.chat.surface
 
-The shared chat/canvas surface in docked, collapsed and full-chat presentations. ChatSurface configuration and host/session bindings are the assembly seams; transport, conversation persistence and native back handling must remain in their owning layers.
+The shared chat/canvas surface in docked, collapsed and full-chat presentations. ChatSurface configuration and host/session bindings are the assembly seams; transport, conversation persistence and native back handling must remain in their owning layers. ChatLane draws the shell's ordered content projection without observing run state. The full page, desktop dock and phone canvas bubble share it; presentation keeps docked input anchored and collapses optional embedded views below the wide breakpoint. The workspace supplies the existing registered renderers, including board/session lifecycle and background-task scope, rather than chat opening its own stores.
 
 # Package com.letta.mobile.ui.chat.surface.ambient
 

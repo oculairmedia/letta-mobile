@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.VerticalDivider
+import com.letta.mobile.ui.chat.surface.LocalChatLane
+import com.letta.mobile.ui.chat.surface.LocalChatModuleContent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -53,10 +56,20 @@ internal fun RowScope.ShellWorkspaceLanes(
     val modules = LocalShellModules.current
     val openConversation by rememberUpdatedState(state.navigation.openConversation)
     val views = remember(host, modules) { host.moduleViews(modules) { openConversation } }
+    val chat = remember(config) { config.chatLane() }
+    val chatLane = remember(chat) { chat.map { it.view to it.objectRef } }
+    val chatContent: @Composable (Int, Modifier) -> Unit = remember(chat, views) {
+        { index, modifier -> ShellModuleSlot(chat[index], views, modifier) }
+    }
     InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val room = if (compact) 1 else (maxWidth / LettaDimens.Pane.sidePanelWidth).toInt()
-            MainLane(config.mainLane(room), views)
+            CompositionLocalProvider(
+                LocalChatLane provides chatLane,
+                LocalChatModuleContent provides chatContent,
+            ) {
+                MainLane(config.mainLane(room), views)
+            }
         }
     }
     config.sideLane().forEach { slot ->
