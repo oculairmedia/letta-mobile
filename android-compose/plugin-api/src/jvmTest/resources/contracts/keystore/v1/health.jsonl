@@ -1,0 +1,6 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":3,"method":"keystore.health","params":{}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":3,"result":{"status":"locked"}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":4,"method":"keystore.health","params":{}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":4,"result":{"status":"ready"}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":5,"method":"keystore.health","params":{}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":5,"result":{"status":"unavailable","detail":"backend did not answer within 5 s"}}}

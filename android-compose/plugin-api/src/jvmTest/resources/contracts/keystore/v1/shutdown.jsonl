@@ -1,0 +1,2 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":24,"method":"keystore.shutdown","params":{}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":24,"result":{}}}
