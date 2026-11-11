@@ -47,13 +47,19 @@ sealed interface CanvasMountResult {
 
     /**
      * Storage failed after authorization. Carries only a fixed [reason], never a path, message or id.
-     * After a mutation it does not say whether the write was applied: the store may replace a record and
-     * then fail a later durability barrier. Re-read to learn the current state.
+     * After a mutation it means the failure came before the commit point: nothing changed.
      */
     data class StorageFailure(
         /** The fixed failure category. */
         val reason: CanvasMountFailure,
     ) : CanvasMountResult
+
+    /**
+     * An authorized mutation failed at or after its commit point (the atomic replacement, or a durability
+     * barrier or lock release after it): the record may hold the previous or the new canvas. Read back
+     * before retrying or telling the user nothing changed. Carries nothing: no path, message, exception or id.
+     */
+    data object OutcomeUnknown : CanvasMountResult
 }
 
 /** Fixed categories for [CanvasMountResult.StorageFailure]. */

@@ -35,7 +35,8 @@ class FileCanvasMountScaleTest {
         val payload = "x".repeat(4_096)
         repeat(1_024) { index ->
             val proposed = CanvasId("$index-$payload")
-            assertEquals(proposed, store.bindIfAbsent(AgentId("a"), ConversationId("c-$index"), proposed))
+            val outcome = store.bindIfAbsent(AgentId("a"), ConversationId("c-$index"), proposed)
+            assertEquals(CanvasMountMutation.Applied(proposed, written = true), outcome)
         }
         assertTrue(records(root).sumOf(Files::size) > 4L * 1024 * 1024, "Actual stored entries must exceed the old table limit")
         val reopened = FileCanvasMountStore(root, HostId("host"))
@@ -51,7 +52,8 @@ class FileCanvasMountScaleTest {
         Files.setLastModifiedTime(file, FileTime.fromMillis(12_000))
         val before = Files.readAllBytes(file)
         val modified = Files.getLastModifiedTime(file)
-        assertEquals(CanvasId("winner"), store.bindIfAbsent(AgentId("a"), ConversationId("c"), CanvasId("loser")))
+        val outcome = store.bindIfAbsent(AgentId("a"), ConversationId("c"), CanvasId("loser"))
+        assertEquals(CanvasMountMutation.Applied(CanvasId("winner"), written = false), outcome)
         assertTrue(before.contentEquals(Files.readAllBytes(file)))
         assertEquals(modified, Files.getLastModifiedTime(file), "Existing winner must not be rewritten")
     }
