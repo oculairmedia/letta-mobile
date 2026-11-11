@@ -1,0 +1,6 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":21,"method":"keystore.delete","params":{"ref":{"provider":"example.memory","path":"team/api/anthropic"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":21,"result":{}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":22,"method":"keystore.delete","params":{"ref":{"provider":"example.memory","path":"team/api/anthropic"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":22,"error":{"code":-32020,"message":"No secret at example.memory:team/api/anthropic","data":{"code":"not_found","ref":{"provider":"example.memory","path":"team/api/anthropic"}}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":23,"method":"keystore.delete","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":23,"error":{"code":-32020,"message":"Invalid secret reference: field_not_allowed","data":{"code":"invalid_ref","refProblem":"field_not_allowed"}}}}

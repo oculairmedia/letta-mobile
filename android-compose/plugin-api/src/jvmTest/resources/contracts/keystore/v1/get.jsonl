@@ -1,0 +1,10 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":9,"method":"keystore.get","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":9,"result":{"value":"TEtTLVNFTlRJTkVMLXZhbHVlLTdmM2E5Yw=="}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":10,"method":"keystore.get","params":{"ref":{"provider":"example.memory","path":"team/api/missing"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":10,"error":{"code":-32020,"message":"No secret at example.memory:team/api/missing","data":{"code":"not_found","ref":{"provider":"example.memory","path":"team/api/missing"}}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":11,"method":"keystore.get","params":{"ref":{"provider":"example.memory","path":"team/api/openai","field":"token"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":11,"error":{"code":-32020,"message":"The keystore provider is locked","data":{"code":"locked"}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":12,"method":"keystore.get","params":{"ref":{"provider":"example.memory","path":"../etc/passwd"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":12,"error":{"code":-32020,"message":"Invalid secret reference: malformed","data":{"code":"invalid_ref","refProblem":"malformed"}}}}
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":13,"method":"keystore.get","params":{"ref":{"provider":"other.vault","path":"team/api/openai"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":13,"error":{"code":-32020,"message":"Invalid secret reference: provider_mismatch","data":{"code":"invalid_ref","refProblem":"provider_mismatch"}}}}

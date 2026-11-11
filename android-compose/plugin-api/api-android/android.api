@@ -971,3 +971,1033 @@ public final class com/letta/mobile/plugin/api/UpdateElement$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/plugin/keystore/HealthStatus : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/HealthStatus$Companion;
+	public static final field LOCKED Lcom/letta/mobile/plugin/keystore/HealthStatus;
+	public static final field READY Lcom/letta/mobile/plugin/keystore/HealthStatus;
+	public static final field UNAVAILABLE Lcom/letta/mobile/plugin/keystore/HealthStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/HealthStatus;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/HealthStatus;
+}
+
+public final class com/letta/mobile/plugin/keystore/HealthStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreCapability : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreCapability$Companion;
+	public static final field DELETE Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+	public static final field LIST Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+	public static final field READ Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+	public static final field WRITE Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreCapability$Companion {
+	public final fun fromWire (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreDescriptor {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-no82UOQ ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()Z
+	public final fun copy-nbpyFkc (Ljava/lang/String;Ljava/util/Set;Z)Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor;
+	public static synthetic fun copy-nbpyFkc$default (Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor;Ljava/lang/String;Ljava/util/Set;ZILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapabilities ()Ljava/util/Set;
+	public final fun getId-no82UOQ ()Ljava/lang/String;
+	public final fun getNeedsUnlock ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreDescriptor$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreDescriptor$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract class com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$Companion;
+	public synthetic fun <init> (ILkotlinx/serialization/internal/SerializationConstructorMarker;)V
+	public abstract fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public abstract fun getMessage ()Ljava/lang/String;
+	public final fun toString ()Ljava/lang/String;
+	public static final synthetic fun write$Self (Lcom/letta/mobile/plugin/keystore/KeystoreError;Lkotlinx/serialization/encoding/CompositeEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;)V
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Conflict : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretRef;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/SecretRef;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict;Lcom/letta/mobile/plugin/keystore/SecretRef;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getRef ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$Conflict$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$Conflict;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Conflict$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Denied : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/KeystoreOperation;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/KeystoreOperation;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied;Lcom/letta/mobile/plugin/keystore/KeystoreOperation;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getOperation ()Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$Denied$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$Denied;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Denied$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Internal : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal$Companion;
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1--Spk3IA ()Ljava/lang/String;
+	public final fun copy-mXsuMME (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal;
+	public static synthetic fun copy-mXsuMME$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public final fun getDetail--Spk3IA ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$Internal$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$Internal;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Internal$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$InvalidRef : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/RefProblem;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/RefProblem;)Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef;Lcom/letta/mobile/plugin/keystore/RefProblem;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getRefProblem ()Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$InvalidRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$InvalidRef$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$InvalidValue : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/ValueProblem;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/ValueProblem;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/ValueProblem;)Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue;Lcom/letta/mobile/plugin/keystore/ValueProblem;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getValueProblem ()Lcom/letta/mobile/plugin/keystore/ValueProblem;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$InvalidValue$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$InvalidValue;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$InvalidValue$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Locked : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$Locked;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$NotFound : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretRef;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/SecretRef;)Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound;Lcom/letta/mobile/plugin/keystore/SecretRef;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getRef ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$NotFound$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$NotFound;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$NotFound$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Unavailable : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable$Companion;
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1--Spk3IA ()Ljava/lang/String;
+	public final fun copy-mXsuMME (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable;
+	public static synthetic fun copy-mXsuMME$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public final fun getDetail--Spk3IA ()Ljava/lang/String;
+	public fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$Unavailable$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$Unavailable;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Unavailable$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Unsupported : com/letta/mobile/plugin/keystore/KeystoreError {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/KeystoreOperation;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/KeystoreOperation;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported;Lcom/letta/mobile/plugin/keystore/KeystoreOperation;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCode ()Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun getOperation ()Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public fun hashCode ()I
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreError$Unsupported$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreError$Unsupported;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreError$Unsupported$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreErrorCode : java/lang/Enum {
+	public static final field CONFLICT Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode$Companion;
+	public static final field DENIED Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field INTERNAL Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field INVALID_REF Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field INVALID_VALUE Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field LOCKED Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field NOT_FOUND Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field UNAVAILABLE Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static final field UNSUPPORTED Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/KeystoreErrorCode;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreErrorCode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreHealth {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreHealth$Companion;
+	public synthetic fun <init> (Lcom/letta/mobile/plugin/keystore/HealthStatus;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/plugin/keystore/HealthStatus;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/HealthStatus;
+	public final fun component2--Spk3IA ()Ljava/lang/String;
+	public final fun copy-vETThcc (Lcom/letta/mobile/plugin/keystore/HealthStatus;Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreHealth;
+	public static synthetic fun copy-vETThcc$default (Lcom/letta/mobile/plugin/keystore/KeystoreHealth;Lcom/letta/mobile/plugin/keystore/HealthStatus;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreHealth;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail--Spk3IA ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/plugin/keystore/HealthStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreHealth$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreHealth$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/KeystoreHealth;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/KeystoreHealth;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreHealth$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreOperation : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreOperation$Companion;
+	public static final field DELETE Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static final field GET Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static final field HEALTH Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static final field LIST Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static final field LOCK Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static final field PUT Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static final field UNLOCK Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public final fun getCapability ()Lcom/letta/mobile/plugin/keystore/KeystoreCapability;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreOperation$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/plugin/keystore/KeystoreProvider {
+	public abstract fun delete (Lcom/letta/mobile/plugin/keystore/SecretRef;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun describe ()Lcom/letta/mobile/plugin/keystore/KeystoreDescriptor;
+	public abstract fun get (Lcom/letta/mobile/plugin/keystore/SecretRef;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun health (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun list (Lcom/letta/mobile/plugin/keystore/SecretScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun lock (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun put (Lcom/letta/mobile/plugin/keystore/SecretRef;Lcom/letta/mobile/plugin/keystore/SecretValue;Lcom/letta/mobile/plugin/keystore/PutOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun put$default (Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/plugin/keystore/SecretRef;Lcom/letta/mobile/plugin/keystore/SecretValue;Lcom/letta/mobile/plugin/keystore/PutOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun unlock (Lcom/letta/mobile/plugin/keystore/SecretValue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreProvider$DefaultImpls {
+	public static fun lock (Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun put$default (Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/plugin/keystore/SecretRef;Lcom/letta/mobile/plugin/keystore/SecretValue;Lcom/letta/mobile/plugin/keystore/PutOptions;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun unlock (Lcom/letta/mobile/plugin/keystore/KeystoreProvider;Lcom/letta/mobile/plugin/keystore/SecretValue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreProviderId {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreProviderId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/KeystoreProviderId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/KeystoreProviderId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreProviderId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-lsDjEkY (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-vZIFEHA (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreProviderId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/plugin/keystore/KeystoreResult {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/KeystoreResult$Companion;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreResult$Companion {
+	public final fun getDone ()Lcom/letta/mobile/plugin/keystore/KeystoreResult;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreResult$Failure : com/letta/mobile/plugin/keystore/KeystoreResult {
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/KeystoreError;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/KeystoreError;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/KeystoreError;)Lcom/letta/mobile/plugin/keystore/KeystoreResult$Failure;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreResult$Failure;Lcom/letta/mobile/plugin/keystore/KeystoreError;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreResult$Failure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/plugin/keystore/KeystoreError;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreResult$Success : com/letta/mobile/plugin/keystore/KeystoreResult {
+	public fun <init> (Ljava/lang/Object;)V
+	public final fun component1 ()Ljava/lang/Object;
+	public final fun copy (Ljava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreResult$Success;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/KeystoreResult$Success;Ljava/lang/Object;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/KeystoreResult$Success;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/Object;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreResultKt {
+	public static final fun errorOrNull (Lcom/letta/mobile/plugin/keystore/KeystoreResult;)Lcom/letta/mobile/plugin/keystore/KeystoreError;
+	public static final fun valueOrNull (Lcom/letta/mobile/plugin/keystore/KeystoreResult;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/plugin/keystore/KeystoreSpi {
+	public static final field CONTRACT_VERSION I
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/KeystoreSpi;
+	public static final field MAX_DESCRIPTION_LENGTH I
+	public static final field MAX_DIAGNOSTIC_LENGTH I
+	public static final field MAX_FIELD_LENGTH I
+	public static final field MAX_LIST_ENTRIES I
+	public static final field MAX_PATH_LENGTH I
+	public static final field MAX_PATH_SEGMENTS I
+	public static final field MAX_PROVIDER_ID_LENGTH I
+	public static final field MAX_VALUE_BYTES I
+}
+
+public final class com/letta/mobile/plugin/keystore/ProviderDiagnostic {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/ProviderDiagnostic$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/ProviderDiagnostic;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/ProviderDiagnostic$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/ProviderDiagnostic$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-AHEnkfo (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-Hp8VcMk (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/ProviderDiagnostic$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/PutOptions {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/WriteMode;Lcom/letta/mobile/plugin/keystore/SecretMetadata;)V
+	public synthetic fun <init> (Lcom/letta/mobile/plugin/keystore/WriteMode;Lcom/letta/mobile/plugin/keystore/SecretMetadata;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public final fun component2 ()Lcom/letta/mobile/plugin/keystore/SecretMetadata;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/WriteMode;Lcom/letta/mobile/plugin/keystore/SecretMetadata;)Lcom/letta/mobile/plugin/keystore/PutOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/PutOptions;Lcom/letta/mobile/plugin/keystore/WriteMode;Lcom/letta/mobile/plugin/keystore/SecretMetadata;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/PutOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMetadata ()Lcom/letta/mobile/plugin/keystore/SecretMetadata;
+	public final fun getMode ()Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/plugin/keystore/RefProblem : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/RefProblem$Companion;
+	public static final field FIELD_NOT_ALLOWED Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public static final field MALFORMED Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public static final field PROVIDER_MISMATCH Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/RefProblem;
+}
+
+public final class com/letta/mobile/plugin/keystore/RefProblem$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretDescription {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretDescription$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/SecretDescription;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretDescription$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretDescription$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-UmENLSE (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-vcNoEfg (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretDescription$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretField {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretField$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/SecretField;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretField$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretField$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-iPxLl7E (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-wHrMaVI (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretField$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretListing {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretListing$Companion;
+	public fun <init> (Ljava/util/List;Z)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/util/List;Z)Lcom/letta/mobile/plugin/keystore/SecretListing;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/SecretListing;Ljava/util/List;ZILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/SecretListing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getTruncated ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretListing$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretListing$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/SecretListing;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/SecretListing;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretListing$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretMetadata {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretMetadata$Companion;
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-WB7EN3A ()Ljava/lang/String;
+	public final fun copy-g3HgtwE (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/SecretMetadata;
+	public static synthetic fun copy-g3HgtwE$default (Lcom/letta/mobile/plugin/keystore/SecretMetadata;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/SecretMetadata;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription-WB7EN3A ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretMetadata$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretMetadata$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/SecretMetadata;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/SecretMetadata;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretMetadata$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretPath {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretPath$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/SecretPath;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun covers-xDD5A8g (Ljava/lang/String;Ljava/lang/String;)Z
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isWellFormed-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretPath$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretPath$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-2GLQuKk (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-VdRM4Ss (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretPath$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretRef {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretRef$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-no82UOQ ()Ljava/lang/String;
+	public final fun component2-Yh9ug_M ()Ljava/lang/String;
+	public final fun component3-cqOO47Q ()Ljava/lang/String;
+	public final fun copy-yWjlSVI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public static synthetic fun copy-yWjlSVI$default (Lcom/letta/mobile/plugin/keystore/SecretRef;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getField-cqOO47Q ()Ljava/lang/String;
+	public final fun getItem ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public final fun getPath-Yh9ug_M ()Ljava/lang/String;
+	public final fun getProvider-no82UOQ ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isWellFormed ()Z
+	public final fun problemFor-ZaGb_6E (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/SecretRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretRef$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretScope {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretScope$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-no82UOQ ()Ljava/lang/String;
+	public final fun component2-113FEJ4 ()Ljava/lang/String;
+	public final fun contains (Lcom/letta/mobile/plugin/keystore/SecretRef;)Z
+	public final fun copy-2KiNCp8 (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/SecretScope;
+	public static synthetic fun copy-2KiNCp8$default (Lcom/letta/mobile/plugin/keystore/SecretScope;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/SecretScope;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPrefix-113FEJ4 ()Ljava/lang/String;
+	public final fun getProvider-no82UOQ ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun problemFor-ZaGb_6E (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/RefProblem;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/SecretScope$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/SecretScope$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/SecretScope;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/SecretScope;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretScope$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretValue {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/SecretValue$Companion;
+	public static final field REDACTED Ljava/lang/String;
+	public final fun contentEqualsConstantTime (Lcom/letta/mobile/plugin/keystore/SecretValue;)Z
+	public final fun getValueProblem ()Lcom/letta/mobile/plugin/keystore/ValueProblem;
+	public final fun isWiped ()Z
+	public final fun revealSecretBytes (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+	public final fun wipe ()V
+}
+
+public final class com/letta/mobile/plugin/keystore/SecretValue$Companion {
+	public final fun ofBytes ([B)Lcom/letta/mobile/plugin/keystore/SecretValue;
+}
+
+public final class com/letta/mobile/plugin/keystore/ValueProblem : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/ValueProblem$Companion;
+	public static final field EMPTY Lcom/letta/mobile/plugin/keystore/ValueProblem;
+	public static final field TOO_LARGE Lcom/letta/mobile/plugin/keystore/ValueProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/ValueProblem;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/ValueProblem;
+}
+
+public final class com/letta/mobile/plugin/keystore/ValueProblem$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/WriteMode : java/lang/Enum {
+	public static final field CREATE Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/WriteMode$Companion;
+	public static final field REPLACE Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public static final field UPSERT Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/WriteMode;
+}
+
+public final class com/letta/mobile/plugin/keystore/WriteMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreGetResult {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreGetResult$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretValue;)V
+	public final fun getValue ()Lcom/letta/mobile/plugin/keystore/SecretValue;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreGetResult$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreGetResult$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreGetResult;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreGetResult;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreGetResult$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreHostInfo {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreHostInfo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreHostInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams$Companion;
+	public fun <init> (Ljava/util/List;Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;Lkotlinx/serialization/json/JsonObject;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;
+	public final fun component3 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun copy (Ljava/util/List;Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;Lkotlinx/serialization/json/JsonObject;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams;Ljava/util/List;Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContractVersions ()Ljava/util/List;
+	public final fun getHost ()Lcom/letta/mobile/plugin/keystore/wire/KeystoreHostInfo;
+	public final fun getSettings ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreInitializeParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult$Companion;
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult;IILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContractVersion ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreInitializeResult$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreListParams {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretScope;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/SecretScope;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/SecretScope;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams;Lcom/letta/mobile/plugin/keystore/SecretScope;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getScope ()Lcom/letta/mobile/plugin/keystore/SecretScope;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreListParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreListParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreListParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreMethod : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod$Companion;
+	public static final field DELETE Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field DESCRIBE Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field GET Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field HEALTH Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field INITIALIZE Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field KEYSTORE_ERROR_CODE I
+	public static final field LIST Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field LOCK Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field PUT Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field SHUTDOWN Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static final field UNLOCK Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public final fun getDeadlineMillis ()J
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getOperation ()Lcom/letta/mobile/plugin/keystore/KeystoreOperation;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public static fun values ()[Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreMethod$Companion {
+	public final fun byWire (Ljava/lang/String;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreMethod;
+	public final fun getVALUE_CARRYING ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystorePutParams {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystorePutParams$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretRef;Lcom/letta/mobile/plugin/keystore/SecretValue;Lcom/letta/mobile/plugin/keystore/WriteMode;Lcom/letta/mobile/plugin/keystore/SecretMetadata;)V
+	public synthetic fun <init> (Lcom/letta/mobile/plugin/keystore/SecretRef;Lcom/letta/mobile/plugin/keystore/SecretValue;Lcom/letta/mobile/plugin/keystore/WriteMode;Lcom/letta/mobile/plugin/keystore/SecretMetadata;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMetadata ()Lcom/letta/mobile/plugin/keystore/SecretMetadata;
+	public final fun getMode ()Lcom/letta/mobile/plugin/keystore/WriteMode;
+	public final fun getOptions ()Lcom/letta/mobile/plugin/keystore/PutOptions;
+	public final fun getRef ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public final fun getValue ()Lcom/letta/mobile/plugin/keystore/SecretValue;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystorePutParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystorePutParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystorePutParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystorePutParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystorePutParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreRefParams {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretRef;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public final fun copy (Lcom/letta/mobile/plugin/keystore/SecretRef;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams;Lcom/letta/mobile/plugin/keystore/SecretRef;ILjava/lang/Object;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRef ()Lcom/letta/mobile/plugin/keystore/SecretRef;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreRefParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreRefParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreRefParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams {
+	public static final field Companion Lcom/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/keystore/SecretValue;)V
+	public final fun getMaterial ()Lcom/letta/mobile/plugin/keystore/SecretValue;
+}
+
+public final synthetic class com/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/keystore/wire/KeystoreUnlockParams$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
