@@ -209,8 +209,9 @@ class ShellLayoutAgentToolUiTest {
         applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
         awaitText("Layout changed by Ada")
         waitForIdle()
-        println("Page bounds: ${onNodeWithTag(Page).getUnclippedBoundsInRoot()}")
-        println("Undo bounds: ${onNodeWithText(Overlay.UNDO_LABEL).getUnclippedBoundsInRoot()}")
+        val undoBounds = onNodeWithText(Overlay.UNDO_LABEL).getUnclippedBoundsInRoot()
+        val pageBounds = onNodeWithTag(Page).getUnclippedBoundsInRoot()
+        assertTrue(undoBounds.left >= pageBounds.left && undoBounds.right <= pageBounds.right, "Undo is off screen: $undoBounds")
         onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
         waitForIdle()
         assertEquals(HomeViews.Default, pageHomeLane)

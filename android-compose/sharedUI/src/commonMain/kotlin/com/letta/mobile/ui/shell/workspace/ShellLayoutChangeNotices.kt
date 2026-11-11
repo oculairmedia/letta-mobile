@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.onSubscription
 @Composable
 internal fun ShellLayoutChangeNotices(agents: List<Pair<String, String>>) {
     val port = LocalShellLayoutAgentPort.current
-    val overlays = LocalOverlayHost.current ?: return
+    val overlays = checkNotNull(LocalOverlayHost.current) { "Shell layout notices require an overlay host" }
     val names by rememberUpdatedState(agents)
     LaunchedEffect(port, overlays) {
         port.changes.onSubscription {
