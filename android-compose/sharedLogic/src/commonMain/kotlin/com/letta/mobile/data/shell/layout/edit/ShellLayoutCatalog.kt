@@ -130,7 +130,8 @@ object ShellLayoutCatalog {
         ShellLayoutLaneSpec(
             ShellLanes.CHAT,
             "Chat",
-            "The chat content, top to bottom; compact canvas presentations keep the input docked.",
+            "The chat content, top to bottom; compact canvas presentations keep the input docked. " +
+                "Modules other than transcript, status and composer show on wide windows only; phones show chat content alone.",
             chatViews + listOf(canvas, tasks),
             maxSlots = 8,
         ),

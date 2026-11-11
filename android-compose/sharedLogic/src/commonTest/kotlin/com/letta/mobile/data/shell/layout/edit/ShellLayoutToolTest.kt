@@ -117,6 +117,10 @@ class ShellLayoutToolTest {
         assertEquals(HomeViews.Default.map { it.value }, home)
         val catalogLanes = receipt["catalog"]!!.jsonArray.map { it.jsonObject["lane"]!!.jsonPrimitive.content }
         assertEquals(ShellLayoutCatalog.lanes.map { it.lane }, catalogLanes)
+        val chat = receipt["catalog"]!!.jsonArray.single { it.jsonObject["lane"]!!.jsonPrimitive.content == "chat" }.jsonObject
+        val description = chat["description"]!!.jsonPrimitive.content
+        assertTrue("Modules other than transcript, status and composer show on wide windows only" in description)
+        assertTrue("phones show chat content alone" in description)
         assertEquals(0, receipt["undo_steps"]!!.jsonPrimitive.int)
         val rules = receipt["rules"]!!.jsonArray.map { it.jsonPrimitive.content }
         assertTrue("${RailViews.HOME.value} stays in lane ${ShellLanes.RAIL}." in rules)

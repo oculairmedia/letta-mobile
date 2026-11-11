@@ -56,13 +56,17 @@ internal fun RowScope.ShellWorkspaceLanes(
     val modules = LocalShellModules.current
     val openConversation by rememberUpdatedState(state.navigation.openConversation)
     val views = remember(host, modules) { host.moduleViews(modules) { openConversation } }
+    val chat = remember(config) { config.chatLane() }
+    val chatLane = remember(chat) { chat.map { it.view to it.objectRef } }
+    val chatContent: @Composable (Int, Modifier) -> Unit = remember(chat, views) {
+        { index, modifier -> ShellModuleSlot(chat[index], views, modifier) }
+    }
     InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val room = if (compact) 1 else (maxWidth / LettaDimens.Pane.sidePanelWidth).toInt()
-            val chat = config.chatLane()
             CompositionLocalProvider(
-                LocalChatLane provides remember(chat) { chat.map { it.view to it.objectRef } },
-                LocalChatModuleContent provides { index, modifier -> ShellModuleSlot(chat[index], views, modifier) },
+                LocalChatLane provides chatLane,
+                LocalChatModuleContent provides chatContent,
             ) {
                 MainLane(config.mainLane(room), views)
             }

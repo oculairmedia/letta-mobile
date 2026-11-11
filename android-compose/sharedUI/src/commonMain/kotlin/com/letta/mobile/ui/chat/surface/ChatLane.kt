@@ -30,9 +30,8 @@ internal fun ChatLane(
     val attachedStatus = lane.indexOfFirst { it.first == ChatViews.STATUS }.let { index ->
         index >= 0 && lane.getOrNull(index + 1)?.first == ChatViews.COMPOSER
     }
-    BoxWithConstraints(modifier) {
-        val wide = maxWidth >= LettaDimens.Pane.wideBreakpoint
-        Column(Modifier.fillMaxSize()) {
+    val content: @Composable (Boolean, Modifier) -> Unit = { wide, bodyModifier ->
+        Column(bodyModifier) {
             lane.forEachIndexed { index, slot ->
                 key(slot) {
                     when (slot.first) {
@@ -43,6 +42,13 @@ internal fun ChatLane(
                     }
                 }
             }
+        }
+    }
+    if (lane.all { it.first in ChatViews.Default }) {
+        content(false, modifier)
+    } else {
+        BoxWithConstraints(modifier) {
+            content(maxWidth >= LettaDimens.Pane.wideBreakpoint, Modifier.fillMaxSize())
         }
     }
 }
