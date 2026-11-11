@@ -33,6 +33,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.Assume.assumeFalse
 
 class FileCanvasMountStoreTest {
     private val host = HostId("host-one")
@@ -148,7 +149,7 @@ class FileCanvasMountStoreTest {
 
     @Test
     fun ambiguousReplacementIsReadBackAndReconfirmedOnRetry() = runBlocking {
-        if (isWindows()) return@runBlocking
+        assumeFalse("Directory fsync fault injection requires a directory channel", isWindows())
         val directory = Files.createTempDirectory("canvas-mounts-after-replace")
         val syncs = AtomicInteger()
         val failing = FileCanvasMountStore(directory, host) { parent ->
