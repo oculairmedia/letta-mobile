@@ -131,7 +131,9 @@ object ShellLayoutCatalog {
             ShellLanes.CHAT,
             "Chat",
             "The chat content, top to bottom; compact canvas presentations keep the input docked. " +
-                "Modules other than transcript, status and composer show on wide windows only; phones show chat content alone.",
+                "Modules other than transcript, status and composer show on wide windows only; phones show chat content alone. " +
+                "Docked status is hidden when attached to the composer (the default), " +
+                "but shown at its position when placed elsewhere.",
             chatViews + listOf(canvas, tasks),
             maxSlots = 8,
         ),

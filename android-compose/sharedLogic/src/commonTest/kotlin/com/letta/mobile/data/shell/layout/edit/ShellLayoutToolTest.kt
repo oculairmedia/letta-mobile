@@ -121,6 +121,8 @@ class ShellLayoutToolTest {
         val description = chat["description"]!!.jsonPrimitive.content
         assertTrue("Modules other than transcript, status and composer show on wide windows only" in description)
         assertTrue("phones show chat content alone" in description)
+        assertTrue("Docked status is hidden when attached to the composer (the default)" in description)
+        assertTrue("but shown at its position when placed elsewhere" in description)
         assertEquals(0, receipt["undo_steps"]!!.jsonPrimitive.int)
         val rules = receipt["rules"]!!.jsonArray.map { it.jsonPrimitive.content }
         assertTrue("${RailViews.HOME.value} stays in lane ${ShellLanes.RAIL}." in rules)

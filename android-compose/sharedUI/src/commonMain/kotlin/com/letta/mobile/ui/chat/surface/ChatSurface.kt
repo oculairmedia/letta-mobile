@@ -637,7 +637,7 @@ internal fun DockedChatLane(frame: ChatSurfaceFrame, modifier: Modifier) {
         modifier = modifier,
         docked = true,
         transcript = { DockedReplyCard(dockedReplyParams(frame), it) },
-        status = {},
+        status = { LiveRunStatus(frame) },
         composer = { _, _ -> },
     )
 }

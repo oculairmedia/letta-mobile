@@ -2048,7 +2048,6 @@ public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$ChatLan
 public final class com/letta/mobile/ui/chat/surface/ComposableSingletons$ChatSurfaceKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/ComposableSingletons$ChatSurfaceKt;
 	public fun <init> ()V
-	public final fun getLambda$-1502964046$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-1894037340$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
