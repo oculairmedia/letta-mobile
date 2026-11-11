@@ -73,6 +73,62 @@ class ContextBreakdownEstimatorTest {
         }
     }
 
+    @Test
+    fun oneUsagePointNamesOverheadWithoutClaimingMeasuredDensity() {
+        val result = reviewFixture(firstPrompt = null, growthChars = 0)
+        val wire = result.toAgentContextJson()
+        assertEquals(540, result.sections.messages)
+        assertTrue((result.toolsAndHarness ?: 0) > 50_000, "A single usage point must name fixed overhead")
+        assertEquals("recorded_usage", wire["overhead_source"]?.jsonPrimitive?.content)
+        assertNull(wire["calibration_source"])
+        assertNull(wire["message_chars_per_token"])
+        assertTrue(result.tools!! - result.toolsAndHarness!! < result.total / 10)
+    }
+
+    @Test
+    fun aModelSwitchRestartsTheFitAtTheLatestRun() {
+        val result = reviewFixture(firstPrompt = 64_000, firstModel = "previous-model")
+        assertEquals(21_000, result.sections.messages)
+        assertEquals(65_000, result.toolsAndHarness)
+    }
+
+    @Test
+    fun aNonIncreasingPromptRestartsRatherThanPoisoningLaterGrowth() {
+        val result = reviewFixture(firstPrompt = 67_000)
+        assertEquals(21_000, result.sections.messages)
+        assertEquals(65_000, result.toolsAndHarness)
+    }
+
+    @Test
+    fun aSwitchWithoutEnoughSubsequentGrowthOnlyNamesOverhead() {
+        val result = reviewFixture(firstPrompt = 64_000, firstModel = "previous-model", growthChars = 432)
+        assertEquals(648, result.sections.messages)
+        assertNull(result.messageCharsPerToken)
+        assertTrue((result.toolsAndHarness ?: 0) > 0)
+    }
+
+    private fun reviewFixture(
+        firstPrompt: Int?,
+        firstModel: String = "fixture",
+        growthChars: Int = 43_200,
+    ): ContextBreakdownEstimate {
+        val lastPrompt = if (growthChars == 43_200) 86_000 else 66_000 + growthChars / 2
+        val messages = buildList {
+            firstPrompt?.let {
+                add(obj("""{"role":"assistant","model":"$firstModel","content":"","usage":{"input":$it}}"""))
+            }
+            add(obj("""{"role":"user","content":"${"x".repeat(2_160)}"}"""))
+            add(obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":66000}}"""))
+            if (growthChars > 0) {
+                add(obj("""{"role":"user","content":"${"x".repeat(growthChars)}"}"""))
+                add(obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":$lastPrompt}}"""))
+            }
+        }
+        // 43,200 chars / 20,000 tokens = 2.16 chars/token, with a 65k fixed intercept.
+        val transcript = LocalTranscriptContext(null, messages, 0)
+        return ContextBreakdownEstimator.estimate(LocalContextInputs(null, obj("{}"), null, transcript, null))
+    }
+
     // ── calibration ────────────────────────────────────────────────────────
 
     @Test
@@ -127,6 +183,7 @@ class ContextBreakdownEstimatorTest {
                {"type":"toolCall","name":"Bash","arguments":{"cmd":"ls"}}]}""",
         )
         // 4 + 4 + len("Bash") + len({"cmd":"ls"}) = 4 + 4 + 4 + 12 = 24 chars -> 6 tokens.
+        assertEquals(24L, LocalMessageTokens.chars(assistant))
         assertEquals(6, LocalMessageTokens.of(assistant))
         val image = obj("""{"role":"user","content":[{"type":"image","data":"x"}]}""")
         assertEquals(LocalMessageTokens.IMAGE_TOKENS, LocalMessageTokens.of(image))

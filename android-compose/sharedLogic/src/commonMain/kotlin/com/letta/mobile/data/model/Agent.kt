@@ -52,6 +52,8 @@ data class ContextWindowOverview(
     @SerialName("calibration_source") val calibrationSource: String? = null,
     /** Fitted message characters per token (1..8); null on the four-character fallback. */
     @SerialName("message_chars_per_token") val messageCharsPerToken: Double? = null,
+    /** `recorded_usage` when fixed overhead was inferred, even if message density remains estimated. */
+    @SerialName("overhead_source") val overheadSource: String? = null,
 )
 
 @Serializable

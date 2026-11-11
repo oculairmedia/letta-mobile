@@ -90,7 +90,7 @@ class AgentContextCardUiTest {
     }
 
     @Test
-    fun aUsageCalibratedBreakdownNamesToolsAndHarness() = runComposeUiTest {
+    fun usageAndOverheadOnlyBreakdownsNameToolsWithHonestCaptions() {
         val overview = ContextWindowOverview(
             contextWindowSizeMax = 200_000,
             contextWindowSizeCurrent = 84_000,
@@ -104,13 +104,29 @@ class AgentContextCardUiTest {
             source = "estimate",
             calibrated = true,
         )
-        val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { overview }, compaction = null)
-        setContent { PointerCard(deps, focus) }
-        onNodeWithTag(AgentContextTags.CARD).performClick()
-        waitForIdle()
-        onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Measured from this conversation's usage")
-        onNodeWithText("Tools and harness").assertExists()
-        onNodeWithText("Other").assertDoesNotExist()
+        val overheadOnly = overview.copy(
+            numTokensMessages = 540,
+            numTokensFunctionsDefinitions = 77_460,
+            numTokensToolsAndHarness = 77_460,
+            calibrationSource = null,
+            messageCharsPerToken = null,
+            overheadSource = "recorded_usage",
+        )
+        val cases = listOf(
+            overview to "Measured from this conversation's usage",
+            overheadOnly to "Overhead measured; messages estimated; split is approximate",
+        )
+        cases.forEach { (reading, caption) ->
+            runComposeUiTest {
+                val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { reading }, compaction = null)
+                setContent { PointerCard(deps, focus) }
+                onNodeWithTag(AgentContextTags.CARD).performClick()
+                waitForIdle()
+                onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals(caption)
+                onNodeWithText("Tools and harness").assertExists()
+                onNodeWithText("Other").assertDoesNotExist()
+            }
+        }
     }
 
     @Test

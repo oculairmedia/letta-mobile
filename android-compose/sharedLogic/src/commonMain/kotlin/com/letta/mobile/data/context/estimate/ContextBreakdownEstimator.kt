@@ -218,7 +218,10 @@ fun ContextBreakdownEstimate.toAgentContextJson(): JsonObject = buildJsonObject 
     put("source", ESTIMATE_SOURCE)
     put("calibrated", calibrated)
     put("tools_derived", tools != null)
-    toolsAndHarness?.let { put("num_tokens_tools_and_harness", it) }
+    toolsAndHarness?.let {
+        put("num_tokens_tools_and_harness", it)
+        put("overhead_source", "recorded_usage")
+    }
     messageCharsPerToken?.let {
         put("calibration_source", "conversation_usage")
         put("message_chars_per_token", it)

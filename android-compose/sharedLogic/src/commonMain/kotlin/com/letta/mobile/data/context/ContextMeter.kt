@@ -26,6 +26,9 @@ enum class ContextProvenance {
 
     /** Usage-calibrated, but more than 10% of occupied tokens remain unexplained. */
     ConversationUsageApproximate,
+
+    /** Recorded overhead, but message density is still estimated and the split is approximate. */
+    OverheadMeasured,
 }
 
 /** A context meter's whole state: the bar, how it was derived, and where auto-compaction fires. */
@@ -66,22 +69,29 @@ data class ContextMeter(
         private fun estimated(estimate: ContextWindowOverview, exactTotal: Int?, window: Int?, totalIsEstimate: Boolean): ContextMeter {
             val matched = exactTotal?.let(estimate::calibratedTo) ?: estimate
             val calibrated = matched.calibrated == true && !totalIsEstimate
-            val measured = matched.calibrationSource == "conversation_usage" && calibrated
-            val other = matched.numTokensFunctionsDefinitions - (matched.numTokensToolsAndHarness ?: 0)
-            val provenance = when {
-                measured && other > matched.contextWindowSizeCurrent * APPROXIMATE_SPLIT_RATIO ->
-                    ContextProvenance.ConversationUsageApproximate
-                measured -> ContextProvenance.ConversationUsage
-                calibrated -> ContextProvenance.EstimatedCalibrated
-                else -> ContextProvenance.Estimated
-            }
             return ContextMeter(
                 usage = ContextWindowUsage.from(matched.copy(contextWindowSizeMax = window ?: 0))
                     .withEstimateLabels(matched.numTokensToolsAndHarness != null),
-                provenance = provenance,
+                provenance = provenanceOf(matched, calibrated),
                 autoCompactAt = autoCompactAt(window),
                 totalIsEstimate = totalIsEstimate,
             )
+        }
+
+        private fun provenanceOf(overview: ContextWindowOverview, calibrated: Boolean): ContextProvenance = when {
+            !calibrated -> ContextProvenance.Estimated
+            overview.calibrationSource == "conversation_usage" -> usageProvenance(overview)
+            overview.overheadSource == "recorded_usage" -> ContextProvenance.OverheadMeasured
+            else -> ContextProvenance.EstimatedCalibrated
+        }
+
+        private fun usageProvenance(overview: ContextWindowOverview): ContextProvenance {
+            val other = overview.numTokensFunctionsDefinitions - (overview.numTokensToolsAndHarness ?: 0)
+            return if (other > overview.contextWindowSizeCurrent * APPROXIMATE_SPLIT_RATIO) {
+                ContextProvenance.ConversationUsageApproximate
+            } else {
+                ContextProvenance.ConversationUsage
+            }
         }
 
         /**

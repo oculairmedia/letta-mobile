@@ -1210,6 +1210,7 @@ final enum class com.letta.mobile.data.context/ContextProvenance : kotlin/Enum<c
     enum entry ConversationUsageApproximate // com.letta.mobile.data.context/ContextProvenance.ConversationUsageApproximate|null[0]
     enum entry Estimated // com.letta.mobile.data.context/ContextProvenance.Estimated|null[0]
     enum entry EstimatedCalibrated // com.letta.mobile.data.context/ContextProvenance.EstimatedCalibrated|null[0]
+    enum entry OverheadMeasured // com.letta.mobile.data.context/ContextProvenance.OverheadMeasured|null[0]
     enum entry TotalOnly // com.letta.mobile.data.context/ContextProvenance.TotalOnly|null[0]
 
     final val entries // com.letta.mobile.data.context/ContextProvenance.entries|#static{}entries[0]
@@ -44247,7 +44248,7 @@ final class com.letta.mobile.data.model/CompletedTimelineIssue { // com.letta.mo
 }
 
 final class com.letta.mobile.data.model/ContextWindowOverview { // com.letta.mobile.data.model/ContextWindowOverview|null[0]
-    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/Double? = ...) // com.letta.mobile.data.model/ContextWindowOverview.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.Double?){}[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/Double? = ..., kotlin/String? = ...) // com.letta.mobile.data.model/ContextWindowOverview.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.Double?;kotlin.String?){}[0]
 
     final val calibrated // com.letta.mobile.data.model/ContextWindowOverview.calibrated|{}calibrated[0]
         final fun <get-calibrated>(): kotlin/Boolean? // com.letta.mobile.data.model/ContextWindowOverview.calibrated.<get-calibrated>|<get-calibrated>(){}[0]
@@ -44287,6 +44288,8 @@ final class com.letta.mobile.data.model/ContextWindowOverview { // com.letta.mob
         final fun <get-numTokensToolUsageRules>(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.numTokensToolUsageRules.<get-numTokensToolUsageRules>|<get-numTokensToolUsageRules>(){}[0]
     final val numTokensToolsAndHarness // com.letta.mobile.data.model/ContextWindowOverview.numTokensToolsAndHarness|{}numTokensToolsAndHarness[0]
         final fun <get-numTokensToolsAndHarness>(): kotlin/Int? // com.letta.mobile.data.model/ContextWindowOverview.numTokensToolsAndHarness.<get-numTokensToolsAndHarness>|<get-numTokensToolsAndHarness>(){}[0]
+    final val overheadSource // com.letta.mobile.data.model/ContextWindowOverview.overheadSource|{}overheadSource[0]
+        final fun <get-overheadSource>(): kotlin/String? // com.letta.mobile.data.model/ContextWindowOverview.overheadSource.<get-overheadSource>|<get-overheadSource>(){}[0]
     final val source // com.letta.mobile.data.model/ContextWindowOverview.source|{}source[0]
         final fun <get-source>(): kotlin/String? // com.letta.mobile.data.model/ContextWindowOverview.source.<get-source>|<get-source>(){}[0]
     final val toolsDerived // com.letta.mobile.data.model/ContextWindowOverview.toolsDerived|{}toolsDerived[0]
@@ -44312,6 +44315,7 @@ final class com.letta.mobile.data.model/ContextWindowOverview { // com.letta.mob
     final fun component21(): kotlin/Int? // com.letta.mobile.data.model/ContextWindowOverview.component21|component21(){}[0]
     final fun component22(): kotlin/String? // com.letta.mobile.data.model/ContextWindowOverview.component22|component22(){}[0]
     final fun component23(): kotlin/Double? // com.letta.mobile.data.model/ContextWindowOverview.component23|component23(){}[0]
+    final fun component24(): kotlin/String? // com.letta.mobile.data.model/ContextWindowOverview.component24|component24(){}[0]
     final fun component3(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.component3|component3(){}[0]
     final fun component4(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.component4|component4(){}[0]
     final fun component5(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.component5|component5(){}[0]
@@ -44319,7 +44323,7 @@ final class com.letta.mobile.data.model/ContextWindowOverview { // com.letta.mob
     final fun component7(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.component7|component7(){}[0]
     final fun component8(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.component8|component8(){}[0]
     final fun component9(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.component9|component9(){}[0]
-    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/Double? = ...): com.letta.mobile.data.model/ContextWindowOverview // com.letta.mobile.data.model/ContextWindowOverview.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.Double?){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Boolean? = ..., kotlin/String? = ..., kotlin/Int? = ..., kotlin/String? = ..., kotlin/Double? = ..., kotlin/String? = ...): com.letta.mobile.data.model/ContextWindowOverview // com.letta.mobile.data.model/ContextWindowOverview.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.String?;kotlin.Boolean?;kotlin.Boolean?;kotlin.String?;kotlin.Boolean?;kotlin.String?;kotlin.Int?;kotlin.String?;kotlin.Double?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ContextWindowOverview.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ContextWindowOverview.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.model/ContextWindowOverview.toString|toString(){}[0]
@@ -72530,6 +72534,7 @@ final object com.letta.mobile.data.context.estimate/LocalMessageTokens { // com.
     final const val IMAGE_TOKENS // com.letta.mobile.data.context.estimate/LocalMessageTokens.IMAGE_TOKENS|{}IMAGE_TOKENS[0]
         final fun <get-IMAGE_TOKENS>(): kotlin/Int // com.letta.mobile.data.context.estimate/LocalMessageTokens.IMAGE_TOKENS.<get-IMAGE_TOKENS>|<get-IMAGE_TOKENS>(){}[0]
 
+    final fun chars(kotlinx.serialization.json/JsonObject): kotlin/Long // com.letta.mobile.data.context.estimate/LocalMessageTokens.chars|chars(kotlinx.serialization.json.JsonObject){}[0]
     final fun of(kotlinx.serialization.json/JsonObject, com.letta.mobile.data.context.estimate/TokenEstimator = ...): kotlin/Int // com.letta.mobile.data.context.estimate/LocalMessageTokens.of|of(kotlinx.serialization.json.JsonObject;com.letta.mobile.data.context.estimate.TokenEstimator){}[0]
     final fun ofAll(kotlin.collections/List<kotlinx.serialization.json/JsonObject>, com.letta.mobile.data.context.estimate/TokenEstimator = ...): kotlin/Int // com.letta.mobile.data.context.estimate/LocalMessageTokens.ofAll|ofAll(kotlin.collections.List<kotlinx.serialization.json.JsonObject>;com.letta.mobile.data.context.estimate.TokenEstimator){}[0]
 }

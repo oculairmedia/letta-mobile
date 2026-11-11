@@ -43,52 +43,69 @@ data class LocalTranscriptContext(
 
     /** Counts text and fits usage growth in one pass; never crosses a compaction or model change. */
     internal fun messageCalibration(estimator: TokenEstimator): MessageCalibration {
-        var chars = 0L
-        var fallback = 0
-        var firstChars = 0L
-        var firstPrompt = 0L
-        var lastChars = 0L
-        var lastPrompt = 0L
-        var model: String? = null
-        var points = 0
-        var valid = true
-        val boundary = summary?.number("timestamp")
-        messages.forEachIndexed { index, message ->
-            if (index >= firstPostCompaction && message.reportsFreshUsage(boundary)) {
-                val usage = message["usage"] as? JsonObject
-                val prompt = listOf("input", "cacheRead", "cacheWrite").sumOf { usage?.number(it) ?: 0L }
-                val currentModel = message.text("model")
-                if (points == 0) {
-                    firstChars = chars
-                    firstPrompt = prompt
-                    model = currentModel
-                } else if (prompt <= lastPrompt || chars <= lastChars || currentModel != model) {
-                    valid = false
-                }
-                valid = valid && prompt > 0 && currentModel != null
-                lastChars = chars
-                lastPrompt = prompt
-                points += 1
-            }
-            if (points > 0 && message.text("role") == "assistant" && message.text("model") != model) valid = false
-            val count = LocalMessageTokens.of(message, TokenEstimator { size ->
-                chars += size
-                estimator.tokensForChars(size)
-            })
-            fallback += count
+        val run = messages.foldIndexed(UsageRun()) { index, accumulated, message ->
+            val point = if (index >= firstPostCompaction) usagePoint(message, accumulated) else null
+            accumulated.append(message, estimator, point)
         }
-        val growthChars = lastChars - firstChars
-        val growthTokens = lastPrompt - firstPrompt
-        if (!valid || points < 2 || growthChars < MIN_CALIBRATION_CHARS || growthTokens < MIN_CALIBRATION_TOKENS) {
-            return MessageCalibration(fallback)
+        return fit(run, estimator)
+    }
+
+    private fun usagePoint(message: JsonObject, run: UsageRun): UsagePoint? {
+        if (!message.reportsFreshUsage(summary?.number("timestamp"))) return null
+        val usage = message["usage"] as? JsonObject ?: return null
+        val prompt = PROMPT_PARTS.sumOf { usage.number(it) ?: 0L }
+        return prompt.takeIf { it > 0 }?.let { UsagePoint(run.chars, it, message.text("model")) }
+    }
+
+    private fun fit(run: UsageRun, estimator: TokenEstimator): MessageCalibration {
+        val first = run.first ?: return MessageCalibration(run.fallback)
+        val density = run.last?.let(first::densityTo)
+        if (density == null) {
+            val fixed = (first.prompt - estimator.tokensForChars(first.chars)).takeIf { it >= 0 }?.toInt()
+            return MessageCalibration(run.fallback, fixed = fixed)
         }
-        // 1..8 chars/token covers dense JSON through prose without trusting pathological slopes.
-        val charsPerToken = (growthChars.toDouble() / growthTokens).coerceIn(1.0, 8.0)
-        val fixed = firstPrompt - firstChars / charsPerToken
-        if (fixed < 0) return MessageCalibration(fallback)
-        return MessageCalibration(
-            kotlin.math.ceil(chars / charsPerToken).toInt(), charsPerToken, fixed.toInt(),
-        )
+        val fixed = first.prompt - first.chars / density
+        if (fixed < 0) return MessageCalibration(run.fallback)
+        return MessageCalibration(kotlin.math.ceil(run.chars / density).toInt(), density, fixed.toInt())
+    }
+
+    /** Immutable, constant-space fold: an offending point starts a new candidate run. */
+    private data class UsageRun(
+        val chars: Long = 0L,
+        val fallback: Int = 0,
+        val first: UsagePoint? = null,
+        val last: UsagePoint? = null,
+    ) {
+        fun append(message: JsonObject, estimator: TokenEstimator, point: UsagePoint?): UsageRun {
+            val addedChars = LocalMessageTokens.chars(message)
+            return withPoint(point).copy(chars = chars + addedChars, fallback = fallback + estimator.tokensForChars(addedChars))
+        }
+
+        private fun withPoint(point: UsagePoint?): UsageRun = when {
+            point == null -> this
+            last?.precedes(point) == true -> copy(last = point)
+            else -> copy(first = point, last = point)
+        }
+    }
+
+    private data class UsagePoint(val chars: Long, val prompt: Long, val model: String?) {
+        fun precedes(next: UsagePoint): Boolean = sameModel(next) && growsTo(next)
+
+        private fun sameModel(next: UsagePoint): Boolean = model != null && model == next.model
+
+        private fun growsTo(next: UsagePoint): Boolean = chars < next.chars && prompt < next.prompt
+
+        fun densityTo(next: UsagePoint): Double? {
+            if (!sameModel(next)) return null
+            val growthChars = next.chars - chars
+            val growthTokens = next.prompt - prompt
+            if (!sufficientGrowth(next)) return null
+            // Covers dense JSON through prose without trusting pathological slopes.
+            return (growthChars.toDouble() / growthTokens).coerceIn(MIN_CHARS_PER_TOKEN, MAX_CHARS_PER_TOKEN)
+        }
+
+        private fun sufficientGrowth(next: UsagePoint): Boolean =
+            next.chars - chars >= MIN_CALIBRATION_CHARS && next.prompt - prompt >= MIN_CALIBRATION_TOKENS
     }
 
     internal data class MessageCalibration(val tokens: Int, val charsPerToken: Double? = null, val fixed: Int? = null)
@@ -143,6 +160,9 @@ data class LocalTranscriptContext(
 
         private const val MIN_CALIBRATION_CHARS = 16_384L
         private const val MIN_CALIBRATION_TOKENS = 4_096L
+        private const val MIN_CHARS_PER_TOKEN = 1.0
+        private const val MAX_CHARS_PER_TOKEN = 8.0
+        private val PROMPT_PARTS = listOf("input", "cacheRead", "cacheWrite")
         private val USAGE_PARTS = listOf("input", "output", "cacheRead", "cacheWrite")
         private val UNUSABLE_STOP_REASONS = setOf("aborted", "error")
     }

@@ -36,7 +36,8 @@ class IrohContextBreakdownTest {
                 """{"context_window_size_current":40000,"context_window_size_max":200000,"num_tokens_system":4000,
                    "num_tokens_messages":30000,"num_tokens_functions_definitions":6000,"source":"estimate",
                    "calibrated":true,"tools_derived":true,"total_source":"client","memory_split":false,
-                   "num_tokens_tools_and_harness":5500,"calibration_source":"conversation_usage","message_chars_per_token":2.16}""",
+                   "num_tokens_tools_and_harness":5500,"calibration_source":"conversation_usage","message_chars_per_token":2.16,
+                   "overhead_source":"recorded_usage"}""",
             )
         }
         val directory = IrohAdminRpcAgentDirectory(transport)
@@ -50,6 +51,7 @@ class IrohContextBreakdownTest {
         assertEquals(5_500, overview.numTokensToolsAndHarness)
         assertEquals("conversation_usage", overview.calibrationSource)
         assertEquals(2.16, overview.messageCharsPerToken)
+        assertEquals("recorded_usage", overview.overheadSource)
     }
 
     @Test

@@ -19,12 +19,14 @@ object LocalMessageTokens {
     /** letta-code's `IMAGE_TOKEN_ESTIMATE`. */
     const val IMAGE_TOKENS: Int = 1200
 
-    fun of(message: JsonObject, estimator: TokenEstimator = CharsPerToken): Int {
+    fun of(message: JsonObject, estimator: TokenEstimator = CharsPerToken): Int = estimator.tokensForChars(chars(message))
+
+    /** Counted characters, including the existing synthetic character allowance for images. */
+    fun chars(message: JsonObject): Long {
         val content = message["content"]
-        if (content is JsonPrimitive) return estimator.tokensForChars(content.contentOrNull.orEmpty().length.toLong())
-        val blocks = (content as? JsonArray) ?: (message["parts"] as? JsonArray) ?: return 0
-        val chars = blocks.sumOf(::blockChars)
-        return estimator.tokensForChars(chars)
+        if (content is JsonPrimitive) return content.contentOrNull.orEmpty().length.toLong()
+        val blocks = (content as? JsonArray) ?: (message["parts"] as? JsonArray) ?: return 0L
+        return blocks.sumOf(::blockChars)
     }
 
     fun ofAll(messages: List<JsonObject>, estimator: TokenEstimator = CharsPerToken): Int =
