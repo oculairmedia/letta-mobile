@@ -125,7 +125,7 @@ class FileCanvasMountStore internal constructor(
     private fun fileFor(agent: AgentId, conversation: ConversationId?): DurableHostFile {
         val identity = JsonArray(listOf(JsonPrimitive(agent.value), conversation?.let { JsonPrimitive(it.value) } ?: JsonNull))
         val hash = sha256Hex(identity.toString().encodeToByteArray())
-        val kind = if (conversation == null) "default" else "binding"
+        val kind = if (conversation == null) DEFAULT_RECORD else BINDING_RECORD
         val lock = lockDirectory.resolve("${hash.take(STRIPE_HEX_CHARS)}.lock")
         return DurableHostFile(directory.resolve("$kind-$hash.json"), lock, directorySync)
     }
@@ -198,6 +198,10 @@ class FileCanvasMountStore internal constructor(
         const val VERSION = 1
         const val MAX_RECORD_BYTES = 8 * 1024
         const val STRIPE_HEX_CHARS = 2
+
+        /** Record file name prefixes: an agent's default mount, and one agent/thread binding. */
+        const val DEFAULT_RECORD = "default"
+        const val BINDING_RECORD = "binding"
     }
 }
 
