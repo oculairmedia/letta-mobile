@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryRecorder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
@@ -131,23 +133,11 @@ class AdminProxyRequestTest {
 
     @Test
     fun non2xxUpstreamResponseDispatchesAsFailure() = runTest {
-        val recording = installRecordingTransport(AdminProxyTransportResponse(404, """{"error":"missing"}"""))
-        val router = AdminRpcRouter()
-        ProjectAdminHandlers.register(router, "http://admin.local")
+        val failure = dispatchUpstreamFailure(AdminProxyTransportResponse(404, """{"error":"missing"}"""))
 
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-404",
-                method = "project.list",
-                params = null,
-            ),
-        ).jsonObject
-
-        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
-        // The upstream status and body are vibesync's own text: the router answers the fixed message.
-        assertEquals(ADMIN_RPC_INTERNAL_ERROR, response.getValue("error").jsonPrimitive.content)
-        assertFalse("missing" in response.toString())
-        assertEquals(1, recording.calls.size)
+        // Status only: vibesync's body is its own text and never crosses the wire.
+        failure.assertStatusOnly("HTTP 404", "missing")
+        assertEquals(1, failure.recording.calls.size)
     }
 
     @Test
@@ -159,21 +149,48 @@ class AdminProxyRequestTest {
 and newline"
             }
         """.trimIndent()
-        installRecordingTransport(AdminProxyTransportResponse(500, upstreamBody))
-        val router = AdminRpcRouter()
-        ProjectAdminHandlers.register(router, "http://admin.local")
 
-        val responseText = router.dispatch(
-            requestId = "req-500",
-            method = "project.list",
-            params = null,
-        )
-        val response = Json.parseToJsonElement(responseText).jsonObject
+        val failure = dispatchUpstreamFailure(AdminProxyTransportResponse(500, upstreamBody))
 
-        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
-        val error = response.getValue("error").jsonPrimitive.content
-        assertEquals(ADMIN_RPC_INTERNAL_ERROR, error)
-        assertFalse("first line" in responseText)
+        failure.assertStatusOnly("HTTP 500", "first line", "quoted", "and newline")
+    }
+
+    @Test
+    fun non2xxUpstreamBodyQuotingAHostPathNeverReachesTheClientOrTelemetry() = runTest {
+        val hostPath = "/srv/vibesync/data/projects/registry.db"
+        val upstreamBody = """{"error":"EACCES: permission denied, open '$hostPath'"}"""
+
+        val failure = dispatchUpstreamFailure(AdminProxyTransportResponse(409, upstreamBody))
+
+        failure.assertStatusOnly("HTTP 409", hostPath, "EACCES")
+    }
+
+    private class UpstreamFailure(
+        val responseText: String,
+        val events: List<Telemetry.Event>,
+        val recording: RecordingTransport,
+    ) {
+        fun assertStatusOnly(expected: String, vararg upstreamFragments: String) {
+            val response = Json.parseToJsonElement(responseText).jsonObject
+            assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
+            assertEquals(expected, response.getValue("error").jsonPrimitive.content)
+            val telemetry = events.joinToString(separator = " | ") { it.toLine() } + events
+            upstreamFragments.forEach { fragment ->
+                assertFalse(fragment in responseText, "response leaked '$fragment'")
+                assertFalse(fragment in telemetry, "telemetry leaked '$fragment'")
+            }
+        }
+    }
+
+    private suspend fun dispatchUpstreamFailure(upstream: AdminProxyTransportResponse): UpstreamFailure {
+        val recording = installRecordingTransport(upstream)
+        val recorder = TelemetryRecorder()
+        return Telemetry.installRecorder(recorder).use {
+            val router = AdminRpcRouter()
+            ProjectAdminHandlers.register(router, "http://admin.local")
+            val responseText = router.dispatch(requestId = "req-upstream", method = "project.list", params = null)
+            UpstreamFailure(responseText, recorder.snapshot(), recording)
+        }
     }
 
     private fun installRecordingTransport(

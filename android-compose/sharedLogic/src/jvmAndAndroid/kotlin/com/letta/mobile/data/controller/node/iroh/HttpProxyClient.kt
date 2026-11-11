@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.readUtf8AtMost
@@ -104,10 +105,11 @@ class AdminProxyClient(
                 "ms" attr (System.currentTimeMillis() - startMs),
             )
             if (response.statusCode !in 200..299) {
-                throw AdminProxyHttpException(response.statusCode, response.bodyText)
+                // Status only: the upstream body can quote host paths or internal detail.
+                adminError("HTTP ${response.statusCode}")
             }
             AdminProxyResponse(response.statusCode, json.parseToJsonElement(response.bodyText))
-        } catch (e: AdminProxyHttpException) {
+        } catch (e: AdminRpcClientError) {
             throw e
         } catch (e: Exception) {
             Telemetry.event("AdminRpc", "proxy.failed", "url" attr url, "error" attr (e.message ?: ""))
