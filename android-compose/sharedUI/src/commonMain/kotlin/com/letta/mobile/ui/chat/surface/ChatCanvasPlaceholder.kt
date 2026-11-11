@@ -31,5 +31,6 @@ fun ChatCanvasPlaceholder(modifier: Modifier = Modifier) {
     }
 }
 
-/** The key a host scopes a conversation's canvas state by; null while there is no conversation. */
-fun chatCanvasKey(conversationId: String?): String? = conversationId?.takeIf { it.isNotBlank() }?.let { "canvas:$it" }
+/** A conversation page's retained key, scoped to its owner generation; null before a conversation exists. */
+fun chatCanvasKey(conversationId: String?, generation: Long): String? =
+    conversationId?.takeIf { it.isNotBlank() }?.let { "canvas:$generation:$it" }

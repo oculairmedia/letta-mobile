@@ -15,6 +15,8 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.act
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -46,12 +48,17 @@ class WsActiveSubagentSourceTest {
         initial: List<SubagentEntry> = emptyList(),
     ) : ISubagentRepository {
         val state = MutableStateFlow(initial)
+        val historyState = MutableStateFlow(initial)
         var refreshResult: Result<List<SubagentEntry>>? = null
         var refreshCalls = 0
         override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
             state.map { entries -> entries.filter { it.inScope(scope) } }
         override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
             state.value.filter { it.inScope(scope) }
+        override fun subagentsWithHistoryFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
+            historyState.map { entries -> entries.filter { it.inScope(scope) } }
+        override fun currentSubagentsWithHistory(scope: SubagentParentScope): List<SubagentEntry> =
+            historyState.value.filter { it.inScope(scope) }
         private fun SubagentEntry.inScope(scope: SubagentParentScope): Boolean =
             parentAgentId == scope.parentAgentId && parentConversationId == scope.parentConversationId
         override suspend fun refresh(): Result<List<SubagentEntry>> {
@@ -79,6 +86,24 @@ class WsActiveSubagentSourceTest {
         scope: CoroutineScope,
         conversationId: MutableStateFlow<String?> = MutableStateFlow("default"),
     ) = WsActiveSubagentSource(repo, scope, "agent-parent", conversationId)
+
+    @Test
+    fun finishedRosterAndConversationMetadataStaySeparateFromRingsAndRunPhases() = runTest {
+        val live = entry(ToolCallRef("live"))
+        val history = (1..5).map { live.copy(toolCallId = "old-$it", status = SubagentStatus.FAILED) }
+        val repo = FakeSubagentRepository(listOf(live))
+        val source = source(repo, backgroundScope)
+        backgroundScope.launch { source.activeSubagents.collect {} }
+        backgroundScope.launch { source.rosterEntries.collect {} }
+        backgroundScope.launch { source.rosterEntriesWithHistory.collect {} }
+        runCurrent()
+        // The visible page owns collection; its opener reads the latest historical metadata.
+        repo.historyState.value = history + live
+        runCurrent()
+        assertEquals(listOf("live"), source.activeSubagents.value.map { it.id })
+        assertEquals(listOf("live"), source.rosterEntries.value.map { it.toolCallId })
+        assertEquals((history + live).map { it.toolCallId }, source.rosterEntriesWithHistory.value.map { it.toolCallId })
+    }
 
     @Test
     fun `status strings map to ActiveSubagent Status`() {

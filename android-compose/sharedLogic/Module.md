@@ -91,6 +91,8 @@ The versioned semantic canvas composer: validation, Markdown conversion, geometr
 
 Canvas library state and operations shared by hosts. `CanvasLibraryController` retains loaded boards when storage fails, reports a retryable error and serializes library operations; `CanvasLibraryState` is its observable content and loading state. Hosts supply storage, archive and synchronization bindings and present the error. Keep windowing and platform storage construction outside this package; retries reload state rather than repeating mutations.
 
+`CanvasBoardOwner` coordinates one window's table and registry using the same config identity as shell layouts. Initial configuration loading adopts the startup owner; identity changes retire pages before publishing replacement services. `CanvasPageHold` retains one destination's session in an injected scope, reports recoverable acquisition failures, and retries only within its original table. Retirement is terminal: old canvas/conversation identifiers are never re-acquired in a replacement backend. Hosts of these controllers bind retention and render `CanvasPageState`; they do not implement this policy.
+
 # Package com.letta.mobile.data.canvas.mount
 
 Host-owned persistence for semantic canvas mounts. `AuthorizedCanvasMounts` is the only entry point from outside this package: every call carries a `CanvasMountRequest` (a `CanvasMountPrincipal` built only from verified host connection identity, plus the `CanvasMountScope` it addresses; agent and conversation ids are targets, never the actor) and is checked by a host-supplied `CanvasMountAuthority` in a fixed order: input bounds (non-blank, at most 512 UTF-8 bytes per id), then scope before storage is touched, then the proposed canvas before any mutation, then the canvas read from storage before it is returned. Abstaining, denying or throwing all deny. `CanvasMountResult.Denied` carries nothing, so a denied caller cannot tell an existing record from an absent one or learn its winner; storage failures become `CanvasMountResult.StorageFailure` with a fixed `CanvasMountFailure` reason and never a path, message or id, while cancellation propagates. When no record exists, a bind stores the caller's own authorized proposal even if the authority then refuses to reveal it; when one exists, a bind writes nothing. A failed mutation does not yet say whether its write was applied.
@@ -532,6 +534,18 @@ Message-search query/match models and text helpers. Search mode and source avail
 # Package com.letta.mobile.data.secrets
 
 Agent secret sources and vault state/controller logic. Secret values have redacted representations; explicit source operations access plaintext rather than exposing it through normal state formatting. Keep secret values out of ordinary display formatting and logs; provide guarded reads through [AgentSecretsSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets/-agent-secrets-source/index.html) and mutations through [AgentVaultActions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets/-agent-vault-actions/index.html).
+
+# Package com.letta.mobile.data.secrets.host
+
+Host side of the secure secret-input flow: agents create requests, the human answers them from a dedicated surface, and the host writes the value to a keystore provider and returns only a receipt. The value travels only inside the keystore secret type and is wiped on every path; single use, expiry and the human-only principal are enforced by [SecretRequestService](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.host/-secret-request-service/index.html), which is host-only (JVM) because the keystore SPI is.
+
+# Package com.letta.mobile.data.secrets.journal
+
+Durable storage of secret requests so single use and expiry survive a host restart. A [SecretRequestJournal](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.journal/-secret-request-journal/index.html) keeps ids, targets, the agent's purpose, states and timestamps, never a secret value; the file implementation replaces atomically, fails closed on corruption and is never reset to empty.
+
+# Package com.letta.mobile.data.secrets.request
+
+Shared models of the secret request contract: typed ids and names with the keystore grammar, the agent request and receipt, the request record clients see, validation of agent-authored purposes, and the lifecycle as pure functions in [SecretRequestLifecycle](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.request/-secret-request-lifecycle/index.html). Nothing here carries a secret value; clients and the host share these types.
 
 # Package com.letta.mobile.data.serialization
 

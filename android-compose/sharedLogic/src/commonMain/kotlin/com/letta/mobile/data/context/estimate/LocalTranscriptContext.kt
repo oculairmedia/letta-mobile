@@ -41,6 +41,113 @@ data class LocalTranscriptContext(
         return (usage + trailing).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
+    /** Counts text and fits usage growth in one pass; never crosses a compaction or model change. */
+    internal fun messageCalibration(estimator: TokenEstimator): MessageCalibration {
+        val run = messages.foldIndexed(UsageRun()) { index, accumulated, message ->
+            val point = if (index >= firstPostCompaction) usagePoint(message, accumulated) else null
+            accumulated.append(message, estimator, point)
+        }
+        return fit(run, estimator)
+    }
+
+    private fun usagePoint(message: JsonObject, run: UsageRun): UsagePoint? {
+        if (!message.reportsFreshUsage(summary?.number("timestamp"))) return null
+        val usage = message["usage"] as? JsonObject ?: return null
+        val prompt = PROMPT_PARTS.sumOf { usage.number(it) ?: 0L }
+        return prompt.takeIf { it > 0 }?.let { UsagePoint(run.chars, it, message.text("model")) }
+    }
+
+    private fun fit(run: UsageRun, estimator: TokenEstimator): MessageCalibration {
+        val current = run.measuredFit()
+        val selected = current ?: run.previousFit
+        if (selected != null) return selected.project(run, reused = current == null)
+        return boundedOverhead(run, estimator)
+    }
+
+    private fun boundedOverhead(run: UsageRun, estimator: TokenEstimator): MessageCalibration {
+        val point = run.first ?: return MessageCalibration(run.fallback)
+        val preceding = estimator.tokensForChars(point.chars)
+        // Limit the assumed-density prefix to 10% of prompt; a long prefix can turn message error into named overhead.
+        if (preceding > point.prompt * MAX_SINGLE_POINT_PREFIX_SHARE) return MessageCalibration(run.fallback)
+        return MessageCalibration(run.fallback, fixed = (point.prompt - preceding).toInt())
+    }
+
+    private data class UsageFit(val density: Double, val fixed: Int, val model: String?) {
+        fun project(run: UsageRun, reused: Boolean): MessageCalibration {
+            val namedFixed = fixed.takeIf { describes(run) }
+            return MessageCalibration(kotlin.math.ceil(run.chars / density).toInt(), density, namedFixed, reused)
+        }
+
+        /**
+         * Whether this fit's fixed overhead can be named for [run]: the same model, and a prompt that
+         * can hold it. A prompt that shrank below the overhead (a same-model reset) keeps the density
+         * but not the overhead, or the row would name tokens the prompt no longer contains.
+         */
+        private fun describes(run: UsageRun): Boolean {
+            val current = run.last ?: return false
+            return model != null && model == run.first?.model && fixed <= current.prompt
+        }
+    }
+
+    /** Immutable, constant-space fold: current candidate and most recent sufficient completed fit. */
+    private data class UsageRun(
+        val chars: Long = 0L,
+        val fallback: Int = 0,
+        val first: UsagePoint? = null,
+        val last: UsagePoint? = null,
+        val previousFit: UsageFit? = null,
+    ) {
+        fun append(message: JsonObject, estimator: TokenEstimator, point: UsagePoint?): UsageRun {
+            val addedChars = LocalMessageTokens.chars(message)
+            return withPoint(point).copy(chars = chars + addedChars, fallback = fallback + estimator.tokensForChars(addedChars))
+        }
+
+        private fun withPoint(point: UsagePoint?): UsageRun = when {
+            point == null -> this
+            last?.precedes(point) == true -> copy(last = point)
+            else -> copy(
+                first = point,
+                last = point,
+                previousFit = measuredFit() ?: previousFit,
+            )
+        }
+
+        fun measuredFit(): UsageFit? = last?.let { first?.fitTo(it) }
+    }
+
+    private data class UsagePoint(val chars: Long, val prompt: Long, val model: String?) {
+        fun precedes(next: UsagePoint): Boolean = sameModel(next) && growsTo(next)
+
+        private fun sameModel(next: UsagePoint): Boolean = model != null && model == next.model
+
+        private fun growsTo(next: UsagePoint): Boolean = chars < next.chars && prompt < next.prompt
+
+        fun fitTo(next: UsagePoint): UsageFit? {
+            val density = densityTo(next) ?: return null
+            val fixed = prompt - chars / density
+            return fixed.takeIf { it >= 0 }?.let { UsageFit(density, it.toInt(), model) }
+        }
+
+        private fun densityTo(next: UsagePoint): Double? {
+            if (!sameModel(next)) return null
+            val growthChars = next.chars - chars
+            val growthTokens = next.prompt - prompt
+            if (!sufficientGrowth(next)) return null
+            // Covers dense JSON through prose without trusting pathological slopes.
+            return (growthChars.toDouble() / growthTokens).coerceIn(MIN_CHARS_PER_TOKEN, MAX_CHARS_PER_TOKEN)
+        }
+
+        private fun sufficientGrowth(next: UsagePoint): Boolean =
+            next.chars - chars >= MIN_CALIBRATION_CHARS && next.prompt - prompt >= MIN_CALIBRATION_TOKENS
+    }
+
+    internal data class MessageCalibration(
+        val tokens: Int,
+        val charsPerToken: Double? = null,
+        val fixed: Int? = null,
+        val reusedFit: Boolean = false,
+    )
+
     private fun lastUsageIndex(): Int? {
         val boundary = summary?.number("timestamp")
         for (index in messages.indices.reversed()) {
@@ -89,6 +196,12 @@ data class LocalTranscriptContext(
             return parts.sum().takeIf { it > 0 }
         }
 
+        private const val MIN_CALIBRATION_CHARS = 16_384L
+        private const val MIN_CALIBRATION_TOKENS = 4_096L
+        private const val MAX_SINGLE_POINT_PREFIX_SHARE = 0.1
+        private const val MIN_CHARS_PER_TOKEN = 1.0
+        private const val MAX_CHARS_PER_TOKEN = 8.0
+        private val PROMPT_PARTS = listOf("input", "cacheRead", "cacheWrite")
         private val USAGE_PARTS = listOf("input", "output", "cacheRead", "cacheWrite")
         private val UNUSABLE_STOP_REASONS = setOf("aborted", "error")
     }

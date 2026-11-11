@@ -212,6 +212,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Lane inbox v1](reference/contracts/lane-inbox-v1.md)
 - [Object verbs v1: contract proposal](reference/contracts/object-verbs-v1.md)
 - [Admin RPC Wire Contracts](reference/contracts/README.md)
+- [Secret request v1: secure secret-input flow](reference/contracts/secret-request-v1.md)
 
 ### reference/contracts/beads.config.get
 

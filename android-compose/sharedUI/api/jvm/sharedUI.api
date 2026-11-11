@@ -546,6 +546,7 @@ public final class com/letta/mobile/ui/canvas/CanvasTableBlock {
 
 public final class com/letta/mobile/ui/canvas/CanvasWorkspaceKt {
 	public static final fun CanvasWorkspace-ZqFPiAU (Landroidx/compose/ui/Modifier;Lio/ak1/drawbox/presentation/viewmodel/DrawBoxController;Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ZLkotlin/jvm/functions/Function2;Lcom/letta/mobile/ui/canvas/CanvasLayout;ZFLcom/letta/mobile/ui/canvas/CanvasCameraRequest;Landroidx/compose/runtime/Composer;III)V
+	public static final fun CanvasWorkspaceLoadFailure (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasHistoryDialogKt {
@@ -727,8 +728,10 @@ public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSource$DefaultIm
 
 public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSourceKt {
 	public static final fun ProvideCanvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
-	public static final fun ProvideCanvasHostWithBoards (Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ProvideCanvasHostWithBoards (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun canvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;)Lcom/letta/mobile/ui/canvas/boards/CanvasBoardSource;
+	public static final fun getLocalCanvasBoardGeneration ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalCanvasBoardSessions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalCanvasBoardSource ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
@@ -1774,7 +1777,7 @@ public final class com/letta/mobile/ui/chat/subagents/SubagentDualViewTags {
 }
 
 public final class com/letta/mobile/ui/chat/subagents/SubagentRingsOverlayKt {
-	public static final fun SubagentRingsOverlay (Ljava/util/List;Lcom/letta/mobile/ui/chat/subagents/SubagentTodoLoader;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun SubagentRingsOverlay (Ljava/util/List;Lcom/letta/mobile/ui/chat/subagents/SubagentTodoLoader;Ljava/util/List;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun conversation (Lcom/letta/mobile/ui/chat/subagents/SubagentTodoSheetTarget;)Lkotlin/Pair;
 	public static final fun rememberSubagentRingsState (Lkotlinx/collections/immutable/ImmutableList;Lcom/letta/mobile/ui/chat/subagents/ActiveSubagent;Landroidx/compose/runtime/Composer;II)Lcom/letta/mobile/ui/chat/subagents/SubagentRingsState;
 }
@@ -1951,7 +1954,7 @@ public final class com/letta/mobile/ui/chat/surface/ChatCanvasActions {
 
 public final class com/letta/mobile/ui/chat/surface/ChatCanvasPlaceholderKt {
 	public static final fun ChatCanvasPlaceholder (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun chatCanvasKey (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun chatCanvasKey (Ljava/lang/String;J)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/chat/surface/ChatImageActions {
