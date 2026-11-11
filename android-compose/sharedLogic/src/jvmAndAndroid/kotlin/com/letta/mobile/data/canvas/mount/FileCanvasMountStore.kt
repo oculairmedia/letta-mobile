@@ -48,26 +48,26 @@ class FileCanvasMountStore internal constructor(
     /** Reads an explicit binding. Null means absent; corrupt/unreadable state throws. */
     suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId? = file.locked {
         validate(agentId, conversationId)
-        read().bindings.singleOrNull { it.agent == agentId && it.conversation == conversationId }?.canvas
+        read().bindings.singleOrNull { it.agent == agentId && it.conversation == conversationId }?.canvas?.let(::CanvasId)
     }
 
     /** Reads an agent default; it neither grants canvas access nor creates a conversation binding. */
     suspend fun readDefault(agentId: AgentId): CanvasId? = file.locked {
         validate(agentId)
-        read().defaults.singleOrNull { it.agent == agentId }?.canvas
+        read().defaults.singleOrNull { it.agent == agentId }?.canvas?.let(::CanvasId)
     }
 
     /** Atomically inserts only if absent and returns the durable stored winner. */
     suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId = file.locked {
         validate(agentId, conversationId, proposed)
         val current = read()
-        val winner = current.bindings.singleOrNull { it.agent == agentId && it.conversation == conversationId }?.canvas
+        val winner = current.bindings.singleOrNull { it.agent == agentId && it.conversation == conversationId }?.canvas?.let(::CanvasId)
         if (winner != null) {
             // Reconfirm durability after an earlier ambiguous replacement before acknowledging it.
             write(current)
             winner
         } else {
-            write(current.copy(bindings = current.bindings + Binding(agentId, conversationId, proposed)))
+            write(current.copy(bindings = current.bindings + Binding(agentId, conversationId, proposed.value)))
             proposed
         }
     }
@@ -77,14 +77,14 @@ class FileCanvasMountStore internal constructor(
         validate(agentId, conversationId, canvasId)
         val current = read()
         val others = current.bindings.filterNot { it.agent == agentId && it.conversation == conversationId }
-        write(current.copy(bindings = others + Binding(agentId, conversationId, canvasId)))
+        write(current.copy(bindings = others + Binding(agentId, conversationId, canvasId.value)))
     }
 
     /** Explicitly sets only the agent default. Existing conversation bindings remain untouched. */
     suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) = file.locked {
         validate(agentId, canvas = canvasId)
         val current = read()
-        write(current.copy(defaults = current.defaults.filterNot { it.agent == agentId } + Default(agentId, canvasId)))
+        write(current.copy(defaults = current.defaults.filterNot { it.agent == agentId } + Default(agentId, canvasId.value)))
     }
 
     private fun read(): Table {
@@ -102,8 +102,8 @@ class FileCanvasMountStore internal constructor(
         val table = Json.decodeFromString<Table>(text)
         require(table.version == VERSION) { "Unsupported mount store version" }
         require(table.host == hostId) { "Mount store belongs to a different host" }
-        table.defaults.forEach { validate(it.agent, canvas = it.canvas) }
-        table.bindings.forEach { validate(it.agent, it.conversation, it.canvas) }
+        table.defaults.forEach { validate(it.agent, canvas = CanvasId(it.canvas)) }
+        table.bindings.forEach { validate(it.agent, it.conversation, CanvasId(it.canvas)) }
         require(table.defaults.map { it.agent }.distinct().size == table.defaults.size) { "Duplicate mount default" }
         require(table.bindings.map { it.agent to it.conversation }.distinct().size == table.bindings.size) { "Duplicate mount binding" }
         return table
@@ -146,11 +146,13 @@ class FileCanvasMountStore internal constructor(
     @Serializable
     private data class Table(val version: Int, val host: HostId, val defaults: List<Default>, val bindings: List<Binding>)
 
+    // CanvasId is a data class whose document-metadata serializer emits an object. This separate
+    // versioned sidecar stores only its semantic value, not notebook/document serialization shape.
     @Serializable
-    private data class Default(val agent: AgentId, val canvas: CanvasId)
+    private data class Default(val agent: AgentId, val canvas: String)
 
     @Serializable
-    private data class Binding(val agent: AgentId, val conversation: ConversationId, val canvas: CanvasId)
+    private data class Binding(val agent: AgentId, val conversation: ConversationId, val canvas: String)
 
     private companion object {
         const val VERSION = 1

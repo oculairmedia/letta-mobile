@@ -81,6 +81,19 @@ class FileCanvasMountStoreTest {
     }
 
     @Test
+    fun versionOneFixtureUsesSemanticStringsNotDocumentMetadataObjects() = runBlocking {
+        val directory = Files.createTempDirectory("canvas-mounts-v1-fixture")
+        Files.writeString(
+            directory.resolve("canvas-mounts.json"),
+            """{"version":1,"host":"host-one","defaults":[{"agent":"agent-one","canvas":"default-board"}],""" +
+                """"bindings":[{"agent":"agent-one","conversation":"conversation-one","canvas":"override-board"}]}""",
+        )
+        val store = FileCanvasMountStore(directory, host)
+        assertEquals(CanvasId("default-board"), store.readDefault(agent))
+        assertEquals(CanvasId("override-board"), store.readBinding(agent, conversation))
+    }
+
+    @Test
     fun malformedAndUnsupportedFilesNeverResetOrMutate() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-invalid")
         val file = directory.resolve("canvas-mounts.json")
