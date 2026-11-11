@@ -121,10 +121,13 @@ class MeridianLiveCalls(
     private fun start(signal: MeridianShellCallSignal.Started) {
         expire()
         if (calls.size >= maxTracked) calls.remove(calls.keys.first())
-        calls.remove(signal.toolCallId)
-        calls[signal.toolCallId] = Entry(signal.scope, nowMs(), invocations = 0)
+        // A call announced again in the same runtime (the hook rewrote its command to carry the token)
+        // is the same call: it keeps its token and its count, or the token just issued would be refused.
+        val again = calls.remove(signal.toolCallId)?.takeIf { it.scope.sameRuntime(signal.scope) }
+        calls[signal.toolCallId] = again ?: Entry(signal.scope, nowMs(), invocations = 0)
         val conversation = signal.scope.conversationId.logSafe()
-        log("$TAG call.started toolCallId=${signal.toolCallId.logSafe()} conversationId=$conversation tracked=${calls.size}")
+        val event = if (again == null) "call.started" else "call.restarted"
+        log("$TAG $event toolCallId=${signal.toolCallId.logSafe()} conversationId=$conversation tracked=${calls.size}")
     }
 
     /** Forgets the call [signal] ends; only a call this host was tracking is worth a log line. */
