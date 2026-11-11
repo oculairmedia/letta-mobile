@@ -18,8 +18,58 @@ import kotlin.test.assertTrue
 class MeridianLiveCallsTest {
     private var now = 0L
     private var minted = 0
-    private val calls = MeridianLiveCalls(nowMs = { now }, newToken = { "token-${++minted}" }, maxAgeMs = 1_000)
+    private val lines = mutableListOf<String>()
+    private val calls = MeridianLiveCalls(nowMs = { now }, newToken = { "token-${++minted}" }, maxAgeMs = 1_000, log = { lines += it })
     private val list = ShellCall("call-1", "meridian canvas list")
+
+    @Test
+    fun aRefusedTokenSaysWhatThisHostHasSeenSoItsCauseCanBeTold() = runTest {
+        calls.observe(started(ShellCall("call-0", "ls -la")))
+
+        assertNull(calls.issueToken("call-1", waitMs = 0))
+
+        val refusal = lines.single { "token.refused" in it }
+        listOf(
+            "toolCallId=call-1", "reason=call_not_live", "framesSeen=1", "toolStartsSeen=1",
+            "meridianStartsSeen=0", "lastToolStarted=Bash",
+        ).forEach { assertTrue(it in refusal, "$it missing from: $refusal") }
+    }
+
+    @Test
+    fun aCallWhoseEndFrameWasLostIsLoggedAsEndedWhenItsTurnEnds() = runTest {
+        calls.observe(started(list))
+        calls.observe(started(ShellCall("call-2", "meridian canvas list", scope = OTHER_CONVERSATION)))
+
+        calls.observe(turnFinished(SCOPE))
+
+        assertEquals(listOf("[meridian-tools] call.ended toolCallId=call-1"), lines.filter { "call.ended" in it })
+        assertEquals(1, calls.size())
+    }
+
+    @Test
+    fun anIdThatCouldBreakTheLogLineIsWrittenAsOneSafeField() = runTest {
+        assertNull(calls.issueToken("call-1\n[meridian-tools] token.issued toolCallId=forged", waitMs = 0))
+
+        val refusal = lines.single()
+        assertFalse("\n" in refusal, refusal)
+        assertTrue("toolCallId=call-1__meridian-tools__token.issued_toolCallId_forged reason=call_not_live" in refusal, refusal)
+    }
+
+    @Test
+    fun aCallIsLoggedFromItsStartToItsEndAndTheTokenNeverIs() = runTest {
+        calls.observe(started(list))
+        val token = calls.issueToken("call-1")
+        calls.claim(token!!)
+        calls.issueToken("call-1")
+        calls.claim("not-a-token")
+        calls.observe(ended(list))
+
+        val names = listOf("call.started", "token.issued", "claim.bound", "token.refused", "claim.refused", "call.ended")
+        assertEquals(names, lines.map { line -> names.first { it in line } })
+        assertTrue("reason=token_already_issued" in lines[3], lines[3])
+        assertTrue(lines.all { it.startsWith("[meridian-tools] ") }, "$lines")
+        assertTrue(lines.none { token in it || "not-a-token" in it }, "a token reached the log: $lines")
+    }
 
     @Test
     fun aRunningMeridianShellCallIssuesOneTokenThatBindsItAndCountsInvocations() = runTest {
