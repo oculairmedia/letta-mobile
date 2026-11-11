@@ -107,7 +107,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
             color = MaterialTheme.colorScheme.background,
         ) {
             // The window's one overlay queue (snackbars, undo, banners), drawn over the whole shell.
-            OverlayHostRoot(rememberOverlayHost(), Modifier.fillMaxSize()) {
+            WorkspaceOverlayRoot {
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -145,6 +145,15 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WorkspaceOverlayRoot(content: @Composable () -> Unit) {
+    if (LocalOverlayHost.current == null) {
+        OverlayHostRoot(rememberOverlayHost(), Modifier.fillMaxSize(), content)
+    } else {
+        content()
     }
 }
 
