@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AdminProxyRequestTest {
@@ -143,7 +144,9 @@ class AdminProxyRequestTest {
         ).jsonObject
 
         assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
-        assertTrue(response.getValue("error").jsonPrimitive.content.contains("404"))
+        // The upstream status and body are vibesync's own text: the router answers the fixed message.
+        assertEquals(ADMIN_RPC_INTERNAL_ERROR, response.getValue("error").jsonPrimitive.content)
+        assertFalse("missing" in response.toString())
         assertEquals(1, recording.calls.size)
     }
 
@@ -169,9 +172,8 @@ and newline"
 
         assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
         val error = response.getValue("error").jsonPrimitive.content
-        assertTrue(error.contains("HTTP 500"))
-        assertTrue(error.contains("quoted \\\"value\\\""))
-        assertTrue(error.contains("and newline"))
+        assertEquals(ADMIN_RPC_INTERNAL_ERROR, error)
+        assertFalse("first line" in responseText)
     }
 
     private fun installRecordingTransport(

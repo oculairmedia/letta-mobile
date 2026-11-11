@@ -344,7 +344,7 @@ class ConversationViewerSubscriptionTest {
         job.join()
 
         assertEquals("false", response["success"]?.jsonPrimitive?.content)
-        assertEquals("native message list failed", response["error"]?.jsonPrimitive?.content)
+        assertEquals(ADMIN_RPC_INTERNAL_ERROR, response["error"]?.jsonPrimitive?.content)
         assertEquals("convA", subscription.currentConversation)
         assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
         assertTrue(registry.viewersFor("convB").isEmpty(), "failed hydration must roll back its viewer")

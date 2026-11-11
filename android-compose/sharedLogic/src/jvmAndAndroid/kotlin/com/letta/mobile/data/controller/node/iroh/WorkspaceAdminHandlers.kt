@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRequestTimeoutException
 import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 import com.letta.mobile.data.transport.appserver.WorkspaceRelay
+import com.letta.mobile.data.transport.appserver.WorkspaceRelayException
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -43,7 +44,14 @@ internal object WorkspaceAdminHandlers {
         router.featureCapabilities += WorkspaceRelay.CAPABILITY
     }
 
-    private suspend fun relay(client: AppServerClient, method: WorkspaceRelayMethod, params: JsonObject?): JsonElement {
+    private suspend fun relay(client: AppServerClient, method: WorkspaceRelayMethod, params: JsonObject?): JsonElement = try {
+        relayChecked(client, method, params)
+    } catch (refused: WorkspaceRelayException) {
+        // The relay's own refusals are fixed sentences (field caps, size cap), safe for the client.
+        adminError(refused.message ?: "${method.method} was refused by the workspace relay")
+    }
+
+    private suspend fun relayChecked(client: AppServerClient, method: WorkspaceRelayMethod, params: JsonObject?): JsonElement {
         val command = WorkspaceRelay.decodeCommand(method, params, NativeAdmin.requestId())
         val frames = forward(client, method, command).map { WorkspaceRelay.normalizeFrame(method, it) }
         val result = WorkspaceRelay.encodeResult(frames)

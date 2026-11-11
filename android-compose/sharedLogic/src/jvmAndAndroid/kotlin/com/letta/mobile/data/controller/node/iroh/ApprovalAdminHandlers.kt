@@ -43,7 +43,7 @@ object ApprovalAdminHandlers {
             adminError("capability_unavailable: approval.submit requires a live App Server controller")
         }
         val convId = request.conversationId?.let(::ConversationId)
-            ?: throw IllegalArgumentException("conversation_id required")
+            ?: adminError("conversation_id required")
         val result = try {
             // After wrapper restart the in-memory runtime cache is empty even though
             // App Server still owns the parked approval. Reattach before submit.
@@ -78,9 +78,9 @@ object ApprovalAdminHandlers {
     ) {
         private val firstDecision: JsonObject? = approval["approvals"]?.jsonArray?.firstOrNull()?.jsonObject
         val approvalRequestId: String = approval.text("approval_request_id")
-            ?: throw IllegalArgumentException("approval_request_id required")
+            ?: adminError("approval_request_id required")
         val approve: Boolean = (approval["approve"] ?: firstDecision?.get("approve"))?.jsonPrimitive?.booleanOrNull
-            ?: throw IllegalArgumentException("approval decision required")
+            ?: adminError("approval decision required")
         private val reason: String? = approval.text("reason") ?: firstDecision?.text("reason")
 
         fun answer(conversationId: ConversationId) = ControllerApprovalAnswer(
@@ -101,9 +101,9 @@ object ApprovalAdminHandlers {
         companion object {
             fun from(params: JsonObject?): SubmittedApproval {
                 val agentId = params.requireParam(AdminParamKey("agent_id"))
-                val payload = params?.get("payload")?.jsonObject ?: throw IllegalArgumentException("payload required")
+                val payload = params?.get("payload")?.jsonObject ?: adminError("payload required")
                 val approval = payload["messages"]?.jsonArray?.firstOrNull()?.jsonObject
-                    ?: throw IllegalArgumentException("approval message required")
+                    ?: adminError("approval message required")
                 return SubmittedApproval(AgentId(agentId), param(params, AdminParamKey("conversation_id")), approval)
             }
 
