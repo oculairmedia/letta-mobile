@@ -46,7 +46,8 @@ class MissingContributionRecoveryTest {
         val missing = fixture.lanes(main = listOf(fixture.page, ModuleSlot(RuntimeViewId("missing.contribution"))),
             side = listOf(ModuleSlot(ShellViews.CANVAS, "absent-board")))
         port.commit(ShellLayoutAuthor.Person, "Stored unavailable contributions", missing, port.attached.value!!.config.value)
-        waitUntil(AcceptanceWorkspace.TIMEOUT) { onAllNodesWithTag(ShellModuleTags.UNAVAILABLE).fetchSemanticsNodes().size == 2 }
+        waitForIdle()
+        assertEquals(2, onAllNodesWithTag(ShellModuleTags.UNAVAILABLE).fetchSemanticsNodes().size)
         onNodeWithTag(AcceptanceWorkspace.PAGE).assertExists()
         onNodeWithTag(AcceptanceWorkspace.RESET).performClick()
         waitForIdle()

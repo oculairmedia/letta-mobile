@@ -40,7 +40,8 @@ class GeometryDoesNotMutateObjectTest {
             session.applyLocalScene(DrawingSerializer.serialize(PayLoad(Color.White, listOf(changed))))
             val stored = DrawingSerializer.deserialize(session.document.value!!.sceneJson).elements.single() as Element.Shape
             assertEquals(changed.points, stored.points)
-            assertEquals(shape, stored.copy(points = shape.points, modifiedAt = shape.modifiedAt), "geometry preserves drawing content and style")
+            val withoutGeometry = stored.copy(points = shape.points, modifiedAt = shape.modifiedAt)
+            assertEquals(shape, withoutGeometry, "geometry preserves drawing content and style")
         }
         fixture.boards.release(session)
     }

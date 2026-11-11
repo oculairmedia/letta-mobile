@@ -47,12 +47,13 @@ class BoundedViewLifecycleTest {
             }
             repeat(3) {
                 runOnIdle { config = fixture.lanes(main = listOf(fixture.page, fixture.canvas), side = listOf(fixture.tasks)) }
-                waitUntil(AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) != null }
+                waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) != null }
                 assertNotNull(fixture.registry.get(fixture.id))
                 assertEquals(1, fixture.boards.holds(fixture.id), "one source hold on mount $it")
                 onNodeWithTag(SHELL_TASKS_MODULE_TAG).assertExists()
                 runOnIdle { config = fixture.lanes() }
-                waitUntil(AcceptanceWorkspace.TIMEOUT) { fixture.boards.holds(fixture.id) == 0 && fixture.registry.get(fixture.id) == null }
+                waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) == null }
+                assertEquals(0, fixture.boards.holds(fixture.id), "no source hold survives unmount $it")
                 assertEquals(0, onAllNodesWithTag(SHELL_TASKS_MODULE_TAG).fetchSemanticsNodes().size)
             }
         } finally {

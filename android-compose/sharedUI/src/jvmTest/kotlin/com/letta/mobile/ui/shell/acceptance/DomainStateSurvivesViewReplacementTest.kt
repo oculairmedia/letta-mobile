@@ -46,7 +46,8 @@ class DomainStateSurvivesViewReplacementTest {
                 fixture.lanes(side = listOf(fixture.canvas)), fixture.lanes(main = listOf(fixture.page, fixture.canvas)),
                 fixture.lanes(side = listOf(fixture.canvas)))
             layouts.forEach { layout ->
-                assertIs<ShellLayoutCommit.Done>(port.commit(ShellLayoutAuthor.Person, "Replace view", layout, port.attached.value!!.config.value))
+                val before = port.attached.value!!.config.value
+                assertIs<ShellLayoutCommit.Done>(port.commit(ShellLayoutAuthor.Person, "Replace view", layout, before))
                 waitForIdle()
                 assertEquals(snapshot, runBlocking { fixture.store.get(fixture.id) })
                 assertEquals(scene, session.document.value!!.sceneJson)

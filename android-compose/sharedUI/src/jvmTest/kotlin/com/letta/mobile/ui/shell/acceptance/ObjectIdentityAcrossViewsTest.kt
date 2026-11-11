@@ -27,6 +27,9 @@ import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.ui.canvas.LocalCanvasSessionRegistry
+import com.letta.mobile.ui.canvas.canvasViewerOptionTag
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
+import com.letta.mobile.ui.canvas.viewer.CANVAS_TEXT_VIEWER_CONTENT_TAG
 import com.letta.mobile.ui.canvas.boards.ProvideCanvasBoardSource
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
@@ -69,15 +72,17 @@ class ObjectIdentityAcrossViewsTest {
                 }
             }
         }
-        waitUntil(AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) === session }
+        waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) === session }
         runOnIdle { config = fixture.lanes(side = listOf(fixture.canvas)) }
-        waitUntil(AcceptanceWorkspace.TIMEOUT) {
+        waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) {
             onAllNodesWithTag(shellCanvasModuleTag(fixture.id)).fetchSemanticsNodes().size == 1
         }
         assertSame(session, fixture.registry.get(fixture.id))
         assertEquals(0, fixture.boards.holds(fixture.id), "a live page session needs no source hold")
         runBlocking { session.updateTitle("Shared edit") }
-        waitUntil(AcceptanceWorkspace.TIMEOUT) { onAllNodes(hasText("Shared edit", substring = true)).fetchSemanticsNodes().size >= 2 }
+        waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) {
+            onAllNodes(hasText("Shared edit", substring = true)).fetchSemanticsNodes().size >= 2
+        }
         assertEquals("Shared edit", runBlocking { fixture.store.get(fixture.id) }!!.title)
     }
 
@@ -90,11 +95,11 @@ class ObjectIdentityAcrossViewsTest {
                 com.letta.mobile.ui.canvas.CanvasWorkspace(session = session)
             }
         }
-        waitUntil(AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) === session }
+        waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) === session }
         runBlocking { session.setBackgroundPattern(com.letta.mobile.data.canvas.CanvasBackgroundPattern(kind = "grid")) }
-        onNodeWithTag(com.letta.mobile.ui.canvas.canvasViewerOptionTag(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId.TEXT)).performClick()
-        onNodeWithTag(com.letta.mobile.ui.canvas.viewer.CANVAS_TEXT_VIEWER_CONTENT_TAG).assertTextEquals(session.document.value!!.sceneJson)
-        onNodeWithTag(com.letta.mobile.ui.canvas.canvasViewerOptionTag(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId.CANVAS)).performClick()
+        onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.TEXT)).performClick()
+        onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertTextEquals(session.document.value!!.sceneJson)
+        onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.CANVAS)).performClick()
         assertSame(session, fixture.registry.get(fixture.id))
         assertEquals("grid", session.backgroundPattern()?.kind)
     }

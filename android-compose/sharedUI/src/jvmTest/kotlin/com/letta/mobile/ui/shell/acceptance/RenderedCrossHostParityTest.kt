@@ -44,7 +44,9 @@ class RenderedCrossHostParityTest {
                     ProvideCanvasBoardSource(fixture.boards) {
                         ProvideShellTaskRegistry(tasks) {
                             val state = fixture.state(config)
-                            LettaShellWorkspace(state.copy(layout = state.layout.copy(sidebarVisible = false)), host, Modifier.size(width.dp, 800.dp))
+                            LettaShellWorkspace(
+                                state.copy(layout = state.layout.copy(sidebarVisible = false)), host, Modifier.size(width.dp, 800.dp),
+                            )
                         }
                     }
                 }
@@ -57,10 +59,12 @@ class RenderedCrossHostParityTest {
                     else -> setOf(AcceptanceWorkspace.PAGE, SHELL_TASKS_MODULE_TAG, shellCanvasModuleTag(fixture.id))
                 }
                 val tags = setOf(AcceptanceWorkspace.PAGE, SHELL_TASKS_MODULE_TAG, shellCanvasModuleTag(fixture.id))
-                waitUntil(AcceptanceWorkspace.TIMEOUT) {
-                    tags.filter { onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }.toSet() == expected
+                waitForIdle()
+                if (size == 1200) {
+                    waitUntil(timeoutMillis = AcceptanceWorkspace.TIMEOUT) { fixture.registry.get(fixture.id) != null }
                 }
-                assertEquals(expected, tags.filter { onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }.toSet(), "mounted set at $size dp")
+                val mounted = tags.filter { onAllNodesWithTag(it).fetchSemanticsNodes().isNotEmpty() }.toSet()
+                assertEquals(expected, mounted, "mounted set at $size dp")
                 val acquired = runBlocking { fixture.boards.acquire(fixture.id) }!!
                 assertSame(session, acquired)
                 fixture.boards.release(acquired)
