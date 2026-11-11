@@ -4,6 +4,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import io.ak1.drawbox.domain.model.DrawingSerializer
+import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.PayLoad
+import io.ak1.drawbox.domain.model.ShapeType
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasSession
@@ -44,8 +50,13 @@ internal class AcceptanceWorkspace {
 
     init {
         runBlocking {
+            val drawing = PayLoad(Color.White, listOf(Element.Shape(
+                id = "content", shapeType = ShapeType.RECTANGLE,
+                points = listOf(Offset(20f, 30f), Offset(220f, 150f)),
+                strokeColor = Color.Blue, strokeWidth = 2f, text = "Keep my board content",
+            )))
             CanvasSession.create(store, CanvasCreateOptions(canvasId = id, title = "Acceptance board",
-                initialSceneJson = """{"elements":[],"_future":{"content":"keep me"}}"""))
+                initialSceneJson = DrawingSerializer.serialize(drawing)))
         }
     }
 
