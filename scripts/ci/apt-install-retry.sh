@@ -10,13 +10,15 @@ set -euo pipefail
 
 [ "$#" -gt 0 ] || { echo "usage: apt-install-retry.sh <package...>" >&2; exit 64; }
 
-ATTEMPTS="${APT_RETRY_ATTEMPTS:-4}"
+ATTEMPTS="${APT_RETRY_ATTEMPTS:-5}"
 SLEEP_SECONDS="${APT_RETRY_SLEEP_SECONDS:-10}"
 APT_GET="${APT_GET:-sudo apt-get}"
 RESOLVE="${APT_RESOLVE:-getent hosts}"
 PUBLIC_RESOLVE="${APT_PUBLIC_RESOLVE:-}"
 HOSTS_FILE="${APT_HOSTS_FILE:-/etc/hosts}"
 HOSTS_WRITE="${APT_HOSTS_WRITE:-sudo tee -a}"
+HOSTS_EDIT="${APT_HOSTS_EDIT:-sudo sed -i}"
+PIN_MARK="# apt-install-retry"
 MIRRORS="${APT_MIRROR_HOSTS:-azure.archive.ubuntu.com archive.ubuntu.com security.ubuntu.com}"
 APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
 
@@ -51,7 +53,7 @@ pin_unresolved_mirrors() {
     $RESOLVE "$host" >/dev/null 2>&1 && continue
     address="$(public_address "$host" 2>/dev/null | head -n 1 || true)"
     if [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      echo "$address $host" | $HOSTS_WRITE "$HOSTS_FILE" >/dev/null
+      echo "$address $host $PIN_MARK" | $HOSTS_WRITE "$HOSTS_FILE" >/dev/null
       log "system resolver cannot find $host; pinned it to $address for this job"
       pinned=0
     else
@@ -59,6 +61,13 @@ pin_unresolved_mirrors() {
     fi
   done
   return $pinned
+}
+
+# Drops this script's pins, so a pinned address that does not work cannot outlive a DNS recovery:
+# each attempt asks the system resolver first and pins again only what it still cannot find.
+unpin_mirrors() {
+  grep -q "$PIN_MARK\$" "$HOSTS_FILE" 2>/dev/null || return 0
+  $HOSTS_EDIT "/$PIN_MARK\$/d" "$HOSTS_FILE"
 }
 
 attempt=1
@@ -72,6 +81,7 @@ while :; do
     log "giving up after $ATTEMPTS attempts; the runner could not reach the Ubuntu mirrors"
     exit 1
   fi
+  unpin_mirrors
   pin_unresolved_mirrors || sleep "$SLEEP_SECONDS"
   attempt=$((attempt + 1))
 done

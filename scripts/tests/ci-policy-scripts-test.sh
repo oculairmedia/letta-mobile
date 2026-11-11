@@ -223,7 +223,8 @@ assert_contains "$test_job" 'scripts/tests/apt-install-retry-test.sh'
 # scripts/ path does not exist (the first version of this step failed with "No such file").
 assert_contains "$test_job" 'bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'
 for workflow in .github/workflows/android.yml .github/workflows/desktop.yml .github/workflows/release.yml; do
-  if grep -n 'apt-install-retry.sh' "$workflow" | grep -v 'apt-install-retry-test' | grep -qv 'GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh'; then
+  [ -f "$SOURCE_ROOT/$workflow" ] || { echo "FAIL: missing $workflow" >&2; exit 1; }
+  if grep -n 'apt-install-retry.sh' "$SOURCE_ROOT/$workflow" | grep -v 'apt-install-retry-test' | grep -qv 'GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh'; then
     echo "FAIL: $workflow calls apt-install-retry.sh by a path relative to the job's working directory" >&2
     exit 1
   fi

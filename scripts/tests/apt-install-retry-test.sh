@@ -11,7 +11,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 cat > "$work/apt" <<'FAKE'
 #!/usr/bin/env bash
 n=$(cat "$COUNT" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$COUNT"
-if [ -n "${NEED_PIN:-}" ] && ! grep -q " $NEED_PIN\$" "$HOSTS" 2>/dev/null; then
+if [ -n "${NEED_PIN:-}" ] && ! grep -q " $NEED_PIN " "$HOSTS" 2>/dev/null; then
   echo "E: Temporary failure resolving '$NEED_PIN'" >&2; exit 100
 fi
 if [ "$n" -le "${FAIL_FIRST:-0}" ]; then echo "E: Temporary failure resolving 'archive.ubuntu.com'" >&2; exit 100; fi
@@ -26,7 +26,7 @@ chmod +x "$work"/apt "$work"/resolve-* "$work"/public-*
 export COUNT="$work/count" CALLS="$work/calls" HOSTS="$work/hosts"
 run() {
   APT_GET="$work/apt" APT_RETRY_SLEEP_SECONDS=0 APT_HOSTS_FILE="$HOSTS" APT_HOSTS_WRITE="tee -a" \
-    APT_MIRROR_HOSTS="mirror.test" "$@"
+    APT_HOSTS_EDIT="sed -i" APT_MIRROR_HOSTS="mirror.test" "$@"
 }
 reset() { rm -f "$COUNT" "$CALLS"; : > "$HOSTS"; }
 
@@ -48,7 +48,7 @@ grep -q "install -y gcc$" "$CALLS" || fail "install missing after recovery"
 reset
 run env NEED_PIN=mirror.test APT_RESOLVE="$work/resolve-broken" APT_PUBLIC_RESOLVE="$work/public-ok" \
   bash "$script" gcc >/dev/null 2>&1 || fail "did not recover by pinning the mirror"
-grep -qx "203.0.113.7 mirror.test" "$HOSTS" || fail "the mirror was not pinned to the public answer"
+grep -qx "203.0.113.7 mirror.test # apt-install-retry" "$HOSTS" || fail "the mirror was not pinned to the public answer"
 grep -q "install -y gcc$" "$CALLS" || fail "install missing after pinning"
 
 # 4. No resolver answers: the step FAILS after the configured attempts, never a false success.
@@ -66,7 +66,28 @@ run env NEED_PIN=mirror.test APT_RETRY_ATTEMPTS=2 APT_RESOLVE="$work/resolve-bro
   APT_PUBLIC_RESOLVE="$work/public-garbage" bash "$script" gcc >/dev/null 2>&1 && fail "succeeded on a garbage answer"
 [ ! -s "$HOSTS" ] || fail "wrote a non-address to the hosts file"
 
-# 6. No packages is a usage error, not a silent success.
+# 6. A pinned address that does not work must not outlive a DNS recovery: apt keeps failing while the
+#    pin is present (BAD_PIN), the system resolver comes back, the pin is dropped and the install succeeds.
+cat > "$work/apt-badpin" <<'FAKE'
+#!/usr/bin/env bash
+n=$(cat "$COUNT" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$COUNT"
+if grep -q "apt-install-retry" "$HOSTS" 2>/dev/null || [ "$n" -le 1 ]; then echo "E: could not connect" >&2; exit 100; fi
+echo "$*" >> "$CALLS"
+FAKE
+cat > "$work/resolve-recovers" <<'FAKE'
+#!/usr/bin/env bash
+n=$(cat "$RCOUNT" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$RCOUNT"
+[ "$n" -gt 1 ]
+FAKE
+chmod +x "$work/apt-badpin" "$work/resolve-recovers"
+reset; rm -f "$work/rcount"
+RCOUNT="$work/rcount" APT_GET="$work/apt-badpin" APT_RETRY_SLEEP_SECONDS=0 APT_HOSTS_FILE="$HOSTS" APT_HOSTS_WRITE="tee -a" \
+  APT_HOSTS_EDIT="sed -i" APT_MIRROR_HOSTS="mirror.test" APT_RESOLVE="$work/resolve-recovers" \
+  APT_PUBLIC_RESOLVE="$work/public-ok" bash "$script" gcc >/dev/null 2>&1 || fail "a bad pin outlived the DNS recovery"
+! grep -q "apt-install-retry" "$HOSTS" || fail "the failed pin was left in the hosts file"
+grep -q "install -y gcc$" "$CALLS" || fail "install missing after the pin was dropped"
+
+# 7. No packages is a usage error, not a silent success.
 if bash "$script" >/dev/null 2>&1; then fail "accepted an empty package list"; fi
 
 echo "apt-install-retry-test: ok"
