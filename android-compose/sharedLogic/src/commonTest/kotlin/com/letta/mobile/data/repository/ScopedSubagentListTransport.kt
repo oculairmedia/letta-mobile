@@ -59,6 +59,9 @@ internal class ScopedSubagentListTransport : NoOpChannelTransport(), SubagentSco
             it.parentAgentId == scope.parentAgentId && it.parentConversationId == scope.parentConversationId &&
                 it.toolCallId == toolCallId.value
         } ?: return Result.failure(IllegalArgumentException("unknown scoped dispatch"))
+        if (entry.status != SubagentStatus.RUNNING && entry.terminalReason != "user_dismissed") {
+            return Result.success(emptyList())
+        }
         val terminal = entry.copy(status = SubagentStatus.CANCELLED, terminalReason = "user_dismissed")
         if (pushBeforeReceipt) {
             events.emit(ServerFrame.SubagentsUpdated(

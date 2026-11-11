@@ -55,14 +55,15 @@ private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 /**
  * The active-subagent rings over a chat page's timeline, for a host that
- * lists the conversation's registry [entries] (desktop): a ring opens its todo sheet (todos through
- * [loader]) with the conversation's whole roster under it. [onViewConversation] null hides "view
+ * supplies active [entries] (desktop): a ring opens its todo sheet (todos through [loader]) with
+ * the conversation's separate full-history [rosterEntries] under it. [onViewConversation] null hides "view
  * conversation" (a host that cannot open a subagent's conversation).
  */
 @Composable
 fun SubagentRingsOverlay(
     entries: List<SubagentEntry>,
     loader: SubagentTodoLoader,
+    rosterEntries: List<SubagentEntry>,
     modifier: Modifier = Modifier,
     onViewConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
 ) {
@@ -94,7 +95,7 @@ fun SubagentRingsOverlay(
         },
         roster = {
             SubagentRoster(
-                entries = entries,
+                entries = rosterEntries,
                 onOpenConversation = onViewConversation?.let { view -> { item -> item.openWith { agent, id -> target = null; view(agent, id) } } },
             )
         },

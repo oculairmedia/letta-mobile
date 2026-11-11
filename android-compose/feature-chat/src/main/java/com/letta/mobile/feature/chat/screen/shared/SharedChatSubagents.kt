@@ -100,6 +100,8 @@ internal class SharedChatSubagentSheetState(
 
 @Composable
 internal fun rememberSharedChatSubagentSheetState(source: ActiveSubagentSource): SharedChatSubagentSheetState {
+    // Keep historical conversation identities current only while the page's lifecycle is started.
+    source.rosterEntriesWithHistory.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     return remember(source, scope) { SharedChatSubagentSheetState(source, scope) }
 }
@@ -220,7 +222,7 @@ private fun SharedChatSubagentRoster(
     navigation: ChatScreenNavigationCallbacks,
     onLeaveSheet: () -> Unit,
 ) {
-    val entries by source.rosterEntries.collectAsStateWithLifecycle()
+    val entries by source.rosterEntriesWithHistory.collectAsStateWithLifecycle()
     SubagentRoster(
         entries = entries,
         onOpenConversation = navigation.onViewSubagentConversation?.let { open ->

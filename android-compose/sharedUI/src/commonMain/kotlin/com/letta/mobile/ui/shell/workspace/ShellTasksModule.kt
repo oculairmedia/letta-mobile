@@ -57,7 +57,7 @@ internal fun ShellTasksModule(scope: SubagentParentScope?, modifier: Modifier) {
         return
     }
     val tasks by remember(registry, scope) { registry.tasksOf(scope) }
-        .collectAsState(remember(registry, scope) { scope?.let(registry::currentActiveSubagents).orEmpty() })
+        .collectAsState(remember(registry, scope) { scope?.let(registry::currentSubagentsWithHistory).orEmpty() })
     val dismiss = remember(registry, scope) { registry.dismissAction(scope) }
     Column(modifier.background(MaterialTheme.colorScheme.surfaceContainerLow).testTag(SHELL_TASKS_MODULE_TAG)) {
         Text(
@@ -72,4 +72,4 @@ internal fun ShellTasksModule(scope: SubagentParentScope?, modifier: Modifier) {
 
 /** The live tasks of [scope], or none while no conversation is open. */
 private fun ISubagentRepository.tasksOf(scope: SubagentParentScope?): Flow<List<SubagentEntry>> =
-    scope?.let(::activeSubagentsFlow) ?: flowOf(emptyList())
+    scope?.let(::subagentsWithHistoryFlow) ?: flowOf(emptyList())

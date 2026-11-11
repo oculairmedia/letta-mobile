@@ -18808,8 +18808,8 @@ public final class com/letta/mobile/data/controller/node/iroh/ControllerSubagent
 	public static final field PUSH_CAPABILITY Ljava/lang/String;
 	public static final field PUSH_TERMINAL_LINGER_MS J
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/subagents/DurableSubagentRegistry;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/subagents/DurableSubagentRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/subagents/DurableSubagentRegistry;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/subagents/DurableSubagentRegistry;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getChangeListener ()Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistryChangeListener;
 	public final fun getRegistry ()Lcom/letta/mobile/data/subagents/DurableSubagentRegistry;
 	public final fun ingest (Lcom/letta/mobile/data/transport/appserver/AppServerInboundFrame;)V
@@ -32693,8 +32693,8 @@ public final class com/letta/mobile/data/model/SubagentDispatchParserKt {
 
 public final class com/letta/mobile/data/model/SubagentEntry {
 	public static final field Companion Lcom/letta/mobile/data/model/SubagentEntry$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Long;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component11 ()Ljava/lang/String;
@@ -32711,6 +32711,7 @@ public final class com/letta/mobile/data/model/SubagentEntry {
 	public final fun component21 ()Ljava/lang/Long;
 	public final fun component22 ()Ljava/lang/Long;
 	public final fun component23 ()Ljava/lang/Boolean;
+	public final fun component24 ()Ljava/lang/Long;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Ljava/lang/String;
@@ -32718,8 +32719,8 @@ public final class com/letta/mobile/data/model/SubagentEntry {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;)Lcom/letta/mobile/data/model/SubagentEntry;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/SubagentEntry;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/model/SubagentEntry;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Long;)Lcom/letta/mobile/data/model/SubagentEntry;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/SubagentEntry;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/String;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;Ljava/lang/Long;ILjava/lang/Object;)Lcom/letta/mobile/data/model/SubagentEntry;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActivity ()Lcom/letta/mobile/data/model/SubagentActivitySnapshot;
 	public final fun getDescription ()Ljava/lang/String;
@@ -32737,6 +32738,7 @@ public final class com/letta/mobile/data/model/SubagentEntry {
 	public final fun getSubagentConversationId ()Ljava/lang/String;
 	public final fun getSubagentType ()Ljava/lang/String;
 	public final fun getTaskId ()Ljava/lang/String;
+	public final fun getTerminalAgeMs ()Ljava/lang/Long;
 	public final fun getTerminalAtEpochMs ()Ljava/lang/Long;
 	public final fun getTerminalReason ()Ljava/lang/String;
 	public final fun getTodoProgress ()Lcom/letta/mobile/data/model/SubagentTodoProgressWire;
@@ -44479,8 +44481,10 @@ public class com/letta/mobile/data/repository/SubagentRepository : com/letta/mob
 	public fun activeSubagentsFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public final fun close ()V
 	public fun currentActiveSubagents (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
+	public fun currentSubagentsWithHistory (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
 	public fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun refresh-IoAF18A (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun subagentsWithHistoryFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public fun todos-gIAlu-s (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -45235,8 +45239,10 @@ public final class com/letta/mobile/data/repository/api/IStepRepository$DefaultI
 public abstract interface class com/letta/mobile/data/repository/api/ISubagentRepository {
 	public abstract fun activeSubagentsFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun currentActiveSubagents (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
+	public abstract fun currentSubagentsWithHistory (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Ljava/util/List;
 	public fun dismiss-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun refresh-IoAF18A (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun subagentsWithHistoryFlow (Lcom/letta/mobile/data/repository/api/SubagentParentScope;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun todos-gIAlu-s (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -52473,7 +52479,8 @@ public final class com/letta/mobile/data/subagents/SubagentChipRecord {
 	public final fun getTodos ()Ljava/util/List;
 	public final fun getToolCallId ()Ljava/lang/String;
 	public fun hashCode ()I
-	public final fun toEntry ()Lcom/letta/mobile/data/model/SubagentEntry;
+	public final fun toEntry (Lkotlin/time/Instant;)Lcom/letta/mobile/data/model/SubagentEntry;
+	public static synthetic fun toEntry$default (Lcom/letta/mobile/data/subagents/SubagentChipRecord;Lkotlin/time/Instant;ILjava/lang/Object;)Lcom/letta/mobile/data/model/SubagentEntry;
 	public fun toString ()Ljava/lang/String;
 }
 

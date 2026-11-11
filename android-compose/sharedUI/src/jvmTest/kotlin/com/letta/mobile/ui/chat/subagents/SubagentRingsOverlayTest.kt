@@ -36,7 +36,11 @@ class SubagentRingsOverlayTest {
                 ),
             )
         }
-        setContent { MaterialTheme { SubagentRingsOverlay(listOf(entry("toolu_index")), loader) } }
+        setContent {
+            MaterialTheme {
+                SubagentRingsOverlay(listOf(entry("toolu_index")), loader, rosterEntries = listOf(entry("toolu_index")))
+            }
+        }
 
         onNodeWithTag(ActiveSubagentRingsTags.ring("toolu_index")).performClick()
         waitForIdle()
@@ -49,10 +53,28 @@ class SubagentRingsOverlayTest {
     }
 
     @Test
+    fun finishedRowsInTheRingSheetNeverBecomeRings() = runComposeUiTest {
+        val live = entry("live")
+        val old = entry("old-failure", status = "failed")
+        setContent {
+            MaterialTheme {
+                SubagentRingsOverlay(listOf(live), SubagentTodoLoader { Result.success(emptyList()) },
+                    rosterEntries = listOf(old, live))
+            }
+        }
+        onNodeWithTag(ActiveSubagentRingsTags.ring("live")).assertExists()
+        onNodeWithTag(ActiveSubagentRingsTags.ring("old-failure")).assertDoesNotExist()
+        onNodeWithTag(ActiveSubagentRingsTags.ring("live")).performClick()
+        waitForIdle()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("old-failure")).assertExists()
+    }
+
+    @Test
     fun reflectionRunsDrawNoRing() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                SubagentRingsOverlay(listOf(entry("subagent-reflect", type = "Reflection")), SubagentTodoLoader { Result.success(emptyList()) })
+                SubagentRingsOverlay(listOf(entry("subagent-reflect", type = "Reflection")),
+                    SubagentTodoLoader { Result.success(emptyList()) }, rosterEntries = emptyList())
             }
         }
         onNodeWithTag(ActiveSubagentRingsTags.RINGS).assertDoesNotExist()

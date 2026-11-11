@@ -247,7 +247,7 @@ private fun desktopWorkspaceActions(
 private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: DesktopShellFrame) {
     if (!context.navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
     BackgroundTasksSidePane(
-        subagents = frame.lists.activeSubagents,
+        subagents = frame.lists.subagentsWithHistory,
         onClose = { context.navigator.showBackgroundTasks = false },
         onOpenConversation = frame.subagentViews?.holder?.rosterOpener(context.navigator::showChat),
         dismissTask = context.panels.subagents.repository?.dismissAction(
