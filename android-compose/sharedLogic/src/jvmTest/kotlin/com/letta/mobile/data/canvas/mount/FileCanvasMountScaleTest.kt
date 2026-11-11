@@ -32,14 +32,14 @@ class FileCanvasMountScaleTest {
     fun bindingsContinueWellPastTheFormerPopulationByteLimit() = runBlocking {
         val root = Files.createTempDirectory("mount-population-size")
         val store = FileCanvasMountStore(root, HostId("host"))
-        val payload = "x".repeat(16_384)
-        repeat(256) { index ->
+        val payload = "x".repeat(4_096)
+        repeat(1_024) { index ->
             val proposed = CanvasId("$index-$payload")
             assertEquals(proposed, store.bindIfAbsent(AgentId("a"), ConversationId("c-$index"), proposed))
         }
         assertTrue(records(root).sumOf(Files::size) > 4L * 1024 * 1024, "Actual stored entries must exceed the old table limit")
         val reopened = FileCanvasMountStore(root, HostId("host"))
-        assertEquals(CanvasId("255-$payload"), reopened.readBinding(AgentId("a"), ConversationId("c-255")))
+        assertEquals(CanvasId("1023-$payload"), reopened.readBinding(AgentId("a"), ConversationId("c-1023")))
     }
 
     @Test

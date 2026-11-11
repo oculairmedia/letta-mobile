@@ -30,9 +30,11 @@ import kotlinx.serialization.json.JsonPrimitive
  * store. Each default or agent/conversation binding owns one hashed file beneath `canvas-mounts/`.
  * Operations read/validate only that key, never enumerate the population or rewrite another key.
  *
- * The shared canonical-path runtime owner and OS lock serialize each key's read/check/write across
- * instances and processes. Independent keys cannot lose each other's changes: they replace distinct
- * files. Each record validates version, host and exact key, including a misplaced/hash-collision file.
+ * The first hash byte selects one of 256 shared runtime owners and OS locks in `canvas-mounts/locks/`.
+ * A stripe serializes read/check/write across instances and processes; colliding keys serialize safely
+ * while replacing distinct files. Absent reads create neither directories, files nor runtime owners.
+ * Existing reads require the writer-created stripe lock and never create it. Records are limited to
+ * 8 KiB and validate version, host and exact key, including misplaced/hash-collision files.
  * Values are semantic [CanvasId]s, never notebook generation IDs. Existing winners are directory-synced
  * without replacing already-forced contents. No document, provenance or client preferences change.
  * No RPC, principal inference or fallback is supplied; S2 must authorize scope, proposal AND winner.
@@ -51,16 +53,17 @@ class FileCanvasMountStore internal constructor(
 
     private val parent = productStateDirectory.toAbsolutePath().normalize()
     private val directory = parent.resolve("canvas-mounts")
+    private val lockDirectory = directory.resolve("locks")
 
     init { require(hostId.value.isNotBlank()) { "Empty mount host" } }
 
     /** Reads only this explicit binding. Null means absent; corrupt/unreadable state throws. */
     suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId? =
-        transaction(agentId, conversationId) { file -> read(file, agentId, conversationId)?.canvas?.let(::CanvasId) }
+        readKey(agentId, conversationId)
 
     /** Reads only this agent's default, without granting canvas access or creating a binding. */
     suspend fun readDefault(agentId: AgentId): CanvasId? =
-        transaction(agentId, null) { file -> read(file, agentId, null)?.canvas?.let(::CanvasId) }
+        readKey(agentId, null)
 
     /** Atomically inserts only when absent, returning the durable winner without rewriting it. */
     suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId =
@@ -68,15 +71,14 @@ class FileCanvasMountStore internal constructor(
             val winner = read(file, agentId, conversationId)
             // Reconfirm the root's own directory entry on every mutation/retry, including creation
             // whose previous parent-directory sync may have failed. No unrelated data file is read.
-            directorySync(parent)
+            syncDirectories()
             when (winner) {
                 null -> {
                     write(file, Record(VERSION, hostId, agentId, conversationId, proposed.value))
                     proposed
                 }
                 else -> {
-                    // Contents were forced before rename; only its directory entry may be unconfirmed.
-                    directorySync(directory)
+                    // syncDirectories confirmed the entry; contents were already forced before rename.
                     CanvasId(winner.canvas)
                 }
             }
@@ -86,15 +88,25 @@ class FileCanvasMountStore internal constructor(
     suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId) =
         transaction(agentId, conversationId, canvasId) { file ->
             read(file, agentId, conversationId)
-            directorySync(parent)
+            syncDirectories()
             write(file, Record(VERSION, hostId, agentId, conversationId, canvasId.value))
         }
 
     /** Durably sets only this default. Existing conversation bindings are neither read nor rewritten. */
     suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) = transaction(agentId, null, canvasId) { file ->
         read(file, agentId, null)
-        directorySync(parent)
+        syncDirectories()
         write(file, Record(VERSION, hostId, agentId, null, canvasId.value))
+    }
+
+    private suspend fun readKey(agent: AgentId, conversation: ConversationId?): CanvasId? = withContext(Dispatchers.IO) {
+        validate(agent, conversation)
+        val attributes = attributesOrNull(directory) ?: return@withContext null
+        require(attributes.isDirectory) { "Mount directory is not a directory" }
+        val file = fileFor(agent, conversation)
+        if (attributesOrNull(file.path) == null) return@withContext null
+        require(attributesOrNull(lockDirectory)?.isDirectory == true) { "Missing or invalid mount lock directory" }
+        file.locked(createLock = false) { read(file, agent, conversation)?.canvas?.let(::CanvasId) }
     }
 
     private suspend fun <T> transaction(
@@ -104,30 +116,37 @@ class FileCanvasMountStore internal constructor(
         action: suspend (DurableHostFile) -> T,
     ): T = withContext(Dispatchers.IO) {
         validate(agent, conversation, canvas)
-        ensureDirectory()
-        val identity = JsonArray(listOf(JsonPrimitive(agent.value), conversation?.let { JsonPrimitive(it.value) } ?: JsonNull))
-        val kind = if (conversation == null) "default" else "binding"
-        val file = DurableHostFile(directory.resolve("$kind-${sha256Hex(identity.toString().encodeToByteArray())}.json"), directorySync)
+        ensureDirectory(directory)
+        ensureDirectory(lockDirectory)
+        val file = fileFor(agent, conversation)
         file.locked { action(file) }
     }
 
-    private fun ensureDirectory() {
+    private fun fileFor(agent: AgentId, conversation: ConversationId?): DurableHostFile {
+        val identity = JsonArray(listOf(JsonPrimitive(agent.value), conversation?.let { JsonPrimitive(it.value) } ?: JsonNull))
+        val hash = sha256Hex(identity.toString().encodeToByteArray())
+        val kind = if (conversation == null) "default" else "binding"
+        val lock = lockDirectory.resolve("${hash.take(STRIPE_HEX_CHARS)}.lock")
+        return DurableHostFile(directory.resolve("$kind-$hash.json"), lock, directorySync)
+    }
+
+    private fun ensureDirectory(path: Path) {
         try {
-            Files.createDirectory(directory)
+            Files.createDirectory(path)
         } catch (_: FileAlreadyExistsException) {
             // Existing directories are validated without following a substituted symlink.
         }
-        require(Files.readAttributes(directory, BasicFileAttributes::class.java, NOFOLLOW_LINKS).isDirectory) {
-            "Mount directory is not a directory"
-        }
+        require(attributesOrNull(path)?.isDirectory == true) { "Mount directory is not a directory" }
+    }
+
+    private fun syncDirectories() {
+        directorySync(parent)
+        directorySync(directory)
+        directorySync(lockDirectory)
     }
 
     private fun read(file: DurableHostFile, agent: AgentId, conversation: ConversationId?): Record? {
-        val attributes = try {
-            Files.readAttributes(file.path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
-        } catch (_: NoSuchFileException) {
-            return null
-        }
+        val attributes = attributesOrNull(file.path) ?: return null
         require(attributes.isRegularFile) { "Mount record is not a regular file" }
         require(attributes.size() <= MAX_RECORD_BYTES) { "Mount record is too large" }
         val text = Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Files.readAllBytes(file.path))).toString()
@@ -177,6 +196,13 @@ class FileCanvasMountStore internal constructor(
 
     private companion object {
         const val VERSION = 1
-        const val MAX_RECORD_BYTES = 1024 * 1024
+        const val MAX_RECORD_BYTES = 8 * 1024
+        const val STRIPE_HEX_CHARS = 2
     }
+}
+
+private fun attributesOrNull(path: Path): BasicFileAttributes? = try {
+    Files.readAttributes(path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+} catch (_: NoSuchFileException) {
+    null
 }

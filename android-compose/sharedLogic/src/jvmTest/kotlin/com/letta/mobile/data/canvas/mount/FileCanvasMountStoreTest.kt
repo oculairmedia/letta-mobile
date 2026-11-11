@@ -28,7 +28,6 @@ import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -85,8 +84,8 @@ class FileCanvasMountStoreTest {
     fun versionOneFixtureUsesSemanticStringsNotDocumentMetadataObjects() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-v1-fixture")
         val store = FileCanvasMountStore(directory, host)
-        store.readDefault(agent)
-        store.readBinding(agent, conversation)
+        store.setDefault(agent, first)
+        store.bindIfAbsent(agent, conversation, first)
         Files.writeString(recordPath(directory, "default"),
             """{"version":1,"host":"host-one","agent":"agent-one","conversation":null,"canvas":"default-board"}""")
         Files.writeString(recordPath(directory, "binding"),
@@ -99,8 +98,8 @@ class FileCanvasMountStoreTest {
     fun malformedAndUnsupportedFilesNeverResetOrMutate() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-invalid")
         val store = FileCanvasMountStore(directory, host)
-        store.readBinding(agent, conversation)
-        store.readDefault(agent)
+        store.bindIfAbsent(agent, conversation, first)
+        store.setDefault(agent, first)
         val file = recordPath(directory, "binding")
         val defaultFile = recordPath(directory, "default")
         val fields = """"host":"host-one","agent":"agent-one","conversation":"conversation-one","canvas":"x"}"""
@@ -166,7 +165,7 @@ class FileCanvasMountStoreTest {
         val directory = Files.createTempDirectory("canvas-mounts-after-replace")
         val syncs = AtomicInteger()
         val failing = FileCanvasMountStore(directory, host) { parent ->
-            if (syncs.incrementAndGet() == 3) throw IOException("after replacement")
+            if (syncs.incrementAndGet() == 5) throw IOException("after replacement")
             forceDirectory(parent)
         }
         assertFailsWith<IOException> { failing.bindIfAbsent(agent, conversation, first) }
@@ -175,7 +174,7 @@ class FileCanvasMountStoreTest {
         other.setDefault(AgentId("other"), second)
         assertEquals(first, failing.bindIfAbsent(agent, conversation, second))
         assertEquals(second, other.readDefault(AgentId("other")))
-        assertTrue(syncs.get() >= 5, "Returning a winner must reconfirm parent and entry durability")
+        assertTrue(syncs.get() >= 8, "Returning a winner must reconfirm parent, entry and stripe durability")
     }
 
     @Test
@@ -190,23 +189,24 @@ class FileCanvasMountStoreTest {
     fun cancellationWhileWaitingForProcessLockReleasesRuntimeOwner() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-cancellation")
         val store = FileCanvasMountStore(directory, host)
-        store.readBinding(agent, conversation)
+        store.bindIfAbsent(agent, conversation, first)
         val file = recordPath(directory, "binding")
-        val lockPath = file.resolveSibling("${file.fileName}.lock")
+        val lockPath = stripeLock(file)
+        val before = Files.readString(file)
         FileChannel.open(lockPath, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE).use { channel ->
             val lock = channel.lock()
             val started = kotlinx.coroutines.CompletableDeferred<Unit>()
             val waiting = launch(Dispatchers.Default) {
                 started.complete(Unit)
-                FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, first)
+                FileCanvasMountStore(directory, host).replaceBinding(agent, conversation, second)
             }
             started.await()
             yield()
             waiting.cancelAndJoin()
-            assertFalse(Files.exists(file))
+            assertEquals(before, Files.readString(file))
             lock.release()
         }
-        withTimeout(5_000) { FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, second) }
+        withTimeout(5_000) { FileCanvasMountStore(directory, host).replaceBinding(agent, conversation, second) }
         assertEquals(second, FileCanvasMountStore(directory, host).readBinding(agent, conversation))
     }
 
@@ -239,14 +239,14 @@ class FileCanvasMountStoreTest {
     @Test
     fun cancellationInsideTransactionReleasesBothLocks() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-owner-cancellation")
-        FileCanvasMountStore(directory, host).readDefault(agent)
+        FileCanvasMountStore(directory, host).setDefault(agent, first)
         val path = recordPath(directory, "default")
-        val file = DurableHostFile(path) { }
+        val file = DurableHostFile(path, stripeLock(path)) { }
         val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
         val owner = launch {
             file.locked {
                 FileChannel.open(
-                    path.resolveSibling("${path.fileName}.lock"), java.nio.file.StandardOpenOption.WRITE,
+                    stripeLock(path), java.nio.file.StandardOpenOption.WRITE,
                 ).use { competing ->
                     assertFailsWith<java.nio.channels.OverlappingFileLockException> { competing.tryLock() }
                 }
@@ -256,16 +256,16 @@ class FileCanvasMountStoreTest {
         }
         entered.await()
         owner.cancelAndJoin()
-        withTimeout(5_000) { FileCanvasMountStore(directory, host).setDefault(agent, first) }
-        assertEquals(first, FileCanvasMountStore(directory, host).readDefault(agent))
+        withTimeout(5_000) { FileCanvasMountStore(directory, host).setDefault(agent, second) }
+        assertEquals(second, FileCanvasMountStore(directory, host).readDefault(agent))
     }
 
     @Test
     fun transactionLockExcludesAnotherJvmProcess() = runBlocking {
         val directory = Files.createTempDirectory("canvas-mounts-process-lock")
-        FileCanvasMountStore(directory, host).readDefault(agent)
+        FileCanvasMountStore(directory, host).setDefault(agent, first)
         val path = recordPath(directory, "default")
-        val file = DurableHostFile(path) { }
+        val file = DurableHostFile(path, stripeLock(path)) { }
         val classpath = listOf(FileCanvasMountStoreTest::class.java, Unit::class.java)
             .map { Path.of(it.protectionDomain.codeSource.location.toURI()).toString() }
             .joinToString(java.io.File.pathSeparator)
@@ -273,7 +273,7 @@ class FileCanvasMountStoreTest {
         file.locked {
             val process = ProcessBuilder(
                 executable.toString(), "-cp", classpath, CanvasMountLockProbe::class.java.name,
-                path.resolveSibling("${path.fileName}.lock").toString(),
+                stripeLock(path).toString(),
             ).redirectErrorStream(true).start()
             try {
                 assertTrue(process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS), "Lock probe must terminate")
@@ -295,6 +295,9 @@ class FileCanvasMountStoreTest {
     private fun isWindows() = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
     private fun forceDirectory(directory: Path) = FileChannel.open(directory).use { it.force(true) }
 }
+
+private fun stripeLock(record: Path): Path = record.parent.resolve("locks")
+    .resolve("${record.fileName.toString().substringAfter('-').take(2)}.lock")
 
 /** A separate JVM proves the lock is not merely a coroutine or process-local mutex. */
 object CanvasMountLockProbe {
