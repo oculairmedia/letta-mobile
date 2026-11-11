@@ -130,6 +130,39 @@ class ShellLayoutToolTest {
     }
 
     @Test
+    fun unseenChangeIsClaimedOnceAndOnlyTheLatestCanBeUndone() = runTest {
+        success(recentsFirst)
+        val first = port.claimUnseenChange()!!
+        assertEquals(null, port.claimUnseenChange())
+        success("""{"action":"apply","ops":[{"op":"remove","lane":"panel","view":"panel.newChat"}]}""")
+        val second = port.claimUnseenChange()!!
+        assertEquals(null, port.claimUnseenChange())
+        assertEquals(false, port.undo(first))
+        assertTrue(port.undo(second))
+    }
+
+    @Test
+    fun unseenChangeIsReplacedAndDiscardedWhenItsStoreOrLayoutChanges() = runTest {
+        val changes = mutableListOf<ShellLayoutChange>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.changes.toList(changes) }
+        success(recentsFirst)
+        success("""{"action":"apply","ops":[{"op":"remove","lane":"panel","view":"panel.newChat"}]}""")
+        assertEquals(null, port.claimUnseenChange(changes.first()))
+        val latest = port.claimUnseenChange(changes.last())!!
+        assertEquals(HomeViews.RECENTS, latest.after.homeLane().first().view)
+        assertEquals(false, latest.after.panelLane().any { it.view == PanelViews.NEW_CHAT })
+        assertEquals(null, port.claimUnseenChange())
+        success("""{"action":"reset"}""")
+        store.save(latest.after)
+        assertEquals(null, port.claimUnseenChange())
+        success("""{"action":"reset"}""")
+        val other = ShellLayoutConfigStore(InMemorySecureSettingsStore(), "other")
+        port.attach(other)
+        port.detach(other)
+        assertEquals(null, port.claimUnseenChange())
+    }
+
+    @Test
     fun aDryRunChecksWithoutChangingOrNotifying() = runTest {
         val changes = mutableListOf<ShellLayoutChange>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.changes.toList(changes) }

@@ -72,6 +72,7 @@ sealed interface ShellLayoutCommit {
 class ShellLayoutAgentPort {
     private val lock = SynchronizedObject()
     private var stores: List<ShellLayoutConfigStore> = emptyList()
+    private var unseen: ShellLayoutChange? = null
     private val attachedStore = MutableStateFlow<ShellLayoutConfigStore?>(null)
     private val published = MutableSharedFlow<ShellLayoutChange>(
         extraBufferCapacity = CHANGE_BUFFER,
@@ -84,16 +85,34 @@ class ShellLayoutAgentPort {
     /** Every change made through this port, as it is made. */
     val changes: SharedFlow<ShellLayoutChange> = published.asSharedFlow()
 
+    /**
+     * Claims the latest unseen change, if it still describes the attached layout. When [expected]
+     * is supplied, only that exact change may be claimed. A claim acknowledges delivery; changes
+     * are retained in memory only and a later change replaces an unseen one.
+     */
+    fun claimUnseenChange(expected: ShellLayoutChange? = null): ShellLayoutChange? = synchronized(lock) {
+        val change = unseen ?: return@synchronized null
+        if (change.store !== attachedStore.value || change.store.config.value != change.after) {
+            unseen = null
+            return@synchronized null
+        }
+        if (expected != null && expected !== change) return@synchronized null
+        unseen = null
+        change
+    }
+
     /** Makes [store] the one changes go to, until [detach]. */
     fun attach(store: ShellLayoutConfigStore) = synchronized(lock) {
         stores = stores - store + store
         attachedStore.value = stores.lastOrNull()
+        if (unseen?.store !== attachedStore.value) unseen = null
     }
 
     /** Stops sending changes to [store]; the store attached before it, if any, takes over. */
     fun detach(store: ShellLayoutConfigStore) = synchronized(lock) {
         stores = stores - store
         attachedStore.value = stores.lastOrNull()
+        if (unseen?.store !== attachedStore.value) unseen = null
     }
 
     /**
@@ -134,6 +153,9 @@ class ShellLayoutAgentPort {
     fun undo(change: ShellLayoutChange): Boolean = change.undoable && change.store.undo(ifCurrent = change.after) != null
 
     private fun publish(change: ShellLayoutChange): ShellLayoutCommit {
+        synchronized(lock) {
+            if (change.store === attachedStore.value && change.store.config.value == change.after) unseen = change
+        }
         published.tryEmit(change)
         return ShellLayoutCommit.Done(change)
     }

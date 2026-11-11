@@ -15,6 +15,7 @@ import com.letta.mobile.ui.host.Overlay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onSubscription
 
 /**
  * Tells the person when the shell layout changes through [LocalShellLayoutAgentPort] (an agent's
@@ -29,7 +30,11 @@ internal fun ShellLayoutChangeNotices(agents: List<Pair<String, String>>) {
     val overlays = LocalOverlayHost.current ?: return
     val names by rememberUpdatedState(agents)
     LaunchedEffect(port, overlays) {
-        port.changes.collect { change -> overlays.show(shellLayoutChangeNotice(change, names, port)) }
+        port.changes.onSubscription {
+            port.claimUnseenChange()?.let { overlays.show(shellLayoutChangeNotice(it, names, port)) }
+        }.collect { change ->
+            port.claimUnseenChange(change)?.let { overlays.show(shellLayoutChangeNotice(it, names, port)) }
+        }
     }
 }
 
