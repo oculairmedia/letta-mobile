@@ -84,9 +84,33 @@ class AgentContextCardUiTest {
         setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
-        onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total")
-        onNodeWithText("Unclassified / estimation gap").assertExists()
+        onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total; split is approximate")
+        onNodeWithText("Other").assertExists()
         onNodeWithText("Memory blocks").assertExists()
+    }
+
+    @Test
+    fun aUsageCalibratedBreakdownNamesToolsAndHarness() = runComposeUiTest {
+        val overview = ContextWindowOverview(
+            contextWindowSizeMax = 200_000,
+            contextWindowSizeCurrent = 84_000,
+            numTokensSystem = 4_000,
+            numTokensCoreMemory = 2_000,
+            numTokensMessages = 60_000,
+            numTokensFunctionsDefinitions = 18_000,
+            numTokensToolsAndHarness = 18_000,
+            calibrationSource = "conversation_usage",
+            messageCharsPerToken = 2.16,
+            source = "estimate",
+            calibrated = true,
+        )
+        val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { overview }, compaction = null)
+        setContent { PointerCard(deps, focus) }
+        onNodeWithTag(AgentContextTags.CARD).performClick()
+        waitForIdle()
+        onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Measured from this conversation's usage")
+        onNodeWithText("Tools and harness").assertExists()
+        onNodeWithText("Other").assertDoesNotExist()
     }
 
     @Test

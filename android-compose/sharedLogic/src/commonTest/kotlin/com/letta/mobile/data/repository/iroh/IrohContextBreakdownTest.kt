@@ -29,12 +29,14 @@ class IrohContextBreakdownTest {
         transport.rpcResponder = { call ->
             assertEquals("agent.context", call.method)
             val body = Json.parseToJsonElement(call.body.orEmpty()).jsonObject
+            assertEquals(request.agentId.value, body.getValue("agent_id").jsonPrimitive.content)
             assertEquals(40_000, body.getValue("reported_total").jsonPrimitive.int)
             assertEquals("conv-1", body.getValue("conversation_id").jsonPrimitive.content)
             ok(
                 """{"context_window_size_current":40000,"context_window_size_max":200000,"num_tokens_system":4000,
                    "num_tokens_messages":30000,"num_tokens_functions_definitions":6000,"source":"estimate",
-                   "calibrated":true,"tools_derived":true,"total_source":"client","memory_split":false}""",
+                   "calibrated":true,"tools_derived":true,"total_source":"client","memory_split":false,
+                   "num_tokens_tools_and_harness":5500,"calibration_source":"conversation_usage","message_chars_per_token":2.16}""",
             )
         }
         val directory = IrohAdminRpcAgentDirectory(transport)
@@ -45,6 +47,9 @@ class IrohContextBreakdownTest {
         assertEquals(true, overview.calibrated)
         assertEquals("client", overview.totalSource)
         assertEquals(false, overview.memorySplit)
+        assertEquals(5_500, overview.numTokensToolsAndHarness)
+        assertEquals("conversation_usage", overview.calibrationSource)
+        assertEquals(2.16, overview.messageCharsPerToken)
     }
 
     @Test

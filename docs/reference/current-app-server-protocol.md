@@ -471,6 +471,18 @@ These are declared ownership decisions, not newly observed production execution.
 | workspace.read&#95;file | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | read&#95;file |
 | workspace.search&#95;files | app&#95;server&#95;v2 | none | admin&#95;read | WorkspaceAdminHandlers.kt | search&#95;files |
 
+## Controller agent.context estimate fields
+
+Controller implementation contract (not an upstream fixture or deployment claim): `ContextBreakdownEstimator` keeps all legacy token fields additive. `num_tokens_functions_definitions` includes both named tools/harness and any unexplained remainder; an old client still sums to the same provider total.
+
+| Additive field | Meaning |
+| --- | --- |
+| num&#95;tokens&#95;tools&#95;and&#95;harness | Optional subset of num&#95;tokens&#95;functions&#95;definitions: fixed tool definitions and harness text beyond disk system/memory/summary. Replace, never add to, the legacy row; its remainder is Other. |
+| calibration&#95;source | conversation&#95;usage when fitted from fresh usage points within the current compaction span; absent on fallback. |
+| message&#95;chars&#95;per&#95;token | Message growth density, clamped to 1..8 characters/token (dense JSON through prose); absent on fallback. |
+
+Calibration requires at least two fresh same-model points, strictly increasing prompt tokens and counted message characters, at least 16,384 characters and 4,096 prompt tokens of growth, and nonnegative fixed overhead. Prompt tokens are input + cacheRead + cacheWrite (not output). Fixed overhead is the earliest prompt minus preceding messages at the fitted rate. System and memory remain chars/4. Hamilton rounding preserves the provider total when sections overflow it. With insufficient signal the original chars/4 estimate remains. New clients show Other instead of the old residual label with an old host; old clients show the combined residual with a new host. Matched new pairs name Tools and harness and distinguish usage measurement from estimation; over 10% unexplained occupied tokens makes the split explicitly approximate. Totals, limits and composer percentages are unchanged.
+
 ## Interpretation and historical evidence
 
 An upstream discriminant is not proof that the Kotlin client adopts it or that a particular host permits it. The generated [Kotlin command API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-command/index.html) describes the typed client surface. Architecture, retry semantics, state ownership rationale and dated captures remain in the [historical system audit](../architecture/app-server-v2-audit-spec.md), [migration ownership record](../architecture/iroh-admin-ownership-matrix.md) and [deployment runbook](../architecture/lettashim-retirement-deployment-runbook.md).

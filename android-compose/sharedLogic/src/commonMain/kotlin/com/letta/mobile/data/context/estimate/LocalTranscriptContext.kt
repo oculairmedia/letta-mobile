@@ -41,6 +41,58 @@ data class LocalTranscriptContext(
         return (usage + trailing).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
+    /** Counts text and fits usage growth in one pass; never crosses a compaction or model change. */
+    internal fun messageCalibration(estimator: TokenEstimator): MessageCalibration {
+        var chars = 0L
+        var fallback = 0
+        var firstChars = 0L
+        var firstPrompt = 0L
+        var lastChars = 0L
+        var lastPrompt = 0L
+        var model: String? = null
+        var points = 0
+        var valid = true
+        val boundary = summary?.number("timestamp")
+        messages.forEachIndexed { index, message ->
+            if (index >= firstPostCompaction && message.reportsFreshUsage(boundary)) {
+                val usage = message["usage"] as? JsonObject
+                val prompt = listOf("input", "cacheRead", "cacheWrite").sumOf { usage?.number(it) ?: 0L }
+                val currentModel = message.text("model")
+                if (points == 0) {
+                    firstChars = chars
+                    firstPrompt = prompt
+                    model = currentModel
+                } else if (prompt <= lastPrompt || chars <= lastChars || currentModel != model) {
+                    valid = false
+                }
+                valid = valid && prompt > 0 && currentModel != null
+                lastChars = chars
+                lastPrompt = prompt
+                points += 1
+            }
+            if (points > 0 && message.text("role") == "assistant" && message.text("model") != model) valid = false
+            val count = LocalMessageTokens.of(message, TokenEstimator { size ->
+                chars += size
+                estimator.tokensForChars(size)
+            })
+            fallback += count
+        }
+        val growthChars = lastChars - firstChars
+        val growthTokens = lastPrompt - firstPrompt
+        if (!valid || points < 2 || growthChars < MIN_CALIBRATION_CHARS || growthTokens < MIN_CALIBRATION_TOKENS) {
+            return MessageCalibration(fallback)
+        }
+        // 1..8 chars/token covers dense JSON through prose without trusting pathological slopes.
+        val charsPerToken = (growthChars.toDouble() / growthTokens).coerceIn(1.0, 8.0)
+        val fixed = firstPrompt - firstChars / charsPerToken
+        if (fixed < 0) return MessageCalibration(fallback)
+        return MessageCalibration(
+            kotlin.math.ceil(chars / charsPerToken).toInt(), charsPerToken, fixed.toInt(),
+        )
+    }
+
+    internal data class MessageCalibration(val tokens: Int, val charsPerToken: Double? = null, val fixed: Int? = null)
+
     private fun lastUsageIndex(): Int? {
         val boundary = summary?.number("timestamp")
         for (index in messages.indices.reversed()) {
@@ -89,6 +141,8 @@ data class LocalTranscriptContext(
             return parts.sum().takeIf { it > 0 }
         }
 
+        private const val MIN_CALIBRATION_CHARS = 16_384L
+        private const val MIN_CALIBRATION_TOKENS = 4_096L
         private val USAGE_PARTS = listOf("input", "output", "cacheRead", "cacheWrite")
         private val UNUSABLE_STOP_REASONS = setOf("aborted", "error")
     }

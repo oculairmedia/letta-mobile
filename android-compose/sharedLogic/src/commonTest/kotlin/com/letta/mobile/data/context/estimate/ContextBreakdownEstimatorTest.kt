@@ -17,6 +17,62 @@ import kotlin.test.assertTrue
 class ContextBreakdownEstimatorTest {
     private fun obj(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject
 
+    @Test
+    fun denseTranscriptSeparatesMessagesFromFixedPromptOverhead() {
+        val messages = listOf(
+            obj("""{"role":"user","content":"${"x".repeat(2_160)}"}"""),
+            obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":66000}}"""),
+            obj("""{"role":"user","content":"${"x".repeat(1_650_240)}"}"""),
+            obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":830000}}"""),
+        )
+        val inputs = LocalContextInputs(
+            obj("""{"content":"${"s".repeat(36_000)}","coreMemory":"${"s".repeat(32_000)}"}"""),
+            obj("{}"), null, LocalTranscriptContext(null, messages, 0), 830_000,
+        )
+        val oldMessages = (2_160 + 1_650_240) / 4
+        assertTrue((830_000 - 9_000 - oldMessages) / 830_000.0 > 0.30)
+        val result = ContextBreakdownEstimator.estimate(inputs)
+        assertTrue(result.sections.messages in 750_000..780_000, "Messages: ${result.sections.messages}")
+        val wire = result.toAgentContextJson()
+        assertTrue(wire.getValue("num_tokens_tools_and_harness").jsonPrimitive.int in 54_000..58_000)
+        assertEquals(result.total, result.sections.total + (result.tools ?: 0))
+        val harness = wire.getValue("num_tokens_tools_and_harness").jsonPrimitive.int
+        assertTrue((result.tools!! - harness) < result.total / 10)
+        // An old client ignores additive fields and still sums exactly to the provider total.
+        val legacyFields = listOf(
+            "num_tokens_system", "num_tokens_core_memory", "num_tokens_summary_memory",
+            "num_tokens_messages", "num_tokens_functions_definitions",
+        )
+        assertEquals(result.total, legacyFields.sumOf { wire.getValue(it).jsonPrimitive.int })
+        listOf(1, 5_000, 100_000, 500_000, 830_000, 900_000).forEach { total ->
+            val scaled = ContextBreakdownEstimator.estimate(inputs.copy(reportedTotal = total))
+            assertEquals(total, scaled.sections.total + scaled.tools!!)
+            assertTrue(scaled.toolsAndHarness!! <= scaled.tools)
+        }
+    }
+
+    @Test
+    fun calibrationFallsBackWithoutEnoughCleanSameModelGrowth() {
+        val point = obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":66000}}""")
+        val text = obj("""{"role":"user","content":"${"x".repeat(40_000)}"}""")
+        val later = obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":86000}}""")
+        val backwards = obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":65000}}""")
+        val switched = obj("""{"role":"assistant","model":"other-model","content":"","usage":{"input":86000}}""")
+        val cases = listOf(
+            LocalTranscriptContext(null, listOf(text), 0),
+            LocalTranscriptContext(null, listOf(point, text), 0),
+            LocalTranscriptContext(null, listOf(point, text, backwards), 0),
+            LocalTranscriptContext(null, listOf(point, text, switched), 0),
+            LocalTranscriptContext(obj("""{"content":"summary"}"""), listOf(point, text, later), 2),
+        )
+        cases.forEach { transcript ->
+            val result = ContextBreakdownEstimator.estimate(LocalContextInputs(null, obj("{}"), null, transcript, 90_000))
+            assertEquals(LocalMessageTokens.ofAll(transcript.messages), result.sections.messages)
+            assertNull(result.toAgentContextJson()["calibration_source"])
+            assertEquals(result.total, result.sections.total + (result.tools ?: 0))
+        }
+    }
+
     // ── calibration ────────────────────────────────────────────────────────
 
     @Test

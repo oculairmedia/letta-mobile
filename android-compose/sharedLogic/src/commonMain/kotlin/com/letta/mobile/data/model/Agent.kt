@@ -39,13 +39,19 @@ data class ContextWindowOverview(
     @SerialName("source") val source: String? = null,
     /** The sections were matched to an exact total, so they sum to [contextWindowSizeCurrent]. */
     @SerialName("calibrated") val calibrated: Boolean? = null,
-    /** [numTokensFunctionsDefinitions] is an unclassified estimation residual, not measured tool tokens. */
+    /** [numTokensFunctionsDefinitions] is a derived residual, including any named tools/harness subset. */
     @SerialName("tools_derived") val toolsDerived: Boolean? = null,
     /** `client` or `recorded`: where the exact total came from. */
     @SerialName("total_source") val totalSource: String? = null,
     /** False when memory could not be told apart from the system prompt (letta-code 0.26.1). */
     @SerialName("memory_split") val memorySplit: Boolean? = null,
     @SerialName("window_source") val windowSource: String? = null,
+    /** Named portion of [numTokensFunctionsDefinitions]; never add both to the total. */
+    @SerialName("num_tokens_tools_and_harness") val numTokensToolsAndHarness: Int? = null,
+    /** `conversation_usage` when message density and fixed overhead were fitted within this span. */
+    @SerialName("calibration_source") val calibrationSource: String? = null,
+    /** Fitted message characters per token (1..8); null on the four-character fallback. */
+    @SerialName("message_chars_per_token") val messageCharsPerToken: Double? = null,
 )
 
 @Serializable

@@ -47,7 +47,9 @@ object AgentContextStrings {
 
     fun provenance(provenance: ContextProvenance, totalIsEstimate: Boolean): String = when {
         totalIsEstimate -> "Estimated after compaction"
-        provenance == ContextProvenance.EstimatedCalibrated -> "Estimated, matched to provider total"
+        provenance == ContextProvenance.ConversationUsage -> "Measured from this conversation's usage"
+        provenance == ContextProvenance.ConversationUsageApproximate -> "Measured from this conversation's usage; split is approximate"
+        provenance == ContextProvenance.EstimatedCalibrated -> "Estimated, matched to provider total; split is approximate"
         provenance == ContextProvenance.Estimated -> "Estimated"
         else -> "Total only"
     }

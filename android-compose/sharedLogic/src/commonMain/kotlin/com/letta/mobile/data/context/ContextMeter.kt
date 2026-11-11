@@ -20,6 +20,12 @@ enum class ContextProvenance {
 
     /** Sections estimated from disk and matched to the exact total, so the rows sum to it. */
     EstimatedCalibrated,
+
+    /** Message density and fixed overhead measured from this conversation's recorded usage. */
+    ConversationUsage,
+
+    /** Usage-calibrated, but more than 10% of occupied tokens remain unexplained. */
+    ConversationUsageApproximate,
 }
 
 /** A context meter's whole state: the bar, how it was derived, and where auto-compaction fires. */
@@ -60,9 +66,19 @@ data class ContextMeter(
         private fun estimated(estimate: ContextWindowOverview, exactTotal: Int?, window: Int?, totalIsEstimate: Boolean): ContextMeter {
             val matched = exactTotal?.let(estimate::calibratedTo) ?: estimate
             val calibrated = matched.calibrated == true && !totalIsEstimate
+            val measured = matched.calibrationSource == "conversation_usage" && calibrated
+            val other = matched.numTokensFunctionsDefinitions - (matched.numTokensToolsAndHarness ?: 0)
+            val provenance = when {
+                measured && other > matched.contextWindowSizeCurrent * APPROXIMATE_SPLIT_RATIO ->
+                    ContextProvenance.ConversationUsageApproximate
+                measured -> ContextProvenance.ConversationUsage
+                calibrated -> ContextProvenance.EstimatedCalibrated
+                else -> ContextProvenance.Estimated
+            }
             return ContextMeter(
-                usage = ContextWindowUsage.from(matched.copy(contextWindowSizeMax = window ?: 0)).withEstimateLabels(),
-                provenance = if (calibrated) ContextProvenance.EstimatedCalibrated else ContextProvenance.Estimated,
+                usage = ContextWindowUsage.from(matched.copy(contextWindowSizeMax = window ?: 0))
+                    .withEstimateLabels(matched.numTokensToolsAndHarness != null),
+                provenance = provenance,
                 autoCompactAt = autoCompactAt(window),
                 totalIsEstimate = totalIsEstimate,
             )
@@ -78,6 +94,8 @@ data class ContextMeter(
             return (window - reserve).coerceAtLeast(0).toFloat() / window.toFloat()
         }
 
+        // A tenth of occupied tokens is too much unexplained content to imply a precise split.
+        private const val APPROXIMATE_SPLIT_RATIO = 0.1
         private const val AUTO_COMPACT_RESERVE_TOKENS = 16_384
         private const val AUTO_COMPACT_RESERVE_RATIO = 0.2
     }
@@ -89,7 +107,10 @@ data class ContextMeter(
  */
 private fun ContextWindowOverview.calibratedTo(total: Int): ContextWindowOverview {
     val sections = ContextSections(numTokensSystem, numTokensCoreMemory, numTokensSummaryMemory, numTokensMessages)
-    val matched = ContextBreakdownEstimator.calibrate(sections, total)
+    val target = total.coerceAtLeast(0)
+    val values = sections.asList() + (numTokensToolsAndHarness ?: 0)
+    val scaled = if (values.sum() > target) ContextBreakdownEstimator.scaleTo(values, target) else values
+    val matched = ContextBreakdownEstimator.calibrate(ContextSections.of(scaled), target)
     return copy(
         contextWindowSizeCurrent = matched.total,
         numTokensSystem = matched.sections.system,
@@ -99,21 +120,24 @@ private fun ContextWindowOverview.calibratedTo(total: Int): ContextWindowOvervie
         numTokensFunctionsDefinitions = matched.tools ?: 0,
         calibrated = true,
         toolsDerived = true,
+        numTokensToolsAndHarness = numTokensToolsAndHarness?.let { scaled.last() },
     )
 }
 
-/**
- * The estimator's residual is an unclassified estimation gap, not measured tool definitions.
- * It can include section-estimation error as well as prompt components absent from disk.
- * "Memory blocks" is rendered core memory; "Summary" is the latest compaction summary.
- */
-private fun ContextWindowUsage.withEstimateLabels(): ContextWindowUsage =
-    copy(segments = segments.map { segment -> ESTIMATE_LABELS[segment.kind]?.let { segment.copy(label = it) } ?: segment })
+/** Keeps named measured overhead separate from the fallback residual. */
+private fun ContextWindowUsage.withEstimateLabels(measuredTools: Boolean): ContextWindowUsage =
+    copy(segments = segments.map { segment ->
+        val label = when {
+            segment.kind == ContextWindowSegmentKind.ToolDefinitions && measuredTools -> "Tools and harness"
+            else -> ESTIMATE_LABELS[segment.kind]
+        }
+        label?.let { segment.copy(label = it) } ?: segment
+    })
 
 private val ESTIMATE_LABELS = mapOf(
     ContextWindowSegmentKind.System to "System prompt",
     ContextWindowSegmentKind.CoreMemory to "Memory blocks",
     ContextWindowSegmentKind.SummaryMemory to "Summary",
     ContextWindowSegmentKind.Messages to "Messages",
-    ContextWindowSegmentKind.ToolDefinitions to "Unclassified / estimation gap",
+    ContextWindowSegmentKind.ToolDefinitions to "Other",
 )
