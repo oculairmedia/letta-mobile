@@ -21,6 +21,7 @@ import kotlin.test.assertTrue
 class NotebookSyncIsolationTest {
     @Test
     fun grantsNeverPermitRawRepositoryExposureEvenForReadOnlyPeers() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-sync-isolation")
         NotebookLocalStore(root.resolve("notebooks"), "host").use { notebooks ->
             val storageId = notebooks.create("Protected")

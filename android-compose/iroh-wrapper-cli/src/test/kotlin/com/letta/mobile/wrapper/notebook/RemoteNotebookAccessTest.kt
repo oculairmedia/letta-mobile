@@ -157,6 +157,7 @@ class RemoteNotebookAccessTest {
     }
 
     private fun withHost(block: suspend (Host) -> Unit) = runBlocking {
+        assumeDurableGrantHost()
         Host(Files.createTempDirectory("remote-notebook")).use { block(it) }
     }
 

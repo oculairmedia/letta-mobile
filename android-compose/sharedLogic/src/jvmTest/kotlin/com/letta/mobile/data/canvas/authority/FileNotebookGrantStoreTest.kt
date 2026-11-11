@@ -36,6 +36,7 @@ class FileNotebookGrantStoreTest {
     }
 
     private suspend fun directorySyncFailureAfterReplacement(expected: NotebookPeerGrant?): NotebookPeerGrant? {
+        assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grant-directory-sync").resolve("grants.json")
         val id = NotebookDocumentId("document")
         if (expected == null) FileNotebookGrantStore(file).provision(id, NotebookPeerGrant("principal", mayRead = true))
@@ -64,22 +65,33 @@ class FileNotebookGrantStoreTest {
         val file = Files.createTempDirectory("notebook-grant-unsupported-sync").resolve("grants.json")
         val id = NotebookDocumentId("document")
         val grant = NotebookPeerGrant("principal", mayRead = true)
-        FileNotebookGrantStore(file).provision(id, grant)
-        val before = Files.readAllBytes(file)
-        val store = FileNotebookGrantStore(file) { directory ->
-            assertEquals(file.parent, directory)
+        val store = FileNotebookGrantStore(file, directoryDurabilitySupported = false) {
             throw UnsupportedOperationException("injected unsupported directory syncing")
         }
-        val failure = runCatching { store.revoke("principal", id) }.exceptionOrNull()
+        val failure = runCatching { store.provision(id, grant) }.exceptionOrNull()
         assertIs<UnsupportedOperationException>(failure, "Unsupported durability must be explicit")
+        Files.list(file.parent).use { assertEquals(0L, it.count(), "Refusal must not even create a lock file") }
+        assertEquals(
+            "Notebook sharing needs a host that can confirm directory durability; not available on a Windows host",
+            failure.message,
+        )
+        assertFailsWith<UnsupportedOperationException> { store.revoke("principal", id) }
+        Files.list(file.parent).use { assertEquals(0L, it.count()) }
+        assertNull(store.withGrant("principal", id) { it })
+        Files.writeString(file, """{"version":1,"grants":[{"principal":"principal","documentId":"document",""" +
+            """"mayRead":true,"mayEdit":false,"mayReference":false}]}""")
+        assertEquals(grant, store.withGrant("principal", id) { it })
+        val before = Files.readAllBytes(file)
+        assertFailsWith<UnsupportedOperationException> { store.provision(id, grant) }
+        assertFailsWith<UnsupportedOperationException> { store.revoke("principal", id) }
         assertTrue(before.contentEquals(Files.readAllBytes(file)), "Unsupported administration must leave grants unchanged")
-        assertEquals(grant, FileNotebookGrantStore(file).withGrant("principal", id) { it })
     }
 
     private fun forceDirectory(directory: Path) = FileChannel.open(directory).use { it.force(true) }
 
     @Test
     fun provisionReloadIsolationAndRevoke() = runBlocking {
+        assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grants").resolve("grants.json")
         val store = FileNotebookGrantStore(file)
         val id = NotebookDocumentId("document-one")
@@ -134,6 +146,7 @@ class FileNotebookGrantStoreTest {
 
     @Test
     fun revokeWaitsForActiveTransactionAcrossStoreInstances() = runBlocking {
+        assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grants-lock").resolve("grants.json")
         val store = FileNotebookGrantStore(file)
         val peer = "principal"

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.mount
 
 import com.letta.mobile.data.hoststate.DurableHostFile
+import com.letta.mobile.data.hoststate.HostDirectoryDurability
 import com.letta.mobile.data.hoststate.StrictHostJson
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
@@ -8,7 +9,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.storage.sha256Hex
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
@@ -44,12 +44,12 @@ class FileCanvasMountStore internal constructor(
     private val hostId: HostId,
     private val directorySync: (Path) -> Unit,
 ) {
-    /** Directory syncing is required except on Windows, whose directory channels are unsupported. */
-    constructor(productStateDirectory: Path, hostId: HostId) : this(productStateDirectory, hostId, { directory ->
-        if (!System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)) {
-            FileChannel.open(directory).use { it.force(true) }
-        }
-    })
+    /**
+     * On Windows contents are forced and atomically replaced, but directory entries are unconfirmed;
+     * a newest binding lost after a power cut is simply set again.
+     */
+    constructor(productStateDirectory: Path, hostId: HostId) :
+        this(productStateDirectory, hostId, HostDirectoryDurability::syncMount)
 
     private val parent = productStateDirectory.toAbsolutePath().normalize()
     private val directory = parent.resolve("canvas-mounts")

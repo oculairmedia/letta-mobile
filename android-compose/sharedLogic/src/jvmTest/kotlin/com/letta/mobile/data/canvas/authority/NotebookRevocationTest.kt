@@ -24,6 +24,7 @@ import kotlin.test.assertTrue
 class NotebookRevocationTest {
     @Test
     fun revokeWaitsForMutationAndBlocksTheNextSave() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-revoke-mutation")
         val hold = AtomicBoolean(false)
         val entered = CompletableFuture<Unit>()
@@ -72,6 +73,7 @@ class NotebookRevocationTest {
     }
     @Test
     fun revokedPendingWriteCannotFlushUntilRegranted() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-revoke-flush")
         val fail = AtomicBoolean(false)
         val wrapper = { delegate: Storage ->

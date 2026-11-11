@@ -24,6 +24,7 @@ import kotlin.test.assertTrue
 class HostNotebookAccessTest {
     @Test
     fun deniedRefreshDisablesSaveAndReauthorizationRetainsTheDraft() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-denied-save")
         NotebookLocalStore(root.resolve("notebooks"), "host").use { notebooks ->
             val storageId = notebooks.create("Note")
@@ -54,6 +55,7 @@ class HostNotebookAccessTest {
 
     @Test
     fun revocationBetweenOpenAndInitialReadRemainsDenial() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("notebook-open-revocation")
         NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { notebooks ->
             val id = requireNotNull(notebooks.read(notebooks.create("Note"))).id
@@ -72,6 +74,7 @@ class HostNotebookAccessTest {
 
     @Test
     fun nestedReferenceRequiresItsOwnCurrentGrant() = runBlocking {
+        assumeDurableGrantHost()
         val root = Files.createTempDirectory("nested-notebook-grants")
         NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { notebooks ->
             val parentStorage = notebooks.create("Parent")
@@ -123,6 +126,7 @@ class HostNotebookAccessTest {
 
     @Test
     fun grantsAreRequiredForReferencesAndRevokedEditorsCannotSave() = runBlocking {
+        assumeDurableGrantHost()
         val path = Files.createTempDirectory("notebook-authority")
         val grantsPath = path.resolve("grants.json")
         NotebookLocalStore(Files.createDirectory(path.resolve("notebooks")), "host").use { notebooks ->
