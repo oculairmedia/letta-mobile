@@ -181,6 +181,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p test_parity_gates.py -v
           bash scripts/tests/platform-ui-gate-test.sh
+          bash scripts/tests/apt-install-retry-test.sh
 
       - name: Enforce platform parity guardrails
         working-directory: ${{ github.workspace }}
@@ -355,8 +356,7 @@ jobs:
       - name: Install Linux hotkey build prerequisites for desktop tests
         if: contains(steps.additive_modules.outputs.tasks, ':desktop:')
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth
+          bash scripts/ci/apt-install-retry.sh gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth
 
       - name: Run Android verification task graph
         env:

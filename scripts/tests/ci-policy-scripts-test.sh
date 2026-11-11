@@ -217,6 +217,10 @@ assert_contains "$test_job" 'bash scripts/ci/agents-policy-check.sh --require-sh
 assert_contains "$test_job" 'test_parity_gates.py'
 assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test_baseline_ratchet_guard.py' -v"
 assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'
+# A runner whose resolver is not ready must not fail the required job on unchanged code.
+assert_contains "$test_job" 'scripts/tests/apt-install-retry-test.sh'
+assert_contains "$test_job" 'bash scripts/ci/apt-install-retry.sh gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'
+assert_not_contains "$test_job" 'sudo apt-get install'
 assert_not_contains "$test_job" 'continue-on-error'
 # letta-mobile-l8lcn: every push to main runs the full additive test set.
 assert_contains "$test_job" 'changed-gradle-modules.sh --all'
