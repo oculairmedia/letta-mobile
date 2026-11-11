@@ -1,0 +1,2 @@
+{"dir":"host->provider","message":{"jsonrpc":"2.0","id":1,"method":"keystore.initialize","params":{"contractVersions":[1],"host":{"name":"letta-desktop","version":"1.0.0"},"settings":{"baseUrl":"https://vault.example.test"}}}}
+{"dir":"provider->host","message":{"jsonrpc":"2.0","id":1,"result":{"contractVersion":1}}}
