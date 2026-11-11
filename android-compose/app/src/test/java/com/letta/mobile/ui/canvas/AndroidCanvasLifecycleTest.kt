@@ -225,6 +225,64 @@ class AndroidCanvasLifecycleTest {
         return first
     }
 
+    @Test
+    fun retainedConversationKeysSelectFreshModelsAcrossBackendRoundTrips() {
+        val viewModels = ViewModelStore()
+        val provider = ViewModelProvider(viewModels, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = modelClass.cast(
+                CanvasViewModel(mockk(relaxed = true), mockk(), mockk(), CanvasDocumentViewerRegistry(), retained),
+            )!!
+        })
+        val conversation = com.letta.mobile.data.model.ConversationId("host-local-conversation")
+        var config by mutableStateOf(backend())
+        var model: CanvasViewModel? = null
+        var shown: CanvasSession? = null
+        compose.setContent {
+            AndroidCanvasHost(deps, config) {
+                val table = checkNotNull(LocalCanvasBoardSessions.current)
+                val generation = com.letta.mobile.ui.canvas.boards.LocalCanvasBoardGeneration.current
+                val key = checkNotNull(com.letta.mobile.ui.chat.surface.chatCanvasKey(conversation.value, generation))
+                val current = provider[key, CanvasViewModel::class.java]
+                val state = rememberCanvasPageState(table, current, null, conversation, null)
+                SideEffect {
+                    model = current
+                    shown = (state as? com.letta.mobile.data.canvas.library.CanvasPageState.Ready)?.session
+                }
+            }
+        }
+        compose.waitUntil(timeoutMillis = NavigationTimeoutMillis) { shown != null }
+        val firstModel = checkNotNull(model)
+        val firstSession = checkNotNull(shown)
+        val firstTable = retained.boards.value
+        val disposeFirst = firstTable.registry.registerMount(firstSession)
+        config = backend().copy(id = OtherBackend)
+        compose.waitForIdle()
+        assertNotSame("backend generations must select different retained page identities", firstModel, model)
+        compose.waitUntil(timeoutMillis = NavigationTimeoutMillis) { shown != null }
+        val secondModel = checkNotNull(model)
+        val secondSession = checkNotNull(shown)
+        val secondTable = retained.boards.value
+        assertNotSame(firstSession, secondSession)
+        assertEquals(0, firstTable.holds(firstSession.canvasId))
+        assertEquals(null, firstTable.registry.get(firstSession.canvasId))
+        assertEquals(1, secondTable.holds(secondSession.canvasId))
+        val disposeSecond = secondTable.registry.registerMount(secondSession)
+        config = backend()
+        compose.waitForIdle()
+        assertNotSame(firstModel, model)
+        assertNotSame(secondModel, model)
+        compose.waitUntil(timeoutMillis = NavigationTimeoutMillis) { shown != null }
+        assertNotSame(firstSession, shown)
+        assertNotSame(secondSession, shown)
+        assertEquals(0, secondTable.holds(secondSession.canvasId))
+        assertEquals(null, secondTable.registry.get(secondSession.canvasId))
+        val thirdSession = checkNotNull(shown)
+        compose.runOnIdle { viewModels.clear() }
+        assertEquals(0, retained.boards.value.holds(thirdSession.canvasId))
+        disposeFirst()
+        disposeSecond()
+    }
+
     private fun backend() = LettaConfig(Backend, LettaConfig.Mode.SELF_HOSTED, "https://backend.invalid")
 }
 

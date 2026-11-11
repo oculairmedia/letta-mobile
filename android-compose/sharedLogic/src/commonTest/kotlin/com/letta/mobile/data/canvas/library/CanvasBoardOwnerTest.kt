@@ -21,6 +21,8 @@ class CanvasBoardOwnerTest {
         owner.updateBackend(backend().copy(accessToken = "edited-token", parkedServerUrl = "https://parked.invalid"))
         assertSame(startup, owner.boards.value)
         assertEquals(1, creations)
+        assertEquals(0L, owner.context.value.generation)
+        assertSame(startup, owner.context.value.boards)
         owner.close()
     }
 
@@ -33,6 +35,8 @@ class CanvasBoardOwnerTest {
         val dispose = old.registry.registerMount(page)
         owner.updateBackend(backend().copy(id = Replacement))
         assertNotSame(old, owner.boards.value)
+        assertEquals(1L, owner.context.value.generation)
+        assertSame(owner.boards.value, owner.context.value.boards)
         assertEquals(0, old.holds(page.canvasId))
         assertNull(old.registry.get(page.canvasId))
         val active = owner.boards.value
@@ -40,6 +44,8 @@ class CanvasBoardOwnerTest {
         val disposeOther = active.registry.registerMount(other)
         owner.updateBackend(null)
         assertNotSame(active, owner.boards.value)
+        assertEquals(2L, owner.context.value.generation)
+        assertSame(owner.boards.value, owner.context.value.boards)
         assertEquals(0, active.holds(other.canvasId))
         assertNull(active.registry.get(other.canvasId))
         dispose()

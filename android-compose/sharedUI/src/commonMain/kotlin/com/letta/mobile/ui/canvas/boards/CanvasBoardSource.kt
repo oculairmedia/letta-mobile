@@ -35,6 +35,9 @@ val LocalCanvasBoardSource = staticCompositionLocalOf<CanvasBoardSource?> { null
 /** The window's board owner, including serialized host-specific session creation. */
 val LocalCanvasBoardSessions = staticCompositionLocalOf<CanvasBoardSessions?> { null }
 
+/** Retained page-key namespace belonging to the host's current board table. */
+val LocalCanvasBoardGeneration = staticCompositionLocalOf { 0L }
+
 /** A source opening boards through the window's [sessions], one live session per board. */
 fun canvasBoardSource(sessions: CanvasBoardSessions): CanvasBoardSource = object : CanvasBoardSource {
     override suspend fun open(canvasId: CanvasId): CanvasSession? = sessions.acquire(canvasId)

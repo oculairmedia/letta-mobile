@@ -15,14 +15,14 @@ import kotlin.test.assertNull
 class ChatCanvasPlaceholderTest {
     @Test
     fun noCanvasKeyWithoutAConversation() {
-        assertNull(chatCanvasKey(null))
-        assertNull(chatCanvasKey(""))
+        assertNull(chatCanvasKey(null, 0L))
+        assertNull(chatCanvasKey("", 0L))
     }
 
     @Test
     fun eachConversationGetsItsOwnCanvasKey() {
-        assertEquals("canvas:conv-1", chatCanvasKey("conv-1"))
-        assertNotEquals(chatCanvasKey("conv-1"), chatCanvasKey("conv-2"))
+        assertEquals("canvas:0:conv-1", chatCanvasKey("conv-1", 0L))
+        assertNotEquals(chatCanvasKey("conv-1", 0L), chatCanvasKey("conv-2", 0L))
     }
 
     @Test

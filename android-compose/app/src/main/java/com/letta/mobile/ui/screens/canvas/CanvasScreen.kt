@@ -34,8 +34,12 @@ internal fun AndroidCanvasHost(
 ) {
     val owner = deps.canvasOwner
     LaunchedEffect(owner, config?.id) { owner.updateBackend(config) }
-    val boards by owner.boards.collectAsStateWithLifecycle()
-    com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards(deps.canvasViewers, boards, content)
+    val context by owner.context.collectAsStateWithLifecycle()
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.letta.mobile.ui.canvas.boards.LocalCanvasBoardGeneration provides context.generation,
+    ) {
+        com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards(deps.canvasViewers, context.boards, content)
+    }
 }
 
 @Composable

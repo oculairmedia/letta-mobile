@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 open class CanvasBoardOwner(private val factory: () -> CanvasBoardSessions) {
     private val current = MutableStateFlow(factory())
+    private val identity = MutableStateFlow(CanvasBoardContext(current.value, 0L))
     private val retirement = mutableSetOf<() -> Unit>()
     private var backend: LettaConfig? = null
     private var resolved = false
@@ -18,6 +19,9 @@ open class CanvasBoardOwner(private val factory: () -> CanvasBoardSessions) {
 
     /** The current backend's table and registry. */
     val boards = current.asStateFlow()
+
+    /** Atomic table and generation snapshot for retained page identities in host composition. */
+    val context = identity.asStateFlow()
 
     /** Uses the shell's config id; the first loaded config adopts startup state without retiring pages. */
     fun updateBackend(config: LettaConfig?) {
@@ -34,7 +38,9 @@ open class CanvasBoardOwner(private val factory: () -> CanvasBoardSessions) {
         retireCurrent()
         val replacement = factory()
         retiring = false
+        // Publish services before the host snapshot so fresh page holders bind the replacement table.
         current.value = replacement
+        identity.value = CanvasBoardContext(replacement, identity.value.generation + 1L)
     }
 
     /** Retires pages before discarding their table; a finished owner cannot be reopened. */
@@ -45,13 +51,16 @@ open class CanvasBoardOwner(private val factory: () -> CanvasBoardSessions) {
     }
 
     internal fun onRetire(boards: CanvasBoardSessions, action: () -> Unit): () -> Unit {
-        if (closed || retiring || current.value !== boards) {
+        if (!canRetainPage(boards)) {
             action()
             return {}
         }
         retirement += action
         return { retirement -= action }
     }
+
+    private fun canRetainPage(boards: CanvasBoardSessions): Boolean =
+        !closed && !retiring && current.value === boards
 
     private fun retireCurrent() {
         val actions = retirement.toList()
