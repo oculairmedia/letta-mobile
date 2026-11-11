@@ -36,7 +36,8 @@ import kotlin.test.assertTrue
  */
 class ShellLayoutToolTest {
     private val port = ShellLayoutAgentPort()
-    private val store = ShellLayoutConfigStore(InMemorySecureSettingsStore(), "shell.tool.lanes")
+    private val storeSettings = InMemorySecureSettingsStore()
+    private val store = ShellLayoutConfigStore(storeSettings, "shell.tool.lanes")
     private val tool = ShellLayoutTool(port)
     private val caller = ExternalToolCaller(agentId = "agent-layout-test")
 
@@ -68,6 +69,24 @@ class ShellLayoutToolTest {
         assertEquals(ShellLayoutToolInput.opNames, opProperties["op"]!!.enumValues())
         assertEquals(ShellLayoutCatalog.lanes.map { it.lane }, opProperties["lane"]!!.enumValues())
         assertTrue("immediately" in tool.description && "Undo" in tool.description)
+    }
+
+    @Test
+    fun noteSlotsAreSyntacticPersistedUndoableAndDryRunsPublishNothing() = runTest {
+        val changes = mutableListOf<ShellLayoutChange>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.changes.toList(changes) }
+        val op = """"ops":[{"op":"add","lane":"side","view":"shell.note","object":"unknown-or-denied"}]"""
+        success("""{"action":"apply","dry_run":true,$op}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
+        assertTrue(changes.isEmpty())
+        success("""{"action":"apply",$op}""")
+        val note = store.config.value.sideLane().last()
+        assertEquals("shell.note", note.view.value)
+        assertEquals("unknown-or-denied", note.objectRef)
+        val reloaded = ShellLayoutConfigStore(storeSettings, "shell.tool.lanes")
+        assertEquals(note, reloaded.config.value.sideLane().last())
+        success("""{"action":"undo"}""")
+        assertEquals(ShellLayoutConfig.Default, store.config.value)
     }
 
     @Test

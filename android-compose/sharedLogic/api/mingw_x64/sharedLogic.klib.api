@@ -74147,6 +74147,8 @@ final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile
 final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile.data.shell.layout/ShellViews|null[0]
     final val CANVAS // com.letta.mobile.data.shell.layout/ShellViews.CANVAS|{}CANVAS[0]
         final fun <get-CANVAS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.CANVAS.<get-CANVAS>|<get-CANVAS>(){}[0]
+    final val NOTE // com.letta.mobile.data.shell.layout/ShellViews.NOTE|{}NOTE[0]
+        final fun <get-NOTE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.NOTE.<get-NOTE>|<get-NOTE>(){}[0]
     final val PAGE // com.letta.mobile.data.shell.layout/ShellViews.PAGE|{}PAGE[0]
         final fun <get-PAGE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.PAGE.<get-PAGE>|<get-PAGE>(){}[0]
     final val SIDE_PANE // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE|{}SIDE_PANE[0]

@@ -40,7 +40,7 @@ import android.os.Build
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
-import com.letta.mobile.ui.canvas.boards.ProvideCanvasBoardSource
+import com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards
 import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
                                 // seats (letta-mobile-te3n1.8); overlays stay above it.
                                 MascotTransportLayer {
                                     // A canvas module in any shell lane opens its board by id here.
-                                    ProvideCanvasBoardSource(remember { deps.canvasBoards }) {
+                                    ProvideCanvasHostWithBoards(null, remember { deps.canvasViewers }, remember { deps.canvasBoards }) {
                                         val navController = rememberNavController()
                                         AppNavGraph(
                                             navController = navController,
