@@ -8,6 +8,7 @@ import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -30,6 +31,54 @@ import com.letta.mobile.feature.chat.route.ChatRouteArgs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatViewModelStartupTest {
+    @Test
+    fun `canvas preference waits for stored false before choosing first presentation`() = runTest {
+        assertCanvasPreference(false)
+    }
+
+    @Test
+    fun `canvas preference waits for stored true before choosing first presentation`() = runTest {
+        assertCanvasPreference(true)
+    }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.assertCanvasPreference(stored: Boolean) {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val settings = io.mockk.mockk<com.letta.mobile.data.repository.api.ISettingsRepository>(relaxed = true) {
+            io.mockk.every { activeConfig } returns MutableStateFlow(null)
+            io.mockk.every { activeConfigChanges } returns kotlinx.coroutines.flow.emptyFlow()
+            io.mockk.every { favoriteAgentId } returns MutableStateFlow(null)
+            io.mockk.every { getChatFontScale() } returns flowOf(1f)
+            io.mockk.every { getOpenChatsOnCanvas() } returns kotlinx.coroutines.flow.flow {
+                kotlinx.coroutines.delay(100)
+                emit(stored)
+            }
+        }
+        val model = openedChatViewModel(
+            ChatPagingHost(), TestData.agent("agent-owner", "Owner"), "conversation-owner",
+            FixtureSession("owner", settings = settings),
+        )
+        val values = mutableListOf<Boolean?>()
+        val subscription = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            model.openChatsOnCanvas.collect { values += it }
+        }
+        try {
+            assertEquals("No presentation may be chosen before storage emits", listOf<Boolean?>(null), values)
+            testScheduler.advanceTimeBy(100)
+            testScheduler.runCurrent()
+            assertEquals(listOf(null, stored), values)
+            val first = values.filterNotNull().first()
+            assertEquals(
+                if (stored) com.letta.mobile.ui.chat.session.ChatSurfacePresentation.CanvasFirst
+                else com.letta.mobile.ui.chat.session.ChatSurfacePresentation.ChatFirst,
+                com.letta.mobile.ui.chat.session.ChatSurfacePresentation.initial(first, hasCanvas = true),
+            )
+        } finally {
+            subscription.cancel()
+            model.viewModelScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun `session turn survives presentation handoff and stop waits for exact terminal`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
