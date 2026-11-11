@@ -6,6 +6,7 @@ import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import dagger.Lazy
@@ -26,6 +27,7 @@ class MainActivityDependenciesTest {
     private val attentionPrefs = CountingLazy(mockk<AttentionPrefsRepository>())
     private val agentDefaults = CountingLazy(mockk<AgentDefaultsRepository>())
     private val canvasBoards = CountingLazy(mockk<CanvasBoardSessions>())
+    private val subagentRepository = CountingLazy(mockk<ISubagentRepository>())
 
     private fun newDependencies() = MainActivityDependencies(
         lazySettingsRepository = settingsRepository,
@@ -36,6 +38,7 @@ class MainActivityDependenciesTest {
         lazyAttentionPrefs = attentionPrefs,
         lazyAgentDefaults = agentDefaults,
         lazyCanvasBoards = canvasBoards,
+        lazySubagentRepository = subagentRepository,
     )
 
     @Test
@@ -49,6 +52,7 @@ class MainActivityDependenciesTest {
         assertEquals(0, attentionPrefs.resolutions)
         assertEquals(0, agentDefaults.resolutions)
         assertEquals(0, canvasBoards.resolutions)
+        assertEquals(0, subagentRepository.resolutions)
     }
 
     @Test
@@ -62,6 +66,7 @@ class MainActivityDependenciesTest {
         assertSame(attentionPrefs.value, dependencies.attentionPrefs)
         assertSame(agentDefaults.value, dependencies.agentDefaults)
         assertSame(canvasBoards.value, dependencies.canvasBoards)
+        assertSame(subagentRepository.value, dependencies.subagentRepository)
         assertEquals(1, settingsRepository.resolutions)
     }
 

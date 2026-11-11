@@ -301,7 +301,7 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
             )
             VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
-        ShellWorkspaceLanes(frame.host, frame.state.layout.lanes, inspectors, compact = false)
+        ShellWorkspaceLanes(frame.host, frame.state, inspectors, compact = false)
     }
 }
 
@@ -331,7 +331,7 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floati
         // not under that, so its sheet still pads its rail and panel below the status bar.
         Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
             Row(Modifier.fillMaxSize()) {
-                ShellWorkspaceLanes(frame.host, frame.state.layout.lanes, inspectors, compact = true)
+                ShellWorkspaceLanes(frame.host, frame.state, inspectors, compact = true)
             }
             floating?.let { ShellFloatingHeader(it) }
         }
