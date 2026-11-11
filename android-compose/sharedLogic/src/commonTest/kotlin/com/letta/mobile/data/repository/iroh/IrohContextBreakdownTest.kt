@@ -37,7 +37,7 @@ class IrohContextBreakdownTest {
                    "num_tokens_messages":30000,"num_tokens_functions_definitions":6000,"source":"estimate",
                    "calibrated":true,"tools_derived":true,"total_source":"client","memory_split":false,
                    "num_tokens_tools_and_harness":5500,"calibration_source":"conversation_usage","message_chars_per_token":2.16,
-                   "overhead_source":"recorded_usage"}""",
+                   "overhead_source":"recorded_usage","calibration_approximate":true}""",
             )
         }
         val directory = IrohAdminRpcAgentDirectory(transport)
@@ -52,6 +52,7 @@ class IrohContextBreakdownTest {
         assertEquals("conversation_usage", overview.calibrationSource)
         assertEquals(2.16, overview.messageCharsPerToken)
         assertEquals("recorded_usage", overview.overheadSource)
+        assertEquals(true, overview.calibrationApproximate)
     }
 
     @Test

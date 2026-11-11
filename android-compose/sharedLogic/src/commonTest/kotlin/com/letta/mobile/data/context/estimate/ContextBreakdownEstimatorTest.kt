@@ -19,12 +19,7 @@ class ContextBreakdownEstimatorTest {
 
     @Test
     fun denseTranscriptSeparatesMessagesFromFixedPromptOverhead() {
-        val messages = listOf(
-            obj("""{"role":"user","content":"${"x".repeat(2_160)}"}"""),
-            obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":66000}}"""),
-            obj("""{"role":"user","content":"${"x".repeat(1_650_240)}"}"""),
-            obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":830000}}"""),
-        )
+        val messages = denseHistory()
         val inputs = LocalContextInputs(
             obj("""{"content":"${"s".repeat(36_000)}","coreMemory":"${"s".repeat(32_000)}"}"""),
             obj("{}"), null, LocalTranscriptContext(null, messages, 0), 830_000,
@@ -106,6 +101,101 @@ class ContextBreakdownEstimatorTest {
         assertNull(result.messageCharsPerToken)
         assertTrue((result.toolsAndHarness ?: 0) > 0)
     }
+
+    @Test
+    fun aShortLatestRunReusesTheEarlierDensityWithoutInflatingOverhead() {
+        for (turns in listOf(1, 2)) {
+            val messages = denseHistory().toMutableList()
+            repeat(turns) { turn ->
+                messages += obj("""{"role":"user","content":"${"x".repeat(216)}"}""")
+                messages += obj(
+                    """{"role":"assistant","model":"new-model","content":"","usage":{"input":${830_100 + turn * 100}}}""",
+                )
+            }
+            val result = denseEstimate(messages)
+            assertEquals(2.16, result.messageCharsPerToken)
+            assertEquals(765_000 + turns * 100, result.sections.messages)
+            assertEquals(0, result.tools!! - result.toolsAndHarness!!)
+            assertTrue((result.toolsAndHarness ?: 0) in 54_000..58_000, "Overhead must not absorb message estimation error")
+            assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
+            assertEquals(result.total, result.sections.total + result.tools!!)
+        }
+    }
+
+    @Test
+    fun aNonIncreasingLatePointReusesTheEarlierFit() {
+        val messages = denseHistory() + obj(
+            """{"role":"assistant","model":"fixture","content":"","usage":{"input":829000}}""",
+        )
+        val result = denseEstimate(messages)
+        assertEquals(2.16, result.messageCharsPerToken)
+        assertTrue((result.toolsAndHarness ?: 0) in 54_000..58_000)
+        assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
+    }
+
+    @Test
+    fun aSingleLateUsagePointCannotNameMessageErrorAsOverhead() {
+        val result = denseEstimate(listOf(
+            obj("""{"role":"user","content":"${"x".repeat(1_648_017)}"}"""),
+            obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":829747}}"""),
+        ))
+        assertNull(result.toolsAndHarness, "Late usage alone cannot identify fixed overhead")
+        assertNull(result.messageCharsPerToken)
+        assertNull(result.toAgentContextJson()["overhead_source"])
+    }
+
+    @Test
+    fun boundedSinglePointOverheadPrefersTheEarliestUsablePoint() {
+        val messages = denseHistory().dropLast(1) + obj(
+            """{"role":"assistant","model":"new-model","content":"","usage":{"input":830000}}""",
+        )
+        val result = denseEstimate(messages)
+        assertNull(result.messageCharsPerToken)
+        assertTrue((result.toolsAndHarness ?: 0) in 54_000..58_000)
+    }
+
+    @Test
+    fun anAdequateLatestRunTakesPriorityOverTheEarlierFit() {
+        val messages = historyWithTwoSufficientRuns()
+        val result = denseEstimate(messages)
+        assertEquals(4.0, result.messageCharsPerToken)
+        assertTrue(result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean != true)
+        assertTrue((result.toolsAndHarness ?: 0) in 54_000..58_000)
+    }
+
+    @Test
+    fun theMostRecentSufficientEarlierRunWinsOverOlderFits() {
+        val messages = historyWithTwoSufficientRuns() + listOf(
+            obj("""{"role":"user","content":"${"x".repeat(216)}"}"""),
+            obj("""{"role":"assistant","model":"third-model","content":"","usage":{"input":488208}}"""),
+        )
+        val result = denseEstimate(messages)
+        assertEquals(4.0, result.messageCharsPerToken)
+        assertEquals(423_208, result.sections.messages)
+        assertEquals(56_000, result.toolsAndHarness)
+        assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
+    }
+
+    private fun historyWithTwoSufficientRuns(): List<JsonObject> = denseHistory() + listOf(
+        obj("""{"role":"user","content":"${"x".repeat(216)}"}"""),
+        obj("""{"role":"assistant","model":"new-model","content":"","usage":{"input":478154}}"""),
+        obj("""{"role":"user","content":"${"x".repeat(40_000)}"}"""),
+        obj("""{"role":"assistant","model":"new-model","content":"","usage":{"input":488154}}"""),
+    )
+
+    private fun denseHistory(): List<JsonObject> = listOf(
+        obj("""{"role":"user","content":"${"x".repeat(2_160)}"}"""),
+        obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":66000}}"""),
+        obj("""{"role":"user","content":"${"x".repeat(1_650_240)}"}"""),
+        obj("""{"role":"assistant","model":"fixture","content":"","usage":{"input":830000}}"""),
+    )
+
+    private fun denseEstimate(messages: List<JsonObject>): ContextBreakdownEstimate = ContextBreakdownEstimator.estimate(
+        LocalContextInputs(
+            obj("""{"content":"${"s".repeat(36_000)}","coreMemory":"${"s".repeat(32_000)}"}"""),
+            obj("{}"), null, LocalTranscriptContext(null, messages, 0), null,
+        ),
+    )
 
     private fun reviewFixture(
         firstPrompt: Int?,

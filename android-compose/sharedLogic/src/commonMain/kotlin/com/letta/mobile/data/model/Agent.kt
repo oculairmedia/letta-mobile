@@ -54,6 +54,8 @@ data class ContextWindowOverview(
     @SerialName("message_chars_per_token") val messageCharsPerToken: Double? = null,
     /** `recorded_usage` when fixed overhead was inferred, even if message density remains estimated. */
     @SerialName("overhead_source") val overheadSource: String? = null,
+    /** True when calibration reuses an earlier run rather than the latest run in this context span. */
+    @SerialName("calibration_approximate") val calibrationApproximate: Boolean? = null,
 )
 
 @Serializable

@@ -114,6 +114,7 @@ class AgentContextCardUiTest {
         )
         val cases = listOf(
             overview to "Measured from this conversation's usage",
+            overview.copy(calibrationApproximate = true) to "Measured from this conversation's usage; split is approximate",
             overheadOnly to "Overhead measured; messages estimated; split is approximate",
         )
         cases.forEach { (reading, caption) ->

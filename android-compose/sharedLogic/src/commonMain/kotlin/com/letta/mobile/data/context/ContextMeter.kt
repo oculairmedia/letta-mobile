@@ -24,7 +24,7 @@ enum class ContextProvenance {
     /** Message density and fixed overhead measured from this conversation's recorded usage. */
     ConversationUsage,
 
-    /** Usage-calibrated, but more than 10% of occupied tokens remain unexplained. */
+    /** Usage-calibrated, but an earlier run supplied the fit or more than 10% remains unexplained. */
     ConversationUsageApproximate,
 
     /** Recorded overhead, but message density is still estimated and the split is approximate. */
@@ -87,7 +87,9 @@ data class ContextMeter(
 
         private fun usageProvenance(overview: ContextWindowOverview): ContextProvenance {
             val other = overview.numTokensFunctionsDefinitions - (overview.numTokensToolsAndHarness ?: 0)
-            return if (other > overview.contextWindowSizeCurrent * APPROXIMATE_SPLIT_RATIO) {
+            val approximate = overview.calibrationApproximate == true ||
+                other > overview.contextWindowSizeCurrent * APPROXIMATE_SPLIT_RATIO
+            return if (approximate) {
                 ContextProvenance.ConversationUsageApproximate
             } else {
                 ContextProvenance.ConversationUsage

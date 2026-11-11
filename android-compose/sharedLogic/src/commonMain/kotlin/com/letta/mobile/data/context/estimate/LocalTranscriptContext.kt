@@ -58,23 +58,34 @@ data class LocalTranscriptContext(
     }
 
     private fun fit(run: UsageRun, estimator: TokenEstimator): MessageCalibration {
-        val first = run.first ?: return MessageCalibration(run.fallback)
-        val density = run.last?.let(first::densityTo)
-        if (density == null) {
-            val fixed = (first.prompt - estimator.tokensForChars(first.chars)).takeIf { it >= 0 }?.toInt()
-            return MessageCalibration(run.fallback, fixed = fixed)
-        }
-        val fixed = first.prompt - first.chars / density
-        if (fixed < 0) return MessageCalibration(run.fallback)
-        return MessageCalibration(kotlin.math.ceil(run.chars / density).toInt(), density, fixed.toInt())
+        val current = run.measuredFit()
+        val selected = current ?: run.previousFit
+        if (selected != null) return selected.project(run, reused = current == null)
+        return boundedOverhead(run, estimator)
     }
 
-    /** Immutable, constant-space fold: an offending point starts a new candidate run. */
+    private fun boundedOverhead(run: UsageRun, estimator: TokenEstimator): MessageCalibration {
+        val point = run.earliest ?: return MessageCalibration(run.fallback)
+        val preceding = estimator.tokensForChars(point.chars)
+        // Limit the assumed-density prefix to 10% of prompt; a long prefix can turn message error into named overhead.
+        if (preceding > point.prompt * MAX_SINGLE_POINT_PREFIX_SHARE) return MessageCalibration(run.fallback)
+        return MessageCalibration(run.fallback, fixed = (point.prompt - preceding).toInt())
+    }
+
+    private data class UsageFit(val density: Double, val fixed: Int) {
+        fun project(run: UsageRun, reused: Boolean): MessageCalibration = MessageCalibration(
+            kotlin.math.ceil(run.chars / density).toInt(), density, fixed, reused,
+        )
+    }
+
+    /** Immutable, constant-space fold: latest candidate, earliest point, and most recent sufficient completed fit. */
     private data class UsageRun(
         val chars: Long = 0L,
         val fallback: Int = 0,
         val first: UsagePoint? = null,
         val last: UsagePoint? = null,
+        val earliest: UsagePoint? = null,
+        val previousFit: UsageFit? = null,
     ) {
         fun append(message: JsonObject, estimator: TokenEstimator, point: UsagePoint?): UsageRun {
             val addedChars = LocalMessageTokens.chars(message)
@@ -84,8 +95,15 @@ data class LocalTranscriptContext(
         private fun withPoint(point: UsagePoint?): UsageRun = when {
             point == null -> this
             last?.precedes(point) == true -> copy(last = point)
-            else -> copy(first = point, last = point)
+            else -> copy(
+                first = point,
+                last = point,
+                earliest = earliest ?: point,
+                previousFit = measuredFit() ?: previousFit,
+            )
         }
+
+        fun measuredFit(): UsageFit? = last?.let { first?.fitTo(it) }
     }
 
     private data class UsagePoint(val chars: Long, val prompt: Long, val model: String?) {
@@ -95,7 +113,13 @@ data class LocalTranscriptContext(
 
         private fun growsTo(next: UsagePoint): Boolean = chars < next.chars && prompt < next.prompt
 
-        fun densityTo(next: UsagePoint): Double? {
+        fun fitTo(next: UsagePoint): UsageFit? {
+            val density = densityTo(next) ?: return null
+            val fixed = prompt - chars / density
+            return fixed.takeIf { it >= 0 }?.let { UsageFit(density, it.toInt()) }
+        }
+
+        private fun densityTo(next: UsagePoint): Double? {
             if (!sameModel(next)) return null
             val growthChars = next.chars - chars
             val growthTokens = next.prompt - prompt
@@ -108,7 +132,12 @@ data class LocalTranscriptContext(
             next.chars - chars >= MIN_CALIBRATION_CHARS && next.prompt - prompt >= MIN_CALIBRATION_TOKENS
     }
 
-    internal data class MessageCalibration(val tokens: Int, val charsPerToken: Double? = null, val fixed: Int? = null)
+    internal data class MessageCalibration(
+        val tokens: Int,
+        val charsPerToken: Double? = null,
+        val fixed: Int? = null,
+        val reusedFit: Boolean = false,
+    )
 
     private fun lastUsageIndex(): Int? {
         val boundary = summary?.number("timestamp")
@@ -160,6 +189,7 @@ data class LocalTranscriptContext(
 
         private const val MIN_CALIBRATION_CHARS = 16_384L
         private const val MIN_CALIBRATION_TOKENS = 4_096L
+        private const val MAX_SINGLE_POINT_PREFIX_SHARE = 0.1
         private const val MIN_CHARS_PER_TOKEN = 1.0
         private const val MAX_CHARS_PER_TOKEN = 8.0
         private val PROMPT_PARTS = listOf("input", "cacheRead", "cacheWrite")

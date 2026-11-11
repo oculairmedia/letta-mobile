@@ -60,6 +60,8 @@ data class ContextBreakdownEstimate(
     val toolsAndHarness: Int? = null,
     /** Message density fitted within the current in-context span; null on fallback. */
     val messageCharsPerToken: Double? = null,
+    /** True when a sufficient earlier run supplied the fit because the latest run was insufficient. */
+    val calibrationApproximate: Boolean = false,
 ) {
     val calibrated: Boolean get() = totalSource != null
 }
@@ -107,6 +109,7 @@ object ContextBreakdownEstimator {
             coreMemory = prompt.coreMemory,
             toolsAndHarness = harness?.let { scaled.last() },
             messageCharsPerToken = messageCalibration.charsPerToken,
+            calibrationApproximate = messageCalibration.reusedFit,
         )
     }
 
@@ -226,6 +229,7 @@ fun ContextBreakdownEstimate.toAgentContextJson(): JsonObject = buildJsonObject 
         put("calibration_source", "conversation_usage")
         put("message_chars_per_token", it)
     }
+    if (calibrationApproximate) put("calibration_approximate", true)
     totalSource?.let { put("total_source", it.wire) }
     put("scaled_down", scaledDown)
     put("memory_split", memorySplit)

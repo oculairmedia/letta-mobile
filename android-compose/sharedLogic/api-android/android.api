@@ -16415,12 +16415,13 @@ public final class com/letta/mobile/data/context/estimate/CharsPerToken : com/le
 }
 
 public final class com/letta/mobile/data/context/estimate/ContextBreakdownEstimate {
-	public fun <init> (Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;Z)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/context/estimate/ContextSections;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component11 ()Ljava/lang/Integer;
 	public final fun component12 ()Ljava/lang/Double;
+	public final fun component13 ()Z
 	public final fun component2 ()Ljava/lang/Integer;
 	public final fun component3 ()I
 	public final fun component4 ()Lcom/letta/mobile/data/context/estimate/ContextTotalSource;
@@ -16429,10 +16430,11 @@ public final class com/letta/mobile/data/context/estimate/ContextBreakdownEstima
 	public final fun component7 ()I
 	public final fun component8 ()Z
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;)Lcom/letta/mobile/data/context/estimate/ContextBreakdownEstimate;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/context/estimate/ContextBreakdownEstimate;Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;ILjava/lang/Object;)Lcom/letta/mobile/data/context/estimate/ContextBreakdownEstimate;
+	public final fun copy (Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;Z)Lcom/letta/mobile/data/context/estimate/ContextBreakdownEstimate;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/context/estimate/ContextBreakdownEstimate;Lcom/letta/mobile/data/context/estimate/ContextSections;Ljava/lang/Integer;ILcom/letta/mobile/data/context/estimate/ContextTotalSource;ZLcom/letta/mobile/data/context/estimate/ContextWindowSize;IZLjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Double;ZILjava/lang/Object;)Lcom/letta/mobile/data/context/estimate/ContextBreakdownEstimate;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCalibrated ()Z
+	public final fun getCalibrationApproximate ()Z
 	public final fun getCoreMemory ()Ljava/lang/String;
 	public final fun getMemorySplit ()Z
 	public final fun getMessageCharsPerToken ()Ljava/lang/Double;
@@ -27392,8 +27394,8 @@ public final class com/letta/mobile/data/model/CompletedTimelineIssue$Companion 
 public final class com/letta/mobile/data/model/ContextWindowOverview {
 	public static final field Companion Lcom/letta/mobile/data/model/ContextWindowOverview$Companion;
 	public fun <init> ()V
-	public fun <init> (IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;)V
-	public synthetic fun <init> (IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Boolean;)V
+	public synthetic fun <init> (IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
 	public final fun component10 ()I
 	public final fun component11 ()I
@@ -27411,6 +27413,7 @@ public final class com/letta/mobile/data/model/ContextWindowOverview {
 	public final fun component22 ()Ljava/lang/String;
 	public final fun component23 ()Ljava/lang/Double;
 	public final fun component24 ()Ljava/lang/String;
+	public final fun component25 ()Ljava/lang/Boolean;
 	public final fun component3 ()I
 	public final fun component4 ()I
 	public final fun component5 ()I
@@ -27418,10 +27421,11 @@ public final class com/letta/mobile/data/model/ContextWindowOverview {
 	public final fun component7 ()I
 	public final fun component8 ()I
 	public final fun component9 ()I
-	public final fun copy (IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;)Lcom/letta/mobile/data/model/ContextWindowOverview;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/ContextWindowOverview;IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/model/ContextWindowOverview;
+	public final fun copy (IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Boolean;)Lcom/letta/mobile/data/model/ContextWindowOverview;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/model/ContextWindowOverview;IIIIIIIIIIIIIILjava/lang/String;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/letta/mobile/data/model/ContextWindowOverview;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCalibrated ()Ljava/lang/Boolean;
+	public final fun getCalibrationApproximate ()Ljava/lang/Boolean;
 	public final fun getCalibrationSource ()Ljava/lang/String;
 	public final fun getContextWindowSizeCurrent ()I
 	public final fun getContextWindowSizeMax ()I
