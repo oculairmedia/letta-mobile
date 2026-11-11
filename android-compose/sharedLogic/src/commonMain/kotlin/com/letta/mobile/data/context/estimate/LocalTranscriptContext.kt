@@ -74,8 +74,18 @@ data class LocalTranscriptContext(
 
     private data class UsageFit(val density: Double, val fixed: Int, val model: String?) {
         fun project(run: UsageRun, reused: Boolean): MessageCalibration {
-            val namedFixed = fixed.takeIf { model != null && model == run.first?.model }
+            val namedFixed = fixed.takeIf { describes(run) }
             return MessageCalibration(kotlin.math.ceil(run.chars / density).toInt(), density, namedFixed, reused)
+        }
+
+        /**
+         * Whether this fit's fixed overhead can be named for [run]: the same model, and a prompt that
+         * can hold it. A prompt that shrank below the overhead (a same-model reset) keeps the density
+         * but not the overhead, or the row would name tokens the prompt no longer contains.
+         */
+        private fun describes(run: UsageRun): Boolean {
+            val current = run.last ?: return false
+            return model != null && model == run.first?.model && fixed <= current.prompt
         }
     }
 

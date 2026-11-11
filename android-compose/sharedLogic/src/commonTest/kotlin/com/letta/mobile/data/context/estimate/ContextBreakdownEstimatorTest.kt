@@ -135,6 +135,19 @@ class ContextBreakdownEstimatorTest {
     }
 
     @Test
+    fun aSameModelPromptBelowTheEarlierOverheadKeepsDensityButNamesNoOverhead() {
+        // The earlier run fits about 56k of fixed overhead; the same model then reports a prompt of 6,000.
+        val messages = denseHistory() + obj(
+            """{"role":"assistant","model":"fixture","content":"","usage":{"input":6000}}""",
+        )
+        val result = denseEstimate(messages)
+        assertEquals(2.16, result.messageCharsPerToken, "the density of the text is still reusable")
+        assertNull(result.toolsAndHarness, "a 6,000-token prompt cannot contain 56,000 tokens of overhead")
+        assertNull(result.toAgentContextJson()["overhead_source"])
+        assertEquals(true, result.toAgentContextJson()["calibration_approximate"]?.jsonPrimitive?.boolean)
+    }
+
+    @Test
     fun aSingleLateUsagePointCannotNameMessageErrorAsOverhead() {
         val result = denseEstimate(listOf(
             obj("""{"role":"user","content":"${"x".repeat(1_648_017)}"}"""),
