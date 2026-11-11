@@ -36,7 +36,7 @@ class ActiveTurnApproval(
 class ActiveTurnCoordinator(
     conversationId: ConversationId,
     agentId: AgentId,
-    private val scope: CoroutineScope,
+    internal val scope: CoroutineScope,
     private val now: () -> Long,
 ) {
     private val lock = SynchronizedObject()
@@ -65,15 +65,17 @@ class ActiveTurnCoordinator(
         }
     }
 
-    /** Replace open tools in event order; pending approvals and cancellation retain priority. */
-    fun progress(turn: ActiveTurnIdentity, openTools: Map<String, String>, subagentCount: Int = 0) {
+    /** Replace supplied tools/counts; null retains existing detail. Approval and cancellation retain priority. */
+    fun progress(turn: ActiveTurnIdentity, openTools: Map<String, String>? = null, subagentCount: Int? = null) {
         synchronized(lock) {
-            require(subagentCount >= 0)
+            require(subagentCount == null || subagentCount >= 0)
             if (!active(turn)) return
-            tools.keys.retainAll(openTools.keys)
-            tools.putAll(openTools)
+            if (openTools != null) {
+                tools.keys.retainAll(openTools.keys)
+                tools.putAll(openTools)
+            }
             publish(state.value.copy(phase = requests.phase(tools.isNotEmpty()), activeTool = tools.values.firstOrNull(),
-                subagentCount = subagentCount), ActiveTurnBoundary.Progress)
+                subagentCount = subagentCount ?: state.value.subagentCount), ActiveTurnBoundary.Progress)
         }
     }
 
@@ -245,7 +247,8 @@ private class ActiveTurnRequests {
 
 private fun ActiveTurnState.matches(turn: ActiveTurnIdentity): Boolean = runId == turn.runId && turnId == turn.turnId
 
-private fun ActiveTurnState.identity(): ActiveTurnIdentity? {
+/** Exact captured identity, absent only before a turn has been established. */
+fun ActiveTurnState.identity(): ActiveTurnIdentity? {
     val run = runId ?: return null
     val turn = turnId ?: return null
     return ActiveTurnIdentity(run, turn)

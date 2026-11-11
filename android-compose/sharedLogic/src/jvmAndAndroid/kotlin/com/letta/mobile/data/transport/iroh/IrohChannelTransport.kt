@@ -1,5 +1,11 @@
 package com.letta.mobile.data.transport.iroh
 
+
+
+
+
+import com.letta.mobile.runtime.RunId
+
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.NotebookLocalStore
@@ -131,6 +137,13 @@ class IrohChannelTransport(
     private val transportScope: CoroutineScope =
         CoroutineScope((scope?.coroutineContext ?: Dispatchers.IO) + transportJob)
 
+    private val turnEvents = com.letta.mobile.data.transport.api.ChannelTurnEventTap.fromEngine(
+        logicalRun = { frame -> RunId(turnRegistry.getActiveTurn(IrohConversationId(frame.conversationId))
+            ?.takeIf { it.turnId == frame.turnId }?.logicalRunId ?: frame.turnId) },
+        engine = { supervisor.ready().turnEngine },
+    )
+    override val activeTurnEvents: com.letta.mobile.data.transport.api.RuntimeTurnEventSource get() = turnEvents
+
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -157,6 +170,7 @@ class IrohChannelTransport(
      *  this is the single ingest point — the publisher drops exact
      *  duplicates here, before fan-out, so no subscriber pays for them. */
     private suspend fun emitBoth(frame: ServerFrame) {
+        turnEvents.publish(frame)
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
         adminRpcExecutor.recordStreamActivity()
         Telemetry.event(
@@ -395,7 +409,7 @@ class IrohChannelTransport(
             adminRpc = { method, path, body -> adminRpc(method, path, body) },
             recordFrameOwnership = ::recordFrameOwnership,
             observerTerminalGraceMs = observerTerminalGraceMs,
-        )
+        ).also { it.onDraft = turnEvents::publishDraft }
     }
 
     private fun currentConnectionGeneration(): Long = connectionSession.currentGeneration()
@@ -568,6 +582,7 @@ class IrohChannelTransport(
         draft: RuntimeEventDraft,
         turn: IrohActiveTurn,
     ): List<ServerFrame> {
+        turnEvents.publishDraft(draft, RunId(turn.logicalRunId))
         val agentId = turn.agentId
         val conversationId = turn.conversationId
         val turnId = turn.turnId
@@ -1096,8 +1111,6 @@ class IrohChannelTransport(
         onFailure = onFailure,
     )
 
-    private fun subagentListFailure(failure: ScopedRpcFailure) = IrohTransportSupport.subagentListFailure(failure)
-    private fun subagentTodosFailure(failure: ScopedRpcFailure) = IrohTransportSupport.subagentTodosFailure(failure)
     private fun cronListFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronListFailure(failure)
     private fun cronAddFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronAddFailure(failure)
     private fun cronGetFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronGetFailure(failure)

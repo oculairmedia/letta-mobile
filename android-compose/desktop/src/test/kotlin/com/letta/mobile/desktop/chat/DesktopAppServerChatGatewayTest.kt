@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.AgentId
+
 import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.presence.ActiveTurnIdentity
 import com.letta.mobile.data.presence.ActiveTurnPhase
@@ -76,7 +78,7 @@ class DesktopAppServerChatGatewayTest {
         val client = FakeAppServerClient()
         val cleared = mutableListOf<String>()
         val binding = startStoppingTurn(client, cleared)
-        val owner = binding.owner("conv-1", "agent-1")
+        val owner = binding.owner(ConversationId("conv-1"), AgentId("agent-1"))
         runCurrent()
         assertEquals(ActiveTurnPhase.Cancelling, owner.state.value.phase)
         assertTrue(cleared.isEmpty(), "Missing correlation must not clear locally")
@@ -104,7 +106,7 @@ class DesktopAppServerChatGatewayTest {
         val client = FakeAppServerClient()
         val cleared = mutableListOf<String>()
         val binding = startStoppingTurn(client, cleared)
-        val owner = binding.owner("conv-1", "agent-1")
+        val owner = binding.owner(ConversationId("conv-1"), AgentId("agent-1"))
         runCurrent()
         advanceTimeBy(29_999)
         runCurrent()
@@ -129,10 +131,15 @@ class DesktopAppServerChatGatewayTest {
             client = client, agentIdResolver = { "agent-1" },
         )
         val binding = DesktopActiveTurnBinding(backgroundScope, cleared::add)
+        binding.bindSessions(kotlinx.coroutines.flow.MutableStateFlow(
+            com.letta.mobile.data.presence.ActiveTurnSession(backgroundScope, now = { testScheduler.currentTime }),
+        ))
         val turn = ActiveTurnIdentity("command-1", "runtime:command-1")
-        binding.start("conv-1", "agent-1", turn)
-        binding.owner("conv-1", "agent-1").interrupt(turn, "stop-1") {
-            gateway.abortConversationTurn(ConversationId("conv-1"), binding.serverRunId("conv-1", turn)?.let(::DesktopRunId))
+        binding.start(ConversationId("conv-1"), AgentId("agent-1"), turn)
+        binding.owner(ConversationId("conv-1"), AgentId("agent-1")).interrupt(turn, "stop-1") {
+            gateway.abortConversationTurn(
+                ConversationId("conv-1"), binding.serverRunId(ConversationId("conv-1"), turn)?.let(::DesktopRunId),
+            )
         }
         return binding
     }

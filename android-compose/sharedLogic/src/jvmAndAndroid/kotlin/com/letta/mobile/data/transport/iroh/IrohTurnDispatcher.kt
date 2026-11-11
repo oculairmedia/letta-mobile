@@ -56,6 +56,7 @@ internal class IrohTurnDispatcher(
             token = IrohTurnToken(IrohConversationId(submission.conversationId), currentGeneration(), turnId),
             runId = IrohRunId("iroh-run-${java.util.UUID.randomUUID()}"),
             agentId = IrohAgentId(submission.agentId),
+            localMessageId = com.letta.mobile.data.model.MessageId(submission.input.localMessageId),
         )
         return when (val result = registry.tryStart(request)) {
             is IrohTryStartResult.Started -> result.turn

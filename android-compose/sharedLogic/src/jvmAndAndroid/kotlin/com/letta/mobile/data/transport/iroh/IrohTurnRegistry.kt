@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap
 /** Per-turn state shared between streaming send jobs, observer ingest, and cancellation. */
 class IrohActiveTurn(request: IrohTurnRequest) {
     val token = request.token
+    /** Outbound command identity retained when the server promotes the synthetic run. */
+    val logicalRunId = request.localMessageId?.value ?: request.token.turnId.value
     private val runIdRef = atomic(request.runId.value)
     private val terminalClaimed = atomic<IrohTerminalSource?>(null)
 

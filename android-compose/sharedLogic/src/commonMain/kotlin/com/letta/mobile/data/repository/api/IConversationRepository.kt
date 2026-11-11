@@ -6,6 +6,8 @@ import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.flow.Flow
 
 interface IConversationRepository {
+    /** True only when a successful delete destroys the conversation, rather than archiving it. */
+    val deletesPermanently: Boolean get() = false
     fun getConversations(agentId: AgentId): Flow<List<Conversation>>
     fun getConversations(agentId: String): Flow<List<Conversation>> = getConversations(AgentId(agentId))
     fun getCachedConversations(agentId: AgentId): List<Conversation>

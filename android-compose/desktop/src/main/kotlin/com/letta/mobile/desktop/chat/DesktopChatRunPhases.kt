@@ -38,6 +38,8 @@ internal class DesktopChatRunPhases(
     private fun agentIdFor(conversationId: String): String? =
         state.value.conversations.firstOrNull { it.id == conversationId }?.agentId
 
+    fun bindActiveTurn(owner: com.letta.mobile.data.presence.ActiveTurnCoordinator) = publisher.bindActiveTurn(owner)
+
     /** Fold one event the controller knows first-hand into [conversationId]'s phase. */
     fun publish(conversationId: String?, payload: RuntimeEventPayload) {
         if (closed()) return

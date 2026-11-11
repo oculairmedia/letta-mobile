@@ -114,6 +114,21 @@ class DesktopChatControllerUndoDeleteTest {
     }
 
     @Test
+    fun archivingDoesNotTombstoneTheRetainedRunningOwner() = runTest {
+        val gateway = ArchivingGateway(ConversationDeleteBehavior.MovesToArchived)
+        val controller = testController { gateway }
+        controller.start()
+        runCurrent()
+        val owner = checkNotNull(controller.activeTurnCoordinator("conv-1"))
+        owner.start(com.letta.mobile.data.presence.ActiveTurnIdentity("server-run", "turn"))
+        controller.deleteConversation("conv-1")
+        runCurrent()
+        assertEquals(com.letta.mobile.data.presence.ActiveTurnPhase.Thinking, owner.state.value.phase)
+        assertEquals(owner, controller.activeTurnCoordinator("conv-1"))
+        controller.close()
+    }
+
+    @Test
     fun deletingTheSameIdOnANewGatewayDoesNotWaitForTheOldGateway() = runTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()

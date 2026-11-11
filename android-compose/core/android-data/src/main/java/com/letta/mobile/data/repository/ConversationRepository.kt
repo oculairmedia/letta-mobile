@@ -56,6 +56,7 @@ open class ConversationRepository(
     /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
     cacheGate: SessionCacheGate = SessionCacheGate.Open,
 ) : IConversationRepository, BackendScopedCache {
+    override val deletesPermanently: Boolean get() = irohConversationListSource?.shouldUseIroh() != true
     /** A repository over a bound [remote] (tests bind a fake). */
     constructor(
         remote: ConversationCrudRemoteSource,

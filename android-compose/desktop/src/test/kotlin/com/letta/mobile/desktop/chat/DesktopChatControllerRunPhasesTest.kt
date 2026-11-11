@@ -31,7 +31,16 @@ class DesktopChatControllerRunPhasesTest {
     private class EventEmittingGateway : FakeDesktopChatGateway(), DesktopRuntimeEventSource {
         private val relay = DesktopRuntimeEventRelay()
         override val runtimeEvents: SharedFlow<ScopedDesktopRuntimeEvent> = relay.runtimeEvents
-        suspend fun emit(payload: RuntimeEventPayload) = relay.emit(ScopedDesktopRuntimeEvent("conv-1", "agent-0", payload))
+        private var started = false
+        suspend fun emit(payload: RuntimeEventPayload) {
+            if (!started) {
+                started = true
+                relay.emit(ScopedDesktopRuntimeEvent("conv-1", "agent-0", RuntimeEventPayload.RunLifecycleChanged(
+                    com.letta.mobile.runtime.RuntimeRunStatus.Started,
+                ), "run-test", "run-test"))
+            }
+            relay.emit(ScopedDesktopRuntimeEvent("conv-1", "agent-0", payload, "run-test", "run-test"))
+        }
     }
 
     @Test

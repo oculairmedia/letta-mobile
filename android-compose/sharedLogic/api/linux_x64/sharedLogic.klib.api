@@ -4331,6 +4331,8 @@ abstract interface <#A: com.letta.mobile.data.session/SessionRepositoryGraph> co
         abstract fun <get-currentGraph>(): kotlinx.coroutines.flow/StateFlow<#A> // com.letta.mobile.data.session/SessionRepositoryGraphProvider.currentGraph.<get-currentGraph>|<get-currentGraph>(){}[0]
     abstract val sessionError // com.letta.mobile.data.session/SessionRepositoryGraphProvider.sessionError|{}sessionError[0]
         abstract fun <get-sessionError>(): kotlinx.coroutines.flow/StateFlow<kotlin/Throwable?> // com.letta.mobile.data.session/SessionRepositoryGraphProvider.sessionError.<get-sessionError>|<get-sessionError>(){}[0]
+    open val activeTurnSessions // com.letta.mobile.data.session/SessionRepositoryGraphProvider.activeTurnSessions|{}activeTurnSessions[0]
+        open fun <get-activeTurnSessions>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.presence/ActiveTurnSession?> // com.letta.mobile.data.session/SessionRepositoryGraphProvider.activeTurnSessions.<get-activeTurnSessions>|<get-activeTurnSessions>(){}[0]
 
     abstract fun rebuild(): #A // com.letta.mobile.data.session/SessionRepositoryGraphProvider.rebuild|rebuild(){}[0]
     abstract suspend fun <#A1: kotlin/Any?> withCurrentSession(kotlin.coroutines/SuspendFunction1<#A, #A1>): #A1 // com.letta.mobile.data.session/SessionRepositoryGraphProvider.withCurrentSession|withCurrentSession(kotlin.coroutines.SuspendFunction1<1:0,0:0>){0§<kotlin.Any?>}[0]
@@ -5355,6 +5357,9 @@ abstract interface com.letta.mobile.data.repository.api/IConversationInspectorMe
 }
 
 abstract interface com.letta.mobile.data.repository.api/IConversationRepository { // com.letta.mobile.data.repository.api/IConversationRepository|null[0]
+    open val deletesPermanently // com.letta.mobile.data.repository.api/IConversationRepository.deletesPermanently|{}deletesPermanently[0]
+        open fun <get-deletesPermanently>(): kotlin/Boolean // com.letta.mobile.data.repository.api/IConversationRepository.deletesPermanently.<get-deletesPermanently>|<get-deletesPermanently>(){}[0]
+
     abstract fun getCachedConversations(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.api/IConversationRepository.getCachedConversations|getCachedConversations(com.letta.mobile.data.model.AgentId){}[0]
     abstract fun getConversations(com.letta.mobile.data.model/AgentId): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/Conversation>> // com.letta.mobile.data.repository.api/IConversationRepository.getConversations|getConversations(com.letta.mobile.data.model.AgentId){}[0]
     open fun canCancelConversationRuns(): kotlin/Boolean // com.letta.mobile.data.repository.api/IConversationRepository.canCancelConversationRuns|canCancelConversationRuns(){}[0]
@@ -5969,6 +5974,8 @@ abstract interface com.letta.mobile.data.session/SessionRepositoryGraph { // com
         abstract fun <get-toolRepository>(): com.letta.mobile.data.repository.api/IToolRepository // com.letta.mobile.data.session/SessionRepositoryGraph.toolRepository.<get-toolRepository>|<get-toolRepository>(){}[0]
     abstract val vibesyncEventStreamRepository // com.letta.mobile.data.session/SessionRepositoryGraph.vibesyncEventStreamRepository|{}vibesyncEventStreamRepository[0]
         abstract fun <get-vibesyncEventStreamRepository>(): com.letta.mobile.data.repository.api/IVibesyncEventStreamRepository // com.letta.mobile.data.session/SessionRepositoryGraph.vibesyncEventStreamRepository.<get-vibesyncEventStreamRepository>|<get-vibesyncEventStreamRepository>(){}[0]
+    open val activeTurns // com.letta.mobile.data.session/SessionRepositoryGraph.activeTurns|{}activeTurns[0]
+        open fun <get-activeTurns>(): com.letta.mobile.data.presence/ActiveTurnSession? // com.letta.mobile.data.session/SessionRepositoryGraph.activeTurns.<get-activeTurns>|<get-activeTurns>(){}[0]
     open val blockRepository // com.letta.mobile.data.session/SessionRepositoryGraph.blockRepository|{}blockRepository[0]
         open fun <get-blockRepository>(): com.letta.mobile.data.repository.api/IAgentBlockRepository? // com.letta.mobile.data.session/SessionRepositoryGraph.blockRepository.<get-blockRepository>|<get-blockRepository>(){}[0]
     open val conversationLanes // com.letta.mobile.data.session/SessionRepositoryGraph.conversationLanes|{}conversationLanes[0]
@@ -6232,6 +6239,8 @@ abstract interface com.letta.mobile.data.transport.api/IChannelTransport { // co
         abstract fun <get-frameEvents>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.transport/TransportFrameEvent> // com.letta.mobile.data.transport.api/IChannelTransport.frameEvents.<get-frameEvents>|<get-frameEvents>(){}[0]
     abstract val state // com.letta.mobile.data.transport.api/IChannelTransport.state|{}state[0]
         abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport/ChannelTransportState> // com.letta.mobile.data.transport.api/IChannelTransport.state.<get-state>|<get-state>(){}[0]
+    open val activeTurnEvents // com.letta.mobile.data.transport.api/IChannelTransport.activeTurnEvents|{}activeTurnEvents[0]
+        open fun <get-activeTurnEvents>(): com.letta.mobile.data.transport.api/RuntimeTurnEventSource? // com.letta.mobile.data.transport.api/IChannelTransport.activeTurnEvents.<get-activeTurnEvents>|<get-activeTurnEvents>(){}[0]
     open val hasAnyActiveChatTurn // com.letta.mobile.data.transport.api/IChannelTransport.hasAnyActiveChatTurn|{}hasAnyActiveChatTurn[0]
         open fun <get-hasAnyActiveChatTurn>(): kotlin/Boolean // com.letta.mobile.data.transport.api/IChannelTransport.hasAnyActiveChatTurn.<get-hasAnyActiveChatTurn>|<get-hasAnyActiveChatTurn>(){}[0]
     open val hostCapabilities // com.letta.mobile.data.transport.api/IChannelTransport.hostCapabilities|{}hostCapabilities[0]
@@ -6263,6 +6272,11 @@ abstract interface com.letta.mobile.data.transport.api/LivenessProbingChannelTra
 abstract interface com.letta.mobile.data.transport.api/RedialAwareChannelTransport { // com.letta.mobile.data.transport.api/RedialAwareChannelTransport|null[0]
     abstract val redialWhileTurnActive // com.letta.mobile.data.transport.api/RedialAwareChannelTransport.redialWhileTurnActive|{}redialWhileTurnActive[0]
         abstract fun <get-redialWhileTurnActive>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.transport.api/RedialWhileTurnActive> // com.letta.mobile.data.transport.api/RedialAwareChannelTransport.redialWhileTurnActive.<get-redialWhileTurnActive>|<get-redialWhileTurnActive>(){}[0]
+}
+
+abstract interface com.letta.mobile.data.transport.api/RuntimeTurnEventSource { // com.letta.mobile.data.transport.api/RuntimeTurnEventSource|null[0]
+    abstract fun observeTurns(kotlin/Function3<com.letta.mobile.runtime/RuntimeEventDraft, com.letta.mobile.runtime/RunId, com.letta.mobile.runtime/RunId?, kotlin/Unit>): kotlin/Function0<kotlin/Unit> // com.letta.mobile.data.transport.api/RuntimeTurnEventSource.observeTurns|observeTurns(kotlin.Function3<com.letta.mobile.runtime.RuntimeEventDraft,com.letta.mobile.runtime.RunId,com.letta.mobile.runtime.RunId?,kotlin.Unit>){}[0]
+    abstract suspend fun abortExact(com.letta.mobile.data.model/AgentId, com.letta.mobile.runtime/ConversationId, com.letta.mobile.runtime/RunId): kotlin/Boolean // com.letta.mobile.data.transport.api/RuntimeTurnEventSource.abortExact|abortExact(com.letta.mobile.data.model.AgentId;com.letta.mobile.runtime.ConversationId;com.letta.mobile.runtime.RunId){}[0]
 }
 
 abstract interface com.letta.mobile.data.transport.api/SubagentScopeAwareChannelTransport { // com.letta.mobile.data.transport.api/SubagentScopeAwareChannelTransport|null[0]
@@ -24524,6 +24538,17 @@ final class <#A: kotlin/Any?, #B: kotlin/Any?> com.letta.mobile.data.document/Do
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.document/DocumentApplyResult.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.document/DocumentApplyResult.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.document/DocumentApplyResult.toString|toString(){}[0]
+}
+
+final class <#A: kotlin/Any?, #B: kotlin/Any?> com.letta.mobile.data.flow/CapturedSessionFlow : kotlinx.coroutines.flow/StateFlow<#B?> { // com.letta.mobile.data.flow/CapturedSessionFlow|null[0]
+    constructor <init>(kotlinx.coroutines.flow/StateFlow<#A>, kotlin/Function1<#A, #B?>) // com.letta.mobile.data.flow/CapturedSessionFlow.<init>|<init>(kotlinx.coroutines.flow.StateFlow<1:0>;kotlin.Function1<1:0,1:1?>){}[0]
+
+    final val replayCache // com.letta.mobile.data.flow/CapturedSessionFlow.replayCache|{}replayCache[0]
+        final fun <get-replayCache>(): kotlin.collections/List<#B?> // com.letta.mobile.data.flow/CapturedSessionFlow.replayCache.<get-replayCache>|<get-replayCache>(){}[0]
+    final val value // com.letta.mobile.data.flow/CapturedSessionFlow.value|{}value[0]
+        final fun <get-value>(): #B? // com.letta.mobile.data.flow/CapturedSessionFlow.value.<get-value>|<get-value>(){}[0]
+
+    final suspend fun collect(kotlinx.coroutines.flow/FlowCollector<#B?>): kotlin/Nothing // com.letta.mobile.data.flow/CapturedSessionFlow.collect|collect(kotlinx.coroutines.flow.FlowCollector<1:1?>){}[0]
 }
 
 final class <#A: kotlin/Any?, #B: kotlin/Any?> com.letta.mobile.data.model.provider.rpc/ProviderRpcCall { // com.letta.mobile.data.model.provider.rpc/ProviderRpcCall|null[0]
@@ -54309,7 +54334,7 @@ final class com.letta.mobile.data.presence/ActiveTurnCoordinator { // com.letta.
     final fun awaitApproval(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.data.presence/ActiveTurnApproval) // com.letta.mobile.data.presence/ActiveTurnCoordinator.awaitApproval|awaitApproval(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.data.presence.ActiveTurnApproval){}[0]
     final fun delete() // com.letta.mobile.data.presence/ActiveTurnCoordinator.delete|delete(){}[0]
     final fun interrupt(com.letta.mobile.data.presence/ActiveTurnIdentity, kotlin/String, kotlin.coroutines/SuspendFunction0<kotlin/Boolean>) // com.letta.mobile.data.presence/ActiveTurnCoordinator.interrupt|interrupt(com.letta.mobile.data.presence.ActiveTurnIdentity;kotlin.String;kotlin.coroutines.SuspendFunction0<kotlin.Boolean>){}[0]
-    final fun progress(com.letta.mobile.data.presence/ActiveTurnIdentity, kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/Int = ...) // com.letta.mobile.data.presence/ActiveTurnCoordinator.progress|progress(com.letta.mobile.data.presence.ActiveTurnIdentity;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.Int){}[0]
+    final fun progress(com.letta.mobile.data.presence/ActiveTurnIdentity, kotlin.collections/Map<kotlin/String, kotlin/String>? = ..., kotlin/Int? = ...) // com.letta.mobile.data.presence/ActiveTurnCoordinator.progress|progress(com.letta.mobile.data.presence.ActiveTurnIdentity;kotlin.collections.Map<kotlin.String,kotlin.String>?;kotlin.Int?){}[0]
     final fun start(com.letta.mobile.data.presence/ActiveTurnIdentity) // com.letta.mobile.data.presence/ActiveTurnCoordinator.start|start(com.letta.mobile.data.presence.ActiveTurnIdentity){}[0]
     final fun terminate(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.data.presence/ActiveTurnTerminalKind) // com.letta.mobile.data.presence/ActiveTurnCoordinator.terminate|terminate(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.data.presence.ActiveTurnTerminalKind){}[0]
     final suspend fun submitApproval(com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.runtime/ToolApprovalId, kotlin/Boolean): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnCoordinator.submitApproval|submitApproval(com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.runtime.ToolApprovalId;kotlin.Boolean){}[0]
@@ -54330,6 +54355,50 @@ final class com.letta.mobile.data.presence/ActiveTurnIdentity { // com.letta.mob
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnIdentity.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.presence/ActiveTurnIdentity.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnIdentity.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.presence/ActiveTurnRuntimeEvent { // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent|null[0]
+    constructor <init>(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, com.letta.mobile.runtime/RuntimeEventPayload, com.letta.mobile.runtime/RunId? = ..., com.letta.mobile.runtime/RunId? = ...) // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.<init>|<init>(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;com.letta.mobile.runtime.RuntimeEventPayload;com.letta.mobile.runtime.RunId?;com.letta.mobile.runtime.RunId?){}[0]
+
+    final val agentId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.agentId|{}agentId[0]
+        final fun <get-agentId>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.agentId.<get-agentId>|<get-agentId>(){}[0]
+    final val conversationId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.conversationId|{}conversationId[0]
+        final fun <get-conversationId>(): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+    final val payload // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.payload|{}payload[0]
+        final fun <get-payload>(): com.letta.mobile.runtime/RuntimeEventPayload // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.payload.<get-payload>|<get-payload>(){}[0]
+    final val runId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.runId|{}runId[0]
+        final fun <get-runId>(): com.letta.mobile.runtime/RunId? // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.runId.<get-runId>|<get-runId>(){}[0]
+    final val serverRunId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.serverRunId|{}serverRunId[0]
+        final fun <get-serverRunId>(): com.letta.mobile.runtime/RunId? // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.serverRunId.<get-serverRunId>|<get-serverRunId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.runtime/RuntimeEventPayload // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.runtime/RunId? // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.runtime/RunId? // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.model/ConversationId = ..., com.letta.mobile.data.model/AgentId = ..., com.letta.mobile.runtime/RuntimeEventPayload = ..., com.letta.mobile.runtime/RunId? = ..., com.letta.mobile.runtime/RunId? = ...): com.letta.mobile.data.presence/ActiveTurnRuntimeEvent // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.copy|copy(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;com.letta.mobile.runtime.RuntimeEventPayload;com.letta.mobile.runtime.RunId?;com.letta.mobile.runtime.RunId?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.presence/ActiveTurnRuntimeEvent.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.presence/ActiveTurnSession : kotlin/AutoCloseable { // com.letta.mobile.data.presence/ActiveTurnSession|null[0]
+    constructor <init>(kotlinx.coroutines/CoroutineScope, kotlin/Function1<com.letta.mobile.data.model/ConversationId, kotlin/Unit> = ..., kotlin/Function0<kotlin/Long> = ..., kotlin.coroutines/SuspendFunction3<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, com.letta.mobile.runtime/RunId?, kotlin.collections/List<com.letta.mobile.data.model/Run>>? = ...) // com.letta.mobile.data.presence/ActiveTurnSession.<init>|<init>(kotlinx.coroutines.CoroutineScope;kotlin.Function1<com.letta.mobile.data.model.ConversationId,kotlin.Unit>;kotlin.Function0<kotlin.Long>;kotlin.coroutines.SuspendFunction3<com.letta.mobile.data.model.ConversationId,com.letta.mobile.data.model.AgentId,com.letta.mobile.runtime.RunId?,kotlin.collections.List<com.letta.mobile.data.model.Run>>?){}[0]
+
+    final val outcomes // com.letta.mobile.data.presence/ActiveTurnSession.outcomes|{}outcomes[0]
+        final fun <get-outcomes>(): kotlin.collections/Map<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.presence/ActiveTurnTerminalKind?> // com.letta.mobile.data.presence/ActiveTurnSession.outcomes.<get-outcomes>|<get-outcomes>(){}[0]
+    final val states // com.letta.mobile.data.presence/ActiveTurnSession.states|{}states[0]
+        final fun <get-states>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.presence/ActiveTurnState>> // com.letta.mobile.data.presence/ActiveTurnSession.states.<get-states>|<get-states>(){}[0]
+
+    final fun bindRegistry(com.letta.mobile.data.presence/ConversationRunRegistry) // com.letta.mobile.data.presence/ActiveTurnSession.bindRegistry|bindRegistry(com.letta.mobile.data.presence.ConversationRunRegistry){}[0]
+    final fun close() // com.letta.mobile.data.presence/ActiveTurnSession.close|close(){}[0]
+    final fun delete(com.letta.mobile.data.model/ConversationId): kotlin/Unit? // com.letta.mobile.data.presence/ActiveTurnSession.delete|delete(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun onEvent(com.letta.mobile.data.presence/ActiveTurnRuntimeEvent) // com.letta.mobile.data.presence/ActiveTurnSession.onEvent|onEvent(com.letta.mobile.data.presence.ActiveTurnRuntimeEvent){}[0]
+    final fun owner(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId): com.letta.mobile.data.presence/ActiveTurnCoordinator // com.letta.mobile.data.presence/ActiveTurnSession.owner|owner(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId){}[0]
+    final fun start(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId, com.letta.mobile.data.presence/ActiveTurnIdentity) // com.letta.mobile.data.presence/ActiveTurnSession.start|start(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId;com.letta.mobile.data.presence.ActiveTurnIdentity){}[0]
+    final fun terminate(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.presence/ActiveTurnIdentity, com.letta.mobile.data.presence/ActiveTurnTerminalKind) // com.letta.mobile.data.presence/ActiveTurnSession.terminate|terminate(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.presence.ActiveTurnIdentity;com.letta.mobile.data.presence.ActiveTurnTerminalKind){}[0]
+    final suspend fun reconcile(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.presence/ActiveTurnSession.reconcile|reconcile(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.AgentId){}[0]
+    final suspend fun serverRunId(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.presence/ActiveTurnIdentity): kotlin/String? // com.letta.mobile.data.presence/ActiveTurnSession.serverRunId|serverRunId(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.presence.ActiveTurnIdentity){}[0]
 }
 
 final class com.letta.mobile.data.presence/ActiveTurnState { // com.letta.mobile.data.presence/ActiveTurnState|null[0]
@@ -54420,6 +54489,7 @@ final class com.letta.mobile.data.presence/AgentPresence { // com.letta.mobile.d
 final class com.letta.mobile.data.presence/ConversationRunPhasePublisher { // com.letta.mobile.data.presence/ConversationRunPhasePublisher|null[0]
     constructor <init>(com.letta.mobile.data.presence/ConversationRunRegistry, kotlin/Function0<kotlin/Long> = ...) // com.letta.mobile.data.presence/ConversationRunPhasePublisher.<init>|<init>(com.letta.mobile.data.presence.ConversationRunRegistry;kotlin.Function0<kotlin.Long>){}[0]
 
+    final fun bindActiveTurn(com.letta.mobile.data.presence/ActiveTurnCoordinator) // com.letta.mobile.data.presence/ConversationRunPhasePublisher.bindActiveTurn|bindActiveTurn(com.letta.mobile.data.presence.ActiveTurnCoordinator){}[0]
     final fun clear(kotlin/String) // com.letta.mobile.data.presence/ConversationRunPhasePublisher.clear|clear(kotlin.String){}[0]
     final fun markInterrupting(com.letta.mobile.data.presence/RunScope) // com.letta.mobile.data.presence/ConversationRunPhasePublisher.markInterrupting|markInterrupting(com.letta.mobile.data.presence.RunScope){}[0]
     final fun onEvent(com.letta.mobile.data.presence/RunScope, com.letta.mobile.runtime/RuntimeEventPayload) // com.letta.mobile.data.presence/ConversationRunPhasePublisher.onEvent|onEvent(com.letta.mobile.data.presence.RunScope;com.letta.mobile.runtime.RuntimeEventPayload){}[0]
@@ -58815,6 +58885,8 @@ final class com.letta.mobile.data.session.graph/SessionGraphIdentity { // com.le
 final class com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph : com.letta.mobile.data.session/SessionRepositoryGraph { // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph|null[0]
     constructor <init>(com.letta.mobile.data.session.graph/SessionGraphIdentity, com.letta.mobile.data.session.graph/HostSessionRepositories, com.letta.mobile.data.session.graph/TransportBoundSessionRepositories, kotlin/Function0<kotlin/Unit> = ...) // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.<init>|<init>(com.letta.mobile.data.session.graph.SessionGraphIdentity;com.letta.mobile.data.session.graph.HostSessionRepositories;com.letta.mobile.data.session.graph.TransportBoundSessionRepositories;kotlin.Function0<kotlin.Unit>){}[0]
 
+    final val activeTurns // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.activeTurns|{}activeTurns[0]
+        final fun <get-activeTurns>(): com.letta.mobile.data.presence/ActiveTurnSession // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.activeTurns.<get-activeTurns>|<get-activeTurns>(){}[0]
     final val agentRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.agentRepository|{}agentRepository[0]
         final fun <get-agentRepository>(): com.letta.mobile.data.repository.api/IAgentRepository // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.agentRepository.<get-agentRepository>|<get-agentRepository>(){}[0]
     final val backendDescriptor // com.letta.mobile.data.session.graph/SharedSessionRepositoryGraph.backendDescriptor|{}backendDescriptor[0]
@@ -65613,7 +65685,7 @@ final class com.letta.mobile.data.transport.appserver/AppServerRunControls { // 
     constructor <init>(com.letta.mobile.data.runtime/AppServerTurnEngine, kotlin/String = ...) // com.letta.mobile.data.transport.appserver/AppServerRunControls.<init>|<init>(com.letta.mobile.data.runtime.AppServerTurnEngine;kotlin.String){}[0]
 
     final suspend fun answer(com.letta.mobile.data.transport.appserver/AppServerApprovalAnswer) // com.letta.mobile.data.transport.appserver/AppServerRunControls.answer|answer(com.letta.mobile.data.transport.appserver.AppServerApprovalAnswer){}[0]
-    final suspend fun stop(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId): kotlin/Boolean // com.letta.mobile.data.transport.appserver/AppServerRunControls.stop|stop(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId){}[0]
+    final suspend fun stop(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId, com.letta.mobile.runtime/RunId? = ...): kotlin/Boolean // com.letta.mobile.data.transport.appserver/AppServerRunControls.stop|stop(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId;com.letta.mobile.runtime.RunId?){}[0]
 }
 
 final class com.letta.mobile.data.transport.appserver/AppServerRuntimeScope { // com.letta.mobile.data.transport.appserver/AppServerRuntimeScope|null[0]
@@ -75233,6 +75305,7 @@ final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobi
 final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/project(com.letta.mobile.data.projects/ProjectKey): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/project|project@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.projects.ProjectKey){}[0]
 final fun (com.letta.mobile.data.objectverbs/ObjectRef.Companion).com.letta.mobile.data.objectverbs.refs/shortcut(com.letta.mobile.data.home.shortcut/HomeShortcut): com.letta.mobile.data.objectverbs/ObjectRef // com.letta.mobile.data.objectverbs.refs/shortcut|shortcut@com.letta.mobile.data.objectverbs.ObjectRef.Companion(com.letta.mobile.data.home.shortcut.HomeShortcut){}[0]
 final fun (com.letta.mobile.data.plugin/PluginOrigin).com.letta.mobile.data.plugin.view/covers(com.letta.mobile.data.plugin.view/ViewLink): kotlin/Boolean // com.letta.mobile.data.plugin.view/covers|covers@com.letta.mobile.data.plugin.PluginOrigin(com.letta.mobile.data.plugin.view.ViewLink){}[0]
+final fun (com.letta.mobile.data.presence/ActiveTurnState).com.letta.mobile.data.presence/identity(): com.letta.mobile.data.presence/ActiveTurnIdentity? // com.letta.mobile.data.presence/identity|identity@com.letta.mobile.data.presence.ActiveTurnState(){}[0]
 final fun (com.letta.mobile.data.repository.api/ISettingsRepository).com.letta.mobile.data.repository/activeBackendUsesChannel(): kotlin/Boolean // com.letta.mobile.data.repository/activeBackendUsesChannel|activeBackendUsesChannel@com.letta.mobile.data.repository.api.ISettingsRepository(){}[0]
 final fun (com.letta.mobile.data.repository.api/ISubagentRepository).com.letta.mobile.data.repository.api/dismissAction(com.letta.mobile.data.repository.api/SubagentParentScope?): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/SubagentEntry, kotlin/Result<kotlin/Unit>>? // com.letta.mobile.data.repository.api/dismissAction|dismissAction@com.letta.mobile.data.repository.api.ISubagentRepository(com.letta.mobile.data.repository.api.SubagentParentScope?){}[0]
 final fun (com.letta.mobile.data.repository.modelcontrol/ConnectableProvider).com.letta.mobile.data.repository.modelcontrol/connectMethodOn(kotlin/Boolean): com.letta.mobile.data.repository.modelcontrol/ProviderConnectMethod // com.letta.mobile.data.repository.modelcontrol/connectMethodOn|connectMethodOn@com.letta.mobile.data.repository.modelcontrol.ConnectableProvider(kotlin.Boolean){}[0]

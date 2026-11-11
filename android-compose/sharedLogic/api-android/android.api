@@ -21912,6 +21912,13 @@ public final class com/letta/mobile/data/dreaming/DreamingState {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/flow/CapturedSessionFlow : kotlinx/coroutines/flow/StateFlow {
+	public fun <init> (Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;)V
+	public fun collect (Lkotlinx/coroutines/flow/FlowCollector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getReplayCache ()Ljava/util/List;
+	public fun getValue ()Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/flow/DerivedStateFlow : kotlinx/coroutines/flow/StateFlow {
 	public fun <init> (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;)V
 	public fun collect (Lkotlinx/coroutines/flow/FlowCollector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -41232,12 +41239,16 @@ public final class com/letta/mobile/data/presence/ActiveTurnCoordinator {
 	public final fun getOutcome ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun interrupt (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
-	public final fun progress (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/util/Map;I)V
-	public static synthetic fun progress$default (Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/util/Map;IILjava/lang/Object;)V
+	public final fun progress (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/util/Map;Ljava/lang/Integer;)V
+	public static synthetic fun progress$default (Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/util/Map;Ljava/lang/Integer;ILjava/lang/Object;)V
 	public final fun start (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;)V
 	public final fun submitApproval-3ughoIs (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun submitApproval-ARNhO7s (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun terminate (Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;)V
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnCoordinatorKt {
+	public static final fun identity (Lcom/letta/mobile/data/presence/ActiveTurnState;)Lcom/letta/mobile/data/presence/ActiveTurnIdentity;
 }
 
 public final class com/letta/mobile/data/presence/ActiveTurnIdentity {
@@ -41267,6 +41278,42 @@ public final class com/letta/mobile/data/presence/ActiveTurnPhase : java/lang/En
 
 public final class com/letta/mobile/data/presence/ActiveTurnPhase$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnRuntimeEvent {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventPayload;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventPayload;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-nFOXY6g ()Ljava/lang/String;
+	public final fun component2-zqmzO_A ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/runtime/RuntimeEventPayload;
+	public final fun component4-qu2xs0U ()Ljava/lang/String;
+	public final fun component5-qu2xs0U ()Ljava/lang/String;
+	public final fun copy-ixV9PII (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventPayload;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/presence/ActiveTurnRuntimeEvent;
+	public static synthetic fun copy-ixV9PII$default (Lcom/letta/mobile/data/presence/ActiveTurnRuntimeEvent;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventPayload;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/presence/ActiveTurnRuntimeEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
+	public final fun getConversationId-nFOXY6g ()Ljava/lang/String;
+	public final fun getPayload ()Lcom/letta/mobile/runtime/RuntimeEventPayload;
+	public final fun getRunId-qu2xs0U ()Ljava/lang/String;
+	public final fun getServerRunId-qu2xs0U ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/presence/ActiveTurnSession : java/lang/AutoCloseable {
+	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function4;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function4;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bindRegistry (Lcom/letta/mobile/data/presence/ConversationRunRegistry;)V
+	public fun close ()V
+	public final fun delete-LfPRSJk (Ljava/lang/String;)Lkotlin/Unit;
+	public final fun getOutcomes ()Ljava/util/Map;
+	public final fun getStates ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun onEvent (Lcom/letta/mobile/data/presence/ActiveTurnRuntimeEvent;)V
+	public final fun owner-5ovmR3Q (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;
+	public final fun reconcile-8blILWk (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun serverRunId-FCMYEXo (Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun start-8blILWk (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnIdentity;)V
+	public final fun terminate-FCMYEXo (Ljava/lang/String;Lcom/letta/mobile/data/presence/ActiveTurnIdentity;Lcom/letta/mobile/data/presence/ActiveTurnTerminalKind;)V
 }
 
 public final class com/letta/mobile/data/presence/ActiveTurnState {
@@ -41379,6 +41426,7 @@ public final class com/letta/mobile/data/presence/AgentPresenceKt {
 public final class com/letta/mobile/data/presence/ConversationRunPhasePublisher {
 	public fun <init> (Lcom/letta/mobile/data/presence/ConversationRunRegistry;Lkotlin/jvm/functions/Function0;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/presence/ConversationRunRegistry;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bindActiveTurn (Lcom/letta/mobile/data/presence/ActiveTurnCoordinator;)V
 	public final fun clear (Ljava/lang/String;)V
 	public final fun markInterrupting (Lcom/letta/mobile/data/presence/RunScope;)V
 	public final fun onEvent (Lcom/letta/mobile/data/presence/RunScope;Lcom/letta/mobile/runtime/RuntimeEventPayload;)V
@@ -43113,6 +43161,7 @@ public abstract interface class com/letta/mobile/data/repository/api/IConversati
 	public fun getConversation-1iDlvEA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getConversations (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getConversations-qkT7gGE (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public fun getDeletesPermanently ()Z
 	public fun hasFreshConversations (Ljava/lang/String;J)Z
 	public fun hasFreshConversations-gfLNG5k (Ljava/lang/String;J)Z
 	public fun listConversationsForAgent (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -43153,6 +43202,7 @@ public final class com/letta/mobile/data/repository/api/IConversationRepository$
 	public static fun getConversation (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getConversation-1iDlvEA (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun getConversations (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public static fun getDeletesPermanently (Lcom/letta/mobile/data/repository/api/IConversationRepository;)Z
 	public static fun hasFreshConversations (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;J)Z
 	public static fun hasFreshConversations-gfLNG5k (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;J)Z
 	public static fun listConversationsForAgent (Lcom/letta/mobile/data/repository/api/IConversationRepository;Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -48350,6 +48400,7 @@ public abstract interface class com/letta/mobile/data/session/BackendScopedCache
 public class com/letta/mobile/data/session/DefaultSessionRepositoryGraphProvider : com/letta/mobile/data/session/SessionRepositoryGraphProvider {
 	public fun <init> (Lcom/letta/mobile/data/session/SessionRepositoryGraphFactory;Ljava/lang/String;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/session/SessionRepositoryGraphFactory;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getActiveTurnSessions ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getCurrent ()Lcom/letta/mobile/data/session/SessionRepositoryGraph;
 	public fun getCurrentGraph ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSessionError ()Lkotlinx/coroutines/flow/StateFlow;
@@ -48375,6 +48426,7 @@ public final class com/letta/mobile/data/session/SessionGraphContractsKt {
 
 public abstract interface class com/letta/mobile/data/session/SessionRepositoryGraph {
 	public abstract fun close ()V
+	public fun getActiveTurns ()Lcom/letta/mobile/data/presence/ActiveTurnSession;
 	public abstract fun getAgentRepository ()Lcom/letta/mobile/data/repository/api/IAgentRepository;
 	public abstract fun getBackendDescriptor ()Lcom/letta/mobile/runtime/BackendDescriptor;
 	public fun getBlockRepository ()Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
@@ -48400,6 +48452,7 @@ public abstract interface class com/letta/mobile/data/session/SessionRepositoryG
 }
 
 public final class com/letta/mobile/data/session/SessionRepositoryGraph$DefaultImpls {
+	public static fun getActiveTurns (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/presence/ActiveTurnSession;
 	public static fun getBlockRepository (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
 	public static fun getConversationLanes (Lcom/letta/mobile/data/session/SessionRepositoryGraph;)Lcom/letta/mobile/data/lanes/ConversationLaneProjection;
 }
@@ -48409,11 +48462,16 @@ public abstract interface class com/letta/mobile/data/session/SessionRepositoryG
 }
 
 public abstract interface class com/letta/mobile/data/session/SessionRepositoryGraphProvider {
+	public fun getActiveTurnSessions ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getCurrent ()Lcom/letta/mobile/data/session/SessionRepositoryGraph;
 	public abstract fun getCurrentGraph ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getSessionError ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun rebuild ()Lcom/letta/mobile/data/session/SessionRepositoryGraph;
 	public abstract fun withCurrentSession (Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/session/SessionRepositoryGraphProvider$DefaultImpls {
+	public static fun getActiveTurnSessions (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;)Lkotlinx/coroutines/flow/StateFlow;
 }
 
 public final class com/letta/mobile/data/session/graph/AdminRemoteRoutes {
@@ -48530,6 +48588,7 @@ public final class com/letta/mobile/data/session/graph/SharedSessionRepositoryGr
 	public fun <init> (Lcom/letta/mobile/data/session/graph/SessionGraphIdentity;Lcom/letta/mobile/data/session/graph/HostSessionRepositories;Lcom/letta/mobile/data/session/graph/TransportBoundSessionRepositories;Lkotlin/jvm/functions/Function0;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/session/graph/SessionGraphIdentity;Lcom/letta/mobile/data/session/graph/HostSessionRepositories;Lcom/letta/mobile/data/session/graph/TransportBoundSessionRepositories;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
+	public fun getActiveTurns ()Lcom/letta/mobile/data/presence/ActiveTurnSession;
 	public fun getAgentRepository ()Lcom/letta/mobile/data/repository/api/IAgentRepository;
 	public fun getBackendDescriptor ()Lcom/letta/mobile/runtime/BackendDescriptor;
 	public fun getBlockRepository ()Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
@@ -48591,6 +48650,7 @@ public final class com/letta/mobile/data/session/graph/UnservedConversationRepos
 	public fun getConversation-1iDlvEA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getConversations (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
 	public fun getConversations-qkT7gGE (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public fun getDeletesPermanently ()Z
 	public fun hasFreshConversations (Ljava/lang/String;J)Z
 	public fun hasFreshConversations-gfLNG5k (Ljava/lang/String;J)Z
 	public fun listConversationsForAgent (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -59567,6 +59627,19 @@ public final class com/letta/mobile/data/transport/api/AppServerClientChannel : 
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
+public final class com/letta/mobile/data/transport/api/ChannelTurnEventTap : com/letta/mobile/data/transport/api/RuntimeTurnEventSource {
+	public static final field Companion Lcom/letta/mobile/data/transport/api/ChannelTurnEventTap$Companion;
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;)V
+	public fun abortExact-DITey8U (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun observeTurns (Lkotlin/jvm/functions/Function3;)Lkotlin/jvm/functions/Function0;
+	public final fun publish (Lcom/letta/mobile/data/transport/ServerFrame;)V
+	public final fun publishDraft-Ool3YKQ (Lcom/letta/mobile/runtime/RuntimeEventDraft;Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/transport/api/ChannelTurnEventTap$Companion {
+	public final fun fromEngine (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/transport/api/ChannelTurnEventTap;
+}
+
 public abstract interface class com/letta/mobile/data/transport/api/CronControlTransport {
 	public abstract fun sendCronPause (Lcom/letta/mobile/data/transport/api/CronPauseCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun sendCronResume (Lcom/letta/mobile/data/transport/api/CronResumeCommand;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -59636,6 +59709,7 @@ public abstract interface class com/letta/mobile/data/transport/api/IChannelTran
 	public abstract fun cancel (Ljava/lang/String;)Z
 	public abstract fun connect (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun disconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getActiveTurnEvents ()Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
 	public abstract fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public abstract fun getFrameEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getHasAnyActiveChatTurn ()Z
@@ -59665,6 +59739,7 @@ public abstract interface class com/letta/mobile/data/transport/api/IChannelTran
 
 public final class com/letta/mobile/data/transport/api/IChannelTransport$DefaultImpls {
 	public static fun adminRpc (Lcom/letta/mobile/data/transport/api/IChannelTransport;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getActiveTurnEvents (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
 	public static fun getHasAnyActiveChatTurn (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Z
 	public static fun getHostCapabilities (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Ljava/util/Set;
 	public static fun getHostNodeId (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Ljava/lang/String;
@@ -59691,6 +59766,7 @@ public class com/letta/mobile/data/transport/api/NoOpChannelTransport : com/lett
 	public fun cancel (Ljava/lang/String;)Z
 	public fun connect (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getActiveTurnEvents ()Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
 	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getFrameEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getHasAnyActiveChatTurn ()Z
@@ -59733,6 +59809,11 @@ public final class com/letta/mobile/data/transport/api/RedialWhileTurnActive {
 	public final fun getTurnId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/transport/api/RuntimeTurnEventSource {
+	public abstract fun abortExact-DITey8U (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun observeTurns (Lkotlin/jvm/functions/Function3;)Lkotlin/jvm/functions/Function0;
 }
 
 public abstract interface class com/letta/mobile/data/transport/api/SubagentScopeAwareChannelTransport {
@@ -65852,7 +65933,8 @@ public final class com/letta/mobile/data/transport/appserver/AppServerRunControl
 	public fun <init> (Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Ljava/lang/String;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/runtime/AppServerTurnEngine;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun answer (Lcom/letta/mobile/data/transport/appserver/AppServerApprovalAnswer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun stop-eAxutHE (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun stop-yUha8Cg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun stop-yUha8Cg$default (Lcom/letta/mobile/data/transport/appserver/AppServerRunControls;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/transport/appserver/AppServerRuntimeScope {
@@ -66884,6 +66966,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohActiveTurn {
 	public final fun getCutOffBySessionLoss ()Z
 	public final fun getHasTerminal ()Z
 	public final fun getJob ()Lkotlinx/coroutines/Job;
+	public final fun getLogicalRunId ()Ljava/lang/String;
 	public final fun getNeedsRedialRecovery ()Z
 	public final fun getRunId ()Ljava/lang/String;
 	public final fun getTerminalReached ()Lkotlinx/coroutines/CompletableDeferred;
@@ -67169,6 +67252,7 @@ public final class com/letta/mobile/data/transport/iroh/IrohChannelTransport : c
 	public fun connect (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun disconnect (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun dismissSubagent-mymyBZk (Lcom/letta/mobile/data/repository/api/SubagentParentScope;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getActiveTurnEvents ()Lcom/letta/mobile/data/transport/api/RuntimeTurnEventSource;
 	public fun getCollectorOverflows ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
 	public fun getFrameCollectorConnectionGeneration ()J
@@ -67748,14 +67832,17 @@ public final class com/letta/mobile/data/transport/iroh/IrohTurnRegistry$IrohTur
 }
 
 public final class com/letta/mobile/data/transport/iroh/IrohTurnRequest {
-	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;
 	public final fun component2-kU4hMD0 ()Ljava/lang/String;
 	public final fun component3-2DIJnXg ()Ljava/lang/String;
-	public final fun copy-24c76IA (Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/transport/iroh/IrohTurnRequest;
-	public static synthetic fun copy-24c76IA$default (Lcom/letta/mobile/data/transport/iroh/IrohTurnRequest;Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohTurnRequest;
+	public final fun component4-_Rke128 ()Ljava/lang/String;
+	public final fun copy-J8mHnxo (Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/transport/iroh/IrohTurnRequest;
+	public static synthetic fun copy-J8mHnxo$default (Lcom/letta/mobile/data/transport/iroh/IrohTurnRequest;Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/transport/iroh/IrohTurnRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId-2DIJnXg ()Ljava/lang/String;
+	public final fun getLocalMessageId-_Rke128 ()Ljava/lang/String;
 	public final fun getRunId-kU4hMD0 ()Ljava/lang/String;
 	public final fun getToken ()Lcom/letta/mobile/data/transport/iroh/IrohTurnToken;
 	public fun hashCode ()I

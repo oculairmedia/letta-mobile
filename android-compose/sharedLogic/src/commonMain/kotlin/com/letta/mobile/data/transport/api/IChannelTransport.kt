@@ -15,6 +15,8 @@ import kotlinx.serialization.json.JsonArray
  * implementation.
  */
 interface IChannelTransport {
+    /** Present only when this captured transport can observe and abort exact turns authoritatively. */
+    val activeTurnEvents: RuntimeTurnEventSource? get() = null
     val state: StateFlow<ChannelTransportState>
     val events: SharedFlow<ServerFrame>
     val frameEvents: SharedFlow<TransportFrameEvent>

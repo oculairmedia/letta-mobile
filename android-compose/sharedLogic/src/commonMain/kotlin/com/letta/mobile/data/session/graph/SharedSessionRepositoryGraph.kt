@@ -84,7 +84,19 @@ class SharedSessionRepositoryGraph(
 
     override val agentRepository: IAgentRepository = host.agentRepository
     override val blockRepository: IAgentBlockRepository? = host.blockRepository
-    override val conversationRepository: IConversationRepository = host.conversationRepository
+    override val conversationRepository: IConversationRepository = object : IConversationRepository by host.conversationRepository,
+        com.letta.mobile.data.session.BackendScopedCache {
+        override suspend fun clearForBackendSwitch() {
+            (host.conversationRepository as? com.letta.mobile.data.session.BackendScopedCache)?.clearForBackendSwitch()
+        }
+        override suspend fun deleteConversation(
+            id: com.letta.mobile.data.model.ConversationId,
+            agentId: com.letta.mobile.data.model.AgentId,
+        ) {
+            host.conversationRepository.deleteConversation(id, agentId)
+            if (host.conversationRepository.deletesPermanently) activeTurns.delete(id)
+        }
+    }
     override val mcpServerRepository: IMcpServerRepository = host.mcpServerRepository
     override val modelRepository: IModelRepository = host.modelRepository
     override val passageRepository: IPassageRepository = host.passageRepository
@@ -101,6 +113,27 @@ class SharedSessionRepositoryGraph(
     override val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository
     override val subagentRepository: ISubagentRepository = transportBound.subagentRepository
 
+    override val activeTurns = com.letta.mobile.data.presence.ActiveTurnSession(
+        transportBound.scope, readRuns = { conversation, agent, run ->
+        if (!capabilities.supports(com.letta.mobile.data.backend.SessionRoute.RUNS)) emptyList() else when (run) {
+            null -> {
+                runRepository.refreshRuns(com.letta.mobile.data.model.RunListParams(
+                    agentId = agent.value, conversationId = conversation.value, active = true, background = false,
+                ))
+                runRepository.runs.value
+            }
+            else -> listOf(runRepository.getRun(run))
+        }
+    })
+    private val detachTurns = channelTransport.activeTurnEvents
+        ?.observeTurns { draft, logical, server ->
+        val conversation = draft.conversationId ?: return@observeTurns
+        val agent = draft.agentId ?: return@observeTurns
+        activeTurns.onEvent(com.letta.mobile.data.presence.ActiveTurnRuntimeEvent(
+            com.letta.mobile.data.model.ConversationId(conversation.value), agent, draft.payload, logical, server,
+        ))
+    }
+
     /** Each conversation's latest context total, fed by [channelTransport]. */
     val contextTokenReadings: ContextTokenReadings = transportBound.contextTokenReadings
 
@@ -116,6 +149,10 @@ class SharedSessionRepositoryGraph(
         get() = closed.value
 
     override fun close() {
-        if (closed.compareAndSet(expect = false, update = true)) onClose()
+        if (closed.compareAndSet(expect = false, update = true)) {
+            detachTurns?.invoke()
+            activeTurns.close()
+            onClose()
+        }
     }
 }

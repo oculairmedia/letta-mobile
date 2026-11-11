@@ -25,6 +25,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import com.letta.mobile.data.lanes.ConversationLaneProjection
 
 /**
@@ -41,6 +42,8 @@ import com.letta.mobile.data.lanes.ConversationLaneProjection
 interface SessionRepositoryGraph {
     /** Session-owned activity/read state, independent of the view displaying it. */
     val conversationLanes: ConversationLaneProjection? get() = null
+    /** Foreground owners live for this trusted backend generation, independently of subscribers. */
+    val activeTurns: com.letta.mobile.data.presence.ActiveTurnSession? get() = null
     val id: Long
     val backendDescriptor: BackendDescriptor
     val agentRepository: IAgentRepository
@@ -91,6 +94,9 @@ interface SessionRepositoryGraphFactory<out Graph : SessionRepositoryGraph> {
 
 interface SessionRepositoryGraphProvider<Graph : SessionRepositoryGraph> {
     val currentGraph: StateFlow<Graph>
+    /** A projection of this provider's captured owners, with no independently retained lifetime. */
+    val activeTurnSessions: StateFlow<com.letta.mobile.data.presence.ActiveTurnSession?>
+        get() = com.letta.mobile.data.flow.DerivedStateFlow(currentGraph.map { it.activeTurns }) { current.activeTurns }
     val sessionError: StateFlow<Throwable?>
     val current: Graph
 

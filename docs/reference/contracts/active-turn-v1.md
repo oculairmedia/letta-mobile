@@ -178,3 +178,18 @@ Run/turn IDs may not exist on every transport frame; slice 2 must establish exac
 correlation before publishing, rather than infer identity from the current focus.
 Snapshot fences alone cannot replace retired-identity history. These are explicit
 implementation prerequisites, not guarantees supplied by this contract-only slice.
+
+## Slice 6 activation boundary
+
+Android and desktop provision conversation owners from the trusted shared session graph and use
+`ActiveTurnSession` for runtime-event correlation. The Iroh/direct Android channel taps events
+before presentation fan-out; presentation replacement never retires its owner. Bound registry
+phases are live projections of those owners. `TimelineRunState` stop flags and its interrupter
+remain the fallback for unbound callers, including web.
+
+Authoritative run readback is capability-gated: Android and desktop Iroh expose `RUNS`; desktop's
+direct WS/local route currently does not. That route retains its engine lifecycle path and does
+not claim authoritative process-recreation readback. A failed read never invents a terminal.
+Physical deletion tombstones the owner after acceptance; reversible archive/hide operations retain
+it so undo does not reanimate a permanently deleted lifecycle. Device rotation, process death and
+live reconnect acceptance still require host/device verification beyond the JVM fixtures.

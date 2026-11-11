@@ -44,6 +44,8 @@ data class IrohTurnRequest(
     val token: IrohTurnToken,
     val runId: IrohRunId,
     val agentId: IrohAgentId,
+    /** Stable outbound message identity, absent only for non-local turns. */
+    val localMessageId: com.letta.mobile.data.model.MessageId? = null,
 )
 
 data class IrohSendJobRegistration(

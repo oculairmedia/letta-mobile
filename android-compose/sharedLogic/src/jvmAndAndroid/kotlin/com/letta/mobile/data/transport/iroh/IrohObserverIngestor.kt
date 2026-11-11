@@ -60,6 +60,8 @@ internal class IrohObserverIngestor(
     /** How long the engine has to publish its own terminal before the observer's copy stands in. */
     private val observerTerminalGraceMs: Long = OBSERVER_TERMINAL_GRACE_MS,
 ) {
+    var onDraft: (com.letta.mobile.runtime.RuntimeEventDraft, com.letta.mobile.runtime.RunId) -> Unit = { _, _ -> }
+
     /** Observer terminal fallbacks waiting out their grace window, one per engine-owned turn. */
     private val pendingObserverTerminals = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private val observedTurns = ObservedTurnTracker<ConversationId>()
@@ -397,6 +399,7 @@ internal class IrohObserverIngestor(
         run: String?,
     ): List<ServerFrame> =
         observerMapper.map(observerTurnCommand(scope.agentId, scope.conversationId), received).flatMap { draft ->
+            turn?.let { onDraft(draft, com.letta.mobile.runtime.RunId(it)) }
             RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(
@@ -429,6 +432,7 @@ internal class IrohObserverIngestor(
     ) {
         val command = observerTurnCommand(scope.agentId, scope.conversationId)
         val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
+            onDraft(draft, com.letta.mobile.runtime.RunId(localTurn.logicalRunId))
             RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(

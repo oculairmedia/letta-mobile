@@ -24,47 +24,31 @@ class ProductionSelectedChatRuntimeProvider @Inject constructor(
     private val sessions: SessionManager,
     private val factory: AndroidCanonicalTimelineRuntimeFactory,
     private val settings: ISettingsRepository,
+    private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry,
 ) : SelectedChatRuntimeProvider {
     override fun runtimes(agentId: String): StateFlow<SelectedChatRuntime?> =
         SubscriberRuntimeFlow(sessions.currentGraph) { capture(it, AgentId(agentId)) }
 
     /** letta-mobile-by4vm.15: every backend (Iroh, ws://, local runtime) runs on the canonical ledger. */
     private fun capture(graph: SessionGraph, agent: AgentId): SelectedChatRuntime {
+        graph.activeTurns?.bindRegistry(runRegistry)
         val config = checkNotNull(graph.capturedConfig) { "Production graph has no captured config" }
-        return CapturedSelectedChatRuntime(graph, agent, factory, CapturedSettings(settings, config))
+        return CapturedSelectedChatRuntime(graph, agent, factory, CapturedSettings(settings, config), checkNotNull(graph.activeTurns))
     }
 }
 
-/** No detached sharing job: the ViewModel collector owns collection and final retirement. */
-@OptIn(InternalCoroutinesApi::class)
-internal class SubscriberRuntimeFlow<G>(
-    private val graphs: StateFlow<G>,
-    private val capture: (G) -> SelectedChatRuntime?,
-) : StateFlow<SelectedChatRuntime?> {
-    private var graph = graphs.value
-    private var runtime = capture(graph)
-    override val value: SelectedChatRuntime? get() = runtime
-    override val replayCache: List<SelectedChatRuntime?> get() = listOf(value)
-    override suspend fun collect(collector: FlowCollector<SelectedChatRuntime?>): Nothing {
-        graphs.collect { next ->
-            if (next !== graph) {
-                val captured = capture(next)
-                graph = next
-                runtime = captured
-            }
-            // The consumer drains its pipeline before retiring this handle, also in finally.
-            collector.emit(runtime)
-        }
-        error("Session graph StateFlow completed")
-    }
-}
+internal typealias SubscriberRuntimeFlow<G> = com.letta.mobile.data.flow.CapturedSessionFlow<G, SelectedChatRuntime>
 
 internal class ConversationBindHooks(
     var bind: suspend (String) -> AndroidCanonicalTimelineRuntime.Binding = {
         error("Conversation bind hooks not installed")
     },
     var retire: suspend () -> Unit = { error("Conversation retire hook not installed") },
+    var turns: com.letta.mobile.data.presence.ActiveTurnSession? = null,
+    var abort: (suspend (ConversationId, com.letta.mobile.data.presence.ActiveTurnIdentity) -> Boolean)? = null,
 )
+
+
 
 internal class CapturedSelectedChatRuntime(
     override val generation: Long,
@@ -79,6 +63,7 @@ internal class CapturedSelectedChatRuntime(
         agent: AgentId,
         factory: AndroidCanonicalTimelineRuntimeFactory,
         settings: ISettingsRepository,
+        turns: com.letta.mobile.data.presence.ActiveTurnSession,
     ) : this(
         generation = graph.id,
         config = checkNotNull(graph.capturedConfig),
@@ -95,6 +80,12 @@ internal class CapturedSelectedChatRuntime(
             )
         }
         hooks.retire = { runtime.retire() }
+        hooks.turns = turns
+        hooks.abort = { conversation, identity -> turns.serverRunId(conversation, identity)?.let { server ->
+            graph.channelTransport.activeTurnEvents?.abortExact(
+                agent, com.letta.mobile.runtime.ConversationId(conversation.value), com.letta.mobile.runtime.RunId(server),
+            ) == true
+        } ?: false }
     }
 
     private val job = SupervisorJob(parent.coroutineContext[Job])
@@ -115,7 +106,12 @@ internal class CapturedSelectedChatRuntime(
         // Private host: never mutate the singleton presentation router.
         val host = ChatPagingHost()
         binding(ConversationId(conversationId)).bindPresentation(host)
-        return checkNotNull(host.openCanonical).invoke(agent, conversationId, target, scope)
+        val conversation = ConversationId(conversationId)
+        hooks.turns?.reconcile(conversation, AgentId(agent))
+        return checkNotNull(host.openCanonical).invoke(agent, conversationId, target, scope).also { presentation ->
+            presentation.activeTurnCoordinator = hooks.turns?.owner(conversation, AgentId(agent))
+            presentation.abortActiveTurn = hooks.abort?.let { abort -> { identity -> abort(conversation, identity) } }
+        }
     }
 
     override val writer: TimelineExternalTransportWriter = SelectedRuntimeWriter(agent, pendingRetry) { conversation ->
@@ -127,6 +123,7 @@ internal class CapturedSelectedChatRuntime(
         job.cancelAndJoin()
     }
 }
+
 /** Every operation resolves only within this captured subscriber, including late terminal calls. */
 internal class SelectedRuntimeWriter(
     private val agent: String,

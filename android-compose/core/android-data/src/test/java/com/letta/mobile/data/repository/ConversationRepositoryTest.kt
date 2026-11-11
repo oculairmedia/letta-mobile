@@ -199,6 +199,7 @@ class ConversationRepositoryTest {
 
     @Test
     fun `deleteConversation removes optimistically`() = runTest {
+        assertTrue(repository.deletesPermanently)
         fakeApi.conversations.addAll(listOf(
             TestData.conversation(id = "1", agentId = "a1"),
             TestData.conversation(id = "2", agentId = "a1"),
@@ -288,6 +289,7 @@ class ConversationRepositoryTest {
             repositoryScope = repositoryScope,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
+        assertFalse(repository.deletesPermanently)
         database.conversationDao().upsert(
             ConversationEntity.fromConversation(httpThatThrows.conversations.single(), cachedAtEpochMs = 10L),
         )
