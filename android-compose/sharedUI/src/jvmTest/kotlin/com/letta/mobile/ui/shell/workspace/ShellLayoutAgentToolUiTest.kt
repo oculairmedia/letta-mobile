@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 
 package com.letta.mobile.ui.shell.workspace
 
@@ -8,9 +8,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -21,6 +26,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Dp
@@ -37,9 +45,34 @@ import com.letta.mobile.data.shell.layout.ShellLayoutConfig
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutTool
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.data.settings.SettingsRow
+import com.letta.mobile.ui.host.PASTE_BLOCKED_HINT
+import com.letta.mobile.ui.settings.SettingsHeader
+import com.letta.mobile.ui.settings.SettingsSection
+import com.letta.mobile.ui.settings.SettingsSectionTags
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatSessionPort
+import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.surface.ChatSurface
+import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.chat.surface.TOUCH_HEAD_TAG
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.ui.canvas.boards.CanvasBoardSource
 import com.letta.mobile.ui.canvas.boards.LocalCanvasBoardSource
 import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.LocalOverlayHost
+import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.OverlayHandle
+import com.letta.mobile.ui.host.OverlayHostRoot
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayPriority
+import com.letta.mobile.ui.host.rememberOverlayHost
+import kotlin.test.assertSame
 import com.letta.mobile.ui.settings.LocalShellLayoutReset
 import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
@@ -92,23 +125,30 @@ class ShellLayoutAgentToolUiTest {
         layout = ShellWorkspaceLayout(lanes = lanes),
     )
 
-    private fun host() = LettaShellWorkspaceHost(
+    private fun host(
+        onOverlay: (OverlayHost?) -> Unit = {},
+        drawerOpen: Boolean = true,
+        androidStyle: Boolean = false,
+        pageContent: @Composable () -> Unit = {},
+    ) = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
         slots = LettaShellWorkspaceSlots(
             main = { modifier ->
                 pageHomeLane = LocalHomeLane.current
+                onOverlay(LocalOverlayHost.current)
                 Box(modifier.testTag(Page)) {
+                    pageContent()
                     LocalShellLayoutReset.current?.let { reset ->
                         Text("Reset layout", Modifier.testTag(ResetProbe).clickable(onClick = reset))
                     }
                 }
             },
             agentCard = {},
-            sidePane = { Box(Modifier.width(HostPaneWidth).fillMaxHeight().testTag(HostPane)) },
+            sidePane = { if (!androidStyle) Box(Modifier.width(HostPaneWidth).fillMaxHeight().testTag(HostPane)) },
             overlays = {},
         ),
-        chrome = ShellWindowChrome.Hoisted {},
-        drawer = ShellWorkspaceDrawer().apply { open = true },
+        chrome = if (androidStyle) ShellWindowChrome.Inline else ShellWindowChrome.Hoisted {},
+        drawer = ShellWorkspaceDrawer().apply { open = drawerOpen },
         events = ShellWorkspaceEvents(),
     )
 
@@ -151,6 +191,193 @@ class ShellLayoutAgentToolUiTest {
 
     private fun assertDp(expected: Dp, actual: Dp, what: String) =
         assertEquals(expected.value, actual.value, absoluteTolerance = 1f, message = what)
+
+    @Test
+    fun settingsPasteHintUsesTheWorkspaceHostWithOrWithoutAWindowRoot() = listOf(false, true).forEach { outer ->
+        runDesktopComposeUiTest(width = 360, height = 800) {
+            val settings = InMemorySecureSettingsStore()
+            val clipboard = object : Clipboard {
+                override suspend fun getClipEntry(): ClipEntry? = error("clipboard read refused")
+                override suspend fun setClipEntry(clipEntry: ClipEntry?) = Unit
+            }
+            val shellHost = host(drawerOpen = false, androidStyle = true) {
+                SettingsSection(SettingsHeader("backend", "Backend")) {
+                    TextFieldRow(SettingsRow.Text("server-url", "Host address"), "draft", paste = true) {}
+                }
+            }
+            setContent {
+                CompositionLocalProvider(LocalClipboard provides clipboard, LocalShellLayoutAgentPort provides port) {
+                    val controller = rememberShellLayoutController(null, settings)
+                    val workspace: @Composable () -> Unit = {
+                        LettaShellWorkspace(state(controller.workspaceLayout().lanes), shellHost, Modifier.size(360.dp, WindowHeight))
+                    }
+                    if (outer) OverlayHostRoot(rememberOverlayHost()) { workspace() } else workspace()
+                }
+            }
+            waitForIdle()
+            onNodeWithTag(SettingsSectionTags.PASTE_PREFIX + "server-url").performClick()
+            awaitText(PASTE_BLOCKED_HINT)
+        }
+    }
+
+    @Test
+    fun noticeCanBeTouchedAboveFullScreenChatWithCanvas() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        val presentation = mutableStateOf(ChatSurfacePresentation.ChatFirst)
+        val chat = object : ChatSessionPort {
+            override val uiState = MutableStateFlow(ChatUiState(conversationState = ConversationState.Ready("conv-1"), agentName = "Ada"))
+            override val composer = MutableStateFlow(ChatComposerUiState())
+            override val actions = RecordingChatActions()
+        }
+        val host = host(drawerOpen = false, androidStyle = true) {
+            ProvideLettaHost(LettaHost.Touch) {
+                ChatSurface(
+                    port = chat,
+                    presentation = presentation.value,
+                    onIntent = {},
+                    host = ChatSurfaceHost(),
+                    canvas = { Box(Modifier.size(360.dp, WindowHeight)) },
+                )
+            }
+        }
+        setContent {
+            CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                val controller = rememberShellLayoutController(null, settings)
+                LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+            }
+        }
+        fun checkNotice() {
+            applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+            awaitText("Layout changed by Ada")
+            waitForIdle()
+            val undoBounds = onNodeWithText(Overlay.UNDO_LABEL).getUnclippedBoundsInRoot()
+            val pageBounds = onNodeWithTag(Page).getUnclippedBoundsInRoot()
+            assertTrue(undoBounds.left >= pageBounds.left && undoBounds.right <= pageBounds.right, "Undo is off screen: $undoBounds")
+            onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
+            waitForIdle()
+            assertEquals(HomeViews.Default, pageHomeLane)
+        }
+        waitForIdle()
+        checkNotice()
+        runOnIdle { presentation.value = ChatSurfacePresentation.CanvasFirst }
+        waitForIdle()
+        checkNotice()
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
+        waitForIdle()
+        checkNotice()
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
+        runOnIdle { presentation.value = ChatSurfacePresentation.ChatFirst }
+        waitForIdle()
+        checkNotice()
+    }
+
+    @Test
+    fun noticeIsDrawnOverAnOpenCompactDrawerAndItsUndoCanBePressed() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        val chat = object : ChatSessionPort {
+            override val uiState = MutableStateFlow(ChatUiState(conversationState = ConversationState.Ready("conv-1"), agentName = "Ada"))
+            override val composer = MutableStateFlow(ChatComposerUiState())
+            override val actions = RecordingChatActions()
+        }
+        // The compact shell with its drawer open over a chat page whose composer holds a snackbar slot.
+        val host = host(drawerOpen = true, androidStyle = true) {
+            ProvideLettaHost(LettaHost.Touch) {
+                ChatSurface(port = chat, presentation = ChatSurfacePresentation.ChatFirst, onIntent = {}, host = ChatSurfaceHost())
+            }
+        }
+        setContent {
+            CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                val controller = rememberShellLayoutController(null, settings)
+                LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+            }
+        }
+        waitForIdle()
+        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        awaitText("Layout changed by Ada")
+        waitForIdle()
+        // A real press at the button's place: the drawer's scrim takes it unless the notice is above it.
+        onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
+        waitForIdle()
+        assertEquals(HomeViews.Default, pageHomeLane, "Undo under the open drawer could not be pressed")
+    }
+
+    @Test
+    fun changeWhileWorkspaceIsAbsentIsOfferedWhenItReturns() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        val visible = mutableStateOf(false)
+        val host = host()
+        setContent {
+            CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                val controller = rememberShellLayoutController(null, settings)
+                if (visible.value) {
+                    LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+                }
+            }
+        }
+        waitForIdle()
+        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        runOnIdle { visible.value = true }
+        awaitText("Layout changed by Ada")
+        undo()
+        assertEquals(HomeViews.Default, pageHomeLane)
+    }
+
+    @Test
+    fun aQueuedNoticeRemainsUnseenUntilItReachesTheScreen() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        val visible = mutableStateOf(true)
+        val overlayHost = OverlayHost()
+        val host = host()
+        setContent {
+            OverlayHostRoot(overlayHost) {
+                CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                    val controller = rememberShellLayoutController(null, settings)
+                    if (visible.value) {
+                        LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+                    }
+                }
+            }
+        }
+        waitForIdle()
+        lateinit var blocker: OverlayHandle
+        runOnIdle {
+            blocker = overlayHost.show(Overlay.Snackbar("Important", presentation = OverlayPresentation(OverlayPriority.Critical, null)))
+        }
+        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        assertEquals("Important", overlayHost.snackbar?.overlay?.message)
+        assertTrue(port.peekUnseenChange() != null)
+        runOnIdle { visible.value = false }
+        waitForIdle()
+        assertTrue(overlayHost.waiting.isEmpty(), "the hidden workspace withdraws its queued notice")
+        runOnIdle { blocker.dismiss(); visible.value = true }
+        awaitText("Layout changed by Ada")
+        undo()
+        assertEquals(HomeViews.Default, pageHomeLane)
+    }
+
+    @Test
+    fun workspaceAndPageShareTheWindowOverlayQueue() = runDesktopComposeUiTest(width = 360, height = 800) {
+        val settings = InMemorySecureSettingsStore()
+        var window: OverlayHost? = null
+        var page: OverlayHost? = null
+        val host = host(onOverlay = { page = it })
+        setContent {
+            val outer = rememberOverlayHost()
+            window = outer
+            OverlayHostRoot(outer) {
+                CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                    val controller = rememberShellLayoutController(null, settings)
+                    LettaShellWorkspace(state(controller.workspaceLayout().lanes), host, Modifier.size(360.dp, WindowHeight))
+                }
+            }
+        }
+        waitForIdle()
+        assertSame(window, page, "the page and activity must use one window overlay queue")
+        applies("""{"op":"move","lane":"home","view":"home.recents","index":0}""")
+        awaitText("Layout changed by Ada")
+        undo()
+        assertEquals(HomeViews.Default, pageHomeLane)
+    }
 
     @Test
     fun anAgentReordersHomeAndTheNoticeOffersUndo() = Widths.forEach { width ->

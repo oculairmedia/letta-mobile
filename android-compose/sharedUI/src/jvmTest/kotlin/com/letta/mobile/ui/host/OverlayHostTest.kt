@@ -4,6 +4,7 @@ package com.letta.mobile.ui.host
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,6 +18,9 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -161,6 +165,26 @@ class OverlayHostTest {
         waitForIdle()
         onAllNodes(hasTestTag(OverlayTags.SNACKBAR)).fetchSemanticsNodes().let { assertEquals(1, it.size) }
         onNode(hasTestTag(OverlayTags.SNACKBAR) and hasAncestorTag(SLOT)).assertExists()
+    }
+
+    @Test
+    fun fullWidthSlotKeepsUndoAndDismissTouchable() = runComposeUiTest {
+        var undone = false
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalReducedMotion provides true) {
+                    OverlayHostRoot(host, Modifier.size(360.dp)) {
+                        OverlaySnackbarSlot(Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        }
+        runOnIdle { host.show(Overlay.undo("Layout changed by Ada", "layout", onUndo = { undone = true }, onCommit = {})) }
+        waitForIdle()
+        onNodeWithTag(OverlayTags.DISMISS).assertIsDisplayed()
+        onNodeWithText(Overlay.UNDO_LABEL).assertIsDisplayed().performTouchInput { click() }
+        waitForIdle()
+        assertTrue(undone)
     }
 
     @Test

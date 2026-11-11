@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -100,12 +101,21 @@ fun OverlayHostLayer(host: OverlayHost, modifier: Modifier = Modifier) {
 }
 
 /**
+ * Whether something modal covers the surfaces inside (the compact shell's open drawer). A covered
+ * [OverlaySnackbarSlot] stands down, so the window layer draws the snackbar over the cover, where its
+ * action can be reached. A lambda, so only the slots recompose when the answer changes.
+ */
+internal val LocalOverlaySnackbarSlotCovered = staticCompositionLocalOf<() -> Boolean> { { false } }
+
+/**
  * Where a surface wants the window's snackbar drawn (the chat page: above its composer). While
  * composed, the newest slot draws it instead of the window layer; the queue is still the window's.
+ * A slot under a modal cover ([LocalOverlaySnackbarSlotCovered]) leaves it to the window layer.
  */
 @Composable
 fun OverlaySnackbarSlot(modifier: Modifier = Modifier) {
     val host = LocalOverlayHost.current ?: return
+    if (LocalOverlaySnackbarSlotCovered.current()) return
     val id = remember(host) { host.slots.newId() }
     DisposableEffect(host, id) {
         host.slots.register(id)
@@ -159,7 +169,9 @@ private fun OverlaySnackbar(host: OverlayHost, modifier: Modifier) {
 private fun OverlaySnackbarCard(host: OverlayHost, entry: OverlayEntry) {
     val overlay = entry.overlay
     Snackbar(
-        modifier = Modifier.padding(LettaDimens.Space.md).widthIn(max = SnackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
+        // Slots may require the full width; do not pass that minimum to each snackbar action.
+        modifier = Modifier.wrapContentWidth().padding(LettaDimens.Space.md)
+            .widthIn(max = SnackbarMaxWidth).testTag(OverlayTags.SNACKBAR),
         action = overlay.action?.let { action ->
             { TextButton(onClick = { host.performAction(entry.id) }, Modifier.testTag(OverlayTags.ACTION)) { Text(action.label) } }
         },
