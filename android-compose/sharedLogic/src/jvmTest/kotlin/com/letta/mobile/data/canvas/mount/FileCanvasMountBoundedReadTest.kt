@@ -89,6 +89,27 @@ class FileCanvasMountBoundedReadTest {
     }
 
     @Test
+    fun aRecordWhoseLockEntriesWereLostIsStillReadAndWritable() = runBlocking {
+        // After a power cut on a host that cannot confirm directory entries (Windows), a record can
+        // survive while its stripe lock file, or the whole lock directory, does not.
+        val root = Files.createTempDirectory("mount-lost-locks")
+        val conversation = ConversationId("kept")
+        FileCanvasMountStore(root, host).bindIfAbsent(agent, conversation, CanvasId("board"))
+        val locks = root.resolve("canvas-mounts").resolve("locks")
+        lockFiles(root).forEach(Files::delete)
+        assertEquals(CanvasId("board"), FileCanvasMountStore(root, host).readBinding(agent, conversation))
+        lockFiles(root).forEach(Files::delete)
+        Files.delete(locks)
+        assertEquals(CanvasId("board"), FileCanvasMountStore(root, host).readBinding(agent, conversation))
+        FileCanvasMountStore(root, host).replaceBinding(agent, conversation, CanvasId("next"))
+        assertEquals(CanvasId("next"), FileCanvasMountStore(root, host).readBinding(agent, conversation))
+        // Recovery is for existing records only: an absent key still leaves nothing behind.
+        val before = lockFiles(root)
+        assertNull(FileCanvasMountStore(root, host).readBinding(agent, ConversationId("never-written")))
+        assertEquals(before, lockFiles(root))
+    }
+
+    @Test
     fun oversizedRecordIsRejectedBeforeDecodingAndWithoutResettingIt() = runBlocking {
         val root = Files.createTempDirectory("mount-record-bound")
         val store = FileCanvasMountStore(root, host)

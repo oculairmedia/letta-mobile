@@ -105,8 +105,11 @@ class FileCanvasMountStore internal constructor(
         require(attributes.isDirectory) { "Mount directory is not a directory" }
         val file = fileFor(agent, conversation)
         if (attributesOrNull(file.path) == null) return@withContext null
-        require(attributesOrNull(lockDirectory)?.isDirectory == true) { "Missing or invalid mount lock directory" }
-        file.locked(createLock = false) { read(file, agent, conversation)?.canvas?.let(::CanvasId) }
+        // A record exists, so a writer made its lock entries. Where the host cannot confirm directory
+        // entries (Windows) a power cut can leave the record without them: put them back instead of
+        // failing every later read of a valid binding. A read of an absent key still creates nothing.
+        ensureDirectory(lockDirectory)
+        file.locked { read(file, agent, conversation)?.canvas?.let(::CanvasId) }
     }
 
     private suspend fun <T> transaction(
