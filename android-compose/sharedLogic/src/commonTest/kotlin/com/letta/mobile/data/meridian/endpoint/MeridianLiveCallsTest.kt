@@ -85,6 +85,28 @@ class MeridianLiveCallsTest {
     }
 
     @Test
+    fun aCallAnnouncedAgainKeepsTheTokenItWasGiven() = runTest {
+        calls.observe(started(list))
+        val token = calls.issueToken("call-1")
+
+        // The hook rewrites the command to carry the token; the runtime may announce the call again.
+        calls.observe(started(ShellCall("call-1", "export LETTA_TOOL_TOKEN=x; meridian canvas list")))
+
+        assertEquals(MeridianLiveCall("call-1", SCOPE, 1), calls.claim(token!!))
+        assertNull(calls.issueToken("call-1"), "the call still has only its one token")
+    }
+
+    @Test
+    fun aCallIdReusedInAnotherConversationDoesNotInheritTheToken() = runTest {
+        calls.observe(started(list))
+        val token = calls.issueToken("call-1")
+
+        calls.observe(started(ShellCall("call-1", "meridian canvas list", scope = OTHER_CONVERSATION)))
+
+        assertNull(calls.claim(token!!))
+    }
+
+    @Test
     fun aTokenIsIssuedOnlyOncePerCall() = runTest {
         calls.observe(started(list))
 
