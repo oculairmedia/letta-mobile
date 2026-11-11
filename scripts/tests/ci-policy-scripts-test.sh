@@ -219,7 +219,15 @@ assert_contains "$test_job" "python3 -m unittest discover -s scripts/ci -p 'test
 assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'
 # A runner whose resolver is not ready must not fail the required job on unchanged code.
 assert_contains "$test_job" 'scripts/tests/apt-install-retry-test.sh'
-assert_contains "$test_job" 'bash scripts/ci/apt-install-retry.sh gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'
+# Workspace-rooted: these jobs default to working-directory android-compose, where a relative
+# scripts/ path does not exist (the first version of this step failed with "No such file").
+assert_contains "$test_job" 'bash "$GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh" gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth'
+for workflow in .github/workflows/android.yml .github/workflows/desktop.yml .github/workflows/release.yml; do
+  if grep -n 'apt-install-retry.sh' "$workflow" | grep -v 'apt-install-retry-test' | grep -qv 'GITHUB_WORKSPACE/scripts/ci/apt-install-retry.sh'; then
+    echo "FAIL: $workflow calls apt-install-retry.sh by a path relative to the job's working directory" >&2
+    exit 1
+  fi
+done
 assert_not_contains "$test_job" 'sudo apt-get install'
 assert_not_contains "$test_job" 'continue-on-error'
 # letta-mobile-l8lcn: every push to main runs the full additive test set.

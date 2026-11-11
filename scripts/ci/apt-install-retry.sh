@@ -1,38 +1,77 @@
 #!/usr/bin/env bash
 # apt-install-retry.sh <package...>
-# Installs build prerequisites on a CI runner, surviving a runner whose resolver is not ready yet.
-# A hosted runner has repeatedly started with DNS failing for the Ubuntu mirrors ("Temporary failure
-# resolving 'archive.ubuntu.com'"), which failed the required `test` job on unchanged code. This waits
-# for name resolution, retries the index update and the install with backoff, and fails loudly with the
-# real apt error if the mirrors stay unreachable. It never skips a package and never reports success
-# unless every requested package is installed.
+# Installs build prerequisites on a CI runner whose resolver cannot find the Ubuntu mirrors.
+# Hosted runners have failed the required `test` job on unchanged code with "Temporary failure resolving
+# 'archive.ubuntu.com'" for every Ubuntu mirror while other hosts resolved, for hours and across reruns.
+# So waiting is not enough: when the system resolver fails for a mirror, its address is looked up over
+# DNS-over-HTTPS by IP (no DNS needed) and pinned in /etc/hosts for this job, then apt is retried.
+# It never skips a package and never reports success unless apt installed every requested package.
 set -euo pipefail
 
 [ "$#" -gt 0 ] || { echo "usage: apt-install-retry.sh <package...>" >&2; exit 64; }
 
-ATTEMPTS="${APT_RETRY_ATTEMPTS:-5}"
-SLEEP_SECONDS="${APT_RETRY_SLEEP_SECONDS:-15}"
+ATTEMPTS="${APT_RETRY_ATTEMPTS:-4}"
+SLEEP_SECONDS="${APT_RETRY_SLEEP_SECONDS:-10}"
 APT_GET="${APT_GET:-sudo apt-get}"
-RESOLVE_HOST="${APT_RESOLVE_HOST:-archive.ubuntu.com}"
 RESOLVE="${APT_RESOLVE:-getent hosts}"
+PUBLIC_RESOLVE="${APT_PUBLIC_RESOLVE:-}"
+HOSTS_FILE="${APT_HOSTS_FILE:-/etc/hosts}"
+HOSTS_WRITE="${APT_HOSTS_WRITE:-sudo tee -a}"
+MIRRORS="${APT_MIRROR_HOSTS:-azure.archive.ubuntu.com archive.ubuntu.com security.ubuntu.com}"
 APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
 
 log() { echo "[apt-install-retry] $*" >&2; }
 
+# One IPv4 address for $1 from a public resolver reached by IP, or nothing.
+public_address() {
+  if [ -n "$PUBLIC_RESOLVE" ]; then $PUBLIC_RESOLVE "$1"; return; fi
+  python3 - "$1" <<'PY'
+import json, sys, urllib.request
+name = sys.argv[1]
+for server in ("1.1.1.1", "8.8.8.8"):
+    path = "dns-query" if server == "1.1.1.1" else "resolve"
+    request = urllib.request.Request(
+        f"https://{server}/{path}?name={name}&type=A", headers={"accept": "application/dns-json"})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            answers = json.load(response).get("Answer", [])
+    except Exception:
+        continue
+    addresses = [a["data"] for a in answers if a.get("type") == 1]
+    if addresses:
+        print(addresses[0])
+        break
+PY
+}
+
+# Pins every mirror the system resolver cannot find. Returns 0 when at least one was pinned.
+pin_unresolved_mirrors() {
+  local pinned=1 host address
+  for host in $MIRRORS; do
+    $RESOLVE "$host" >/dev/null 2>&1 && continue
+    address="$(public_address "$host" 2>/dev/null | head -n 1 || true)"
+    if [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "$address $host" | $HOSTS_WRITE "$HOSTS_FILE" >/dev/null
+      log "system resolver cannot find $host; pinned it to $address for this job"
+      pinned=0
+    else
+      log "system resolver cannot find $host and no public resolver answered"
+    fi
+  done
+  return $pinned
+}
+
 attempt=1
 while :; do
-  if ! $RESOLVE "$RESOLVE_HOST" >/dev/null 2>&1; then
-    log "attempt $attempt/$ATTEMPTS: cannot resolve $RESOLVE_HOST yet"
-  elif $APT_GET "${APT_OPTS[@]}" update && $APT_GET "${APT_OPTS[@]}" install -y "$@"; then
+  if $APT_GET "${APT_OPTS[@]}" update && $APT_GET "${APT_OPTS[@]}" install -y "$@"; then
     log "installed: $*"
     exit 0
-  else
-    log "attempt $attempt/$ATTEMPTS: apt failed"
   fi
+  log "attempt $attempt/$ATTEMPTS: apt failed"
   if [ "$attempt" -ge "$ATTEMPTS" ]; then
     log "giving up after $ATTEMPTS attempts; the runner could not reach the Ubuntu mirrors"
     exit 1
   fi
+  pin_unresolved_mirrors || sleep "$SLEEP_SECONDS"
   attempt=$((attempt + 1))
-  sleep "$SLEEP_SECONDS"
 done
