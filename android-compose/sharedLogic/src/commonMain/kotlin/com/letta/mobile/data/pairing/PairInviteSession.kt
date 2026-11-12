@@ -99,7 +99,7 @@ class PairInviteSession(
         _state.update { it.copy(selfNodeId = nodeId?.lowercase()) }
     }
 
-    fun revokeDevice(nodeId: String) = tracked(Tracked.DEVICE, nodeId, REVOKE_FAILED) { repository.revokeDevice(nodeId) }
+    fun revokeDevice(nodeId: String) = tracked(TrackedItem(Tracked.DEVICE, nodeId)) { repository.revokeDevice(nodeId) }
 
     /** "Revoke all other devices": every paired device except this one. Needs this device to be known. */
     fun revokeAllOthers() {
@@ -109,7 +109,7 @@ class PairInviteSession(
     }
 
     /** Cancel a pending invite (the on-screen one or one from the list). */
-    fun revokeInvite(inviteId: String) = tracked(Tracked.INVITE, inviteId, CANCEL_FAILED) {
+    fun revokeInvite(inviteId: String) = tracked(TrackedItem(Tracked.INVITE, inviteId)) {
         repository.revokeInvite(inviteId).also { revoked ->
             if (revoked && _state.value.invite?.inviteId == inviteId) {
                 _state.update { it.copy(invite = null, qr = null, cancelled = true) }
@@ -147,32 +147,41 @@ class PairInviteSession(
         }
     }
 
-    private enum class Tracked { DEVICE, INVITE }
+    /** Which kind of row a revoke/cancel targets, and what to tell the user if the host does not confirm it. */
+    private enum class Tracked(val failure: String) { DEVICE(REVOKE_FAILED), INVITE(CANCEL_FAILED) }
 
-    private fun PairInviteUiState.withTracked(kind: Tracked, id: String, on: Boolean): PairInviteUiState = when (kind) {
-        Tracked.DEVICE -> copy(revoking = if (on) revoking + id else revoking - id)
-        Tracked.INVITE -> copy(cancelling = if (on) cancelling + id else cancelling - id)
+    /** One in-flight revoke/cancel: the row kind plus its device NodeId or invite id. */
+    private data class TrackedItem(val kind: Tracked, val id: String)
+
+    private fun PairInviteUiState.markTracked(item: TrackedItem): PairInviteUiState = when (item.kind) {
+        Tracked.DEVICE -> copy(revoking = revoking + item.id)
+        Tracked.INVITE -> copy(cancelling = cancelling + item.id)
     }
 
-    private fun isTracked(kind: Tracked, id: String): Boolean = when (kind) {
-        Tracked.DEVICE -> id in _state.value.revoking
-        Tracked.INVITE -> id in _state.value.cancelling
+    private fun PairInviteUiState.unmarkTracked(item: TrackedItem): PairInviteUiState = when (item.kind) {
+        Tracked.DEVICE -> copy(revoking = revoking - item.id)
+        Tracked.INVITE -> copy(cancelling = cancelling - item.id)
     }
 
-    /** Run one revoke/cancel independently of [run]'s busy gate, marking [id] until the host answers. */
-    private fun tracked(kind: Tracked, id: String, failure: String, action: suspend () -> Boolean) {
-        if (isTracked(kind, id)) return
-        _state.update { it.withTracked(kind, id, on = true).copy(error = null) }
+    private fun isTracked(item: TrackedItem): Boolean = when (item.kind) {
+        Tracked.DEVICE -> item.id in _state.value.revoking
+        Tracked.INVITE -> item.id in _state.value.cancelling
+    }
+
+    /** Run one revoke/cancel independently of [run]'s busy gate, marking [item] until the host answers. */
+    private fun tracked(item: TrackedItem, action: suspend () -> Boolean) {
+        if (isTracked(item)) return
+        _state.update { it.markTracked(item).copy(error = null) }
         scope.launch {
             try {
-                if (!action()) _state.update { it.copy(error = failure) }
+                if (!action()) _state.update { it.copy(error = item.kind.failure) }
                 reload()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _state.update { it.copy(error = userMessage(error)) }
             } finally {
-                _state.update { it.withTracked(kind, id, on = false) }
+                _state.update { it.unmarkTracked(item) }
             }
         }
     }
