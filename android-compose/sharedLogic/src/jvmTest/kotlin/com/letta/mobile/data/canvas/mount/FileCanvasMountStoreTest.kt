@@ -28,6 +28,7 @@ import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -46,9 +47,9 @@ class FileCanvasMountStoreTest {
         val directory = Files.createTempDirectory("canvas-mounts-unsupported")
         val unsupportedSync: (Path) -> Unit = {}
         val store = FileCanvasMountStore(directory, host, unsupportedSync)
-        assertEquals(first, store.bindIfAbsent(agent, conversation, first))
-        store.replaceBinding(agent, conversation, second)
-        store.setDefault(agent, first)
+        assertEquals(first, store.bindIfAbsent(agent, conversation, first).durable())
+        assertEquals(second, store.replaceBinding(agent, conversation, second).durable())
+        assertEquals(first, store.setDefault(agent, first).durable())
         val reopened = FileCanvasMountStore(directory, host, unsupportedSync)
         assertEquals(second, reopened.readBinding(agent, conversation))
         assertEquals(first, reopened.readDefault(agent))
@@ -61,7 +62,7 @@ class FileCanvasMountStoreTest {
         assertNull(store.readBinding(agent, conversation))
         store.setDefault(agent, first)
         assertNull(store.readBinding(agent, conversation))
-        assertEquals(first, store.bindIfAbsent(agent, conversation, first))
+        assertEquals(first, store.bindIfAbsent(agent, conversation, first).durable())
         store.replaceBinding(agent, conversation, second)
         store.bindIfAbsent(agent, ConversationId("another"), first)
         store.setDefault(agent, second)
@@ -70,7 +71,7 @@ class FileCanvasMountStoreTest {
         assertEquals(second, reopened.readBinding(agent, conversation))
         assertEquals(first, reopened.readBinding(agent, ConversationId("another")))
         assertNull(reopened.readBinding(AgentId("another-agent"), conversation))
-        assertEquals(second, reopened.bindIfAbsent(agent, conversation, first))
+        assertEquals(second, reopened.bindIfAbsent(agent, conversation, first).durable())
     }
 
     @Test
@@ -86,7 +87,7 @@ class FileCanvasMountStoreTest {
         }
         val winners = (1..20).map { number ->
             async(Dispatchers.Default) {
-                FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, CanvasId("proposal-$number"))
+                FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, CanvasId("proposal-$number")).durable()
             }
         }.awaitAll()
         assertEquals(1, winners.distinct().size)
@@ -134,8 +135,8 @@ class FileCanvasMountStoreTest {
         for (text in fixtures) {
             Files.writeString(file, text)
             assertFailsWith<Exception> { store.readBinding(agent, conversation) }
-            assertFailsWith<Exception> { store.bindIfAbsent(agent, conversation, first) }
-            assertFailsWith<Exception> { store.replaceBinding(agent, conversation, first) }
+            store.bindIfAbsent(agent, conversation, first).notAppliedCause()
+            store.replaceBinding(agent, conversation, first).notAppliedCause()
             assertEquals(text, Files.readString(file))
             // A corrupt binding does not poison an independent default, or vice versa.
             Files.deleteIfExists(defaultFile)
@@ -143,7 +144,7 @@ class FileCanvasMountStoreTest {
             assertEquals(first, store.readDefault(agent))
             Files.writeString(defaultFile, text)
             assertFailsWith<Exception> { store.readDefault(agent) }
-            assertFailsWith<Exception> { store.setDefault(agent, first) }
+            store.setDefault(agent, first).notAppliedCause()
             assertEquals(text, Files.readString(defaultFile))
         }
     }
@@ -154,7 +155,7 @@ class FileCanvasMountStoreTest {
         val good = FileCanvasMountStore(directory, host)
         good.setDefault(agent, first)
         val failing = FileCanvasMountStore(directory, host) { throw IOException("before replacement") }
-        assertFailsWith<IOException> { failing.replaceBinding(agent, conversation, second) }
+        assertIs<IOException>(failing.replaceBinding(agent, conversation, second).notAppliedCause())
         good.setDefault(AgentId("other"), second)
         assertEquals(first, good.readDefault(agent))
         assertEquals(second, good.readDefault(AgentId("other")))
@@ -168,7 +169,7 @@ class FileCanvasMountStoreTest {
         val file = recordPath(directory, "default")
         val before = Files.readAllBytes(file)
         val failing = FileCanvasMountStore(directory, host) { throw UnsupportedOperationException("injected unsupported sync") }
-        assertFailsWith<UnsupportedOperationException> { failing.setDefault(agent, second) }
+        assertIs<UnsupportedOperationException>(failing.setDefault(agent, second).notAppliedCause())
         assertTrue(before.contentEquals(Files.readAllBytes(file)))
     }
 
@@ -181,11 +182,11 @@ class FileCanvasMountStoreTest {
             if (syncs.incrementAndGet() == 5) throw IOException("after replacement")
             forceDirectory(parent)
         }
-        assertFailsWith<IOException> { failing.bindIfAbsent(agent, conversation, first) }
+        assertEquals(CanvasMountMutation.OutcomeUnknown, failing.bindIfAbsent(agent, conversation, first))
         assertTrue(Files.exists(recordPath(directory, "binding")), "Real replacement must have happened")
         val other = FileCanvasMountStore(directory, host)
         other.setDefault(AgentId("other"), second)
-        assertEquals(first, failing.bindIfAbsent(agent, conversation, second))
+        assertEquals(CanvasMountMutation.Applied(first, written = false), failing.bindIfAbsent(agent, conversation, second))
         assertEquals(second, other.readDefault(AgentId("other")))
         assertTrue(syncs.get() >= 8, "Returning a winner must reconfirm parent, entry and stripe durability")
     }
@@ -195,7 +196,7 @@ class FileCanvasMountStoreTest {
         val directory = Files.createTempDirectory("canvas-mounts-retry")
         FileCanvasMountStore(directory, host).bindIfAbsent(agent, conversation, first)
         val failing = FileCanvasMountStore(directory, host) { throw IOException("durability unavailable") }
-        assertFailsWith<IOException> { failing.bindIfAbsent(agent, conversation, second) }
+        assertIs<IOException>(failing.bindIfAbsent(agent, conversation, second).notAppliedCause())
     }
 
     @Test
