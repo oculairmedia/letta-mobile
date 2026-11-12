@@ -130,6 +130,7 @@ class WireContractsTest {
         val inputs = mapOf(
             AdminRpcHostServices::class.java to setOf(
                 "controller", "subagentRegistrySource", "vibesyncBaseUrl", "beadsBaseUrl", "beadsTokenFile", "beadsRoutes", "pluginRoutes",
+                "canvasMountRoutes",
             ),
             AdminRpcNativeSources::class.java to setOf(
                 "nativeClient", "localBackendDir", "skillsListing", "slashCommands", "modelExposureFile", "wrapperRecords",
@@ -235,14 +236,7 @@ class WireContractsTest {
         try {
             runtime.start()
             val router = AdminRpcRegistry.buildRouter(
-                services = AdminRpcHostServices(
-                    controller = controller(state),
-                    subagentRegistrySource = rejectSubagentCalls(),
-                    vibesyncBaseUrl = "http://127.0.0.1:9",
-                    beadsBaseUrl = "http://127.0.0.1:9",
-                    beadsRoutes = beadsRoutes(),
-                    pluginRoutes = PluginAdminHandlers(runtime, InMemoryAssetStore()),
-                ),
+                services = fullServices(state, PluginAdminHandlers(runtime, InMemoryAssetStore()), dir),
                 pairing = AdminRpcPairing(
                     pairingService = IrohPairingService(InMemoryPairedPeerStore()),
                     pairingQr = PairingQrConfig(PairQrSigner { _, _, _ -> error("Unexpected QR mint") }, "0".repeat(64)),
@@ -275,6 +269,34 @@ class WireContractsTest {
             dir.deleteRecursively()
         }
     }
+
+    private fun fullServices(
+        state: AppServerControllerState,
+        pluginRoutes: AdminRpcRoutes,
+        dir: File,
+    ): AdminRpcHostServices = AdminRpcHostServices(
+        controller = controller(state),
+        subagentRegistrySource = rejectSubagentCalls(),
+        vibesyncBaseUrl = "http://127.0.0.1:9",
+        beadsBaseUrl = "http://127.0.0.1:9",
+        beadsRoutes = beadsRoutes(),
+        pluginRoutes = pluginRoutes,
+        canvasMountRoutes = canvasMountRoutes(dir),
+    )
+
+    /** The real canvas mount routes under a secure policy; no fixture may reach the host's records. */
+    private fun canvasMountRoutes(dir: File): AdminRpcRoutes = com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountRoutes(
+        com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,
+        com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountStoreLocation(
+            File(dir, "product-state").apply { mkdirs() }.toPath(),
+            com.letta.mobile.data.model.HostId("contract-host"),
+        ),
+        com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountSources(
+            com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountGrants(File(dir, "canvas-grants.json").toPath()),
+            rejectCalls("canvas mount directory"),
+        ),
+        com.letta.mobile.data.controller.node.iroh.mounts.TEST_CALL_SCOPE,
+    )
 
     private fun rejectSubagentCalls(): SubagentRegistrySource = object : SubagentRegistrySource {
         override suspend fun list(conversationId: String, includeTerminal: Boolean) = error("Unexpected subagent read")

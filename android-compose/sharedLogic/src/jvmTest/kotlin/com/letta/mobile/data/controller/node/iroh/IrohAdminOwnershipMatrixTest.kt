@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrix.requiredString
 import com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrix.stringSet
 import kotlin.test.Test
@@ -42,14 +43,19 @@ class IrohAdminOwnershipMatrixTest {
         )
         val registered = router.registeredMethods
         val allDeclared = operations.map { it.requiredString("method") }.toSet()
-        val declared = allDeclared.filterNot { it.startsWith("beads.") }.toSet()
+        val declared = allDeclared.filterNot { it.startsWith("beads.") || it in CanvasMountWire.METHODS }.toSet()
 
         assertEquals(operations.size, allDeclared.size, "Duplicate method rows in the ownership matrix")
         assertEquals(
             com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes.reads.keys +
                 com.letta.mobile.data.controller.node.iroh.beads.BeadsRoutes.writes.keys,
-            allDeclared - declared,
+            allDeclared.filter { it.startsWith("beads.") }.toSet(),
             "Conditional Beads routes must all have ownership decisions",
+        )
+        assertEquals(
+            CanvasMountWire.METHODS,
+            allDeclared.filter { it.startsWith("canvas.mount.") }.toSet(),
+            "Conditional canvas mount routes must all have ownership decisions",
         )
         assertEquals(
             emptySet(),
