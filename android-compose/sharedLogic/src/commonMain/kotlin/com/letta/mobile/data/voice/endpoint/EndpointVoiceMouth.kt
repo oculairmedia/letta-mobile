@@ -28,6 +28,10 @@ import kotlinx.coroutines.launch
  * which keeps gaps short when synthesis is faster than realtime. A synthesis or playback failure
  * reports [VoiceMouthEvent.Failed] for its segment with the endpoint's code and drops the rest of the queue.
  *
+ * The pipeline (its two workers in [scope]) starts with the first segment after construction or
+ * after a stop, and [stop] ends it without starting another: an unused or stopped mouth runs no
+ * coroutine, so stopping is also the mouth's final teardown.
+ *
  * Call [speak], [flush] and [stop] from one coroutine at a time (the loop's).
  */
 class EndpointVoiceMouth(
@@ -36,12 +40,13 @@ class EndpointVoiceMouth(
     private val scope: CoroutineScope,
 ) : VoiceMouth {
     private val mutableEvents = MutableSharedFlow<VoiceMouthEvent>(extraBufferCapacity = EVENT_BUFFER)
-    private var pipeline = MouthPipeline()
+    private var pipeline: MouthPipeline? = null
 
     override val events: SharedFlow<VoiceMouthEvent> = mutableEvents.asSharedFlow()
 
     override fun speak(segment: SpeechSegment) {
-        pipeline.texts.trySend(segment)
+        val current = pipeline ?: MouthPipeline().also { pipeline = it }
+        current.texts.trySend(segment)
     }
 
     /** Segments are synthesised as they arrive, so there is nothing buffered to push. */
@@ -53,9 +58,10 @@ class EndpointVoiceMouth(
      */
     internal fun eventBufferFull(): Boolean = !mutableEvents.tryEmit(VoiceMouthEvent.OutputLevel(AudioLevel.Silent))
 
+    /** Ends the current pipeline, if any, and waits until its workers have finished; starts nothing. */
     override suspend fun stop() {
-        val stopping = pipeline
-        pipeline = MouthPipeline()
+        val stopping = pipeline ?: return
+        pipeline = null
         stopping.job.cancelAndJoin()
     }
 
@@ -63,7 +69,7 @@ class EndpointVoiceMouth(
     private class PipelineFailure(val error: Throwable, val id: SpeechSegmentId, val fallback: VoiceErrorCode)
 
     /**
-     * One generation of queue, prefetch and playback; [stop] replaces it whole. A failure in either
+     * One generation of queue, prefetch and playback; [stop] ends it whole. A failure in either
      * worker reports once, then cancels both workers and drops every pending segment and clip, so
      * nothing is synthesised or played after the failure.
      */

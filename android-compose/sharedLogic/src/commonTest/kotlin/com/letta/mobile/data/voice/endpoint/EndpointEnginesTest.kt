@@ -133,9 +133,26 @@ class EndpointEnginesTest {
         assertTrue(requests >= 1)
     }
 
-    private fun TestScope.mouth(player: AudioPlayer): EndpointVoiceMouth {
+    private fun TestScope.mouth(player: AudioPlayer): EndpointVoiceMouth =
+        EndpointVoiceMouth(synthesizer(), player, backgroundScope + Dispatchers.Default)
+
+    private fun synthesizer(): EndpointSpeechSynthesizer {
         val granted = grants(VoiceEndpointGrant(origin, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS))
-        return EndpointVoiceMouth(EndpointSpeechSynthesizer(client(), { granted }, settings), player, backgroundScope + Dispatchers.Default)
+        return EndpointSpeechSynthesizer(client(), { granted }, settings)
+    }
+
+    @Test
+    fun stoppingTheMouthStartsNoWorkersAndLeavesNoneBehind() = runTest {
+        val owner = Job(backgroundScope.coroutineContext[Job])
+        val mouth = EndpointVoiceMouth(synthesizer(), GatedPlayer(), backgroundScope + owner)
+        testScheduler.runCurrent()
+        assertEquals(emptyList(), owner.children.toList(), "an unused mouth runs nothing")
+        mouth.stop()
+        assertEquals(emptyList(), owner.children.toList(), "stopping an unused mouth starts nothing")
+        mouth.speak(SpeechSegment(SpeechSegmentId(1), VoiceText("One.")))
+        assertEquals(1, owner.children.count())
+        mouth.stop()
+        assertEquals(emptyList(), owner.children.toList(), "a stopped mouth leaves no worker behind")
     }
 
     private class RecordingPlayer : AudioPlayer {
