@@ -51,6 +51,25 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorCleanupTest {
     @Test
+    fun `queued outbox validation failure is surfaced once and never retried`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(MutableList(1_000) { false })
+        val coordinator = coordinator(timeline, ui, transport, scope = backgroundScope)
+        coordinator.send("over budget").join()
+        var admissions = 0
+        timeline.beforeAcceptance = {
+            admissions++
+            throw IllegalArgumentException("Outbox byte budget exceeded")
+        }
+        advanceTimeBy(60_001)
+        assertEquals(1, admissions)
+        assertEquals("Couldn’t save this message. Dismiss an unsent message or try a smaller message.", ui.currentError())
+        assertTrue(coordinator.sendQueue.state.value.values.all { it.items.isEmpty() })
+        assertTrue(timeline.externalLocals.isEmpty())
+    }
+
+    @Test
     fun `transport reconnect wakes queued head without waiting for backoff`() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val transport = FakeChannelTransport(MutableList(1_000) { false })
@@ -1408,6 +1427,16 @@ class ChatSendCoordinatorCleanupTest {
         private val ingestFailure: Throwable? = null,
         private val terminalTrace: MutableList<String> = mutableListOf(),
     ) : TimelineExternalTransportWriter {
+        var beforeAcceptance: () -> Unit = {}
+        override suspend fun acceptPendingSend(
+            attempt: com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt,
+            content: String,
+            attachments: List<MessageContentPart.Image>,
+            accept: () -> Boolean,
+        ): Boolean {
+            beforeAcceptance()
+            return accept()
+        }
         var beforeSettlementWrite: suspend (SettlementWrite) -> Unit = {}
         val settlementWrites = mutableListOf<SettlementWrite>()
         val activeConversations = mutableSetOf<String>()

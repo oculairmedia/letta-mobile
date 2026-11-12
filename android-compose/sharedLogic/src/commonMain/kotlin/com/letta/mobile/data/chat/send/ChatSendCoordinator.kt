@@ -451,7 +451,9 @@ class ChatSendCoordinator(
             throw cancelled
         } catch (failure: Exception) {
             val queueOwnsSend = queuedSends.queueFor(pending.conversationId).items.any { it.id == pending.id }
-            if (pending.attempt > 0 || queueOwnsSend) throw failure
+            // Pending-store require checks (identity, row and byte budgets) cannot heal on retry.
+            // Keep transport/state failures retryable, but surface invalid admission immediately.
+            if (failure !is IllegalArgumentException && (pending.attempt > 0 || queueOwnsSend)) throw failure
             Telemetry.error("AdminChatVM", "ws.send.pendingRejected", failure)
             foreground.sendFailed(ConversationId(pending.conversationId.value),
                 "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
