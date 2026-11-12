@@ -4,23 +4,45 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.ui.chat.render.ChatUiState
 
+/** The sent utterance's row, by row id and by client message id (which survives confirmation). */
+private data class AnchorIdentity(val rowId: String, val clientRow: String?) {
+    fun matches(message: UiMessage): Boolean = message.id == rowId || message.clientMessageId == (clientRow ?: rowId)
+}
+
 /**
- * Follows one run's assistant text in successive chat states. The utterance is anchored as the
- * first user message absent from [start]; the reply is the assistant text after it, from the run
- * of the first such message. Not thread-safe: one tracker serves one reply's collection.
+ * Follows the run that answers one sent utterance, in successive chat states.
+ *
+ * The utterance is anchored as the first user row that was not in [start], matched later by row id
+ * or client message id (a pending row's id changes when the server confirms it). Runs seen before
+ * the send, or in rows before the anchor, are earlier runs; their late rows are never spoken.
+ *
+ * The session-wide in-flight flag is trusted only once the utterance's own run is evident: a row
+ * of a new run after the anchor, or a run starting after the session was idle with the anchor
+ * present. A confirmed anchor with nothing in flight means the run already ended (perhaps with no
+ * text). Not thread-safe: one tracker serves one reply's collection.
  */
 internal class ChatReplyTracker(start: ChatUiState) {
-    private val baseline: Set<String> = start.messages.mapTo(HashSet()) { it.id }
+    private val baseline: Set<String> = start.messages.flatMapTo(HashSet()) { listOfNotNull(it.id, it.clientMessageId) }
+    private val earlierRuns: MutableSet<String> = start.messages.mapNotNullTo(HashSet()) { it.runId }
     private val agent: String? = start.agentId
     private val spokenLengths = mutableMapOf<String, Int>()
-    private var anchor: String? = null
+    private var anchor: AnchorIdentity? = null
     private var run: String? = null
+    private var idleSinceAnchor = false
+    private var ownRunSeen = false
 
-    /** The utterance is in the conversation and its run has started (or already answered). */
+    /** The utterance's own run has started, or already ended. */
     fun delivered(state: ChatUiState): Boolean {
-        if (anchorIndex(state) < 0) return false
-        return state.isRunInFlight || replies(state).isNotEmpty()
+        val index = observe(state)
+        return when {
+            index < 0 -> false
+            ownRunSeen -> true
+            else -> !state.messages[index].isPending && !state.isRunInFlight
+        }
     }
+
+    /** Delivery is decided either way: delivered, or the conversation moved to another agent. */
+    fun settled(state: ChatUiState): Boolean = delivered(state) || agentChanged(state)
 
     /** The conversation now belongs to another agent. */
     fun agentChanged(state: ChatUiState): Boolean = agent != null && state.agentId != agent
@@ -30,8 +52,20 @@ internal class ChatReplyTracker(start: ChatUiState) {
 
     /** The assistant text added since the last call, or null when nothing new arrived. */
     fun advance(state: ChatUiState): VoiceText? {
+        observe(state)
         val pieces = replies(state).mapNotNull(::newText)
         return if (pieces.isEmpty()) null else VoiceText(pieces.joinToString(""))
+    }
+
+    /** Updates what is known about the utterance's run from [state]; returns the anchor's index or -1. */
+    private fun observe(state: ChatUiState): Int {
+        val index = anchorIndex(state)
+        if (index < 0) return index
+        state.messages.subList(0, index).mapNotNullTo(earlierRuns) { it.runId }
+        if (afterAnchor(state).any { it.isOwnRun() }) ownRunSeen = true
+        if (!state.isRunInFlight) idleSinceAnchor = true
+        if (state.isRunInFlight && idleSinceAnchor) ownRunSeen = true
+        return index
     }
 
     private fun newText(message: UiMessage): String? {
@@ -44,10 +78,12 @@ internal class ChatReplyTracker(start: ChatUiState) {
     }
 
     private fun replies(state: ChatUiState): List<UiMessage> {
-        val texts = afterAnchor(state).filter { it.isSpokenText() }
+        val texts = afterAnchor(state).filter { it.isSpokenText() && it.isOwnRun() }
         if (run == null) run = texts.firstOrNull()?.runId
         return texts.filter { it.belongsTo(run) }
     }
+
+    private fun UiMessage.isOwnRun(): Boolean = runId?.let { it !in earlierRuns } ?: false
 
     private fun UiMessage.belongsTo(expected: String?): Boolean = when {
         runId == null -> true
@@ -61,12 +97,13 @@ internal class ChatReplyTracker(start: ChatUiState) {
     }
 
     private fun anchorIndex(state: ChatUiState): Int {
-        val known = anchor
-        if (known != null) return state.messages.indexOfFirst { it.id == known }
-        val index = state.messages.indexOfFirst { it.role == USER_ROLE && it.id !in baseline }
-        if (index >= 0) anchor = state.messages[index].id
+        anchor?.let { known -> return state.messages.indexOfFirst(known::matches) }
+        val index = state.messages.indexOfFirst { it.role == USER_ROLE && it.isNew() }
+        if (index >= 0) anchor = state.messages[index].let { AnchorIdentity(it.id, it.clientMessageId) }
         return index
     }
+
+    private fun UiMessage.isNew(): Boolean = id !in baseline && (clientMessageId ?: id) !in baseline
 
     private fun UiMessage.isSpokenText(): Boolean = when {
         role != ASSISTANT_ROLE -> false

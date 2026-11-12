@@ -89,6 +89,15 @@ enum class VoiceErrorCode(
     /** An optional asset (wake-word or voice-activity model) is missing; voice keeps working without it. */
     ASSET_MISSING(VoiceUserAction.NONE),
 
+    /** A bearer key would travel over an unencrypted connection (plain http to a non-loopback host); nothing was sent. */
+    INSECURE_TRANSPORT(VoiceUserAction.OPEN_SETTINGS),
+
+    /** The engine is already in use (a second concurrent listener); the running one is unaffected. */
+    BUSY(VoiceUserAction.NONE),
+
+    /** The capture offered for a retry is no longer held by the ear. */
+    CAPTURE_EXPIRED(VoiceUserAction.NONE),
+
     /** An audio source produces a format the engine does not accept; nothing resamples it. */
     UNSUPPORTED_FORMAT(VoiceUserAction.NONE),
 

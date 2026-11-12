@@ -28,6 +28,7 @@ internal object Transitions {
             speech = SpeechQueue(nextId = model.speech.nextId),
             late = LateState(),
             view = model.view.copy(speaking = null, outputLevel = AudioLevel.Silent, failure = failure),
+            pendingRetry = null,
         )
         return Step(halted, effects)
     }
@@ -48,14 +49,18 @@ internal object Transitions {
         return Step(model.copy(speech = speech), listOf(LoopEffect.Speak(SpeechSegment(id, text))))
     }
 
-    /** Queues every text in [texts] and moves to speaking. */
+    /**
+     * Queues every text in [texts], moves to speaking and flushes: these texts are complete (late
+     * replies, held text), so a buffering mouth must not wait for more.
+     */
     fun speakAll(model: LoopModel, texts: List<VoiceText>): Step =
         texts.fold(Step(model.copy(phase = VoicePhase.SPEAKING))) { step, text ->
             val next = speak(step.model, text)
             Step(next.model, step.effects + next.effects)
-        }
+        } + listOf(LoopEffect.FlushMouth)
 
-    private fun speakHeld(model: LoopModel): Step =
+    /** Speaks the late text held while the person was speaking. */
+    fun speakHeld(model: LoopModel): Step =
         speakAll(model.copy(late = model.late.copy(held = emptyList())), model.late.held)
 
     /**
@@ -71,6 +76,7 @@ internal object Transitions {
         val turn = model.turn.copy(
             active = null,
             replyOpen = false,
+            textArrived = false,
             pendingFailure = null,
             interrupting = model.turn.interrupting + listOfNotNull(active),
         )

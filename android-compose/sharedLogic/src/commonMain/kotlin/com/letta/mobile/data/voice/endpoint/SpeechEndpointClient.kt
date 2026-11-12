@@ -24,9 +24,12 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -36,6 +39,11 @@ import kotlinx.serialization.json.put
 /**
  * An OpenAI-compatible speech client: `POST {base}/v1/audio/transcriptions` and
  * `POST {base}/v1/audio/speech`.
+ *
+ * A configured bearer key is sent only over https, or over plain http to a loopback host
+ * (`localhost`, `127.0.0.0/8`, `::1`). Plain http to any other host, private LAN addresses
+ * included, is refused with [VoiceErrorCode.INSECURE_TRANSPORT] before anything is sent: a LAN is
+ * not an encrypted transport. Use https, or reach the server through a loopback tunnel.
  *
  * It builds its own isolated client on the supplied [engine] (no logging, no redirects, no shared
  * auth), sends the bearer key only when one is configured, and maps every failure to a
@@ -61,6 +69,7 @@ class SpeechEndpointClient(
 
     /** Transcribes [request]'s audio and returns the text. */
     suspend fun transcribe(request: TranscriptionRequest): VoiceText = call(SpeechOperation.TRANSCRIPTION) {
+        requireProtectedTransport(SpeechOperation.TRANSCRIPTION)
         val response = client.post(url(TRANSCRIPTIONS_PATH)) {
             authorize()
             setBody(transcriptionBody(request))
@@ -72,6 +81,7 @@ class SpeechEndpointClient(
     /** Synthesises [request], handing the audio to [onChunk] as it streams in. */
     suspend fun synthesize(request: SpeechRequest, onChunk: suspend (AudioChunk) -> Unit) {
         call(SpeechOperation.SPEECH) {
+            requireProtectedTransport(SpeechOperation.SPEECH)
             client.preparePost(url(SPEECH_PATH)) {
                 authorize()
                 setBody(TextContent(speechBody(request), ContentType.Application.Json))
@@ -91,9 +101,18 @@ class SpeechEndpointClient(
         return AudioClip(bytes, request.encoding)
     }
 
-    /** Closes the client and cancels its requests. */
+    /** Cancels the requests in flight and closes the client. */
     fun close() {
+        client.coroutineContext.cancel()
         client.close()
+    }
+
+    /** Refuses to send the bearer key unless the transport protects it. */
+    private fun requireProtectedTransport(operation: SpeechOperation) {
+        if (config.apiKey == null) return
+        if (!SpeechTransportPolicy.protectsKey(config.baseUrl)) {
+            throw SpeechEndpointException(operation, VoiceErrorCode.INSECURE_TRANSPORT)
+        }
     }
 
     private fun url(path: String): String = config.baseUrl.value.trimEnd('/') + path
@@ -193,4 +212,22 @@ internal object SpeechStatusCodes {
         in timedOut -> VoiceErrorCode.TIMED_OUT
         else -> VoiceErrorCode.REJECTED
     }
+}
+
+/** Which endpoints may receive a bearer key. */
+internal object SpeechTransportPolicy {
+    private val loopbackNames = setOf("localhost", "::1", "[::1]")
+    private const val LOOPBACK_V4_PREFIX = "127."
+
+    /** True for https, and for plain http to a loopback host. */
+    fun protectsKey(url: SpeechEndpointUrl): Boolean {
+        val parsed = runCatching { Url(url.value) }.getOrNull() ?: return false
+        return when (parsed.protocol) {
+            URLProtocol.HTTPS -> true
+            URLProtocol.HTTP -> isLoopback(parsed.host.lowercase())
+            else -> false
+        }
+    }
+
+    private fun isLoopback(host: String): Boolean = host in loopbackNames || host.startsWith(LOOPBACK_V4_PREFIX)
 }

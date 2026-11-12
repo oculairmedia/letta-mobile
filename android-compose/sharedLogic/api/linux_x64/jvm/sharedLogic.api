@@ -70903,8 +70903,11 @@ public final class com/letta/mobile/data/voice/VoiceError {
 public final class com/letta/mobile/data/voice/VoiceErrorCode : java/lang/Enum {
 	public static final field ASSET_MISSING Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field BAD_RESPONSE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field BUSY Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field CANCELLED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field CAPTURE_EXPIRED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field ENGINE_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field INSECURE_TRANSPORT Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field NOT_DELIVERED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field PERMISSION_REQUIRED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field PLAYBACK_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
@@ -71364,7 +71367,6 @@ public final class com/letta/mobile/data/voice/audio/AudioEncoding : java/lang/E
 	public static final field FLAC Lcom/letta/mobile/data/voice/audio/AudioEncoding;
 	public static final field MP3 Lcom/letta/mobile/data/voice/audio/AudioEncoding;
 	public static final field OPUS Lcom/letta/mobile/data/voice/audio/AudioEncoding;
-	public static final field PCM Lcom/letta/mobile/data/voice/audio/AudioEncoding;
 	public static final field WAV Lcom/letta/mobile/data/voice/audio/AudioEncoding;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getMimeType ()Ljava/lang/String;
@@ -71747,12 +71749,14 @@ public abstract interface class com/letta/mobile/data/voice/engine/VoiceMouthEve
 }
 
 public final class com/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed : com/letta/mobile/data/voice/engine/VoiceMouthEvent {
-	public fun <init> (Lcom/letta/mobile/data/voice/VoiceError;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceError;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceError;
-	public final fun copy (Lcom/letta/mobile/data/voice/VoiceError;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;Lcom/letta/mobile/data/voice/VoiceError;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;
+	public final fun component2-N_zLtOA ()J
+	public final fun copy-gyNZfHs (Lcom/letta/mobile/data/voice/VoiceError;J)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;
+	public static synthetic fun copy-gyNZfHs$default (Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;Lcom/letta/mobile/data/voice/VoiceError;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getError ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun getId-N_zLtOA ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -71870,6 +71874,7 @@ public final class com/letta/mobile/data/voice/loop/VoiceLoop {
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun onKey (Lcom/letta/mobile/data/voice/activation/KeyDecision;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)V
 	public final fun retryCapture ()V
+	public final fun shutdown (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun stop ()V
 }
 

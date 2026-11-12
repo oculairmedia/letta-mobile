@@ -114,6 +114,26 @@ internal class SoftCut(private val max: Int) {
         return if (space > 0) space + 1 else max
     }
 
+    /**
+     * The position after the last whitespace in [text] that lies outside brackets and parentheses,
+     * so a cut never splits a markdown link or its URL; null when there is none.
+     */
+    fun lastSafeBreak(text: CharSequence): Int? {
+        var depth = 0
+        var last: Int? = null
+        text.forEachIndexed { index, char ->
+            depth = (depth + char.nesting()).coerceAtLeast(0)
+            if (depth == 0 && char.isWhitespace()) last = index + 1
+        }
+        return last
+    }
+
+    private fun Char.nesting(): Int = when (this) {
+        '[', '(' -> 1
+        ']', ')' -> -1
+        else -> 0
+    }
+
     private companion object {
         val ClauseBreaks = setOf(',', ';', ':')
     }

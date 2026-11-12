@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 
 /** Whether the listener is running. */
 enum class WakeListenerState {
@@ -71,7 +72,8 @@ data class WakeWordListenerConfig(
  * hits: per-phrase sensitivity, a cooldown after each hit, suppression while the app speaks and for
  * a tail after, then the policy's confirmer.
  *
- * Collecting [events] starts listening; cancelling the collection stops it, and the collection does
+ * Collecting [events] starts listening; [WakeWordEvent.Listening] is reported once the first frame
+ * arrives (the source is open). Cancelling the collection stops it, and the collection does
  * not complete until the frame source is released and the session closed. With no usable engine the
  * frame source is never opened. Phrase changes ([setPhrases]) apply live, without reopening.
  */
@@ -81,23 +83,47 @@ class WakeWordListener(
     private val config: WakeWordListenerConfig = WakeWordListenerConfig(),
 ) {
     private val phrases = MutableStateFlow<List<WakePhrase>>(emptyList())
-    private val appSpeaking = MutableStateFlow(false)
+    private val appSpeech = MutableStateFlow(AppSpeech())
     private val mutableState = MutableStateFlow(WakeListenerState.STOPPED)
+    private val running = MutableStateFlow(false)
 
     /** Whether the listener is running. */
     val state: StateFlow<WakeListenerState> = mutableState.asStateFlow()
 
-    /** Detections and lifecycle while collected. */
-    val events: Flow<WakeWordEvent> = flow { run() }
-
-    /** The phrases to listen for; applied at the next frame. */
-    fun setPhrases(list: List<WakePhrase>) {
-        phrases.value = list
+    /**
+     * Detections and lifecycle while collected. One collection runs at a time: a second concurrent
+     * collection receives [WakeWordEvent.Unavailable] with [VoiceErrorCode.BUSY] at once and opens
+     * nothing, leaving the running one and [state] untouched.
+     */
+    val events: Flow<WakeWordEvent> = flow {
+        if (!running.compareAndSet(expect = false, update = true)) {
+            emit(WakeWordEvent.Unavailable(VoiceError(VoiceErrorCode.BUSY, VoicePort.ACTIVATION)))
+            return@flow
+        }
+        try {
+            run()
+        } finally {
+            running.value = false
+        }
     }
 
-    /** Whether the app's own speech is playing (from the voice loop), for suppression. */
+    /** The phrases to listen for (copied); applied at the next frame. */
+    fun setPhrases(list: List<WakePhrase>) {
+        phrases.value = list.toList()
+    }
+
+    /**
+     * Whether the app's own speech is playing (from the voice loop), for suppression. A start and a
+     * stop between two frames still begin the echo tail.
+     */
     fun setAppSpeaking(speaking: Boolean) {
-        appSpeaking.value = speaking
+        appSpeech.update { current ->
+            when {
+                !speaking -> current.copy(speaking = false)
+                current.speaking -> current
+                else -> AppSpeech(speaking = true, episode = current.episode + 1)
+            }
+        }
     }
 
     private suspend fun FlowCollector<WakeWordEvent>.run() {
@@ -113,8 +139,6 @@ class WakeWordListener(
             if (source.format != selection.binding.engine.descriptor.format) {
                 return unavailable(VoiceErrorCode.UNSUPPORTED_FORMAT, selection.skipped)
             }
-            mutableState.value = WakeListenerState.LISTENING
-            emit(WakeWordEvent.Listening)
             val run = ListenRun(session, source.format, config.policy)
             val outcome = runCatching { source.frames().collect { frame -> process(run, frame) } }
             val error = outcome.exceptionOrNull()
@@ -128,8 +152,13 @@ class WakeWordListener(
         }
     }
 
+    /** The first frame proves the source is open: only then is the listener reported as listening. */
     private suspend fun FlowCollector<WakeWordEvent>.process(run: ListenRun, frame: AudioFrame) {
-        run.onFrame(frame, phrases.value, appSpeaking.value).forEach { emit(it) }
+        if (mutableState.value != WakeListenerState.LISTENING) {
+            mutableState.value = WakeListenerState.LISTENING
+            emit(WakeWordEvent.Listening)
+        }
+        run.onFrame(frame, ListenInput(phrases.value, appSpeech.value)).forEach { emit(it) }
     }
 
     private suspend fun FlowCollector<WakeWordEvent>.unavailable(code: VoiceErrorCode, skipped: List<SkippedEngine>) {
@@ -146,6 +175,9 @@ class WakeWordListener(
     }
 }
 
+/** What the listener wants for one frame: the phrases and the app's speech. */
+private data class ListenInput(val phrases: List<WakePhrase>, val speech: AppSpeech)
+
 /** One listening run: the session, its applied phrases and the gates. Used from one coroutine. */
 private class ListenRun(
     private val session: WakeWordSession,
@@ -156,10 +188,10 @@ private class ListenRun(
     private val cooldown = CooldownGate(policy.cooldown)
     private val suppression = OutputSuppressionGate(policy.speechTail)
 
-    suspend fun onFrame(frame: AudioFrame, wanted: List<WakePhrase>, speaking: Boolean): List<WakeWordEvent> {
-        val applying = applyPhrases(wanted)
+    suspend fun onFrame(frame: AudioFrame, input: ListenInput): List<WakeWordEvent> {
+        val applying = applyPhrases(input.phrases)
         val at = format.timeAt(frame.start)
-        val suppressed = suppression.suppressed(speaking, at)
+        val suppressed = suppression.suppressed(input.speech, at)
         val hit = session.process(frame) ?: return applying
         return if (admits(hit, suppressed)) applying + WakeWordEvent.Detected(hit) else applying
     }
@@ -170,10 +202,16 @@ private class ListenRun(
         return listOf(WakeWordEvent.PhrasesApplied(session.setPhrases(wanted)))
     }
 
-    private suspend fun admits(hit: WakeWordHit, suppressed: Boolean): Boolean = when {
-        suppressed -> false
-        !SensitivityGate.passes(hit) -> false
-        !cooldown.admit(format.timeAt(hit.position)) -> false
-        else -> policy.confirmer.confirm(hit)
+    /** The cooldown starts only from a hit the confirmer accepted. */
+    private suspend fun admits(hit: WakeWordHit, suppressed: Boolean): Boolean {
+        val at = format.timeAt(hit.position)
+        val eligible = when {
+            suppressed -> false
+            !SensitivityGate.passes(hit) -> false
+            else -> !cooldown.coolingAt(at)
+        }
+        val accepted = eligible && policy.confirmer.confirm(hit)
+        if (accepted) cooldown.record(at)
+        return accepted
     }
 }

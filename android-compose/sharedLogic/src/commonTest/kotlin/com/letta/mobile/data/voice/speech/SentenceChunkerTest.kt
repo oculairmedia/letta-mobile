@@ -84,4 +84,17 @@ class SentenceChunkerTest {
         chunker.reset()
         assertTrue(chunker.flush().isEmpty())
     }
+
+    @Test
+    fun onlyRecognisableTagsAreStrippedSoComparisonsSurvive() {
+        assertEquals(listOf("Is 2 < 3 > 1 true?", "Bold text."), chunk("Is 2 < 3 > 1 true? <b>Bold</b> text."))
+    }
+
+    @Test
+    fun overlongTextNeverCutsALinkRaw() {
+        val segments = chunk("See [docs](https://x.io/abcdefghij) and then some more words", max = 16)
+        assertTrue(segments.none { "[" in it || "](" in it || "http" in it }, segments.toString())
+        assertTrue(segments.any { "docs" in it })
+        assertTrue(segments.all { it.length <= 16 })
+    }
 }

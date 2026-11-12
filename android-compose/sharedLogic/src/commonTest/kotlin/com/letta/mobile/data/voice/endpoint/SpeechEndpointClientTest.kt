@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
 
 class SpeechEndpointClientTest {
     private val secret = "sk-voice-secret-4711"
-    private val base = SpeechEndpointUrl("http://speech.local:8880/")
+    private val base = SpeechEndpointUrl("https://speech.local:8880/")
     private val recorded = mutableListOf<HttpRequestData>()
     private val events = mutableListOf<SpeechClientEvent>()
     private val clip = AudioClip(byteArrayOf(1, 2, 3), AudioEncoding.WAV)
@@ -43,12 +43,17 @@ class SpeechEndpointClientTest {
     private fun client(
         key: SpeechApiKey? = SpeechApiKey(secret),
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
+    ): SpeechEndpointClient = client(SpeechEndpointConfig(base, key), handler)
+
+    private fun client(
+        config: SpeechEndpointConfig,
+        handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
     ): SpeechEndpointClient {
         val engine = MockEngine { request ->
             recorded += request
             handler(request)
         }
-        return SpeechEndpointClient(engine, SpeechEndpointConfig(base, key)) { events += it }
+        return SpeechEndpointClient(engine, config) { events += it }
     }
 
     /** HttpTimeout delays on the test scheduler would fire at once; run requests on real time. */
@@ -142,5 +147,34 @@ class SpeechEndpointClientTest {
         surfaces.forEach { assertFalse(secret in it, it) }
         assertFalse(base.value.removeSuffix("/") in failure.message.orEmpty())
         assertEquals(listOf(VoiceErrorCode.UNAUTHORIZED, null), events.map { it.failure })
+    }
+
+    @Test
+    fun bearerKeyTravelsOnlyOverHttpsOrLoopback() = realTimeTest {
+        val cases = mapOf(
+            "https://speech.example.net" to true,
+            "http://127.0.0.1:8880" to true,
+            "http://localhost:8880" to true,
+            "http://[::1]:8880" to true,
+            "http://192.168.1.20:8880" to false,
+            "http://10.0.0.5" to false,
+            "http://speech.example.net" to false,
+        )
+        cases.forEach { (url, allowed) ->
+            recorded.clear()
+            val config = SpeechEndpointConfig(SpeechEndpointUrl(url), SpeechApiKey(secret))
+            val outcome = runCatching { client(config) { json("""{"text":"ok"}""") }.transcribe(transcription) }
+            assertEquals(allowed, outcome.isSuccess, url)
+            assertEquals(if (allowed) 1 else 0, recorded.size, url)
+            val failure = outcome.exceptionOrNull() as? SpeechEndpointException
+            if (!allowed) assertEquals(VoiceErrorCode.INSECURE_TRANSPORT, failure?.code, url)
+            assertFalse(secret in failure?.message.orEmpty())
+        }
+    }
+
+    @Test
+    fun plainHttpWithoutAKeyIsAllowed() = realTimeTest {
+        val config = SpeechEndpointConfig(SpeechEndpointUrl("http://192.168.1.20:8880"))
+        assertEquals("ok", client(config) { json("""{"text":"ok"}""") }.transcribe(transcription).value)
     }
 }

@@ -398,6 +398,98 @@ class VoiceLoopTest {
         assertEquals(VoicePhase.IDLE, h.state.phase)
     }
 
+    @Test
+    fun earThatWillNotReleaseBlocksASecondEarUntilItDoes() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        h.ear.releaseDelay = 5.seconds
+        h.loop.stop()
+        advanceTimeBy(VoiceLoopConfig().releaseTimeout + 1.seconds)
+        h.settle()
+        assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.EAR), h.state.failure)
+        h.listening()
+        assertEquals(1, h.ear.opens())
+        assertEquals(VoicePhase.FAILED, h.state.phase)
+        advanceTimeBy(5.seconds)
+        h.listening()
+        assertEquals(2, h.ear.opens())
+        assertEquals(VoicePhase.LISTENING, h.state.phase)
+    }
+
+    @Test
+    fun lateReplyWithoutBargeInClosesTheEarBeforeSpeaking() = runTest {
+        val h = LoopHarness(this, noBargeIn)
+        h.speaking(VoiceText("On it. "))
+        h.reply(VoiceReplyEvent.AwaitingLateReply)
+        h.finishSpeech()
+        assertTrue(h.ear.listening)
+        h.replyText(VoiceText("Research done. "))
+        val entries = h.log.entries
+        assertTrue(entries.lastIndexOf("ear:close") < entries.lastIndexOf("mouth:speak"))
+        assertFalse(h.ear.listening)
+    }
+
+    @Test
+    fun mouthThatWillNotStopKeepsTheEarClosed() = runTest {
+        val h = LoopHarness(this, noBargeIn)
+        h.speaking()
+        h.mouth.hangOnStop = true
+        h.loop.activate(VoiceActivationKind.TAP)
+        advanceTimeBy(VoiceLoopConfig().releaseTimeout + 1.seconds)
+        h.settle()
+        assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.MOUTH), h.state.failure)
+        assertEquals(1, h.ear.opens())
+    }
+
+    @Test
+    fun stopReportsAnAnswerThatWillNotStop() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        h.turn()
+        h.responder.last.cancelOutcome = VoiceCancelOutcome.UNRESPONSIVE
+        h.loop.stop()
+        h.settle()
+        assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.RESPONDER), h.state.failure)
+    }
+
+    @Test
+    fun firstTextWithoutASentenceEndStopsTheThinkingTimer() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        h.turn()
+        h.replyText(VoiceText("Hello"))
+        advanceTimeBy(VoiceLoopConfig().thinkingTimeout + 1.seconds)
+        h.settle()
+        assertEquals(VoicePhase.THINKING, h.state.phase)
+        h.reply(VoiceReplyEvent.Completed)
+        assertEquals(listOf("Hello"), h.mouth.spokenTexts)
+    }
+
+    @Test
+    fun shutdownReleasesEveryEngineBeforeReturning() = runTest {
+        val h = LoopHarness(this)
+        h.speaking()
+        h.loop.shutdown()
+        assertEquals(1, h.mouth.stops)
+        assertEquals(1, h.responder.last.cancels)
+        assertFalse(h.ear.listening)
+        assertEquals(VoicePhase.IDLE, h.state.phase)
+    }
+
+    @Test
+    fun retryIsHandedToTheEarOnceItListensAndFailsWhenTheCaptureExpired() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        h.ear.retryAccepted = false
+        h.ear.hear(VoiceEarEvent.Failed(VoiceError(VoiceErrorCode.TRANSCRIPTION_FAILED, VoicePort.EAR), CapturedAudioHandle(3)))
+        h.settle()
+        h.loop.retryCapture()
+        h.settle()
+        val entries = h.log.entries
+        assertTrue(entries.lastIndexOf("ear:open") < entries.indexOf("ear:retry"))
+        assertEquals(VoiceError(VoiceErrorCode.CAPTURE_EXPIRED, VoicePort.EAR), h.state.failure)
+    }
+
     private fun source(vararg events: VoiceActivationEvent): VoiceActivationSource = object : VoiceActivationSource {
         override val events: Flow<VoiceActivationEvent> = flowOf(*events)
     }

@@ -34,11 +34,14 @@ internal object ReplyRules {
         ReplySignal.Completed -> close(model, delegate = false)
         is ReplySignal.Failed -> failed(model, signal.error)
         ReplySignal.ThinkingTimedOut -> timedOut(model)
+        ReplySignal.TextStarted -> Step(model.withTurn { copy(textArrived = true) })
     }
 
-    private fun timedOut(model: LoopModel): Step {
-        if (model.phase != VoicePhase.THINKING) return Step(model)
-        return Transitions.fail(model, VoiceError(VoiceErrorCode.TIMED_OUT, VoicePort.RESPONDER))
+    /** The thinking timeout only fails an answer that has produced no text at all. */
+    private fun timedOut(model: LoopModel): Step = when {
+        model.phase != VoicePhase.THINKING -> Step(model)
+        model.turn.textArrived -> Step(model)
+        else -> Transitions.fail(model, VoiceError(VoiceErrorCode.TIMED_OUT, VoicePort.RESPONDER))
     }
 
     private fun close(model: LoopModel, delegate: Boolean): Step {
@@ -69,8 +72,8 @@ internal object ReplyRules {
 internal object LateReplyRules {
     fun on(model: LoopModel, turn: TurnKey, signal: ReplySignal): Step = when (signal) {
         is ReplySignal.Segment -> lateSegment(model, signal.text)
-        ReplySignal.Delegated -> Step(model)
-        else -> Step(model.copy(late = model.late.copy(delegated = model.late.delegated - turn)))
+        ReplySignal.Completed, is ReplySignal.Failed -> Step(model.copy(late = model.late.copy(delegated = model.late.delegated - turn)))
+        else -> Step(model)
     }
 
     private fun lateSegment(model: LoopModel, text: VoiceText): Step = when {

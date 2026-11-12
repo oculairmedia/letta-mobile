@@ -3983,7 +3983,6 @@ final enum class com.letta.mobile.data.voice.audio/AudioEncoding : kotlin/Enum<c
     enum entry FLAC // com.letta.mobile.data.voice.audio/AudioEncoding.FLAC|null[0]
     enum entry MP3 // com.letta.mobile.data.voice.audio/AudioEncoding.MP3|null[0]
     enum entry OPUS // com.letta.mobile.data.voice.audio/AudioEncoding.OPUS|null[0]
-    enum entry PCM // com.letta.mobile.data.voice.audio/AudioEncoding.PCM|null[0]
     enum entry WAV // com.letta.mobile.data.voice.audio/AudioEncoding.WAV|null[0]
 
     final val entries // com.letta.mobile.data.voice.audio/AudioEncoding.entries|#static{}entries[0]
@@ -4145,8 +4144,11 @@ final enum class com.letta.mobile.data.voice/VoiceEarKind : kotlin/Enum<com.lett
 final enum class com.letta.mobile.data.voice/VoiceErrorCode : kotlin/Enum<com.letta.mobile.data.voice/VoiceErrorCode> { // com.letta.mobile.data.voice/VoiceErrorCode|null[0]
     enum entry ASSET_MISSING // com.letta.mobile.data.voice/VoiceErrorCode.ASSET_MISSING|null[0]
     enum entry BAD_RESPONSE // com.letta.mobile.data.voice/VoiceErrorCode.BAD_RESPONSE|null[0]
+    enum entry BUSY // com.letta.mobile.data.voice/VoiceErrorCode.BUSY|null[0]
     enum entry CANCELLED // com.letta.mobile.data.voice/VoiceErrorCode.CANCELLED|null[0]
+    enum entry CAPTURE_EXPIRED // com.letta.mobile.data.voice/VoiceErrorCode.CAPTURE_EXPIRED|null[0]
     enum entry ENGINE_FAILED // com.letta.mobile.data.voice/VoiceErrorCode.ENGINE_FAILED|null[0]
+    enum entry INSECURE_TRANSPORT // com.letta.mobile.data.voice/VoiceErrorCode.INSECURE_TRANSPORT|null[0]
     enum entry NOT_DELIVERED // com.letta.mobile.data.voice/VoiceErrorCode.NOT_DELIVERED|null[0]
     enum entry PERMISSION_REQUIRED // com.letta.mobile.data.voice/VoiceErrorCode.PERMISSION_REQUIRED|null[0]
     enum entry PLAYBACK_FAILED // com.letta.mobile.data.voice/VoiceErrorCode.PLAYBACK_FAILED|null[0]
@@ -24842,13 +24844,16 @@ sealed interface com.letta.mobile.data.voice.engine/VoiceEarEvent { // com.letta
 
 sealed interface com.letta.mobile.data.voice.engine/VoiceMouthEvent { // com.letta.mobile.data.voice.engine/VoiceMouthEvent|null[0]
     final class Failed : com.letta.mobile.data.voice.engine/VoiceMouthEvent { // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed|null[0]
-        constructor <init>(com.letta.mobile.data.voice/VoiceError) // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.<init>|<init>(com.letta.mobile.data.voice.VoiceError){}[0]
+        constructor <init>(com.letta.mobile.data.voice/VoiceError, com.letta.mobile.data.voice.engine/SpeechSegmentId) // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.<init>|<init>(com.letta.mobile.data.voice.VoiceError;com.letta.mobile.data.voice.engine.SpeechSegmentId){}[0]
 
         final val error // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.error|{}error[0]
             final fun <get-error>(): com.letta.mobile.data.voice/VoiceError // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.error.<get-error>|<get-error>(){}[0]
+        final val id // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.id|{}id[0]
+            final fun <get-id>(): com.letta.mobile.data.voice.engine/SpeechSegmentId // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.id.<get-id>|<get-id>(){}[0]
 
         final fun component1(): com.letta.mobile.data.voice/VoiceError // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.component1|component1(){}[0]
-        final fun copy(com.letta.mobile.data.voice/VoiceError = ...): com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.copy|copy(com.letta.mobile.data.voice.VoiceError){}[0]
+        final fun component2(): com.letta.mobile.data.voice.engine/SpeechSegmentId // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.component2|component2(){}[0]
+        final fun copy(com.letta.mobile.data.voice/VoiceError = ..., com.letta.mobile.data.voice.engine/SpeechSegmentId = ...): com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.copy|copy(com.letta.mobile.data.voice.VoiceError;com.letta.mobile.data.voice.engine.SpeechSegmentId){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.voice.engine/VoiceMouthEvent.Failed.toString|toString(){}[0]
@@ -68464,6 +68469,7 @@ final class com.letta.mobile.data.voice.loop/VoiceLoop { // com.letta.mobile.dat
     final fun onKey(com.letta.mobile.data.voice.activation/KeyDecision, com.letta.mobile.data.voice.activation/VoiceActivationKind) // com.letta.mobile.data.voice.loop/VoiceLoop.onKey|onKey(com.letta.mobile.data.voice.activation.KeyDecision;com.letta.mobile.data.voice.activation.VoiceActivationKind){}[0]
     final fun retryCapture() // com.letta.mobile.data.voice.loop/VoiceLoop.retryCapture|retryCapture(){}[0]
     final fun stop() // com.letta.mobile.data.voice.loop/VoiceLoop.stop|stop(){}[0]
+    final suspend fun shutdown() // com.letta.mobile.data.voice.loop/VoiceLoop.shutdown|shutdown(){}[0]
 }
 
 final class com.letta.mobile.data.voice.loop/VoiceLoopRuntime { // com.letta.mobile.data.voice.loop/VoiceLoopRuntime|null[0]

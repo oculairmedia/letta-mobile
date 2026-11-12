@@ -107,7 +107,7 @@ class ChatSessionVoiceResponderTest {
 
     @Test
     fun ignoresReasoningToolRowsAndOlderMessages() = runTest {
-        session.append(assistantRow.copy(id = "old", content = "Earlier answer."))
+        session.append(assistantRow.copy(id = "old", content = "Earlier answer.", runId = "r0"))
         val events = collect(ask())
         startRun()
         session.append(
@@ -193,11 +193,81 @@ class ChatSessionVoiceResponderTest {
         advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
         runCurrent()
         assertEquals(true, outcome.isCompleted)
+        session.update { copy(isAgentTyping = false) }
         val stopped = ask()
         collect(stopped)
         session.endRunOnStop = true
-        session.append(userRow.copy(id = "u9"))
+        session.append(userRow.copy(id = "u9", isPending = true))
+        session.update { copy(isAgentTyping = true) }
         runCurrent()
+        val stopsBefore = session.stops
         assertEquals(VoiceCancelOutcome.STOPPED, stopped.cancel())
+        assertEquals(stopsBefore + 1, session.stops)
+    }
+
+    @Test
+    fun olderRunEndingDoesNotCompleteAQueuedUtterance() = runTest {
+        session.update { copy(isAgentTyping = true) }
+        val events = collect(ask())
+        session.append(userRow.copy(id = "u2", isPending = true))
+        runCurrent()
+        endRun()
+        assertEquals(emptyList<VoiceReplyEvent>(), events)
+        session.update { copy(isAgentTyping = true) }
+        session.append(assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
+        runCurrent()
+        endRun()
+        assertEquals(listOf("Answer two."), texts(events))
+        assertEquals(VoiceReplyEvent.Completed, events.last())
+    }
+
+    @Test
+    fun lateRowOfThePreviousRunAfterTheNewUtteranceIsNotSpoken() = runTest {
+        collect(ask(VoiceText("first")))
+        startRun()
+        session.append(assistantRow.copy(id = "m1", content = "Partial"))
+        runCurrent()
+        val second = collect(ask(VoiceText("second")))
+        session.append(userRow.copy(id = "u2"))
+        session.append(assistantRow.copy(id = "m2", content = "Late words from the first run", runId = "r1"))
+        session.append(assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
+        runCurrent()
+        endRun()
+        assertEquals(listOf("Answer two."), texts(second))
+    }
+
+    @Test
+    fun pendingRowConfirmationKeepsTheAnchor() = runTest {
+        val events = collect(ask())
+        session.append(userRow.copy(id = "otid1", clientMessageId = "otid1", isPending = true))
+        session.update { copy(isAgentTyping = true) }
+        runCurrent()
+        val confirmed = userRow.copy(id = "srv1", clientMessageId = "otid1")
+        session.update { copy(messages = messages.map { if (it.id == "otid1") confirmed else it }.toPersistentList()) }
+        session.append(assistantRow.copy(id = "m1", content = "Hi."))
+        runCurrent()
+        endRun()
+        assertEquals(listOf("Hi."), texts(events))
+    }
+
+    @Test
+    fun replyCancelledWhileThePreviousRunStopsSendsNothing() = runTest {
+        collect(ask(VoiceText("first")))
+        startRun()
+        session.endRunOnStop = false
+        val second = ask(VoiceText("second"))
+        collect(second)
+        backgroundScope.launch { second.cancel() }
+        advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
+        runCurrent()
+        assertEquals(listOf("first"), session.sent)
+    }
+
+    @Test
+    fun runThatEndedBeforeDeliveryWasObservedCompletes() = runTest {
+        val events = collect(ask())
+        session.append(userRow.copy(id = "u1"))
+        runCurrent()
+        assertEquals(listOf<VoiceReplyEvent>(VoiceReplyEvent.Completed), events)
     }
 }

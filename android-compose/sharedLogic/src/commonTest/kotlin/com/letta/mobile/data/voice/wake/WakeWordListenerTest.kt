@@ -1,6 +1,8 @@
 package com.letta.mobile.data.voice.wake
 
+import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
+import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.WakePhrase
 import com.letta.mobile.data.voice.WakeSensitivity
 import com.letta.mobile.data.voice.WakeWordEngineId
@@ -152,8 +154,82 @@ class WakeWordListenerTest {
     fun activationSourceWrapsTheListener() = runTest {
         val engine = FakeWakeWordEngine(script = hits(1L to ScriptedHit(hey.text)))
         val activations = WakeWordActivationSource(listener(FakeFrameSource(3), engine)).events.toList()
-        assertEquals(listOf<VoiceActivationEvent>(VoiceActivationEvent.Activated(VoiceActivationKind.WAKE_WORD)), activations)
+        val endedError = VoiceError(VoiceErrorCode.UNAVAILABLE, VoicePort.ACTIVATION)
+        val ended = VoiceActivationEvent.Degraded(VoiceActivationKind.WAKE_WORD, endedError)
+        assertEquals(listOf(VoiceActivationEvent.Activated(VoiceActivationKind.WAKE_WORD), ended), activations)
         val missing = WakeWordActivationSource(WakeWordListener(FakeFrameSource(1), WakeWordEngines())).events.toList()
         assertIs<VoiceActivationEvent.Degraded>(missing.single())
+    }
+
+    @Test
+    fun secondConcurrentCollectionIsBusyAndLeavesTheFirstRunning() = runTest {
+        val source = FakeFrameSource(2, hold = true)
+        val wake = listener(source, FakeWakeWordEngine())
+        val first = launch { wake.events.collect { } }
+        runCurrent()
+        val second = wake.events.toList().single()
+        assertEquals(VoiceErrorCode.BUSY, (second as WakeWordEvent.Unavailable).error.code)
+        assertEquals(WakeListenerState.LISTENING, wake.state.value)
+        assertEquals(1, source.opens)
+        first.cancelAndJoin()
+    }
+
+    @Test
+    fun cooldownStartsOnlyAfterTheConfirmerAccepts() = runTest {
+        val heard = ScriptedHit(hey.text)
+        val engine = FakeWakeWordEngine(script = hits(0L to heard, 10L to heard))
+        val confirmer = WakeHitConfirmer { hit -> hit.position.value > 0 }
+        val config = WakeWordListenerConfig(policy = WakeWordPolicy(confirmer = confirmer))
+        val wake = WakeWordListener(FakeFrameSource(12), engines(engine), config).apply { setPhrases(listOf(hey)) }
+        assertEquals(listOf(10L), wake.events.toList().detectedFrames())
+    }
+
+    @Test
+    fun phraseListIsCopiedSoAMutatedListStillApplies() = runTest {
+        val engine = FakeWakeWordEngine(script = hits(8L to ScriptedHit(other.text)))
+        val phrases = mutableListOf(hey)
+        lateinit var wake: WakeWordListener
+        val source = FakeFrameSource(10) { index ->
+            if (index == 5) {
+                phrases[0] = other
+                wake.setPhrases(phrases)
+            }
+        }
+        wake = listener(source, engine, phrases)
+        assertEquals(listOf(8L), wake.events.toList().detectedFrames())
+    }
+
+    @Test
+    fun speechStartAndStopBetweenFramesStillStartsTheTail() = runTest {
+        val heard = ScriptedHit(hey.text)
+        val engine = FakeWakeWordEngine(script = hits(5L to heard, 40L to heard))
+        lateinit var wake: WakeWordListener
+        val source = FakeFrameSource(45) { index ->
+            if (index == 3) {
+                wake.setAppSpeaking(true)
+                wake.setAppSpeaking(false)
+            }
+        }
+        wake = listener(source, engine)
+        assertEquals(listOf(40L), wake.events.toList().detectedFrames())
+    }
+
+    @Test
+    fun listeningIsReportedOnlyOnceFramesArrive() = runTest {
+        val wake = listener(FakeFrameSource(0, hold = true), FakeWakeWordEngine())
+        val events = mutableListOf<WakeWordEvent>()
+        val job = launch { wake.events.collect { events += it } }
+        runCurrent()
+        assertEquals(WakeListenerState.STOPPED, wake.state.value)
+        assertTrue(events.none { it is WakeWordEvent.Listening })
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun calibrationRecordingOwnsItsFrames() {
+        val frame = frameAt(0)
+        val recording = CalibrationRecording(listOf(frame))
+        frame.samples[0] = 42
+        assertEquals(0, recording.frames.single().samples[0].toInt())
     }
 }

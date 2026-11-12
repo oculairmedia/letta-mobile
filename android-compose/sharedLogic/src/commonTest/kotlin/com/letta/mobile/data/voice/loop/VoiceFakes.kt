@@ -41,6 +41,7 @@ internal class FakeEar(private val log: EngineLog) : VoiceEar {
     var releaseDelay: Duration = Duration.ZERO
     val outputHints = mutableListOf<Boolean>()
     val retried = mutableListOf<CapturedAudioHandle>()
+    var retryAccepted = true
     var commits = 0
         private set
 
@@ -75,8 +76,12 @@ internal class FakeEar(private val log: EngineLog) : VoiceEar {
 
     override fun retry(handle: CapturedAudioHandle): Boolean {
         retried += handle
-        return true
+        log.add("ear:retry")
+        return retryAccepted
     }
+
+    /** How many times the microphone was opened. */
+    fun opens(): Int = log.entries.count { it == "ear:open" }
 }
 
 /** A scripted mouth: records what it was asked to say; tests drive [started] and [finished]. */

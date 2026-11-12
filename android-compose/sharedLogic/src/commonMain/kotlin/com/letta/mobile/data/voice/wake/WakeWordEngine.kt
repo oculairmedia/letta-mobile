@@ -161,11 +161,14 @@ interface WakeWordSession {
     fun close()
 }
 
-/** A recording of the person saying a phrase once, for calibration. */
-class CalibrationRecording(
-    /** The frames of the recording; never stored beyond calibration. */
-    val frames: List<AudioFrame>,
-) {
+/**
+ * A recording of the person saying a phrase once, for calibration. The frames are copied on
+ * construction, because a frame source may reuse a frame's sample array after it is processed.
+ */
+class CalibrationRecording(frames: List<AudioFrame>) {
+    /** Owned copies of the recording's frames; never stored beyond calibration. */
+    val frames: List<AudioFrame> = frames.map { AudioFrame(it.samples.copyOf(), it.start) }
+
     override fun toString(): String = "CalibrationRecording(frames=${frames.size})"
 }
 

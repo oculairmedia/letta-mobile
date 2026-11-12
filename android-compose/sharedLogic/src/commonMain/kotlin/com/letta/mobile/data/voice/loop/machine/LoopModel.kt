@@ -13,6 +13,7 @@ import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.engine.VoiceCancelOutcome
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.engine.VoiceMouthEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlin.jvm.JvmInline
 
 /** The generation token of one turn: every reply event carries it, and stale ones are dropped. */
@@ -25,6 +26,8 @@ internal data class TurnState(
     val active: TurnKey? = null,
     /** Whether the active turn's answer may still produce text before going back to listening. */
     val replyOpen: Boolean = false,
+    /** The active answer has produced text (maybe not yet a whole sentence); the thinking timeout no longer applies. */
+    val textArrived: Boolean = false,
     /** A failure to report once the queued speech has been spoken. */
     val pendingFailure: VoiceError? = null,
     /** The ear reported speech in this listening window and no end of turn yet. */
@@ -70,6 +73,8 @@ internal data class LoopModel(
     val speech: SpeechQueue = SpeechQueue(),
     val late: LateState = LateState(),
     val view: LoopView = LoopView(),
+    /** A capture retry waiting for the ear to report it is listening. */
+    val pendingRetry: CapturedAudioHandle? = null,
 ) {
     /** Whether the microphone should be open: always while listening, while answering only for barge-in. */
     val micWanted: Boolean
@@ -91,8 +96,11 @@ internal sealed interface LoopInput {
     /** The person ended their turn (push-to-talk release, second tap). */
     data object EndTurn : LoopInput
 
-    /** The person stopped, or the conversation changed under the loop ([contextChanged]). */
-    data class Stop(val contextChanged: Boolean = false) : LoopInput
+    /**
+     * The person stopped, or the conversation changed under the loop ([contextChanged]). [done] is
+     * completed once the stop has been applied and every engine has let go.
+     */
+    data class Stop(val contextChanged: Boolean = false, val done: CompletableDeferred<Unit>? = null) : LoopInput
 
     /** The person asked to retry the retained capture. */
     data object RetryCapture : LoopInput
@@ -118,6 +126,9 @@ internal sealed interface LoopInput {
 
 /** An answer event after chunking. */
 internal sealed interface ReplySignal {
+    /** The answer produced its first text, before any sentence is complete; ends the thinking wait. */
+    data object TextStarted : ReplySignal
+
     /** One speakable segment. */
     data class Segment(val text: VoiceText) : ReplySignal
 

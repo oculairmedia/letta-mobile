@@ -9,6 +9,7 @@ import com.letta.mobile.data.voice.activation.VoiceActivationSource
 import com.letta.mobile.data.voice.loop.machine.LoopInput
 import com.letta.mobile.data.voice.loop.machine.LoopModel
 import com.letta.mobile.data.voice.loop.machine.VoiceLoopMachine
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
@@ -31,14 +32,20 @@ import kotlinx.coroutines.plus
  *   ear events from a closed ear, and anything from before [conversationChanged] are dropped.
  * - A phase is published only after the engines have actually let go: [stop] waits (bounded by
  *   [VoiceLoopConfig.releaseTimeout]) for the mouth, the ear and every answer to settle; an engine
- *   that will not let go turns into an UNRESPONSIVE failure.
+ *   or answer that will not let go turns into an UNRESPONSIVE failure. An ear that timed out stays
+ *   held, and no second ear opens until it has released. [shutdown] awaits all of this.
  * - Interrupting an answer is a request that can fail: while it is outstanding the state's
  *   [InterruptStatus] is REQUESTED (or UNRESPONSIVE) and that answer's text is never spoken.
  * - The microphone is never opened over the app's own speech: the mouth is stopped (and its stop
- *   awaited) before the ear opens, except while barge-in keeps the ear open on purpose. The ear is
- *   told when output is playing ([com.letta.mobile.data.voice.engine.VoiceEar.setOutputActive]).
+ *   awaited) before the ear opens, and a step that starts speech without barge-in closes the ear
+ *   first; the ear stays open during speech only while barge-in keeps it open on purpose. A mouth
+ *   that will not stop keeps the ear closed. The ear is told when output is playing
+ *   ([com.letta.mobile.data.voice.engine.VoiceEar.setOutputActive]).
+ * - Mouth failures name their segment; a failure for output already stopped is ignored.
  * - End of turn is the ear's decision; the loop has no silence timer. The only timer is the
- *   thinking timeout from sending to the first reply text.
+ *   thinking timeout from sending to the answer's first text (not its first whole sentence).
+ * - A capture retry is handed to the ear once it reports listening; an ear that no longer holds
+ *   the capture fails with CAPTURE_EXPIRED.
  * - A late reply (text from an answer that delegated and went quiet) is spoken when the loop is
  *   listening and the person is not mid-utterance, or idle after a single shot; otherwise it is
  *   held (bounded) and spoken after the current answer. With the DISCARD policy it is never spoken.
@@ -106,7 +113,20 @@ class VoiceLoop(
         source.events.collect { inputs.send(it.toInput()) }
     }
 
-    /** Ends the loop's coroutines. Call [stop] first to release the engines in order. */
+    /**
+     * Stops everything, waits until the stop has been applied and every engine has let go (each
+     * wait bounded by the release budget), then ends the loop's coroutines. Prefer this to [close].
+     */
+    suspend fun shutdown() {
+        val done = CompletableDeferred<Unit>()
+        if (inputs.trySend(LoopInput.Stop(done = done)).isSuccess) {
+            job.invokeOnCompletion { done.complete(Unit) }
+            done.await()
+        }
+        close()
+    }
+
+    /** Ends the loop's coroutines at once, without releasing the engines; use [shutdown] for an orderly end. */
     fun close() {
         job.cancel()
         inputs.close()
@@ -114,14 +134,17 @@ class VoiceLoop(
 
     private suspend fun process(first: LoopInput) {
         val pending = ArrayDeque(listOf(first))
+        val acknowledgements = mutableListOf<CompletableDeferred<Unit>>()
         while (pending.isNotEmpty()) {
             val input = pending.removeFirst()
             if (runner.isStale(input)) continue
+            (input as? LoopInput.Stop)?.done?.let(acknowledgements::add)
             val step = VoiceLoopMachine.reduce(model, input)
             model = step.model
             pending += runner.apply(step)
         }
         publish()
+        acknowledgements.forEach { it.complete(Unit) }
     }
 
     private fun publish() {

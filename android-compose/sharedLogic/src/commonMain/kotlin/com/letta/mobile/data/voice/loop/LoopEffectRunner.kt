@@ -44,16 +44,27 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
     fun isStale(input: LoopInput): Boolean = ear.isStale(input)
 
     /**
-     * Applies [step]: engine effects first (so the mouth has stopped before any microphone opens),
-     * then the microphone, then calls into the running ear. Returns follow-up inputs (faults).
+     * Applies [step] so the microphone and the app's speech never overlap unless barge-in keeps the
+     * ear open on purpose: a step that no longer wants the microphone closes the ear first (before
+     * any speech starts); a step that wants it runs the engine effects first (so the mouth has
+     * stopped) and opens the ear only when they all succeeded. Calls into the ear come last.
+     * Returns follow-up inputs (faults), which the loop applies before publishing.
      */
     suspend fun apply(step: Step): List<LoopInput> {
-        val faults = step.effects.filterNot(ear::handles).mapNotNull { execute(it) }.toMutableList()
-        ear.reconcile(step.model)?.let(faults::add)
-        step.effects.filter(ear::handles).forEach(ear::call)
-        ear.reportOutput(step.model)
-        reconcileTimer(step.model)
+        val model = step.model
+        val faults = mutableListOf<LoopInput>()
+        if (!model.micWanted) ear.reconcile(model)?.let(faults::add)
+        step.effects.filterNot(ear::handles).mapNotNullTo(faults) { execute(it) }
+        if (faults.isEmpty()) faults += openEar(step)
+        ear.reportOutput(model)
+        reconcileTimer(model)
         return faults
+    }
+
+    private suspend fun openEar(step: Step): List<LoopInput> {
+        val opened = if (step.model.micWanted) ear.reconcile(step.model) else null
+        if (opened != null) return listOf(opened)
+        return step.effects.filter(ear::handles).mapNotNull(ear::call)
     }
 
     private suspend fun execute(effect: LoopEffect): LoopInput? = when (effect) {
@@ -83,7 +94,7 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
     }
 
     private fun reconcileTimer(model: LoopModel) {
-        val awaited = model.turn.active.takeIf { model.phase == VoicePhase.THINKING }
+        val awaited = model.turn.active.takeIf { model.phase == VoicePhase.THINKING && !model.turn.textArrived }
         if (awaited == timerTurn) return
         timer?.cancel()
         timerTurn = awaited

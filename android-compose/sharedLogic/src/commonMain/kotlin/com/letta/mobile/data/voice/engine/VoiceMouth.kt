@@ -64,9 +64,14 @@ sealed interface VoiceMouthEvent {
         val level: AudioLevel,
     ) : VoiceMouthEvent
 
-    /** Speaking failed. */
+    /**
+     * Speaking segment [id] failed; the mouth has dropped the rest of its queue. The loop ignores a
+     * failure for a segment it no longer has outstanding (output it already stopped).
+     */
     data class Failed(
         /** What failed. */
         val error: VoiceError,
+        /** The segment that failed. */
+        val id: SpeechSegmentId,
     ) : VoiceMouthEvent
 }

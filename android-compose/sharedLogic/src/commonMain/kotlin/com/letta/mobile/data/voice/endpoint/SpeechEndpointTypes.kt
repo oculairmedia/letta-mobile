@@ -62,7 +62,7 @@ enum class SpeechOperation {
 class SpeechEndpointException(
     /** The operation that failed. */
     val operation: SpeechOperation,
-    /** Why: UNREACHABLE, UNAUTHORIZED, REJECTED, BAD_RESPONSE, TIMED_OUT or PERMISSION_REQUIRED. */
+    /** Why: UNREACHABLE, UNAUTHORIZED, REJECTED, BAD_RESPONSE, TIMED_OUT, PERMISSION_REQUIRED or INSECURE_TRANSPORT. */
     val code: VoiceErrorCode,
     /** The HTTP status, when the server answered. */
     val status: Int? = null,

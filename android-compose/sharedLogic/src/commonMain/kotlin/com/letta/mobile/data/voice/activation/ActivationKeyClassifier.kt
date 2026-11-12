@@ -87,7 +87,9 @@ class ActivationKeyClassifier(
         KeyGesture.Cancel -> cancel(state)
     }
 
+    /** A press while the key is already down (key repeat) changes nothing. */
     private fun press(state: KeyClassifierState, at: KeyTime): KeyStep = when {
+        state.pressedAt != null -> KeyStep(state, KeyDecision.NONE)
         !state.active -> KeyStep(KeyClassifierState(active = true, pressedAt = at), KeyDecision.START)
         mode == ActivationKeyMode.HOLD -> KeyStep(state, KeyDecision.NONE)
         else -> KeyStep(KeyClassifierState(), KeyDecision.END_TURN)

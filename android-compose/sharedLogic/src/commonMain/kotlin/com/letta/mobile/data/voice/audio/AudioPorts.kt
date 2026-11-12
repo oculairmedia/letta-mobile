@@ -3,7 +3,10 @@ package com.letta.mobile.data.voice.audio
 import com.letta.mobile.data.voice.AudioLevel
 import kotlinx.coroutines.flow.Flow
 
-/** An audio container or sample format, with the name OpenAI-compatible endpoints use for it. */
+/**
+ * An audio container, with the name OpenAI-compatible endpoints use for it. Headerless PCM is not
+ * offered: a clip carries no sample rate or channel count, so a player could not play it correctly.
+ */
 enum class AudioEncoding(
     /** The `response_format` name and file extension. */
     val wireName: String,
@@ -15,9 +18,6 @@ enum class AudioEncoding(
 
     /** RIFF WAVE. */
     WAV("wav", "audio/wav"),
-
-    /** Raw 16-bit little-endian PCM. */
-    PCM("pcm", "audio/pcm"),
 
     /** Opus in Ogg. */
     OPUS("opus", "audio/ogg"),

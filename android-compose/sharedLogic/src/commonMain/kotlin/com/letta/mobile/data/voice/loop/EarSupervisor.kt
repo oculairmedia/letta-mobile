@@ -9,16 +9,18 @@ import com.letta.mobile.data.voice.loop.machine.LoopInput
 import com.letta.mobile.data.voice.loop.machine.LoopModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Opens and closes the ear to match the model, tags its events with a generation so events from a
- * closed ear are dropped, and tells it when output plays. Used from the loop's processing coroutine.
+ * closed ear are dropped, and tells it when output plays. An ear that does not let go within the
+ * release budget stays held: no second ear is opened until the first has confirmed its release,
+ * and every attempt meanwhile reports UNRESPONSIVE. Used from the loop's processing coroutine.
  */
 internal class EarSupervisor(private val wiring: LoopWiring) {
     private var job: Job? = null
+    private var stopping = false
     private var generation = 0L
     private var outputHint = false
 
@@ -28,22 +30,22 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
     /** True for effects that call into the running ear (applied after the microphone opens). */
     fun handles(effect: LoopEffect): Boolean = effect is LoopEffect.CommitTurn || effect is LoopEffect.RetryCapture
 
-    /** Calls into the ear for [effect]. */
-    fun call(effect: LoopEffect) {
-        when (effect) {
-            LoopEffect.CommitTurn -> wiring.engines.ear.commitTurn()
-            is LoopEffect.RetryCapture -> wiring.engines.ear.retry(effect.handle)
-            else -> Unit
-        }
+    /** Calls into the ear for [effect]; a retry the ear can no longer serve becomes a CAPTURE_EXPIRED fault. */
+    fun call(effect: LoopEffect): LoopInput? = when (effect) {
+        LoopEffect.CommitTurn -> wiring.engines.ear.commitTurn().let { null }
+        is LoopEffect.RetryCapture -> if (wiring.engines.ear.retry(effect.handle)) null else expired()
+        else -> null
     }
+
+    private fun expired(): LoopInput = LoopInput.Fault(VoiceError(VoiceErrorCode.CAPTURE_EXPIRED, VoicePort.EAR))
 
     /** Opens or closes the ear to match [model]; closing waits (bounded) for the ear to let go. */
     suspend fun reconcile(model: LoopModel): LoopInput? {
-        val running = job
+        val running = job ?: return startIfWanted(model)
         return when {
-            model.micWanted && running == null -> start()
-            !model.micWanted && running != null -> stop(running)
-            else -> null
+            !stopping && model.micWanted -> null
+            stopping && !model.micWanted -> null
+            else -> release(running) ?: startIfWanted(model)
         }
     }
 
@@ -54,17 +56,24 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
         wiring.engines.ear.setOutputActive(outputHint)
     }
 
-    private fun start(): LoopInput? {
+    private fun startIfWanted(model: LoopModel): LoopInput? {
+        if (!model.micWanted) return null
         val current = ++generation
         job = wiring.scope.launch { listen(current) }
         return null
     }
 
-    private suspend fun stop(running: Job): LoopInput? {
+    /** Stops [running] (once) and waits, bounded, for it to let go; it stays held while it has not. */
+    private suspend fun release(running: Job): LoopInput? {
+        if (!stopping) {
+            stopping = true
+            generation++
+            running.cancel()
+        }
+        withTimeoutOrNull(wiring.config.releaseTimeout) { running.join() } ?: return wiring.unresponsive(VoicePort.EAR)
         job = null
-        generation++
-        val stopped = withTimeoutOrNull(wiring.config.releaseTimeout) { running.cancelAndJoin() }
-        return if (stopped == null) wiring.unresponsive(VoicePort.EAR) else null
+        stopping = false
+        return null
     }
 
     private suspend fun listen(current: Long) {

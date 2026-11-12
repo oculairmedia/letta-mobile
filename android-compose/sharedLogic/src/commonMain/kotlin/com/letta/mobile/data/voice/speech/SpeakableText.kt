@@ -1,12 +1,15 @@
 package com.letta.mobile.data.voice.speech
 
-/** Strips what should not be read aloud from one segment of reply text. */
+/**
+ * Strips what should not be read aloud from one segment of reply text. Only recognisable HTML tags
+ * are removed, so comparisons such as `2 < 3 > 1` survive.
+ */
 internal object SpeakableText {
     private val rules: List<Pair<Regex, String>> = listOf(
         Regex("""!\[([^\]]*)]\([^)]*\)""") to "$1",
         Regex("""\[([^\]]+)]\([^)]*\)""") to "$1",
         Regex("""https?://\S+""") to "",
-        Regex("""<[^>\n]+>""") to "",
+        Regex("""</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>\n]*)?/?>""") to "",
         Regex("""^\s*#{1,6}\s*""") to "",
         Regex("""^\s*>\s?""") to "",
         Regex("""^\s*(?:[-*+]|\d+[.)])(?:\s+|$)""") to "",

@@ -47,15 +47,17 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
         return null
     }
 
-    /** Cancels every answer, waiting (bounded) for each to settle. */
+    /**
+     * Cancels every answer, waiting (bounded) for each to settle. An answer that does not confirm
+     * its stop turns into an UNRESPONSIVE responder fault, so a stop never reports idle over it.
+     */
     suspend fun cancelAll(): LoopInput? {
         val all = replies.values.toList()
         replies.clear()
-        all.forEach { followed ->
-            boundedCancel(followed.reply)
-            followed.job.cancel()
+        val outcomes = all.map { followed ->
+            boundedCancel(followed.reply).also { followed.job.cancel() }
         }
-        return null
+        return if (VoiceCancelOutcome.UNRESPONSIVE in outcomes) wiring.unresponsive(VoicePort.RESPONDER) else null
     }
 
     private suspend fun boundedCancel(reply: VoiceReply): VoiceCancelOutcome =
@@ -77,15 +79,25 @@ private class ReplyForwarder(
     private val inputs: SendChannel<LoopInput>,
 ) {
     private var ended = false
+    private var started = false
 
     suspend fun forward(event: VoiceReplyEvent) {
         when (event) {
-            is VoiceReplyEvent.Text -> send(chunker.push(event.delta).map(ReplySignal::Segment))
+            is VoiceReplyEvent.Text -> text(event)
             VoiceReplyEvent.PartEnded -> flush()
             VoiceReplyEvent.AwaitingLateReply -> flush(ReplySignal.Delegated)
             VoiceReplyEvent.Completed -> end(ReplySignal.Completed)
             is VoiceReplyEvent.Failed -> end(ReplySignal.Failed(event.error))
         }
+    }
+
+    /** The first non-blank delta ends the thinking wait even before a sentence is complete. */
+    private suspend fun text(event: VoiceReplyEvent.Text) {
+        if (!started && !event.delta.isBlank) {
+            started = true
+            send(listOf(ReplySignal.TextStarted))
+        }
+        send(chunker.push(event.delta).map(ReplySignal::Segment))
     }
 
     /** The answer's flow ended; [crashed] when it threw. An answer that just stopped counts as complete. */

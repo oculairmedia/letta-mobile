@@ -110,6 +110,11 @@ data class VoiceUtterance(
     /** The capture this utterance came from, retained by the ear until its next capture starts. */
     val capture: CapturedAudioHandle? = null,
 ) {
-    /** True when the turn carries nothing to answer or say. */
-    val isEmpty: Boolean get() = text.isBlank && immediateReply == null
+    /** True when the turn carries nothing to answer, say or act on (an action-only turn is not empty). */
+    val isEmpty: Boolean
+        get() = when {
+            decision is VoiceDecision.Act -> false
+            immediateReply != null -> false
+            else -> text.isBlank
+        }
 }

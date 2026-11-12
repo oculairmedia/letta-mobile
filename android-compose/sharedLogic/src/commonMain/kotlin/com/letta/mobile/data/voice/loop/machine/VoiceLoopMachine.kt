@@ -51,22 +51,27 @@ internal object ControlRules {
 
     private fun listen(model: LoopModel, kind: VoiceActivationKind): LoopModel = model.copy(
         phase = VoicePhase.LISTENING,
-        view = model.view.copy(failure = null, transcript = null, activation = kind),
+        view = model.view.copy(failure = null, transcript = null, activation = kind, retryable = null),
     )
 
+    /**
+     * Listens again and hands the retained capture to the ear once it reports listening; an ear
+     * that no longer holds the capture turns into a CAPTURE_EXPIRED fault.
+     */
     private fun retry(model: LoopModel): Step {
         val handle = model.view.retryable ?: return Step(model)
         val resting = model.phase == VoicePhase.IDLE || model.phase == VoicePhase.FAILED
         if (!resting && model.phase != VoicePhase.LISTENING) return Step(model)
         val listening = model.copy(phase = VoicePhase.LISTENING, view = model.view.copy(failure = null, retryable = null))
-        return Step(listening, listOf(LoopEffect.RetryCapture(handle)))
+        if (listening.view.micOpen) return Step(listening, listOf(LoopEffect.RetryCapture(handle)))
+        return Step(listening.copy(pendingRetry = handle))
     }
 }
 
 /** What the ear reports. */
 internal object EarRules {
     fun on(model: LoopModel, event: VoiceEarEvent): Step = when (event) {
-        VoiceEarEvent.ListeningStarted -> Step(model.withView { copy(micOpen = true) })
+        VoiceEarEvent.ListeningStarted -> listening(model)
         is VoiceEarEvent.InputLevel -> Step(model.withView { copy(inputLevel = event.level) })
         is VoiceEarEvent.PartialTranscript -> Step(model.withView { copy(transcript = event.text) })
         VoiceEarEvent.SpeechStarted -> speechStarted(model)
@@ -74,6 +79,12 @@ internal object EarRules {
         is VoiceEarEvent.Failed -> Transitions.fail(model, event.error).let { step ->
             step.copy(model = step.model.withView { copy(retryable = event.retry) })
         }
+    }
+
+    private fun listening(model: LoopModel): Step {
+        val open = model.withView { copy(micOpen = true) }
+        val handle = model.pendingRetry ?: return Step(open)
+        return Step(open.copy(pendingRetry = null), listOf(LoopEffect.RetryCapture(handle)))
     }
 
     private fun speechStarted(model: LoopModel): Step = when (model.phase) {
@@ -95,10 +106,10 @@ internal object EarRules {
 
     private fun startTurn(model: LoopModel, utterance: VoiceUtterance): Step {
         val heard = model.withTurn { copy(userSpeaking = false) }.withView { copy(transcript = utterance.text) }
-        if (utterance.isEmpty) return Step(heard)
+        if (utterance.isEmpty) return emptyTurn(heard)
         val key = TurnKey(heard.turn.nextKey)
         val keyed = heard.withTurn { copy(nextKey = nextKey + 1) }
-        val spoken = utterance.immediateReply?.let { Transitions.speak(keyed, it) } ?: Step(keyed)
+        val spoken = utterance.immediateReply?.let { Transitions.speak(keyed, it) + listOf(LoopEffect.FlushMouth) } ?: Step(keyed)
         val answered = answer(spoken, key, utterance)
         val next = answered.model
         return when {
@@ -108,9 +119,13 @@ internal object EarRules {
         }
     }
 
+    /** Nothing was said; late text held while the person spoke is spoken now. */
+    private fun emptyTurn(model: LoopModel): Step =
+        if (model.late.held.isEmpty()) Step(model) else Transitions.speakHeld(model)
+
     private fun answer(step: Step, key: TurnKey, utterance: VoiceUtterance): Step {
         if (utterance.decision == VoiceDecision.AnsweredByEar) return step
-        val awaiting = step.model.withTurn { copy(active = key, replyOpen = true) }
+        val awaiting = step.model.withTurn { copy(active = key, replyOpen = true, textArrived = false) }
         return Step(awaiting, step.effects + LoopEffect.Respond(key, utterance))
     }
 }
@@ -121,7 +136,7 @@ internal object MouthRules {
         is VoiceMouthEvent.Started -> Step(model.withView { copy(speaking = model.speech.outstanding[event.id] ?: speaking) })
         is VoiceMouthEvent.Finished -> finished(model, event)
         is VoiceMouthEvent.OutputLevel -> level(model, event)
-        is VoiceMouthEvent.Failed -> if (model.outputActive) Transitions.fail(model, event.error) else Step(model)
+        is VoiceMouthEvent.Failed -> if (event.id in model.speech.outstanding) Transitions.fail(model, event.error) else Step(model)
     }
 
     private fun level(model: LoopModel, event: VoiceMouthEvent.OutputLevel): Step =

@@ -74,13 +74,26 @@ class SentenceChunker(
             val fence = pending.indexOf(FENCE)
             val limit = if (fence < 0) pending.length else fence
             val end = SentenceScan(pending, limit, mode).firstEnd()
+            val overflow = overflowCut()
             return when {
                 end != null -> take(Cut(end.value))
                 fence >= 0 -> openCodeBlock(Cut(fence, FENCE.length))
-                pending.length > maxSegmentLength -> take(Cut(softCut.indexIn(pending)))
+                overflow != null -> take(overflow)
                 mode == ScanMode.FINAL -> emitAll()
                 else -> false
             }
+        }
+
+        /**
+         * Overlong text without a sentence end is released up to its last break outside markup,
+         * then cleaned and split to length; a link is never cut raw. Text with no safe break is
+         * held until [HARD_LIMIT_FACTOR] times the segment length, then released whole.
+         */
+        private fun overflowCut(): Cut? {
+            if (pending.length <= maxSegmentLength) return null
+            val safe = softCut.lastSafeBreak(pending)
+            if (safe != null) return Cut(safe)
+            return if (pending.length > maxSegmentLength * HARD_LIMIT_FACTOR) Cut(pending.length) else null
         }
 
         private fun openCodeBlock(cut: Cut): Boolean {
@@ -107,11 +120,11 @@ class SentenceChunker(
             var rest = text
             while (rest.length > maxSegmentLength) {
                 val cut = softCut.indexIn(rest)
-                parts += rest.substring(0, cut).trim()
+                parts += rest.substring(0, cut).trim(',', ' ')
                 rest = rest.substring(cut).trim()
             }
             if (rest.isNotEmpty()) parts += rest
-            return parts
+            return parts.filter(String::isNotEmpty)
         }
     }
 
@@ -121,5 +134,6 @@ class SentenceChunker(
         const val DEFAULT_MAX_SEGMENT_LENGTH: Int = 240
         private const val MIN_SEGMENT_LENGTH = 16
         private const val FENCE = "```"
+        private const val HARD_LIMIT_FACTOR = 4
     }
 }

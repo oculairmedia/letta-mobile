@@ -47,4 +47,13 @@ class ActivationTest {
         val discarded = decisions(ActivationKeyMode.HOLD, KeyGesture.Press(0.atMs), KeyGesture.Cancel, KeyGesture.Release(10.atMs))
         assertEquals(listOf(KeyDecision.START, KeyDecision.DISCARD, KeyDecision.NONE), discarded)
     }
+
+    @Test
+    fun keyRepeatWhileHeldChangesNothing() {
+        val cases = listOf(ActivationKeyMode.AUTO, ActivationKeyMode.TOGGLE, ActivationKeyMode.HOLD)
+        cases.forEach { mode ->
+            val gestures = decisions(mode, KeyGesture.Press(0.atMs), KeyGesture.Press(30.atMs), KeyGesture.Press(60.atMs))
+            assertEquals(listOf(KeyDecision.START, KeyDecision.NONE, KeyDecision.NONE), gestures, "$mode")
+        }
+    }
 }

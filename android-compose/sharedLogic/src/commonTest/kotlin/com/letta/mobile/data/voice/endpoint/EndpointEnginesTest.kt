@@ -20,6 +20,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -32,10 +33,12 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EndpointEnginesTest {
@@ -44,11 +47,13 @@ class EndpointEnginesTest {
     private val settings = VoiceEndpointSettings(baseUrl = base)
     private var requests = 0
     private var status = HttpStatusCode.OK
+    private var failingRequest = 0
 
     private fun client(): SpeechEndpointClient = SpeechEndpointClient(
         MockEngine {
-            requests++
-            respond("""{"text":"hello"}""", status, headersOf(HttpHeaders.ContentType, "application/json"))
+            val number = ++requests
+            val code = if (number == failingRequest) HttpStatusCode.Unauthorized else status
+            respond("""{"text":"hello"}""", code, headersOf(HttpHeaders.ContentType, "application/json"))
         },
         SpeechEndpointConfig(base),
     )
@@ -134,6 +139,31 @@ class EndpointEnginesTest {
         override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
             onLevel(AudioLevel(0.5f))
             played++
+        }
+    }
+
+    @Test
+    fun aSynthesisFailureStopsPlaybackOfPrefetchedSegmentsAndFurtherRequests() = runTest {
+        failingRequest = 3
+        val player = GatedPlayer()
+        val mouth = mouth(player)
+        val failed = async { mouth.events.first { it is VoiceMouthEvent.Failed } }
+        val later = async { mouth.events.first { it == VoiceMouthEvent.Started(SpeechSegmentId(2)) } }
+        testScheduler.runCurrent()
+        (1..4).forEach { mouth.speak(SpeechSegment(SpeechSegmentId(it.toLong()), VoiceText("Segment $it."))) }
+        assertEquals(SpeechSegmentId(3), (failed.await() as VoiceMouthEvent.Failed).id)
+        player.gate.complete(Unit)
+        val secondPlayed = withContext(Dispatchers.Default) { withTimeoutOrNull(300.milliseconds) { later.await() } }
+        later.cancel()
+        assertEquals(null, secondPlayed)
+        assertEquals(3, requests)
+    }
+
+    private class GatedPlayer : AudioPlayer {
+        val gate = CompletableDeferred<Unit>()
+
+        override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
+            gate.await()
         }
     }
 }

@@ -42,9 +42,12 @@ data class ChatReplyPolicy(
  * stops the run with `stopRun()` and waits for it to end.
  *
  * A second utterance supersedes the first: when its reply is collected the earlier reply is
- * cancelled first, and the session queues the new send behind the stopping run.
+ * cancelled first, and the session queues the new send behind the stopping run. A reply cancelled
+ * while that happens sends nothing. Late rows of earlier runs are never spoken.
  *
- * Assumes the session shows a sent utterance in [ChatUiState.messages] once its run starts.
+ * The utterance is followed by its own row (row id or client message id) and its own run, not by
+ * the session-wide in-flight flag alone, so a queued utterance is not completed by an older run
+ * ending. Assumes the session shows a sent utterance as a pending row until its run starts.
  * [respond] is called from one coroutine at a time (the loop's).
  */
 class ChatSessionVoiceResponder(
@@ -60,27 +63,30 @@ class ChatSessionVoiceResponder(
     }
 }
 
-/** Where one reply is in its life. */
-private enum class ReplyStage { NEW, SENT, FINISHED, CANCELLED }
+/** Where one reply is in its life: PREPARING waits for the superseded reply to stop, before anything is sent. */
+private enum class ReplyStage { NEW, PREPARING, SENT, FINISHED, CANCELLED }
 
 /** One utterance sent through the session and the run that answers it. */
 private class ChatSessionReply(
     private val session: ChatSessionPort,
     private val text: VoiceText,
     private val policy: ChatReplyPolicy,
-    private val previous: ChatSessionReply?,
+    private var previous: ChatSessionReply?,
 ) : VoiceReply {
     private val stage = MutableStateFlow(ReplyStage.NEW)
 
     override val events: Flow<VoiceReplyEvent> = flow {
-        if (!stage.compareAndSet(ReplyStage.NEW, ReplyStage.SENT)) return@flow
+        if (!stage.compareAndSet(ReplyStage.NEW, ReplyStage.PREPARING)) return@flow
         previous?.cancel()
+        previous = null
+        if (!stage.compareAndSet(ReplyStage.PREPARING, ReplyStage.SENT)) return@flow
         val tracker = ChatReplyTracker(session.uiState.value)
         session.actions.sendText(text.value)
         follow(tracker)
     }
 
     override suspend fun cancel(): VoiceCancelOutcome {
+        previous = null
         val before = stage.getAndUpdate { if (it == ReplyStage.FINISHED) it else ReplyStage.CANCELLED }
         return if (before == ReplyStage.SENT) stopRun() else VoiceCancelOutcome.ALREADY_FINISHED
     }
@@ -96,7 +102,7 @@ private class ChatSessionReply(
 
     private suspend fun FlowCollector<VoiceReplyEvent>.follow(tracker: ChatReplyTracker) {
         val delivered = withTimeoutOrNull(policy.deliveryTimeout) {
-            observed().first { (state, now) -> now == ReplyStage.CANCELLED || tracker.delivered(state) }
+            observed().first { (state, now) -> now == ReplyStage.CANCELLED || tracker.settled(state) }
         }
         when {
             delivered == null -> finish(failure(VoiceErrorCode.NOT_DELIVERED))

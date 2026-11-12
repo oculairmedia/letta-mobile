@@ -18,13 +18,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
  * A mouth that synthesises each segment through [synthesizer] and plays it through the platform's
  * [player]. The next segment is synthesised while the current one plays (one clip of prefetch),
- * which keeps gaps short when synthesis is faster than realtime. A synthesis failure reports
- * [VoiceMouthEvent.Failed] with the endpoint's code and drops the rest of the queue.
+ * which keeps gaps short when synthesis is faster than realtime. A synthesis or playback failure
+ * reports [VoiceMouthEvent.Failed] for its segment with the endpoint's code and drops the rest of the queue.
  *
  * Call [speak], [flush] and [stop] from one coroutine at a time (the loop's).
  */
@@ -51,37 +53,52 @@ class EndpointVoiceMouth(
         stopping.job.cancelAndJoin()
     }
 
-    /** One generation of queue, prefetch and playback; [stop] replaces it whole. */
+    /** What failed in a pipeline, and the code to report when the error carries none. */
+    private class PipelineFailure(val error: Throwable, val id: SpeechSegmentId, val fallback: VoiceErrorCode)
+
+    /**
+     * One generation of queue, prefetch and playback; [stop] replaces it whole. A failure in either
+     * worker reports once, then cancels both workers and drops every pending segment and clip, so
+     * nothing is synthesised or played after the failure.
+     */
     private inner class MouthPipeline {
         val texts = Channel<SpeechSegment>(Channel.UNLIMITED)
         private val clips = Channel<Pair<SpeechSegmentId, AudioClip>>(PREFETCH)
         val job: Job = scope.launch {
-            launch { synthesizeAll() }
-            playAll()
+            coroutineScope {
+                launch { synthesizeAll(this@coroutineScope) }
+                playAll(this)
+            }
         }
 
-        private suspend fun synthesizeAll() {
+        private suspend fun synthesizeAll(workers: CoroutineScope) {
             for (segment in texts) {
                 val clip = runCatching { synthesizer.synthesize(segment.text) }
-                clip.exceptionOrNull()?.let { return report(it, VoiceErrorCode.SYNTHESIS_FAILED) }
+                val error = clip.exceptionOrNull()
+                if (error != null) return report(workers, PipelineFailure(error, segment.id, VoiceErrorCode.SYNTHESIS_FAILED))
                 clips.send(segment.id to clip.getOrThrow())
             }
         }
 
-        private suspend fun playAll() {
+        private suspend fun playAll(workers: CoroutineScope) {
             for ((id, clip) in clips) {
                 mutableEvents.emit(VoiceMouthEvent.Started(id))
                 val played = runCatching { player.play(clip) { mutableEvents.tryEmit(VoiceMouthEvent.OutputLevel(it)) } }
                 mutableEvents.emit(VoiceMouthEvent.OutputLevel(AudioLevel.Silent))
-                played.exceptionOrNull()?.let { return report(it, VoiceErrorCode.PLAYBACK_FAILED) }
+                val error = played.exceptionOrNull()
+                if (error != null) return report(workers, PipelineFailure(error, id, VoiceErrorCode.PLAYBACK_FAILED))
                 mutableEvents.emit(VoiceMouthEvent.Finished(id))
             }
         }
 
-        private suspend fun report(error: Throwable, fallback: VoiceErrorCode) {
+        private suspend fun report(workers: CoroutineScope, failure: PipelineFailure) {
+            val error = failure.error
             if (error is CancellationException) throw error
-            val code = (error as? SpeechEndpointException)?.code ?: fallback
-            mutableEvents.emit(VoiceMouthEvent.Failed(VoiceError(code, VoicePort.MOUTH)))
+            val code = (error as? SpeechEndpointException)?.code ?: failure.fallback
+            mutableEvents.emit(VoiceMouthEvent.Failed(VoiceError(code, VoicePort.MOUTH), failure.id))
+            texts.cancel()
+            clips.cancel()
+            workers.cancel()
         }
     }
 
