@@ -37,27 +37,30 @@ class HostNotebookAccess(
     val backend: NotebookNoteBackend = AuthorizedBackend(LocalNotebookNoteBackend(notebooks), grants, principal)
 
     /** Rechecks both reference capabilities before consulting the repository. */
-    val resolver = NotebookReferenceResolver(
-        authorize = { id ->
-            recover(NotebookReferenceAccess.UNAVAILABLE) {
-                grants.withGrant(principal, id) { grant ->
-                    if (mayResolveNotebookReference(grant)) NotebookReferenceAccess.ALLOWED else NotebookReferenceAccess.DENIED
-                }
-            }
-        },
-        readAuthorized = { id ->
-            recover(NotebookReferenceLoad.Unavailable) {
-                grants.withGrant(principal, id) { grant ->
-                    if (!mayResolveNotebookReference(grant)) NotebookReferenceLoad.Denied
-                    else notebooks.read(notebookStorageId(id))?.let(NotebookReferenceLoad::Found) ?: NotebookReferenceLoad.Missing
-                }
-            }
-        },
-    )
+    val resolver = NotebookReferenceResolver(authorize = ::referenceAccess, readAuthorized = ::referenceLoad)
 
     /** A new edit decision is made for every requested open. */
-    val opener = DocumentWorkspaceOpener { id ->
-        recover(DocumentWorkspaceOpen.Unavailable) {
+    val opener = DocumentWorkspaceOpener(::open)
+
+    private suspend fun referenceAccess(id: NotebookDocumentId): NotebookReferenceAccess {
+        return recover(NotebookReferenceAccess.UNAVAILABLE) {
+            grants.withGrant(principal, id) { grant ->
+                if (mayResolveNotebookReference(grant)) NotebookReferenceAccess.ALLOWED else NotebookReferenceAccess.DENIED
+            }
+        }
+    }
+
+    private suspend fun referenceLoad(id: NotebookDocumentId): NotebookReferenceLoad {
+        return recover(NotebookReferenceLoad.Unavailable) {
+            grants.withGrant(principal, id) { grant ->
+                if (!mayResolveNotebookReference(grant)) NotebookReferenceLoad.Denied
+                else notebooks.read(notebookStorageId(id))?.let(NotebookReferenceLoad::Found) ?: NotebookReferenceLoad.Missing
+            }
+        }
+    }
+
+    private suspend fun open(id: NotebookDocumentId): DocumentWorkspaceOpen {
+        return recover(DocumentWorkspaceOpen.Unavailable) {
             grants.withGrant(principal, id) { grant ->
                 if (!mayEditNotebookContent(grant)) DocumentWorkspaceOpen.Denied
                 else DocumentWorkspaceOpen.Opened(
@@ -75,7 +78,11 @@ class HostNotebookAccess(
      * one listing rechecks at most [SharedNotesWire.MAX_CHECKED] grants; a listing that stopped
      * before the last grant (full, or at that bound) says so ([SharedNoteListing.Listed.truncated]).
      */
-    suspend fun sharedNotes(): SharedNoteListing = recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) {
+    suspend fun sharedNotes(): SharedNoteListing {
+        return recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) { listOpenable() }
+    }
+
+    private suspend fun listOpenable(): SharedNoteListing {
         val candidates = grants.documentsOf(principal)
         val notes = mutableListOf<SharedNote>()
         var checked = 0
@@ -84,11 +91,13 @@ class HostNotebookAccess(
             checked++
             openable(id)?.let(notes::add)
         }
-        SharedNoteListing.Listed(notes, truncated = checked < candidates.size)
+        return SharedNoteListing.Listed(notes, truncated = checked < candidates.size)
     }
 
-    private suspend fun openable(id: NotebookDocumentId): SharedNote? = grants.withGrant(principal, id) { grant ->
-        if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
+    private suspend fun openable(id: NotebookDocumentId): SharedNote? {
+        return grants.withGrant(principal, id) { grant ->
+            if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
+        }
     }
 }
 
@@ -97,12 +106,13 @@ private class AuthorizedBackend(
     private val grants: NotebookGrantStore,
     private val principal: String,
 ) : NotebookNoteBackend {
-    override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad =
-        recover(NotebookNoteLoad.Unavailable("Notebook authority unavailable")) {
+    override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad {
+        return recover(NotebookNoteLoad.Unavailable("Notebook authority unavailable")) {
             grants.withGrant(principal, id) { grant ->
                 if (mayEditNotebookContent(grant)) delegate.load(id) else NotebookNoteLoad.Denied
             }
         }
+    }
 
     override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave =
         edit(id) { delegate.save(id, expected, replacement) }
@@ -110,21 +120,24 @@ private class AuthorizedBackend(
     override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave =
         edit(applied.id) { delegate.flush(applied) }
 
-    private suspend fun edit(id: NotebookDocumentId, action: suspend () -> NotebookNoteSave): NotebookNoteSave =
-        recover(NotebookNoteSave.Unavailable("Notebook authority unavailable")) {
+    private suspend fun edit(id: NotebookDocumentId, action: suspend () -> NotebookNoteSave): NotebookNoteSave {
+        return recover(NotebookNoteSave.Unavailable("Notebook authority unavailable")) {
             grants.withGrant(principal, id) { grant -> if (mayEditNotebookContent(grant)) action() else NotebookNoteSave.Denied }
         }
+    }
 }
 
-private suspend fun <T> recover(failure: T, action: suspend () -> T): T = try {
-    action()
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (expectedFailure: Exception) {
-    Telemetry.event(
-        "NotebookAuthority", "operation.unavailable", "reason" attr (expectedFailure.message ?: "unknown"),
-        level = Telemetry.Level.WARN,
-    )
-    failure
+private suspend fun <T> recover(failure: T, action: suspend () -> T): T {
+    return try {
+        action()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (expectedFailure: Exception) {
+        Telemetry.event(
+            "NotebookAuthority", "operation.unavailable", "reason" attr (expectedFailure.message ?: "unknown"),
+            level = Telemetry.Level.WARN,
+        )
+        failure
+    }
 }
 
