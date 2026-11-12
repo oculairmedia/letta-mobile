@@ -24,7 +24,7 @@ class SharedNotesPlacementTest {
         assertEquals(listOf(SharedNotesPlacement.SLOT, sidePane), shown.sideLane())
         assertEquals(listOf(page), shown.mainLane())
         assertTrue(SharedNotesPlacement.shown(shown))
-        assertTrue(SharedNotesPlacement.inSideLane(shown))
+        assertTrue(SharedNotesPlacement.overCompactPage(shown))
     }
 
     @Test
@@ -33,12 +33,13 @@ class SharedNotesPlacementTest {
             lanes = ShellLayoutConfig.Default.lanes + (ShellLanes.MAIN to listOf(page, SharedNotesPlacement.SLOT)),
         )
         assertTrue(SharedNotesPlacement.shown(inMain))
-        assertFalse(SharedNotesPlacement.inSideLane(inMain))
+        assertTrue(SharedNotesPlacement.overCompactPage(inMain), "a phone's main lane draws only the page, so the view goes over it")
 
         val hidden = applied(inMain)
         assertEquals(listOf(page), hidden.mainLane())
         assertFalse(SharedNotesPlacement.shown(hidden))
         assertFalse(SharedNotesPlacement.shown(applied(applied(ShellLayoutConfig.Default))))
+        assertFalse(SharedNotesPlacement.overCompactPage(hidden))
     }
 
     @Test

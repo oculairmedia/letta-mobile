@@ -18,8 +18,12 @@ object SharedNotesPlacement {
     /** True when [config] already shows the document view in the main or side lane. */
     fun shown(config: ShellLayoutConfig): Boolean = lanesHolding(config).isNotEmpty()
 
-    /** True when [config] holds the document view in its side lane (a compact window draws it over the page). */
-    fun inSideLane(config: ShellLayoutConfig): Boolean = SLOT in config.sideLane()
+    /**
+     * True when a compact window draws the document view over the page: [config] shows it in either
+     * lane, and the compact main lane (room for one module, the page first) does not draw it itself.
+     * The menu's shown state and a phone's view therefore agree wherever an agent placed it.
+     */
+    fun overCompactPage(config: ShellLayoutConfig): Boolean = shown(config) && SLOT !in config.mainLane(room = 1)
 
     /** [config] with the document view shown or hidden, or why it cannot be (a full side lane). */
     fun toggled(config: ShellLayoutConfig): ShellLayoutEditResult {

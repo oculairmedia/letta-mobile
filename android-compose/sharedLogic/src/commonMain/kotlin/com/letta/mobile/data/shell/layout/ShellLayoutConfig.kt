@@ -69,8 +69,8 @@ object ShellViews {
     /**
      * The notes the host shares with this device, and the one opened from them in the document
      * workspace. It names no object: the person picks the note. A host that cannot reach shared
-     * notes shows it as unavailable. Not part of the default layout; a compact window draws a side
-     * slot of it over the page, which stays mounted beneath.
+     * notes shows it as unavailable. Not part of the default layout; a compact window draws it over
+     * the page (from either lane), which stays mounted beneath.
      */
     val DOCUMENT = RuntimeViewId("shell.document")
 

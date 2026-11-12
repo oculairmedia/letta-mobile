@@ -79,7 +79,7 @@ object ShellLayoutCatalog {
         ShellViews.DOCUMENT,
         "Shared notes",
         "The notes the host shares with this device; the person opens one to read and edit it. " +
-            "In the side area a phone shows it over the chat.",
+            "In either area a phone shows it over the chat.",
     )
     private val sidePane =
         ShellLayoutViewSpec(ShellViews.SIDE_PANE, "Side pane", "The host's own side pane (the desktop's background tasks).")

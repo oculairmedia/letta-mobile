@@ -55,8 +55,9 @@ internal val LocalShellModules = staticCompositionLocalOf { ShellModules() }
  *
  * A window shows as many main modules side by side as it has room for and a compact one shows one;
  * side modules other than the host's own pane are left out of a compact window, except the
- * shared-notes view, which a compact window draws over the page (the page stays mounted beneath,
- * so the main agent's chat keeps its state) and which closes the navigation drawer as it appears.
+ * shared-notes view, which a compact window draws over the page from either lane (the page stays
+ * mounted beneath, so the main agent's chat keeps its state) and which closes the navigation drawer
+ * as it appears.
  */
 @Composable
 internal fun RowScope.ShellWorkspaceLanes(
@@ -109,8 +110,9 @@ internal fun RowScope.ShellWorkspaceLanes(
 private val SecretRequestSlot = ModuleSlot(ShellViews.SECRET_REQUEST)
 
 /**
- * A compact window's shared-notes view: over the page, below the floating header, while the side
- * lane holds it. Showing it closes the drawer the person toggled it from, so it is seen at once.
+ * A compact window's shared-notes view: over the page, below the floating header, while either lane
+ * holds it (the compact main lane draws only the page). Showing it closes the drawer the person
+ * toggled it from, so it is seen at once.
  */
 @Composable
 private fun CompactDocumentLayer(
@@ -118,7 +120,7 @@ private fun CompactDocumentLayer(
     config: ShellLayoutConfig,
     views: Map<RuntimeViewId, ShellModuleView>,
 ) {
-    val shown = SharedNotesPlacement.inSideLane(config)
+    val shown = SharedNotesPlacement.overCompactPage(config)
     LaunchedEffect(shown) { if (shown) host.drawer.open = false }
     if (!shown) return
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
