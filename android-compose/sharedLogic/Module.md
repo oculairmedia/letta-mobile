@@ -747,6 +747,10 @@ Wrapper-owned producer run records and leases, independent of upstream cron stor
 
 Bounded Beads admin RPC adapter for the wrapper, with upstream credentials held on the host.
 
+# Package com.letta.mobile.data.controller.node.iroh.errors
+
+The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
+
 # Package com.letta.mobile.data.schedules.leases
 
 Read-only lease records and their per-day calendar spans. Lease producers and transport remain outside this model.

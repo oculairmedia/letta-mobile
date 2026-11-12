@@ -6,6 +6,7 @@ import com.letta.mobile.data.beads.BeadsProtocolException
 import com.letta.mobile.data.beads.BeadsTransportException
 import com.letta.mobile.data.beads.BeadsUnsupportedOperation
 import com.letta.mobile.data.beads.KtorBeadsBackend
+import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import io.ktor.client.engine.cio.CIO
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -56,7 +57,7 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
         val path = readPath(operation, params)
         val body = params?.get("body")
         val result = request(operation, path, query, body)
-        if (token?.let { containsSecret(result, it) } == true) error("beads.invalid_response")
+        if (token?.let { containsSecret(result, it) } == true) refuse("beads.invalid_response")
         return result
     }
 
@@ -70,15 +71,15 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: BeadsUnsupportedOperation) {
-        error("capability_unavailable: beads operation unsupported")
+        refuse("capability_unavailable: beads operation unsupported")
     } catch (failure: BeadsHttpException) {
-        error(httpError(failure.status))
+        refuse(httpError(failure.status))
     } catch (_: BeadsProtocolException) {
-        error("beads.invalid_response")
+        refuse("beads.invalid_response")
     } catch (_: BeadsTransportException) {
-        error("beads.unavailable")
+        refuse("beads.unavailable")
     } catch (_: Exception) {
-        error("beads.unavailable")
+        refuse("beads.unavailable")
     }
 
     private fun httpError(status: Int): String = when (status) {
@@ -106,11 +107,11 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
 
     private fun readQuery(params: JsonObject?): Map<String, List<String>> {
         val query = params?.get("query") ?: return emptyMap()
-        if (query !is JsonObject) error("validation.invalid_params: query")
+        if (query !is JsonObject) refuse("validation.invalid_params: query")
         return query.mapValues { (_, value) ->
-            if (value !is JsonArray) error("validation.invalid_params: query")
+            if (value !is JsonArray) refuse("validation.invalid_params: query")
             value.map { item ->
-                if (item !is JsonPrimitive || !item.isString) error("validation.invalid_params: query")
+                if (item !is JsonPrimitive || !item.isString) refuse("validation.invalid_params: query")
                 item.content
             }
         }
@@ -124,7 +125,7 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
             else -> return emptyMap()
         }
         val value = (params?.get(key) as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotBlank() }
-            ?: error("validation.invalid_params: $key")
+            ?: refuse("validation.invalid_params: $key")
         return mapOf(key to value.content)
     }
 
@@ -134,3 +135,6 @@ class BeadsRouteClient(private val baseUrl: String, private val tokenFile: Strin
         is JsonPrimitive -> secret in value.content
     }
 }
+
+/** Answers the caller with a fixed beads code: the admin router passes only this type's text through. */
+private fun refuse(code: String): Nothing = throw AdminRpcClientError(code)
