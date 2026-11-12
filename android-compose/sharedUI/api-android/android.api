@@ -10522,6 +10522,7 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 	public final fun getLambda$-163979135$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1958376124$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1244612492$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$370358104$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$379441742$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
@@ -10748,8 +10749,9 @@ public final class com/letta/mobile/ui/shell/workspace/ShellDocumentTags {
 	public static final field LIST Ljava/lang/String;
 	public static final field LOADING Ljava/lang/String;
 	public static final field MODULE Ljava/lang/String;
+	public static final field MORE Ljava/lang/String;
+	public static final field MORE_FAILED Ljava/lang/String;
 	public static final field OPEN_PROBLEM Ljava/lang/String;
-	public static final field TRUNCATED Ljava/lang/String;
 	public static final field UNAVAILABLE Ljava/lang/String;
 	public static final field WITHDRAWN Ljava/lang/String;
 	public final fun row (Lcom/letta/mobile/data/canvas/workspace/SharedNote;)Ljava/lang/String;
