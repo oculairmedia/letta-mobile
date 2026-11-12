@@ -311,7 +311,7 @@ for optional_workflow in desktop android-perf iroh-probe pagination-replay-fuzz;
   assert_eq "$readonly_count" "$setup_count"
 done
 embedded_workflow="$(<"$SOURCE_ROOT/.github/workflows/embedded-runtime-node18.yml")"
-assert_contains "$embedded_workflow" 'cache-read-only: ${{ github.event_name == '\''pull_request'\'' }}'
+assert_contains "$embedded_workflow" 'cache-read-only: ${{ github.event_name == '\''pull_request'\'' || github.ref != '\''refs/heads/main'\'' }}'
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'
 assert_not_contains "$perf_workflow" '  macrobenchmark:'
