@@ -211,6 +211,25 @@ class ConversationTurnFanoutTest {
     )
 
     @Test
+    fun idleProtocolSnapshotIsInitiatorOnlyEvenWithAnObserverSubscribed() = runTest {
+        val registry = ConnectionRegistry()
+        val initiatingSink = CapturingSink()
+        val observingSink = CapturingSink()
+        val initiator = viewer("conn-init", initiatingSink)
+        registry.register(conversationId, initiator)
+        registry.register(conversationId, viewer("conn-obs", observingSink))
+        fanoutFor(registry, initiator).writeInitiatorProtocolFrame("update_loop_status", buildJsonObject {
+            put("loop_status", buildJsonObject {
+                put("status", "WAITING_ON_INPUT")
+                put("active_run_ids", kotlinx.serialization.json.JsonArray(emptyList()))
+            })
+        })
+        val frame = json.parseToJsonElement(initiatingSink.frames().single()).jsonObject
+        assertEquals("update_loop_status", frame["type"]?.jsonPrimitive?.content)
+        assertTrue(observingSink.frames().isEmpty(), "second viewers cannot rely on initiator-only idle snapshots")
+    }
+
+    @Test
     fun bothViewersReceiveOrderedTaggedSequenceWithOneTerminalEach() = runTest {
         val registry = ConnectionRegistry()
         val sinkInit = CapturingSink()
