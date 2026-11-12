@@ -5,7 +5,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -17,6 +16,9 @@ import com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasState
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.ui.canvas.LocalCanvasBoardSave
+import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
+import com.letta.mobile.ui.shell.sidebar.LocalShellCanvasMounts
 import kotlinx.coroutines.delay
 
 /**
@@ -25,16 +27,15 @@ import kotlinx.coroutines.delay
  */
 val LocalConversationCanvasPicker = staticCompositionLocalOf<ConversationCanvasPicker?> { null }
 
-/** The save a switch waits for, attached by the board on screen inside a [ConversationCanvasFrame]. */
-val LocalCanvasBoardSwitchGate = staticCompositionLocalOf<CanvasBoardSwitchGate?> { null }
-
-/** True while the chat page shows its board with the chat over it (canvas mode); the chat surface provides it. */
-val LocalChatCanvasOnBoard = compositionLocalOf { false }
-
-/** Gives every view inside [content] the window's [picker]. */
+/** Gives every view inside [content] the window's [picker], and the side menu its view of it. */
 @Composable
 fun ProvideConversationCanvasPicker(picker: ConversationCanvasPicker?, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalConversationCanvasPicker provides picker, content = content)
+    val menu = remember(picker) { picker?.let(::PickerShellCanvasMounts) }
+    CompositionLocalProvider(
+        LocalConversationCanvasPicker provides picker,
+        LocalShellCanvasMounts provides menu,
+        content = content,
+    )
 }
 
 /**
@@ -63,7 +64,7 @@ fun ConversationCanvasFrame(target: ConversationCanvasTarget?, content: @Composa
     }
     ReportCanvasMode(picker.focus, target)
     val shown by switch.shown.collectAsState()
-    CompositionLocalProvider(LocalCanvasBoardSwitchGate provides gate) {
+    CompositionLocalProvider(LocalCanvasBoardSave provides gate::attach) {
         key(shown) { content(shown) }
     }
 }

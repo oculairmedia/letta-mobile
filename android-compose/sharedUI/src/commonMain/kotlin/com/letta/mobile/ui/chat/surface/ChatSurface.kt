@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface
 
-import com.letta.mobile.ui.canvas.mount.LocalChatCanvasOnBoard
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues

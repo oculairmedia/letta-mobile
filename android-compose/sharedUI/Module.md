@@ -34,7 +34,7 @@ How a view that shows one board wherever it is placed (the shell's canvas module
 
 # Package com.letta.mobile.ui.canvas.mount
 
-The board seat of a conversation's page, the same on every host. `ConversationCanvasFrame` draws the conversation's own board at once and switches to the canvas the host has mounted for it once the window's `ConversationCanvasPicker` (provided through `LocalConversationCanvasPicker`; null is a host without mounts) says so, saving the board on screen first through `LocalCanvasBoardSwitchGate`. It reports canvas mode (`LocalChatCanvasOnBoard`, provided by the chat surface) to the window's `CanvasModeFocus`, so the side menu's pick mounts on the conversation on screen. Resolution, retries and the switch rule live in sharedLogic; this package holds no policy of its own.
+The board seat of a conversation's page, the same on every host. `ConversationCanvasFrame` draws the conversation's own board at once and switches to the canvas the host has mounted for it once the window's `ConversationCanvasPicker` (provided through `LocalConversationCanvasPicker`; null is a host without mounts) says so, saving the board on screen first through the workspace's `LocalCanvasBoardSave`. It reports canvas mode (`LocalChatCanvasOnBoard`, provided by the chat surface) to the window's `CanvasModeFocus`, and gives the side menu its view of the picker (`PickerShellCanvasMounts` as `LocalShellCanvasMounts`), so a pick mounts on the conversation on screen. Resolution, retries and the switch rule live in sharedLogic; this package holds no policy of its own.
 
 # Package com.letta.mobile.ui.canvas.library
 

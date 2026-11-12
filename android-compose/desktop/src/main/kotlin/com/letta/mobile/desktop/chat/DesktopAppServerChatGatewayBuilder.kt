@@ -283,7 +283,7 @@ internal fun desktopCanvasToolRegistry(
 ): ExternalToolRegistry = agentToolsModes.withoutCli().apply(
     ExternalToolRegistry.hostTools(
         if (isIroh) emptyList() else CanvasExternalTools.all(
-            DesktopNotebookCanvasStore.documents, canvasSessions, mounts = DesktopCanvasHostSync.mounts,
+            DesktopNotebookCanvasStore.documents, canvasSessions, mounts = DesktopCanvasHostSync.mounts::mountedCanvas,
         ) + ShellLayoutTool(),
     ),
 )

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas.mount.client
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,6 +63,10 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
         launch { client.changes(target).collect { accept(target, it) } }
         known.map { it[target] ?: ConversationCanvasState.Resolving }.distinctUntilChanged().collect { send(it) }
     }
+
+    /** The canvas mounted for [conversationId] of [agentId] now, asking the host; null for its own board. */
+    suspend fun mountedCanvas(agentId: AgentId, conversationId: ConversationId): CanvasId? =
+        refresh(ConversationCanvasTarget(agentId, conversationId)).mountedCanvas
 
     /** Asks the host for [target]'s board now and publishes the answer. */
     suspend fun refresh(target: ConversationCanvasTarget): ConversationCanvasState = turn.withLock { refreshLocked(target, keep = false) }

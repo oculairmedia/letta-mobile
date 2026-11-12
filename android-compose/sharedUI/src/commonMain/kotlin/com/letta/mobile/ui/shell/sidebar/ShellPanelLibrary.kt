@@ -85,7 +85,7 @@ internal fun canvasesLine(sections: List<RosterSection<ShellPanelItem>>): Int =
  */
 @Composable
 internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
-    val picker = rememberCanvasPickerState()
+    val picker = rememberCanvasMountState()
     val picks = rememberCanvasPicks(actions)
     val canvases = remember(state.canvases, picker.mounted) { markMounted(state.canvases, picker.mounted) }
     val sections = remember(state.conversations, canvases, actions.onNewCanvas) {

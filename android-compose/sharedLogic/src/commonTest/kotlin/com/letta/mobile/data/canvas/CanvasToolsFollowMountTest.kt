@@ -25,7 +25,7 @@ class CanvasToolsFollowMountTest {
     private val store = InMemoryCanvasDocumentStore()
     private val client = FakeCanvasMountClient()
     private val registry = ExternalToolRegistry.hostTools(
-        CanvasExternalTools.all(store, CanvasSessionRegistry(), mounts = ConversationCanvasResolver(client)),
+        CanvasExternalTools.all(store, CanvasSessionRegistry(), mounts = ConversationCanvasResolver(client)::mountedCanvas),
     )
     private val own = CanvasId.forConversation(ConversationId(CONVERSATION))
     private val mounted = CanvasId("canvas-made-with-another-agent")

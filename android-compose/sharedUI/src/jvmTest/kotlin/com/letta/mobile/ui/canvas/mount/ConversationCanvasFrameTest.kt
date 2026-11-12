@@ -16,6 +16,7 @@ import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

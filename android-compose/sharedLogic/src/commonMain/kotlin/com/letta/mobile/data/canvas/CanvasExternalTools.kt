@@ -3,9 +3,6 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget
-import com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver
-import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
-import com.letta.mobile.data.canvas.mount.client.mountedCanvas
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
@@ -41,8 +38,8 @@ private class CanvasToolContext(private val tool: BaseCanvasTool, val agentId: S
     /** The plugin kinds whose props a plugin element write is held to. */
     val kinds: PluginKindCatalog get() = tool.kinds
 
-    /** Which board a conversation shows; null keeps every conversation on its own board. */
-    val mounts: ConversationCanvasResolver? get() = tool.mounts
+    /** The canvas mounted for a conversation; null keeps every conversation on its own board. */
+    val mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? get() = tool.mounts
 
     fun resolveCallerId(): CanvasActorId = CanvasActorId(agentId)
 }
@@ -52,8 +49,7 @@ private class CanvasToolContext(private val tool: BaseCanvasTool, val agentId: S
  * else its own. The tools default to this board, so the agent draws on the board the person sees.
  */
 private suspend fun conversationCanvasId(context: CanvasToolContext, conversationId: ConversationId): CanvasId? {
-    val target = ConversationCanvasTarget(AgentId(context.agentId), conversationId)
-    return context.mounts?.refresh(target)?.mountedCanvas ?: context.store.getForConversation(conversationId)?.id
+    return context.mounts?.invoke(AgentId(context.agentId), conversationId) ?: context.store.getForConversation(conversationId)?.id
 }
 
 private fun canRead(doc: CanvasDocument, callerId: CanvasActorId): Boolean =
@@ -360,8 +356,8 @@ abstract class BaseCanvasTool(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
     val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
-    /** Which board a conversation shows (its mount); null keeps every conversation on its own board. */
-    val mounts: ConversationCanvasResolver? = null,
+    /** The canvas mounted for a conversation (its host mount); null keeps every conversation on its own board. */
+    val mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
 ) : HostExternalTool {
     override val capability: Capability = Capability.ImageHydration
 }
@@ -541,7 +537,7 @@ class CanvasExportSvgTool(
 class CanvasListTool(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-    mounts: ConversationCanvasResolver? = null,
+    mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
 ) : BaseCanvasTool(store, sessions, mounts = mounts) {
     override val name: String = NAME
     override val description: String = CanvasToolContract.list.description
@@ -565,7 +561,7 @@ class CanvasListTool(
 class CanvasComposeTool(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-    mounts: ConversationCanvasResolver? = null,
+    mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
 ) : BaseCanvasTool(store, sessions, mounts = mounts) {
     override val name: String = NAME
     override val description: String = CanvasToolContract.compose.description
@@ -622,14 +618,15 @@ object CanvasExternalTools {
     /**
      * [sessions] must be the same registry the canvas UI registers into, or every tool falls back
      * to the store and an agent's edits never reach the session the user is looking at. [kinds]
-     * are the plugin kinds this app holds plugin element props to. [mounts] is the window's
-     * resolver, so a conversation's default board is the one its page shows (null: its own board).
+     * are the plugin kinds this app holds plugin element props to. [mounts] answers from the window's
+     * resolver (`ConversationCanvasResolver::mountedCanvas`), so a conversation's default board is the
+     * one its page shows (null: its own board).
      */
     fun all(
         store: CanvasDocumentStore,
         sessions: CanvasSessionRegistry,
         kinds: PluginKindCatalog = PluginKindCatalog.Empty,
-        mounts: ConversationCanvasResolver? = null,
+        mounts: (suspend (AgentId, ConversationId) -> CanvasId?)? = null,
     ): List<HostExternalTool> = listOf(
         CanvasCreateTool(store, sessions),
         CanvasGetSceneTool(store, sessions),

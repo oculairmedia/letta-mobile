@@ -18,10 +18,6 @@ import androidx.compose.ui.semantics.semantics
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Undo2
-import com.letta.mobile.data.canvas.mount.client.CanvasMountProblem
-import com.letta.mobile.data.canvas.mount.client.CanvasPick
-import com.letta.mobile.data.canvas.mount.client.CanvasPickerState
-import com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shell_canvas_jump
@@ -32,7 +28,6 @@ import com.letta.mobile.sharedui.resources.shell_canvas_mount_unavailable
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_unknown
 import com.letta.mobile.sharedui.resources.shell_canvas_new
 import com.letta.mobile.sharedui.resources.shell_canvas_use_own
-import com.letta.mobile.ui.canvas.mount.LocalConversationCanvasPicker
 import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayHost
@@ -53,11 +48,11 @@ object ShellCanvasTags {
 /** The canvases section's key in the panel's roster. */
 internal const val CANVASES_SECTION = "canvases"
 
-/** The side menu's view of canvas picks now; nothing mounts while the host offers no picker. */
+/** The side menu's view of canvas mounts now; nothing mounts while the host offers none. */
 @Composable
-internal fun rememberCanvasPickerState(): CanvasPickerState {
-    val picker = LocalConversationCanvasPicker.current ?: return CanvasPickerState()
-    val state by remember(picker) { picker.state }.collectAsState(CanvasPickerState())
+internal fun rememberCanvasMountState(): ShellCanvasMountState {
+    val mounts = LocalShellCanvasMounts.current ?: return ShellCanvasMountState()
+    val state by remember(mounts) { mounts.state }.collectAsState(ShellCanvasMountState())
     return state
 }
 
@@ -71,40 +66,41 @@ internal fun markMounted(canvases: List<ShellCanvasRowModel>, mounted: CanvasId?
  * A refusal or outage is told through the window's notices in plain words; the board stays.
  */
 internal class ShellCanvasPicks(
-    private val picker: ConversationCanvasPicker?,
+    private val mounts: ShellCanvasMounts?,
     private val actions: ShellAgentPanelActions,
     private val scope: CoroutineScope,
     private val overlays: OverlayHost?,
 ) {
     /** A canvas row was picked. */
     fun open(canvas: CanvasId) {
-        val window = picker?.takeIf { it.mountTarget() != null } ?: return actions.onOpenCanvas(canvas)
+        val window = mounts?.takeIf { it.mountsOnPick() } ?: return actions.onOpenCanvas(canvas)
         scope.launch { report(window.pick(canvas), canvas) }
     }
 
     /** "Use this conversation's own canvas" on the mounted row. */
     fun useOwn() {
-        val window = picker ?: return
-        scope.launch { report(window.useOwnCanvas(), canvas = null) }
+        val window = mounts ?: return
+        scope.launch { report(window.useOwn(), canvas = null) }
     }
 
-    private suspend fun report(pick: CanvasPick, canvas: CanvasId?) {
-        when (pick) {
+    private suspend fun report(outcome: ShellCanvasPickOutcome, canvas: CanvasId?) {
+        when (outcome) {
             // Canvas mode ended while the pick was on its way: open it as a pick outside canvas mode does.
-            CanvasPick.OpenAsBefore -> canvas?.let(actions.onOpenCanvas)
-            is CanvasPick.Mounted -> actions.onCanvasMounted()
-            is CanvasPick.Failed -> overlays?.show(Overlay.Snackbar(getString(messageOf(pick.problem)), key = NOTICE_KEY))
+            ShellCanvasPickOutcome.OpenAsBefore -> canvas?.let(actions.onOpenCanvas)
+            ShellCanvasPickOutcome.Mounted -> canvas?.let(actions.onCanvasMounted)
+            else -> messageOf(outcome)?.let { overlays?.show(Overlay.Snackbar(getString(it), key = NOTICE_KEY)) }
         }
     }
 
     private companion object {
         const val NOTICE_KEY = "shell-canvas-mount"
 
-        fun messageOf(problem: CanvasMountProblem): StringResource = when (problem) {
-            CanvasMountProblem.Denied -> Res.string.shell_canvas_mount_denied
-            is CanvasMountProblem.InvalidInput -> Res.string.shell_canvas_mount_invalid
-            is CanvasMountProblem.Unavailable -> Res.string.shell_canvas_mount_unavailable
-            CanvasMountProblem.OutcomeUnknown -> Res.string.shell_canvas_mount_unknown
+        fun messageOf(outcome: ShellCanvasPickOutcome): StringResource? = when (outcome) {
+            ShellCanvasPickOutcome.Denied -> Res.string.shell_canvas_mount_denied
+            ShellCanvasPickOutcome.Invalid -> Res.string.shell_canvas_mount_invalid
+            ShellCanvasPickOutcome.Unavailable -> Res.string.shell_canvas_mount_unavailable
+            ShellCanvasPickOutcome.Unknown -> Res.string.shell_canvas_mount_unknown
+            else -> null
         }
     }
 }
@@ -112,10 +108,10 @@ internal class ShellCanvasPicks(
 /** This window's canvas picks over [actions]. */
 @Composable
 internal fun rememberCanvasPicks(actions: ShellAgentPanelActions): ShellCanvasPicks {
-    val picker = LocalConversationCanvasPicker.current
+    val mounts = LocalShellCanvasMounts.current
     val scope = rememberCoroutineScope()
     val overlays = LocalOverlayHost.current
-    return remember(picker, actions, scope, overlays) { ShellCanvasPicks(picker, actions, scope, overlays) }
+    return remember(mounts, actions, scope, overlays) { ShellCanvasPicks(mounts, actions, scope, overlays) }
 }
 
 /** The Canvases header's "New canvas", when the host can start one. */

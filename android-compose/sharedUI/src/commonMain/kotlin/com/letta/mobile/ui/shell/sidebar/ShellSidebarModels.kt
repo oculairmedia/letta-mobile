@@ -128,8 +128,8 @@ data class ShellAgentPanelActions(
     val onArchiveCanvas: ((id: CanvasId, archived: Boolean) -> Unit)? = null,
     /** Starts a new canvas; null means the host cannot, so the Canvases header offers none. */
     val onNewCanvas: (() -> Unit)? = null,
-    /** A pick mounted a canvas on the board on show (the phone drawer closes so the board shows). */
-    val onCanvasMounted: () -> Unit = {},
+    /** A pick mounted this canvas on the board on show (the phone drawer closes; the desktop drops a pane copy of it). */
+    val onCanvasMounted: (CanvasId) -> Unit = {},
     /** Settle and marker; null means the host keeps no such marks. */
     val conversationMarks: ShellConversationMarkActions? = null,
     /** What the Chat options dialog changes; read with [ShellAgentPanelState.chatOptions]. */

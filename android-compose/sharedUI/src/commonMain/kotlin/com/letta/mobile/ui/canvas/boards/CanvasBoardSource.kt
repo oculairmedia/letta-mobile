@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.canvas.boards
 
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker
-import com.letta.mobile.ui.canvas.mount.LocalConversationCanvasPicker
+import com.letta.mobile.ui.canvas.mount.ProvideConversationCanvasPicker
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -71,8 +71,8 @@ fun ProvideCanvasHostWithBoards(
     content: @Composable () -> Unit,
 ) {
     ProvideCanvasHost(boards.registry, viewers) {
-        CompositionLocalProvider(LocalCanvasBoardSessions provides boards, LocalConversationCanvasPicker provides picker) {
-            ProvideCanvasBoardSource(boards, content)
+        CompositionLocalProvider(LocalCanvasBoardSessions provides boards) {
+            ProvideConversationCanvasPicker(picker) { ProvideCanvasBoardSource(boards, content) }
         }
     }
 }
