@@ -46,8 +46,8 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.components.LettaListRow
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaPane

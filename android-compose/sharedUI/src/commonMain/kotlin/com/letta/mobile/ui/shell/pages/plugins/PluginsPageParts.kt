@@ -25,7 +25,7 @@ import com.letta.mobile.data.plugin.catalog.PluginSummary
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
 import com.letta.mobile.data.plugin.catalog.PluginsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterOptions

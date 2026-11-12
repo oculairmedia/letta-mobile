@@ -42,7 +42,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.chat.branch.ForkNameDialog
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.components.list.RosterListRow
@@ -50,7 +50,6 @@ import com.letta.mobile.ui.components.list.RosterRowSlots
 import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
-import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenus
@@ -129,23 +128,23 @@ fun ShellConversationRow(
     val laneLabel = laneDescription(model.lane)
     val subtitle = listOf(laneLabel, model.subtitle).filter(String::isNotBlank).joinToString(" · ")
     Box {
-        LocalLettaHost.current.tooltip(model.title) {
-            RosterListRow(
-                spec = LettaListRowSpec(
-                    title = model.marker?.let { "$it ${model.title}" } ?: model.title,
-                    selected = model.selected,
-                    subtitle = subtitle.takeIf { it.isNotBlank() && it != model.title },
-                    emphasized = model.selected,
-                    quiet = model.deleting || model.settled,
-                    enabled = !model.deleting,
-                ),
-                row = row,
-                slots = RosterRowSlots(
-                    leading = { ConversationLeadingIcon(model = model, hovered = row.hovered, onArchiveToggle = actions.onArchiveToggle) },
-                    end = { ConversationRowEnd(model, laneActivity) },
-                ),
-            )
-        }
+        RosterListRow(
+            spec = LettaListRowSpec(
+                title = model.marker?.let { "$it ${model.title}" } ?: model.title,
+                selected = model.selected,
+                subtitle = subtitle.takeIf { it.isNotBlank() && it != model.title },
+                emphasized = model.selected,
+                quiet = model.deleting || model.settled,
+                enabled = !model.deleting,
+                muted = model.archived,
+                tooltip = model.title,
+            ),
+            row = row,
+            slots = RosterRowSlots(
+                leading = { ConversationLeadingIcon(model = model, hovered = row.hovered, onArchiveToggle = actions.onArchiveToggle) },
+                end = { ConversationRowEnd(model, laneActivity) },
+            ),
+        )
         actions.marks?.let { marks -> ShellMarkerPicker(model, marks, ui) }
     }
 }

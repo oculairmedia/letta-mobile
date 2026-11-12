@@ -7,13 +7,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +62,6 @@ import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAtWork
-import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags for the agent panel's parts. */
@@ -176,30 +175,15 @@ data class ShellNavRowModel(
 
 @Composable
 fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val content = if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-    LocalLettaHost.current.tooltip(model.tooltip ?: model.label) {
-        Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .height(LettaDimens.Space.xxl)
-                .clip(MaterialTheme.shapes.small)
-                .background(if (model.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
-                .clickable(onClick = onClick)
-                .padding(horizontal = LettaDimens.Space.sm),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(imageVector = model.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = content)
-            Text(
-                text = model.label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = content,
-                fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    LettaListRow(
+        spec = LettaListRowSpec(
+            title = model.label, icon = model.icon, selected = model.selected,
+            emphasized = model.selected, quiet = !model.selected,
+            tooltip = model.tooltip ?: model.label,
+        ),
+        onClick = onClick,
+        modifier = modifier.heightIn(min = LettaDimens.Space.xxl),
+    )
 }
 
 /**
