@@ -75,6 +75,12 @@ object ShellLayoutCatalog {
         "Background tasks",
         "The open conversation's background tasks (subagent runs); the person can dismiss each. Shown only in a wide window.",
     )
+    private val document = ShellLayoutViewSpec(
+        ShellViews.DOCUMENT,
+        "Shared notes",
+        "The notes the host shares with this device; the person opens one to read and edit it. " +
+            "In the side area a phone shows it over the chat.",
+    )
     private val sidePane =
         ShellLayoutViewSpec(ShellViews.SIDE_PANE, "Side pane", "The host's own side pane (the desktop's background tasks).")
 
@@ -114,14 +120,14 @@ object ShellLayoutCatalog {
             ShellLanes.MAIN,
             "Main area",
             "Beside the navigation; its modules share the width in a wide window, a phone shows the page alone.",
-            listOf(page, canvas, note, tasks),
+            listOf(page, canvas, note, tasks, document),
             maxSlots = 4,
         ),
         ShellLayoutLaneSpec(
             ShellLanes.SIDE,
             "Side area",
             "After the main area, each module at its own width; a canvas or tasks here shows only in a wide window.",
-            listOf(sidePane, canvas, note, tasks),
+            listOf(sidePane, canvas, note, tasks, document),
             maxSlots = 3,
         ),
         ShellLayoutLaneSpec(ShellLanes.HOME, "Home", "The Home page's sections, top to bottom.", homeViews, homeViews.size),
