@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas.mount
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlin.test.assertIs
 
 /** A test authority's answer; [THROW] proves a failing authority denies instead of escaping. */
 internal enum class Answer { ALLOW, DENY, ABSTAIN, THROW }
@@ -68,17 +69,21 @@ internal class RecordingStorage(
 
     override suspend fun readDefault(agentId: AgentId) = touch("readDefault")
 
-    override suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId =
-        touch("bindIfAbsent") ?: proposed.also { stored = it }
-
-    override suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId) {
-        touch("replaceBinding")
-        stored = canvasId
+    override suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasMountMutation {
+        val winner = touch("bindIfAbsent") ?: proposed.also { stored = it }
+        return CanvasMountMutation.Applied(winner, written = winner == proposed)
     }
 
-    override suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) {
+    override suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId): CanvasMountMutation {
+        touch("replaceBinding")
+        stored = canvasId
+        return CanvasMountMutation.Applied(canvasId, written = true)
+    }
+
+    override suspend fun setDefault(agentId: AgentId, canvasId: CanvasId): CanvasMountMutation {
         touch("setDefault")
         stored = canvasId
+        return CanvasMountMutation.Applied(canvasId, written = true)
     }
 
     private suspend fun touch(operation: String): CanvasId? {
@@ -88,3 +93,9 @@ internal class RecordingStorage(
         return stored
     }
 }
+
+/** The durable canvas of a mutation that must have been applied. */
+internal fun CanvasMountMutation.durable(): CanvasId = assertIs<CanvasMountMutation.Applied>(this).canvas
+
+/** The cause of a mutation that must have failed before its commit point. */
+internal fun CanvasMountMutation.notAppliedCause(): Throwable = assertIs<CanvasMountMutation.NotApplied>(this).cause
