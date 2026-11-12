@@ -449,16 +449,21 @@ class ChatSendCoordinator(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (failure: IllegalArgumentException) {
+            // Pending-store require checks (identity, row and byte budgets) cannot heal on retry.
+            rejectPendingSend(pending, failure)
         } catch (failure: Exception) {
             val queueOwnsSend = queuedSends.queueFor(pending.conversationId).items.any { it.id == pending.id }
-            // Pending-store require checks (identity, row and byte budgets) cannot heal on retry.
-            // Keep transport/state failures retryable, but surface invalid admission immediately.
-            if (failure !is IllegalArgumentException && (pending.attempt > 0 || queueOwnsSend)) throw failure
-            Telemetry.error("AdminChatVM", "ws.send.pendingRejected", failure)
-            foreground.sendFailed(ConversationId(pending.conversationId.value),
-                "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
-            null
+            if (pending.attempt > 0 || queueOwnsSend) throw failure
+            rejectPendingSend(pending, failure)
         }
+    }
+
+    private fun rejectPendingSend(pending: QueuedChatSend, failure: Exception): Boolean? {
+        Telemetry.error("AdminChatVM", "ws.send.pendingRejected", failure)
+        foreground.sendFailed(ConversationId(pending.conversationId.value),
+            "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
+        return null
     }
 
     private fun reportQueuedSend(pending: QueuedChatSend, position: Int) {
