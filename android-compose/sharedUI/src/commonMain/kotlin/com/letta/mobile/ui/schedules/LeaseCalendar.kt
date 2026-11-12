@@ -13,8 +13,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.leases.Lease
 import com.letta.mobile.data.schedules.leases.LeaseState
-import com.letta.mobile.ui.components.LettaListRow
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.datetime.TimeZone
 

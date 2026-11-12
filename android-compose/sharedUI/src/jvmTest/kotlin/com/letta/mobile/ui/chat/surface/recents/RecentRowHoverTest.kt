@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
@@ -27,17 +28,18 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.requestFocus
-import com.letta.mobile.ui.components.LettaListRow
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.components.LettaListRowDefaults
+import com.letta.mobile.ui.components.row.LettaListRowDefaults
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterSection
 import com.letta.mobile.ui.components.list.RosterSpec
@@ -117,6 +119,39 @@ class RecentRowHoverTest {
         disabled.performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(before, disabled.captureToImage().toPixelMap()[SAMPLE_X, SAMPLE_Y])
+    }
+
+    @Test
+    fun touchPressShowsSurfaceWithoutMovingAndReleaseRestoresIt() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                ProvideLettaHost(LettaHost.Touch) {
+                    Column(Modifier.width(400.dp)) {
+                        for ((key, selected) in listOf(IDLE_KEY to false, OPEN_KEY to true)) {
+                            LettaListRow(
+                                LettaListRowSpec(key, selected = selected), {},
+                                Modifier.testTag(recentRowTag(key)).focusProperties { canFocus = false },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        for ((key, selected) in listOf(IDLE_KEY to false, OPEN_KEY to true)) {
+            val node = onNodeWithTag(recentRowTag(key))
+            val bounds = node.fetchSemanticsNode().boundsInRoot
+            val before = node.captureToImage().toPixelMap()[SAMPLE_X, SAMPLE_Y]
+            node.performTouchInput { down(center) }
+            mainClock.advanceTimeBy(TOOLTIP_SETTLE_MILLIS)
+            waitForIdle()
+            val expected = if (selected) lightColorScheme().surfaceContainerHighest else lightColorScheme().surfaceContainer
+            assertEquals(expected, node.captureToImage().toPixelMap()[SAMPLE_X, SAMPLE_Y], "Touch press surface")
+            assertEquals(bounds, node.fetchSemanticsNode().boundsInRoot)
+            node.performTouchInput { up() }
+            mainClock.advanceTimeBy(TOOLTIP_SETTLE_MILLIS)
+            waitForIdle()
+            assertEquals(before, node.captureToImage().toPixelMap()[SAMPLE_X, SAMPLE_Y])
+        }
     }
 
     @Test

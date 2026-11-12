@@ -24,7 +24,7 @@ import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.runs.RunMonitorState
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterList

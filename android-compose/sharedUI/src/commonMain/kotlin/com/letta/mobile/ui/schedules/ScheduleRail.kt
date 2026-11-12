@@ -44,7 +44,7 @@ import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.ScheduleReliability
 import com.letta.mobile.data.schedules.ScheduleRun
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterListRow

@@ -10,10 +10,11 @@ class ListRowOwnershipTest {
     @Test
     fun sharedRowOwnsHoverSurfaceCursorAndTooltip() {
         val source = File("src/commonMain/kotlin/com/letta/mobile/ui")
-        val shared = File(source, "components/LettaListParts.kt").readText()
+        val shared = File(source, "components/row/LettaListRow.kt").readText()
         assertTrue(shared.contains("collectIsHoveredAsState()"))
         assertTrue(shared.contains("pointerHoverIcon("))
-        assertTrue(shared.contains("tooltip(spec.tooltip)"))
+        assertTrue(shared.contains("LocalLettaRowTooltip.current(spec.tooltip)"))
+        assertEquals(0, Regex("import com\\.letta\\.mobile\\.ui\\.(host|shell|chat)").findAll(shared).count())
         val paths = listOf(
             "chat/surface/recents/RecentInteractionsList.kt",
             "shell/sidebar/ShellConversationRow.kt",
@@ -28,7 +29,7 @@ class ListRowOwnershipTest {
             assertEquals(0, Regex("\\.tooltip\\s*\\(").findAll(text).count(), path)
         }
         assertTrue(File(source, paths.first()).readText().contains("LettaListRow("))
-        val rowFiles = source.walkTopDown().filter { it.isFile && it.name.endsWith("Row.kt") }
+        val rowFiles = source.walkTopDown().filter { it.isFile && it.name.endsWith("Row.kt") && it.name != "LettaListRow.kt" }
         for (file in rowFiles) {
             assertEquals(0, Regex("collectIsHoveredAsState\\s*\\(").findAll(file.readText()).count(), file.path)
         }

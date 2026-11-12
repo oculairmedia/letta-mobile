@@ -4,8 +4,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.runtime.CompositionLocalProvider
-import com.letta.mobile.ui.components.LocalLettaListRowInteraction
-import com.letta.mobile.ui.components.rememberLettaListRowInteraction
+import com.letta.mobile.ui.components.row.LocalLettaListRowInteraction
+import com.letta.mobile.ui.components.row.rememberLettaListRowInteraction
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement

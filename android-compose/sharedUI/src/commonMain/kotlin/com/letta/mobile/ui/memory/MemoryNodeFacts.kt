@@ -18,8 +18,8 @@ import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.ui.components.LettaFactLabel
 import com.letta.mobile.ui.components.LettaFactRow
-import com.letta.mobile.ui.components.LettaListRow
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaMeter
 import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.components.lettaFraction
