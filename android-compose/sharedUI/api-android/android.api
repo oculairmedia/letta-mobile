@@ -7904,6 +7904,17 @@ public final class com/letta/mobile/ui/shell/header/UnifiedShellSearch {
 	public static synthetic fun sections$default (Lcom/letta/mobile/ui/shell/header/UnifiedShellSearch;Lcom/letta/mobile/ui/shell/header/UnifiedSearchQuery;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;Ljava/util/List;IILjava/lang/Object;)Ljava/util/List;
 }
 
+public final class com/letta/mobile/ui/shell/modules/SharedNotesToggle {
+	public static final field $stable I
+	public fun <init> (ZLkotlin/jvm/functions/Function0;)V
+	public final fun getShown ()Z
+	public final fun getToggle ()Lkotlin/jvm/functions/Function0;
+}
+
+public final class com/letta/mobile/ui/shell/modules/SharedNotesToggleKt {
+	public static final fun getLocalSharedNotesToggle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/shell/modules/ShellModuleTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/modules/ShellModuleTags;
@@ -10505,6 +10516,15 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellSidebarMapping {
 	public final fun panelState (Lcom/letta/mobile/ui/shell/sidebar/ShellSidebarInput;Lkotlin/time/Instant;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;
 }
 
+public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellDocumentModuleKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellDocumentModuleKt;
+	public fun <init> ()V
+	public final fun getLambda$-163979135$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1958376124$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1244612492$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$379441742$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellMinimalHeaderKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellMinimalHeaderKt;
 	public fun <init> ()V
@@ -10523,6 +10543,7 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 	public final fun getLambda$-301314359$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$1573032$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$607347814$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$910235205$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
@@ -10709,6 +10730,27 @@ public final class com/letta/mobile/ui/shell/workspace/ShellConversationTabs {
 	public final fun getTabs ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ShellDocumentModuleKt {
+	public static final fun ProvideShellSharedNotes (Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalShellSharedNotes ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ShellDocumentTags {
+	public static final field $stable I
+	public static final field BACK Ljava/lang/String;
+	public static final field CLOSE Ljava/lang/String;
+	public static final field DENIED Ljava/lang/String;
+	public static final field EMPTY Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ShellDocumentTags;
+	public static final field LIST Ljava/lang/String;
+	public static final field LOADING Ljava/lang/String;
+	public static final field MODULE Ljava/lang/String;
+	public static final field OPEN_PROBLEM Ljava/lang/String;
+	public static final field UNAVAILABLE Ljava/lang/String;
+	public static final field WITHDRAWN Ljava/lang/String;
+	public final fun row (Lcom/letta/mobile/data/canvas/workspace/SharedNote;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellFleetListsKt {
