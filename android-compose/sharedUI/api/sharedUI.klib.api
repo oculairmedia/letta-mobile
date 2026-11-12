@@ -857,6 +857,11 @@ abstract interface com.letta.mobile.ui.pairing.composition/PairingShellPorts { /
     abstract fun shareLink(kotlin/String) // com.letta.mobile.ui.pairing.composition/PairingShellPorts.shareLink|shareLink(kotlin.String){}[0]
 }
 
+abstract interface com.letta.mobile.ui.secrets/SecureSurface { // com.letta.mobile.ui.secrets/SecureSurface|null[0]
+    abstract fun enter(): com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities // com.letta.mobile.ui.secrets/SecureSurface.enter|enter(){}[0]
+    abstract fun exit() // com.letta.mobile.ui.secrets/SecureSurface.exit|exit(){}[0]
+}
+
 sealed interface <#A: out kotlin/Any?> com.letta.mobile.ui.components.picker/PickerLine { // com.letta.mobile.ui.components.picker/PickerLine|null[0]
     abstract val key // com.letta.mobile.ui.components.picker/PickerLine.key|{}key[0]
         abstract fun <get-key>(): kotlin/String // com.letta.mobile.ui.components.picker/PickerLine.key.<get-key>|<get-key>(){}[0]
@@ -892,6 +897,33 @@ sealed interface <#A: out kotlin/Any?> com.letta.mobile.ui.components.picker/Pic
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.components.picker/PickerLine.Row.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.ui.components.picker/PickerLine.Row.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.ui.components.picker/PickerLine.Row.toString|toString(){}[0]
+    }
+}
+
+sealed interface <#A: out kotlin/Any?> com.letta.mobile.ui.secrets/LedgerRelease { // com.letta.mobile.ui.secrets/LedgerRelease|null[0]
+    final class <#A1: out kotlin/Any?> Restore : com.letta.mobile.ui.secrets/LedgerRelease<#A1> { // com.letta.mobile.ui.secrets/LedgerRelease.Restore|null[0]
+        constructor <init>(#A1) // com.letta.mobile.ui.secrets/LedgerRelease.Restore.<init>|<init>(1:0){}[0]
+
+        final val previous // com.letta.mobile.ui.secrets/LedgerRelease.Restore.previous|{}previous[0]
+            final fun <get-previous>(): #A1 // com.letta.mobile.ui.secrets/LedgerRelease.Restore.previous.<get-previous>|<get-previous>(){}[0]
+
+        final fun component1(): #A1 // com.letta.mobile.ui.secrets/LedgerRelease.Restore.component1|component1(){}[0]
+        final fun copy(#A1 = ...): com.letta.mobile.ui.secrets/LedgerRelease.Restore<#A1> // com.letta.mobile.ui.secrets/LedgerRelease.Restore.copy|copy(1:0){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.secrets/LedgerRelease.Restore.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.ui.secrets/LedgerRelease.Restore.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.ui.secrets/LedgerRelease.Restore.toString|toString(){}[0]
+    }
+
+    final object NotHeld : com.letta.mobile.ui.secrets/LedgerRelease<kotlin/Nothing> { // com.letta.mobile.ui.secrets/LedgerRelease.NotHeld|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.secrets/LedgerRelease.NotHeld.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.ui.secrets/LedgerRelease.NotHeld.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.ui.secrets/LedgerRelease.NotHeld.toString|toString(){}[0]
+    }
+
+    final object StillHeld : com.letta.mobile.ui.secrets/LedgerRelease<kotlin/Nothing> { // com.letta.mobile.ui.secrets/LedgerRelease.StillHeld|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.secrets/LedgerRelease.StillHeld.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.ui.secrets/LedgerRelease.StillHeld.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.ui.secrets/LedgerRelease.StillHeld.toString|toString(){}[0]
     }
 }
 
@@ -1538,6 +1570,16 @@ final class <#A: com.letta.mobile.ui.mascot/MascotEntry> com.letta.mobile.ui.mas
 
     final fun closeAll() // com.letta.mobile.ui.mascot/MascotEntries.closeAll|closeAll(){}[0]
     final fun get(kotlin/String, com.letta.mobile.avatar.core.model/MascotIdentity): #A? // com.letta.mobile.ui.mascot/MascotEntries.get|get(kotlin.String;com.letta.mobile.avatar.core.model.MascotIdentity){}[0]
+}
+
+final class <#A: kotlin/Any, #B: kotlin/Any?> com.letta.mobile.ui.secrets/RestoreLedger { // com.letta.mobile.ui.secrets/RestoreLedger|null[0]
+    constructor <init>() // com.letta.mobile.ui.secrets/RestoreLedger.<init>|<init>(){}[0]
+
+    final val size // com.letta.mobile.ui.secrets/RestoreLedger.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.letta.mobile.ui.secrets/RestoreLedger.size.<get-size>|<get-size>(){}[0]
+
+    final fun acquire(#A, #B): kotlin/Boolean // com.letta.mobile.ui.secrets/RestoreLedger.acquire|acquire(1:0;1:1){}[0]
+    final fun release(#A): com.letta.mobile.ui.secrets/LedgerRelease<#B> // com.letta.mobile.ui.secrets/RestoreLedger.release|release(1:0){}[0]
 }
 
 final class <#A: kotlin/Any> com.letta.mobile.ui.chat.surface/LayoutPrefStorage { // com.letta.mobile.ui.chat.surface/LayoutPrefStorage|null[0]
@@ -5212,6 +5254,52 @@ final class com.letta.mobile.ui.search/LettaSearchToggle { // com.letta.mobile.u
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.search/LettaSearchToggle.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.search/LettaSearchToggle.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.search/LettaSearchToggle.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.ui.secrets/SecretRequestCardModel { // com.letta.mobile.ui.secrets/SecretRequestCardModel|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestRecord, kotlin/String, kotlin/Int, kotlin/Int = ...) // com.letta.mobile.ui.secrets/SecretRequestCardModel.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestRecord;kotlin.String;kotlin.Int;kotlin.Int){}[0]
+
+    final val agentLabel // com.letta.mobile.ui.secrets/SecretRequestCardModel.agentLabel|{}agentLabel[0]
+        final fun <get-agentLabel>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestCardModel.agentLabel.<get-agentLabel>|<get-agentLabel>(){}[0]
+    final val minutesLeft // com.letta.mobile.ui.secrets/SecretRequestCardModel.minutesLeft|{}minutesLeft[0]
+        final fun <get-minutesLeft>(): kotlin/Int // com.letta.mobile.ui.secrets/SecretRequestCardModel.minutesLeft.<get-minutesLeft>|<get-minutesLeft>(){}[0]
+    final val othersWaiting // com.letta.mobile.ui.secrets/SecretRequestCardModel.othersWaiting|{}othersWaiting[0]
+        final fun <get-othersWaiting>(): kotlin/Int // com.letta.mobile.ui.secrets/SecretRequestCardModel.othersWaiting.<get-othersWaiting>|<get-othersWaiting>(){}[0]
+    final val request // com.letta.mobile.ui.secrets/SecretRequestCardModel.request|{}request[0]
+        final fun <get-request>(): com.letta.mobile.data.secrets.request/SecretRequestRecord // com.letta.mobile.ui.secrets/SecretRequestCardModel.request.<get-request>|<get-request>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestRecord // com.letta.mobile.ui.secrets/SecretRequestCardModel.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestCardModel.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.ui.secrets/SecretRequestCardModel.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.letta.mobile.ui.secrets/SecretRequestCardModel.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.secrets.request/SecretRequestRecord = ..., kotlin/String = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.ui.secrets/SecretRequestCardModel // com.letta.mobile.ui.secrets/SecretRequestCardModel.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestRecord;kotlin.String;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.secrets/SecretRequestCardModel.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.ui.secrets/SecretRequestCardModel.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestCardModel.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.ui.secrets/SecretRequestHost { // com.letta.mobile.ui.secrets/SecretRequestHost|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.client/SecretRequestClient, kotlin/Function1<com.letta.mobile.data.model/AgentId, kotlin/String?> = ..., kotlin.time/Clock = ...) // com.letta.mobile.ui.secrets/SecretRequestHost.<init>|<init>(com.letta.mobile.data.secrets.client.SecretRequestClient;kotlin.Function1<com.letta.mobile.data.model.AgentId,kotlin.String?>;kotlin.time.Clock){}[0]
+
+    final val agentName // com.letta.mobile.ui.secrets/SecretRequestHost.agentName|{}agentName[0]
+        final fun <get-agentName>(): kotlin/Function1<com.letta.mobile.data.model/AgentId, kotlin/String?> // com.letta.mobile.ui.secrets/SecretRequestHost.agentName.<get-agentName>|<get-agentName>(){}[0]
+    final val client // com.letta.mobile.ui.secrets/SecretRequestHost.client|{}client[0]
+        final fun <get-client>(): com.letta.mobile.data.secrets.client/SecretRequestClient // com.letta.mobile.ui.secrets/SecretRequestHost.client.<get-client>|<get-client>(){}[0]
+    final val clock // com.letta.mobile.ui.secrets/SecretRequestHost.clock|{}clock[0]
+        final fun <get-clock>(): kotlin.time/Clock // com.letta.mobile.ui.secrets/SecretRequestHost.clock.<get-clock>|<get-clock>(){}[0]
+
+    final fun labelOf(com.letta.mobile.data.model/AgentId): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestHost.labelOf|labelOf(com.letta.mobile.data.model.AgentId){}[0]
+}
+
+final class com.letta.mobile.ui.secrets/SecretRequestPanel { // com.letta.mobile.ui.secrets/SecretRequestPanel|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, com.letta.mobile.ui.secrets/SecretRequestHost, kotlin/Function1<com.letta.mobile.data.secrets.request/SecretRequestRecord, kotlin/Unit>) // com.letta.mobile.ui.secrets/SecretRequestPanel.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>;com.letta.mobile.ui.secrets.SecretRequestHost;kotlin.Function1<com.letta.mobile.data.secrets.request.SecretRequestRecord,kotlin.Unit>){}[0]
+
+    final val host // com.letta.mobile.ui.secrets/SecretRequestPanel.host|{}host[0]
+        final fun <get-host>(): com.letta.mobile.ui.secrets/SecretRequestHost // com.letta.mobile.ui.secrets/SecretRequestPanel.host.<get-host>|<get-host>(){}[0]
+    final val open // com.letta.mobile.ui.secrets/SecretRequestPanel.open|{}open[0]
+        final fun <get-open>(): kotlin/Function1<com.letta.mobile.data.secrets.request/SecretRequestRecord, kotlin/Unit> // com.letta.mobile.ui.secrets/SecretRequestPanel.open.<get-open>|<get-open>(){}[0]
+    final val pending // com.letta.mobile.ui.secrets/SecretRequestPanel.pending|{}pending[0]
+        final fun <get-pending>(): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.ui.secrets/SecretRequestPanel.pending.<get-pending>|<get-pending>(){}[0]
 }
 
 final class com.letta.mobile.ui.settings/ActionButton { // com.letta.mobile.ui.settings/ActionButton|null[0]
@@ -9881,6 +9969,37 @@ final object com.letta.mobile.ui.search/LettaSearchChipTags { // com.letta.mobil
     final fun chip(kotlin/String): kotlin/String // com.letta.mobile.ui.search/LettaSearchChipTags.chip|chip(kotlin.String){}[0]
 }
 
+final object com.letta.mobile.ui.secrets/SecretRequestCardTags { // com.letta.mobile.ui.secrets/SecretRequestCardTags|null[0]
+    final const val CARD // com.letta.mobile.ui.secrets/SecretRequestCardTags.CARD|{}CARD[0]
+        final fun <get-CARD>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestCardTags.CARD.<get-CARD>|<get-CARD>(){}[0]
+    final const val OPEN // com.letta.mobile.ui.secrets/SecretRequestCardTags.OPEN|{}OPEN[0]
+        final fun <get-OPEN>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestCardTags.OPEN.<get-OPEN>|<get-OPEN>(){}[0]
+}
+
+final object com.letta.mobile.ui.secrets/SecretRequestFormTags { // com.letta.mobile.ui.secrets/SecretRequestFormTags|null[0]
+    final const val CLOSE // com.letta.mobile.ui.secrets/SecretRequestFormTags.CLOSE|{}CLOSE[0]
+        final fun <get-CLOSE>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.CLOSE.<get-CLOSE>|<get-CLOSE>(){}[0]
+    final const val DECLINE // com.letta.mobile.ui.secrets/SecretRequestFormTags.DECLINE|{}DECLINE[0]
+        final fun <get-DECLINE>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.DECLINE.<get-DECLINE>|<get-DECLINE>(){}[0]
+    final const val FIELD // com.letta.mobile.ui.secrets/SecretRequestFormTags.FIELD|{}FIELD[0]
+        final fun <get-FIELD>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.FIELD.<get-FIELD>|<get-FIELD>(){}[0]
+    final const val FORM // com.letta.mobile.ui.secrets/SecretRequestFormTags.FORM|{}FORM[0]
+        final fun <get-FORM>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.FORM.<get-FORM>|<get-FORM>(){}[0]
+    final const val MESSAGE // com.letta.mobile.ui.secrets/SecretRequestFormTags.MESSAGE|{}MESSAGE[0]
+        final fun <get-MESSAGE>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.MESSAGE.<get-MESSAGE>|<get-MESSAGE>(){}[0]
+    final const val RETRY // com.letta.mobile.ui.secrets/SecretRequestFormTags.RETRY|{}RETRY[0]
+        final fun <get-RETRY>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.RETRY.<get-RETRY>|<get-RETRY>(){}[0]
+    final const val REVEAL // com.letta.mobile.ui.secrets/SecretRequestFormTags.REVEAL|{}REVEAL[0]
+        final fun <get-REVEAL>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.REVEAL.<get-REVEAL>|<get-REVEAL>(){}[0]
+    final const val SUBMIT // com.letta.mobile.ui.secrets/SecretRequestFormTags.SUBMIT|{}SUBMIT[0]
+        final fun <get-SUBMIT>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestFormTags.SUBMIT.<get-SUBMIT>|<get-SUBMIT>(){}[0]
+}
+
+final object com.letta.mobile.ui.secrets/SecretRequestModuleTags { // com.letta.mobile.ui.secrets/SecretRequestModuleTags|null[0]
+    final const val FORM_PANE // com.letta.mobile.ui.secrets/SecretRequestModuleTags.FORM_PANE|{}FORM_PANE[0]
+        final fun <get-FORM_PANE>(): kotlin/String // com.letta.mobile.ui.secrets/SecretRequestModuleTags.FORM_PANE.<get-FORM_PANE>|<get-FORM_PANE>(){}[0]
+}
+
 final object com.letta.mobile.ui.settings/BackendConnectionTags { // com.letta.mobile.ui.settings/BackendConnectionTags|null[0]
     final const val NOTICE // com.letta.mobile.ui.settings/BackendConnectionTags.NOTICE|{}NOTICE[0]
         final fun <get-NOTICE>(): kotlin/String // com.letta.mobile.ui.settings/BackendConnectionTags.NOTICE.<get-NOTICE>|<get-NOTICE>(){}[0]
@@ -11516,6 +11635,8 @@ final const val com.letta.mobile.ui.search/SearchPanelTestTag // com.letta.mobil
     final fun <get-SearchPanelTestTag>(): kotlin/String // com.letta.mobile.ui.search/SearchPanelTestTag.<get-SearchPanelTestTag>|<get-SearchPanelTestTag>(){}[0]
 final const val com.letta.mobile.ui.search/SearchTriggerTestTag // com.letta.mobile.ui.search/SearchTriggerTestTag|{}SearchTriggerTestTag[0]
     final fun <get-SearchTriggerTestTag>(): kotlin/String // com.letta.mobile.ui.search/SearchTriggerTestTag.<get-SearchTriggerTestTag>|<get-SearchTriggerTestTag>(){}[0]
+final const val com.letta.mobile.ui.secrets/SECRET_MASK_CHAR // com.letta.mobile.ui.secrets/SECRET_MASK_CHAR|{}SECRET_MASK_CHAR[0]
+    final fun <get-SECRET_MASK_CHAR>(): kotlin/Char // com.letta.mobile.ui.secrets/SECRET_MASK_CHAR.<get-SECRET_MASK_CHAR>|<get-SECRET_MASK_CHAR>(){}[0]
 final const val com.letta.mobile.ui.settings/REMOTE_HOST_PLACEHOLDER // com.letta.mobile.ui.settings/REMOTE_HOST_PLACEHOLDER|{}REMOTE_HOST_PLACEHOLDER[0]
     final fun <get-REMOTE_HOST_PLACEHOLDER>(): kotlin/String // com.letta.mobile.ui.settings/REMOTE_HOST_PLACEHOLDER.<get-REMOTE_HOST_PLACEHOLDER>|<get-REMOTE_HOST_PLACEHOLDER>(){}[0]
 final const val com.letta.mobile.ui.settings/SETTINGS_NEEDS_HOST // com.letta.mobile.ui.settings/SETTINGS_NEEDS_HOST|{}SETTINGS_NEEDS_HOST[0]
@@ -11982,6 +12103,20 @@ final val com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchScope
 final val com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSection$stableprop // com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSection$stableprop|#static{}com_letta_mobile_ui_search_LettaSearchSection$stableprop[0]
 final val com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSource$stableprop // com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSource$stableprop|#static{}com_letta_mobile_ui_search_LettaSearchSource$stableprop[0]
 final val com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchToggle$stableprop // com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchToggle$stableprop|#static{}com_letta_mobile_ui_search_LettaSearchToggle$stableprop[0]
+final val com.letta.mobile.ui.secrets/LocalSecretRequestHost // com.letta.mobile.ui.secrets/LocalSecretRequestHost|{}LocalSecretRequestHost[0]
+    final fun <get-LocalSecretRequestHost>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.secrets/SecretRequestHost?> // com.letta.mobile.ui.secrets/LocalSecretRequestHost.<get-LocalSecretRequestHost>|<get-LocalSecretRequestHost>(){}[0]
+final val com.letta.mobile.ui.secrets/LocalSecretRequestPanel // com.letta.mobile.ui.secrets/LocalSecretRequestPanel|{}LocalSecretRequestPanel[0]
+    final fun <get-LocalSecretRequestPanel>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.secrets/SecretRequestPanel?> // com.letta.mobile.ui.secrets/LocalSecretRequestPanel.<get-LocalSecretRequestPanel>|<get-LocalSecretRequestPanel>(){}[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_NotHeld$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_NotHeld$stableprop|#static{}com_letta_mobile_ui_secrets_LedgerRelease_NotHeld$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_Restore$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_Restore$stableprop|#static{}com_letta_mobile_ui_secrets_LedgerRelease_Restore$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_StillHeld$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_StillHeld$stableprop|#static{}com_letta_mobile_ui_secrets_LedgerRelease_StillHeld$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_RestoreLedger$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_RestoreLedger$stableprop|#static{}com_letta_mobile_ui_secrets_RestoreLedger$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardModel$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardModel$stableprop|#static{}com_letta_mobile_ui_secrets_SecretRequestCardModel$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardTags$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardTags$stableprop|#static{}com_letta_mobile_ui_secrets_SecretRequestCardTags$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestFormTags$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestFormTags$stableprop|#static{}com_letta_mobile_ui_secrets_SecretRequestFormTags$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestHost$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestHost$stableprop|#static{}com_letta_mobile_ui_secrets_SecretRequestHost$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestModuleTags$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestModuleTags$stableprop|#static{}com_letta_mobile_ui_secrets_SecretRequestModuleTags$stableprop[0]
+final val com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestPanel$stableprop // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestPanel$stableprop|#static{}com_letta_mobile_ui_secrets_SecretRequestPanel$stableprop[0]
 final val com.letta.mobile.ui.settings/LocalSettingsLock // com.letta.mobile.ui.settings/LocalSettingsLock|{}LocalSettingsLock[0]
     final fun <get-LocalSettingsLock>(): androidx.compose.runtime/ProvidableCompositionLocal<kotlin/String?> // com.letta.mobile.ui.settings/LocalSettingsLock.<get-LocalSettingsLock>|<get-LocalSettingsLock>(){}[0]
 final val com.letta.mobile.ui.settings/com_letta_mobile_ui_settings_ActionButton$stableprop // com.letta.mobile.ui.settings/com_letta_mobile_ui_settings_ActionButton$stableprop|#static{}com_letta_mobile_ui_settings_ActionButton$stableprop[0]
@@ -13004,6 +13139,23 @@ final fun com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSecti
 final fun com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSource$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchSource$stableprop_getter|com_letta_mobile_ui_search_LettaSearchSource$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchToggle$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.search/com_letta_mobile_ui_search_LettaSearchToggle$stableprop_getter|com_letta_mobile_ui_search_LettaSearchToggle$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.search/messageSearchChipRows(com.letta.mobile.data.search/MessageSearchCapabilities, com.letta.mobile.data.search/MessageSearchSelection, kotlin/Function1<com.letta.mobile.data.search/MessageSearchSelection, kotlin/Unit>): kotlin.collections/List<com.letta.mobile.ui.search/LettaSearchChipRow> // com.letta.mobile.ui.search/messageSearchChipRows|messageSearchChipRows(com.letta.mobile.data.search.MessageSearchCapabilities;com.letta.mobile.data.search.MessageSearchSelection;kotlin.Function1<com.letta.mobile.data.search.MessageSearchSelection,kotlin.Unit>){}[0]
+final fun com.letta.mobile.ui.secrets/ProvideSecretRequestHost(com.letta.mobile.ui.secrets/SecretRequestHost?, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.secrets/ProvideSecretRequestHost|ProvideSecretRequestHost(com.letta.mobile.ui.secrets.SecretRequestHost?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/SecretRequestCard(com.letta.mobile.ui.secrets/SecretRequestCardModel, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.secrets/SecretRequestCard|SecretRequestCard(com.letta.mobile.ui.secrets.SecretRequestCardModel;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/SecretRequestForm(com.letta.mobile.data.secrets.client/SecretFormController, kotlin/String, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.secrets/SecretRequestForm|SecretRequestForm(com.letta.mobile.data.secrets.client.SecretFormController;kotlin.String;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/SecretRequestModule(androidx.compose.ui/Modifier, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.secrets/SecretRequestModule|SecretRequestModule(androidx.compose.ui.Modifier;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/SecretRequestMount(kotlin/Function3<androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.secrets/SecretRequestMount|SecretRequestMount(kotlin.Function3<androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/SecureSurfaceEffect(androidx.compose.runtime/Composer?, kotlin/Int): com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities // com.letta.mobile.ui.secrets/SecureSurfaceEffect|SecureSurfaceEffect(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/SecureTextInput(kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.secrets/SecureTextInput|SecureTextInput(kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_NotHeld$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_NotHeld$stableprop_getter|com_letta_mobile_ui_secrets_LedgerRelease_NotHeld$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_Restore$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_Restore$stableprop_getter|com_letta_mobile_ui_secrets_LedgerRelease_Restore$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_StillHeld$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_LedgerRelease_StillHeld$stableprop_getter|com_letta_mobile_ui_secrets_LedgerRelease_StillHeld$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_RestoreLedger$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_RestoreLedger$stableprop_getter|com_letta_mobile_ui_secrets_RestoreLedger$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardModel$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardModel$stableprop_getter|com_letta_mobile_ui_secrets_SecretRequestCardModel$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestCardTags$stableprop_getter|com_letta_mobile_ui_secrets_SecretRequestCardTags$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestFormTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestFormTags$stableprop_getter|com_letta_mobile_ui_secrets_SecretRequestFormTags$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestHost$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestHost$stableprop_getter|com_letta_mobile_ui_secrets_SecretRequestHost$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestModuleTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestModuleTags$stableprop_getter|com_letta_mobile_ui_secrets_SecretRequestModuleTags$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestPanel$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.secrets/com_letta_mobile_ui_secrets_SecretRequestPanel$stableprop_getter|com_letta_mobile_ui_secrets_SecretRequestPanel$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.settings/AccessibilitySettingsSection(androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.settings/AccessibilitySettingsSection|AccessibilitySettingsSection(androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.settings/AppearanceSettingsSection(com.letta.mobile.data.settings/AppearanceSettings, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.settings/AppearanceSettingsSection|AppearanceSettingsSection(com.letta.mobile.data.settings.AppearanceSettings;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.settings/BackendConnectionNotice(com.letta.mobile.data.model/BackendConnectionStatus, kotlin/String?, com.letta.mobile.ui.settings/BackendConnectionNoticeActions, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.settings/BackendConnectionNotice|BackendConnectionNotice(com.letta.mobile.data.model.BackendConnectionStatus;kotlin.String?;com.letta.mobile.ui.settings.BackendConnectionNoticeActions;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]

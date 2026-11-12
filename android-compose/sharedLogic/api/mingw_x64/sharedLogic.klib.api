@@ -2967,6 +2967,32 @@ final enum class com.letta.mobile.data.search/MessageSearchRole : kotlin/Enum<co
     }
 }
 
+final enum class com.letta.mobile.data.secrets.client/SecretInputPresence : kotlin/Enum<com.letta.mobile.data.secrets.client/SecretInputPresence> { // com.letta.mobile.data.secrets.client/SecretInputPresence|null[0]
+    enum entry EMPTY // com.letta.mobile.data.secrets.client/SecretInputPresence.EMPTY|null[0]
+    enum entry ENTERED // com.letta.mobile.data.secrets.client/SecretInputPresence.ENTERED|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.client/SecretInputPresence.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.client/SecretInputPresence> // com.letta.mobile.data.secrets.client/SecretInputPresence.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.client/SecretInputPresence // com.letta.mobile.data.secrets.client/SecretInputPresence.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.client/SecretInputPresence> // com.letta.mobile.data.secrets.client/SecretInputPresence.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.secrets.client/SecureProtection : kotlin/Enum<com.letta.mobile.data.secrets.client/SecureProtection> { // com.letta.mobile.data.secrets.client/SecureProtection|null[0]
+    enum entry AUTOFILL_EXCLUDED // com.letta.mobile.data.secrets.client/SecureProtection.AUTOFILL_EXCLUDED|null[0]
+    enum entry IME_LEARNING_DISABLED // com.letta.mobile.data.secrets.client/SecureProtection.IME_LEARNING_DISABLED|null[0]
+    enum entry MASKED_FIELD_STATE // com.letta.mobile.data.secrets.client/SecureProtection.MASKED_FIELD_STATE|null[0]
+    enum entry PASSWORD_KEYBOARD // com.letta.mobile.data.secrets.client/SecureProtection.PASSWORD_KEYBOARD|null[0]
+    enum entry SCREEN_CAPTURE_BLOCKED // com.letta.mobile.data.secrets.client/SecureProtection.SCREEN_CAPTURE_BLOCKED|null[0]
+    enum entry SENSITIVE_CONTENT // com.letta.mobile.data.secrets.client/SecureProtection.SENSITIVE_CONTENT|null[0]
+
+    final val entries // com.letta.mobile.data.secrets.client/SecureProtection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.secrets.client/SecureProtection> // com.letta.mobile.data.secrets.client/SecureProtection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.secrets.client/SecureProtection // com.letta.mobile.data.secrets.client/SecureProtection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.secrets.client/SecureProtection> // com.letta.mobile.data.secrets.client/SecureProtection.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.secrets.journal/SecretJournalProblem : kotlin/Enum<com.letta.mobile.data.secrets.journal/SecretJournalProblem> { // com.letta.mobile.data.secrets.journal/SecretJournalProblem|null[0]
     enum entry CORRUPT // com.letta.mobile.data.secrets.journal/SecretJournalProblem.CORRUPT|null[0]
     enum entry FULL // com.letta.mobile.data.secrets.journal/SecretJournalProblem.FULL|null[0]
@@ -3204,6 +3230,7 @@ final enum class com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule : k
     enum entry CHAT_READ_SEND_STAYS // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.CHAT_READ_SEND_STAYS|null[0]
     enum entry DUPLICATE_SLOT // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.DUPLICATE_SLOT|null[0]
     enum entry HOME_STAYS // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.HOME_STAYS|null[0]
+    enum entry HOST_OWNED_VIEW // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.HOST_OWNED_VIEW|null[0]
     enum entry INDEX_OUT_OF_RANGE // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.INDEX_OUT_OF_RANGE|null[0]
     enum entry LANE_FULL // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.LANE_FULL|null[0]
     enum entry MALFORMED // com.letta.mobile.data.shell.layout.edit/ShellLayoutEditRule.MALFORMED|null[0]
@@ -6100,6 +6127,12 @@ abstract interface com.letta.mobile.data.search/MessageSearchSource { // com.let
         abstract fun <get-capabilities>(): com.letta.mobile.data.search/MessageSearchCapabilities // com.letta.mobile.data.search/MessageSearchSource.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
 
     abstract suspend fun search(com.letta.mobile.data.search/MessageSearchQuery): kotlin.collections/List<com.letta.mobile.data.search/MessageSearchHit> // com.letta.mobile.data.search/MessageSearchSource.search|search(com.letta.mobile.data.search.MessageSearchQuery){}[0]
+}
+
+abstract interface com.letta.mobile.data.secrets.client/SecretRequestClient { // com.letta.mobile.data.secrets.client/SecretRequestClient|null[0]
+    abstract fun pending(com.letta.mobile.data.secrets.client/SecretRequestScope): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>> // com.letta.mobile.data.secrets.client/SecretRequestClient.pending|pending(com.letta.mobile.data.secrets.client.SecretRequestScope){}[0]
+    abstract suspend fun decline(com.letta.mobile.data.secrets.request/SecretRequestId): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/SecretRequestClient.decline|decline(com.letta.mobile.data.secrets.request.SecretRequestId){}[0]
+    abstract suspend fun submit(com.letta.mobile.data.secrets.request/SecretRequestId, com.letta.mobile.data.secrets.client/SecretInput): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/SecretRequestClient.submit|submit(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.client.SecretInput){}[0]
 }
 
 abstract interface com.letta.mobile.data.secrets.journal/SecretRequestJournal { // com.letta.mobile.data.secrets.journal/SecretRequestJournal|null[0]
@@ -14045,6 +14078,228 @@ sealed interface com.letta.mobile.data.schedules/ScheduleTiming { // com.letta.m
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.schedules/ScheduleTiming.Recurring.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.schedules/ScheduleTiming.Recurring.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.schedules/ScheduleTiming.Recurring.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.client/SecretClientOutcome { // com.letta.mobile.data.secrets.client/SecretClientOutcome|null[0]
+    final class Refused : com.letta.mobile.data.secrets.client/SecretClientOutcome { // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestRefusal) // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestRefusal){}[0]
+
+        final val refusal // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.refusal|{}refusal[0]
+            final fun <get-refusal>(): com.letta.mobile.data.secrets.request/SecretRequestRefusal // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.refusal.<get-refusal>|<get-refusal>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestRefusal // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretRequestRefusal = ...): com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestRefusal){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretClientOutcome.Refused.toString|toString(){}[0]
+    }
+
+    final class Settled : com.letta.mobile.data.secrets.client/SecretClientOutcome { // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestReceipt) // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestReceipt){}[0]
+
+        final val receipt // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.receipt|{}receipt[0]
+            final fun <get-receipt>(): com.letta.mobile.data.secrets.request/SecretRequestReceipt // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.receipt.<get-receipt>|<get-receipt>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestReceipt // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretRequestReceipt = ...): com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestReceipt){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretClientOutcome.Settled.toString|toString(){}[0]
+    }
+
+    final object Unreachable : com.letta.mobile.data.secrets.client/SecretClientOutcome { // com.letta.mobile.data.secrets.client/SecretClientOutcome.Unreachable|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretClientOutcome.Unreachable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretClientOutcome.Unreachable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretClientOutcome.Unreachable.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent|null[0]
+    final class Answered : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.client/SecretClientOutcome) // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.<init>|<init>(com.letta.mobile.data.secrets.client.SecretClientOutcome){}[0]
+
+        final val outcome // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.outcome|{}outcome[0]
+            final fun <get-outcome>(): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.outcome.<get-outcome>|<get-outcome>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.client/SecretClientOutcome = ...): com.letta.mobile.data.secrets.client/SecretFormEvent.Answered // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.copy|copy(com.letta.mobile.data.secrets.client.SecretClientOutcome){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Answered.toString|toString(){}[0]
+    }
+
+    final class Input : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Input|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.client/SecretInputPresence) // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.<init>|<init>(com.letta.mobile.data.secrets.client.SecretInputPresence){}[0]
+
+        final val input // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.input|{}input[0]
+            final fun <get-input>(): com.letta.mobile.data.secrets.client/SecretInputPresence // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.input.<get-input>|<get-input>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.client/SecretInputPresence // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.client/SecretInputPresence = ...): com.letta.mobile.data.secrets.client/SecretFormEvent.Input // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.copy|copy(com.letta.mobile.data.secrets.client.SecretInputPresence){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Input.toString|toString(){}[0]
+    }
+
+    final object Decline : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Decline|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Decline.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Decline.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Decline.toString|toString(){}[0]
+    }
+
+    final object Expire : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Expire|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Expire.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Expire.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Expire.toString|toString(){}[0]
+    }
+
+    final object Open : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Open|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Open.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Open.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Open.toString|toString(){}[0]
+    }
+
+    final object Retry : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Retry|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Retry.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Retry.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Retry.toString|toString(){}[0]
+    }
+
+    final object Submit : com.letta.mobile.data.secrets.client/SecretFormEvent { // com.letta.mobile.data.secrets.client/SecretFormEvent.Submit|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormEvent.Submit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormEvent.Submit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormEvent.Submit.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.client/SecretFormFailure { // com.letta.mobile.data.secrets.client/SecretFormFailure|null[0]
+    abstract val retryable // com.letta.mobile.data.secrets.client/SecretFormFailure.retryable|{}retryable[0]
+        abstract fun <get-retryable>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.retryable.<get-retryable>|<get-retryable>(){}[0]
+
+    final class Refused : com.letta.mobile.data.secrets.client/SecretFormFailure { // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretServiceError) // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.<init>|<init>(com.letta.mobile.data.secrets.request.SecretServiceError){}[0]
+
+        final val error // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.error|{}error[0]
+            final fun <get-error>(): com.letta.mobile.data.secrets.request/SecretServiceError // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.error.<get-error>|<get-error>(){}[0]
+        final val retryable // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.retryable|{}retryable[0]
+            final fun <get-retryable>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.retryable.<get-retryable>|<get-retryable>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretServiceError // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretServiceError = ...): com.letta.mobile.data.secrets.client/SecretFormFailure.Refused // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.copy|copy(com.letta.mobile.data.secrets.request.SecretServiceError){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormFailure.Refused.toString|toString(){}[0]
+    }
+
+    final class WriteFailed : com.letta.mobile.data.secrets.client/SecretFormFailure { // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretFailureReason) // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.<init>|<init>(com.letta.mobile.data.secrets.request.SecretFailureReason){}[0]
+
+        final val reason // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.reason|{}reason[0]
+            final fun <get-reason>(): com.letta.mobile.data.secrets.request/SecretFailureReason // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.reason.<get-reason>|<get-reason>(){}[0]
+        final val retryable // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.retryable|{}retryable[0]
+            final fun <get-retryable>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.retryable.<get-retryable>|<get-retryable>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretFailureReason // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretFailureReason = ...): com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.copy|copy(com.letta.mobile.data.secrets.request.SecretFailureReason){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormFailure.WriteFailed.toString|toString(){}[0]
+    }
+
+    final object Unreachable : com.letta.mobile.data.secrets.client/SecretFormFailure { // com.letta.mobile.data.secrets.client/SecretFormFailure.Unreachable|null[0]
+        final val retryable // com.letta.mobile.data.secrets.client/SecretFormFailure.Unreachable.retryable|{}retryable[0]
+            final fun <get-retryable>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.Unreachable.retryable.<get-retryable>|<get-retryable>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormFailure.Unreachable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormFailure.Unreachable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormFailure.Unreachable.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState|null[0]
+    final class Done : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Done|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestReceipt) // com.letta.mobile.data.secrets.client/SecretFormState.Done.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestReceipt){}[0]
+
+        final val receipt // com.letta.mobile.data.secrets.client/SecretFormState.Done.receipt|{}receipt[0]
+            final fun <get-receipt>(): com.letta.mobile.data.secrets.request/SecretRequestReceipt // com.letta.mobile.data.secrets.client/SecretFormState.Done.receipt.<get-receipt>|<get-receipt>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.request/SecretRequestReceipt // com.letta.mobile.data.secrets.client/SecretFormState.Done.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.request/SecretRequestReceipt = ...): com.letta.mobile.data.secrets.client/SecretFormState.Done // com.letta.mobile.data.secrets.client/SecretFormState.Done.copy|copy(com.letta.mobile.data.secrets.request.SecretRequestReceipt){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Done.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Done.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Done.toString|toString(){}[0]
+    }
+
+    final class Editing : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Editing|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.client/SecretInputPresence) // com.letta.mobile.data.secrets.client/SecretFormState.Editing.<init>|<init>(com.letta.mobile.data.secrets.client.SecretInputPresence){}[0]
+
+        final val input // com.letta.mobile.data.secrets.client/SecretFormState.Editing.input|{}input[0]
+            final fun <get-input>(): com.letta.mobile.data.secrets.client/SecretInputPresence // com.letta.mobile.data.secrets.client/SecretFormState.Editing.input.<get-input>|<get-input>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.client/SecretInputPresence // com.letta.mobile.data.secrets.client/SecretFormState.Editing.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.client/SecretInputPresence = ...): com.letta.mobile.data.secrets.client/SecretFormState.Editing // com.letta.mobile.data.secrets.client/SecretFormState.Editing.copy|copy(com.letta.mobile.data.secrets.client.SecretInputPresence){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Editing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Editing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Editing.toString|toString(){}[0]
+    }
+
+    final class Failed : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Failed|null[0]
+        constructor <init>(com.letta.mobile.data.secrets.client/SecretFormFailure) // com.letta.mobile.data.secrets.client/SecretFormState.Failed.<init>|<init>(com.letta.mobile.data.secrets.client.SecretFormFailure){}[0]
+
+        final val failure // com.letta.mobile.data.secrets.client/SecretFormState.Failed.failure|{}failure[0]
+            final fun <get-failure>(): com.letta.mobile.data.secrets.client/SecretFormFailure // com.letta.mobile.data.secrets.client/SecretFormState.Failed.failure.<get-failure>|<get-failure>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.secrets.client/SecretFormFailure // com.letta.mobile.data.secrets.client/SecretFormState.Failed.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.secrets.client/SecretFormFailure = ...): com.letta.mobile.data.secrets.client/SecretFormState.Failed // com.letta.mobile.data.secrets.client/SecretFormState.Failed.copy|copy(com.letta.mobile.data.secrets.client.SecretFormFailure){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Failed.toString|toString(){}[0]
+    }
+
+    final object Declined : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Declined|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Declined.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Declined.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Declined.toString|toString(){}[0]
+    }
+
+    final object Expired : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Expired|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Expired.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Expired.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Expired.toString|toString(){}[0]
+    }
+
+    final object Idle : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Idle|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Idle.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Idle.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Idle.toString|toString(){}[0]
+    }
+
+    final object Submitting : com.letta.mobile.data.secrets.client/SecretFormState { // com.letta.mobile.data.secrets.client/SecretFormState.Submitting|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormState.Submitting.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretFormState.Submitting.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormState.Submitting.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.secrets.client/SecretRequestScope { // com.letta.mobile.data.secrets.client/SecretRequestScope|null[0]
+    final class Agent : com.letta.mobile.data.secrets.client/SecretRequestScope { // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent|null[0]
+        constructor <init>(com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.<init>|<init>(com.letta.mobile.data.model.AgentId){}[0]
+
+        final val agent // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.agent|{}agent[0]
+            final fun <get-agent>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.agent.<get-agent>|<get-agent>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.model/AgentId = ...): com.letta.mobile.data.secrets.client/SecretRequestScope.Agent // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.copy|copy(com.letta.mobile.data.model.AgentId){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretRequestScope.Agent.toString|toString(){}[0]
+    }
+
+    final object Everyone : com.letta.mobile.data.secrets.client/SecretRequestScope { // com.letta.mobile.data.secrets.client/SecretRequestScope.Everyone|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretRequestScope.Everyone.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretRequestScope.Everyone.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretRequestScope.Everyone.toString|toString(){}[0]
     }
 }
 
@@ -58945,6 +59200,92 @@ final class com.letta.mobile.data.search/MessageSearchSelection { // com.letta.m
     final fun toggled(com.letta.mobile.data.search/MessageSearchRole): com.letta.mobile.data.search/MessageSearchSelection // com.letta.mobile.data.search/MessageSearchSelection.toggled|toggled(com.letta.mobile.data.search.MessageSearchRole){}[0]
 }
 
+final class com.letta.mobile.data.secrets.client/SecretBuffer { // com.letta.mobile.data.secrets.client/SecretBuffer|null[0]
+    constructor <init>() // com.letta.mobile.data.secrets.client/SecretBuffer.<init>|<init>(){}[0]
+
+    final val isEmpty // com.letta.mobile.data.secrets.client/SecretBuffer.isEmpty|{}isEmpty[0]
+        final fun <get-isEmpty>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretBuffer.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
+    final val length // com.letta.mobile.data.secrets.client/SecretBuffer.length|{}length[0]
+        final fun <get-length>(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretBuffer.length.<get-length>|<get-length>(){}[0]
+
+    final fun <#A1: kotlin/Any?> revealChars(kotlin/Function1<kotlin/CharSequence, #A1>): #A1 // com.letta.mobile.data.secrets.client/SecretBuffer.revealChars|revealChars(kotlin.Function1<kotlin.CharSequence,0:0>){0§<kotlin.Any?>}[0]
+    final fun replace(kotlin.ranges/IntRange, kotlin/CharSequence): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretBuffer.replace|replace(kotlin.ranges.IntRange;kotlin.CharSequence){}[0]
+    final fun takeSecretInput(): com.letta.mobile.data.secrets.client/SecretInput // com.letta.mobile.data.secrets.client/SecretBuffer.takeSecretInput|takeSecretInput(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretBuffer.toString|toString(){}[0]
+    final fun wipe() // com.letta.mobile.data.secrets.client/SecretBuffer.wipe|wipe(){}[0]
+
+    final object Companion { // com.letta.mobile.data.secrets.client/SecretBuffer.Companion|null[0]
+        final const val MAX_CHARS // com.letta.mobile.data.secrets.client/SecretBuffer.Companion.MAX_CHARS|{}MAX_CHARS[0]
+            final fun <get-MAX_CHARS>(): kotlin/Int // com.letta.mobile.data.secrets.client/SecretBuffer.Companion.MAX_CHARS.<get-MAX_CHARS>|<get-MAX_CHARS>(){}[0]
+        final const val REDACTED // com.letta.mobile.data.secrets.client/SecretBuffer.Companion.REDACTED|{}REDACTED[0]
+            final fun <get-REDACTED>(): kotlin/String // com.letta.mobile.data.secrets.client/SecretBuffer.Companion.REDACTED.<get-REDACTED>|<get-REDACTED>(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.client/SecretFormController { // com.letta.mobile.data.secrets.client/SecretFormController|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.request/SecretRequestRecord, com.letta.mobile.data.secrets.client/SecretRequestClient, kotlinx.coroutines/CoroutineScope, kotlin.time/Clock = ...) // com.letta.mobile.data.secrets.client/SecretFormController.<init>|<init>(com.letta.mobile.data.secrets.request.SecretRequestRecord;com.letta.mobile.data.secrets.client.SecretRequestClient;kotlinx.coroutines.CoroutineScope;kotlin.time.Clock){}[0]
+
+    final val details // com.letta.mobile.data.secrets.client/SecretFormController.details|{}details[0]
+        final fun <get-details>(): com.letta.mobile.data.secrets.request/SecretRequestDetails // com.letta.mobile.data.secrets.client/SecretFormController.details.<get-details>|<get-details>(){}[0]
+    final val requestId // com.letta.mobile.data.secrets.client/SecretFormController.requestId|{}requestId[0]
+        final fun <get-requestId>(): com.letta.mobile.data.secrets.request/SecretRequestId // com.letta.mobile.data.secrets.client/SecretFormController.requestId.<get-requestId>|<get-requestId>(){}[0]
+    final val state // com.letta.mobile.data.secrets.client/SecretFormController.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.secrets.client/SecretFormState> // com.letta.mobile.data.secrets.client/SecretFormController.state.<get-state>|<get-state>(){}[0]
+    final val target // com.letta.mobile.data.secrets.client/SecretFormController.target|{}target[0]
+        final fun <get-target>(): com.letta.mobile.data.secrets.request/SecretRequestTarget // com.letta.mobile.data.secrets.client/SecretFormController.target.<get-target>|<get-target>(){}[0]
+
+    final var surfaceCapabilities // com.letta.mobile.data.secrets.client/SecretFormController.surfaceCapabilities|{}surfaceCapabilities[0]
+        final fun <get-surfaceCapabilities>(): com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities // com.letta.mobile.data.secrets.client/SecretFormController.surfaceCapabilities.<get-surfaceCapabilities>|<get-surfaceCapabilities>(){}[0]
+
+    final fun <#A1: kotlin/Any?> reveal(kotlin/Function1<kotlin/CharSequence, #A1>): #A1 // com.letta.mobile.data.secrets.client/SecretFormController.reveal|reveal(kotlin.Function1<kotlin.CharSequence,0:0>){0§<kotlin.Any?>}[0]
+    final fun decline() // com.letta.mobile.data.secrets.client/SecretFormController.decline|decline(){}[0]
+    final fun dispose() // com.letta.mobile.data.secrets.client/SecretFormController.dispose|dispose(){}[0]
+    final fun edit(kotlin.ranges/IntRange, kotlin/CharSequence): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormController.edit|edit(kotlin.ranges.IntRange;kotlin.CharSequence){}[0]
+    final fun expire() // com.letta.mobile.data.secrets.client/SecretFormController.expire|expire(){}[0]
+    final fun open() // com.letta.mobile.data.secrets.client/SecretFormController.open|open(){}[0]
+    final fun retry() // com.letta.mobile.data.secrets.client/SecretFormController.retry|retry(){}[0]
+    final fun submit(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormController.submit|submit(){}[0]
+    final fun surfaceShown(com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities) // com.letta.mobile.data.secrets.client/SecretFormController.surfaceShown|surfaceShown(com.letta.mobile.data.secrets.client.SecureSurfaceCapabilities){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretFormController.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.secrets.client/SecretInput { // com.letta.mobile.data.secrets.client/SecretInput|null[0]
+    final val isEmpty // com.letta.mobile.data.secrets.client/SecretInput.isEmpty|{}isEmpty[0]
+        final fun <get-isEmpty>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretInput.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
+    final val isWiped // com.letta.mobile.data.secrets.client/SecretInput.isWiped|{}isWiped[0]
+        final fun <get-isWiped>(): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretInput.isWiped.<get-isWiped>|<get-isWiped>(){}[0]
+
+    final fun <#A1: kotlin/Any?> revealSecretBytes(kotlin/Function1<kotlin/ByteArray, #A1>): #A1 // com.letta.mobile.data.secrets.client/SecretInput.revealSecretBytes|revealSecretBytes(kotlin.Function1<kotlin.ByteArray,0:0>){0§<kotlin.Any?>}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecretInput.toString|toString(){}[0]
+    final fun wipe() // com.letta.mobile.data.secrets.client/SecretInput.wipe|wipe(){}[0]
+
+    final object Companion { // com.letta.mobile.data.secrets.client/SecretInput.Companion|null[0]
+        final const val REDACTED // com.letta.mobile.data.secrets.client/SecretInput.Companion.REDACTED|{}REDACTED[0]
+            final fun <get-REDACTED>(): kotlin/String // com.letta.mobile.data.secrets.client/SecretInput.Companion.REDACTED.<get-REDACTED>|<get-REDACTED>(){}[0]
+
+        final fun ofBytes(kotlin/ByteArray): com.letta.mobile.data.secrets.client/SecretInput // com.letta.mobile.data.secrets.client/SecretInput.Companion.ofBytes|ofBytes(kotlin.ByteArray){}[0]
+    }
+}
+
+final class com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities { // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities|null[0]
+    constructor <init>(kotlin.collections/Set<com.letta.mobile.data.secrets.client/SecureProtection>) // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.<init>|<init>(kotlin.collections.Set<com.letta.mobile.data.secrets.client.SecureProtection>){}[0]
+
+    final val active // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.active|{}active[0]
+        final fun <get-active>(): kotlin.collections/Set<com.letta.mobile.data.secrets.client/SecureProtection> // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.active.<get-active>|<get-active>(){}[0]
+
+    final fun component1(): kotlin.collections/Set<com.letta.mobile.data.secrets.client/SecureProtection> // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.component1|component1(){}[0]
+    final fun contains(com.letta.mobile.data.secrets.client/SecureProtection): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.contains|contains(com.letta.mobile.data.secrets.client.SecureProtection){}[0]
+    final fun copy(kotlin.collections/Set<com.letta.mobile.data.secrets.client/SecureProtection> = ...): com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.copy|copy(kotlin.collections.Set<com.letta.mobile.data.secrets.client.SecureProtection>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.Companion|null[0]
+        final val SharedOnly // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.Companion.SharedOnly|{}SharedOnly[0]
+            final fun <get-SharedOnly>(): com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities // com.letta.mobile.data.secrets.client/SecureSurfaceCapabilities.Companion.SharedOnly.<get-SharedOnly>|<get-SharedOnly>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal : com.letta.mobile.data.secrets.journal/SecretRequestJournal { // com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal|null[0]
     constructor <init>(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> = ...) // com.letta.mobile.data.secrets.journal/InMemorySecretRequestJournal.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
 
@@ -75093,6 +75434,14 @@ final object com.letta.mobile.data.search/TextMatch { // com.letta.mobile.data.s
     final fun matches(kotlin/String, kotlin/Array<out kotlin/String?>...): kotlin/Boolean // com.letta.mobile.data.search/TextMatch.matches|matches(kotlin.String;kotlin.Array<out|kotlin.String?>...){}[0]
 }
 
+final object com.letta.mobile.data.secrets.client/SecretFormMachine { // com.letta.mobile.data.secrets.client/SecretFormMachine|null[0]
+    final fun canSubmit(com.letta.mobile.data.secrets.client/SecretFormState): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormMachine.canSubmit|canSubmit(com.letta.mobile.data.secrets.client.SecretFormState){}[0]
+    final fun isAnswerable(com.letta.mobile.data.secrets.client/SecretFormState): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormMachine.isAnswerable|isAnswerable(com.letta.mobile.data.secrets.client.SecretFormState){}[0]
+    final fun isFinal(com.letta.mobile.data.secrets.client/SecretFormState): kotlin/Boolean // com.letta.mobile.data.secrets.client/SecretFormMachine.isFinal|isFinal(com.letta.mobile.data.secrets.client.SecretFormState){}[0]
+    final fun next(com.letta.mobile.data.secrets.client/SecretFormState, com.letta.mobile.data.secrets.client/SecretFormEvent): com.letta.mobile.data.secrets.client/SecretFormState // com.letta.mobile.data.secrets.client/SecretFormMachine.next|next(com.letta.mobile.data.secrets.client.SecretFormState;com.letta.mobile.data.secrets.client.SecretFormEvent){}[0]
+    final fun outcomeState(com.letta.mobile.data.secrets.client/SecretClientOutcome): com.letta.mobile.data.secrets.client/SecretFormState // com.letta.mobile.data.secrets.client/SecretFormMachine.outcomeState|outcomeState(com.letta.mobile.data.secrets.client.SecretClientOutcome){}[0]
+}
+
 final object com.letta.mobile.data.secrets.journal/SecretRequestJournalRules { // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules|null[0]
     final fun problem(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>): com.letta.mobile.data.secrets.journal/SecretJournalProblem? // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules.problem|problem(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
     final fun require(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>) // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules.require|require(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
@@ -75258,10 +75607,14 @@ final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile
 final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile.data.shell.layout/ShellViews|null[0]
     final val CANVAS // com.letta.mobile.data.shell.layout/ShellViews.CANVAS|{}CANVAS[0]
         final fun <get-CANVAS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.CANVAS.<get-CANVAS>|<get-CANVAS>(){}[0]
+    final val HostOwned // com.letta.mobile.data.shell.layout/ShellViews.HostOwned|{}HostOwned[0]
+        final fun <get-HostOwned>(): kotlin.collections/Set<com.letta.mobile.data.model.view/RuntimeViewId> // com.letta.mobile.data.shell.layout/ShellViews.HostOwned.<get-HostOwned>|<get-HostOwned>(){}[0]
     final val NOTE // com.letta.mobile.data.shell.layout/ShellViews.NOTE|{}NOTE[0]
         final fun <get-NOTE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.NOTE.<get-NOTE>|<get-NOTE>(){}[0]
     final val PAGE // com.letta.mobile.data.shell.layout/ShellViews.PAGE|{}PAGE[0]
         final fun <get-PAGE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.PAGE.<get-PAGE>|<get-PAGE>(){}[0]
+    final val SECRET_REQUEST // com.letta.mobile.data.shell.layout/ShellViews.SECRET_REQUEST|{}SECRET_REQUEST[0]
+        final fun <get-SECRET_REQUEST>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.SECRET_REQUEST.<get-SECRET_REQUEST>|<get-SECRET_REQUEST>(){}[0]
     final val SIDE_PANE // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE|{}SIDE_PANE[0]
         final fun <get-SIDE_PANE>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.SIDE_PANE.<get-SIDE_PANE>|<get-SIDE_PANE>(){}[0]
     final val TASKS // com.letta.mobile.data.shell.layout/ShellViews.TASKS|{}TASKS[0]
