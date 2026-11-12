@@ -35,6 +35,7 @@ import com.letta.mobile.data.canvas.workspace.SharedNote
 import com.letta.mobile.data.canvas.workspace.SharedNoteDirectory
 import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.canvas.workspace.SharedNotebooks
+import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
@@ -60,9 +61,11 @@ import kotlin.test.assertTrue
 private const val Page = "document-module-page"
 private const val TimeoutMillis = 10_000L
 private val WindowHeight = 800.dp
+private val MaxShowMoreHeight = 64.dp
 private val PageSlot = ModuleSlot(ShellViews.PAGE)
 private val DocumentSlot = ModuleSlot(ShellViews.DOCUMENT)
 private val Note = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+private val Later = NotebookDocumentId("fedcba9876543210fedcba9876543210")
 
 /**
  * The way into a note the host shares with this device: the shared-notes view is a shell module
@@ -187,6 +190,40 @@ class ShellDocumentModuleTest {
         assertEquals("shared text", host.markdown[Note], "nothing reached the host after the revoke")
     }
 
+    /**
+     * A host with more notes than one page shows "Show more" at the end of the list, on one line;
+     * it appends the next page, says so when that page cannot be loaded and keeps what is shown.
+     */
+    private fun showMoreLoadsTheNextPage(width: Dp) {
+        host.granted.add(Later)
+        host.pageSize = 1
+        window(width) {
+            await(ShellDocumentTags.MORE)
+            onNodeWithTag(ShellDocumentTags.row(SharedNote(Note, "Plan"))).assertExists()
+            onNodeWithTag(ShellDocumentTags.row(SharedNote(Later, "Plan"))).assertDoesNotExist()
+            val more = onNodeWithTag(ShellDocumentTags.MORE).getUnclippedBoundsInRoot()
+            assertTrue((more.bottom - more.top) < MaxShowMoreHeight, "Show more stays one line at $width")
+
+            host.reachable = false
+            onNodeWithTag(ShellDocumentTags.MORE).performClick()
+            await(ShellDocumentTags.MORE_FAILED)
+            onNodeWithTag(ShellDocumentTags.row(SharedNote(Note, "Plan"))).assertExists()
+
+            host.reachable = true
+            onNodeWithTag(ShellDocumentTags.MORE).performClick()
+            await(ShellDocumentTags.row(SharedNote(Later, "Plan")))
+            waitUntil(timeoutMillis = TimeoutMillis) { !exists(ShellDocumentTags.MORE) }
+            onNodeWithTag(ShellDocumentTags.MORE_FAILED).assertDoesNotExist()
+            onNodeWithTag(ShellDocumentTags.row(SharedNote(Note, "Plan"))).assertExists()
+        }
+    }
+
+    @Test
+    fun onAPhoneShowMoreLoadsTheNextPage() = showMoreLoadsTheNextPage(360.dp)
+
+    @Test
+    fun onADesktopShowMoreLoadsTheNextPage() = showMoreLoadsTheNextPage(1200.dp)
+
     @Test
     fun aHostSharingNothingShowsTheEmptyState() {
         host.granted.clear()
@@ -308,8 +345,19 @@ private class NoteHost : SharedNotebooks, NotebookNoteBackend {
     @Volatile
     var reachable = true
 
-    override val directory = SharedNoteDirectory {
-        if (reachable) SharedNoteListing.Listed(granted.map { SharedNote(it, "Plan") }) else SharedNoteListing.Unavailable("down")
+    /** How many notes one page holds; the cursor is the index the next page starts at. */
+    @Volatile
+    var pageSize = Int.MAX_VALUE
+
+    override val directory = SharedNoteDirectory { from ->
+        if (reachable) page(from?.value?.toInt() ?: 0) else SharedNoteListing.Unavailable("down")
+    }
+
+    private fun page(start: Int): SharedNoteListing.Listed {
+        val ordered = granted.sortedBy { it.value }
+        val end = minOf(ordered.size, start + minOf(pageSize, ordered.size))
+        val next = SharedNotesCursor(end.toString()).takeIf { end < ordered.size }
+        return SharedNoteListing.Listed(ordered.subList(start, end).map { SharedNote(it, "Plan") }, next)
     }
 
     override val opener = DocumentWorkspaceOpener { id ->

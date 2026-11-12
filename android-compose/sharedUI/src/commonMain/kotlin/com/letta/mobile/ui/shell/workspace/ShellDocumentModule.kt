@@ -46,14 +46,16 @@ import com.letta.mobile.sharedui.resources.shared_notes_close_view
 import com.letta.mobile.sharedui.resources.shared_notes_denied
 import com.letta.mobile.sharedui.resources.shared_notes_empty
 import com.letta.mobile.sharedui.resources.shared_notes_loading
+import com.letta.mobile.sharedui.resources.shared_notes_more_failed
+import com.letta.mobile.sharedui.resources.shared_notes_none_yet
 import com.letta.mobile.sharedui.resources.shared_notes_not_shown
 import com.letta.mobile.sharedui.resources.shared_notes_open_denied
 import com.letta.mobile.sharedui.resources.shared_notes_open_unavailable
 import com.letta.mobile.sharedui.resources.shared_notes_refresh
 import com.letta.mobile.sharedui.resources.shared_notes_retry
+import com.letta.mobile.sharedui.resources.shared_notes_show_more
 import com.letta.mobile.sharedui.resources.shared_notes_side_lane_full
 import com.letta.mobile.sharedui.resources.shared_notes_title
-import com.letta.mobile.sharedui.resources.shared_notes_truncated
 import com.letta.mobile.sharedui.resources.shared_notes_unavailable
 import com.letta.mobile.sharedui.resources.shared_notes_untitled
 import com.letta.mobile.sharedui.resources.shared_notes_withdrawn
@@ -227,23 +229,42 @@ private fun SharedNoteList(state: SharedNoteBrowserState, browser: SharedNoteBro
                 Text(stringResource(Res.string.shared_notes_retry))
             }
         }
-        is SharedNoteListing.Listed ->
-            ListedNotes(listing, enabled = state.opening == null) { note -> scope.launch { browser.open(note.id) } }
+        is SharedNoteListing.Listed -> ListedNotes(listing, state, browser, scope)
     }
 }
 
-/** The listed notes; a listing the host cut short says so rather than passing for all of them. */
+/**
+ * The listed notes and, while the host has more to check, a "Show more" control at the end that
+ * appends the next page. A page that failed to load keeps what is shown and says so beside the control.
+ */
 @Composable
-private fun ListedNotes(listing: SharedNoteListing.Listed, enabled: Boolean, onOpen: (SharedNote) -> Unit) {
-    if (listing.truncated) Notice(Res.string.shared_notes_truncated, ShellDocumentTags.TRUNCATED)
-    when {
-        listing.notes.isNotEmpty() -> NoteRows(listing.notes, enabled, onOpen)
-        !listing.truncated -> Notice(Res.string.shared_notes_empty, ShellDocumentTags.EMPTY)
+private fun ListedNotes(
+    listing: SharedNoteListing.Listed,
+    state: SharedNoteBrowserState,
+    browser: SharedNoteBrowser,
+    scope: CoroutineScope,
+) {
+    val more = listing.next?.let { MoreNotes(loading = state.loadingMore, failed = state.moreFailed) }
+    if (listing.notes.isEmpty() && more == null) {
+        Notice(Res.string.shared_notes_empty, ShellDocumentTags.EMPTY)
+        return
     }
+    if (listing.notes.isEmpty()) Notice(Res.string.shared_notes_none_yet, tag = null)
+    val actions = NoteActions(
+        open = { note -> scope.launch { browser.open(note.id) } },
+        more = { scope.launch { browser.loadMore() } },
+    )
+    NoteRows(listing.notes, more, enabled = state.opening == null, actions)
 }
 
+/** Whether the next page is being asked for, and whether the latest ask failed. */
+private data class MoreNotes(val loading: Boolean, val failed: Boolean)
+
+/** What the list's rows and its "Show more" control do. */
+private class NoteActions(val open: (SharedNote) -> Unit, val more: () -> Unit)
+
 @Composable
-private fun NoteRows(notes: List<SharedNote>, enabled: Boolean, onOpen: (SharedNote) -> Unit) {
+private fun NoteRows(notes: List<SharedNote>, more: MoreNotes?, enabled: Boolean, actions: NoteActions) {
     val untitled = stringResource(Res.string.shared_notes_untitled)
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.sm).testTag(ShellDocumentTags.LIST),
@@ -252,12 +273,27 @@ private fun NoteRows(notes: List<SharedNote>, enabled: Boolean, onOpen: (SharedN
         items(notes, key = { it.id.value }) { note ->
             LettaListRow(
                 spec = LettaListRowSpec(title = note.title.ifBlank { untitled }, icon = LettaIcons.FileOpen, enabled = enabled),
-                onClick = { onOpen(note) },
+                onClick = { actions.open(note) },
                 modifier = Modifier.testTag(ShellDocumentTags.row(note)),
             )
         }
+        more?.let { item(key = MORE_KEY) { ShowMore(it, actions.more) } }
     }
 }
+
+/** The end of a list the host has more of: a full-width "Show more", busy while it asks, with why the last ask failed. */
+@Composable
+private fun ShowMore(more: MoreNotes, onMore: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        if (more.failed) Notice(Res.string.shared_notes_more_failed, ShellDocumentTags.MORE_FAILED, error = true)
+        if (more.loading) LettaBusyBar(Modifier.fillMaxWidth())
+        TextButton(onClick = onMore, enabled = !more.loading, modifier = Modifier.fillMaxWidth().testTag(ShellDocumentTags.MORE)) {
+            Text(stringResource(Res.string.shared_notes_show_more), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+private const val MORE_KEY = "shell-document-more"
 
 @Composable
 private fun Notice(text: StringResource, tag: String?, error: Boolean = false) {
