@@ -292,7 +292,10 @@ class WireContractsTest {
             com.letta.mobile.data.model.HostId("contract-host"),
         ),
         com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountSources(
-            com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountGrants(File(dir, "canvas-grants.json").toPath()),
+            com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountCatalog(
+                com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory(),
+                com.letta.mobile.data.canvas.InMemoryCanvasRelayStore(),
+            ),
             rejectCalls("canvas mount directory"),
         ),
         com.letta.mobile.data.controller.node.iroh.mounts.TEST_CALL_SCOPE,

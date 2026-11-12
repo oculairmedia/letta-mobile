@@ -1,15 +1,19 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
-import com.letta.mobile.data.canvas.NotebookDocumentId
-import com.letta.mobile.data.canvas.NotebookPeerGrant
-import com.letta.mobile.data.canvas.authority.FileNotebookGrantStore
-import com.letta.mobile.data.canvas.authority.NotebookGrantStore
+import com.letta.mobile.data.canvas.CanvasAcl
+import com.letta.mobile.data.canvas.CanvasRelayProtocol
+import com.letta.mobile.data.canvas.HostCanvasDirectory
+import com.letta.mobile.data.canvas.HostCanvasEntry
+import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
+import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.canvas.mount.FileCanvasMountStore
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.ConversationViewers
+import com.letta.mobile.data.controller.node.iroh.ViewerHandle
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.hoststate.DurableHostFileHooks
 import com.letta.mobile.data.hoststate.HostDirectoryDurability
@@ -96,8 +100,9 @@ internal class FakeDirectory : CanvasMountDirectory {
     }
 }
 
-/** Grant store wrapper that can fail from its [failFromCall]th lookup on, or hang from its [hangFromCall]th. */
-internal class ScriptedGrants(private val delegate: NotebookGrantStore) : NotebookGrantStore {
+/** The host's agent canvas directory, scriptable to fail or hang from its [failFromCall]th / [hangFromCall]th lookup. */
+internal class ScriptedCanvases(private val delegate: HostCanvasDirectory = InMemoryHostCanvasDirectory()) :
+    HostCanvasDirectory by delegate {
     private val calls = AtomicInteger()
 
     @Volatile var failure: Throwable? = null
@@ -106,15 +111,39 @@ internal class ScriptedGrants(private val delegate: NotebookGrantStore) : Notebo
 
     @Volatile var hangFromCall: Int = Int.MAX_VALUE
 
-    override suspend fun <T> withGrant(
-        principal: String,
-        documentId: NotebookDocumentId,
-        action: suspend (NotebookPeerGrant?) -> T,
-    ): T {
+    override suspend fun get(canvasId: CanvasId): HostCanvasEntry? {
         val call = calls.incrementAndGet()
         if (call >= hangFromCall) awaitCancellation()
         failure?.takeIf { call >= failFromCall }?.let { throw it }
-        return delegate.withGrant(principal, documentId, action)
+        return delegate.get(canvasId)
+    }
+}
+
+/** A conversation viewer that records the frames it is sent; [context] is what its connection established. */
+internal class FakeViewer(private val context: AdminRpcRequestContext?) : ViewerHandle {
+    override val connectionId: String = "viewer-${System.identityHashCode(this)}"
+    val frames: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    override suspend fun writeFrame(frame: String): Boolean = frames.add(frame)
+
+    override fun adminContextFor(method: String): AdminRpcRequestContext? = context
+}
+
+/** Host records shared by every harness on one root, as two host processes share one host's files. */
+internal class HarnessRecords {
+    val canvases = ScriptedCanvases()
+    val relay = InMemoryCanvasRelayStore()
+    val directory = FakeDirectory()
+    val viewers: MutableMap<ConversationId, Set<ViewerHandle>> = ConcurrentHashMap()
+
+    /** Registers [canvas] on the host: in the agent directory owned by [owner], or relay-only (no known owner). */
+    suspend fun canvas(canvas: CanvasId, owner: AgentId?) {
+        if (owner == null) {
+            relay.bind(CanvasRelayProtocol.canvasTopic(canvas), canvas)
+            return
+        }
+        val acl = CanvasAcl(ownerUserId = "local-user", writerAgentIds = setOf(owner.value), readerAgentIds = setOf(owner.value))
+        canvases.putIfAbsent(HostCanvasEntry(canvas.value, CanvasRelayProtocol.canvasTopic(canvas), "Board", acl = acl))
     }
 }
 
@@ -131,25 +160,29 @@ internal class HarnessOptions(
 )
 
 /**
- * The real routes on a real [AdminRpcRouter] over a real file mount store and file grant store in a temp root.
- * Every response is kept in [responses] so tests can scan them.
+ * The real routes on a real [AdminRpcRouter] over a real file mount store in a temp root and the host's canvas
+ * records ([HarnessRecords]). Every response is kept in [responses] so tests can scan them.
  */
 internal class MountHarness(
     val root: Path = Files.createTempDirectory("canvas-mount-routes"),
     private val options: HarnessOptions = HarnessOptions(),
+    val records: HarnessRecords = HarnessRecords(),
 ) {
-    val directory = FakeDirectory()
-    private val grantFile = FileNotebookGrantStore(root.resolve("canvas-grants.json"), true) {}
-    val grants = ScriptedGrants(grantFile)
+    val directory: FakeDirectory get() = records.directory
+    val canvases: ScriptedCanvases get() = records.canvases
     val router = AdminRpcRouter()
     val responses: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
     init {
+        val sources = CanvasMountSources(
+            CanvasMountCatalog(records.canvases, records.relay),
+            records.directory,
+            ConversationViewers { conversation -> records.viewers[conversation].orEmpty() },
+        )
         val host = CanvasMountHost(
             mounts = { authority -> AuthorizedCanvasMounts(store(), authority) },
-            grants = CanvasMountGrants(grants),
-            directory = directory,
-            bounds = CanvasMountBounds(CanvasMountDurability.ofHost(), options.deadline),
+            sources = sources,
+            bounds = CanvasMountBounds(CanvasMountDurability.ofHost(), options.deadline, TEST_CALL_SCOPE),
         )
         CanvasMountRoutes(options.policy, host).register(router)
     }
@@ -157,11 +190,7 @@ internal class MountHarness(
     /** A raw store instance on this root, as a separate host process would open it. */
     fun store(): FileCanvasMountStore = FileCanvasMountStore(root, TEST_HOST, HostDirectoryDurability::syncMount, options.hooks)
 
-    suspend fun grant(peer: Peer, canvas: CanvasId, level: CanvasMountGrant) {
-        if (level == CanvasMountGrant.NONE) return
-        val grant = NotebookPeerGrant(peer.endpoint, mayRead = true, mayEdit = level == CanvasMountGrant.MOUNT)
-        grantFile.provision(NotebookDocumentId(canvas.value), grant)
-    }
+    suspend fun canvas(canvas: CanvasId, owner: AgentId?) = records.canvas(canvas, owner)
 
     suspend fun call(route: CanvasMountRoute, params: JsonObject?, peer: Peer): Reply = call(route.method, params, peer.context())
 

@@ -2672,7 +2672,7 @@
       "data_store": "controller_state_file",
       "fallback": "deny_fail_closed",
       "migration_slice": "none",
-      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas grants keyed by CanvasId; canvas.mount.read, agent/conversation scope and conversation ownership.",
+      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas.mount.read (chat roles), agent/conversation scope, conversation ownership, host-decided canvas visibility.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
@@ -2687,7 +2687,7 @@
       "data_store": "controller_state_file",
       "fallback": "deny_fail_closed",
       "migration_slice": "none",
-      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas grants keyed by CanvasId; canvas.mount.write; conversation must exist and belong to agent_id.",
+      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas.mount.write (chat roles); conversation must exist and belong to agent_id; host-decided canvas visibility; pushes canvas_mount_updated to entitled viewers.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
@@ -2702,7 +2702,7 @@
       "data_store": "controller_state_file",
       "fallback": "deny_fail_closed",
       "migration_slice": "none",
-      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas grants keyed by CanvasId; canvas.mount.write; conversation must exist and belong to agent_id.",
+      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas.mount.write (chat roles); conversation must exist and belong to agent_id; host-decided canvas visibility; pushes canvas_mount_updated to entitled viewers.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
@@ -2717,7 +2717,7 @@
       "data_store": "controller_state_file",
       "fallback": "deny_fail_closed",
       "migration_slice": "none",
-      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas grants keyed by CanvasId; canvas.mount.write plus unrestricted conversation scope (conversation.manage).",
+      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; admin.full only (not part of the picker feature) plus unrestricted conversation scope; host-decided canvas visibility.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"

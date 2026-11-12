@@ -52,7 +52,7 @@ class CanvasMountInputTest {
     @Test
     fun malformedParamsGetFixedCodesAndNeverReachStorage() = runBlocking {
         val harness = MountHarness()
-        harness.grant(PEER, CANVAS, CanvasMountGrant.MOUNT)
+        harness.canvas(CANVAS, AGENT_A)
         CASES.forEach { case ->
             val reply = harness.call(case.route, case.params, PEER)
             assertEquals("${CanvasMountWire.INVALID_INPUT_PREFIX}:${case.field}:${case.code}", reply.error, "$case")
@@ -64,7 +64,7 @@ class CanvasMountInputTest {
     fun anIdOfExactlyTheByteLimitIsAccepted() = runBlocking {
         val harness = MountHarness()
         val canvas = CanvasId("c".repeat(AuthorizedCanvasMounts.MAX_ID_BYTES))
-        harness.grant(PEER, canvas, CanvasMountGrant.MOUNT)
+        harness.canvas(canvas, AGENT_A)
         val reply = harness.call(CanvasMountRoute.BIND, bindingParams(AGENT_A, CONV_A, canvas), PEER)
         assertEquals(CanvasMountWire.BOUND to canvas.value, reply.status to reply.canvas)
     }

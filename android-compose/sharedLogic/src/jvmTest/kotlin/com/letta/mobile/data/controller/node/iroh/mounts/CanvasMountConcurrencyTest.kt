@@ -19,10 +19,7 @@ class CanvasMountConcurrencyTest {
         val harness = MountHarness()
         val peers = (0 until PEERS).map { Peer.of("0123456789abcdef"[it]) }
         val proposals = peers.indices.map { CanvasId("canvas-peer-$it") }
-        peers.forEachIndexed { index, peer ->
-            proposals.forEach { harness.grant(peer, it, CanvasMountGrant.SEE) }
-            harness.grant(peer, proposals[index], CanvasMountGrant.MOUNT)
-        }
+        proposals.forEach { harness.canvas(it, AGENT_A) }
         val replies = peers.indices.map { index ->
             async(Dispatchers.Default) {
                 harness.call(CanvasMountRoute.BIND, bindingParams(AGENT_A, CONV_A, proposals[index]), peers[index])
@@ -38,9 +35,9 @@ class CanvasMountConcurrencyTest {
     fun twoHostProcessesReplacingDifferentKeysNeverEraseEachOther() = runBlocking {
         val root = Files.createTempDirectory("canvas-mount-two-hosts")
         val first = MountHarness(root)
-        val second = MountHarness(root)
+        val second = MountHarness(root, records = first.records)
         val canvases = (0 until ROUNDS).map { CanvasId("canvas-round-$it") }
-        canvases.forEach { first.grant(PEER, it, CanvasMountGrant.MOUNT) }
+        canvases.forEach { first.canvas(it, AGENT_A) }
         val writes = canvases.flatMap { canvas ->
             listOf(
                 async(Dispatchers.Default) { first.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, canvas), PEER) },

@@ -46,9 +46,10 @@ private fun unavailable(reason: String) = CanvasMountWire.UNAVAILABLE to reason
 
 private fun Reply.unavailability() = status to reason
 
+/** Registers the test canvases on [harness]'s host, owned by agent A. */
 private suspend fun granted(harness: MountHarness): MountHarness = harness.apply {
-    grant(PEER, FIRST, CanvasMountGrant.MOUNT)
-    grant(PEER, NEXT, CanvasMountGrant.MOUNT)
+    canvas(FIRST, AGENT_A)
+    canvas(NEXT, AGENT_A)
 }
 
 class CanvasMountFailureTest {
@@ -142,7 +143,7 @@ class CanvasMountFailureTest {
         val root = Files.createTempDirectory("canvas-mount-deadline-winner")
         val harness = granted(MountHarness(root, HarnessOptions(deadline = SHORT)))
         // Lookup 1 authorizes the proposal; lookup 2, the winner check after storage, never answers.
-        harness.grants.hangFromCall = 2
+        harness.canvases.hangFromCall = 2
         val reply = harness.call(CanvasMountRoute.BIND, bindingParams(AGENT_A, CONV_A, NEXT), PEER)
         assertEquals(CanvasMountWire.OUTCOME_UNKNOWN, reply.status)
         assertEquals(NEXT, harness.store().readBinding(AGENT_A, CONV_A))
@@ -160,13 +161,13 @@ class CanvasMountFailureTest {
 
     @Test
     fun failedAuthorityLookupsAreUnavailableBeforeStorageAndOutcomeUnknownAfterABind() = runBlocking {
-        val secret = IllegalStateException("grant file at /srv/secret/canvas-grants.json")
+        val secret = IllegalStateException("canvas directory at /srv/secret/host-canvases.json")
         val directoryDown = granted(MountHarness()).apply { directory.failure = secret }
-        val grantsDown = granted(MountHarness()).apply { grants.failure = secret }
+        val grantsDown = granted(MountHarness()).apply { canvases.failure = secret }
         // Lookup 1 authorizes the proposal; lookup 2, the winner check after the bind committed, fails.
         val winnerCheckDown = granted(MountHarness()).apply {
-            grants.failure = secret
-            grants.failFromCall = 2
+            canvases.failure = secret
+            canvases.failFromCall = 2
         }
         val read = directoryDown.call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A), PEER)
         assertEquals(unavailable(CanvasMountWire.REASON_AUTHORITY), read.unavailability())
