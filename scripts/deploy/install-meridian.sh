@@ -39,6 +39,7 @@ UNITS=(
 declare -A DROPINS=(
   [meridian-appserver.memory-protection.conf]="meridian-appserver.service.d/memory-protection.conf"
   [meridian-appserver.subagent-archive.conf]="meridian-appserver.service.d/subagent-archive.conf"
+  [meridian-appserver.process-identity.conf]="meridian-appserver.service.d/process-identity.conf"
   [meridian-iroh-wrapper.memory-protection.conf]="meridian-iroh-wrapper.service.d/memory-protection.conf"
 )
 # meridian-token-hook.cjs requires its two neighbours, so the shim is installed here too.

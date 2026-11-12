@@ -4,6 +4,7 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -111,6 +112,13 @@ internal class QueuedSendDriver(
     }
 
     private suspend fun releaseOtherClientHoldLocked(conversationId: QueueConversationId) {
+        // A foreign terminal can race the transport's retirement, or the next autonomous wake.
+        // Keep observing ownership until idle instead of spending the only backstop on a busy drain.
+        if (turns.hasActiveTurn(conversationId)) {
+            otherClientHold.reset(conversationId)
+            otherClientHold.schedule(conversationId)
+            return
+        }
         otherClientHold.cancel(conversationId)
         if (!queue.releaseOtherClientHold(conversationId)) return
         report(QueueEvent.OtherClientReleased, conversationId)
@@ -184,13 +192,23 @@ internal class QueuedSendDriver(
     /** True when the drain is finished (dispatched, or nothing runnable); false to retry. */
     private suspend fun drainOnceLocked(conversationId: QueueConversationId): Boolean {
         if (turns.hasActiveTurn(conversationId)) return false
-        val next = queue.takeNext(conversationId) ?: return true
-        if (turns.dispatch(next)) {
-            report(QueueEvent.Dispatched, conversationId, next.id)
-            return true
+        val waiting = queue.queueFor(conversationId)
+        val next = waiting.items.firstOrNull()?.takeUnless { waiting.paused || waiting.heldByOtherClient } ?: return true
+        // The queue owns presentation until dispatch has published the transcript row. Keeping
+        // the head here also avoids a disappear/reappear pulse when the transport rejects a retry.
+        val dispatched = runCatching { turns.dispatch(next) }.getOrElse { failure ->
+            if (failure is CancellationException || failure !is Exception) throw failure
+            Telemetry.error(
+                TELEMETRY_TAG, "queue.drainFailed", failure,
+                "conversationId" attr conversationId.value, "otid" attr next.id.value,
+                "attempt" attr next.attempt,
+            )
+            false
         }
-        queue.putBack(next)
-        return false
+        if (!dispatched) return false
+        queue.remove(next.id)
+        report(QueueEvent.Dispatched, conversationId, next.id)
+        return true
     }
 
     private fun report(event: QueueEvent, conversationId: QueueConversationId, id: QueuedSendId? = null) {

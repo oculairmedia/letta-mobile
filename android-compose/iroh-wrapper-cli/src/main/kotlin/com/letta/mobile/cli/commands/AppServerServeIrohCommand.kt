@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
+import com.letta.mobile.cli.process.LinuxAppServerProcessIdentity
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
@@ -203,6 +204,12 @@ class AppServerServeIrohCommand : CliktCommand(
         "--agent-tools-mode-overrides",
         envvar = "LETTA_AGENT_TOOLS_MODE_OVERRIDES",
         help = "Per-agent agent-tools-mode, as agentId=mode pairs separated by commas; overrides --agent-tools-mode.",
+    )
+
+    private val appServerPidFile by option(
+        "--app-server-pid-file",
+        envvar = "LETTA_APP_SERVER_PID_FILE",
+        help = "Trusted MainPID file for the external numeric-loopback App Server; unavailable or remote means unknown identity.",
     )
 
     private val subagentRegistryFile by option(
@@ -593,6 +600,9 @@ class AppServerServeIrohCommand : CliktCommand(
             beadsBaseUrl = beadsBaseUrl,
             beadsTokenFile = beadsTokenFile,
             subagentRegistryFile = subagentRegistryFile,
+            appServerProcessIdentity = LinuxAppServerProcessIdentity(
+                appServerUrl.takeUnless { ownAppServer }, appServerPidFile?.let(java.nio.file.Path::of),
+            ),
             skillsDir = skillsDir,
             localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
             eventScope = scope,

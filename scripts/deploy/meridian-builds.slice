@@ -9,7 +9,7 @@
 # kotlin daemon RSS 1.00GB as children of meridian-appserver.service). Two ways
 # that hurts:
 #   1. android-compose/gradle.properties configures org.gradle.jvmargs=-Xmx4096m
-#      AND kotlin.daemon.jvmargs=-Xmx4096m -- up to 8GB of heap that can drive a
+#      AND kotlin.daemon.jvmargs=-Xmx6144m -- up to 10GB of heap that can drive a
 #      busy 48GB host into swap and stall the App Server's event loop.
 #   2. meridian-appserver uses KillMode=control-group, so restarting the App
 #      Server REAPS in-flight builds (confirmed during the 16:28 restart).
