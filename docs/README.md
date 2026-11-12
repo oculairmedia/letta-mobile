@@ -299,6 +299,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [beads.stats v1](reference/contracts/beads.stats/beads-v1.md)
 
+### reference/contracts/canvas.mount.candidates
+
+- [canvas.mount.candidates: Canvas Mount v1](reference/contracts/canvas.mount.candidates/canvas-mount-v1.md)
+
 ### reference/contracts/canvas.mount.binding.bind
 
 - [canvas.mount.binding.bind: Canvas Mount v1](reference/contracts/canvas.mount.binding.bind/canvas-mount-v1.md)

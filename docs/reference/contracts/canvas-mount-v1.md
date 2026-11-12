@@ -18,15 +18,19 @@ ids, never notebook storage ids, and live in the host's `canvas-mounts/` sidecar
 
 ## Capability and registration
 
-- The host advertises `canvas.mount.v1` exactly when all four methods are registered. A client that
+- The host advertises `canvas.mount.v1` exactly when all five methods are registered. A client that
   does not see it must not call them.
-- All four methods are registered together or not at all, and only when the endpoint's auth policy is
+- All five methods are registered together or not at all, and only when the endpoint's auth policy is
   secure (bearer token, peer allowlist or paired peers only). Under the anonymous test policy
   (`--allow-insecure-anonymous-iroh`) nothing is registered and nothing is advertised.
-- Peer capabilities: `canvas.mount.resolve` needs `canvas.mount.read`; bind and replace need
-  `canvas.mount.write`; `canvas.mount.default.set` needs `admin.full`. Every pairing role with chat
-  access (`chat`, `desktop`, `vibesync`) holds `canvas.mount.read` and `canvas.mount.write`.
-  Devices paired before this change keep their stored capability set until re-scoped.
+- Peer capabilities: `canvas.mount.resolve` and `canvas.mount.candidates` need `canvas.mount.read`;
+  bind and replace need `canvas.mount.write`; `canvas.mount.default.set` needs `admin.full`. Every
+  pairing role with chat access (`chat`, `desktop`, `vibesync`) holds `canvas.mount.read` and
+  `canvas.mount.write`.
+- Devices paired before this change (D7): when the host first starts with `--enable-canvas-mounts`,
+  a one-time upgrade adds the two mount capabilities to every paired device whose capability set is
+  exactly the `chat`, `desktop` or `vibesync` role as it was before them. Any other set is left as
+  it is, nothing else is ever added, and a marker beside the pairing store makes it run once.
 
 ## Who is asking
 
@@ -46,7 +50,7 @@ Every call is checked in this order; the first failure ends it.
 3. Scope: the agent is in the connection's agent scope; for a binding, the conversation is in the
    connection's conversation scope and the host's own conversation record says it belongs to
    `agent_id`.
-4. Proposal (writes): `canvas_id` is visible to the connection (below). `canvas.mount.default.set`
+4. Proposal (writes; also each listed canvas of `canvas.mount.candidates`): `canvas_id` is visible to the connection (below). `canvas.mount.default.set`
    additionally needs unrestricted conversation scope (a `conversation.manage` or `admin.full` peer)
    and an existing agent.
 5. Storage.
@@ -86,6 +90,7 @@ characters).
 | `canvas.mount.binding.bind` | `agent_id`, `conversation_id`, `canvas_id` |
 | `canvas.mount.binding.replace` | `agent_id`, `conversation_id`, `canvas_id` |
 | `canvas.mount.default.set` | `agent_id`, `canvas_id` |
+| `canvas.mount.candidates` | `agent_id`, `conversation_id` |
 
 ## Results
 
@@ -99,6 +104,7 @@ Outcomes are `success: true` results carrying `status`. A client treats an unkno
 | `bound` | bind | `canvas_id`, `won`, `durability` | The durable winner; `won` is true when it is the caller's own `canvas_id` |
 | `replaced` | replace | `canvas_id`, `durability` | The binding now holds the caller's canvas |
 | `default_set` | default.set | `canvas_id`, `durability` | The default now holds the caller's canvas |
+| `listed` | candidates | `canvases`, `truncated` | Candidates in order (below); `truncated` is true when more than 100 exist |
 | `unavailable` | all | `reason` | Nothing changed. `reason` is `storage`, `authority`, `timeout_before_commit` or `identity` |
 | `outcome_unknown` | writes | (none) | The write may or may not have committed: resolve before acting |
 
@@ -107,6 +113,7 @@ Outcomes are `success: true` results carrying `status`. A client treats an unkno
 {"status": "bound", "canvas_id": "canvas-b2c8", "won": false, "durability": "durable"}
 {"status": "unavailable", "reason": "timeout_before_commit"}
 {"status": "outcome_unknown"}
+{"status": "listed", "canvases": [{"canvas_id": "canvas-conversation-conv-41d0", "owner_kind": "conversation"}], "truncated": false}
 ```
 
 Refusals are `success: false` admin RPC responses whose `error` is fixed text:
@@ -137,7 +144,14 @@ Any other failure answers the router's fixed `Internal error`.
   revert, and two clients may have been told different winners. A read reports the record as it is
   on disk and does not re-confirm it: after an ambiguous write it can return a value a power cut
   could still lose.
-- No listing method exists. Agents have no way to call these methods.
+- **Candidates** (D6) lists, read-only, the canvases the caller may mount for the addressed binding:
+  the binding's own canvas first, then every canvas in the host canvas directory that passes the
+  proposal check (step 4) for this caller, so nothing is listed that bind or replace would refuse.
+  Each entry has `canvas_id`, `title` when the directory records one, and `owner_kind`
+  (`conversation` or `agent`, never an owner id). At most 100 entries. Canvases only the relay holds
+  (app-made) are not enumerated. A failed host lookup answers `unavailable` / `authority`, never a
+  partial list. It reads no mount record and pushes nothing.
+- Agents have no way to call these methods.
 
 ## Change push
 
@@ -159,8 +173,16 @@ A host canvas tool call that names no canvas acts on the canvas the runtime-stam
 conversation is mounted on (its binding, else its agent's default), else the conversation's own
 canvas, and `canvas_list` marks that one `current`. The tools read the mount as a host-internal
 principal that admits only the caller's own binding and default and refuses every mutation, so an
-agent can never change a mount. The mounted canvas's own ACL still decides whether the agent may
-read or write it: a canvas created by another agent is refused, never replaced by another board.
+agent can never change a mount.
+
+Grant on mount (D5): the canvas the caller's own conversation is mounted on now may be read and
+written by that caller (the runtime-stamped agent of that conversation), even when its ACL names
+another agent and even when only the relay holds it (an app-made canvas, opened read-only, never
+created by the check). The grant is derived from the live mount at every check and no ACL is
+changed, so replacing or removing the mount revokes it on the next call. It covers only that
+canvas, only for that agent in that conversation; other conversations and agents gain nothing. A
+mount that cannot be read, or a mounted canvas the host does not have, is a refusal, never another
+board.
 
 ## Client rules (for the later adapter)
 
