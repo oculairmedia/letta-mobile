@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface
 
+import com.letta.mobile.ui.canvas.mount.LocalChatCanvasOnBoard
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -196,7 +198,12 @@ fun ChatSurface(
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {
-                ChatSurfaceLayers(frame, canvas?.let { { it(canvasActions) } })
+                // The board learns whether it is on show with the chat over it (canvas mode), for the side menu's pick.
+                val onBoard = presentation.mode != ChatSurfaceMode.FullScreen
+                val board: (@Composable () -> Unit)? = canvas?.let { slot ->
+                    { CompositionLocalProvider(LocalChatCanvasOnBoard provides onBoard) { slot(canvasActions) } }
+                }
+                ChatSurfaceLayers(frame, board)
             }
         }
     }

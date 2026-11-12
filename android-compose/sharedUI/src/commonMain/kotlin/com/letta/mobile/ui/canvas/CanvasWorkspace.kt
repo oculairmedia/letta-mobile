@@ -31,6 +31,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.canvas_viewer_load_failed
 import com.letta.mobile.sharedui.resources.canvas_viewer_retry
 import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceLoadState
+import com.letta.mobile.ui.canvas.mount.LocalCanvasBoardSwitchGate
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaSpinner
 import io.ak1.drawbox.domain.usecase.UseCase
@@ -117,6 +118,13 @@ fun CanvasWorkspace(
     val sessionLifecycle = CanvasWorkspaceSessionLifetime(host.session, host.sessionRegistry)
     val sessionLoadState = sessionLifecycle.loadState.value
     val prepareViewerChange = remember(session, controller) { mutableStateOf<suspend () -> Boolean>({ true }) }
+    // A conversation switching to another board saves this one first, as a viewer change does.
+    LocalCanvasBoardSwitchGate.current?.let { gate ->
+        DisposableEffect(gate, prepareViewerChange) {
+            val detach = gate.attach { prepareViewerChange.value() }
+            onDispose { detach() }
+        }
+    }
     val activeSession = host.session
     if (activeSession == null) {
         CanvasWorkspaceBoard(host, modifier)
