@@ -135,6 +135,19 @@ class ProjectRegistryV1FixturesTest {
     }
 
     @Test
+    fun onlyARecordWithATrustedFileSharesItsIdentityWithAProjectFile() {
+        val fileIds = PROJECT_FILES.map { fixture(it).text("projectId") }.toSet()
+        records().forEach { (label, record) ->
+            val state = record.text("state")
+            val hostMinted = state == "unconfirmed" || (state == "invalid" && "key" !in record)
+            // I2, I5: the host has read no file it trusts for these, so the id is its own.
+            if (hostMinted) assertFalse(record.text("projectId") in fileIds, "$label carries a host-assigned id (I2)")
+        }
+        assertTrue(fixture("record-active.json").text("projectId") in fileIds, "the active record's id comes from its file (I1)")
+        listOf("I1", "I2", "I3", "I4", "I5").forEach { assertTrue("**$it**" in contract, "identity rule $it is in the contract") }
+    }
+
+    @Test
     fun aProjectIsFetchedByIdOrByKeyAndBothAnswerTheSameRecord() {
         val cases = fixture(GET_FIXTURE).cases().associateBy { it.text("name") }
         val byId = cases.getValue("found")

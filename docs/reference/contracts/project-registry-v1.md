@@ -74,7 +74,7 @@ The host holds one record per project. This is what the read methods return.
 
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `projectId` | string | yes | as in the project file |
+| `projectId` | string | yes | from the project file, or assigned by the host (I rules) |
 | `key` | string | see K5 | the project's short name on this host |
 | `name` | string | yes | as in the project file; for an unconfirmed project, the folder name |
 | `state` | string | yes | `active`, `unconfirmed`, `archived` or `invalid` |
@@ -128,6 +128,24 @@ Rules:
   project has no agent for is absent.
 - **R7** `repository.slug` is `owner/name`. It is absent when the origin remote does not name one.
 
+Identity rules:
+
+- **I1** A record's `projectId` is the one in the project file whenever the host can read one there.
+- **I2** A folder with no project file, or with a file that gives no usable `projectId`, gets its
+  `projectId` from the host: the id already registered for that checkout when there is one, otherwise
+  a new UUID minted the first time the host sees the folder. The host stores it against the checkout
+  (root and relative path) and reuses it on every later scan, so the record keeps one id for as long
+  as the folder stays where it is.
+- **I3** Confirming a folder that has no project file writes the file with the record's existing
+  `projectId`. Confirmation does not change a record's identity.
+- **I4** When a project file names a `projectId` other than the one registered for its checkout, the
+  file wins. The checkout moves to the record with the file's id, which the host creates when it is
+  new. A record whose id the host minted is removed when it loses its last checkout; any other record
+  stays, with fewer checkouts. A reader sees this as one record changing or going and another
+  appearing; the host never rewrites a record's `projectId` in place.
+- **I5** Only an `unconfirmed` record, or an `invalid` record with no `key`, can carry a
+  host-minted id. An `active` or `archived` record always carries the id from its project file.
+
 Key rules:
 
 - **K1** `key` is the project's stable short name on a host: what people type, and what an engine may
@@ -135,16 +153,19 @@ Key rules:
 - **K2** A key is lower-case and matches the grammar exactly. The host does not fold case or trim; a
   lookup key outside the grammar is refused (`key_malformed`).
 - **K3** A key is unique on a host. When a second project arrives carrying a key that another project
-  on the host already holds, the first keeps it. The second is `invalid` with `key_conflict` until
-  its file names a key that is free.
+  on the host already holds, the first keeps it and the second is `invalid` with `key_conflict`. It
+  stays so until the key is free on that host, or, for a project no host has registered yet, until
+  its file names a free key. v1 has no other repair: for a project already registered elsewhere,
+  changing the file's key would break that registration (K4), so it cannot be registered on a host
+  where another project holds its key.
 - **K4** A registered key does not change in v1. When the project file's `key` differs from the one
   the host registered, the record keeps the registered key and the project is `invalid` with
   `key_changed` until the file is restored. Renaming is a later stage (§7).
 - **K5** An `active` or `archived` record always carries `key`. An `unconfirmed` record has none. An
   `invalid` record carries the registered key when the host has one.
-- **K6** The key is committed, so one project has the same key on every host. Two different projects
-  may hold the same key on different hosts; a reader that works across hosts keeps `projectId`
-  beside the key.
+- **K6** The key is committed, so one project has the same key on every host that registers it. Two
+  different projects may hold the same key on different hosts; a reader that works across hosts
+  keeps `projectId` beside the key.
 
 ## 3. Read methods
 
@@ -233,6 +254,8 @@ does not define.
   starts (a ready label, a formula the engine knows) is the engine's rule.
 - **X6** Name a project by `key` or `projectId`. `name`, a folder name and `repository.slug` can all
   change, or be absent.
+- **X7** Store a `projectId` only from an `active` or `archived` record. Other records may carry a
+  host-minted id that goes away (I4, I5).
 
 ## 7. Not in v1
 
@@ -240,7 +263,8 @@ does not define.
   until the stage that moves them to the host.
 - The create operation, the folder watcher and the workspace-root declaration format.
 - Creating role agents, and deriving a peer's agent scope from the registry.
-- Renaming a key.
+- Renaming a key, and registering a project on a host where another project already holds its key
+  (K3).
 - A push channel, and listing another host's projects.
 
 ## 8. Open for review
@@ -256,6 +280,8 @@ does not define.
 6. **K4**: a changed key makes the project `invalid` instead of renaming it. Is that right for v1?
 7. **K2**: existing identifiers that are not lower-case, contain spaces, or collide once lower-cased
    need a decision when the registry is first filled.
+8. **K3**: v1 cannot register a project on a second host where a different project holds its key.
+   Is that acceptable until keys can be renamed?
 
 ## 9. Fixtures
 
