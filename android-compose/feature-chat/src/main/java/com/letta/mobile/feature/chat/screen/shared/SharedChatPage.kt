@@ -25,7 +25,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
-import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
@@ -79,7 +78,7 @@ internal data class SharedChatPageParams(
     val hapticsEnabled: Boolean,
     val pagingPresentation: ChatPagingPresentation?,
     /** "Open conversations on the canvas": the initial presentation only. */
-    val openOnCanvas: Boolean = OPEN_CHATS_ON_CANVAS_DEFAULT,
+    val openOnCanvas: Boolean,
     /** Subagent dispatches open their todo sheet from these. */
     val subagents: SharedChatSubagentInputs,
     /** The ambient agent glow, drawn behind the full-screen page. */

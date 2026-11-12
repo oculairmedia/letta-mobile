@@ -529,10 +529,10 @@ internal class AdminChatViewModel @Inject constructor(
     val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
-    val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
+    /** The stored first-presentation preference, or null while settings are loading. */
+    val openChatsOnCanvas: StateFlow<Boolean?> = settingsRepository.getOpenChatsOnCanvas()
+        .map<Boolean, Boolean?> { it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
