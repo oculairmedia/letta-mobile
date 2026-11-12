@@ -34,8 +34,11 @@ import com.letta.mobile.data.canvas.workspace.SharedNoteBrowser
 import com.letta.mobile.data.canvas.workspace.SharedNoteBrowserState
 import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.canvas.workspace.SharedNotebooks
+import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
+import com.letta.mobile.data.shell.layout.edit.ShellLayoutCatalog
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutEditResult
+import com.letta.mobile.data.shell.layout.edit.ShellLayoutEditRule
 import com.letta.mobile.data.shell.layout.edit.SharedNotesPlacement
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shared_notes_back_to_list
@@ -43,10 +46,12 @@ import com.letta.mobile.sharedui.resources.shared_notes_close_view
 import com.letta.mobile.sharedui.resources.shared_notes_denied
 import com.letta.mobile.sharedui.resources.shared_notes_empty
 import com.letta.mobile.sharedui.resources.shared_notes_loading
+import com.letta.mobile.sharedui.resources.shared_notes_not_shown
 import com.letta.mobile.sharedui.resources.shared_notes_open_denied
 import com.letta.mobile.sharedui.resources.shared_notes_open_unavailable
 import com.letta.mobile.sharedui.resources.shared_notes_refresh
 import com.letta.mobile.sharedui.resources.shared_notes_retry
+import com.letta.mobile.sharedui.resources.shared_notes_side_lane_full
 import com.letta.mobile.sharedui.resources.shared_notes_title
 import com.letta.mobile.sharedui.resources.shared_notes_truncated
 import com.letta.mobile.sharedui.resources.shared_notes_unavailable
@@ -55,6 +60,8 @@ import com.letta.mobile.sharedui.resources.shared_notes_withdrawn
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.document.workspace.DocumentWorkspace
+import com.letta.mobile.ui.host.LocalOverlayHost
+import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.sidebar.LocalSharedNotesToggle
 import com.letta.mobile.ui.shell.sidebar.SharedNotesToggle
@@ -62,8 +69,6 @@ import com.letta.mobile.ui.shell.modules.UnavailableModule
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -99,30 +104,60 @@ fun ProvideShellSharedNotes(notebooks: SharedNotebooks?, content: @Composable ()
 }
 
 /**
- * The person's shared-notes toggle over the attached shell layout: null while the host cannot reach
- * shared notes or no layout is attached. A person's own toggle is kept in the layout history (so it
- * can be stepped back) but raises no "layout changed" notice: the person made it.
+ * The person's shared-notes toggle over this workspace's own layout [store] (never the process-wide
+ * attached one, which is another window's while two shells are open): null while the host cannot
+ * reach shared notes or the workspace has no store. A person's own toggle is kept in the layout
+ * history (so it can be stepped back) but raises no "layout changed" notice: the person made it. A
+ * toggle the layout rules refuse tells the person why, in the window's notice line.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 @Composable
-internal fun rememberSharedNotesToggle(browser: SharedNoteBrowser?): SharedNotesToggle? {
-    val port = LocalShellLayoutAgentPort.current
-    val store by port.attached.collectAsState()
-    val layouts = remember(port) { port.attached.flatMapLatest { it?.config ?: flowOf(null) } }
-    val layout by layouts.collectAsState(port.attached.value?.config?.value)
-    return remember(browser, store, layout) {
-        val attached = store
-        val shown = layout?.let(SharedNotesPlacement::shown)
-        if (browser == null || attached == null) null else SharedNotesToggle(shown == true) { toggleSharedNotes(attached) }
+internal fun rememberSharedNotesToggle(browser: SharedNoteBrowser?, store: ShellLayoutConfigStore?): SharedNotesToggle? {
+    val layout = store?.config?.collectAsState()?.value
+    val tell = rememberSharedNotesRefusalNotice()
+    return remember(browser, store, layout, tell) {
+        val shown = layout?.let(SharedNotesPlacement::shown) == true
+        if (browser == null || store == null) null else SharedNotesToggle(shown) { toggleSharedNotes(store)?.let(tell) }
     }
 }
 
-/** Shows or hides the shared-notes view in [store]'s layout; false when the edit is refused or stale. */
-internal fun toggleSharedNotes(store: ShellLayoutConfigStore): Boolean {
-    val before = store.config.value
-    val applied = SharedNotesPlacement.toggled(before) as? ShellLayoutEditResult.Applied ?: return false
-    return store.commit(applied.after, expected = before) != null
+/** Why the person's shared-notes toggle left the layout as it was. */
+internal enum class SharedNotesRefusal {
+    /** The side lane already holds as many views as it may; the person must close one first. */
+    SIDE_LANE_FULL,
+
+    /** Any other refusal, or the layout changed under the toggle. */
+    NOT_APPLIED,
 }
+
+/** Shows or hides the shared-notes view in [store]'s layout; why not when the edit is refused or stale, else null. */
+internal fun toggleSharedNotes(store: ShellLayoutConfigStore): SharedNotesRefusal? {
+    val before = store.config.value
+    return when (val result = SharedNotesPlacement.toggled(before)) {
+        is ShellLayoutEditResult.Applied -> SharedNotesRefusal.NOT_APPLIED.takeIf { store.commit(result.after, expected = before) == null }
+        is ShellLayoutEditResult.Rejected -> refusal(result)
+    }
+}
+
+private fun refusal(rejected: ShellLayoutEditResult.Rejected): SharedNotesRefusal {
+    val full = rejected.errors.any { it.rule == ShellLayoutEditRule.LANE_FULL }
+    return if (full) SharedNotesRefusal.SIDE_LANE_FULL else SharedNotesRefusal.NOT_APPLIED
+}
+
+/** Tells the person, in the window's notice line, why the toggle did nothing and how to make room. */
+@Composable
+private fun rememberSharedNotesRefusalNotice(): (SharedNotesRefusal) -> Unit {
+    val overlays = LocalOverlayHost.current
+    val full = stringResource(Res.string.shared_notes_side_lane_full, ShellLayoutCatalog.lane(ShellLanes.SIDE)?.maxSlots ?: 0)
+    val notApplied = stringResource(Res.string.shared_notes_not_shown)
+    return remember(overlays, full, notApplied) {
+        { refusal ->
+            val message = if (refusal == SharedNotesRefusal.SIDE_LANE_FULL) full else notApplied
+            overlays?.show(Overlay.Snackbar(message, key = SHARED_NOTES_REFUSAL_KEY))
+        }
+    }
+}
+
+private const val SHARED_NOTES_REFUSAL_KEY = "shared-notes-refused"
 
 /**
  * The shared-notes view as a shell module: the host's list of notes shared with this device, and

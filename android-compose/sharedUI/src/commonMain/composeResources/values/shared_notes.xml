@@ -2,6 +2,8 @@
     <string name="shared_notes_title">Shared notes</string>
     <string name="shared_notes_show">Shared notes</string>
     <string name="shared_notes_hide">Hide shared notes</string>
+    <string name="shared_notes_side_lane_full">The side area already holds %1$d views. Close one of them to make room for Shared notes.</string>
+    <string name="shared_notes_not_shown">The layout changed before Shared notes could be shown or hidden. Try again.</string>
     <string name="shared_notes_close_view">Close shared notes</string>
     <string name="shared_notes_back_to_list">All shared notes</string>
     <string name="shared_notes_refresh">Refresh</string>

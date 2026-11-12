@@ -134,7 +134,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalPanelLane provides remember(state.layout.lanes) { state.layout.lanes.panelLane().map { it.view } },
                                 LocalShellLayoutReset provides rememberShellLayoutReset(),
                                 LocalShellSharedNotes provides sharedNotes,
-                                LocalSharedNotesToggle provides rememberSharedNotesToggle(sharedNotes),
+                                LocalSharedNotesToggle provides rememberSharedNotesToggle(sharedNotes, state.layout.lanesStore),
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {

@@ -3,8 +3,10 @@
 package com.letta.mobile.ui.shell.workspace
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
@@ -37,7 +39,9 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellLanes
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
+import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.shell.layout.ShellViews
+import com.letta.mobile.data.shell.layout.edit.SharedNotesPlacement
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.ui.shell.modules.ShellModuleTags
@@ -50,6 +54,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private const val Page = "document-module-page"
@@ -70,14 +75,16 @@ private val Note = NotebookDocumentId("0123456789abcdef0123456789abcdef")
 class ShellDocumentModuleTest {
     private val host = NoteHost()
 
-    private fun state(lanes: ShellLayoutConfig) = LettaShellWorkspaceState(
+    private fun state(lanes: ShellLayoutConfig) = state(ShellWorkspaceLayout(lanes = lanes))
+
+    private fun state(layout: ShellWorkspaceLayout) = LettaShellWorkspaceState(
         header = ShellWorkspaceHeaderState(title = "Window title"),
         navigation = ShellWorkspaceNavigation(
             rail = ShellLibraryRailState(agents = listOf("agent-a" to "Ada"), focus = ShellRailFocus(selectedAgentId = "agent-a")),
             panel = ShellAgentPanelState(agent = ShellPanelAgent(name = "Ada", agentId = "agent-a")),
             openConversation = SubagentParentScope("agent-a", "conv-a"),
         ),
-        layout = ShellWorkspaceLayout(lanes = lanes),
+        layout = layout,
     )
 
     private fun shellHost() = LettaShellWorkspaceHost(
@@ -91,12 +98,17 @@ class ShellDocumentModuleTest {
     private fun lanes(main: List<ModuleSlot> = listOf(PageSlot), side: List<ModuleSlot> = listOf(DocumentSlot)) =
         ShellLayoutConfig(version = ShellLayoutConfig.VERSION, lanes = mapOf(ShellLanes.MAIN to main, ShellLanes.SIDE to side))
 
-    private fun window(width: Dp, notebooks: SharedNotebooks? = host, block: ComposeUiTest.() -> Unit) =
+    private fun window(
+        width: Dp,
+        notebooks: SharedNotebooks? = host,
+        layout: ShellLayoutConfig = lanes(),
+        block: ComposeUiTest.() -> Unit,
+    ) =
         runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
             val shell = shellHost()
             setContent {
                 ProvideShellSharedNotes(notebooks) {
-                    LettaShellWorkspace(state(lanes()), shell, Modifier.size(width = width, height = WindowHeight))
+                    LettaShellWorkspace(state(layout), shell, Modifier.size(width = width, height = WindowHeight))
                 }
             }
             block()
@@ -141,6 +153,17 @@ class ShellDocumentModuleTest {
 
     @Test
     fun justBelowTheWideBreakpointASharedNoteOpensOverTheChat() = opensOverThePage(700.dp)
+
+    /** An agent may place the view in the main lane; a phone, whose main lane draws only the page, still shows it. */
+    @Test
+    fun onAPhoneTheViewPlacedInTheMainLaneStillShowsOverTheChat() =
+        window(360.dp, layout = lanes(main = listOf(PageSlot, DocumentSlot), side = emptyList())) {
+            openTheSharedNote()
+            val module = onNodeWithTag(ShellDocumentTags.MODULE).getUnclippedBoundsInRoot()
+            assertEquals(360f, (module.right - module.left).value, absoluteTolerance = 1f, message = "the view spans the phone")
+            assertEquals(1, onAllNodesWithTag(ShellDocumentTags.MODULE).fetchSemanticsNodes().size, "drawn once")
+            onNodeWithTag(Page).assertExists()
+        }
 
     @Test
     fun anEditInTheWorkspaceReachesTheHostsNote() = window(1200.dp) {
@@ -201,7 +224,7 @@ class ShellDocumentModuleTest {
             CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
                 ProvideShellSharedNotes(host) {
                     val controller = rememberShellLayoutController(null, settings)
-                    LettaShellWorkspace(state(controller.workspaceLayout().lanes), shell, Modifier.size(1200.dp, WindowHeight))
+                    LettaShellWorkspace(state(controller.workspaceLayout()), shell, Modifier.size(1200.dp, WindowHeight))
                 }
             }
         }
@@ -216,6 +239,64 @@ class ShellDocumentModuleTest {
         onNodeWithTag(ShellDocumentTags.CLOSE).performClick()
         waitUntil(timeoutMillis = TimeoutMillis) { !exists(ShellDocumentTags.MODULE) }
         onNodeWithTag(Page).assertIsDisplayed()
+    }
+
+    /** Two windows, two layouts: the menu in the first window edits the first window's layout, not the one attached last. */
+    @Test
+    fun eachWindowsMenuTogglesItsOwnLayoutNotTheLastAttachedOne() = runDesktopComposeUiTest(width = 2400, height = 800) {
+        val port = ShellLayoutAgentPort()
+        val first = ShellLayoutConfigStore(InMemorySecureSettingsStore(), "shell.first.lanes")
+        val second = ShellLayoutConfigStore(InMemorySecureSettingsStore(), "shell.second.lanes")
+        port.attach(first)
+        port.attach(second)
+        setContent {
+            CompositionLocalProvider(LocalShellLayoutAgentPort provides port) {
+                ProvideShellSharedNotes(host) {
+                    Row {
+                        for (store in listOf(first, second)) {
+                            val layout = ShellWorkspaceLayout(lanes = store.config.collectAsState().value, lanesStore = store)
+                            LettaShellWorkspace(state(layout), shellHost(), Modifier.size(1200.dp, WindowHeight))
+                        }
+                    }
+                }
+            }
+        }
+        waitForIdle()
+
+        onAllNodesWithTag(ShellAgentPanelTags.AGENT_MENU)[0].performClick()
+        onNode(hasText("Shared notes")).performClick()
+        waitForIdle()
+
+        assertTrue(SharedNotesPlacement.shown(first.config.value), "the first window's own layout shows the view")
+        assertFalse(SharedNotesPlacement.shown(second.config.value), "the window attached last is untouched")
+        assertEquals(second, port.attached.value)
+    }
+
+    /** A full side lane refuses the view; the person is told why and how to make room instead of nothing happening. */
+    @Test
+    fun aFullSideLaneTellsThePersonToCloseAViewFirst() = runDesktopComposeUiTest(width = 1200, height = 800) {
+        val store = ShellLayoutConfigStore(InMemorySecureSettingsStore(), "shell.full.lanes")
+        val sideSlots = listOf(ModuleSlot(ShellViews.SIDE_PANE), ModuleSlot(ShellViews.TASKS), ModuleSlot(ShellViews.NOTE, "board"))
+        val full = lanes(side = sideSlots)
+        store.commit(full)
+        val before = store.config.value
+        setContent {
+            ProvideShellSharedNotes(host) {
+                val layout = ShellWorkspaceLayout(lanes = store.config.collectAsState().value, lanesStore = store)
+                LettaShellWorkspace(state(layout), shellHost(), Modifier.size(1200.dp, WindowHeight))
+            }
+        }
+        waitForIdle()
+
+        onNodeWithTag(ShellAgentPanelTags.AGENT_MENU).performClick()
+        onNode(hasText("Shared notes")).performClick()
+
+        waitUntil(timeoutMillis = TimeoutMillis) {
+            onAllNodes(hasText("Close one of them to make room for Shared notes", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
+        onNode(hasText("already holds 3 views", substring = true)).assertExists()
+        assertEquals(before, store.config.value, "nothing was dropped to make room")
+        onNodeWithTag(ShellDocumentTags.MODULE).assertDoesNotExist()
     }
 }
 
