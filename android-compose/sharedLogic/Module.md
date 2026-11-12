@@ -717,7 +717,7 @@ The voice loop's internal transition table: a pure function from model and input
 
 # Package com.letta.mobile.data.voice.responder
 
-The first responder: the conversation's agent answering through the chat session port. It sends the utterance, follows the assistant text of the run it started while ignoring reasoning, tool rows and errors, completes when the run ends, reports a run that never starts or fails, and stops the run when interrupted or superseded by a newer utterance.
+The responder for the conversation's agent, over its own port, [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html): sending returns the message's client id, and the state publishes the run each sent message started. Replies are attributed by that identity only, never by text, position or timing; without it nothing is spoken and the reply ends unattributed. No adapter from the app's chat session exists yet, because the chat session does not return a sent message's id or publish the run it started.
 
 # Package com.letta.mobile.data.voice.speech
 

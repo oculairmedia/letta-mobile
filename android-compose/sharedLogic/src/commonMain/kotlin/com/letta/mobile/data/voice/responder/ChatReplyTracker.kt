@@ -1,127 +1,68 @@
 package com.letta.mobile.data.voice.responder
 
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.voice.VoiceText
-import com.letta.mobile.ui.chat.render.ChatUiState
-
-/** The sent utterance's row, by row id and by client message id (which survives confirmation). */
-private data class AnchorIdentity(val rowId: String, val clientRow: String?) {
-    fun matches(message: UiMessage): Boolean = message.id == rowId || message.clientMessageId == (clientRow ?: rowId)
-}
 
 /**
- * Follows the run that answers one sent utterance, in successive chat states.
+ * Follows the run that answers one sent message, by identity only.
  *
- * Requirement: the session must expose the identity of a sent message and the run it started.
- * The chat port offers neither today: `sendText` returns no client message id, and the chat state
- * publishes no run per sent message. So this tracker fails closed:
- *
- * - The utterance's row is a user row absent from [start] whose text equals [text]. Text is not
- *   identity, so it is only a necessary condition: if more than one new row could be the utterance
- *   the reply is [ambiguous] and nothing is spoken. Once chosen, the row is followed by row id or
- *   client message id (a pending row's id changes when the server confirms it).
- * - The run is the run id on that row once it is confirmed. A pending (local) row's run id is
- *   ignored: local rows are built without one, and only the server's confirmation names the run.
- * - An assistant row is the utterance's only when its run id equals that run id. Nothing is
- *   inferred from timing, ordering or which runs were seen before; rows without a run id, and
- *   live rows streamed under a provisional run id, are not attributed.
- *
- * Until the run is known nothing is spoken; if it never becomes known the responder fails as
- * UNATTRIBUTED rather than speak another message's reply.
+ * The message is [sent]; its run is whatever the session publishes in
+ * [VoiceChatState.startedRuns] for that id (every provisional and durable id of the run). That
+ * mapping is the single source of attribution: a row belongs to the reply only when its run id is
+ * one of those ids. The confirmed user row's own run id is not used as a second source, because
+ * the session publishes the pairing at the moment the run starts, which is earlier and does not
+ * depend on how rows are confirmed. Nothing is inferred from text, position or timing. Until the
+ * session publishes the run, nothing is spoken; if it never does, the responder fails as
+ * UNATTRIBUTED.
  *
  * Not thread-safe: one tracker serves one reply's collection.
  */
-internal class ChatReplyTracker(start: ChatUiState, private val text: VoiceText) {
-    private val baseline: Set<String> = start.messages.flatMapTo(HashSet()) { listOfNotNull(it.id, it.clientMessageId) }
-    private val agent: String? = start.agentId
-    private val spokenLengths = mutableMapOf<String, Int>()
-    private var anchor: AnchorIdentity? = null
-    private var ownRun: String? = null
+internal class ChatReplyTracker(start: VoiceChatState, private val sent: ClientMessageId) {
+    private val conversation: VoiceConversationKey? = start.conversation
+    private val spokenLengths = mutableMapOf<VoiceRowKey, Int>()
 
-    /** The utterance has appeared in the conversation (whether or not its run is known). */
-    val anchored: Boolean get() = anchor != null
+    /** The sent message's own row has appeared in the conversation. */
+    fun anchored(state: VoiceChatState): Boolean = state.rows.any { it.clientMessageId == sent }
 
-    /** More than one new message could be the utterance; the reply cannot be attributed. */
-    var ambiguous: Boolean = false
-        private set
+    /** The run the message started is published. */
+    fun delivered(state: VoiceChatState): Boolean = ownRuns(state).isNotEmpty()
 
-    /** The run the utterance started is positively identified. */
-    fun delivered(state: ChatUiState): Boolean = observe(state) >= 0 && ownRun != null
+    /** Delivery is decided either way: delivered, or the conversation changed. */
+    fun settled(state: VoiceChatState): Boolean = delivered(state) || conversationChanged(state)
 
-    /** Delivery is decided either way: delivered, ambiguous, or the conversation moved to another agent. */
-    fun settled(state: ChatUiState): Boolean = when {
-        delivered(state) -> true
-        ambiguous -> true
-        else -> agentChanged(state)
+    /** The session moved to another conversation. */
+    fun conversationChanged(state: VoiceChatState): Boolean = conversation != null && state.conversation != conversation
+
+    /** The message's run is still in flight. */
+    fun running(state: VoiceChatState): Boolean = ownRuns(state).any { it in state.activeRuns }
+
+    /** The message's run failed. */
+    fun failed(state: VoiceChatState): Boolean {
+        val runs = ownRuns(state)
+        return runs.any { it in state.failedRuns } || ownRows(state, runs).any { it.kind == VoiceRowKind.ERROR }
     }
 
-    /** The conversation now belongs to another agent. */
-    fun agentChanged(state: ChatUiState): Boolean = agent != null && state.agentId != agent
-
-    /** The run failed: the session says so, or an error row of the utterance's run follows it. */
-    fun failed(state: ChatUiState): Boolean = state.runFailed || ownRows(state).any { it.isError }
-
-    /** The utterance's run's assistant text added since the last call, or null when nothing new arrived. */
-    fun advance(state: ChatUiState): VoiceText? {
-        observe(state)
-        val pieces = ownRows(state).filter { it.isSpokenText() }.mapNotNull(::newText)
+    /** The run's assistant text added since the last call, or null when nothing new arrived. */
+    fun advance(state: VoiceChatState): VoiceText? {
+        val texts = ownRows(state, ownRuns(state)).filter { it.kind == VoiceRowKind.ASSISTANT_TEXT }
+        val pieces = texts.mapNotNull(::newText)
         return if (pieces.isEmpty()) null else VoiceText(pieces.joinToString(""))
     }
 
-    /** Records the utterance's run from its confirmed row; returns the anchor's index or -1. */
-    private fun observe(state: ChatUiState): Int {
-        val index = anchorIndex(state)
-        if (index < 0) return index
-        val row = state.messages[index]
-        if (!row.isPending) row.runId?.let { ownRun = it }
-        return index
-    }
+    private fun ownRuns(state: VoiceChatState): Set<VoiceRunId> = state.startedRuns[sent].orEmpty()
 
-    private fun ownRows(state: ChatUiState): List<UiMessage> {
-        val run = ownRun ?: return emptyList()
-        val index = anchorIndex(state)
-        if (index < 0) return emptyList()
-        return state.messages.subList(index + 1, state.messages.size).filter { it.runId == run }
-    }
+    private fun ownRows(state: VoiceChatState, runs: Set<VoiceRunId>): List<VoiceChatRow> =
+        if (runs.isEmpty()) emptyList() else state.rows.filter { row -> row.runId?.let { it in runs } == true }
 
-    private fun newText(message: UiMessage): String? {
-        val spoken = spokenLengths[message.id]
-        val content = message.content
+    private fun newText(row: VoiceChatRow): String? {
+        val spoken = spokenLengths[row.key]
+        val content = row.text.value
         if (content.length <= (spoken ?: 0)) return null
         val separator = if (spoken == null && spokenLengths.isNotEmpty()) MESSAGE_SEPARATOR else ""
-        spokenLengths[message.id] = content.length
+        spokenLengths[row.key] = content.length
         return separator + content.substring(spoken ?: 0)
     }
 
-    private fun anchorIndex(state: ChatUiState): Int {
-        val candidates = state.messages.withIndex().filter { (_, row) -> row.couldBeUtterance() }
-        if (candidates.size > 1) ambiguous = true
-        if (ambiguous) return -1
-        anchor?.let { known -> return state.messages.indexOfFirst(known::matches) }
-        val chosen = candidates.singleOrNull() ?: return -1
-        anchor = AnchorIdentity(chosen.value.id, chosen.value.clientMessageId)
-        return chosen.index
-    }
-
-    /** A new user row whose text equals the utterance: necessary for being it, not sufficient. */
-    private fun UiMessage.couldBeUtterance(): Boolean = when {
-        role != USER_ROLE -> false
-        !isNew() -> false
-        else -> content.trim() == text.value.trim()
-    }
-
-    private fun UiMessage.isNew(): Boolean = id !in baseline && (clientMessageId ?: id) !in baseline
-
-    private fun UiMessage.isSpokenText(): Boolean = when {
-        role != ASSISTANT_ROLE -> false
-        isReasoning || isError -> false
-        isCompaction -> false
-        else -> toolCalls.isNullOrEmpty()
-    }
-
     private companion object {
-        const val USER_ROLE = "user"
-        const val ASSISTANT_ROLE = "assistant"
         const val MESSAGE_SEPARATOR = "\n"
     }
 }

@@ -68,6 +68,7 @@ class EndpointVoiceMouth(
      * nothing is synthesised or played after the failure.
      */
     private inner class MouthPipeline {
+        // overflow: holds only the segments of the reply being spoken (bounded by that reply's length); stop() and failures discard it.
         val texts = Channel<SpeechSegment>(Channel.UNLIMITED)
         private val clips = Channel<Pair<SpeechSegmentId, AudioClip>>(PREFETCH)
         val job: Job = scope.launch {

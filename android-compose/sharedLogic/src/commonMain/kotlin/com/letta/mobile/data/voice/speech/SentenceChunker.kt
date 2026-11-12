@@ -18,6 +18,7 @@ class SentenceChunker(
 ) {
     private val pending = StringBuilder()
     private var inCodeBlock = false
+    private var inDroppedTag = false
     private val softCut = SoftCut(maxSegmentLength)
 
     init {
@@ -41,6 +42,7 @@ class SentenceChunker(
     fun reset() {
         pending.clear()
         inCodeBlock = false
+        inDroppedTag = false
     }
 
     /** The first [length] buffered characters become a segment; [skip] more after them are dropped. */
@@ -52,7 +54,11 @@ class SentenceChunker(
 
         fun run(): List<VoiceText> {
             do {
-                val progressed = if (inCodeBlock) skipCode() else splitProse()
+                val progressed = when {
+                    inCodeBlock -> skipCode()
+                    inDroppedTag -> skipTag()
+                    else -> splitProse()
+                }
             } while (progressed)
             return out
         }
@@ -70,6 +76,19 @@ class SentenceChunker(
             return false
         }
 
+        /** Drops the rest of a tag released past the hold limit until it closes; nothing of it is spoken. */
+        private fun skipTag(): Boolean {
+            val close = pending.indexOf('>')
+            if (close < 0) {
+                pending.clear()
+                if (mode == ScanMode.FINAL) inDroppedTag = false
+                return false
+            }
+            pending.deleteRange(0, close + 1)
+            inDroppedTag = false
+            return true
+        }
+
         private fun splitProse(): Boolean {
             val fence = pending.indexOf(FENCE)
             val limit = if (fence < 0) pending.length else fence
@@ -78,7 +97,7 @@ class SentenceChunker(
             return when {
                 end != null -> take(Cut(end.value))
                 fence >= 0 -> openCodeBlock(Cut(fence, FENCE.length))
-                overflow != null -> take(overflow)
+                overflow != null -> releaseOverflow(overflow)
                 mode == ScanMode.FINAL -> emitAll()
                 else -> false
             }
@@ -94,6 +113,27 @@ class SentenceChunker(
             val safe = softCut.lastSafeBreak(pending)
             if (safe != null) return Cut(safe)
             return if (pending.length > maxSegmentLength * HARD_LIMIT_FACTOR) Cut(pending.length) else null
+        }
+
+        /**
+         * Releases overflowing text. Released whole past the hold limit, an unfinished HTML tag at its
+         * end is dropped: the text before it is spoken, the tag never is, and the tag's remainder is
+         * skipped until it closes (or the reply ends).
+         */
+        private fun releaseOverflow(cut: Cut): Boolean {
+            val tag = if (cut.length == pending.length) unfinishedTagStart() else null
+            if (tag == null) return take(cut)
+            take(Cut(tag))
+            inDroppedTag = true
+            return true
+        }
+
+        /** Where an unfinished HTML tag (`<` then a letter or `/`, with no `>` after it) starts, or null. */
+        private fun unfinishedTagStart(): Int? {
+            val start = pending.lastIndexOf('<')
+            if (start < 0 || pending.indexOf('>', start) >= 0) return null
+            val next = pending.getOrNull(start + 1) ?: return null
+            return if (next.isLetter() || next == '/') start else null
         }
 
         private fun openCodeBlock(cut: Cut): Boolean {

@@ -39,6 +39,7 @@ internal class FakeEar(private val log: EngineLog) : VoiceEar {
     var listening = false
         private set
     var releaseDelay: Duration = Duration.ZERO
+    var throwOnRelease = false
     val outputHints = mutableListOf<Boolean>()
     val retried = mutableListOf<CapturedAudioHandle>()
     var retryAccepted = true
@@ -55,6 +56,7 @@ internal class FakeEar(private val log: EngineLog) : VoiceEar {
             if (releaseDelay > Duration.ZERO) withContext(NonCancellable) { delay(releaseDelay) }
             listening = false
             log.add("ear:close")
+            check(!throwOnRelease) { "microphone stuck" }
         }
     }
 
@@ -93,6 +95,7 @@ internal class FakeMouth(private val log: EngineLog) : VoiceMouth {
         private set
     var hangOnStop = false
     var throwOnSpeak = false
+    var throwOnStop = false
     private val stopGate = CompletableDeferred<Unit>()
 
     override val events: Flow<VoiceMouthEvent> = emitted
@@ -108,6 +111,7 @@ internal class FakeMouth(private val log: EngineLog) : VoiceMouth {
 
     override suspend fun stop() {
         if (hangOnStop) stopGate.await()
+        check(!throwOnStop) { "speaker stuck" }
         stops++
         queued.clear()
         log.add("mouth:stop")

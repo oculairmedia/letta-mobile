@@ -564,6 +564,36 @@ class VoiceLoopTest {
         assertFalse(h.ear.listening)
     }
 
+    @Test
+    fun mouthStopThatThrowsIsNotAConfirmedRelease() = runTest {
+        val h = LoopHarness(this, noBargeIn)
+        h.speaking()
+        h.mouth.throwOnStop = true
+        repeat(2) {
+            h.loop.activate(VoiceActivationKind.TAP)
+            h.settle()
+            assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.MOUTH), h.state.failure)
+            assertEquals(1, h.ear.opens())
+        }
+        h.mouth.throwOnStop = false
+        h.listening()
+        assertEquals(2, h.ear.opens())
+        assertEquals(VoicePhase.LISTENING, h.state.phase)
+    }
+
+    @Test
+    fun earReleaseThatThrowsKeepsTheEarHeld() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        h.ear.throwOnRelease = true
+        h.loop.stop()
+        h.settle()
+        assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.EAR), h.state.failure)
+        h.listening()
+        assertEquals(1, h.ear.opens())
+        assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.EAR), h.state.failure)
+    }
+
     private fun source(vararg events: VoiceActivationEvent): VoiceActivationSource = object : VoiceActivationSource {
         override val events: Flow<VoiceActivationEvent> = flowOf(*events)
     }

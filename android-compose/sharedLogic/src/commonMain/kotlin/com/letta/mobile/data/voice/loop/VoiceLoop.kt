@@ -70,6 +70,7 @@ class VoiceLoop(
 ) {
     private val job = SupervisorJob(runtime.scope.coroutineContext[Job])
     private val scope = runtime.scope + job + runtime.dispatcher
+    // overflow: one consumer that only pauses for bounded release waits; blocking or dropping here would lose stops.
     private val inputs = Channel<LoopInput>(Channel.UNLIMITED)
     private val runner = LoopEffectRunner(LoopWiring(engines, config, scope, inputs))
     private var model = LoopModel(config)

@@ -72442,10 +72442,133 @@ public final class com/letta/mobile/data/voice/responder/ChatReplyPolicy {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/voice/responder/ChatSessionVoiceResponder : com/letta/mobile/data/voice/engine/VoiceResponder {
-	public fun <init> (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+public final class com/letta/mobile/data/voice/responder/ClientMessageId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/ClientMessageId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/SentUtterance {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-qNd_j7I ()Ljava/lang/String;
+	public final fun copy-TO09WPU (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/SentUtterance;
+	public static synthetic fun copy-TO09WPU$default (Lcom/letta/mobile/data/voice/responder/SentUtterance;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/SentUtterance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-qNd_j7I ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatResponder : com/letta/mobile/data/voice/engine/VoiceResponder {
+	public fun <init> (Lcom/letta/mobile/data/voice/responder/VoiceChatSession;Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/responder/VoiceChatSession;Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun respond (Lcom/letta/mobile/data/voice/VoiceUtterance;)Lcom/letta/mobile/data/voice/engine/VoiceReply;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatRow {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-S6PfSEs ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public final fun component3-WHRWuv8 ()Ljava/lang/String;
+	public final fun component4-XLRj9Ro ()Ljava/lang/String;
+	public final fun component5-QkQMI6A ()Ljava/lang/String;
+	public final fun copy-BxLJEW8 (Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceChatRow;
+	public static synthetic fun copy-BxLJEW8$default (Lcom/letta/mobile/data/voice/responder/VoiceChatRow;Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/VoiceChatRow;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClientMessageId-XLRj9Ro ()Ljava/lang/String;
+	public final fun getKey-S6PfSEs ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public final fun getRunId-QkQMI6A ()Ljava/lang/String;
+	public final fun getText-WHRWuv8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/responder/VoiceChatSession {
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun send-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun stopRun ()V
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatState {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-n7MmrEY ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun component4 ()Ljava/util/Set;
+	public final fun component5 ()Ljava/util/Set;
+	public final fun copy-Yhk6gEM (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/data/voice/responder/VoiceChatState;
+	public static synthetic fun copy-Yhk6gEM$default (Lcom/letta/mobile/data/voice/responder/VoiceChatState;Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/VoiceChatState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActiveRuns ()Ljava/util/Set;
+	public final fun getConversation-n7MmrEY ()Ljava/lang/String;
+	public final fun getFailedRuns ()Ljava/util/Set;
+	public final fun getRows ()Ljava/util/List;
+	public final fun getStartedRuns ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceConversationKey {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceConversationKey;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceRowKey {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceRowKey;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceRowKind : java/lang/Enum {
+	public static final field ASSISTANT_TEXT Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static final field ERROR Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static final field OTHER Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static final field USER Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceRunId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceRunId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/voice/speech/SentenceChunker {

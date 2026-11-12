@@ -8,6 +8,7 @@ import com.letta.mobile.data.voice.loop.machine.LoopEffect
 import com.letta.mobile.data.voice.loop.machine.LoopInput
 import com.letta.mobile.data.voice.loop.machine.LoopModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -16,10 +17,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Opens and closes the ear to match the model, tags its events with a generation so events from a
  * closed ear are dropped, and tells it when output plays. An ear that does not let go within the
  * release budget stays held: no second ear is opened until the first has confirmed its release,
- * and every attempt meanwhile reports UNRESPONSIVE. Used from the loop's processing coroutine.
+ * and every attempt meanwhile reports UNRESPONSIVE. An ear whose collection threw while being
+ * released has not confirmed its release either: it stays held for this loop's lifetime, since the
+ * ear port offers nothing else to retry. Used from the loop's processing coroutine.
  */
 internal class EarSupervisor(private val wiring: LoopWiring) {
     private var job: Job? = null
+    private var releasedCleanly: CompletableDeferred<Boolean>? = null
     private var stopping = false
     private var generation = 0L
     private var outputHint = false
@@ -68,7 +72,9 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
     private fun startIfWanted(model: LoopModel): LoopInput? {
         if (!model.micWanted) return null
         val current = ++generation
-        job = wiring.scope.launch { listen(current) }
+        val clean = CompletableDeferred<Boolean>()
+        releasedCleanly = clean
+        job = wiring.scope.launch { listen(current, clean) }
         return null
     }
 
@@ -79,15 +85,21 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
             generation++
             running.cancel()
         }
-        withTimeoutOrNull(wiring.config.releaseTimeout) { running.join() } ?: return wiring.unresponsive(VoicePort.EAR)
+        val clean = withTimeoutOrNull(wiring.config.releaseTimeout) {
+            running.join()
+            releasedCleanly?.await() ?: true
+        }
+        if (clean != true) return wiring.unresponsive(VoicePort.EAR)
         job = null
         stopping = false
         return null
     }
 
-    private suspend fun listen(current: Long) {
+    /** Collects the ear; [clean] records whether its collection ended without throwing (cancellation is clean). */
+    private suspend fun listen(current: Long, clean: CompletableDeferred<Boolean>) {
         val outcome = runCatching { wiring.engines.ear.listen().collect { wiring.inputs.send(LoopInput.FromEar(it, current)) } }
         val error = outcome.exceptionOrNull()
+        clean.complete(error == null || error is CancellationException)
         if (error is CancellationException) throw error
         val ended = VoiceEarEvent.Failed(VoiceError(VoiceErrorCode.ENGINE_FAILED, VoicePort.EAR))
         wiring.inputs.send(LoopInput.FromEar(ended, current))

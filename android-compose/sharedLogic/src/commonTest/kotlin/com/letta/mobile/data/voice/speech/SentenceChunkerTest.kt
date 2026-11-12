@@ -110,4 +110,13 @@ class SentenceChunkerTest {
         assertTrue(segments.none { "[" in it || "](" in it || "http" in it }, segments.toString())
         assertTrue(segments.any { "docs" in it })
     }
+
+    @Test
+    fun anUnfinishedTagPastTheHoldLimitIsDroppedNeverSpoken() {
+        val cases = listOf(
+            arrayOf("Hello there <span class=\"" + "x".repeat(100)) to listOf("Hello there"),
+            arrayOf("Intro <span " + "a".repeat(100), "\">after tag.") to listOf("Intro", "after tag."),
+        )
+        cases.forEach { (deltas, expected) -> assertEquals(expected, chunk(*deltas, max = 16)) }
+    }
 }
