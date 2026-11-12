@@ -618,6 +618,33 @@ LETTA_IROH_VIBESYNC_BASE_URL=http://127.0.0.1:3099
 Add domain-specific bounded-service URLs only for services approved by the
 ownership matrix.
 
+### App Server process identity (`52vxf`)
+
+The repository wrapper unit passes `--app-server-pid-file /run/meridian-appserver/main.pid`
+(or use `LETTA_APP_SERVER_PID_FILE`). The matching App Server drop-in
+`scripts/deploy/meridian-appserver.process-identity.conf`, installed by `install-meridian.sh`,
+writes systemd's MainPID in ExecStartPost. Deploy both templates together under normal
+approval; this change does not modify or restart live units. The App Server must be
+launched directly with Type=simple, not through a non-exec launcher, and must retain
+KillMode=control-group so its workers cannot survive it. The PID file is trusted host
+configuration: it MUST name the App Server serving the configured URL, not another service.
+
+The wrapper reads the configured PID file and `/proc/<pid>/stat` field 22 plus
+`/proc/sys/kernel/random/boot_id`, checking the PID and start time twice. This avoids
+process-name guesses, socket-owner enumeration, subprocesses, and PID-reuse ambiguity.
+Only numeric loopback WebSocket URLs (`127.0.0.1` or `::1`) qualify; remote URLs,
+hostnames, missing/malformed files, unsupported platforms (including Windows without
+`/proc`), and read failures yield unknown. The existing wire handshake has no process identity.
+
+Each newly observed durable record stores this identity. On startup a different known
+identity immediately cancels its live record as `app_server_restarted`, publishes the
+terminal change, and rejects replayed RUNNING frames. Equal identities mean a wrapper-only
+restart: silent workers keep normal snapshot protection and the six-hour TTL. Unknown
+on either side (including old-format records) retains the one-hour `restart_unobserved`
+uncertainty bound; this fallback can still cancel a live entirely silent worker. Installing
+the PID-file integration cannot retrospectively prove ownership of old records. A new
+App Server generation is distinguished from the wrapper's local connection generation.
+
 ### Cron handover (`lgns8.24`) — DONE, executed 2026-08-01 01:05
 
 The handover was performed in the maintenance window and the App Server now

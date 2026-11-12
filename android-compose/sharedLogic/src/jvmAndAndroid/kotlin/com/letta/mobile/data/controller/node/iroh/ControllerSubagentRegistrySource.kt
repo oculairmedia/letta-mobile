@@ -91,6 +91,10 @@ class ControllerSubagentRegistrySource(
      */
     @Volatile
     var changeListener: SubagentRegistryChangeListener? = null
+        set(value) {
+            field = value
+            if (value != null) notifyExpired(registry.takeStartupRetired())
+        }
 
     /**
      * The parent turn ended. Background subagents

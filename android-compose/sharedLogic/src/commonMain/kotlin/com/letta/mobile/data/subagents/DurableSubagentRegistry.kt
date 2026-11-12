@@ -49,11 +49,15 @@ class DurableSubagentRegistry(
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** How long a live chip may go unobserved; see [staleRunningChips]. */
     private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
+    /** Host-local proof; unknown on remote or unsupported hosts. Captured once at registry startup. */
+    processIdentity: AppServerProcessIdentity = AppServerProcessIdentity { null },
 ) {
     internal val supportsDurableDismissal: Boolean = store.durable
     private val lock = SynchronizedObject()
     private val snapshotAbsence = SubagentSnapshotAbsence()
     private val startedAtEpochMs = clock()
+    private val currentProcessIdentity = runCatching { processIdentity.current() }.getOrNull()?.takeIf { it.isNotBlank() }
+    private var startupRetired = emptyList<SubagentChipRecord>()
     // Connection generations are local counters, not App Server process identities.
     // Only records loaded at startup get this uncertainty bound; a sighting removes it.
     private val restartUnobserved = mutableSetOf<SubagentChipKey>()
@@ -63,15 +67,17 @@ class DurableSubagentRegistry(
 
     init {
         rehydrate()
+        retirePreviousProcess()
         // Zombies persisted by an earlier process end now, not on some later mutation.
         expireStale()
     }
 
     /**
      * Terminalize every live chip unobserved for longer than [staleAfterMs].
-     * Rehydrated chips never re-observed in this wrapper instead have a one-hour
-     * uncertainty bound, measured from both startup and their last sighting. This
-     * does not prove worker death: the App Server handshake has no process identity,
+     * Rehydrated chips with an unknown prior or current process identity, never
+     * re-observed in this wrapper, instead have a one-hour uncertainty bound,
+     * measured from both startup and their last sighting. This does not prove
+     * worker death: the App Server handshake has no process identity,
      * so a silent worker surviving a wrapper-only restart may also time out. Its
      * distinct `restart_unobserved` reason must not be presented as confirmed death.
      * Returns the ended chips so the caller can tell their conversations' viewers.
@@ -85,8 +91,8 @@ class DurableSubagentRegistry(
                 TAG,
                 if (record.terminalReason == "restart_unobserved") "restart.unobserved" else "ttl.expired",
                 "reason" attr record.terminalReason,
-                "previousAppServerGeneration" attr "unknown",
-                "currentAppServerGeneration" attr "unknown",
+                "previousAppServerGeneration" attr (record.appServerProcessIdentity ?: "unknown"),
+                "currentAppServerGeneration" attr (currentProcessIdentity ?: "unknown"),
                 "conversationId" attr record.conversationId,
                 "toolCallId" attr record.toolCallId,
                 "subagentType" attr record.subagentType,
@@ -95,6 +101,40 @@ class DurableSubagentRegistry(
             )
         }
         return expired
+    }
+
+    private fun retirePreviousProcess() {
+        val current = currentProcessIdentity ?: return
+        startupRetired = synchronized(lock) {
+            entries.values.filter {
+                !it.state.isTerminal && it.appServerProcessIdentity != null && it.appServerProcessIdentity != current
+            }.map { record ->
+                record.copy(
+                    state = SubagentChipState.CANCELLED,
+                    terminalReason = "app_server_restarted",
+                    terminalAtEpochMs = clock(),
+                )
+            }.also { retired ->
+                retired.forEach { entries[it.key] = it }
+                if (retired.isNotEmpty()) persistLocked()
+            }
+        }
+        startupRetired.forEach { record ->
+            Telemetry.event(
+                TAG, "process.restarted",
+                "conversationId" attr record.conversationId,
+                "toolCallId" attr record.toolCallId,
+                "reason" attr record.terminalReason,
+                "previousAppServerGeneration" attr record.appServerProcessIdentity,
+                "currentAppServerGeneration" attr current,
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
+
+    /** Drain startup changes after a source has installed its viewer listener. */
+    internal fun takeStartupRetired(): List<SubagentChipRecord> = synchronized(lock) {
+        startupRetired.also { startupRetired = emptyList() }
     }
 
     private fun expireStaleLocked(): List<SubagentChipRecord> {
@@ -134,7 +174,9 @@ class DurableSubagentRegistry(
         synchronized(lock) {
             entries.clear()
             loaded.forEach { entries[it.key] = it }
-            restartUnobserved.addAll(loaded.filterNot { it.state.isTerminal }.map { it.key })
+            restartUnobserved.addAll(loaded.filter {
+                !it.state.isTerminal && (currentProcessIdentity == null || it.appServerProcessIdentity == null)
+            }.map { it.key })
         }
         if (loaded.isNotEmpty()) {
             Telemetry.event(
@@ -262,6 +304,7 @@ class DurableSubagentRegistry(
             todos = observation.todos,
             todoRevision = observation.todoRevision,
             lastActivityEpochMs = now,
+            appServerProcessIdentity = currentProcessIdentity,
         )
         entries[observation.key] = record
         enforceCapacityLocked()

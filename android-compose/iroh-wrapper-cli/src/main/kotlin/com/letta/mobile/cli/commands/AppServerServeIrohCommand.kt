@@ -205,6 +205,12 @@ class AppServerServeIrohCommand : CliktCommand(
         help = "Per-agent agent-tools-mode, as agentId=mode pairs separated by commas; overrides --agent-tools-mode.",
     )
 
+    private val appServerPidFile by option(
+        "--app-server-pid-file",
+        envvar = "LETTA_APP_SERVER_PID_FILE",
+        help = "Trusted MainPID file for the external numeric-loopback App Server; unavailable or remote means unknown identity.",
+    )
+
     private val subagentRegistryFile by option(
         "--subagent-registry-file",
         envvar = "LETTA_SUBAGENT_REGISTRY_STORE",
@@ -593,6 +599,9 @@ class AppServerServeIrohCommand : CliktCommand(
             beadsBaseUrl = beadsBaseUrl,
             beadsTokenFile = beadsTokenFile,
             subagentRegistryFile = subagentRegistryFile,
+            appServerProcessIdentity = LinuxAppServerProcessIdentity(
+                appServerUrl.takeUnless { ownAppServer }, appServerPidFile?.let(java.nio.file.Path::of),
+            ),
             skillsDir = skillsDir,
             localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
             eventScope = scope,

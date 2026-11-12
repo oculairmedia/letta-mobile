@@ -39,6 +39,31 @@ class ControllerSubagentRegistrySourceTest {
         ownedTelemetryHistory?.close()
     }
 
+    @Test
+    fun confirmedProcessReplacementNotifiesOnceAfterListenerInstallation() {
+        val store = InMemorySubagentRegistryStore()
+        val original = ControllerSubagentRegistrySource(DurableSubagentRegistry(
+            store, processIdentity = com.letta.mobile.data.subagents.AppServerProcessIdentity { "boot:42:100" },
+        ))
+        original.ingestFromSource(
+            "restart-parent", "parent",
+            listOf(SubagentEntry(toolCallId = "first", status = "running"),
+                SubagentEntry(toolCallId = "second", status = "running")),
+            SubagentChipSource.CONTROLLER_NATIVE,
+        )
+        val source = ControllerSubagentRegistrySource(DurableSubagentRegistry(
+            store, processIdentity = com.letta.mobile.data.subagents.AppServerProcessIdentity { "boot:42:200" },
+        ))
+        val changed = mutableListOf<SubagentConversationKey>()
+        val listener = SubagentRegistryChangeListener { changed += it }
+        source.changeListener = listener
+        val key = SubagentConversationKey("parent", "restart-parent")
+        assertEquals(listOf(key), changed)
+        source.changeListener = listener
+        assertEquals(listOf(key), changed)
+        assertTrue(store.load().all { it.terminalReason == "app_server_restarted" && it.state == SubagentChipState.CANCELLED })
+    }
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
     fun idleRestartSweepNotifiesOncePerConversationAndPushesTerminalRecords() = runTest {
