@@ -370,6 +370,13 @@ class MobileGuardrailProvider : RuleSetProvider {
             NoDetachedCoroutineLifecycle(config),
             CoroutineTestGuardrails(config),
             NoAdHocJsonInstance(config),
+            InvisibleOrBidiCharacter(config),
+            ExceptionMessageToClientOrTelemetry(config),
+            NoRunBlockingInProduction(config),
+            UnboundedBufferNeedsPolicy(config),
+            WallClockInSharedLogic(config),
+            HostOrUrlStringMatching(config),
+            SecretBearingDataClass(config),
         ),
     )
 }

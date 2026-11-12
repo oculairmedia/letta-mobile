@@ -356,7 +356,6 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohSu
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohTransportSupport.kt 3
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohTurnDispatcher.kt 4
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/NotebookEndpointSession.kt 2
-sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/RetiredRunRegistry.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/chat/render/RenderDiagnostics.kt 16
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PlacementCompiler.kt 3
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginViewCalls.kt 1
