@@ -17,7 +17,10 @@ import java.nio.file.Path
  *    same [CanvasMountResult.Denied] whether or not a record exists.
  * 3. Proposal (mutations only): [CanvasMountAuthority.mayPropose] for the canvas the caller would store,
  *    before any mutation; a denied proposal never reaches storage.
- * 4. Storage. Any failure becomes [CanvasMountResult.StorageFailure]; cancellation propagates.
+ * 4. Storage. A failure before anything changed becomes [CanvasMountResult.StorageFailure]; a mutation
+ *    failure at or after its commit point becomes [CanvasMountResult.OutcomeUnknown], and the caller must
+ *    read back. Cancellation before the commit point propagates; once the record was replaced the store
+ *    still returns its outcome (see [FileCanvasMountStore]).
  * 5. Winner (read and bind only): [CanvasMountAuthority.maySee] for the canvas read from storage, before
  *    it is returned. A denied winner yields [CanvasMountResult.Denied] and appears nowhere.
  *
@@ -42,10 +45,11 @@ class AuthorizedCanvasMounts internal constructor(
     /** Reads the addressed binding or agent default: [CanvasMountResult.Found] or [CanvasMountResult.None]. */
     suspend fun read(request: CanvasMountRequest<CanvasMountScope>): CanvasMountResult =
         execute(request, MountStep(proposal = null, revealsStored = true, outcome = CanvasMountResult::Found) { store ->
-            when (val scope = request.scope) {
+            val stored = when (val scope = request.scope) {
                 is CanvasMountScope.AgentDefault -> store.readDefault(scope.agent)
                 is CanvasMountScope.Conversation -> store.readBinding(scope.agent, scope.conversation)
             }
+            stored?.let { CanvasMountMutation.Applied(it, written = false) }
         })
 
     /** Inserts [proposed] only when absent: [CanvasMountResult.Bound] with the durable winner. */
@@ -64,7 +68,6 @@ class AuthorizedCanvasMounts internal constructor(
     ): CanvasMountResult =
         execute(request, MountStep(canvas, revealsStored = false, outcome = CanvasMountResult::Replaced) { store ->
             store.replaceBinding(request.scope.agent, request.scope.conversation, canvas)
-            canvas
         })
 
     /** Sets the addressed agent default to [canvas]: [CanvasMountResult.DefaultSet]. */
@@ -74,7 +77,6 @@ class AuthorizedCanvasMounts internal constructor(
     ): CanvasMountResult =
         execute(request, MountStep(canvas, revealsStored = false, outcome = CanvasMountResult::DefaultSet) { store ->
             store.setDefault(request.scope.agent, canvas)
-            canvas
         })
 
     private suspend fun execute(request: CanvasMountRequest<CanvasMountScope>, step: MountStep): CanvasMountResult =
@@ -94,10 +96,20 @@ class AuthorizedCanvasMounts internal constructor(
         proposal == null || allows { mayPropose(request, proposal) }
 
     private suspend fun stored(request: CanvasMountRequest<CanvasMountScope>, step: MountStep): CanvasMountResult {
-        val result = runCatchingCancellable { step.action(storage) }
-        val failure = result.exceptionOrNull()
-        if (failure != null) return CanvasMountResult.StorageFailure(CanvasMountFailure.of(failure))
-        val canvas = result.getOrNull() ?: return CanvasMountResult.None
+        val stored = runCatchingCancellable { step.action(storage) }.getOrElse { CanvasMountMutation.NotApplied(it) }
+        return when (stored) {
+            null -> CanvasMountResult.None
+            is CanvasMountMutation.NotApplied -> CanvasMountResult.StorageFailure(CanvasMountFailure.of(stored.cause))
+            CanvasMountMutation.OutcomeUnknown -> CanvasMountResult.OutcomeUnknown
+            is CanvasMountMutation.Applied -> revealed(request, step, stored.canvas)
+        }
+    }
+
+    private suspend fun revealed(
+        request: CanvasMountRequest<CanvasMountScope>,
+        step: MountStep,
+        canvas: CanvasId,
+    ): CanvasMountResult {
         val visible = !step.revealsStored || allows { maySee(request, canvas) }
         return if (visible) step.outcome(canvas) else CanvasMountResult.Denied
     }
@@ -122,14 +134,44 @@ private class MountStep(
     val proposal: CanvasId?,
     val revealsStored: Boolean,
     val outcome: (CanvasId) -> CanvasMountResult,
-    val action: suspend (CanvasMountStorage) -> CanvasId?,
+    /** Null means the addressed record is absent; a read's value is wrapped as an unwritten [CanvasMountMutation.Applied]. */
+    val action: suspend (CanvasMountStorage) -> CanvasMountMutation?,
 )
 
 /** The raw, unauthorized mount operations; implemented only by [FileCanvasMountStore] and test doubles. */
 internal interface CanvasMountStorage {
     suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId?
     suspend fun readDefault(agentId: AgentId): CanvasId?
-    suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId
-    suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId)
-    suspend fun setDefault(agentId: AgentId, canvasId: CanvasId)
+    suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasMountMutation
+    suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId): CanvasMountMutation
+    suspend fun setDefault(agentId: AgentId, canvasId: CanvasId): CanvasMountMutation
+}
+
+/** Where one raw mutation ended relative to its commit point, the atomic replacement of the record. */
+internal sealed interface CanvasMountMutation {
+    /** Whether the record may differ from before this call; once true, the outcome must not be lost. */
+    val mayHaveChanged: Boolean
+
+    /** The record durably holds [canvas]; [written] says whether this call replaced it. */
+    data class Applied(
+        /** The durable canvas: the caller's own, or an existing bind winner. */
+        val canvas: CanvasId,
+        /** False when an existing record was confirmed without being rewritten. */
+        val written: Boolean,
+    ) : CanvasMountMutation {
+        override val mayHaveChanged: Boolean get() = written
+    }
+
+    /** Failed before the commit point; nothing changed. [cause] is for classification only. */
+    class NotApplied(
+        /** The failure, never exposed beyond a fixed [CanvasMountFailure]. */
+        val cause: Throwable,
+    ) : CanvasMountMutation {
+        override val mayHaveChanged: Boolean get() = false
+    }
+
+    /** Failed at or after the commit point: the record may hold the old or the new canvas. Read back. */
+    data object OutcomeUnknown : CanvasMountMutation {
+        override val mayHaveChanged: Boolean get() = true
+    }
 }
