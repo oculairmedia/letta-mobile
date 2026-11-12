@@ -14,8 +14,10 @@ sealed interface SharedNoteListing {
     /**
      * The notes this device may open now; empty when the host shares none.
      * @property notes The listed notes, in the host's order.
+     * @property truncated The host stopped before checking every grant it holds for this device
+     *   (the listing is full, or it reached its per-request bound), so it may share more than listed.
      */
-    data class Listed(val notes: List<SharedNote>) : SharedNoteListing
+    data class Listed(val notes: List<SharedNote>, val truncated: Boolean = false) : SharedNoteListing
 
     /** The host refused this device (it is not authenticated or may not ask). */
     data object Denied : SharedNoteListing

@@ -69,15 +69,26 @@ class HostNotebookAccess(
 
     /**
      * The notes this principal may open now: each listed grant is rechecked under its own
-     * transaction for read and edit, and a granted note missing from the store is left out.
+     * transaction for read and edit, and a granted note missing from the store is left out. The
+     * listing holds up to [SharedNotesWire.MAX_LISTED] notes that pass that check, however many
+     * grants that cannot open the editor come first. Every recheck is its own grant transaction, so
+     * one listing rechecks at most [SharedNotesWire.MAX_CHECKED] grants; a listing that stopped
+     * before the last grant (full, or at that bound) says so ([SharedNoteListing.Listed.truncated]).
      */
     suspend fun sharedNotes(): SharedNoteListing = recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) {
-        val notes = grants.documentsOf(principal).take(SharedNotesWire.MAX_LISTED).mapNotNull { id ->
-            grants.withGrant(principal, id) { grant ->
-                if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
-            }
+        val candidates = grants.documentsOf(principal)
+        val notes = mutableListOf<SharedNote>()
+        var checked = 0
+        for (id in candidates.take(SharedNotesWire.MAX_CHECKED)) {
+            if (notes.size == SharedNotesWire.MAX_LISTED) break
+            checked++
+            openable(id)?.let(notes::add)
         }
-        SharedNoteListing.Listed(notes)
+        SharedNoteListing.Listed(notes, truncated = checked < candidates.size)
+    }
+
+    private suspend fun openable(id: NotebookDocumentId): SharedNote? = grants.withGrant(principal, id) { grant ->
+        if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
     }
 }
 

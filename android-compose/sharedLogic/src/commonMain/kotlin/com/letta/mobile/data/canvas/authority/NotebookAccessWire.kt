@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -119,12 +120,22 @@ object NotebookAccessWire {
 object SharedNotesWire {
     const val LIST = "notebook.shared.list"
 
-    /** The most notes one listing carries; a host with more lists its first [MAX_LISTED]. */
+    /** The most notes one listing carries; a host with more lists its first [MAX_LISTED] and says it stopped. */
     const val MAX_LISTED = 500
 
-    /** The listing result: the notes the caller may open now, at most [MAX_LISTED]. */
+    /**
+     * The most grants one listing rechecks (each recheck is its own grant transaction), so a caller
+     * holding many grants that cannot open the editor costs the host bounded work per request.
+     */
+    const val MAX_CHECKED = 2 * MAX_LISTED
+
+    /**
+     * The listing result: the notes the caller may open now, at most [MAX_LISTED], and `truncated`
+     * when the host stopped before checking every grant (the caller may be shared more than listed).
+     */
     fun sharedNotes(result: SharedNoteListing): JsonObject = when (result) {
         is SharedNoteListing.Listed -> response(LISTED) {
+            put("truncated", result.truncated || result.notes.size > MAX_LISTED)
             putJsonArray("notes") {
                 result.notes.take(MAX_LISTED).forEach { note ->
                     addJsonObject {
@@ -142,7 +153,7 @@ object SharedNotesWire {
     fun readSharedNotes(result: JsonElement?): SharedNoteListing {
         val body = result as? JsonObject ?: return SharedNoteListing.Unavailable(NO_RESULT)
         return when (body.status()) {
-            LISTED -> body.notes()?.let(SharedNoteListing::Listed) ?: SharedNoteListing.Unavailable(MALFORMED_LIST)
+            LISTED -> body.listing() ?: SharedNoteListing.Unavailable(MALFORMED_LIST)
             DENIED -> SharedNoteListing.Denied
             else -> SharedNoteListing.Unavailable(body.reason())
         }
@@ -160,6 +171,14 @@ private fun JsonObject.conflict(id: NotebookDocumentId): NotebookNoteSave.Confli
     val current = snapshotAt("current", id) ?: return null
     if (!containsKey("durable")) return NotebookNoteSave.Conflict(current)
     return snapshotAt("durable", id)?.let { NotebookNoteSave.Conflict(current, it) }
+}
+
+/** A listing; an absent `truncated` (an older host) is false, an unreadable one makes it malformed. */
+private fun JsonObject.listing(): SharedNoteListing.Listed? {
+    val notes = notes() ?: return null
+    val flag = get("truncated") ?: return SharedNoteListing.Listed(notes)
+    val truncated = (flag as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull ?: return null
+    return SharedNoteListing.Listed(notes, truncated)
 }
 
 private fun JsonObject.notes(): List<SharedNote>? {

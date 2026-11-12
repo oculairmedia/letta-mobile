@@ -48,6 +48,7 @@ import com.letta.mobile.sharedui.resources.shared_notes_open_unavailable
 import com.letta.mobile.sharedui.resources.shared_notes_refresh
 import com.letta.mobile.sharedui.resources.shared_notes_retry
 import com.letta.mobile.sharedui.resources.shared_notes_title
+import com.letta.mobile.sharedui.resources.shared_notes_truncated
 import com.letta.mobile.sharedui.resources.shared_notes_unavailable
 import com.letta.mobile.sharedui.resources.shared_notes_untitled
 import com.letta.mobile.sharedui.resources.shared_notes_withdrawn
@@ -191,11 +192,18 @@ private fun SharedNoteList(state: SharedNoteBrowserState, browser: SharedNoteBro
                 Text(stringResource(Res.string.shared_notes_retry))
             }
         }
-        is SharedNoteListing.Listed -> if (listing.notes.isEmpty()) {
-            Notice(Res.string.shared_notes_empty, ShellDocumentTags.EMPTY)
-        } else {
-            NoteRows(listing.notes, enabled = state.opening == null) { note -> scope.launch { browser.open(note.id) } }
-        }
+        is SharedNoteListing.Listed ->
+            ListedNotes(listing, enabled = state.opening == null) { note -> scope.launch { browser.open(note.id) } }
+    }
+}
+
+/** The listed notes; a listing the host cut short says so rather than passing for all of them. */
+@Composable
+private fun ListedNotes(listing: SharedNoteListing.Listed, enabled: Boolean, onOpen: (SharedNote) -> Unit) {
+    if (listing.truncated) Notice(Res.string.shared_notes_truncated, ShellDocumentTags.TRUNCATED)
+    when {
+        listing.notes.isNotEmpty() -> NoteRows(listing.notes, enabled, onOpen)
+        !listing.truncated -> Notice(Res.string.shared_notes_empty, ShellDocumentTags.EMPTY)
     }
 }
 

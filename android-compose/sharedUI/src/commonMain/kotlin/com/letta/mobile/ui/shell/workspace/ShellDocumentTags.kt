@@ -13,6 +13,9 @@ object ShellDocumentTags {
     /** The host shares no notes with this device. */
     const val EMPTY = "shell-document-empty"
 
+    /** The host stopped listing before it checked every note it may share with this device. */
+    const val TRUNCATED = "shell-document-truncated"
+
     /** The first listing has not arrived yet. */
     const val LOADING = "shell-document-loading"
 

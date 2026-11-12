@@ -8,6 +8,7 @@
     <string name="shared_notes_retry">Try again</string>
     <string name="shared_notes_loading">Asking the host for shared notes</string>
     <string name="shared_notes_empty">The host shares no notes with this device yet.</string>
+    <string name="shared_notes_truncated">This list may not show every note the host shares with this device.</string>
     <string name="shared_notes_unavailable">The host is not reachable right now.</string>
     <string name="shared_notes_denied">The host does not let this device see its notes.</string>
     <string name="shared_notes_untitled">Untitled note</string>
