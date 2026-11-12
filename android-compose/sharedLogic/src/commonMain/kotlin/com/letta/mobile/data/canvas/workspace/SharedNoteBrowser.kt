@@ -43,6 +43,10 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
     private var shown = 0L
     private var waiting = 0
 
+    // The page-request generation: a refresh that publishes its listing advances it, so a page asked
+    // for an older listing neither appends nor clears the flag of a page asked for the newer one.
+    private var pageGeneration = 0L
+
     /** The listing and the open note. */
     val state: StateFlow<SharedNoteBrowserState> = mutableState.asStateFlow()
 
@@ -62,22 +66,30 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
         } finally {
             waiting--
             val fresh = answer?.takeIf { ticket > shown }
-            if (fresh != null) shown = ticket
+            if (fresh != null) markPublished(ticket)
             mutableState.update { showRefresh(it, fresh) }
         }
     }
 
+    private fun markPublished(ticket: Long) {
+        shown = ticket
+        pageGeneration++
+    }
+
+    /** A published refresh starts the listing again, so no page is being asked for it yet. */
     private fun showRefresh(current: SharedNoteBrowserState, fresh: SharedNoteListing?): SharedNoteBrowserState {
         if (fresh == null) return current.copy(loading = waiting > 0)
-        return current.copy(listing = fresh, loading = waiting > 0, moreFailed = false)
+        return current.copy(listing = fresh, loading = waiting > 0, loadingMore = false, moreFailed = false)
     }
 
     /**
      * Asks for the page after the one shown and appends it; true when it was appended. Nothing is
      * asked (false) while a page is already being asked for or when the host said nothing is left.
      * The page extends the listing shown when it was asked: once a refresh is asked or answered
-     * meanwhile, its answer is dropped, since the refresh starts again from the first page. A failed
-     * page keeps what is shown and sets [SharedNoteBrowserState.moreFailed], so the person can ask again.
+     * meanwhile, its answer is dropped, since the refresh starts again from the first page; once a
+     * refresh has published its listing, this request no longer touches the state at all, so a page
+     * asked for the new listing is not held back by it. A failed page keeps what is shown and sets
+     * [SharedNoteBrowserState.moreFailed], so the person can ask again.
      */
     suspend fun loadMore(): Boolean {
         val current = state.value
@@ -85,6 +97,7 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
         if (from == null) return false
         if (current.loadingMore) return false
         val base = asked to shown
+        val generation = pageGeneration
         mutableState.update { it.copy(loadingMore = true, moreFailed = false) }
         var page: SharedNoteListing? = null
         try {
@@ -92,7 +105,7 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
         } finally {
             page = page?.takeIf { asked to shown == base }
             val answer = page
-            mutableState.update { showPage(it, answer) }
+            if (generation == pageGeneration) mutableState.update { showPage(it, answer) }
         }
         return page is SharedNoteListing.Listed
     }

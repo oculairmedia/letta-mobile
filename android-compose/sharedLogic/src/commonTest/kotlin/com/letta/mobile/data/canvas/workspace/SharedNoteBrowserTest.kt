@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSession
 import com.letta.mobile.data.canvas.notes.NoteTestBackend
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -213,6 +214,37 @@ class SharedNoteBrowserTest {
         assertFalse(paged.state.value.moreFailed)
     }
 
+    /** A refresh that publishes frees paging at once; the obsolete page neither appends nor clears the newer page's flag. */
+    @Test
+    fun aPublishedRefreshFreesPagingAndTheObsoletePageLeavesTheNewerOneAlone() = runTest {
+        val gated = GatedDirectory()
+        val paged = pagedBrowser(gated)
+        val first = launch { paged.refresh() }
+        runCurrent()
+        gated.answer(0, SharedNoteListing.Listed(listOf(FIRST), CURSOR))
+        first.join()
+        val obsolete = async { paged.loadMore() }
+        runCurrent()
+        val refresh = launch { paged.refresh() }
+        runCurrent()
+        gated.answer(2, SharedNoteListing.Listed(listOf(FIRST), CURSOR))
+        refresh.join()
+        assertFalse(paged.state.value.loadingMore, "the published listing has no page in flight")
+
+        val newer = async { paged.loadMore() }
+        runCurrent()
+        assertEquals(CURSOR, gated.asked[3], "the new listing can ask for its next page right away")
+        gated.answer(1, SharedNoteListing.Listed(listOf(OBSOLETE)))
+        assertFalse(obsolete.await())
+        assertTrue(paged.state.value.loadingMore, "the obsolete page does not clear the newer page's flag")
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST), CURSOR), paged.state.value.listing, "nor does it append")
+
+        gated.answer(3, SharedNoteListing.Listed(listOf(SECOND)))
+        assertTrue(newer.await())
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST, SECOND)), paged.state.value.listing)
+        assertFalse(paged.state.value.loadingMore)
+    }
+
     private fun pagedBrowser(source: SharedNoteDirectory) = SharedNoteBrowser(object : SharedNotebooks {
         override val directory = source
         override val opener = host.opener
@@ -223,6 +255,7 @@ class SharedNoteBrowserTest {
         val FIRST = SharedNote(NOTE, "Plan")
         val SECOND = SharedNote(NotebookDocumentId("fedcba9876543210fedcba9876543210"), "Later")
         val CURSOR = SharedNotesCursor("after-first")
+        val OBSOLETE = SharedNote(NotebookDocumentId("00000000000000000000000000000000"), "Gone")
     }
 
     /** Two pages: [FIRST] with a cursor, then [SECOND] with none; the second can be made to fail. */
