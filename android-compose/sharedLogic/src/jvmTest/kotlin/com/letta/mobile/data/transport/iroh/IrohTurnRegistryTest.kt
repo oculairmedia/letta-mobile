@@ -110,6 +110,28 @@ class IrohTurnRegistryTest {
         assertFalse(registry.hasAnyActiveTurn)
     }
 
+    @Test
+    fun retiredIdentifiersExpireUsingElapsedTime() {
+        var elapsed = 0L
+        var wall = 1_000_000L
+        val timedRegistry = IrohTurnRegistry { elapsed }
+        val started = timedRegistry.tryStart(request()) as IrohTryStartResult.Started
+        val terminal = publication(started.turn, IrohTerminalSource.Engine)
+        assertTrue(timedRegistry.claimTerminal(terminal))
+        assertTrue(timedRegistry.retireClaimed(terminal))
+        wall -= 2_000_000L
+        assertTrue(wall < 0)
+        assertTrue(timedRegistry.isRetiredRun(IrohRunId("run-1")))
+        elapsed = IrohTurnRegistry.RETIRED_RUN_TTL_MS
+        wall += 10_000_000L
+        assertTrue(wall > 0)
+        assertTrue(timedRegistry.isRetiredRun(IrohRunId("run-1")))
+        assertTrue(timedRegistry.isRetiredTurn(IrohTurnId("turn-1")))
+        elapsed++
+        assertFalse(timedRegistry.isRetiredRun(IrohRunId("run-1")))
+        assertFalse(timedRegistry.isRetiredTurn(IrohTurnId("turn-1")))
+    }
+
     private fun conversationId() = IrohConversationId("conv-1")
 
     private fun request(
