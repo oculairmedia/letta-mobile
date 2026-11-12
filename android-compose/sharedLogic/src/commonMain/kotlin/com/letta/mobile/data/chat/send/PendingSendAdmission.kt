@@ -10,17 +10,18 @@ internal suspend fun acceptPendingSendOrReportFailure(
     foreground: ConversationChatUi,
     isQueued: () -> Boolean,
     accept: suspend () -> Boolean,
-): Boolean? = try {
-    accept()
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (failure: IllegalArgumentException) {
-    // Pending-store require checks (identity, row and byte budgets) cannot heal on retry.
-    rejectPendingSend(pending, foreground, failure)
-} catch (failure: Exception) {
-    val queueOwnsSend = isQueued()
-    if (pending.attempt > 0 || queueOwnsSend) throw failure
-    rejectPendingSend(pending, foreground, failure)
+): Boolean? = runCatching { accept() }.getOrElse { failure ->
+    when (failure) {
+        is CancellationException -> throw failure
+        // Pending-store require checks (identity, row and byte budgets) cannot heal on retry.
+        is IllegalArgumentException -> rejectPendingSend(pending, foreground, failure)
+        is Exception -> {
+            val queueOwnsSend = isQueued()
+            if (pending.attempt > 0 || queueOwnsSend) throw failure
+            rejectPendingSend(pending, foreground, failure)
+        }
+        else -> throw failure
+    }
 }
 
 private fun rejectPendingSend(pending: QueuedChatSend, foreground: ConversationChatUi, failure: Exception): Boolean? {
