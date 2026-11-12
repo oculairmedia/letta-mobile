@@ -253,23 +253,57 @@ class VoiceChatResponderTest {
         assertEquals(listOf("Answer two."), texts(second))
     }
 
+    /** Starts [reply]'s cancel in the background; the outcome is null until the cancel returns. */
+    private fun TestScope.cancelLater(reply: VoiceReply): () -> VoiceCancelOutcome? {
+        var outcome: VoiceCancelOutcome? = null
+        backgroundScope.launch { outcome = reply.cancel() }
+        runCurrent()
+        return { outcome }
+    }
+
     @Test
-    fun cancelStopsOnlyItsOwnRunningRun() = runTest {
+    fun cancelBeforeSendingSendsNothingAndCancelStopsItsRunningRun() = runTest {
         assertEquals(VoiceCancelOutcome.ALREADY_FINISHED, ask().cancel())
         assertEquals(emptyList<VoiceText>(), session.sent)
-        session.update { copy(activeRuns = setOf(Runs.UNRELATED)) }
-        val notYetRunning = ask()
-        collect(notYetRunning)
-        assertEquals(VoiceCancelOutcome.ALREADY_FINISHED, notYetRunning.cancel())
-        assertEquals(0, session.stops)
         val running = ask()
         collect(running)
-        settle { start(Sent.SECOND, Runs.R2) }
+        settle { start(Sent.FIRST, Runs.R1) }
         session.endRunOnStop = false
-        val outcome = backgroundScope.launch { assertEquals(VoiceCancelOutcome.UNRESPONSIVE, running.cancel()) }
+        val outcome = cancelLater(running)
         advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
         runCurrent()
-        assertEquals(true, outcome.isCompleted)
+        assertEquals(VoiceCancelOutcome.UNRESPONSIVE, outcome())
+        assertEquals(1, session.stops)
+    }
+
+    @Test
+    fun cancelBeforeTheRunStartsStopsItTheMomentItIsPublished() = runTest {
+        session.update { copy(activeRuns = setOf(Runs.UNRELATED)) }
+        val cancelled = ask()
+        val events = collect(cancelled)
+        val outcome = cancelLater(cancelled)
+        assertEquals(null, outcome())
+        assertEquals(0, session.stops)
+        settle { start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("Too late."), Runs.R1)) }
+        assertEquals(1, session.stops)
+        assertEquals(VoiceCancelOutcome.STOPPED, outcome())
+        assertEquals(emptyList(), texts(events))
+    }
+
+    @Test
+    fun pendingStopOutlivesItsCancelAndIsAppliedWhenTheRunAppears() = runTest {
+        val first = ask(Say.FIRST)
+        collect(first)
+        val outcome = cancelLater(first)
+        advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
+        runCurrent()
+        assertEquals(VoiceCancelOutcome.UNRESPONSIVE, outcome())
+        val second = collect(ask(Say.SECOND))
+        settle { start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("Late words from the first run"), Runs.R1)) }
+        assertEquals(1, session.stops)
+        settle { start(Sent.SECOND, Runs.R2); add(reply(Keys.M3, VoiceText("Answer two."), Runs.R2)) }
+        settle { end(Runs.R2) }
+        assertEquals(listOf("Answer two."), texts(second))
         assertEquals(1, session.stops)
     }
 

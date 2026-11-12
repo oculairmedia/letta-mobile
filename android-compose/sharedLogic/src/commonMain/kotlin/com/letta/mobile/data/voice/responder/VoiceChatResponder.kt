@@ -38,7 +38,12 @@ data class ChatReplyPolicy(
  * RUN_FAILED when it failed, NOT_DELIVERED when the message never appears, UNATTRIBUTED (with
  * nothing spoken) when the message appears but its run is never published within
  * [ChatReplyPolicy.deliveryTimeout], and CANCELLED when the conversation changes. Cancelling stops
- * the run only when it is this message's run and in flight, and waits for it to end.
+ * the run only when it is this message's run and in flight, and waits for it to end. Cancelling a
+ * sent message whose run has not started yet leaves a pending stop for that message's identity
+ * ([PendingStops]): the run is stopped the moment the session publishes it as this message's run,
+ * and its text is never followed. The cancel waits for that (bounded by
+ * [ChatReplyPolicy.stopTimeout]) and reports UNRESPONSIVE when the run has not appeared by then;
+ * the stop stays pending and the next reply of this responder that observes the session applies it.
  *
  * A second utterance supersedes the first: when its reply is collected the earlier reply is
  * cancelled first; a reply cancelled before it sends sends nothing.
@@ -46,13 +51,14 @@ data class ChatReplyPolicy(
  * [respond] is called from one coroutine at a time (the loop's).
  */
 class VoiceChatResponder(
-    private val session: VoiceChatSession,
-    private val policy: ChatReplyPolicy = ChatReplyPolicy(),
+    session: VoiceChatSession,
+    policy: ChatReplyPolicy = ChatReplyPolicy(),
 ) : VoiceResponder {
+    private val context = ReplyContext(session, policy, PendingStops())
     private var latest: VoiceChatReply? = null
 
     override fun respond(utterance: VoiceUtterance): VoiceReply {
-        val reply = VoiceChatReply(session, utterance.text, policy, latest)
+        val reply = VoiceChatReply(context, utterance.text, latest)
         latest = reply
         return reply
     }
@@ -61,13 +67,22 @@ class VoiceChatResponder(
 /** Where one reply is in its life. */
 private enum class ReplyStage { NEW, PREPARING, SENDING, SENT, FINISHED, CANCELLED }
 
+/** What every reply of one responder shares: the session, the budgets and the stops still pending. */
+private class ReplyContext(
+    val session: VoiceChatSession,
+    val policy: ChatReplyPolicy,
+    val pendingStops: PendingStops,
+)
+
 /** One utterance sent through the session and the run that answers it. */
 private class VoiceChatReply(
-    private val session: VoiceChatSession,
+    context: ReplyContext,
     private val text: VoiceText,
-    private val policy: ChatReplyPolicy,
     private var previous: VoiceChatReply?,
 ) : VoiceReply {
+    private val session = context.session
+    private val policy = context.policy
+    private val pendingStops = context.pendingStops
     private val stage = MutableStateFlow(ReplyStage.NEW)
     private val sentId = CompletableDeferred<ClientMessageId>()
 
@@ -75,12 +90,16 @@ private class VoiceChatReply(
         if (!stage.compareAndSet(ReplyStage.NEW, ReplyStage.PREPARING)) return@flow
         previous?.cancel()
         previous = null
+        pendingStops.applyTo(session, session.state.value)
         if (!stage.compareAndSet(ReplyStage.PREPARING, ReplyStage.SENDING)) return@flow
         val start = session.state.value
         val sent = session.send(text).id
         sentId.complete(sent)
-        if (!stage.compareAndSet(ReplyStage.SENDING, ReplyStage.SENT)) return@flow
-        follow(ChatReplyTracker(start, sent))
+        if (stage.compareAndSet(ReplyStage.SENDING, ReplyStage.SENT)) {
+            follow(ChatReplyTracker(start, sent))
+        } else {
+            pendingStops.add(sent)
+        }
     }
 
     override suspend fun cancel(): VoiceCancelOutcome {
@@ -94,10 +113,29 @@ private class VoiceChatReply(
         }
     }
 
-    /** Stops the run only when it is this message's run and in flight. */
+    /**
+     * Stops the message's own run: at once when it is in flight, as a pending stop when the session
+     * has not published it yet, and not at all when it already ended.
+     */
     private suspend fun stopOwnRun(id: ClientMessageId): VoiceCancelOutcome {
-        if (!ownRunActive(session.state.value, id)) return VoiceCancelOutcome.ALREADY_FINISHED
+        val state = session.state.value
+        if (state.startedRuns[id].isNullOrEmpty()) return stopWhenStarted(id)
+        if (!ownRunActive(state, id)) return VoiceCancelOutcome.ALREADY_FINISHED
         session.stopRun()
+        return awaitEnd(id)
+    }
+
+    /** Leaves a pending stop for [id] and waits (bounded) for its run to appear, be stopped and end. */
+    private suspend fun stopWhenStarted(id: ClientMessageId): VoiceCancelOutcome {
+        pendingStops.add(id)
+        withTimeoutOrNull(policy.stopTimeout) { session.state.first { !it.startedRuns[id].isNullOrEmpty() } }
+            ?: return VoiceCancelOutcome.UNRESPONSIVE
+        pendingStops.applyTo(session, session.state.value)
+        return awaitEnd(id)
+    }
+
+    /** Waits (bounded) until [id]'s run is no longer in flight. */
+    private suspend fun awaitEnd(id: ClientMessageId): VoiceCancelOutcome {
         val ended = withTimeoutOrNull(policy.stopTimeout) { session.state.first { !ownRunActive(it, id) } }
         return if (ended == null) VoiceCancelOutcome.UNRESPONSIVE else VoiceCancelOutcome.STOPPED
     }
@@ -105,7 +143,11 @@ private class VoiceChatReply(
     private fun ownRunActive(state: VoiceChatState, id: ClientMessageId): Boolean =
         state.startedRuns[id].orEmpty().any { it in state.activeRuns }
 
-    private fun observed(): Flow<Pair<VoiceChatState, ReplyStage>> = combine(session.state, stage, ::Pair)
+    /** The session and this reply's stage; every state seen also applies the responder's pending stops. */
+    private fun observed(): Flow<Pair<VoiceChatState, ReplyStage>> = combine(session.state, stage) { state, now ->
+        pendingStops.applyTo(session, state)
+        state to now
+    }
 
     private suspend fun FlowCollector<VoiceReplyEvent>.follow(tracker: ChatReplyTracker) {
         var last = session.state.value
