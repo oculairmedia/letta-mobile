@@ -8,6 +8,7 @@ import com.letta.mobile.data.canvas.notes.NoteTestBackend
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -243,6 +244,52 @@ class SharedNoteBrowserTest {
         assertTrue(newer.await())
         assertEquals(SharedNoteListing.Listed(listOf(FIRST, SECOND)), paged.state.value.listing)
         assertFalse(paged.state.value.loadingMore)
+    }
+
+    /** A next page the host refuses replaces the listing: the earlier notes are not shown once this device is refused. */
+    @Test
+    fun aRefusedNextPageReplacesTheListingWithTheRefusal() = runTest {
+        val gated = GatedDirectory()
+        val paged = listedOnce(gated)
+        val page = async { paged.loadMore() }
+        runCurrent()
+        gated.answer(1, SharedNoteListing.Denied)
+
+        assertFalse(page.await())
+        assertEquals(SharedNoteListing.Denied, paged.state.value.listing)
+        assertFalse(paged.state.value.moreFailed, "a refusal is not a page to try again")
+        assertFalse(paged.state.value.loadingMore)
+        assertFalse(paged.loadMore(), "nothing is left to page through")
+    }
+
+    /** A cursor the host can no longer read is not retried: the browser lists again from the first page. */
+    @Test
+    fun aCursorTheHostCannotReadListsAgainFromTheFirstPage() = runTest {
+        val gated = GatedDirectory()
+        val paged = listedOnce(gated)
+        val page = async { paged.loadMore() }
+        runCurrent()
+        gated.answer(1, SharedNoteListing.Unavailable(SharedNoteListing.Unavailable.INVALID_CURSOR))
+        runCurrent()
+
+        assertEquals(3, gated.asked.size)
+        assertNull(gated.asked[2], "the browser asks for the first page again")
+        assertTrue(paged.state.value.loading)
+        assertFalse(paged.state.value.moreFailed, "the dead cursor is not offered for a retry")
+        gated.answer(2, SharedNoteListing.Listed(listOf(FIRST, SECOND)))
+        assertFalse(page.await())
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST, SECOND)), paged.state.value.listing)
+        assertFalse(paged.state.value.loading)
+    }
+
+    /** A browser over [gated] showing [FIRST] with [CURSOR] (the directory's call 0). */
+    private suspend fun TestScope.listedOnce(gated: GatedDirectory): SharedNoteBrowser {
+        val paged = pagedBrowser(gated)
+        val first = launch { paged.refresh() }
+        runCurrent()
+        gated.answer(0, SharedNoteListing.Listed(listOf(FIRST), CURSOR))
+        first.join()
+        return paged
     }
 
     private fun pagedBrowser(source: SharedNoteDirectory) = SharedNoteBrowser(object : SharedNotebooks {

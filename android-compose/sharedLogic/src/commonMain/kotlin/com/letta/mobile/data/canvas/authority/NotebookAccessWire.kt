@@ -145,7 +145,7 @@ object SharedNotesWire {
     const val NEXT_CURSOR = "next_cursor"
 
     /** The reason a host gives for a cursor it cannot read; the caller starts again from the first page. */
-    const val INVALID_CURSOR = "The listing position is not valid; list again from the start"
+    const val INVALID_CURSOR = SharedNoteListing.Unavailable.INVALID_CURSOR
 
     /** The request for the page starting at [from], or the first page when it is null. */
     fun request(from: SharedNotesCursor?): JsonObject = buildJsonObject { from?.let { put(CURSOR, it.value) } }

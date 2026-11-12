@@ -35,7 +35,12 @@ sealed interface SharedNoteListing {
      * The host could not be reached or did not answer usefully; never read as "none shared".
      * @property reason A short diagnostic, for logs rather than the person.
      */
-    data class Unavailable(val reason: String) : SharedNoteListing
+    data class Unavailable(val reason: String) : SharedNoteListing {
+        companion object {
+            /** The reason a host gives for a cursor it cannot read; the caller starts again from the first page. */
+            const val INVALID_CURSOR = "The listing position is not valid; list again from the start"
+        }
+    }
 }
 
 /** Asks the host which notes it shares with this device. Every call is a fresh question. */

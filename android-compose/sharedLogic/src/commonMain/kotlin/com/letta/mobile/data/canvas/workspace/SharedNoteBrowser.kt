@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.update
  *   appended in order; null before the first answer arrives.
  * @property loading A refresh (a first-page request) is in flight.
  * @property loadingMore The next page is being asked for.
- * @property moreFailed The latest request for the next page failed; what is shown stays and it may be asked again.
+ * @property moreFailed The latest request for the next page was unavailable; what is shown stays and it may be asked again.
  * @property opening The note being opened, while the opener decides.
  * @property workspace The workspace holding the open note, or null while the list shows.
  * @property openProblem Why the latest open failed, shown beside the list.
@@ -89,13 +89,12 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
      * meanwhile, its answer is dropped, since the refresh starts again from the first page; once a
      * refresh has published its listing, this request no longer touches the state at all, so a page
      * asked for the new listing is not held back by it. A failed page keeps what is shown and sets
-     * [SharedNoteBrowserState.moreFailed], so the person can ask again.
+     * [SharedNoteBrowserState.moreFailed], so the person can ask again; a cursor the host can no longer
+     * read lists again from the first page instead. A refused page replaces the listing with
+     * [SharedNoteListing.Denied]: the earlier notes are not shown once the host has refused this device.
      */
     suspend fun loadMore(): Boolean {
-        val current = state.value
-        val from = (current.listing as? SharedNoteListing.Listed)?.next
-        if (from == null) return false
-        if (current.loadingMore) return false
+        val from = nextPageOf(state.value) ?: return false
         val base = asked to shown
         val generation = pageGeneration
         mutableState.update { it.copy(loadingMore = true, moreFailed = false) }
@@ -107,15 +106,33 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
             val answer = page
             if (generation == pageGeneration) mutableState.update { showPage(it, answer) }
         }
+        if (page == CURSOR_REFUSED) refresh()
         return page is SharedNoteListing.Listed
     }
 
+    /** Where the next page starts, or null when nothing is left or a page is already being asked for. */
+    private fun nextPageOf(current: SharedNoteBrowserState): SharedNotesCursor? {
+        if (current.loadingMore) return null
+        return (current.listing as? SharedNoteListing.Listed)?.next
+    }
+
+    /**
+     * A refused page is the host's current answer for this device, so the notes listed before it are
+     * no longer shown. An unavailable page keeps them and may be asked again, except a cursor the host
+     * cannot read: asking with it again can never succeed, so [loadMore] lists again from the first page.
+     */
     private fun showPage(current: SharedNoteBrowserState, page: SharedNoteListing?): SharedNoteBrowserState {
-        val shownListing = current.listing as? SharedNoteListing.Listed
-        if (page == null) return current.copy(loadingMore = false)
-        if (page !is SharedNoteListing.Listed) return current.copy(loadingMore = false, moreFailed = true)
-        val notes = (shownListing?.notes.orEmpty() + page.notes).distinctBy { it.id }
-        return current.copy(listing = SharedNoteListing.Listed(notes, page.next), loadingMore = false)
+        return when (page) {
+            null -> current.copy(loadingMore = false)
+            SharedNoteListing.Denied -> current.copy(listing = SharedNoteListing.Denied, loadingMore = false)
+            is SharedNoteListing.Unavailable -> current.copy(loadingMore = false, moreFailed = page != CURSOR_REFUSED)
+            is SharedNoteListing.Listed -> current.copy(listing = appended(current.listing, page), loadingMore = false)
+        }
+    }
+
+    private fun appended(shown: SharedNoteListing?, page: SharedNoteListing.Listed): SharedNoteListing.Listed {
+        val notes = ((shown as? SharedNoteListing.Listed)?.notes.orEmpty() + page.notes).distinctBy { it.id }
+        return SharedNoteListing.Listed(notes, page.next)
     }
 
     private suspend fun ask(from: SharedNotesCursor?): SharedNoteListing = try {
@@ -165,6 +182,8 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
         refresh()
     }
 }
+
+private val CURSOR_REFUSED = SharedNoteListing.Unavailable(SharedNoteListing.Unavailable.INVALID_CURSOR)
 
 /** The host refused the open note's current grant (revoked while it was open). */
 fun DocumentWorkspaceController.withdrawn(): Boolean = state.value.current?.note?.state?.value?.denied == true
