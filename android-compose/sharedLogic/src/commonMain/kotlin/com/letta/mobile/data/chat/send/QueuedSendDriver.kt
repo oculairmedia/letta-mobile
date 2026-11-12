@@ -4,6 +4,7 @@ import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -195,7 +196,16 @@ internal class QueuedSendDriver(
         val next = waiting.items.firstOrNull()?.takeUnless { waiting.paused || waiting.heldByOtherClient } ?: return true
         // The queue owns presentation until dispatch has published the transcript row. Keeping
         // the head here also avoids a disappear/reappear pulse when the transport rejects a retry.
-        if (!turns.dispatch(next)) return false
+        val dispatched = runCatching { turns.dispatch(next) }.getOrElse { failure ->
+            if (failure is CancellationException || failure !is Exception) throw failure
+            Telemetry.error(
+                TELEMETRY_TAG, "queue.drainFailed", failure,
+                "conversationId" attr conversationId.value, "otid" attr next.id.value,
+                "attempt" attr next.attempt,
+            )
+            false
+        }
+        if (!dispatched) return false
         queue.remove(next.id)
         report(QueueEvent.Dispatched, conversationId, next.id)
         return true
