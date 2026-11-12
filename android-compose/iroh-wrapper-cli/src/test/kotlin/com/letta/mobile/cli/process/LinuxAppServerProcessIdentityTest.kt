@@ -1,4 +1,4 @@
-package com.letta.mobile.cli.commands
+package com.letta.mobile.cli.process
 
 import java.nio.file.Files
 import java.nio.file.Path

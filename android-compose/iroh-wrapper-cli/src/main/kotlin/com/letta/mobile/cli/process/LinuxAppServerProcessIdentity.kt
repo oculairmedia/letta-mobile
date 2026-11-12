@@ -1,4 +1,4 @@
-package com.letta.mobile.cli.commands
+package com.letta.mobile.cli.process
 
 import com.letta.mobile.data.subagents.AppServerProcessIdentity
 import java.net.URI

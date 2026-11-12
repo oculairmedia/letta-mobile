@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
+import com.letta.mobile.cli.process.LinuxAppServerProcessIdentity
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
