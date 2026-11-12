@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
+import com.letta.mobile.data.secrets.wire.SecretRequestRouteWire
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
 
@@ -38,10 +39,19 @@ object IrohPeerCapabilities {
     const val SUBAGENT_SPAWN = "subagent.spawn"
     const val WORKACTIVITY_REPORT = "workactivity.report"
 
+    // letta-mobile-n2stx.2.4: secret request routes. Granted to no role: the human side's handler still requires a
+    // paired device holding admin.full, and no connection is ever an agent (the agent side is the secret_request tool).
+    /** Admits `secret.request.list`, `.get`, `.submit` and `.cancel` at the gate. */
+    const val SECRET_REQUEST_ANSWER = SecretRequestRouteWire.ANSWER_CAPABILITY
+
+    /** Admits `secret.request` and `secret.request.status` at the gate; their handler refuses every connection. */
+    const val SECRET_REQUEST_AGENT = SecretRequestRouteWire.AGENT_CAPABILITY
+
     val ALL: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE, ADMIN_FULL,
         SUBAGENT_SPAWN, WORKACTIVITY_REPORT, BEADS_READ, BEADS_WRITE,
+        SECRET_REQUEST_ANSWER, SECRET_REQUEST_AGENT,
     )
 
     /**
@@ -107,6 +117,8 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
+        method in SecretRequestRouteWire.HUMAN_METHODS -> SECRET_REQUEST_ANSWER
+        method in SecretRequestRouteWire.AGENT_METHODS -> SECRET_REQUEST_AGENT
         method in BEADS_READ_METHODS -> BEADS_READ
         method in BEADS_WRITE_METHODS -> BEADS_WRITE
         method in WRAPPER_RECORD_READ_METHODS -> CHAT_READ

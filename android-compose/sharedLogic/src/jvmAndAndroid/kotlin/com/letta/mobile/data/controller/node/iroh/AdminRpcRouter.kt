@@ -47,6 +47,15 @@ data class AdminRpcRequestContext(
     val authorizedAgentIds: Set<String>? = null,
     /** Iroh endpoint identity established by the serving connection, never request parameters. */
     val authenticatedEndpointId: String? = null,
+    /**
+     * Whether the serving connection authenticated a paired device by its stored pairing record
+     * (letta-mobile-n2stx.2.4). False for bootstrap sessions (bearer token, static allowlist,
+     * anonymous test mode), which is how a host-local process holding an admin token is told apart
+     * from a person's device. Only the serving connection sets it.
+     */
+    val pairedDevice: Boolean = false,
+    /** The capabilities the serving connection granted this session, as it verified them; empty unless it set them. */
+    val grantedCapabilities: Set<String> = emptySet(),
 ) {
     fun canAccessConversation(conversationId: String): Boolean =
         authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)
@@ -63,7 +72,11 @@ data class AdminRpcInvocation(
     val method: String,
     val params: JsonObject?,
     val context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
-)
+) {
+    /** Never the params' values (a call may carry a secret, as `secret.request.submit` does): only their names. */
+    override fun toString(): String =
+        "AdminRpcInvocation(requestId=$requestId, method=$method, paramNames=${params?.keys}, context=$context)"
+}
 
 class AdminRpcRouter(
     private val json: Json = Json { ignoreUnknownKeys = true },

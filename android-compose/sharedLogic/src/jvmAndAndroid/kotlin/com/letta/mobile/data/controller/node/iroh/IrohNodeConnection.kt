@@ -360,6 +360,8 @@ class IrohNodeConnection(
                 viewedConversationId = viewerSubscription?.currentConversation,
             ),
             authorizedAgentIds = sessionAuth.agentScope(),
+            pairedDevice = isAuthenticated && sessionAuth.isPairedDevice(),
+            grantedCapabilities = capabilities,
         )
     }
 
