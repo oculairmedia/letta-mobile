@@ -35,8 +35,9 @@ internal class SentenceScan(
 ) {
     /**
      * The end (exclusive) of the first complete sentence, or null when none is complete yet. Nothing
-     * inside an HTML tag or a Markdown link target counts, finished or not, so a sentence end within
-     * markup never releases part of it; a `<` that does not start a tag (`2 < 3`) is ordinary text.
+     * inside an HTML tag or a Markdown link (its text or its target) counts, finished or not, so a
+     * sentence end within markup never releases part of it; a `<` that does not start a tag
+     * (`2 < 3`) is ordinary text.
      */
     fun firstEnd(): TextIndex? {
         val markup = MarkupRegions()
@@ -109,9 +110,28 @@ internal class SentenceScan(
     }
 }
 
-/** Tracks, character by character, whether the scan is inside an HTML tag or a Markdown link target. */
-private class MarkupRegions {
+/** A markup region still open at the end of a text: where it starts and the character that would close it. */
+internal class OpenMarkup(
+    /** Where the region starts. */
+    val start: TextIndex,
+    /** `>` for a tag, `]` for a link's text, `)` for a link's target. */
+    val closer: Char,
+)
+
+/** The markup region left open at the end of [text], or null when every region is closed. */
+internal fun openMarkupIn(text: CharSequence): OpenMarkup? {
+    val regions = MarkupRegions()
+    text.indices.forEach { regions.covers(text, it) }
+    return regions.open()
+}
+
+/**
+ * Tracks, character by character, whether a scan is inside markup: an HTML tag (`<` then a letter
+ * or `/`, up to `>`), a Markdown link's text (`[` up to `]`) or its target (`(` right after `]`, up to `)`).
+ */
+internal class MarkupRegions {
     private var closer: Char? = null
+    private var openedAt = 0
 
     /** True when the character at [index] opens, lies inside or closes a markup region. */
     fun covers(text: CharSequence, index: Int): Boolean {
@@ -122,11 +142,16 @@ private class MarkupRegions {
             return true
         }
         closer = closerFor(text, index)
+        if (closer != null) openedAt = index
         return closer != null
     }
 
+    /** The region open after the characters seen so far, or null. */
+    fun open(): OpenMarkup? = closer?.let { OpenMarkup(TextIndex(openedAt), it) }
+
     private fun closerFor(text: CharSequence, index: Int): Char? = when {
         startsTag(text, index) -> '>'
+        text[index] == '[' -> ']'
         text[index] == '(' && text.getOrNull(index - 1) == ']' -> ')'
         else -> null
     }

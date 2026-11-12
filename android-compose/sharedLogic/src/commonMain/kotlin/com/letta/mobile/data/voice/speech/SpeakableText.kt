@@ -1,19 +1,24 @@
 package com.letta.mobile.data.voice.speech
 
 /**
- * Strips what should not be read aloud from one segment of reply text. Only recognisable HTML tags
- * are removed, so comparisons such as `2 < 3 > 1` survive. A link cut off before it ends (released
- * whole once the chunker's hold limit is exceeded) is reduced to its link text; its syntax and URL
- * are never spoken.
+ * Strips what should not be read aloud from one segment of reply text. A tag is what the chunker
+ * treats as one: `<` followed by a letter or `/`, up to the next `>`; comparisons such as
+ * `2 < 3 > 1` survive. Unfinished markup at the end of a
+ * segment is never spoken either: an unfinished tag is dropped, an unfinished link is reduced to
+ * its text, and the orphaned target of a link whose `[` was released earlier is dropped. Leftover
+ * brackets are never read.
  */
 internal object SpeakableText {
     private val rules: List<Pair<Regex, String>> = listOf(
         Regex("""!\[([^\]]*)]\([^)]*\)""") to "$1",
         Regex("""\[([^\]]+)]\([^)]*\)""") to "$1",
-        Regex("""\[([^\]]+)]\([^)\s]*""") to "$1",
-        Regex("""\[([^\]]+)$""") to "$1",
+        Regex("""\[([^\]]+)]\([^)]*$""") to "$1",
+        Regex("""\[([^\]]*)$""") to "$1",
+        Regex("""]\([^)]*(?:\)|$)""") to "",
+        Regex("""[\[\]]""") to "",
+        Regex("""<[A-Za-z/][^>]*>""") to "",
+        Regex("""<[A-Za-z/][^>]*$""") to "",
         Regex("""https?://\S+""") to "",
-        Regex("""</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>\n]*)?/?>""") to "",
         Regex("""^\s*#{1,6}\s*""") to "",
         Regex("""^\s*>\s?""") to "",
         Regex("""^\s*(?:[-*+]|\d+[.)])(?:\s+|$)""") to "",

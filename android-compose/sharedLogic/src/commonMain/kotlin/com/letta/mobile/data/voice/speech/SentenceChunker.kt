@@ -18,7 +18,7 @@ class SentenceChunker(
 ) {
     private val pending = StringBuilder()
     private var inCodeBlock = false
-    private var inDroppedTag = false
+    private var dropUntil: Char? = null
     private val softCut = SoftCut(maxSegmentLength)
 
     init {
@@ -42,7 +42,7 @@ class SentenceChunker(
     fun reset() {
         pending.clear()
         inCodeBlock = false
-        inDroppedTag = false
+        dropUntil = null
     }
 
     /** The first [length] buffered characters become a segment; [skip] more after them are dropped. */
@@ -56,7 +56,7 @@ class SentenceChunker(
             do {
                 val progressed = when {
                     inCodeBlock -> skipCode()
-                    inDroppedTag -> skipTag()
+                    dropUntil != null -> skipDropped()
                     else -> splitProse()
                 }
             } while (progressed)
@@ -76,16 +76,16 @@ class SentenceChunker(
             return false
         }
 
-        /** Drops the rest of a tag released past the hold limit until it closes; nothing of it is spoken. */
-        private fun skipTag(): Boolean {
-            val close = pending.indexOf('>')
+        /** Drops the rest of markup released past the hold limit until it closes; nothing of it is spoken. */
+        private fun skipDropped(): Boolean {
+            val close = pending.indexOf(dropUntil ?: return false)
             if (close < 0) {
                 pending.clear()
-                if (mode == ScanMode.FINAL) inDroppedTag = false
+                if (mode == ScanMode.FINAL) dropUntil = null
                 return false
             }
             pending.deleteRange(0, close + 1)
-            inDroppedTag = false
+            dropUntil = null
             return true
         }
 
@@ -95,7 +95,7 @@ class SentenceChunker(
             val end = SentenceScan(pending, limit, mode).firstEnd()
             val overflow = overflowCut()
             return when {
-                end != null -> take(Cut(end.value))
+                end != null -> release(Cut(end.value))
                 fence >= 0 -> openCodeBlock(Cut(fence, FENCE.length))
                 overflow != null -> releaseOverflow(overflow)
                 mode == ScanMode.FINAL -> emitAll()
@@ -116,38 +116,51 @@ class SentenceChunker(
         }
 
         /**
-         * Releases overflowing text. Released whole past the hold limit, an unfinished HTML tag at its
-         * end is dropped: the text before it is spoken, the tag never is, and the tag's remainder is
-         * skipped until it closes (or the reply ends).
+         * Releases overflowing text. Past the hold limit everything pending goes, so markup still open
+         * there is settled first: an unfinished tag is dropped (the text before it is released, the
+         * tag's remainder is skipped until it closes or the reply ends); an unfinished link's text
+         * loses its `[` and stays text (its later `](target)` is dropped on release); an unfinished
+         * link target is released as its link text and the rest of the target is skipped. A `<` at the
+         * very end is held back: the next delta decides whether it starts a tag.
          */
         private fun releaseOverflow(cut: Cut): Boolean {
-            val tag = if (cut.length == pending.length) unfinishedTagStart() else null
-            if (tag == null) return take(cut)
-            take(Cut(tag))
-            inDroppedTag = true
+            if (cut.length != pending.length) return release(cut)
+            if (pending.endsWith('<')) return release(Cut(pending.length - 1))
+            val open = openMarkupIn(pending) ?: return release(cut)
+            return when (open.closer) {
+                '>' -> releaseThenDrop(Cut(open.start.value), '>')
+                ']' -> {
+                    pending.deleteAt(open.start.value)
+                    true
+                }
+                else -> releaseThenDrop(cut, ')')
+            }
+        }
+
+        private fun releaseThenDrop(cut: Cut, closer: Char): Boolean {
+            release(cut)
+            dropUntil = closer
             return true
         }
 
-        /** Where an unfinished HTML tag (`<` then a letter or `/`, with no `>` after it) starts, or null. */
-        private fun unfinishedTagStart(): Int? {
-            val start = pending.lastIndexOf('<')
-            if (start < 0 || pending.indexOf('>', start) >= 0) return null
-            val next = pending.getOrNull(start + 1) ?: return null
-            return if (next.isLetter() || next == '/') start else null
-        }
-
         private fun openCodeBlock(cut: Cut): Boolean {
-            take(cut)
+            release(cut)
             inCodeBlock = true
             return true
         }
 
         private fun emitAll(): Boolean {
-            if (pending.isNotEmpty()) take(Cut(pending.length))
+            if (pending.isNotEmpty()) release(Cut(pending.length))
             return false
         }
 
-        private fun take(cut: Cut): Boolean {
+        /**
+         * The only place text leaves the chunker. Every path (a sentence end, a safe break, the hold
+         * limit, a code fence, the final flush) releases through here, and [SpeakableText.clean]
+         * enforces the invariant that no segment carries raw markup: complete tags and links are
+         * reduced, unfinished trailing markup is dropped or reduced to its text.
+         */
+        private fun release(cut: Cut): Boolean {
             val raw = pending.substring(0, cut.length)
             pending.deleteRange(0, cut.length + cut.skip)
             val spoken = SpeakableText.clean(raw)
