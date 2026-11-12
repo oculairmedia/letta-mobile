@@ -53,6 +53,10 @@ class DurableSubagentRegistry(
     internal val supportsDurableDismissal: Boolean = store.durable
     private val lock = SynchronizedObject()
     private val snapshotAbsence = SubagentSnapshotAbsence()
+    private val startedAtEpochMs = clock()
+    // Connection generations are local counters, not App Server process identities.
+    // Only records loaded at startup get this uncertainty bound; a sighting removes it.
+    private val restartUnobserved = mutableSetOf<SubagentChipKey>()
 
     /** Insertion-ordered so eviction and snapshots are deterministic. */
     private val entries = LinkedHashMap<SubagentChipKey, SubagentChipRecord>()
@@ -64,9 +68,13 @@ class DurableSubagentRegistry(
     }
 
     /**
-     * Terminalize every live chip unobserved for longer
-     * than [staleAfterMs] (see [staleRunningChips]). Returns the chips it
-     * ended so the caller can tell their conversations' viewers.
+     * Terminalize every live chip unobserved for longer than [staleAfterMs].
+     * Rehydrated chips never re-observed in this wrapper instead have a one-hour
+     * uncertainty bound, measured from both startup and their last sighting. This
+     * does not prove worker death: the App Server handshake has no process identity,
+     * so a silent worker surviving a wrapper-only restart may also time out. Its
+     * distinct `restart_unobserved` reason must not be presented as confirmed death.
+     * Returns the ended chips so the caller can tell their conversations' viewers.
      */
     fun expireStale(): List<SubagentChipRecord> {
         val expired = synchronized(lock) {
@@ -75,7 +83,10 @@ class DurableSubagentRegistry(
         expired.forEach { record ->
             Telemetry.event(
                 TAG,
-                "ttl.expired",
+                if (record.terminalReason == "restart_unobserved") "restart.unobserved" else "ttl.expired",
+                "reason" attr record.terminalReason,
+                "previousAppServerGeneration" attr "unknown",
+                "currentAppServerGeneration" attr "unknown",
                 "conversationId" attr record.conversationId,
                 "toolCallId" attr record.toolCallId,
                 "subagentType" attr record.subagentType,
@@ -87,8 +98,25 @@ class DurableSubagentRegistry(
     }
 
     private fun expireStaleLocked(): List<SubagentChipRecord> {
-        val expired = staleRunningChips(entries.values, clock(), staleAfterMs)
-        expired.forEach { entries[it.key] = it }
+        val now = clock()
+        val stale = staleRunningChips(entries.values, now, staleAfterMs)
+        stale.forEach { entries[it.key] = it }
+        val unobserved = entries.values.filter {
+            it.key in restartUnobserved && !it.state.isTerminal &&
+                now - startedAtEpochMs > RESTART_UNOBSERVED_AFTER_MS &&
+                now - it.lastSeenEpochMs > RESTART_UNOBSERVED_AFTER_MS
+        }.map { record ->
+            record.copy(
+                state = SubagentChipState.CANCELLED,
+                terminalReason = "restart_unobserved",
+                terminalAtEpochMs = now,
+            )
+        }
+        val expired = stale + unobserved
+        expired.forEach {
+            entries[it.key] = it
+            restartUnobserved.remove(it.key)
+        }
         if (expired.isNotEmpty()) enforceCapacityLocked()
         return expired
     }
@@ -106,6 +134,7 @@ class DurableSubagentRegistry(
         synchronized(lock) {
             entries.clear()
             loaded.forEach { entries[it.key] = it }
+            restartUnobserved.addAll(loaded.filterNot { it.state.isTerminal }.map { it.key })
         }
         if (loaded.isNotEmpty()) {
             Telemetry.event(
@@ -198,6 +227,7 @@ class DurableSubagentRegistry(
         entries[observation.key] = merged
         // Any accepted sighting, even from an incomplete snapshot, is positive evidence of life.
         snapshotAbsence.seen(observation.key)
+        restartUnobserved.remove(observation.key)
         // PR #1077 review (P2): capacity must be re-checked on every ACCEPTED
         // transition, not only on insert. A burst of >maxEntries simultaneously
         // live chips is deliberately allowed to exceed the cap (live chips are
@@ -557,6 +587,7 @@ class DurableSubagentRegistry(
             ordinaryCount--
             // A later chip reusing this key must not inherit the evicted one's absence clock.
             snapshotAbsence.forget(victim.key)
+            restartUnobserved.remove(victim.key)
             evicted += victim
         }
         evicted.forEach { victim ->
@@ -595,6 +626,7 @@ class DurableSubagentRegistry(
     fun clear() {
         synchronized(lock) {
             entries.clear()
+            restartUnobserved.clear()
             snapshotAbsence.retainKeys(emptySet())
             persistLocked()
         }
@@ -602,6 +634,11 @@ class DurableSubagentRegistry(
 
     companion object {
         const val TAG = "DurableSubagentRegistry"
+
+        // An uncertainty timeout, NOT evidence of App Server death. Legacy records have
+        // no process identity and the handshake supplies none. A wrapper-only restart
+        // therefore protects re-observed workers but cannot protect forever-silent ones.
+        private const val RESTART_UNOBSERVED_AFTER_MS: Long = 60 * 60_000L
 
         /**
          * Bound on retained chips. Sized well above any plausible fan-out of

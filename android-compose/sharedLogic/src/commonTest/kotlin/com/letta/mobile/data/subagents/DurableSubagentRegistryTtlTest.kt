@@ -69,6 +69,64 @@ class DurableSubagentRegistryTtlTest {
     }
 
     @Test
+    fun restartBoundsUnobservedLegacyRecordsWithoutClaimingWorkerDeath() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-unobserved"))
+        val restarted = registry(store)
+        now += 60 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        now++
+        val retired = restarted.expireStale()
+        assertEquals(listOf("tool-unobserved"), retired.map { it.toolCallId })
+        val expired = retired.single()
+        assertEquals(SubagentChipState.CANCELLED, expired.state)
+        assertEquals("restart_unobserved", expired.terminalReason)
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(
+            true,
+            restarted.observe(running("tool-unobserved")) is DurableSubagentRegistry.ObserveResult.IllegalTransition,
+        )
+    }
+
+    @Test
+    fun wrapperRestartProtectsReobservedWorkerForTheFullTtl() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-live"))
+        val restarted = registry(store)
+        now += 30 * 60_000L
+        restarted.observe(running("tool-live"))
+        now += 31 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-live")?.state)
+    }
+
+    @Test
+    fun wrapperRestartOmissionDoesNotImmediatelyOrphanSilentWorker() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-silent"))
+        val restarted = registry(store)
+        repeat(2) {
+            val result = restarted.reconcileSnapshot(
+                com.letta.mobile.data.model.ConversationId("conv-a"),
+                com.letta.mobile.data.model.AgentId("agent-1"),
+                emptySet(), 1L,
+            )
+            assertEquals(emptyList(), result.orphaned)
+            now += 30 * 60_000L
+        }
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-silent")?.state)
+    }
+
+    @Test
+    fun newWorkersDoNotInheritTheRestartBound() {
+        val reg = registry()
+        reg.observe(running("tool-new"))
+        now += 61 * 60_000L
+        assertEquals(emptyList(), reg.expireStale())
+    }
+
+    @Test
     fun restartEndsPersistedZombies() {
         val store = InMemorySubagentRegistryStore()
         registry(store).observe(running("tool-zombie"))

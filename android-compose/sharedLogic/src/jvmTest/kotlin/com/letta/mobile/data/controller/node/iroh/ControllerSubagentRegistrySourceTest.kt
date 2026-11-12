@@ -15,6 +15,8 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.add
@@ -35,6 +37,38 @@ class ControllerSubagentRegistrySourceTest {
     @kotlin.test.AfterTest
     fun detachOwnedTelemetryHistory() {
         ownedTelemetryHistory?.close()
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun idleRestartSweepNotifiesOncePerConversationAndPushesTerminalRecords() = runTest {
+        var now = 10_000L
+        val store = InMemorySubagentRegistryStore()
+        val original = ControllerSubagentRegistrySource(DurableSubagentRegistry(store, clock = { now }))
+        original.ingestFromSource(
+            "restart-parent", "parent",
+            listOf(SubagentEntry(toolCallId = "first", status = "running"),
+                SubagentEntry(toolCallId = "second", status = "running")),
+            SubagentChipSource.CONTROLLER_NATIVE,
+        )
+        val source = ControllerSubagentRegistrySource(DurableSubagentRegistry(store, clock = { now }), clock = { now })
+        val changed = mutableListOf<SubagentConversationKey>()
+        source.changeListener = SubagentRegistryChangeListener { changed += it }
+        val events = kotlinx.coroutines.flow.MutableSharedFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
+        val job = source.start(backgroundScope, events)
+        runCurrent()
+        now += 61 * 60_000L
+        advanceTimeBy(10 * 60_000L)
+        runCurrent()
+        val key = SubagentConversationKey("parent", "restart-parent")
+        assertEquals(listOf(key), changed)
+        val pushed = source.pushSnapshot(key, now)
+        assertEquals(2, pushed.size)
+        assertTrue(pushed.all { it.status == "cancelled" && it.terminalReason == "restart_unobserved" })
+        advanceTimeBy(10 * 60_000L)
+        runCurrent()
+        assertEquals(listOf(key), changed)
+        job.cancel()
     }
 
     @Test
