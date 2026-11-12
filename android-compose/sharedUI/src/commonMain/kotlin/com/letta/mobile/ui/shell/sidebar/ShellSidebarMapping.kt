@@ -78,7 +78,10 @@ object ShellSidebarMapping {
             chatOptions = input.chatOptions,
             canvases = canvasRows(
                 input.canvases,
-                ShellCanvasScope(input.agent.agentId?.let(::AgentId), input.archiveFilter, input.archivedCanvasIds, input.activeCanvasId),
+                // The host has already scoped the canvases to its filter, so none is applied again here.
+                ShellCanvasScope(
+                    input.agent.agentId?.let(::AgentId), ShellArchiveFilter.All, input.archivedCanvasIds, input.activeCanvasId,
+                ),
                 now,
             ),
         )
