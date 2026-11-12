@@ -29,10 +29,6 @@ object NotebookAccessWire {
     const val OPEN = "notebook.note.open"
     const val SAVE = "notebook.note.save"
     const val FLUSH = "notebook.note.flush"
-    const val LIST = "notebook.shared.list"
-
-    /** The most notes one listing carries; a host with more lists its first [MAX_LISTED]. */
-    const val MAX_LISTED = 500
 
     /** The request body naming one document. */
     fun request(id: NotebookDocumentId, fields: JsonObjectBuilder.() -> Unit = {}): JsonObject =
@@ -81,32 +77,6 @@ object NotebookAccessWire {
         NotebookReferenceLoad.Unavailable -> response(UNAVAILABLE)
     }
 
-    /** The listing result: the notes the caller may open now, at most [MAX_LISTED]. */
-    fun sharedNotes(result: SharedNoteListing): JsonObject = when (result) {
-        is SharedNoteListing.Listed -> response(LISTED) {
-            putJsonArray("notes") {
-                result.notes.take(MAX_LISTED).forEach { note ->
-                    addJsonObject {
-                        put("document_id", note.id.value)
-                        put("title", note.title)
-                    }
-                }
-            }
-        }
-        SharedNoteListing.Denied -> response(DENIED)
-        is SharedNoteListing.Unavailable -> response(UNAVAILABLE) { put("reason", result.reason) }
-    }
-
-    /** Read a listing; an entry without an id or a title makes the whole answer malformed, not shorter. */
-    fun readSharedNotes(result: JsonElement?): SharedNoteListing {
-        val body = result as? JsonObject ?: return SharedNoteListing.Unavailable(NO_RESULT)
-        return when (body.status()) {
-            LISTED -> body.notes()?.let(SharedNoteListing::Listed) ?: SharedNoteListing.Unavailable(MALFORMED_LIST)
-            DENIED -> SharedNoteListing.Denied
-            else -> SharedNoteListing.Unavailable(body.reason())
-        }
-    }
-
     /** Read an open result for [id]; a snapshot for another document is unavailable. */
     fun readLoad(id: NotebookDocumentId, result: JsonElement?): NotebookNoteLoad {
         val body = result as? JsonObject ?: return NotebookNoteLoad.Unavailable(NO_RESULT)
@@ -145,6 +115,40 @@ object NotebookAccessWire {
     }
 }
 
+/** The `notebook.shared.list` result shape, shared by the host route and the remote client. */
+object SharedNotesWire {
+    const val LIST = "notebook.shared.list"
+
+    /** The most notes one listing carries; a host with more lists its first [MAX_LISTED]. */
+    const val MAX_LISTED = 500
+
+    /** The listing result: the notes the caller may open now, at most [MAX_LISTED]. */
+    fun sharedNotes(result: SharedNoteListing): JsonObject = when (result) {
+        is SharedNoteListing.Listed -> response(LISTED) {
+            putJsonArray("notes") {
+                result.notes.take(MAX_LISTED).forEach { note ->
+                    addJsonObject {
+                        put("document_id", note.id.value)
+                        put("title", note.title)
+                    }
+                }
+            }
+        }
+        SharedNoteListing.Denied -> response(DENIED)
+        is SharedNoteListing.Unavailable -> response(UNAVAILABLE) { put("reason", result.reason) }
+    }
+
+    /** Read a listing; an entry without an id or a title makes the whole answer malformed, not shorter. */
+    fun readSharedNotes(result: JsonElement?): SharedNoteListing {
+        val body = result as? JsonObject ?: return SharedNoteListing.Unavailable(NO_RESULT)
+        return when (body.status()) {
+            LISTED -> body.notes()?.let(SharedNoteListing::Listed) ?: SharedNoteListing.Unavailable(MALFORMED_LIST)
+            DENIED -> SharedNoteListing.Denied
+            else -> SharedNoteListing.Unavailable(body.reason())
+        }
+    }
+}
+
 private fun JsonObject.status(): String? = text("status")
 
 private fun JsonObject.reason(): String = text("reason") ?: "The host could not complete the request"
@@ -159,7 +163,7 @@ private fun JsonObject.conflict(id: NotebookDocumentId): NotebookNoteSave.Confli
 }
 
 private fun JsonObject.notes(): List<SharedNote>? {
-    val entries = (get("notes") as? JsonArray)?.takeIf { it.size <= NotebookAccessWire.MAX_LISTED } ?: return null
+    val entries = (get("notes") as? JsonArray)?.takeIf { it.size <= SharedNotesWire.MAX_LISTED } ?: return null
     val notes = entries.mapNotNull { entry -> (entry as? JsonObject)?.sharedNote() }
     return notes.takeIf { it.size == entries.size }
 }

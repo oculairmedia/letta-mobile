@@ -72695,10 +72695,6 @@ final object com.letta.mobile.data.backend/SessionRouteMatrix { // com.letta.mob
 final object com.letta.mobile.data.canvas.authority/NotebookAccessWire { // com.letta.mobile.data.canvas.authority/NotebookAccessWire|null[0]
     final const val FLUSH // com.letta.mobile.data.canvas.authority/NotebookAccessWire.FLUSH|{}FLUSH[0]
         final fun <get-FLUSH>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.FLUSH.<get-FLUSH>|<get-FLUSH>(){}[0]
-    final const val LIST // com.letta.mobile.data.canvas.authority/NotebookAccessWire.LIST|{}LIST[0]
-        final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.LIST.<get-LIST>|<get-LIST>(){}[0]
-    final const val MAX_LISTED // com.letta.mobile.data.canvas.authority/NotebookAccessWire.MAX_LISTED|{}MAX_LISTED[0]
-        final fun <get-MAX_LISTED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/NotebookAccessWire.MAX_LISTED.<get-MAX_LISTED>|<get-MAX_LISTED>(){}[0]
     final const val OPEN // com.letta.mobile.data.canvas.authority/NotebookAccessWire.OPEN|{}OPEN[0]
         final fun <get-OPEN>(): kotlin/String // com.letta.mobile.data.canvas.authority/NotebookAccessWire.OPEN.<get-OPEN>|<get-OPEN>(){}[0]
     final const val RESOLVE // com.letta.mobile.data.canvas.authority/NotebookAccessWire.RESOLVE|{}RESOLVE[0]
@@ -72711,12 +72707,20 @@ final object com.letta.mobile.data.canvas.authority/NotebookAccessWire { // com.
     final fun readLoad(com.letta.mobile.data.canvas/NotebookDocumentId, kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.notes/NotebookNoteLoad // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readLoad|readLoad(com.letta.mobile.data.canvas.NotebookDocumentId;kotlinx.serialization.json.JsonElement?){}[0]
     final fun readReference(kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.references/NotebookReferenceLoad // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readReference|readReference(kotlinx.serialization.json.JsonElement?){}[0]
     final fun readSave(com.letta.mobile.data.canvas/NotebookDocumentId, kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.notes/NotebookNoteSave // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readSave|readSave(com.letta.mobile.data.canvas.NotebookDocumentId;kotlinx.serialization.json.JsonElement?){}[0]
-    final fun readSharedNotes(kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.workspace/SharedNoteListing // com.letta.mobile.data.canvas.authority/NotebookAccessWire.readSharedNotes|readSharedNotes(kotlinx.serialization.json.JsonElement?){}[0]
     final fun reference(com.letta.mobile.data.canvas.references/NotebookReferenceLoad): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.reference|reference(com.letta.mobile.data.canvas.references.NotebookReferenceLoad){}[0]
     final fun request(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/Function1<kotlinx.serialization.json/JsonObjectBuilder, kotlin/Unit> = ...): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.request|request(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.Function1<kotlinx.serialization.json.JsonObjectBuilder,kotlin.Unit>){}[0]
     final fun save(com.letta.mobile.data.canvas.notes/NotebookNoteSave): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.save|save(com.letta.mobile.data.canvas.notes.NotebookNoteSave){}[0]
-    final fun sharedNotes(com.letta.mobile.data.canvas.workspace/SharedNoteListing): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.sharedNotes|sharedNotes(com.letta.mobile.data.canvas.workspace.SharedNoteListing){}[0]
     final fun snapshot(com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.snapshot|snapshot(com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot){}[0]
+}
+
+final object com.letta.mobile.data.canvas.authority/SharedNotesWire { // com.letta.mobile.data.canvas.authority/SharedNotesWire|null[0]
+    final const val LIST // com.letta.mobile.data.canvas.authority/SharedNotesWire.LIST|{}LIST[0]
+        final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.LIST.<get-LIST>|<get-LIST>(){}[0]
+    final const val MAX_LISTED // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED|{}MAX_LISTED[0]
+        final fun <get-MAX_LISTED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED.<get-MAX_LISTED>|<get-MAX_LISTED>(){}[0]
+
+    final fun readSharedNotes(kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.workspace/SharedNoteListing // com.letta.mobile.data.canvas.authority/SharedNotesWire.readSharedNotes|readSharedNotes(kotlinx.serialization.json.JsonElement?){}[0]
+    final fun sharedNotes(com.letta.mobile.data.canvas.workspace/SharedNoteListing): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/SharedNotesWire.sharedNotes|sharedNotes(com.letta.mobile.data.canvas.workspace.SharedNoteListing){}[0]
 }
 
 final object com.letta.mobile.data.canvas.bubble/CanvasBubbleLayoutCodec { // com.letta.mobile.data.canvas.bubble/CanvasBubbleLayoutCodec|null[0]

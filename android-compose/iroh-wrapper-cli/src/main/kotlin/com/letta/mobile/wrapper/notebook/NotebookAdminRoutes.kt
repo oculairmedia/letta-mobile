@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.canvas.authority.HostNotebookAccess
 import com.letta.mobile.data.canvas.authority.NotebookAccessWire
 import com.letta.mobile.data.canvas.authority.NotebookGrantStore
+import com.letta.mobile.data.canvas.authority.SharedNotesWire
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
@@ -27,8 +28,8 @@ fun registerNotebookAdminRoutes(router: AdminRpcRouter, notebooks: NotebookLocal
         val id = documentId(params)
         NotebookAccessWire.reference(access(context).resolver.resolve(id))
     }
-    router.registerScoped(NotebookAccessWire.LIST) { _, context ->
-        NotebookAccessWire.sharedNotes(access(context).sharedNotes())
+    router.registerScoped(SharedNotesWire.LIST) { _, context ->
+        SharedNotesWire.sharedNotes(access(context).sharedNotes())
     }
     router.registerScoped(NotebookAccessWire.OPEN) { params, context ->
         val id = documentId(params)

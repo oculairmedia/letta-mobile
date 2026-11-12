@@ -131,7 +131,8 @@ class ShellDocumentModuleTest {
     private fun opensOverThePage(width: Dp) = window(width) {
         openTheSharedNote()
         val module = onNodeWithTag(ShellDocumentTags.MODULE).getUnclippedBoundsInRoot()
-        assertEquals(width.value, (module.right - module.left).value, absoluteTolerance = 1f, message = "the view spans the window at $width")
+        val spanned = (module.right - module.left).value
+        assertEquals(width.value, spanned, absoluteTolerance = 1f, message = "the view spans the window at $width")
         onNodeWithTag(Page).assertExists()
     }
 

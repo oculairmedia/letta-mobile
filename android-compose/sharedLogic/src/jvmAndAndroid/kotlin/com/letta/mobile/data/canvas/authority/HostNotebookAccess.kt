@@ -72,7 +72,7 @@ class HostNotebookAccess(
      * transaction for read and edit, and a granted note missing from the store is left out.
      */
     suspend fun sharedNotes(): SharedNoteListing = recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) {
-        val notes = grants.documentsOf(principal).take(NotebookAccessWire.MAX_LISTED).mapNotNull { id ->
+        val notes = grants.documentsOf(principal).take(SharedNotesWire.MAX_LISTED).mapNotNull { id ->
             grants.withGrant(principal, id) { grant ->
                 if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
             }

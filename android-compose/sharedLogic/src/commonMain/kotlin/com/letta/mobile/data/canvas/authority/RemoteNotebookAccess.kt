@@ -49,8 +49,8 @@ class RemoteNotebookAccess(rpc: AdminRpcInvoker) : SharedNotebooks {
 
     /** Every call is a fresh `notebook.shared.list`; the host lists only notes this device may open now. */
     override val directory = SharedNoteDirectory {
-        host.call(NotebookAccessWire.LIST, buildJsonObject {}, { SharedNoteListing.Unavailable(it) }) {
-            NotebookAccessWire.readSharedNotes(it)
+        host.call(SharedNotesWire.LIST, buildJsonObject {}, { SharedNoteListing.Unavailable(it) }) {
+            SharedNotesWire.readSharedNotes(it)
         }
     }
 

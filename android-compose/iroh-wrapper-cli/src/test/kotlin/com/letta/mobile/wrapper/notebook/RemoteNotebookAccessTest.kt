@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.canvas.authority.FileNotebookGrantStore
 import com.letta.mobile.data.canvas.authority.NotebookAccessWire
 import com.letta.mobile.data.canvas.authority.RemoteNotebookAccess
+import com.letta.mobile.data.canvas.authority.SharedNotesWire
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
@@ -134,15 +135,15 @@ class RemoteNotebookAccessTest {
     @Test
     fun aListingWithAnUnreadableEntryIsUnavailableNotShorter() {
         val id = NotebookDocumentId("0123456789abcdef0123456789abcdef")
-        val listed = NotebookAccessWire.sharedNotes(SharedNoteListing.Listed(listOf(SharedNote(id, "T"))))
+        val listed = SharedNotesWire.sharedNotes(SharedNoteListing.Listed(listOf(SharedNote(id, "T"))))
         val broken = buildJsonObject {
             put("status", "listed")
             put("notes", buildJsonArray { add(JsonPrimitive("junk")) })
         }
 
-        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(id, "T"))), NotebookAccessWire.readSharedNotes(listed))
-        assertIs<SharedNoteListing.Unavailable>(NotebookAccessWire.readSharedNotes(broken))
-        assertIs<SharedNoteListing.Unavailable>(NotebookAccessWire.readSharedNotes(null))
+        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(id, "T"))), SharedNotesWire.readSharedNotes(listed))
+        assertIs<SharedNoteListing.Unavailable>(SharedNotesWire.readSharedNotes(broken))
+        assertIs<SharedNoteListing.Unavailable>(SharedNotesWire.readSharedNotes(null))
     }
 
     @Test
