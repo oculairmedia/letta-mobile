@@ -159,31 +159,51 @@ class ProjectRegistryV1FixturesTest {
         error["problem"]?.let { assertTrue(it.jsonPrimitive.content in PROBLEMS && named(it.jsonPrimitive.content), "$label problem") }
     }
 
+    /** One answered list case: its name, its params and its result. */
+    private class ListAnswer(val label: String, val params: JsonObject, val result: JsonObject) {
+        val items: List<JsonObject>? = (result["items"] as? JsonArray)?.map { it.jsonObject }
+        val notModified: Boolean = result["notModified"]?.jsonPrimitive?.boolean == true
+    }
+
+    private fun listAnswers(): List<ListAnswer> = fixture(LIST_FIXTURE).cases().mapNotNull { case ->
+        case["result"]?.jsonObject?.let { ListAnswer(case.text("name"), case.getValue("params").jsonObject, it) }
+    }
+
     @Test
-    fun listPagesAreBoundedOrderedAndNotModifiedCarriesNoItems() {
-        val cases = fixture(LIST_FIXTURE).cases()
-        cases.forEach { case ->
-            val label = case.text("name")
-            val params = case.getValue("params").jsonObject
-            val result = case["result"]?.jsonObject ?: return@forEach
-            assertTrue((result.keys - LIST_RESULT_FIELDS).isEmpty(), "$label result fields")
-            assertTrue("revision" in result, "$label names the revision it was read at")
-            val items = result["items"]?.jsonArray?.map { it.jsonObject }
-            if (result["notModified"]?.jsonPrimitive?.boolean == true) {
-                assertEquals(null, items, "$label: notModified carries no items")
-                assertEquals(params.text("ifRevision"), result.text("revision"), "$label: notModified answers the held revision")
-                return@forEach
-            }
-            val ids = checkNotNull(items) { "$label has items" }.map { it.text("projectId") }
-            assertTrue(ids.size <= (params["limit"]?.jsonPrimitive?.int ?: DEFAULT_LIMIT), "$label: at most limit records")
-            assertEquals(ids.sorted(), ids, "$label: ordered by projectId (L1)")
-            params["engineEnabled"]?.jsonPrimitive?.boolean?.let { wanted ->
-                items.forEach { assertEquals(wanted, it.getValue("engine").jsonObject.getValue("enabled").jsonPrimitive.boolean, label) }
-            }
+    fun everyListAnswerNamesItsRevisionAndCarriesOnlyContractFields() {
+        val answers = listAnswers()
+        answers.forEach { answer ->
+            assertTrue((answer.result.keys - LIST_RESULT_FIELDS).isEmpty(), "${answer.label} result fields")
+            assertTrue("revision" in answer.result, "${answer.label} names the revision it was read at")
         }
-        assertTrue(cases.any { "nextCursor" in (it["result"]?.jsonObject ?: JsonObject(emptyMap())) }, "a case shows a further page")
+        assertTrue(answers.any { "nextCursor" in it.result }, "a case shows a further page")
         assertEquals(ERROR_CODES + PROBLEMS, errorsShown(), "every error code and problem has a fixture case")
     }
+
+    @Test
+    fun aNotModifiedAnswerCarriesNoItemsAndRepeatsTheHeldRevision() {
+        val unchanged = listAnswers().filter(ListAnswer::notModified)
+        assertTrue(unchanged.isNotEmpty(), "a case shows notModified")
+        unchanged.forEach { answer ->
+            assertEquals(null, answer.items, "${answer.label}: notModified carries no items")
+            assertEquals(answer.params.text("ifRevision"), answer.result.text("revision"), "${answer.label}: the held revision")
+        }
+    }
+
+    @Test
+    fun listPagesAreBoundedOrderedAndHonourTheEngineFilter() {
+        listAnswers().filterNot(ListAnswer::notModified).forEach { answer ->
+            val items = checkNotNull(answer.items) { "${answer.label} has items" }
+            val ids = items.map { it.text("projectId") }
+            val limit = answer.params["limit"]?.jsonPrimitive?.int ?: DEFAULT_LIMIT
+            assertTrue(ids.size <= limit, "${answer.label}: at most limit records")
+            assertEquals(ids.sorted(), ids, "${answer.label}: ordered by projectId (L1)")
+            val wanted = answer.params["engineEnabled"]?.jsonPrimitive?.boolean ?: return@forEach
+            assertTrue(items.all { it.engineEnabled() == wanted }, "${answer.label}: only records with engine.enabled = $wanted")
+        }
+    }
+
+    private fun JsonObject.engineEnabled(): Boolean = getValue("engine").jsonObject.getValue("enabled").jsonPrimitive.boolean
 
     /** The error codes and problems the method fixtures exercise between them. */
     private fun errorsShown(): Set<String> = (fixture(LIST_FIXTURE).cases() + fixture(GET_FIXTURE).cases())
