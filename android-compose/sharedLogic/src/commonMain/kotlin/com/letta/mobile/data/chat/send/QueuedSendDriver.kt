@@ -218,7 +218,7 @@ internal class QueuedSendDriver(
                 attempt = (retryCounts[conversationId] ?: 0) + 1
                 retryCounts[conversationId] = attempt
                 val drained = drainOnceLocked(conversationId)
-                if (!drained && attempt >= retry.attempts && backingOff.add(conversationId)) {
+                if (fellBackToBackoff(conversationId, drained, attempt)) {
                     report(QueueEvent.DrainDeferred, conversationId, attempts = attempt)
                 }
                 drained
@@ -227,10 +227,17 @@ internal class QueuedSendDriver(
         }
     }
 
+    private fun fellBackToBackoff(conversationId: QueueConversationId, drained: Boolean, attempt: Int): Boolean =
+        !drained && attempt >= retry.attempts && backingOff.add(conversationId)
+
+    private fun runnableHead(conversationId: QueueConversationId): QueuedChatSend? {
+        val waiting = queue.queueFor(conversationId)
+        return waiting.items.firstOrNull()?.takeUnless { waiting.paused || waiting.heldByOtherClient }
+    }
+
     /** True when the drain is finished (dispatched, or nothing runnable); false to retry. */
     private suspend fun drainOnceLocked(conversationId: QueueConversationId): Boolean {
-        val waiting = queue.queueFor(conversationId)
-        val next = waiting.items.firstOrNull()?.takeUnless { waiting.paused || waiting.heldByOtherClient } ?: return true
+        val next = runnableHead(conversationId) ?: return true
         if (turns.hasActiveTurn(conversationId)) return false
         // The queue owns presentation until dispatch has published the transcript row. Keeping
         // the head here also avoids a disappear/reappear pulse when the transport rejects a retry.
@@ -239,13 +246,17 @@ internal class QueuedSendDriver(
             false
         }
         if (!dispatched) return false
+        completeDispatch(conversationId, next)
+        return true
+    }
+
+    private fun completeDispatch(conversationId: QueueConversationId, next: QueuedChatSend) {
         queue.remove(next.id)
         val attempts = retryCounts.remove(conversationId)
         if (backingOff.remove(conversationId)) {
             report(QueueEvent.DrainRecovered, conversationId, next.id, attempts = attempts)
         }
         report(QueueEvent.Dispatched, conversationId, next.id)
-        return true
     }
 
     private fun report(

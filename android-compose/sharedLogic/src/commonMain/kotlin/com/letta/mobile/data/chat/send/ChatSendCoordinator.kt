@@ -428,7 +428,9 @@ class ChatSendCoordinator(
     }
 
     private suspend fun reserveAndAcceptSend(pending: QueuedChatSend, state: ConversationTurnState): Boolean? {
-        return try {
+        return acceptPendingSendOrReportFailure(pending, foreground,
+            isQueued = { queuedSends.queueFor(pending.conversationId).items.any { it.id == pending.id } },
+        ) {
             timelineRepository.acceptPendingSend(pending.pendingAttempt(agentId), pending.text, pending.attachments) {
                 state.acceptSend(
                     pending = pending,
@@ -447,23 +449,7 @@ class ChatSendCoordinator(
                     },
                 )
             }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: IllegalArgumentException) {
-            // Pending-store require checks (identity, row and byte budgets) cannot heal on retry.
-            rejectPendingSend(pending, failure)
-        } catch (failure: Exception) {
-            val queueOwnsSend = queuedSends.queueFor(pending.conversationId).items.any { it.id == pending.id }
-            if (pending.attempt > 0 || queueOwnsSend) throw failure
-            rejectPendingSend(pending, failure)
         }
-    }
-
-    private fun rejectPendingSend(pending: QueuedChatSend, failure: Exception): Boolean? {
-        Telemetry.error("AdminChatVM", "ws.send.pendingRejected", failure)
-        foreground.sendFailed(ConversationId(pending.conversationId.value),
-            "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
-        return null
     }
 
     private fun reportQueuedSend(pending: QueuedChatSend, position: Int) {
@@ -537,11 +523,13 @@ class ChatSendCoordinator(
         }
     }
 
+    private fun shouldSettleOldRun(state: ConversationTurnState): Boolean = state.otid != null || ui.isStreaming()
+
     private suspend fun handleSubscribeDone(event: WsTimelineEvent.SubscribeDone) {
         val status = BridgeTurnStatus.fromWire(event.status)
         // Settle the old run before readiness can admit a new send into that same state.
-        val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId))
-        val drained = if (state != null && (state.otid != null || ui.isStreaming())) {
+        val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId))?.takeIf(::shouldSettleOldRun)
+        val drained = if (state != null) {
             finishActiveTurn(state, TurnSettlementRequest(
                 WsTimelineEvent.TurnDone(state.turnId.orEmpty(), event.runId, status),
                 reason = "subscribeDone", recordEvent = false,
