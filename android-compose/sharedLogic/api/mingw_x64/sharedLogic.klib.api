@@ -400,6 +400,17 @@ final enum class com.letta.mobile.data.canvas.mount.client/CanvasMountDurability
     final fun values(): kotlin/Array<com.letta.mobile.data.canvas.mount.client/CanvasMountDurability> // com.letta.mobile.data.canvas.mount.client/CanvasMountDurability.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.canvas.mount.client/CanvasMountReach : kotlin/Enum<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> { // com.letta.mobile.data.canvas.mount.client/CanvasMountReach|null[0]
+    enum entry Device // com.letta.mobile.data.canvas.mount.client/CanvasMountReach.Device|null[0]
+    enum entry Host // com.letta.mobile.data.canvas.mount.client/CanvasMountReach.Host|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.mount.client/CanvasMountReach.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> // com.letta.mobile.data.canvas.mount.client/CanvasMountReach.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.mount.client/CanvasMountReach // com.letta.mobile.data.canvas.mount.client/CanvasMountReach.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> // com.letta.mobile.data.canvas.mount.client/CanvasMountReach.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.canvas.mount.client/CanvasMountSource : kotlin/Enum<com.letta.mobile.data.canvas.mount.client/CanvasMountSource> { // com.letta.mobile.data.canvas.mount.client/CanvasMountSource|null[0]
     enum entry Binding // com.letta.mobile.data.canvas.mount.client/CanvasMountSource.Binding|null[0]
     enum entry Default // com.letta.mobile.data.canvas.mount.client/CanvasMountSource.Default|null[0]
@@ -4721,6 +4732,8 @@ abstract interface com.letta.mobile.data.canvas.library/CanvasPage { // com.lett
 abstract interface com.letta.mobile.data.canvas.mount.client/CanvasMountClient { // com.letta.mobile.data.canvas.mount.client/CanvasMountClient|null[0]
     abstract val supported // com.letta.mobile.data.canvas.mount.client/CanvasMountClient.supported|{}supported[0]
         abstract fun <get-supported>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.canvas.mount.client/CanvasMountClient.supported.<get-supported>|<get-supported>(){}[0]
+    open val reach // com.letta.mobile.data.canvas.mount.client/CanvasMountClient.reach|{}reach[0]
+        open fun <get-reach>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> // com.letta.mobile.data.canvas.mount.client/CanvasMountClient.reach.<get-reach>|<get-reach>(){}[0]
 
     abstract fun changes(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.canvas.mount.client/CanvasMountClient.changes|changes(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
     abstract suspend fun mount(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas.mount.client/CanvasMountChange // com.letta.mobile.data.canvas.mount.client/CanvasMountClient.mount|mount(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget;com.letta.mobile.data.model.CanvasId){}[0]
@@ -30270,24 +30283,36 @@ final class com.letta.mobile.data.canvas.mount.client/CanvasModeFocus { // com.l
 
     final val current // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.current|{}current[0]
         final fun <get-current>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget?> // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.current.<get-current>|<get-current>(){}[0]
+    final val onScreen // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.onScreen|{}onScreen[0]
+        final fun <get-onScreen>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget?> // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.onScreen.<get-onScreen>|<get-onScreen>(){}[0]
 
     final fun enter(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget) // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.enter|enter(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+    final fun hide(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget) // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.hide|hide(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
     final fun leave(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget) // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.leave|leave(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+    final fun show(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget) // com.letta.mobile.data.canvas.mount.client/CanvasModeFocus.show|show(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
 }
 
 final class com.letta.mobile.data.canvas.mount.client/CanvasPickerState { // com.letta.mobile.data.canvas.mount.client/CanvasPickerState|null[0]
-    constructor <init>(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ...) // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.<init>|<init>(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?){}[0]
+    constructor <init>(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.mount.client/CanvasMountReach = ...) // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.<init>|<init>(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;com.letta.mobile.data.canvas.mount.client.CanvasMountReach){}[0]
 
+    final val canvasMode // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.canvasMode|{}canvasMode[0]
+        final fun <get-canvasMode>(): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.canvasMode.<get-canvasMode>|<get-canvasMode>(){}[0]
     final val mounted // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.mounted|{}mounted[0]
         final fun <get-mounted>(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.mounted.<get-mounted>|<get-mounted>(){}[0]
     final val mountsOnPick // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.mountsOnPick|{}mountsOnPick[0]
         final fun <get-mountsOnPick>(): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.mountsOnPick.<get-mountsOnPick>|<get-mountsOnPick>(){}[0]
+    final val onBoard // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.onBoard|{}onBoard[0]
+        final fun <get-onBoard>(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.onBoard.<get-onBoard>|<get-onBoard>(){}[0]
+    final val reach // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.reach|{}reach[0]
+        final fun <get-reach>(): com.letta.mobile.data.canvas.mount.client/CanvasMountReach // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.reach.<get-reach>|<get-reach>(){}[0]
     final val target // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.target|{}target[0]
         final fun <get-target>(): com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.target.<get-target>|<get-target>(){}[0]
 
     final fun component1(): com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component2|component2(){}[0]
-    final fun copy(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ...): com.letta.mobile.data.canvas.mount.client/CanvasPickerState // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.copy|copy(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.data.canvas.mount.client/CanvasMountReach // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.mount.client/CanvasMountReach = ...): com.letta.mobile.data.canvas.mount.client/CanvasPickerState // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.copy|copy(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;com.letta.mobile.data.canvas.mount.client.CanvasMountReach){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.toString|toString(){}[0]
@@ -30312,6 +30337,7 @@ final class com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker {
     final val state // com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.canvas.mount.client/CanvasPickerState> // com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker.state.<get-state>|<get-state>(){}[0]
 
+    final fun inCanvasMode(): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker.inCanvasMode|inCanvasMode(){}[0]
     final fun mountTarget(): com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? // com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker.mountTarget|mountTarget(){}[0]
     final suspend fun pick(com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas.mount.client/CanvasPick // com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker.pick|pick(com.letta.mobile.data.model.CanvasId){}[0]
     final suspend fun useOwnCanvas(): com.letta.mobile.data.canvas.mount.client/CanvasPick // com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker.useOwnCanvas|useOwnCanvas(){}[0]
@@ -30320,6 +30346,8 @@ final class com.letta.mobile.data.canvas.mount.client/ConversationCanvasPicker {
 final class com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver { // com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver|null[0]
     constructor <init>(com.letta.mobile.data.canvas.mount.client/CanvasMountClient) // com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver.<init>|<init>(com.letta.mobile.data.canvas.mount.client.CanvasMountClient){}[0]
 
+    final val reach // com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver.reach|{}reach[0]
+        final fun <get-reach>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> // com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver.reach.<get-reach>|<get-reach>(){}[0]
     final val supported // com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver.supported|{}supported[0]
         final fun <get-supported>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.canvas.mount.client/ConversationCanvasResolver.supported.<get-supported>|<get-supported>(){}[0]
 
@@ -30352,6 +30380,36 @@ final class com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget {
     final object Companion { // com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget.Companion|null[0]
         final fun of(com.letta.mobile.data.model/AgentId?, com.letta.mobile.data.model/ConversationId?): com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? // com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget.Companion.of|of(com.letta.mobile.data.model.AgentId?;com.letta.mobile.data.model.ConversationId?){}[0]
     }
+}
+
+final class com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient : com.letta.mobile.data.canvas.mount.client/CanvasMountClient { // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient|null[0]
+    constructor <init>() // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.<init>|<init>(){}[0]
+
+    final val reach // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.reach|{}reach[0]
+        final fun <get-reach>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.reach.<get-reach>|<get-reach>(){}[0]
+    final val supported // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.supported|{}supported[0]
+        final fun <get-supported>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.supported.<get-supported>|<get-supported>(){}[0]
+
+    final fun changes(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.changes|changes(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+    final suspend fun mount(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas.mount.client/CanvasMountChange // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.mount|mount(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget;com.letta.mobile.data.model.CanvasId){}[0]
+    final suspend fun resolve(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): com.letta.mobile.data.canvas.mount.client/CanvasMountLookup // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.resolve|resolve(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+    final suspend fun unmount(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): com.letta.mobile.data.canvas.mount.client/CanvasMountChange // com.letta.mobile.data.canvas.mount.client/DeviceCanvasMountClient.unmount|unmount(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+}
+
+final class com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient : com.letta.mobile.data.canvas.mount.client/CanvasMountClient { // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.mount.client/CanvasMountClient, com.letta.mobile.data.canvas.mount.client/CanvasMountClient = ...) // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.<init>|<init>(com.letta.mobile.data.canvas.mount.client.CanvasMountClient;com.letta.mobile.data.canvas.mount.client.CanvasMountClient){}[0]
+
+    final val active // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.active|{}active[0]
+        final fun <get-active>(): com.letta.mobile.data.canvas.mount.client/CanvasMountClient // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.active.<get-active>|<get-active>(){}[0]
+    final val reach // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.reach|{}reach[0]
+        final fun <get-reach>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.canvas.mount.client/CanvasMountReach> // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.reach.<get-reach>|<get-reach>(){}[0]
+    final val supported // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.supported|{}supported[0]
+        final fun <get-supported>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.supported.<get-supported>|<get-supported>(){}[0]
+
+    final fun changes(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.changes|changes(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+    final suspend fun mount(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.canvas.mount.client/CanvasMountChange // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.mount|mount(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget;com.letta.mobile.data.model.CanvasId){}[0]
+    final suspend fun resolve(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): com.letta.mobile.data.canvas.mount.client/CanvasMountLookup // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.resolve|resolve(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
+    final suspend fun unmount(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget): com.letta.mobile.data.canvas.mount.client/CanvasMountChange // com.letta.mobile.data.canvas.mount.client/DeviceFallbackCanvasMountClient.unmount|unmount(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget){}[0]
 }
 
 final class com.letta.mobile.data.canvas.notes/NotebookNoteSession { // com.letta.mobile.data.canvas.notes/NotebookNoteSession|null[0]

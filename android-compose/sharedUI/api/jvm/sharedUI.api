@@ -751,6 +751,7 @@ public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 }
 
 public final class com/letta/mobile/ui/canvas/mount/ConversationCanvasFrameKt {
+	public static final fun CloseCanvasPaneShownOnBoard (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ConversationCanvasFrame (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideConversationCanvasPicker (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasPicker;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalConversationCanvasPicker ()Landroidx/compose/runtime/ProvidableCompositionLocal;
@@ -760,8 +761,8 @@ public final class com/letta/mobile/ui/canvas/mount/PickerShellCanvasMounts : co
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasPicker;)V
 	public fun getState ()Lkotlinx/coroutines/flow/Flow;
-	public fun mountsOnPick ()Z
 	public fun pick (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun pickPlan ()Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
 	public fun useOwn (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -7642,8 +7643,8 @@ public final class com/letta/mobile/ui/shell/ShellRowMenus {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/ShellRowMenus;
 	public final fun agent (Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Lkotlin/jvm/functions/Function3;)Ljava/util/List;
 	public static synthetic fun agent$default (Lcom/letta/mobile/ui/shell/ShellRowMenus;Lcom/letta/mobile/ui/shell/rail/ShellRailEntry;Lcom/letta/mobile/ui/shell/rail/ShellAgentRailActions;Lkotlin/jvm/functions/Function3;ILjava/lang/Object;)Ljava/util/List;
-	public final fun canvas (ZLkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/components/LettaMenuItem;)Ljava/util/List;
-	public static synthetic fun canvas$default (Lcom/letta/mobile/ui/shell/ShellRowMenus;ZLkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/components/LettaMenuItem;ILjava/lang/Object;)Ljava/util/List;
+	public final fun canvas (ZLkotlin/jvm/functions/Function0;Ljava/util/List;)Ljava/util/List;
+	public static synthetic fun canvas$default (Lcom/letta/mobile/ui/shell/ShellRowMenus;ZLkotlin/jvm/functions/Function0;Ljava/util/List;ILjava/lang/Object;)Ljava/util/List;
 	public final fun conversation (ZZLcom/letta/mobile/ui/shell/ShellConversationMenuActions;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;)Ljava/util/List;
 	public static synthetic fun conversation$default (Lcom/letta/mobile/ui/shell/ShellRowMenus;ZZLcom/letta/mobile/ui/shell/ShellConversationMenuActions;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;ILjava/lang/Object;)Ljava/util/List;
 }
@@ -10233,27 +10234,22 @@ public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellC
 	public final fun getLambda$1504641410$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
-public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellPanelCanvasesKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellPanelCanvasesKt;
-	public fun <init> ()V
-	public final fun getLambda$-1190079206$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-}
-
 public final class com/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function1;
 	public final fun component10 ()Lkotlin/jvm/functions/Function2;
 	public final fun component11 ()Lkotlin/jvm/functions/Function2;
 	public final fun component12 ()Lkotlin/jvm/functions/Function2;
 	public final fun component13 ()Lkotlin/jvm/functions/Function1;
-	public final fun component14 ()Lkotlin/jvm/functions/Function2;
-	public final fun component15 ()Lkotlin/jvm/functions/Function0;
-	public final fun component16 ()Lkotlin/jvm/functions/Function1;
-	public final fun component17 ()Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;
-	public final fun component18 ()Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;
+	public final fun component14 ()Lkotlin/jvm/functions/Function1;
+	public final fun component15 ()Lkotlin/jvm/functions/Function2;
+	public final fun component16 ()Lkotlin/jvm/functions/Function0;
+	public final fun component17 ()Lkotlin/jvm/functions/Function1;
+	public final fun component18 ()Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;
+	public final fun component19 ()Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;
 	public final fun component2 ()Lkotlin/jvm/functions/Function0;
 	public final fun component3 ()Lkotlin/jvm/functions/Function0;
 	public final fun component4 ()Lkotlin/jvm/functions/Function0;
@@ -10262,8 +10258,8 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions {
 	public final fun component7 ()Lkotlin/jvm/functions/Function2;
 	public final fun component8 ()Lkotlin/jvm/functions/Function1;
 	public final fun component9 ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
-	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;
+	public final fun copy (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getChatOptions ()Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;
 	public final fun getConversationMarks ()Lcom/letta/mobile/ui/shell/sidebar/ShellConversationMarkActions;
@@ -10279,6 +10275,7 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions {
 	public final fun getOnNewCanvas ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnNewChat ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnOpenCanvas ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnOpenCanvasInPane ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnOpenSection ()Lkotlin/jvm/functions/Function1;
 	public final fun getOnOpenSettings ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnPinConversation ()Lkotlin/jvm/functions/Function2;
@@ -10356,23 +10353,27 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellArchivedChatsDialogKt 
 public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasMountState {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (ZLcom/letta/mobile/data/model/CanvasId;)V
-	public synthetic fun <init> (ZLcom/letta/mobile/data/model/CanvasId;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Lcom/letta/mobile/data/model/CanvasId;
-	public final fun copy (ZLcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;ZLcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/Set;
+	public final fun copy (ZLcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;ZLcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDeviceOnly ()Z
 	public final fun getMounted ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun getMountsOnPick ()Z
+	public final fun getNotForPane ()Ljava/util/Set;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/letta/mobile/ui/shell/sidebar/ShellCanvasMounts {
 	public abstract fun getState ()Lkotlinx/coroutines/flow/Flow;
-	public abstract fun mountsOnPick ()Z
 	public abstract fun pick (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun pickPlan ()Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
 	public abstract fun useOwn (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -10392,6 +10393,15 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasPickOutcome : ja
 	public static fun values ()[Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickOutcome;
 }
 
+public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan : java/lang/Enum {
+	public static final field Mount Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
+	public static final field Open Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
+	public static final field OpenAndMount Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
+	public static fun values ()[Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
+}
+
 public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasRowActions {
 	public static final field $stable I
 	public fun <init> ()V
@@ -10403,20 +10413,22 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasRowActions {
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZ)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZZ)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Z
 	public final fun component5 ()Z
 	public final fun component6 ()Z
-	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZ)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel;
+	public final fun component7 ()Z
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZZ)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Ljava/lang/String;ZZZZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasRowModel;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArchived ()Z
 	public final fun getId ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun getMounted ()Z
+	public final fun getMountedHereOnly ()Z
 	public final fun getSelected ()Z
 	public final fun getTimeLabel ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
