@@ -70,11 +70,9 @@ class IrohPairingService(
 
     fun createInvite(request: InviteRequest): PairingInvite {
         val unknown = request.capabilities - IrohPeerCapabilities.ALL
-        require(unknown.isEmpty()) { "unknown capabilities: ${unknown.sorted().joinToString(",")}" }
-        require(request.capabilities.isNotEmpty()) { "an invite must grant at least one capability" }
-        require(request.agentIds == null || request.agentIds.isNotEmpty()) {
-            "agent_ids must name at least one agent (omit it for every agent)"
-        }
+        if (unknown.isNotEmpty()) adminError("unknown capabilities: ${unknown.sorted().joinToString(",")}")
+        if (request.capabilities.isEmpty()) adminError("an invite must grant at least one capability")
+        if (request.agentIds?.isEmpty() == true) adminError("agent_ids must name at least one agent (omit it for every agent)")
         val secret = ByteArray(SECRET_BYTES).also(random::nextBytes)
             .joinToString("") { "%02x".format(it) }
         val createdAt = nowMs()

@@ -83,6 +83,9 @@ enum class ShellLayoutEditRule(val code: String) {
     /** The transcript or input would leave the chat lane. */
     CHAT_READ_SEND_STAYS("chat_read_send_stays"),
 
+    /** The view is mounted by the shell itself (the pending secret request card); no edit may place, move or remove it. */
+    HOST_OWNED_VIEW("host_owned_view"),
+
     /** The slot is already in this lane, or in the other of main and side. */
     DUPLICATE_SLOT("duplicate_slot"),
 

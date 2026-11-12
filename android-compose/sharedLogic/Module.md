@@ -535,6 +535,10 @@ Message-search query/match models and text helpers. Search mode and source avail
 
 Agent secret sources and vault state/controller logic. Secret values have redacted representations; explicit source operations access plaintext rather than exposing it through normal state formatting. Keep secret values out of ordinary display formatting and logs; provide guarded reads through [AgentSecretsSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets/-agent-secrets-source/index.html) and mutations through [AgentVaultActions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets/-agent-vault-actions/index.html).
 
+# Package com.letta.mobile.data.secrets.client
+
+Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; no implementation here talks to a host. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
+
 # Package com.letta.mobile.data.secrets.host
 
 Host side of the secure secret-input flow: agents create requests, the human answers them from a dedicated surface, and the host writes the value to a keystore provider and returns only a receipt. The value travels only inside the keystore secret type and is wiped on every path; single use, expiry and the human-only principal are enforced by [SecretRequestService](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.host/-secret-request-service/index.html), which is host-only (JVM) because the keystore SPI is.
@@ -794,6 +798,10 @@ Wrapper-owned producer run records and leases, independent of upstream cron stor
 # Package com.letta.mobile.data.controller.node.iroh.beads
 
 Bounded Beads admin RPC adapter for the wrapper, with upstream credentials held on the host.
+
+# Package com.letta.mobile.data.controller.node.iroh.errors
+
+The one exception type whose message the admin RPC router returns to a remote client. Handlers raise it for deliberate, safe refusals built from the caller's own request; every other exception answers a fixed internal-error text so host paths and state never cross the wire. This leaf package imports nothing from the handlers or the router.
 
 # Package com.letta.mobile.data.schedules.leases
 

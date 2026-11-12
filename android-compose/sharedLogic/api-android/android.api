@@ -48650,6 +48650,322 @@ public final class com/letta/mobile/data/secrets/VaultAgent {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/secrets/client/SecretBuffer {
+	public static final field Companion Lcom/letta/mobile/data/secrets/client/SecretBuffer$Companion;
+	public static final field MAX_CHARS I
+	public static final field REDACTED Ljava/lang/String;
+	public fun <init> ()V
+	public final fun getLength ()I
+	public final fun isEmpty ()Z
+	public final fun replace (Lkotlin/ranges/IntRange;Ljava/lang/CharSequence;)Z
+	public final fun revealChars (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun takeSecretInput ()Lcom/letta/mobile/data/secrets/client/SecretInput;
+	public fun toString ()Ljava/lang/String;
+	public final fun wipe ()V
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretBuffer$Companion {
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretClientOutcome {
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretClientOutcome$Refused : com/letta/mobile/data/secrets/client/SecretClientOutcome {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;)Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Refused;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Refused;Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRefusal ()Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretClientOutcome$Settled : com/letta/mobile/data/secrets/client/SecretClientOutcome {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Settled;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Settled;Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Settled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReceipt ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretClientOutcome$Unreachable : com/letta/mobile/data/secrets/client/SecretClientOutcome {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretClientOutcome$Unreachable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormController {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Lcom/letta/mobile/data/secrets/client/SecretRequestClient;Lkotlinx/coroutines/CoroutineScope;Lkotlin/time/Clock;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Lcom/letta/mobile/data/secrets/client/SecretRequestClient;Lkotlinx/coroutines/CoroutineScope;Lkotlin/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun decline ()V
+	public final fun dispose ()V
+	public final fun edit (Lkotlin/ranges/IntRange;Ljava/lang/CharSequence;)Z
+	public final fun expire ()V
+	public final fun getDetails ()Lcom/letta/mobile/data/secrets/request/SecretRequestDetails;
+	public final fun getRequestId-y8m6XLE ()Ljava/lang/String;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getSurfaceCapabilities ()Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;
+	public final fun getTarget ()Lcom/letta/mobile/data/secrets/request/SecretRequestTarget;
+	public final fun open ()V
+	public final fun retry ()V
+	public final fun reveal (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun submit ()Z
+	public final fun surfaceShown (Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretFormEvent {
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Answered : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public fun <init> (Lcom/letta/mobile/data/secrets/client/SecretClientOutcome;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/client/SecretClientOutcome;
+	public final fun copy (Lcom/letta/mobile/data/secrets/client/SecretClientOutcome;)Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Answered;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Answered;Lcom/letta/mobile/data/secrets/client/SecretClientOutcome;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Answered;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutcome ()Lcom/letta/mobile/data/secrets/client/SecretClientOutcome;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Decline : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Decline;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Expire : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Expire;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Input : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public fun <init> (Lcom/letta/mobile/data/secrets/client/SecretInputPresence;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public final fun copy (Lcom/letta/mobile/data/secrets/client/SecretInputPresence;)Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Input;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Input;Lcom/letta/mobile/data/secrets/client/SecretInputPresence;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Input;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInput ()Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Open : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Open;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Retry : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Retry;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormEvent$Submit : com/letta/mobile/data/secrets/client/SecretFormEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormEvent$Submit;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretFormFailure {
+	public abstract fun getRetryable ()Z
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormFailure$Refused : com/letta/mobile/data/secrets/client/SecretFormFailure {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretServiceError;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretServiceError;)Lcom/letta/mobile/data/secrets/client/SecretFormFailure$Refused;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormFailure$Refused;Lcom/letta/mobile/data/secrets/request/SecretServiceError;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormFailure$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public fun getRetryable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormFailure$Unreachable : com/letta/mobile/data/secrets/client/SecretFormFailure {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormFailure$Unreachable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getRetryable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormFailure$WriteFailed : com/letta/mobile/data/secrets/client/SecretFormFailure {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretFailureReason;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretFailureReason;)Lcom/letta/mobile/data/secrets/client/SecretFormFailure$WriteFailed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormFailure$WriteFailed;Lcom/letta/mobile/data/secrets/request/SecretFailureReason;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormFailure$WriteFailed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/letta/mobile/data/secrets/request/SecretFailureReason;
+	public fun getRetryable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormMachine {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormMachine;
+	public final fun canSubmit (Lcom/letta/mobile/data/secrets/client/SecretFormState;)Z
+	public final fun isAnswerable (Lcom/letta/mobile/data/secrets/client/SecretFormState;)Z
+	public final fun isFinal (Lcom/letta/mobile/data/secrets/client/SecretFormState;)Z
+	public final fun next (Lcom/letta/mobile/data/secrets/client/SecretFormState;Lcom/letta/mobile/data/secrets/client/SecretFormEvent;)Lcom/letta/mobile/data/secrets/client/SecretFormState;
+	public final fun outcomeState (Lcom/letta/mobile/data/secrets/client/SecretClientOutcome;)Lcom/letta/mobile/data/secrets/client/SecretFormState;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretFormState {
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Declined : com/letta/mobile/data/secrets/client/SecretFormState {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormState$Declined;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Done : com/letta/mobile/data/secrets/client/SecretFormState {
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;)Lcom/letta/mobile/data/secrets/client/SecretFormState$Done;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormState$Done;Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormState$Done;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReceipt ()Lcom/letta/mobile/data/secrets/request/SecretRequestReceipt;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Editing : com/letta/mobile/data/secrets/client/SecretFormState {
+	public fun <init> (Lcom/letta/mobile/data/secrets/client/SecretInputPresence;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public final fun copy (Lcom/letta/mobile/data/secrets/client/SecretInputPresence;)Lcom/letta/mobile/data/secrets/client/SecretFormState$Editing;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormState$Editing;Lcom/letta/mobile/data/secrets/client/SecretInputPresence;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormState$Editing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInput ()Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Expired : com/letta/mobile/data/secrets/client/SecretFormState {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormState$Expired;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Failed : com/letta/mobile/data/secrets/client/SecretFormState {
+	public fun <init> (Lcom/letta/mobile/data/secrets/client/SecretFormFailure;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/client/SecretFormFailure;
+	public final fun copy (Lcom/letta/mobile/data/secrets/client/SecretFormFailure;)Lcom/letta/mobile/data/secrets/client/SecretFormState$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecretFormState$Failed;Lcom/letta/mobile/data/secrets/client/SecretFormFailure;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretFormState$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailure ()Lcom/letta/mobile/data/secrets/client/SecretFormFailure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Idle : com/letta/mobile/data/secrets/client/SecretFormState {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormState$Idle;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretFormState$Submitting : com/letta/mobile/data/secrets/client/SecretFormState {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretFormState$Submitting;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretInput {
+	public static final field Companion Lcom/letta/mobile/data/secrets/client/SecretInput$Companion;
+	public static final field REDACTED Ljava/lang/String;
+	public final fun isEmpty ()Z
+	public final fun isWiped ()Z
+	public final fun revealSecretBytes (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+	public final fun wipe ()V
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretInput$Companion {
+	public final fun ofBytes ([B)Lcom/letta/mobile/data/secrets/client/SecretInput;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretInputPresence : java/lang/Enum {
+	public static final field EMPTY Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public static final field ENTERED Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/client/SecretInputPresence;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretRequestClient {
+	public abstract fun decline-8eGxqyg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun pending (Lcom/letta/mobile/data/secrets/client/SecretRequestScope;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun submit-7DbFAfA (Ljava/lang/String;Lcom/letta/mobile/data/secrets/client/SecretInput;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretRequestScope {
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretRequestScope$Agent : com/letta/mobile/data/secrets/client/SecretRequestScope {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun copy-qkT7gGE (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/client/SecretRequestScope$Agent;
+	public static synthetic fun copy-qkT7gGE$default (Lcom/letta/mobile/data/secrets/client/SecretRequestScope$Agent;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecretRequestScope$Agent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgent-zqmzO_A ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecretRequestScope$Everyone : com/letta/mobile/data/secrets/client/SecretRequestScope {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/client/SecretRequestScope$Everyone;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecureProtection : java/lang/Enum {
+	public static final field AUTOFILL_EXCLUDED Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static final field IME_LEARNING_DISABLED Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static final field MASKED_FIELD_STATE Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static final field PASSWORD_KEYBOARD Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static final field SCREEN_CAPTURE_BLOCKED Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static final field SENSITIVE_CONTENT Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/client/SecureProtection;
+	public static fun values ()[Lcom/letta/mobile/data/secrets/client/SecureProtection;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecureSurfaceCapabilities {
+	public static final field Companion Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities$Companion;
+	public fun <init> (Ljava/util/Set;)V
+	public final fun component1 ()Ljava/util/Set;
+	public final fun contains (Lcom/letta/mobile/data/secrets/client/SecureProtection;)Z
+	public final fun copy (Ljava/util/Set;)Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActive ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/secrets/client/SecureSurfaceCapabilities$Companion {
+	public final fun getSharedOnly ()Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;
+}
+
 public final class com/letta/mobile/data/secrets/journal/FileSecretRequestJournal : com/letta/mobile/data/secrets/journal/SecretRequestJournal {
 	public static final field Companion Lcom/letta/mobile/data/secrets/journal/FileSecretRequestJournal$Companion;
 	public static final field MAX_JOURNAL_BYTES I
@@ -51017,8 +51333,10 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Com
 public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellViews;
 	public final fun getCANVAS-p0dNODo ()Ljava/lang/String;
+	public final fun getHostOwned ()Ljava/util/Set;
 	public final fun getNOTE-p0dNODo ()Ljava/lang/String;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
+	public final fun getSECRET_REQUEST-p0dNODo ()Ljava/lang/String;
 	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
 	public final fun getTASKS-p0dNODo ()Ljava/lang/String;
 }
@@ -51173,6 +51491,7 @@ public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule :
 	public static final field CHAT_READ_SEND_STAYS Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field DUPLICATE_SLOT Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field HOME_STAYS Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
+	public static final field HOST_OWNED_VIEW Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field INDEX_OUT_OF_RANGE Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field LANE_FULL Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;
 	public static final field MALFORMED Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditRule;

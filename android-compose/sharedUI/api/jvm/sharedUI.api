@@ -6702,6 +6702,151 @@ public final class com/letta/mobile/ui/search/LettaSearchTriggerStyle : java/lan
 	public static fun values ()[Lcom/letta/mobile/ui/search/LettaSearchTriggerStyle;
 }
 
+public final class com/letta/mobile/ui/secrets/ComposableSingletons$SecretRequestCardKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/ComposableSingletons$SecretRequestCardKt;
+	public fun <init> ()V
+	public final fun getLambda$1502829312$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/secrets/ComposableSingletons$SecretRequestFormKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/ComposableSingletons$SecretRequestFormKt;
+	public fun <init> ()V
+	public final fun getLambda$-1237110951$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1781545313$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1965284024$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-720354659$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$844800407$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public abstract interface class com/letta/mobile/ui/secrets/LedgerRelease {
+}
+
+public final class com/letta/mobile/ui/secrets/LedgerRelease$NotHeld : com/letta/mobile/ui/secrets/LedgerRelease {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/LedgerRelease$NotHeld;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/LedgerRelease$Restore : com/letta/mobile/ui/secrets/LedgerRelease {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/Object;)V
+	public final fun component1 ()Ljava/lang/Object;
+	public final fun copy (Ljava/lang/Object;)Lcom/letta/mobile/ui/secrets/LedgerRelease$Restore;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/secrets/LedgerRelease$Restore;Ljava/lang/Object;ILjava/lang/Object;)Lcom/letta/mobile/ui/secrets/LedgerRelease$Restore;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPrevious ()Ljava/lang/Object;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/LedgerRelease$StillHeld : com/letta/mobile/ui/secrets/LedgerRelease {
+	public static final field $stable I
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/LedgerRelease$StillHeld;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/RestoreLedger {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun acquire (Ljava/lang/Object;Ljava/lang/Object;)Z
+	public final fun getSize ()I
+	public final fun release (Ljava/lang/Object;)Lcom/letta/mobile/ui/secrets/LedgerRelease;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestCardKt {
+	public static final fun SecretRequestCard (Lcom/letta/mobile/ui/secrets/SecretRequestCardModel;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestCardModel {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Ljava/lang/String;II)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Ljava/lang/String;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun copy (Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Ljava/lang/String;II)Lcom/letta/mobile/ui/secrets/SecretRequestCardModel;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/secrets/SecretRequestCardModel;Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;Ljava/lang/String;IIILjava/lang/Object;)Lcom/letta/mobile/ui/secrets/SecretRequestCardModel;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentLabel ()Ljava/lang/String;
+	public final fun getMinutesLeft ()I
+	public final fun getOthersWaiting ()I
+	public final fun getRequest ()Lcom/letta/mobile/data/secrets/request/SecretRequestRecord;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestCardTags {
+	public static final field $stable I
+	public static final field CARD Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/SecretRequestCardTags;
+	public static final field OPEN Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestFormKt {
+	public static final field SECRET_MASK_CHAR C
+	public static final fun SecretRequestForm (Lcom/letta/mobile/data/secrets/client/SecretFormController;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestFormTags {
+	public static final field $stable I
+	public static final field CLOSE Ljava/lang/String;
+	public static final field DECLINE Ljava/lang/String;
+	public static final field FIELD Ljava/lang/String;
+	public static final field FORM Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/SecretRequestFormTags;
+	public static final field MESSAGE Ljava/lang/String;
+	public static final field RETRY Ljava/lang/String;
+	public static final field REVEAL Ljava/lang/String;
+	public static final field SUBMIT Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestHost {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/secrets/client/SecretRequestClient;Lkotlin/jvm/functions/Function1;Lkotlin/time/Clock;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/client/SecretRequestClient;Lkotlin/jvm/functions/Function1;Lkotlin/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAgentName ()Lkotlin/jvm/functions/Function1;
+	public final fun getClient ()Lcom/letta/mobile/data/secrets/client/SecretRequestClient;
+	public final fun getClock ()Lkotlin/time/Clock;
+	public final fun labelOf-qkT7gGE (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestModuleKt {
+	public static final fun ProvideSecretRequestHost (Lcom/letta/mobile/ui/secrets/SecretRequestHost;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun SecretRequestModule (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)V
+	public static final fun SecretRequestMount (Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalSecretRequestHost ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalSecretRequestPanel ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestModuleTags {
+	public static final field $stable I
+	public static final field FORM_PANE Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/secrets/SecretRequestModuleTags;
+}
+
+public final class com/letta/mobile/ui/secrets/SecretRequestPanel {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Lcom/letta/mobile/ui/secrets/SecretRequestHost;Lkotlin/jvm/functions/Function1;)V
+	public final fun getHost ()Lcom/letta/mobile/ui/secrets/SecretRequestHost;
+	public final fun getOpen ()Lkotlin/jvm/functions/Function1;
+	public final fun getPending ()Ljava/util/List;
+}
+
+public abstract interface class com/letta/mobile/ui/secrets/SecureSurface {
+	public abstract fun enter ()Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;
+	public abstract fun exit ()V
+}
+
+public final class com/letta/mobile/ui/secrets/SecureSurface_jvmKt {
+	public static final fun SecureSurfaceEffect (Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/secrets/client/SecureSurfaceCapabilities;
+	public static final fun SecureTextInput (Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+}
+
 public final class com/letta/mobile/ui/settings/ActionButton {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;ZZ)V
@@ -10486,6 +10631,7 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 	public fun <init> ()V
 	public final fun getLambda$-301314359$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 	public final fun getLambda$1573032$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$607347814$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {

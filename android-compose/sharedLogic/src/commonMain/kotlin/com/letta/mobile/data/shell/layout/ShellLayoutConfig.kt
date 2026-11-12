@@ -72,6 +72,17 @@ object ShellViews {
      * that cannot list tasks shows it as unavailable. Not part of the default layout.
      */
     val TASKS = RuntimeViewId("shell.tasks")
+
+    /**
+     * The pending secret request card: an agent asks for a secret and the person answers it in the
+     * secure form this card opens. The shell mounts it itself, in a reserved place above the main
+     * lane and only while a request is pending, so no layout (the person's or an agent's) places,
+     * moves, removes or covers it: it is in [HostOwned], and a config naming it is ignored there.
+     */
+    val SECRET_REQUEST = RuntimeViewId("shell.secret-request")
+
+    /** Views only the shell mounts: a layout never holds them, and an edit naming one is refused. */
+    val HostOwned: Set<RuntimeViewId> = setOf(SECRET_REQUEST)
 }
 
 /**
@@ -87,8 +98,8 @@ data class ShellLayoutConfig(
     val version: Int = 0,
     val lanes: Map<String, List<ModuleSlot>> = emptyMap(),
 ) {
-    /** The lane's modules, each one once. */
-    fun lane(id: String): List<ModuleSlot> = lanes[id].orEmpty().distinct()
+    /** The lane's modules, each one once, without any view only the shell mounts ([ShellViews.HostOwned]). */
+    fun lane(id: String): List<ModuleSlot> = lanes[id].orEmpty().distinct().filterNot { it.view in ShellViews.HostOwned }
 
     /** The main lane always shows something: the page is the shell's recovery path, so an emptied lane gets it back. */
     fun mainLane(): List<ModuleSlot> = lane(ShellLanes.MAIN).ifEmpty { Default.lane(ShellLanes.MAIN) }

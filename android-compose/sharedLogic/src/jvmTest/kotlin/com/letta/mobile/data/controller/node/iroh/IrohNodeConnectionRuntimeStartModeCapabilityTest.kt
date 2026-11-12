@@ -103,7 +103,7 @@ class IrohNodeConnectionRuntimeStartModeCapabilityTest {
         val response = harness.messageList(conversationId = "convB")
 
         assertEquals("false", response.string("success"))
-        assertEquals("native message list failed", response.string("error"))
+        assertEquals(ADMIN_RPC_INTERNAL_ERROR, response.string("error"))
         assertEquals("convA", harness.currentViewerConversation)
         assertEquals(1, harness.viewersForConversation("convA").size)
         assertTrue(harness.viewersForConversation("convB").isEmpty(), "failed hydration must roll back its viewer")

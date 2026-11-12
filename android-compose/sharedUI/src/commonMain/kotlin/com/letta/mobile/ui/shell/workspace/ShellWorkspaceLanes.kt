@@ -1,10 +1,12 @@
 package com.letta.mobile.ui.shell.workspace
 
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.VerticalDivider
@@ -24,6 +26,8 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.layout.ModuleSlot
 import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.ui.host.InspectorFrame
+import com.letta.mobile.ui.secrets.SecretRequestModule
+import com.letta.mobile.ui.secrets.SecretRequestMount
 import com.letta.mobile.ui.host.InspectorHost
 import com.letta.mobile.ui.shell.modules.ShellModuleSlot
 import com.letta.mobile.ui.shell.modules.ShellModuleView
@@ -40,7 +44,8 @@ internal val LocalShellModules = staticCompositionLocalOf { ShellModules() }
  * The shell's lanes beside the navigation, drawn from the layout in [state]: the main lane inside
  * the inspector frame, then the side lane. With the default config that is the page followed by
  * the host's side pane. A tasks module lists the background tasks of the conversation the
- * navigation has open.
+ * navigation has open. While a secret request is pending, the shell's own secret request card sits
+ * above the main lane, outside every layout ([ShellViews.HostOwned]).
  *
  * A window shows as many main modules side by side as it has room for and a compact one shows one;
  * side modules other than the host's own pane are left out of a compact window.
@@ -62,13 +67,17 @@ internal fun RowScope.ShellWorkspaceLanes(
         { index, modifier -> ShellModuleSlot(chat[index], views, modifier) }
     }
     InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val room = if (compact) 1 else (maxWidth / LettaDimens.Pane.sidePanelWidth).toInt()
-            CompositionLocalProvider(
-                LocalChatLane provides chatLane,
-                LocalChatModuleContent provides chatContent,
-            ) {
-                MainLane(config.mainLane(room), views)
+        Column(Modifier.fillMaxSize()) {
+            // Reserved for the shell: no layout holds this view, so no edit can move, remove or cover it.
+            SecretRequestMount { modifier -> ShellModuleSlot(SecretRequestSlot, views, modifier) }
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val room = if (compact) 1 else (maxWidth / LettaDimens.Pane.sidePanelWidth).toInt()
+                CompositionLocalProvider(
+                    LocalChatLane provides chatLane,
+                    LocalChatModuleContent provides chatContent,
+                ) {
+                    MainLane(config.mainLane(room), views)
+                }
             }
         }
     }
@@ -87,6 +96,9 @@ internal fun RowScope.ShellWorkspaceLanes(
     }
 }
 
+/** The pending secret request card's slot: mounted by the shell above the main lane, never by a layout. */
+private val SecretRequestSlot = ModuleSlot(ShellViews.SECRET_REQUEST)
+
 /** The main lane's modules sharing its width; one module takes all of it. */
 @Composable
 private fun MainLane(slots: List<ModuleSlot>, views: Map<RuntimeViewId, ShellModuleView>) {
@@ -99,8 +111,8 @@ private fun MainLane(slots: List<ModuleSlot>, views: Map<RuntimeViewId, ShellMod
 }
 
 /**
- * The added views with the shell's own bound over them: the page, the side pane, a canvas board and
- * the tasks of the [openConversation] are never replaced.
+ * The added views with the shell's own bound over them: the page, the side pane, a canvas board,
+ * the tasks of the [openConversation] and the pending secret request card are never replaced.
  */
 private fun LettaShellWorkspaceHost.moduleViews(
     modules: ShellModules,
@@ -111,4 +123,5 @@ private fun LettaShellWorkspaceHost.moduleViews(
     ShellViews.CANVAS to { slot, modifier -> ShellCanvasModule(slot.objectRef?.takeIf { it.isNotBlank() }?.let(::CanvasId), modifier) },
     ShellViews.NOTE to { slot, modifier -> ShellNoteModule(slot.objectRef?.takeIf { it.isNotBlank() }?.let(::CanvasId), modifier) },
     ShellViews.TASKS to { _, modifier -> ShellTasksModule(openConversation(), modifier) },
+    ShellViews.SECRET_REQUEST to { _, modifier -> SecretRequestModule(modifier) },
 )

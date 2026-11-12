@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.records
 
+import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import java.time.Instant
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -18,9 +19,9 @@ private const val FUTURE_DAYS = 366L
 private val latestQueryInstant = Instant.parse("2100-01-01T00:00:00Z").toEpochMilli()
 private val earliestInstant = Instant.parse("2000-01-01T00:00:00Z").toEpochMilli()
 
-internal fun String.invalid(): Nothing = throw IllegalArgumentException("validation.invalid_params: $this")
-internal fun String.conflict(): Nothing = throw IllegalArgumentException("validation.conflict: $this")
-internal fun String.capacity(): Nothing = error("storage.capacity: $this")
+internal fun String.invalid(): Nothing = throw AdminRpcClientError("validation.invalid_params: $this")
+internal fun String.conflict(): Nothing = throw AdminRpcClientError("validation.conflict: $this")
+internal fun String.capacity(): Nothing = throw AdminRpcClientError("storage.capacity: $this")
 
 internal data class TextField(val name: String, val maxLength: Int, val optional: Boolean = false)
 

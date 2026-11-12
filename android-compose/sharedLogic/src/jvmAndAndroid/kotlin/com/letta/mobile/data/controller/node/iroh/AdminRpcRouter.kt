@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.node.iroh.errors.AdminRpcClientError
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -13,9 +14,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * Throws an IllegalArgumentException so the router's catch path returns success:false.
+ * Refuses the call with [message] for the remote client: the router's catch path returns
+ * success:false carrying [message]. Use it only for safe, deliberate text; any other exception
+ * a handler lets escape answers [ADMIN_RPC_INTERNAL_ERROR] instead.
  */
-fun adminError(message: String): Nothing = throw IllegalArgumentException(message)
+fun adminError(message: String): Nothing = throw AdminRpcClientError(message)
+
+/** The fixed failure text for every handler exception that is not a deliberate client refusal. */
+internal const val ADMIN_RPC_INTERNAL_ERROR = "Internal error"
 
 /**
  * Routes incoming admin RPC calls to registered handler functions.
@@ -166,14 +172,20 @@ class AdminRpcRouter(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
-            Telemetry.event(
-                "AdminRpc",
-                "handler.error",
-                "method" attr invocation.method,
-                "error" attr (e.message ?: ""),
-            )
-            encodeFailure(invocation.requestId, e.message ?: "Internal error")
+            reportHandlerError(invocation.method, e)
+            encodeFailure(invocation.requestId, clientFacingMessage(e))
         }
+    }
+
+    /** Records a failed handler by exception class and category only: never its message, a path or an id. */
+    private fun reportHandlerError(method: String, error: Exception) {
+        Telemetry.event(
+            "AdminRpc",
+            "handler.error",
+            "method" attr method,
+            "class" attr error::class.simpleName,
+            "category" attr if (error is AdminRpcClientError) "client_refusal" else "internal",
+        )
     }
 
     private fun encodeFailure(requestId: String, message: String): String =
@@ -187,6 +199,14 @@ class AdminRpcRouter(
             },
         )
 }
+
+/**
+ * The failure text a remote client may see for [error]: the message of a deliberate
+ * [AdminRpcClientError], else [ADMIN_RPC_INTERNAL_ERROR]. Exception messages of any other type can
+ * carry host paths or internal state, so they never cross the wire.
+ */
+internal fun clientFacingMessage(error: Exception): String =
+    (error as? AdminRpcClientError)?.message ?: ADMIN_RPC_INTERNAL_ERROR
 
 /** Whether a router response is a failure envelope that must roll observer state back. */
 internal fun isAdminRpcFailureEnvelope(response: String): Boolean =
