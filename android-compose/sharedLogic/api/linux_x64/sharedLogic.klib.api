@@ -7910,13 +7910,16 @@ sealed interface com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen { 
 
 sealed interface com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing|null[0]
     final class Listed : com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed|null[0]
-        constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote>) // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.workspace.SharedNote>){}[0]
+        constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote>, kotlin/Boolean = ...) // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.workspace.SharedNote>;kotlin.Boolean){}[0]
 
         final val notes // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.notes|{}notes[0]
             final fun <get-notes>(): kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.notes.<get-notes>|<get-notes>(){}[0]
+        final val truncated // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.truncated|{}truncated[0]
+            final fun <get-truncated>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.truncated.<get-truncated>|<get-truncated>(){}[0]
 
         final fun component1(): kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.component1|component1(){}[0]
-        final fun copy(kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> = ...): com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.copy|copy(kotlin.collections.List<com.letta.mobile.data.canvas.workspace.SharedNote>){}[0]
+        final fun component2(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.component2|component2(){}[0]
+        final fun copy(kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> = ..., kotlin/Boolean = ...): com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.copy|copy(kotlin.collections.List<com.letta.mobile.data.canvas.workspace.SharedNote>;kotlin.Boolean){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.toString|toString(){}[0]
@@ -72716,6 +72719,8 @@ final object com.letta.mobile.data.canvas.authority/NotebookAccessWire { // com.
 final object com.letta.mobile.data.canvas.authority/SharedNotesWire { // com.letta.mobile.data.canvas.authority/SharedNotesWire|null[0]
     final const val LIST // com.letta.mobile.data.canvas.authority/SharedNotesWire.LIST|{}LIST[0]
         final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.LIST.<get-LIST>|<get-LIST>(){}[0]
+    final const val MAX_CHECKED // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CHECKED|{}MAX_CHECKED[0]
+        final fun <get-MAX_CHECKED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CHECKED.<get-MAX_CHECKED>|<get-MAX_CHECKED>(){}[0]
     final const val MAX_LISTED // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED|{}MAX_LISTED[0]
         final fun <get-MAX_LISTED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED.<get-MAX_LISTED>|<get-MAX_LISTED>(){}[0]
 
@@ -75653,7 +75658,7 @@ final object com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement { // c
     final val SLOT // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.SLOT|{}SLOT[0]
         final fun <get-SLOT>(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.SLOT.<get-SLOT>|<get-SLOT>(){}[0]
 
-    final fun inSideLane(com.letta.mobile.data.shell.layout/ShellLayoutConfig): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.inSideLane|inSideLane(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    final fun overCompactPage(com.letta.mobile.data.shell.layout/ShellLayoutConfig): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.overCompactPage|overCompactPage(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
     final fun shown(com.letta.mobile.data.shell.layout/ShellLayoutConfig): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.shown|shown(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
     final fun toggled(com.letta.mobile.data.shell.layout/ShellLayoutConfig): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.toggled|toggled(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
 }

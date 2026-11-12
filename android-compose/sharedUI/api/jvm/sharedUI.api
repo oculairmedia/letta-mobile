@@ -10865,6 +10865,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellConversationTabs {
 
 public final class com/letta/mobile/ui/shell/workspace/ShellDocumentModuleKt {
 	public static final fun ProvideShellSharedNotes (Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalSharedNotebooks ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalShellSharedNotes ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
@@ -10879,6 +10880,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellDocumentTags {
 	public static final field LOADING Ljava/lang/String;
 	public static final field MODULE Ljava/lang/String;
 	public static final field OPEN_PROBLEM Ljava/lang/String;
+	public static final field TRUNCATED Ljava/lang/String;
 	public static final field UNAVAILABLE Ljava/lang/String;
 	public static final field WITHDRAWN Ljava/lang/String;
 	public final fun row (Lcom/letta/mobile/data/canvas/workspace/SharedNote;)Ljava/lang/String;
@@ -11064,17 +11066,19 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderTags 
 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZ)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZLcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZLcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
 	public final fun component2 ()Z
 	public final fun component3 ()Z
 	public final fun component4 ()Z
-	public final fun copy (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZ)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
+	public final fun component5 ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
+	public final fun copy (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZLcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;ZZZLcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceLayout;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getForceCompact ()Z
 	public final fun getLanes ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;
+	public final fun getLanesStore ()Lcom/letta/mobile/data/shell/layout/ShellLayoutConfigStore;
 	public final fun getReducedMotion ()Z
 	public final fun getSidebarVisible ()Z
 	public fun hashCode ()I

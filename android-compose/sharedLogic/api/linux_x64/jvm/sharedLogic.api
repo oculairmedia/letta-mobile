@@ -9055,6 +9055,7 @@ public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccessKt
 public final class com/letta/mobile/data/canvas/authority/SharedNotesWire {
 	public static final field INSTANCE Lcom/letta/mobile/data/canvas/authority/SharedNotesWire;
 	public static final field LIST Ljava/lang/String;
+	public static final field MAX_CHECKED I
 	public static final field MAX_LISTED I
 	public final fun readSharedNotes (Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
 	public final fun sharedNotes (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;)Lkotlinx/serialization/json/JsonObject;
@@ -11649,12 +11650,15 @@ public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Deni
 }
 
 public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
-	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Z)V
+	public synthetic fun <init> (Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
-	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/util/List;Z)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;Ljava/util/List;ZILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getNotes ()Ljava/util/List;
+	public final fun getTruncated ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -53146,7 +53150,7 @@ public final class com/letta/mobile/data/shell/layout/ShellViews {
 public final class com/letta/mobile/data/shell/layout/edit/SharedNotesPlacement {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/SharedNotesPlacement;
 	public final fun getSLOT ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
-	public final fun inSideLane (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
+	public final fun overCompactPage (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
 	public final fun shown (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
 	public final fun toggled (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult;
 }
