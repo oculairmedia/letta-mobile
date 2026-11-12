@@ -20,7 +20,6 @@ import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
@@ -47,9 +46,9 @@ class RemoteNotebookAccess(rpc: AdminRpcInvoker) : SharedNotebooks {
         readAuthorized = ::resolve,
     )
 
-    /** Every call is a fresh `notebook.shared.list`; the host lists only notes this device may open now. */
-    override val directory = SharedNoteDirectory {
-        host.call(SharedNotesWire.LIST, buildJsonObject {}, { SharedNoteListing.Unavailable(it) }) {
+    /** Every page is a fresh `notebook.shared.list`; the host lists only notes this device may open now. */
+    override val directory = SharedNoteDirectory { from ->
+        host.call(SharedNotesWire.LIST, SharedNotesWire.request(from), { SharedNoteListing.Unavailable(it) }) {
             SharedNotesWire.readSharedNotes(it)
         }
     }

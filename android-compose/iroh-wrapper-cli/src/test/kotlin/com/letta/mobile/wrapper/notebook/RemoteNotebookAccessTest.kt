@@ -84,18 +84,18 @@ class RemoteNotebookAccessTest {
     @Test
     fun theListingShowsOnlyNotesThisPeerMayOpenNow() = withHost { host ->
         val alice = host.client(ALICE)
-        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list())
+        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(null))
 
         host.grant(ALICE, edit = true)
-        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(host.id, "Shared"))), alice.directory.list())
-        assertEquals(SharedNoteListing.Listed(emptyList()), host.client(BOB).directory.list())
+        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(host.id, "Shared"))), alice.directory.list(null))
+        assertEquals(SharedNoteListing.Listed(emptyList()), host.client(BOB).directory.list(null))
 
         host.grant(ALICE, edit = false)
-        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(), "a read-only grant cannot open the editor")
+        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(null), "a read-only grant cannot open the editor")
 
         host.grant(ALICE, edit = true)
         host.revoke(ALICE)
-        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(), "a revoked note leaves the listing")
+        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(null), "a revoked note leaves the listing")
     }
 
     @Test
@@ -116,7 +116,7 @@ class RemoteNotebookAccessTest {
         assertIs<NotebookNoteLoad.Unavailable>(access.backend.load(id))
         assertIs<NotebookNoteSave.Unavailable>(access.backend.save(id, "", "x"))
         assertEquals(NotebookReferenceLoad.Unavailable, access.resolver.resolve(id))
-        assertIs<SharedNoteListing.Unavailable>(access.directory.list())
+        assertIs<SharedNoteListing.Unavailable>(access.directory.list(null))
     }
 
     @Test
@@ -128,7 +128,7 @@ class RemoteNotebookAccessTest {
             assertEquals(DocumentWorkspaceOpen.Denied, access.opener.open(id))
             assertEquals(NotebookNoteSave.Denied, access.backend.save(id, "", "x"))
             assertEquals(NotebookReferenceLoad.Denied, access.resolver.resolve(id))
-            assertEquals(SharedNoteListing.Denied, access.directory.list())
+            assertEquals(SharedNoteListing.Denied, access.directory.list(null))
         }
     }
 

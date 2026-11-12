@@ -41,7 +41,7 @@ class SharedNoteBrowserTest {
         assertIs<SharedNoteListing.Unavailable>(browser.state.value.listing)
 
         val throwing = SharedNoteBrowser(object : SharedNotebooks {
-            override val directory = SharedNoteDirectory { error("socket closed") }
+            override val directory = SharedNoteDirectory { _ -> error("socket closed") }
             override val opener = host.opener
         })
         throwing.refresh()
@@ -156,16 +156,96 @@ class SharedNoteBrowserTest {
         assertFalse(overlapping.state.value.loading)
     }
 
-    private companion object {
-        val NOTE = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+    @Test
+    fun showMoreAppendsTheNextPageAndRefreshStartsAgainFromTheFirst() = runTest {
+        val paged = pagedBrowser(PagedDirectory())
+        paged.refresh()
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST), CURSOR), paged.state.value.listing)
+
+        assertTrue(paged.loadMore())
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST, SECOND)), paged.state.value.listing)
+        assertFalse(paged.state.value.loadingMore)
+        assertFalse(paged.loadMore(), "nothing is asked once the host says nothing is left")
+
+        paged.refresh()
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST), CURSOR), paged.state.value.listing, "a refresh shows the first page only")
     }
 
-    /** A directory whose every call waits until the test answers it, by call number. */
+    @Test
+    fun aPageThatFailsKeepsWhatIsShownAndCanBeAskedAgain() = runTest {
+        val directory = PagedDirectory().apply { nextPageFails = true }
+        val paged = pagedBrowser(directory)
+        paged.refresh()
+
+        assertFalse(paged.loadMore())
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST), CURSOR), paged.state.value.listing, "what is shown stays")
+        assertTrue(paged.state.value.moreFailed)
+
+        directory.nextPageFails = false
+        assertTrue(paged.loadMore())
+        assertEquals(SharedNoteListing.Listed(listOf(FIRST, SECOND)), paged.state.value.listing)
+        assertFalse(paged.state.value.moreFailed)
+    }
+
+    @Test
+    fun aPageAnsweredForAnOutdatedRefreshIsDropped() = runTest {
+        val gated = GatedDirectory()
+        val paged = pagedBrowser(gated)
+        val first = launch { paged.refresh() }
+        runCurrent()
+        gated.answer(0, SharedNoteListing.Listed(listOf(FIRST), CURSOR))
+        first.join()
+
+        val page = launch { paged.loadMore() }
+        runCurrent()
+        assertEquals(CURSOR, gated.asked[1], "the page starts where the shown listing stopped")
+        assertTrue(paged.state.value.loadingMore)
+        val refresh = launch { paged.refresh() }
+        runCurrent()
+        assertNull(gated.asked[2], "a refresh asks for the first page")
+        gated.answer(2, SharedNoteListing.Listed(listOf(SECOND)))
+        refresh.join()
+
+        gated.answer(1, SharedNoteListing.Listed(listOf(FIRST)))
+        page.join()
+        assertEquals(SharedNoteListing.Listed(listOf(SECOND)), paged.state.value.listing, "the page for the older listing is dropped")
+        assertFalse(paged.state.value.loadingMore)
+        assertFalse(paged.state.value.moreFailed)
+    }
+
+    private fun pagedBrowser(source: SharedNoteDirectory) = SharedNoteBrowser(object : SharedNotebooks {
+        override val directory = source
+        override val opener = host.opener
+    })
+
+    private companion object {
+        val NOTE = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+        val FIRST = SharedNote(NOTE, "Plan")
+        val SECOND = SharedNote(NotebookDocumentId("fedcba9876543210fedcba9876543210"), "Later")
+        val CURSOR = SharedNotesCursor("after-first")
+    }
+
+    /** Two pages: [FIRST] with a cursor, then [SECOND] with none; the second can be made to fail. */
+    private class PagedDirectory : SharedNoteDirectory {
+        var nextPageFails = false
+
+        override suspend fun list(from: SharedNotesCursor?): SharedNoteListing = when {
+            from == null -> SharedNoteListing.Listed(listOf(FIRST), CURSOR)
+            nextPageFails -> SharedNoteListing.Unavailable("down")
+            else -> SharedNoteListing.Listed(listOf(SECOND))
+        }
+    }
+
+    /** A directory whose every call waits until the test answers it, by call number; [asked] records each call's cursor. */
     private class GatedDirectory : SharedNoteDirectory {
         // overflow: one gate per call in a single test; bounded by the calls the test makes.
         private val gates = mutableListOf<CompletableDeferred<SharedNoteListing>>()
+        val asked = mutableListOf<SharedNotesCursor?>()
 
-        override suspend fun list(): SharedNoteListing = CompletableDeferred<SharedNoteListing>().also { gates += it }.await()
+        override suspend fun list(from: SharedNotesCursor?): SharedNoteListing {
+            asked += from
+            return CompletableDeferred<SharedNoteListing>().also { gates += it }.await()
+        }
 
         fun answer(call: Int, listing: SharedNoteListing) {
             gates[call].complete(listing)
@@ -178,7 +258,7 @@ class SharedNoteBrowserTest {
         private var shared = listOf(SharedNote(NOTE, "Plan"))
         private var reachable = true
 
-        override val directory = SharedNoteDirectory {
+        override val directory = SharedNoteDirectory { _ ->
             if (reachable) SharedNoteListing.Listed(shared) else SharedNoteListing.Unavailable("down")
         }
 

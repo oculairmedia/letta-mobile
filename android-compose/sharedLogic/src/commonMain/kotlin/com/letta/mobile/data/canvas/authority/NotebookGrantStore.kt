@@ -21,8 +21,10 @@ interface NotebookGrantStore {
     ): T
 
     /**
-     * The documents [principal] holds a grant for, read in one transaction, in storage order. A
-     * listing authorizes nothing: every operation on a listed document still runs [withGrant].
+     * The documents [principal] holds a grant for, read in one transaction, ordered by
+     * [NotebookDocumentId.value] (ascending, by [String.compareTo]) so a position in the list means
+     * the same thing on every call. A listing authorizes nothing: every operation on a listed
+     * document still runs [withGrant].
      */
     suspend fun documentsOf(principal: String): List<NotebookDocumentId>
 }

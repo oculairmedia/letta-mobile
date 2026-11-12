@@ -9,6 +9,7 @@ import com.letta.mobile.data.canvas.authority.SharedNotesWire
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
+import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.adminError
@@ -28,8 +29,8 @@ fun registerNotebookAdminRoutes(router: AdminRpcRouter, notebooks: NotebookLocal
         val id = documentId(params)
         NotebookAccessWire.reference(access(context).resolver.resolve(id))
     }
-    router.registerScoped(SharedNotesWire.LIST) { _, context ->
-        SharedNotesWire.sharedNotes(access(context).sharedNotes())
+    router.registerScoped(SharedNotesWire.LIST) { params, context ->
+        SharedNotesWire.sharedNotes(access(context).sharedNotes(listCursor(params)))
     }
     router.registerScoped(NotebookAccessWire.OPEN) { params, context ->
         val id = documentId(params)
@@ -51,6 +52,14 @@ fun registerNotebookAdminRoutes(router: AdminRpcRouter, notebooks: NotebookLocal
         val applied = NotebookNoteSnapshot(id, string(item, "title"), string(item, "markdown"))
         NotebookAccessWire.save(access(context).backend.flush(applied))
     }
+}
+
+/** The page a listing request asks for: no field but `cursor`, which must be a string; the host reads its content. */
+private fun listCursor(params: JsonObject?): SharedNotesCursor? {
+    val fields = params?.keys.orEmpty()
+    if (!fields.all { it == SharedNotesWire.CURSOR }) adminError("unknown field")
+    if (fields.isEmpty()) return null
+    return SharedNotesCursor(string(params, SharedNotesWire.CURSOR))
 }
 
 private fun documentId(params: JsonObject?): NotebookDocumentId {

@@ -46,7 +46,7 @@ class FileNotebookGrantStore internal constructor(
 
     override suspend fun documentsOf(principal: String): List<NotebookDocumentId> = locked {
         require(principal.isNotBlank()) { "Empty notebook grant principal" }
-        read().grants.filter { it.principal == principal }.map { NotebookDocumentId(it.documentId) }
+        read().grants.filter { it.principal == principal }.map { it.documentId }.sorted().map(::NotebookDocumentId)
     }
 
     /** Add or replace one pair. These capabilities do not authorize plugin or agent-tool use. */

@@ -18,6 +18,7 @@ import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpener
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions
 import com.letta.mobile.data.canvas.workspace.SharedNote
 import com.letta.mobile.data.canvas.workspace.SharedNoteListing
+import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlinx.coroutines.CancellationException
@@ -71,19 +72,34 @@ class HostNotebookAccess(
     }
 
     /**
-     * The notes this principal may open now: each listed grant is rechecked under its own
-     * transaction for read and edit, and a granted note missing from the store is left out. The
-     * listing holds up to [SharedNotesWire.MAX_LISTED] notes that pass that check, however many
-     * grants that cannot open the editor come first. Every recheck is its own grant transaction, so
-     * one listing rechecks at most [SharedNotesWire.MAX_CHECKED] grants; a listing that stopped
-     * before the last grant (full, or at that bound) says so ([SharedNoteListing.Listed.truncated]).
+     * One page of the notes this principal may open now, starting after [from] (null for the first
+     * page). Each grant is rechecked under its own transaction for read and edit, and a granted note
+     * missing from the store is left out, as is a grant whose id is longer than a cursor can name
+     * ([SharedNotesCursors.MAX_ID_BYTES]; the host's own note ids are far shorter). A page holds up
+     * to [SharedNotesWire.MAX_LISTED] notes that pass that check and rechecks at most [SharedNotesWire.MAX_CHECKED] grants; one that stopped
+     * before the principal's last grant carries [SharedNoteListing.Listed.next], naming the last grant
+     * it checked, so following cursors reaches every grant however many cannot open the editor.
+     *
+     * Consistency: every page is a fresh decision over a fresh, id-ordered read of the principal's
+     * grants, and starts strictly after the cursor's id, so pages never repeat a note and a walk
+     * always ends. Nothing is held between pages: a note shared or unshared during a walk may be
+     * missed (it sorts before the cursor) or appear on a later page, but a page never lists a note
+     * its own check did not just allow. A cursor that is malformed, too long or issued to another
+     * principal is answered unavailable with [SharedNotesWire.INVALID_CURSOR] before any recheck.
      */
-    suspend fun sharedNotes(): SharedNoteListing {
-        return recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) { listOpenable() }
+    suspend fun sharedNotes(from: SharedNotesCursor? = null): SharedNoteListing {
+        return recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) { listFrom(from) }
     }
 
-    private suspend fun listOpenable(): SharedNoteListing {
-        val candidates = grants.documentsOf(principal)
+    private suspend fun listFrom(from: SharedNotesCursor?): SharedNoteListing {
+        if (from == null) return listAfter(null)
+        val after = SharedNotesCursors.read(principal, from)
+        if (after == null) return SharedNoteListing.Unavailable(SharedNotesWire.INVALID_CURSOR)
+        return listAfter(after)
+    }
+
+    private suspend fun listAfter(after: NotebookDocumentId?): SharedNoteListing {
+        val candidates = candidatesAfter(after)
         val notes = mutableListOf<SharedNote>()
         var checked = 0
         for (id in candidates.take(SharedNotesWire.MAX_CHECKED)) {
@@ -91,7 +107,21 @@ class HostNotebookAccess(
             checked++
             openable(id)?.let(notes::add)
         }
-        return SharedNoteListing.Listed(notes, truncated = checked < candidates.size)
+        return SharedNoteListing.Listed(notes, nextCursor(candidates, checked))
+    }
+
+    /** The principal's grants after [after], in id order (sorted here too, so a store's own order never moves a cursor). */
+    private suspend fun candidatesAfter(after: NotebookDocumentId?): List<NotebookDocumentId> {
+        val ordered = grants.documentsOf(principal).filter(SharedNotesCursors::positionable).sortedBy { it.value }
+        if (after == null) return ordered
+        return ordered.filter { it.value > after.value }
+    }
+
+    /** Where the next page starts: after the last grant checked, unless every candidate was checked. */
+    private fun nextCursor(candidates: List<NotebookDocumentId>, checked: Int): SharedNotesCursor? {
+        if (checked == 0) return null
+        if (checked == candidates.size) return null
+        return SharedNotesCursors.issue(principal, candidates[checked - 1])
     }
 
     private suspend fun openable(id: NotebookDocumentId): SharedNote? {
