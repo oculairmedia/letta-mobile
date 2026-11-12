@@ -134,6 +134,16 @@ class AgentScaffoldHiltTest {
     }
 
     @Test
+    fun theChatWaitsForCanvasPreferenceEvenWhenFontScaleIsLoaded() {
+        every { viewModel.chatFontScale } returns MutableStateFlow<Float?>(1f)
+        every { viewModel.openChatsOnCanvas } returns MutableStateFlow<Boolean?>(null)
+        showChat()
+        composeRule.waitForIdle()
+        // Composer binding happens inside the page, after both stored preferences are known.
+        verify(exactly = 0) { viewModel.composerState }
+    }
+
+    @Test
     fun theChatDrawsNoHeaderOfItsOwn() {
         showChat()
         composeRule.onAllNodesWithTag(SearchTriggerTestTag).assertCountEquals(0)

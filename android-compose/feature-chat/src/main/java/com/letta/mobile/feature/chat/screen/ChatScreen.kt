@@ -80,6 +80,8 @@ internal fun ChatScreen(
 
     // The font scale loads from settings; the page waits for it so its rows never re-lay out on arrival.
     val fontScale = activeFontScale ?: return
+    // The page saves its first presentation; never initialize it from a placeholder preference.
+    val openOnCanvas = openChatsOnCanvas ?: return
     LettaChatTheme(fontScale = fontScale) {
         val subagentBarState = rememberChatScreenSubagentBarState(
             resolvedSubagentSource = resolvedSubagentSource,
@@ -109,7 +111,7 @@ internal fun ChatScreen(
                 fontScale = fontScale,
                 hapticsEnabled = hapticsEnabled,
                 pagingPresentation = pagingPresentation,
-                openOnCanvas = openChatsOnCanvas,
+                openOnCanvas = openOnCanvas,
                 subagents = SharedChatSubagentInputs(
                     source = resolvedSubagentSource,
                     selfTodoSource = resolvedSelfTodoSource,
