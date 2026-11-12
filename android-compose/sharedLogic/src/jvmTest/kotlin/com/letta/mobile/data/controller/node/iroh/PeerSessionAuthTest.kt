@@ -202,4 +202,21 @@ class PeerSessionAuthTest {
         assertEquals(PeerSessionAuth.Decision.Accepted("paired_node_id"), redial.authenticate("", null))
         assertEquals(IrohPeerCapabilities.CHAT_ROLE, redial.effectiveCapabilities())
     }
+
+    @Test
+    fun onlyAPairedSessionWithALiveRecordIsAPairedDevice() {
+        val bearer = IrohAuthPolicy.BearerToken(token)
+        val adminToken = session(mallory, policy = bearer)
+        adminToken.authenticate(token, null)
+        assertFalse(adminToken.isPairedDevice(), "a host-local process holding the admin token is not a paired device")
+        val allowlisted = session(alice, policy = IrohAuthPolicy.PeerAllowlist(setOf(alice)))
+        assertFalse(allowlisted.isPairedDevice(), "an allowlisted peer is not paired")
+        assertFalse(session(alice).isPairedDevice(), "an unauthenticated session is not a paired device")
+
+        session(alice).authenticate(inviteToken(), null)
+        val paired = session(alice)
+        assertTrue(paired.isPairedDevice())
+        pairing.revoke(alice)
+        assertFalse(paired.isPairedDevice(), "a revoked record ends the paired device")
+    }
 }
