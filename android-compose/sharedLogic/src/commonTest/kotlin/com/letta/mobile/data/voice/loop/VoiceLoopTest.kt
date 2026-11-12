@@ -22,9 +22,11 @@ import com.letta.mobile.data.voice.activation.VoiceActivationSource
 import com.letta.mobile.data.voice.engine.VoiceCancelOutcome
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -488,6 +490,78 @@ class VoiceLoopTest {
         val entries = h.log.entries
         assertTrue(entries.lastIndexOf("ear:open") < entries.indexOf("ear:retry"))
         assertEquals(VoiceError(VoiceErrorCode.CAPTURE_EXPIRED, VoicePort.EAR), h.state.failure)
+    }
+
+    @Test
+    fun mouthThatWillNotStopBlocksTheEarUntilItConfirms() = runTest {
+        val h = LoopHarness(this, noBargeIn)
+        h.speaking()
+        h.mouth.hangOnStop = true
+        val unresponsive = VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.MOUTH)
+        repeat(2) {
+            h.loop.activate(VoiceActivationKind.TAP)
+            advanceTimeBy(VoiceLoopConfig().releaseTimeout + 1.seconds)
+            h.settle()
+            assertEquals(unresponsive, h.state.failure)
+            assertEquals(1, h.ear.opens())
+        }
+        h.mouth.releaseStop()
+        h.listening()
+        assertEquals(2, h.ear.opens())
+        assertEquals(VoicePhase.LISTENING, h.state.phase)
+    }
+
+    @Test
+    fun earThatWillNotReleaseBlocksSpeechWithoutBargeIn() = runTest {
+        val h = LoopHarness(this, noBargeIn)
+        h.speaking(VoiceText("On it. "))
+        h.reply(VoiceReplyEvent.AwaitingLateReply)
+        h.finishSpeech()
+        h.ear.releaseDelay = 5.seconds
+        h.replyText(VoiceText("Research done. "))
+        advanceTimeBy(VoiceLoopConfig().releaseTimeout + 1.seconds)
+        h.settle()
+        assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.EAR), h.state.failure)
+        assertEquals(listOf("On it."), h.mouth.spokenTexts)
+    }
+
+    @Test
+    fun immediateReplyWithASilentResponderStillTimesOut() = runTest {
+        val h = LoopHarness(this)
+        h.listening()
+        val action = VoiceDecision.Act(VoiceActionDecision(VoiceActionKind("research_task")))
+        h.ear.hear(VoiceEarEvent.EndOfTurn(VoiceUtterance(VoiceText("look it up"), VoiceText("Sure."), action)))
+        h.settle()
+        h.finishSpeech()
+        advanceTimeBy(VoiceLoopConfig().thinkingTimeout + 1.seconds)
+        h.settle()
+        assertEquals(VoiceErrorCode.TIMED_OUT, h.state.failure?.code)
+        assertEquals(1, h.responder.last.cancels)
+    }
+
+    @Test
+    fun activationQueuedDuringShutdownIsIgnored() = runTest {
+        val h = LoopHarness(this)
+        h.speaking()
+        val closing = launch(start = CoroutineStart.UNDISPATCHED) { h.loop.shutdown() }
+        h.loop.activate(VoiceActivationKind.TAP)
+        h.settle()
+        closing.join()
+        assertEquals(VoicePhase.IDLE, h.state.phase)
+        assertFalse(h.ear.listening)
+    }
+
+    @Test
+    fun engineThatThrowsOnSpeakFailsTheLoopWhichStillStopsAndShutsDown() = runTest {
+        val h = LoopHarness(this)
+        h.mouth.throwOnSpeak = true
+        h.speaking()
+        assertEquals(VoiceError(VoiceErrorCode.ENGINE_FAILED, VoicePort.MOUTH), h.state.failure)
+        h.loop.stop()
+        h.settle()
+        assertEquals(VoicePhase.IDLE, h.state.phase)
+        h.loop.shutdown()
+        assertFalse(h.ear.listening)
     }
 
     private fun source(vararg events: VoiceActivationEvent): VoiceActivationSource = object : VoiceActivationSource {

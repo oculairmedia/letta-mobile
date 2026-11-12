@@ -13,8 +13,8 @@ import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 import com.letta.mobile.data.voice.engine.VoiceReply
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
 import com.letta.mobile.data.voice.engine.VoiceResponder
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -92,10 +92,13 @@ internal class FakeMouth(private val log: EngineLog) : VoiceMouth {
     var stops = 0
         private set
     var hangOnStop = false
+    var throwOnSpeak = false
+    private val stopGate = CompletableDeferred<Unit>()
 
     override val events: Flow<VoiceMouthEvent> = emitted
 
     override fun speak(segment: SpeechSegment) {
+        check(!throwOnSpeak) { "speaker gone" }
         queued += segment
         spokenTexts += segment.text.value
         log.add("mouth:speak")
@@ -104,10 +107,15 @@ internal class FakeMouth(private val log: EngineLog) : VoiceMouth {
     override fun flush() = Unit
 
     override suspend fun stop() {
-        if (hangOnStop) awaitCancellation()
+        if (hangOnStop) stopGate.await()
         stops++
         queued.clear()
         log.add("mouth:stop")
+    }
+
+    /** Lets a stop that was hanging finish. */
+    fun releaseStop() {
+        stopGate.complete(Unit)
     }
 
     suspend fun started(id: SpeechSegmentId) = emitted.emit(VoiceMouthEvent.Started(id))

@@ -97,4 +97,17 @@ class SentenceChunkerTest {
         assertTrue(segments.any { "docs" in it })
         assertTrue(segments.all { it.length <= 16 })
     }
+
+    @Test
+    fun aCutNeverLandsInsideAnUnfinishedTag() {
+        val segments = chunk("Some words <span class", "=\"x\">styled</span> more.", max = 16)
+        assertTrue(segments.none { "<" in it || "span" in it }, segments.toString())
+    }
+
+    @Test
+    fun anUnterminatedLinkPastTheHoldLimitIsSpokenAsItsTextOnly() {
+        val segments = chunk("See [docs](https://x.io/" + "a".repeat(100), max = 16)
+        assertTrue(segments.none { "[" in it || "](" in it || "http" in it }, segments.toString())
+        assertTrue(segments.any { "docs" in it })
+    }
 }

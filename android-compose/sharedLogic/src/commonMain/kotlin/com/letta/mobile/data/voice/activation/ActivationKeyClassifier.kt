@@ -62,6 +62,8 @@ data class KeyClassifierState(
     val active: Boolean = false,
     /** When the current press began; null when the key is up or the press ended a turn. */
     val pressedAt: KeyTime? = null,
+    /** Whether the key is physically down, independent of [active]; repeats are ignored until it comes up. */
+    val keyDown: Boolean = false,
 )
 
 /** A classification: the next state and what it means. */
@@ -87,21 +89,25 @@ class ActivationKeyClassifier(
         KeyGesture.Cancel -> cancel(state)
     }
 
-    /** A press while the key is already down (key repeat) changes nothing. */
-    private fun press(state: KeyClassifierState, at: KeyTime): KeyStep = when {
-        state.pressedAt != null -> KeyStep(state, KeyDecision.NONE)
-        !state.active -> KeyStep(KeyClassifierState(active = true, pressedAt = at), KeyDecision.START)
-        mode == ActivationKeyMode.HOLD -> KeyStep(state, KeyDecision.NONE)
-        else -> KeyStep(KeyClassifierState(), KeyDecision.END_TURN)
+    /** A press while the key is already down (key repeat) changes nothing, whatever it did before. */
+    private fun press(state: KeyClassifierState, at: KeyTime): KeyStep =
+        if (state.keyDown) KeyStep(state, KeyDecision.NONE) else pressDown(state, at)
+
+    private fun pressDown(state: KeyClassifierState, at: KeyTime): KeyStep = when {
+        !state.active -> KeyStep(KeyClassifierState(active = true, pressedAt = at, keyDown = true), KeyDecision.START)
+        mode == ActivationKeyMode.HOLD -> KeyStep(state.copy(keyDown = true), KeyDecision.NONE)
+        else -> KeyStep(KeyClassifierState(keyDown = true), KeyDecision.END_TURN)
     }
 
+    /** The key comes up; a release after a press that already ended the turn changes nothing more. */
     private fun release(state: KeyClassifierState, at: KeyTime): KeyStep {
-        val pressedAt = state.pressedAt ?: return KeyStep(state, KeyDecision.NONE)
+        val up = state.copy(keyDown = false)
+        val pressedAt = up.pressedAt ?: return KeyStep(up, KeyDecision.NONE)
         val held = at.sinceOrigin - pressedAt.sinceOrigin
         return if (endsTurnOnRelease(held)) {
             KeyStep(KeyClassifierState(), KeyDecision.END_TURN)
         } else {
-            KeyStep(state.copy(pressedAt = null), KeyDecision.NONE)
+            KeyStep(up.copy(pressedAt = null), KeyDecision.NONE)
         }
     }
 
@@ -112,7 +118,7 @@ class ActivationKeyClassifier(
     }
 
     private fun cancel(state: KeyClassifierState): KeyStep =
-        KeyStep(KeyClassifierState(), if (state.active) KeyDecision.DISCARD else KeyDecision.NONE)
+        KeyStep(KeyClassifierState(keyDown = state.keyDown), if (state.active) KeyDecision.DISCARD else KeyDecision.NONE)
 
     /** Defaults. */
     companion object {

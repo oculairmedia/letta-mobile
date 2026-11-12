@@ -152,40 +152,39 @@ class SpeechEndpointClientTest {
 
     @Test
     fun bearerKeyTravelsOnlyOverHttpsOrLoopback() = realTimeTest {
-        val cases = mapOf(
-            "https://speech.example.net" to true,
-            "http://127.0.0.1:8880" to true,
-            "http://127.255.255.254" to true,
-            "http://localhost:8880" to true,
-            "http://LOCALHOST:8880" to true,
-            "http://[::1]:8880" to true,
-            "http://[0:0:0:0:0:0:0:1]:8880" to true,
-            "http://localhost.:8880" to false,
-            "http://127.attacker.example" to false,
-            "http://127.0.0.1.example.com" to false,
-            "http://127.1" to false,
-            "http://2130706433" to false,
-            "http://0x7f.0.0.1" to false,
-            "http://0177.0.0.1" to false,
-            "http://127.0.0.256" to false,
-            "http://localhost.example.com" to false,
-            "http://localhost@evil.example/" to false,
-            "http://[::ffff:127.0.0.1]:8880" to false,
-            " http://localhost:8880" to false,
-            "http://localhost:8880 " to false,
-            "http://192.168.1.20:8880" to false,
-            "http://10.0.0.5" to false,
-            "http://speech.example.net" to false,
+        val cases: Map<String, VoiceErrorCode?> = mapOf(
+            "https://speech.example.net" to null,
+            "http://127.0.0.1:8880" to null,
+            "http://127.255.255.254" to null,
+            "http://localhost:8880" to null,
+            "http://LOCALHOST:8880" to null,
+            "http://[::1]:8880" to null,
+            "http://[0:0:0:0:0:0:0:1]:8880" to null,
+            "http://localhost.:8880" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://127.attacker.example" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://127.0.0.1.example.com" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://127.1" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://2130706433" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://0x7f.0.0.1" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://0177.0.0.1" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://127.0.0.256" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://localhost.example.com" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://localhost@evil.example/" to VoiceErrorCode.INVALID_ENDPOINT,
+            "http://[::ffff:127.0.0.1]:8880" to VoiceErrorCode.INSECURE_TRANSPORT,
+            " http://localhost:8880" to VoiceErrorCode.INVALID_ENDPOINT,
+            "http://localhost:8880 " to VoiceErrorCode.INVALID_ENDPOINT,
+            "http://192.168.1.20:8880" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://10.0.0.5" to VoiceErrorCode.INSECURE_TRANSPORT,
+            "http://speech.example.net" to VoiceErrorCode.INSECURE_TRANSPORT,
         )
-        cases.forEach { (url, allowed) ->
+        cases.forEach { (url, refusal) ->
             recorded.clear()
             val config = SpeechEndpointConfig(SpeechEndpointUrl(url), SpeechApiKey(secret))
             val outcome = runCatching { client(config) { json("""{"text":"ok"}""") }.transcribe(transcription) }
-            assertEquals(allowed, outcome.isSuccess, url)
-            assertEquals(if (allowed) 1 else 0, recorded.size, url)
             val failure = outcome.exceptionOrNull() as? SpeechEndpointException
-            if (!allowed) assertEquals(VoiceErrorCode.INSECURE_TRANSPORT, failure?.code, url)
-            if (allowed) assertEquals(Url(url.trim()).host, recorded.single().url.host, url)
+            assertEquals(refusal, failure?.code, url)
+            assertEquals(if (refusal == null) 1 else 0, recorded.size, url)
+            if (refusal == null) assertEquals(Url(url).host, recorded.single().url.host, url)
             assertFalse(secret in failure?.message.orEmpty())
         }
     }
@@ -205,5 +204,30 @@ class SpeechEndpointClientTest {
         }
         assertEquals(VoiceErrorCode.REJECTED, failure.code)
         assertEquals(listOf("127.0.0.1"), recorded.map { it.url.host })
+    }
+
+    @Test
+    fun requestUrlsAreBuiltFromParsedComponents() = realTimeTest {
+        val cases = mapOf(
+            "https://speech.local" to "/v1/audio/transcriptions",
+            "https://speech.local/" to "/v1/audio/transcriptions",
+            "https://speech.local/prefix" to "/prefix/v1/audio/transcriptions",
+            "https://speech.local/prefix/" to "/prefix/v1/audio/transcriptions",
+            "https://speech.local/api?tenant=a" to null,
+            "https://speech.local/api#part" to null,
+            "https://user:pw@speech.local" to null,
+        )
+        cases.forEach { (url, path) ->
+            recorded.clear()
+            val config = SpeechEndpointConfig(SpeechEndpointUrl(url), SpeechApiKey(secret))
+            val outcome = runCatching { client(config) { json("""{"text":"ok"}""") }.transcribe(transcription) }
+            if (path == null) {
+                assertEquals(VoiceErrorCode.INVALID_ENDPOINT, (outcome.exceptionOrNull() as? SpeechEndpointException)?.code, url)
+                assertEquals(0, recorded.size, url)
+            } else {
+                assertEquals(path, recorded.single().url.encodedPath, url)
+                assertEquals("", recorded.single().url.encodedQuery, url)
+            }
+        }
     }
 }

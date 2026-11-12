@@ -56,4 +56,18 @@ class ActivationTest {
             assertEquals(listOf(KeyDecision.START, KeyDecision.NONE, KeyDecision.NONE), gestures, "$mode")
         }
     }
+
+    @Test
+    fun repeatAfterAPressThatEndedTheTurnChangesNothing() {
+        val sequence = arrayOf<KeyGesture>(
+            KeyGesture.Press(0.atMs), KeyGesture.Release(100.atMs), KeyGesture.Press(900.atMs),
+            KeyGesture.Press(930.atMs), KeyGesture.Press(960.atMs), KeyGesture.Release(1000.atMs),
+        )
+        val expected = listOf(
+            KeyDecision.START, KeyDecision.NONE, KeyDecision.END_TURN, KeyDecision.NONE, KeyDecision.NONE, KeyDecision.NONE,
+        )
+        listOf(ActivationKeyMode.AUTO, ActivationKeyMode.TOGGLE).forEach { mode ->
+            assertEquals(expected, decisions(mode, *sequence), "$mode")
+        }
+    }
 }

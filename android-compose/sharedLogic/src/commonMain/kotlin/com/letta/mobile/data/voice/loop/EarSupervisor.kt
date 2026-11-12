@@ -30,11 +30,20 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
     /** True for effects that call into the running ear (applied after the microphone opens). */
     fun handles(effect: LoopEffect): Boolean = effect is LoopEffect.CommitTurn || effect is LoopEffect.RetryCapture
 
-    /** Calls into the ear for [effect]; a retry the ear can no longer serve becomes a CAPTURE_EXPIRED fault. */
+    /**
+     * Calls into the ear for [effect]; a retry the ear can no longer serve becomes a CAPTURE_EXPIRED
+     * fault, and a call that throws an ENGINE_FAILED fault.
+     */
     fun call(effect: LoopEffect): LoopInput? = when (effect) {
-        LoopEffect.CommitTurn -> wiring.engines.ear.commitTurn().let { null }
-        is LoopEffect.RetryCapture -> if (wiring.engines.ear.retry(effect.handle)) null else expired()
+        LoopEffect.CommitTurn -> wiring.call(VoicePort.EAR) { wiring.engines.ear.commitTurn() }
+        is LoopEffect.RetryCapture -> retry(effect)
         else -> null
+    }
+
+    private fun retry(effect: LoopEffect.RetryCapture): LoopInput? {
+        var accepted = false
+        val fault = wiring.call(VoicePort.EAR) { accepted = wiring.engines.ear.retry(effect.handle) }
+        return fault ?: if (accepted) null else expired()
     }
 
     private fun expired(): LoopInput = LoopInput.Fault(VoiceError(VoiceErrorCode.CAPTURE_EXPIRED, VoicePort.EAR))
@@ -50,10 +59,10 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
     }
 
     /** Tells the ear whether the app's own speech is playing, on change. */
-    fun reportOutput(model: LoopModel) {
-        if (model.outputActive == outputHint) return
+    fun reportOutput(model: LoopModel): LoopInput? {
+        if (model.outputActive == outputHint) return null
         outputHint = model.outputActive
-        wiring.engines.ear.setOutputActive(outputHint)
+        return wiring.call(VoicePort.EAR) { wiring.engines.ear.setOutputActive(outputHint) }
     }
 
     private fun startIfWanted(model: LoopModel): LoopInput? {

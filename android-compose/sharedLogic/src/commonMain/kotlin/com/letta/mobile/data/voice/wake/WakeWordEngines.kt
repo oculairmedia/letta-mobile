@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.WakeWordEngineId
 import com.letta.mobile.data.voice.wake.assets.ReadyWakeWordAssets
 import com.letta.mobile.data.voice.wake.assets.WakeWordAssetState
 import com.letta.mobile.data.voice.wake.assets.WakeWordAssets
+import kotlinx.coroutines.CancellationException
 
 /** An engine and the provisioning of its assets. */
 data class WakeWordBinding(
@@ -73,9 +74,17 @@ class WakeWordEngines {
 
     private suspend fun tryOpen(binding: WakeWordBinding): WakeWordSessionResult {
         val required = binding.engine.descriptor.requiredAssets
-        if (required.isEmpty()) return binding.engine.open(ReadyWakeWordAssets())
+        if (required.isEmpty()) return openSafely(binding.engine, ReadyWakeWordAssets())
         val ready = (binding.assets.state.value as? WakeWordAssetState.Ready)?.assets
         if (ready?.covers(required) != true) return WakeWordSessionResult.Failed(WakeWordOpenFailure.ASSET_MISSING)
-        return binding.engine.open(ready)
+        return openSafely(binding.engine, ready)
+    }
+
+    /** An engine that throws instead of reporting a failure is skipped as ENGINE_FAILED. */
+    private suspend fun openSafely(engine: WakeWordEngine, assets: ReadyWakeWordAssets): WakeWordSessionResult {
+        val outcome = runCatching { engine.open(assets) }
+        val error = outcome.exceptionOrNull()
+        if (error is CancellationException) throw error
+        return outcome.getOrNull() ?: WakeWordSessionResult.Failed(WakeWordOpenFailure.ENGINE_FAILED)
     }
 }

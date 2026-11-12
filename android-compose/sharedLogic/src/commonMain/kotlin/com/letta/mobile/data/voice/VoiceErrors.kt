@@ -84,8 +84,10 @@ enum class VoiceErrorCode(
     NOT_DELIVERED(VoiceUserAction.RETRY),
 
     /**
-     * The utterance reached the conversation, but no answer could be tied to it with certainty
-     * (the session did not link the utterance to the run it started); nothing was spoken.
+     * The utterance reached the conversation, but no answer could be tied to it with certainty, so
+     * nothing was spoken. This happens when the chat session does not (yet) publish which run the
+     * sent message started, or when more than one new message could be the utterance. The reply is
+     * still in the conversation; only speaking it was skipped.
      */
     UNATTRIBUTED(VoiceUserAction.NONE),
 
@@ -94,6 +96,9 @@ enum class VoiceErrorCode(
 
     /** An optional asset (wake-word or voice-activity model) is missing; voice keeps working without it. */
     ASSET_MISSING(VoiceUserAction.NONE),
+
+    /** The endpoint address has a query, fragment or user info; it must be a plain base URL. */
+    INVALID_ENDPOINT(VoiceUserAction.OPEN_SETTINGS),
 
     /** A bearer key would travel over an unencrypted connection (plain http to a non-loopback host); nothing was sent. */
     INSECURE_TRANSPORT(VoiceUserAction.OPEN_SETTINGS),

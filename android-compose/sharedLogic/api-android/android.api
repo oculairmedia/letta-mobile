@@ -69214,6 +69214,7 @@ public final class com/letta/mobile/data/voice/VoiceErrorCode : java/lang/Enum {
 	public static final field CAPTURE_EXPIRED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field ENGINE_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field INSECURE_TRANSPORT Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field INVALID_ENDPOINT Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field NOT_DELIVERED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field PERMISSION_REQUIRED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field PLAYBACK_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
@@ -69501,14 +69502,16 @@ public final class com/letta/mobile/data/voice/activation/ActivationKeyMode : ja
 }
 
 public final class com/letta/mobile/data/voice/activation/KeyClassifierState {
-	public synthetic fun <init> (ZLcom/letta/mobile/data/voice/activation/KeyTime;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (ZLcom/letta/mobile/data/voice/activation/KeyTime;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/voice/activation/KeyTime;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/voice/activation/KeyTime;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2-M-JK3Kg ()Lcom/letta/mobile/data/voice/activation/KeyTime;
-	public final fun copy-oHeFr0g (ZLcom/letta/mobile/data/voice/activation/KeyTime;)Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
-	public static synthetic fun copy-oHeFr0g$default (Lcom/letta/mobile/data/voice/activation/KeyClassifierState;ZLcom/letta/mobile/data/voice/activation/KeyTime;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
+	public final fun component3 ()Z
+	public final fun copy-q1hpJWM (ZLcom/letta/mobile/data/voice/activation/KeyTime;Z)Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
+	public static synthetic fun copy-q1hpJWM$default (Lcom/letta/mobile/data/voice/activation/KeyClassifierState;ZLcom/letta/mobile/data/voice/activation/KeyTime;ZILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActive ()Z
+	public final fun getKeyDown ()Z
 	public final fun getPressedAt-M-JK3Kg ()Lcom/letta/mobile/data/voice/activation/KeyTime;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

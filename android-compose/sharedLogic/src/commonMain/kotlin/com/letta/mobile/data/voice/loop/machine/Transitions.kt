@@ -89,9 +89,15 @@ internal object Transitions {
         return Step(listening, effects)
     }
 
-    /** After the queue drained: finish the turn when the answer is done too. */
-    fun maybeFinish(model: LoopModel): Step =
-        if (model.outputActive || model.turn.replyOpen) Step(model) else afterTurn(model)
+    /**
+     * After the queue drained: finish the turn when the answer is done too; while the answer is
+     * still open (after an immediate reply, or between sentences) wait for its text in THINKING.
+     */
+    fun maybeFinish(model: LoopModel): Step = when {
+        model.outputActive -> Step(model)
+        model.turn.replyOpen -> Step(model.copy(phase = VoicePhase.THINKING))
+        else -> afterTurn(model)
+    }
 
     /** The turn is over: report a held failure, speak held late text, or go back to listening (or idle). */
     fun afterTurn(model: LoopModel): Step {

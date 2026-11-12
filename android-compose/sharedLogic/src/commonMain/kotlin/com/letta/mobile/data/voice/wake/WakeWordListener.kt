@@ -152,7 +152,7 @@ class WakeWordListener(
             if (error is CancellationException) throw error
             return if (error == null) WakeWordEvent.Stopped else unavailableEvent(VoiceErrorCode.ENGINE_FAILED, selection.skipped)
         } finally {
-            session.close()
+            runCatching { session.close() }
             mutableState.compareAndSet(WakeListenerState.LISTENING, WakeListenerState.STOPPED)
         }
     }

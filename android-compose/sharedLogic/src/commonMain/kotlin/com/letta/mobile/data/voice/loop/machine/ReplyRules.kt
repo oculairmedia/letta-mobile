@@ -37,9 +37,13 @@ internal object ReplyRules {
         ReplySignal.TextStarted -> Step(model.withTurn { copy(textArrived = true) })
     }
 
-    /** The thinking timeout only fails an answer that has produced no text at all. */
+    /**
+     * The first-text timeout fails an open answer that has produced no text at all, in whatever
+     * phase (an immediate reply may have been spoken meanwhile). It fails at once: any immediate
+     * speech still playing is stopped and the answer is cancelled, rather than left to finish.
+     */
     private fun timedOut(model: LoopModel): Step = when {
-        model.phase != VoicePhase.THINKING -> Step(model)
+        !model.turn.replyOpen -> Step(model)
         model.turn.textArrived -> Step(model)
         else -> Transitions.fail(model, VoiceError(VoiceErrorCode.TIMED_OUT, VoicePort.RESPONDER))
     }

@@ -115,8 +115,10 @@ internal class SoftCut(private val max: Int) {
     }
 
     /**
-     * The position after the last whitespace in [text] that lies outside brackets and parentheses,
-     * so a cut never splits a markdown link or its URL; null when there is none.
+     * The position after the last whitespace in [text] that lies outside brackets, parentheses and
+     * angle brackets, so a cut never splits a markdown link, its URL or an HTML tag; null when there
+     * is none. An unbalanced `<` (a comparison) only makes later breaks unsafe; the hold limit
+     * releases such text.
      */
     fun lastSafeBreak(text: CharSequence): Int? {
         var depth = 0
@@ -129,8 +131,8 @@ internal class SoftCut(private val max: Int) {
     }
 
     private fun Char.nesting(): Int = when (this) {
-        '[', '(' -> 1
-        ']', ')' -> -1
+        '[', '(', '<' -> 1
+        ']', ')', '>' -> -1
         else -> 0
     }
 

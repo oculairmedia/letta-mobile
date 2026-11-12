@@ -27,11 +27,14 @@ private class FollowedReply(val reply: VoiceReply, val job: Job)
 internal class ReplyFollower(private val wiring: LoopWiring) {
     private val replies = mutableMapOf<TurnKey, FollowedReply>()
 
+    /** Starts answering; a responder that throws becomes an ENGINE_FAILED responder fault. */
     fun respond(effect: LoopEffect.Respond): LoopInput? {
         replies.entries.removeAll { !it.value.job.isActive }
-        val reply = wiring.engines.responder.respond(effect.utterance)
-        val job = wiring.scope.launch { follow(effect.turn, reply) }
-        replies[effect.turn] = FollowedReply(reply, job)
+        var reply: VoiceReply? = null
+        val fault = wiring.call(VoicePort.RESPONDER) { reply = wiring.engines.responder.respond(effect.utterance) }
+        val started = reply ?: return fault
+        val job = wiring.scope.launch { follow(effect.turn, started) }
+        replies[effect.turn] = FollowedReply(started, job)
         return null
     }
 
@@ -60,8 +63,13 @@ internal class ReplyFollower(private val wiring: LoopWiring) {
         return if (VoiceCancelOutcome.UNRESPONSIVE in outcomes) wiring.unresponsive(VoicePort.RESPONDER) else null
     }
 
-    private suspend fun boundedCancel(reply: VoiceReply): VoiceCancelOutcome =
-        withTimeoutOrNull(wiring.config.releaseTimeout) { reply.cancel() } ?: VoiceCancelOutcome.UNRESPONSIVE
+    /** A cancel that throws or misses the release budget is unconfirmed: UNRESPONSIVE. */
+    private suspend fun boundedCancel(reply: VoiceReply): VoiceCancelOutcome {
+        val outcome = runCatching { withTimeoutOrNull(wiring.config.releaseTimeout) { reply.cancel() } }
+        val error = outcome.exceptionOrNull()
+        if (error is CancellationException) throw error
+        return outcome.getOrNull() ?: VoiceCancelOutcome.UNRESPONSIVE
+    }
 
     private suspend fun follow(turn: TurnKey, reply: VoiceReply) {
         val forwarder = ReplyForwarder(turn, SentenceChunker(wiring.config.maxSegmentLength), wiring.inputs)

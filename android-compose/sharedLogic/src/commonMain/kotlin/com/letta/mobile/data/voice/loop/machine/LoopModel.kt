@@ -141,7 +141,7 @@ internal sealed interface ReplySignal {
     /** The answer failed. */
     data class Failed(val error: VoiceError) : ReplySignal
 
-    /** No reply text arrived within the thinking timeout. Ignored once speaking has begun. */
+    /** No reply text arrived within the first-text timeout. Ignored once the answer produced text or closed. */
     data object ThinkingTimedOut : ReplySignal
 }
 

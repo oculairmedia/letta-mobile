@@ -25,6 +25,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.http.content.TextContent
@@ -45,8 +46,8 @@ import kotlinx.serialization.json.put
  * loopback literal (`localhost`, a dotted-quad `127.x.x.x`, `::1`). Plain http to any other host,
  * private LAN addresses and look-alike names included, is refused with
  * [VoiceErrorCode.INSECURE_TRANSPORT] before anything is sent: a LAN is not an encrypted
- * transport. Use https, or reach the server through a loopback tunnel. A keyed URL containing any
- * whitespace is refused outright. The request URL is parsed
+ * transport. Use https, or reach the server through a loopback tunnel. The base URL must be plain
+ * (no query, fragment, user info or whitespace; INVALID_ENDPOINT otherwise). The request URL is built
  * once, and the parsed URL is both what is checked and where the request goes; redirects are
  * never followed.
  *
@@ -74,7 +75,7 @@ class SpeechEndpointClient(
 
     /** Transcribes [request]'s audio and returns the text. */
     suspend fun transcribe(request: TranscriptionRequest): VoiceText = call(SpeechOperation.TRANSCRIPTION) {
-        val target = requestUrl(TRANSCRIPTIONS_PATH, SpeechOperation.TRANSCRIPTION)
+        val target = requestUrl(TRANSCRIPTIONS_ROUTE, SpeechOperation.TRANSCRIPTION)
         val response = client.post {
             url(target)
             authorize()
@@ -87,7 +88,7 @@ class SpeechEndpointClient(
     /** Synthesises [request], handing the audio to [onChunk] as it streams in. */
     suspend fun synthesize(request: SpeechRequest, onChunk: suspend (AudioChunk) -> Unit) {
         call(SpeechOperation.SPEECH) {
-            val target = requestUrl(SPEECH_PATH, SpeechOperation.SPEECH)
+            val target = requestUrl(SPEECH_ROUTE, SpeechOperation.SPEECH)
             client.preparePost {
                 url(target)
                 authorize()
@@ -118,13 +119,13 @@ class SpeechEndpointClient(
      * Parses the request URL once; the parsed URL is both what the transport check validates and
      * what the request is sent to. Refuses to send the bearer key unless the transport protects it.
      */
-    private fun requestUrl(path: String, operation: SpeechOperation): Url {
-        val raw = config.baseUrl.value.trimEnd('/') + path
-        val parsed = runCatching { Url(raw) }.getOrNull()
-        if (config.apiKey != null && !SpeechTransportPolicy.protectsKey(raw, parsed)) {
+    private fun requestUrl(route: List<String>, operation: SpeechOperation): Url {
+        val target = SpeechEndpointAddress.resolve(config.baseUrl, route)
+            ?: throw SpeechEndpointException(operation, VoiceErrorCode.INVALID_ENDPOINT)
+        if (config.apiKey != null && !SpeechTransportPolicy.protectsKey(target)) {
             throw SpeechEndpointException(operation, VoiceErrorCode.INSECURE_TRANSPORT)
         }
-        return parsed ?: throw SpeechEndpointException(operation, VoiceErrorCode.REJECTED)
+        return target
     }
 
     private fun HttpRequestBuilder.authorize() {
@@ -201,8 +202,8 @@ class SpeechEndpointClient(
     }
 
     private companion object {
-        const val TRANSCRIPTIONS_PATH = "/v1/audio/transcriptions"
-        const val SPEECH_PATH = "/v1/audio/speech"
+        val TRANSCRIPTIONS_ROUTE = listOf("v1", "audio", "transcriptions")
+        val SPEECH_ROUTE = listOf("v1", "audio", "speech")
         const val CHUNK_BYTES = 8 * 1024
         const val HTTP_OK = 200
     }
@@ -224,14 +225,31 @@ internal object SpeechStatusCodes {
     }
 }
 
+/**
+ * Builds request URLs from the parsed components of a base URL. The base must be a plain URL:
+ * scheme, host, optional port and optional path prefix. A base with a query, a fragment, user info
+ * or any whitespace is refused (null), rather than having a request path land in its query.
+ */
+internal object SpeechEndpointAddress {
+    /** The request URL for [route] under [base], or null when [base] is not a plain base URL. */
+    fun resolve(base: SpeechEndpointUrl, route: List<String>): Url? {
+        if (base.value.any(Char::isWhitespace)) return null
+        val parsed = runCatching { Url(base.value) }.getOrNull() ?: return null
+        if (!isPlain(parsed)) return null
+        return URLBuilder(parsed).apply { pathSegments = parsed.segments + route }.build()
+    }
+
+    private fun isPlain(url: Url): Boolean = when {
+        url.encodedQuery.isNotEmpty() -> false
+        url.encodedFragment.isNotEmpty() -> false
+        else -> url.user == null && url.password == null
+    }
+}
+
 /** Which endpoints may receive a bearer key. */
 internal object SpeechTransportPolicy {
-    /**
-     * True for https, and for plain http to a host that is exactly a loopback literal. [raw], the
-     * text [url] was parsed from, must contain no whitespace at all; an unparsable URL is refused.
-     */
-    fun protectsKey(raw: String, url: Url?): Boolean {
-        if (url == null || raw.any(Char::isWhitespace)) return false
+    /** True for https, and for plain http to a host that is exactly a loopback literal. */
+    fun protectsKey(url: Url): Boolean {
         return when (url.protocol) {
             URLProtocol.HTTPS -> true
             URLProtocol.HTTP -> LoopbackHost.matches(url.host)

@@ -4149,6 +4149,7 @@ final enum class com.letta.mobile.data.voice/VoiceErrorCode : kotlin/Enum<com.le
     enum entry CAPTURE_EXPIRED // com.letta.mobile.data.voice/VoiceErrorCode.CAPTURE_EXPIRED|null[0]
     enum entry ENGINE_FAILED // com.letta.mobile.data.voice/VoiceErrorCode.ENGINE_FAILED|null[0]
     enum entry INSECURE_TRANSPORT // com.letta.mobile.data.voice/VoiceErrorCode.INSECURE_TRANSPORT|null[0]
+    enum entry INVALID_ENDPOINT // com.letta.mobile.data.voice/VoiceErrorCode.INVALID_ENDPOINT|null[0]
     enum entry NOT_DELIVERED // com.letta.mobile.data.voice/VoiceErrorCode.NOT_DELIVERED|null[0]
     enum entry PERMISSION_REQUIRED // com.letta.mobile.data.voice/VoiceErrorCode.PERMISSION_REQUIRED|null[0]
     enum entry PLAYBACK_FAILED // com.letta.mobile.data.voice/VoiceErrorCode.PLAYBACK_FAILED|null[0]
@@ -68141,16 +68142,19 @@ final class com.letta.mobile.data.voice.activation/ActivationKeyClassifier { // 
 }
 
 final class com.letta.mobile.data.voice.activation/KeyClassifierState { // com.letta.mobile.data.voice.activation/KeyClassifierState|null[0]
-    constructor <init>(kotlin/Boolean = ..., com.letta.mobile.data.voice.activation/KeyTime? = ...) // com.letta.mobile.data.voice.activation/KeyClassifierState.<init>|<init>(kotlin.Boolean;com.letta.mobile.data.voice.activation.KeyTime?){}[0]
+    constructor <init>(kotlin/Boolean = ..., com.letta.mobile.data.voice.activation/KeyTime? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.voice.activation/KeyClassifierState.<init>|<init>(kotlin.Boolean;com.letta.mobile.data.voice.activation.KeyTime?;kotlin.Boolean){}[0]
 
     final val active // com.letta.mobile.data.voice.activation/KeyClassifierState.active|{}active[0]
         final fun <get-active>(): kotlin/Boolean // com.letta.mobile.data.voice.activation/KeyClassifierState.active.<get-active>|<get-active>(){}[0]
+    final val keyDown // com.letta.mobile.data.voice.activation/KeyClassifierState.keyDown|{}keyDown[0]
+        final fun <get-keyDown>(): kotlin/Boolean // com.letta.mobile.data.voice.activation/KeyClassifierState.keyDown.<get-keyDown>|<get-keyDown>(){}[0]
     final val pressedAt // com.letta.mobile.data.voice.activation/KeyClassifierState.pressedAt|{}pressedAt[0]
         final fun <get-pressedAt>(): com.letta.mobile.data.voice.activation/KeyTime? // com.letta.mobile.data.voice.activation/KeyClassifierState.pressedAt.<get-pressedAt>|<get-pressedAt>(){}[0]
 
     final fun component1(): kotlin/Boolean // com.letta.mobile.data.voice.activation/KeyClassifierState.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.voice.activation/KeyTime? // com.letta.mobile.data.voice.activation/KeyClassifierState.component2|component2(){}[0]
-    final fun copy(kotlin/Boolean = ..., com.letta.mobile.data.voice.activation/KeyTime? = ...): com.letta.mobile.data.voice.activation/KeyClassifierState // com.letta.mobile.data.voice.activation/KeyClassifierState.copy|copy(kotlin.Boolean;com.letta.mobile.data.voice.activation.KeyTime?){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.voice.activation/KeyClassifierState.component3|component3(){}[0]
+    final fun copy(kotlin/Boolean = ..., com.letta.mobile.data.voice.activation/KeyTime? = ..., kotlin/Boolean = ...): com.letta.mobile.data.voice.activation/KeyClassifierState // com.letta.mobile.data.voice.activation/KeyClassifierState.copy|copy(kotlin.Boolean;com.letta.mobile.data.voice.activation.KeyTime?;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.voice.activation/KeyClassifierState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.voice.activation/KeyClassifierState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.voice.activation/KeyClassifierState.toString|toString(){}[0]

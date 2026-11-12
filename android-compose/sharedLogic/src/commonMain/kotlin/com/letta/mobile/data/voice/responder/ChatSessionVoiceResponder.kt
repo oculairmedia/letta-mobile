@@ -46,12 +46,14 @@ data class ChatReplyPolicy(
  * cancelled first, and the session queues the new send behind the stopping run. A reply cancelled
  * while that happens sends nothing. Late rows of earlier runs are never spoken.
  *
- * Requirement: the session must expose the run started by a sent message. The utterance is
- * followed by its own row (row id or client message id), and an assistant row is spoken only when
- * its run id equals the run id on the confirmed user row: the only positive link the chat state
- * offers today. Nothing is attributed by timing or elimination; failing silent is preferred to
- * speaking another run's text. Against a session whose confirmed user rows carry no run id, every
- * reply ends UNATTRIBUTED.
+ * Requirement: the session must expose the identity of a sent message and the run it started.
+ * Neither is exposed today (`sendText` returns no client message id; the chat state publishes no
+ * run per sent message), so attribution fails closed: the utterance's row is the single new user
+ * row with the utterance's text (more than one candidate ends UNATTRIBUTED), and an assistant row
+ * is spoken only when its run id equals the run id on that row once confirmed. Nothing is
+ * attributed by timing or elimination; failing silent is preferred to speaking another message's
+ * reply. Against a session whose confirmed user rows carry no run id, every reply ends
+ * UNATTRIBUTED.
  * [respond] is called from one coroutine at a time (the loop's).
  */
 class ChatSessionVoiceResponder(
@@ -84,7 +86,7 @@ private class ChatSessionReply(
         previous?.cancel()
         previous = null
         if (!stage.compareAndSet(ReplyStage.PREPARING, ReplyStage.SENT)) return@flow
-        val tracker = ChatReplyTracker(session.uiState.value)
+        val tracker = ChatReplyTracker(session.uiState.value, text)
         session.actions.sendText(text.value)
         follow(tracker)
     }
@@ -111,6 +113,7 @@ private class ChatSessionReply(
         when {
             delivered == null -> finish(failure(if (tracker.anchored) VoiceErrorCode.UNATTRIBUTED else VoiceErrorCode.NOT_DELIVERED))
             delivered.second == ReplyStage.CANCELLED -> Unit
+            tracker.ambiguous -> finish(failure(VoiceErrorCode.UNATTRIBUTED))
             else -> observed().first { (state, now) -> progress(tracker, state, now) }
         }
     }
@@ -122,10 +125,20 @@ private class ChatSessionReply(
         now: ReplyStage,
     ): Boolean {
         if (now == ReplyStage.CANCELLED) return true
-        if (tracker.agentChanged(state)) return finish(failure(VoiceErrorCode.CANCELLED))
-        tracker.advance(state)?.let { emit(VoiceReplyEvent.Text(it)) }
-        if (state.isRunInFlight) return false
-        return finish(if (tracker.failed(state)) failure(VoiceErrorCode.RUN_FAILED) else VoiceReplyEvent.Completed)
+        val added = if (tracker.agentChanged(state)) null else tracker.advance(state)
+        val ending = ending(tracker, state)
+        val withheld = tracker.ambiguous || tracker.agentChanged(state)
+        if (!withheld) added?.let { emit(VoiceReplyEvent.Text(it)) }
+        return ending?.let { finish(it) } ?: false
+    }
+
+    /** How following ends in [state], or null while the run is still going. */
+    private fun ending(tracker: ChatReplyTracker, state: ChatUiState): VoiceReplyEvent? = when {
+        tracker.agentChanged(state) -> failure(VoiceErrorCode.CANCELLED)
+        tracker.ambiguous -> failure(VoiceErrorCode.UNATTRIBUTED)
+        state.isRunInFlight -> null
+        tracker.failed(state) -> failure(VoiceErrorCode.RUN_FAILED)
+        else -> VoiceReplyEvent.Completed
     }
 
     private suspend fun FlowCollector<VoiceReplyEvent>.finish(event: VoiceReplyEvent): Boolean {
