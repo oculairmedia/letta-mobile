@@ -5,35 +5,54 @@ import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.flow.Flow
 
 /**
- * The window's canvas mounts as the side menu sees them: whether a canvas pick mounts it on the
- * conversation in canvas mode, which canvas is mounted there, and the pick itself. The host's canvas
+ * The window's canvas mounts as the side menu sees them: what a canvas pick does now
+ * ([ShellCanvasPickPlan]), which canvas is mounted for the conversation on screen, and the pick itself. The host's canvas
  * picker implements it (see `ui.canvas.mount`), so the menu knows nothing of how mounts are resolved.
  */
 interface ShellCanvasMounts {
     /** What the menu draws for canvases, live. */
     val state: Flow<ShellCanvasMountState>
 
-    /** Whether a pick mounts right now (canvas mode on a host with mounts); else it opens as before. */
-    fun mountsOnPick(): Boolean
+    /** What a pick does right now. */
+    fun pickPlan(): ShellCanvasPickPlan
 
-    /** Mounts [canvas] on the conversation in canvas mode. */
+    /** Mounts [canvas] on the conversation on screen. */
     suspend fun pick(canvas: CanvasId): ShellCanvasPickOutcome
 
-    /** Puts the conversation in canvas mode back on its own canvas. */
+    /** Puts the conversation on screen back on its own canvas. */
     suspend fun useOwn(): ShellCanvasPickOutcome
+}
+
+/** What a canvas pick in the side menu does now. */
+enum class ShellCanvasPickPlan {
+    /** No conversation on screen (Home): the host opens the canvas as it always has. */
+    Open,
+
+    /** Canvas mode: the board behind the chat swaps to the canvas in place; no pane opens. */
+    Mount,
+
+    /** Chat mode: the host opens the canvas as it always has (a side pane) and it is mounted for the conversation. */
+    OpenAndMount,
 }
 
 /** What the side menu draws for canvas mounts. */
 data class ShellCanvasMountState(
-    /** Whether a pick mounts (canvas mode on a host with mounts). */
+    /** Whether a pick mounts (a conversation is on screen). */
     val mountsOnPick: Boolean = false,
-    /** The canvas mounted for the conversation in canvas mode; null while it shows its own. */
+    /** The canvas mounted for the conversation on screen; null while it shows its own. */
     val mounted: CanvasId? = null,
+    /** The mount is held on this device only (a host without mounts); the agent's tools keep the conversation's own canvas. */
+    val deviceOnly: Boolean = false,
+    /**
+     * Canvases the menu's "Open in side panel" leaves out: the conversation's own (it lives under the
+     * chat) and the board on show in canvas mode (already on screen).
+     */
+    val notForPane: Set<CanvasId> = emptySet(),
 )
 
 /** What became of one pick, in the words the menu tells the person. */
 enum class ShellCanvasPickOutcome {
-    /** Not in canvas mode (any more): the host opens the canvas as it always has. */
+    /** No conversation on screen (any more): the host opens the canvas as it always has. */
     OpenAsBefore,
 
     /** The conversation's board switched. */

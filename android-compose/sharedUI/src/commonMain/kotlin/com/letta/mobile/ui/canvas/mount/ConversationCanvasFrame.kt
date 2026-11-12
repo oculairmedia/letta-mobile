@@ -8,9 +8,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.canvas.mount.client.CanvasBoardSwitchGate
 import com.letta.mobile.data.canvas.mount.client.CanvasModeFocus
+import com.letta.mobile.data.canvas.mount.client.CanvasPickerState
 import com.letta.mobile.data.canvas.mount.client.ConversationBoardSwitch
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasState
@@ -43,8 +45,9 @@ fun ProvideConversationCanvasPicker(picker: ConversationCanvasPicker?, content: 
  * for the mounted canvas it is given, or the conversation's own board for null. It opens on the
  * own board at once and switches when the host's mount says otherwise, saving the board on screen
  * first (see [ConversationBoardSwitch]); each board is drawn under its own key, so a switch disposes
- * the old board only after its save. While the page is in canvas mode it tells the window's
- * [CanvasModeFocus], so a pick in the side menu mounts on this conversation.
+ * the old board only after its save. While the page is composed it tells the window's
+ * [CanvasModeFocus] it is on screen, and whether it is in canvas mode, so a pick in the side menu
+ * mounts on this conversation (and knows whether to open a pane too).
  *
  * Without a picker or a [target] (a new chat) the own board is drawn and nothing is reported.
  */
@@ -62,10 +65,19 @@ fun ConversationCanvasFrame(target: ConversationCanvasTarget?, content: @Composa
         // A failed save keeps the board on screen; the switch is asked again until it lands or the mount changes.
         while (!switch.follow(state)) delay(SWITCH_RETRY_MS)
     }
+    ReportOnScreen(picker.focus, target)
     ReportCanvasMode(picker.focus, target)
     val shown by switch.shown.collectAsState()
     CompositionLocalProvider(LocalCanvasBoardSave provides gate::attach) {
         key(shown) { content(shown) }
+    }
+}
+
+@Composable
+private fun ReportOnScreen(focus: CanvasModeFocus, target: ConversationCanvasTarget) {
+    DisposableEffect(focus, target) {
+        focus.show(target)
+        onDispose { focus.hide(target) }
     }
 }
 
@@ -75,6 +87,24 @@ private fun ReportCanvasMode(focus: CanvasModeFocus, target: ConversationCanvasT
     DisposableEffect(focus, target, onBoard) {
         if (onBoard) focus.enter(target)
         onDispose { focus.leave(target) }
+    }
+}
+
+/**
+ * A host's side pane showing [paneCanvas], closed by [close] when the conversation on screen enters
+ * canvas mode with that board mounted (or mounts it while in canvas mode): the board behind the chat
+ * shows it now, so the pane would be a second copy. A pane opened while the board is already on show
+ * is left alone. Nothing happens without the window's picker.
+ */
+@Composable
+fun CloseCanvasPaneShownOnBoard(paneCanvas: CanvasId?, close: () -> Unit) {
+    val picker = LocalConversationCanvasPicker.current ?: return
+    val state by remember(picker) { picker.state }.collectAsState(CanvasPickerState())
+    val pane by rememberUpdatedState(paneCanvas)
+    val onClose by rememberUpdatedState(close)
+    val mountedOnBoard = state.mounted.takeIf { state.canvasMode }
+    LaunchedEffect(mountedOnBoard) {
+        if (mountedOnBoard != null && mountedOnBoard == pane) onClose()
     }
 }
 

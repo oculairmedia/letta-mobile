@@ -15,6 +15,9 @@
     <!-- The side menu's canvases: the board a conversation shows in canvas mode, and switching it. -->
     <string name="shell_canvas_current">On this conversation’s board</string>
     <string name="shell_canvas_current_state">Shown on this conversation’s board</string>
+    <string name="shell_canvas_current_device">This device only; agent keeps its own canvas</string>
+    <string name="shell_canvas_current_device_state">Shown on this conversation’s board on this device only. The agent’s canvas tools still use the conversation’s own canvas.</string>
+    <string name="shell_canvas_open_in_pane">Open in side panel</string>
     <string name="shell_canvas_use_own">Use this conversation’s own canvas</string>
     <string name="shell_canvas_new">New canvas</string>
     <string name="shell_canvas_jump_description">Jump to canvases</string>

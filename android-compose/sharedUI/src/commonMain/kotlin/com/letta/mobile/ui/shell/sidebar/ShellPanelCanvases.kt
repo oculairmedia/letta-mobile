@@ -23,10 +23,13 @@ import com.letta.mobile.sharedui.resources.shell_canvas_mount_invalid
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_unavailable
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_unknown
 import com.letta.mobile.sharedui.resources.shell_canvas_new
+import com.letta.mobile.sharedui.resources.shell_canvas_open_in_pane
 import com.letta.mobile.sharedui.resources.shell_canvas_use_own
 import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.PaneWindowClass
+import com.letta.mobile.ui.host.currentPaneWindowClass
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -52,14 +55,19 @@ internal fun rememberCanvasMountState(): ShellCanvasMountState {
     return state
 }
 
-/** [canvases] with the one mounted for the conversation in canvas mode marked current. */
-internal fun markMounted(canvases: List<ShellCanvasRowModel>, mounted: CanvasId?): List<ShellCanvasRowModel> =
-    canvases.map { it.copy(mounted = it.id == mounted) }
+/** [canvases] with the one mounted for the conversation on screen marked current (and whether only this device holds it). */
+internal fun markMounted(canvases: List<ShellCanvasRowModel>, mounts: ShellCanvasMountState): List<ShellCanvasRowModel> =
+    canvases.map { row ->
+        val mounted = row.id == mounts.mounted
+        row.copy(mounted = mounted, mountedHereOnly = mounted && mounts.deviceOnly)
+    }
 
 /**
- * The panel's canvas picks for this window: in canvas mode on a host with mounts a pick mounts the
- * canvas for the conversation on screen, else the host opens it as before ([ShellAgentPanelActions.onOpenCanvas]).
- * A refusal or outage is told through the window's notices in plain words; the board stays.
+ * The panel's canvas picks for this window, by [ShellCanvasMounts.pickPlan]: in canvas mode a pick
+ * mounts the canvas for the conversation on screen and opens nothing; in chat mode it is mounted and
+ * also opened as before ([ShellAgentPanelActions.onOpenCanvas], a side pane where the host has one);
+ * with no conversation on screen it only opens. "Open in side panel" opens a pane and leaves the
+ * mount alone. A refusal or outage is told through the window's notices in plain words; the board stays.
  */
 internal class ShellCanvasPicks(
     private val mounts: ShellCanvasMounts?,
@@ -69,8 +77,17 @@ internal class ShellCanvasPicks(
 ) {
     /** A canvas row was picked. */
     fun open(canvas: CanvasId) {
-        val window = mounts?.takeIf { it.mountsOnPick() } ?: return actions.onOpenCanvas(canvas)
-        scope.launch { report(window.pick(canvas), canvas) }
+        val window = mounts ?: return actions.onOpenCanvas(canvas)
+        when (window.pickPlan()) {
+            ShellCanvasPickPlan.Open -> actions.onOpenCanvas(canvas)
+            ShellCanvasPickPlan.Mount -> scope.launch { report(window.pick(canvas), canvas) }
+            ShellCanvasPickPlan.OpenAndMount -> scope.launch { openAndMount(window, canvas) }
+        }
+    }
+
+    /** The row menu's "Open in side panel": a pane, whatever the mode, without touching the mount. */
+    fun openInPane(canvas: CanvasId) {
+        actions.onOpenCanvasInPane?.invoke(canvas)
     }
 
     /** "Use this conversation's own canvas" on the mounted row. */
@@ -79,13 +96,26 @@ internal class ShellCanvasPicks(
         scope.launch { report(window.useOwn(), canvas = null) }
     }
 
+    /**
+     * Chat mode: the mount lands first, then the canvas opens, because opening may close the phone's
+     * drawer and with it this scope. A failed mount is told; the canvas still opens.
+     */
+    private suspend fun openAndMount(window: ShellCanvasMounts, canvas: CanvasId) {
+        notify(window.pick(canvas))
+        actions.onOpenCanvas(canvas)
+    }
+
     private suspend fun report(outcome: ShellCanvasPickOutcome, canvas: CanvasId?) {
         when (outcome) {
-            // Canvas mode ended while the pick was on its way: open it as a pick outside canvas mode does.
+            // The conversation left the screen while the pick was on its way: open it as a pick without one does.
             ShellCanvasPickOutcome.OpenAsBefore -> canvas?.let(actions.onOpenCanvas)
             ShellCanvasPickOutcome.Mounted -> canvas?.let(actions.onCanvasMounted)
-            else -> messageOf(outcome)?.let { overlays?.show(Overlay.Snackbar(getString(it), key = NOTICE_KEY)) }
+            else -> notify(outcome)
         }
+    }
+
+    private suspend fun notify(outcome: ShellCanvasPickOutcome) {
+        messageOf(outcome)?.let { overlays?.show(Overlay.Snackbar(getString(it), key = NOTICE_KEY)) }
     }
 
     private companion object {
@@ -99,6 +129,21 @@ internal class ShellCanvasPicks(
             else -> null
         }
     }
+}
+
+/**
+ * A canvas row menu's extras: the way back's label while a conversation is on screen, and
+ * "Open in side panel"'s where the window is wide enough for a side pane and the host has one
+ * (null hides each), with the canvases the latter leaves out.
+ */
+internal class ShellCanvasMenu(val useOwnLabel: String?, val paneLabel: String?, val notForPane: Set<CanvasId>)
+
+@Composable
+internal fun rememberCanvasMenu(mounts: ShellCanvasMountState, actions: ShellAgentPanelActions): ShellCanvasMenu {
+    val useOwn = stringResource(Res.string.shell_canvas_use_own).takeIf { mounts.mountsOnPick }
+    val wide = currentPaneWindowClass() == PaneWindowClass.Wide
+    val pane = stringResource(Res.string.shell_canvas_open_in_pane).takeIf { wide }?.takeIf { actions.onOpenCanvasInPane != null }
+    return remember(useOwn, pane, mounts.notForPane) { ShellCanvasMenu(useOwn, pane, mounts.notForPane) }
 }
 
 /** This window's canvas picks over [actions]. */

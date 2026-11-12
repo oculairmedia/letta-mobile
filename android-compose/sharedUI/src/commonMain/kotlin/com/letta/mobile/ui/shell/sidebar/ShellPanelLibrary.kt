@@ -33,9 +33,6 @@ import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.components.list.rememberRosterListState
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.shell_canvas_use_own
-import org.jetbrains.compose.resources.stringResource
 
 /** One row of the agent panel's roster: a conversation or a canvas. */
 @Immutable
@@ -48,7 +45,7 @@ internal sealed interface ShellPanelItem {
         override val selected: Boolean get() = model.selected
     }
 
-    /** Selected while open in a pane, or while it is the board the conversation in canvas mode shows. */
+    /** Selected while open in a pane, or while it is the board mounted for the conversation on screen. */
     data class Canvas(val model: ShellCanvasRowModel) : ShellPanelItem {
         override val key: String get() = "canvas-${model.id.value}"
         override val selected: Boolean get() = model.selected || model.mounted
@@ -79,15 +76,16 @@ internal fun canvasesLine(sections: List<RosterSection<ShellPanelItem>>): Int =
 
 /**
  * The conversations under their Active / Archived / All filter, then the canvases: one
- * [RosterList]. A pinned or settled chat that moves glides to its place. In canvas mode a
- * canvas pick mounts it for the conversation on screen ([ShellCanvasPicks]); the mounted one is
- * marked current and offers the way back to the conversation's own canvas.
+ * [RosterList]. A pinned or settled chat that moves glides to its place. With a conversation on
+ * screen a canvas pick mounts it for that conversation ([ShellCanvasPicks]: in place in canvas mode,
+ * and opened as before too in chat mode); the mounted one is marked current and offers the way back
+ * to the conversation's own canvas. A canvas's menu can open it in a side panel without mounting it.
  */
 @Composable
 internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
     val picker = rememberCanvasMountState()
     val picks = rememberCanvasPicks(actions)
-    val canvases = remember(state.canvases, picker.mounted) { markMounted(state.canvases, picker.mounted) }
+    val canvases = remember(state.canvases, picker) { markMounted(state.canvases, picker) }
     val sections = remember(state.conversations, canvases, actions.onNewCanvas) {
         shellPanelSections(state.copy(canvases = canvases), actions.onNewCanvas?.let { { NewCanvasButton(it) } })
     }
@@ -104,8 +102,7 @@ internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions:
     }
     val verbs = LocalObjectVerbs.current
     val ui = remember { ShellConversationListUi() }
-    val useOwnLabel = stringResource(Res.string.shell_canvas_use_own).takeIf { picker.mountsOnPick }
-    val rows = ShellPanelRows(actions, picks, ui, useOwnLabel)
+    val rows = ShellPanelRows(actions, picks, ui, rememberCanvasMenu(picker, actions))
     RosterList(
         RosterSpec(
             sections = sections,
@@ -144,8 +141,7 @@ private class ShellPanelRows(
     val actions: ShellAgentPanelActions,
     val picks: ShellCanvasPicks,
     val ui: ShellConversationListUi,
-    /** The way back's label while a pick mounts (canvas mode on a host with mounts); null hides the way back. */
-    val useOwnLabel: String?,
+    val menu: ShellCanvasMenu,
 ) {
     fun open(item: ShellPanelItem) {
         when (item) {
@@ -155,11 +151,16 @@ private class ShellPanelRows(
     }
 
     /** The mounted row's way back to the conversation's own canvas; null on every other row. */
-    fun useOwn(canvas: ShellCanvasRowModel): (() -> Unit)? = picks::useOwn.takeIf { canvas.mounted && useOwnLabel != null }
+    fun useOwn(canvas: ShellCanvasRowModel): (() -> Unit)? = picks::useOwn.takeIf { canvas.mounted && menu.useOwnLabel != null }
 
-    /** The mounted row's menu entry for the way back; null on every other row. */
-    fun useOwnItem(canvas: ShellCanvasRowModel): LettaMenuItem? =
-        useOwn(canvas)?.let { action -> useOwnLabel?.let { LettaMenuItem(it, onClick = action) } }
+    /** A canvas's menu entries before archive: the mounted row's way back, then "Open in side panel" where offered. */
+    fun menuExtras(canvas: ShellCanvasRowModel): List<LettaMenuItem> = listOfNotNull(useOwnItem(canvas), paneItem(canvas))
+
+    private fun useOwnItem(canvas: ShellCanvasRowModel): LettaMenuItem? =
+        useOwn(canvas)?.let { action -> menu.useOwnLabel?.let { LettaMenuItem(it, onClick = action) } }
+
+    private fun paneItem(canvas: ShellCanvasRowModel): LettaMenuItem? =
+        menu.paneLabel?.takeIf { canvas.id !in menu.notForPane }?.let { LettaMenuItem(it) { picks.openInPane(canvas.id) } }
 }
 
 @Composable
@@ -175,7 +176,7 @@ private fun ShellPanelItemRow(item: ShellPanelItem, row: RosterRowState, rows: S
 private fun ShellPanelItem.panelItemMenu(row: RosterRowState, rows: ShellPanelRows, verbs: ObjectVerbMenus?): List<LettaMenuItem> =
     when (this) {
         is ShellPanelItem.Chat -> model.shellConversationMenu(conversationRowActions(model, rows.actions), rows.ui, row, verbs)
-        is ShellPanelItem.Canvas -> ShellRowMenus.canvas(model.archived, canvasArchiveToggle(model, rows.actions), rows.useOwnItem(model))
+        is ShellPanelItem.Canvas -> ShellRowMenus.canvas(model.archived, canvasArchiveToggle(model, rows.actions), rows.menuExtras(model))
     }
 
 /** Rename in place: the chat's own menu entry ("Rename chat") opens it, as F2 does. */

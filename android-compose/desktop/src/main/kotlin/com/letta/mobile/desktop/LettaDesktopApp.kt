@@ -17,6 +17,7 @@ import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards
+import com.letta.mobile.ui.canvas.mount.CloseCanvasPaneShownOnBoard
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellSearchContext
@@ -66,6 +67,9 @@ internal fun LettaDesktopApp(
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
         ProvideCanvasHostWithBoards(context.core.canvasShell.viewers, context.core.canvasShell.boards, context.core.canvasShell.picker) {
+            // Entering canvas mode with the pane's board mounted puts it behind the chat: the pane copy closes.
+            val canvasShell = context.core.canvasShell
+            CloseCanvasPaneShownOnBoard(canvasShell.activeSession?.canvasId, canvasShell::close)
             DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
                 // Boards register where the canvas_* tools look and open by id for canvas modules; the header hoists into the title bar.
                 val header = DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange)

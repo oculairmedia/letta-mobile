@@ -154,6 +154,8 @@ internal fun desktopSidebarActions(
             }
         },
         onOpenCanvas = { context.openCanvas(it) },
+        // The row menu's "Open in side panel": the pane, even in canvas mode, with the mount left as it is.
+        onOpenCanvasInPane = { canvasShell.open(it) },
         onArchiveCanvas = canvasShell.library::setArchived,
         onNewCanvas = { canvasShell.createNew(frame.value.focus.selectedAgentId) },
         onCanvasMounted = { id -> if (canvasShell.activeSession?.canvasId == id) canvasShell.close() },

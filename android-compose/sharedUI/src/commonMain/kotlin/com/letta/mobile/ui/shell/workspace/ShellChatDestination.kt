@@ -56,6 +56,7 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.theme.LettaDimens
@@ -112,7 +113,10 @@ class ShellChatLook(
     val pagedTimeline: CanonicalTimelinePresentation? = null,
     val recents: ChatRecentInteractions? = null,
     val canvasHeaderTrailing: (@Composable () -> Unit)? = null,
-    /** The board on show, so the host can route its own opens of it to this page (desktop's dock); null when it leaves. */
+    /**
+     * The board on show, so the host can route its own opens of it to this page (desktop's dock); null when it
+     * leaves, and while a mounted board waits under the chat page (it is not on show until canvas mode).
+     */
     val onBoardShown: ((CanvasId?) -> Unit)? = null,
     /** The conversation's subagent dual view; null draws the page alone. */
     val subagentViews: SubagentDualViewBinding? = null,
@@ -233,9 +237,13 @@ private class BoardInputs(val page: ShellChatPage, val look: ShellChatLook, val 
 private fun ConversationBoard(inputs: BoardInputs, actions: ChatCanvasActions) {
     val board = inputs.page.board
     val session = rememberConversationBoard(board, inputs.page.owner, inputs.mounted)
+    // A mounted board under the chat page is not on show: the host may show it in its side pane
+    // (the same live session, through the window's boards) until canvas mode puts it on show.
+    val onBoard = LocalChatCanvasOnBoard.current
+    val shown = session?.canvasId?.takeIf { inputs.mounted == null || onBoard }
     inputs.look.onBoardShown?.let { report ->
-        DisposableEffect(report, session) {
-            report(session?.canvasId)
+        DisposableEffect(report, shown) {
+            report(shown)
             onDispose { report(null) }
         }
     }
