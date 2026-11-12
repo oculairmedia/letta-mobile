@@ -68,6 +68,8 @@ data class ShellCanvasRowModel(
     val timeLabel: String,
     val selected: Boolean = false,
     val archived: Boolean = false,
+    /** The board the conversation in canvas mode shows (its mount); drawn as the current one. */
+    val mounted: Boolean = false,
 )
 
 /**
@@ -121,8 +123,13 @@ data class ShellAgentPanelActions(
     val onPinConversation: ((id: String, pinned: Boolean) -> Unit)? = null,
     /**  (G37): fork a conversation, named or not; null means the backend cannot fork. */
     val onForkConversation: ((id: String, name: String?) -> Unit)? = null,
+    /** Opens a canvas as before (pane or page); in canvas mode on a host with mounts a pick mounts instead. */
     val onOpenCanvas: (CanvasId) -> Unit = {},
     val onArchiveCanvas: ((id: CanvasId, archived: Boolean) -> Unit)? = null,
+    /** Starts a new canvas; null means the host cannot, so the Canvases header offers none. */
+    val onNewCanvas: (() -> Unit)? = null,
+    /** A pick mounted a canvas on the board on show (the phone drawer closes so the board shows). */
+    val onCanvasMounted: () -> Unit = {},
     /** Settle and marker; null means the host keeps no such marks. */
     val conversationMarks: ShellConversationMarkActions? = null,
     /** What the Chat options dialog changes; read with [ShellAgentPanelState.chatOptions]. */

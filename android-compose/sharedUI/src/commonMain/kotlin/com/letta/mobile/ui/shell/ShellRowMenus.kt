@@ -56,9 +56,10 @@ object ShellRowMenus {
             )
         }
 
-    /** A canvas: archive or restore, when the host can archive canvases (null: it cannot). */
-    fun canvas(archived: Boolean, onArchiveToggle: (() -> Unit)?): List<LettaMenuItem> =
+    /** A canvas: [useOwn] (the mounted canvas's way back), then archive or restore when the host can archive canvases. */
+    fun canvas(archived: Boolean, onArchiveToggle: (() -> Unit)?, useOwn: LettaMenuItem? = null): List<LettaMenuItem> =
         listOfNotNull(
+            useOwn,
             onArchiveToggle?.let { LettaMenuItem(if (archived) "Restore canvas" else "Archive canvas", onClick = it) },
         )
 

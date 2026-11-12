@@ -7,6 +7,7 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.time.TimeLabels
 import kotlin.time.Instant
@@ -48,6 +49,18 @@ data class ShellSidebarInput(
     val archivedCanvasIds: Set<CanvasId> = emptySet(),
 )
 
+/** Which canvases the panel lists and how: the focused agent's first, the filter, and the one open in a pane. */
+data class ShellCanvasScope(
+    /** The focused agent, whose canvases lead; null lists every canvas by recency alone. */
+    val agentId: AgentId? = null,
+    val filter: ShellArchiveFilter = ShellArchiveFilter.Active,
+    val archivedIds: Set<CanvasId> = emptySet(),
+    val activeCanvasId: CanvasId? = null,
+) {
+    /** Whether [canvas] was made with the focused agent. */
+    fun isAgents(canvas: CanvasDocument): Boolean = agentId != null && canvas.agentId == agentId.value
+}
+
 /** Pure mapping from the platform-neutral conversation summaries to the panel's rows. */
 object ShellSidebarMapping {
     /** The agent panel a host's [input] draws, its times relative to [now]. */
@@ -63,17 +76,31 @@ object ShellSidebarMapping {
             conversations = conversationRows(input.conversations, input.marks, timeLabel),
             archivedConversations = conversationRows(input.archivedConversations, input.marks, timeLabel),
             chatOptions = input.chatOptions,
-            canvases = input.canvases.map { canvas ->
+            canvases = canvasRows(
+                input.canvases,
+                ShellCanvasScope(input.agent.agentId?.let(::AgentId), input.archiveFilter, input.archivedCanvasIds, input.activeCanvasId),
+                now,
+            ),
+        )
+    }
+
+    /**
+     * The canvases the device can see under [scope]'s filter: the focused agent's first, then the
+     * rest, each group most recently edited first. Every host's panel lists them this way.
+     */
+    fun canvasRows(canvases: List<CanvasDocument>, scope: ShellCanvasScope, now: Instant): List<ShellCanvasRowModel> =
+        canvases
+            .filter { scope.filter.admits(it.id in scope.archivedIds) }
+            .sortedWith(compareByDescending<CanvasDocument> { scope.isAgents(it) }.thenByDescending { it.updatedAtEpochMs })
+            .map { canvas ->
                 ShellCanvasRowModel(
                     id = canvas.id,
                     title = canvas.title,
                     timeLabel = TimeLabels.age(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
-                    selected = canvas.id == input.activeCanvasId,
-                    archived = canvas.id in input.archivedCanvasIds,
+                    selected = canvas.id == scope.activeCanvasId,
+                    archived = canvas.id in scope.archivedIds,
                 )
-            },
-        )
-    }
+            }
 
     /** The placeholder preview a conversation carries before its messages load; never shown. */
     private const val LOADING_PREVIEW = "Loaded from backend"
