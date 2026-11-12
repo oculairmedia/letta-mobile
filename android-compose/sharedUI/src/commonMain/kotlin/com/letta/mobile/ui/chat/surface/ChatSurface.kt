@@ -197,15 +197,19 @@ fun ChatSurface(
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {
-                // The board learns whether it is on show with the chat over it (canvas mode), for the side menu's pick.
-                val onBoard = presentation.mode != ChatSurfaceMode.FullScreen
-                val board: (@Composable () -> Unit)? = canvas?.let { slot ->
-                    { CompositionLocalProvider(LocalChatCanvasOnBoard provides onBoard) { slot(canvasActions) } }
-                }
-                ChatSurfaceLayers(frame, board)
+                ChatSurfaceLayers(frame, canvas?.let { boardOnShow(it, canvasActions, presentation.mode) })
             }
         }
     }
+}
+
+/** The host's board, told whether it is on show with the chat over it (canvas mode), for the side menu's pick. */
+private fun boardOnShow(
+    slot: @Composable (ChatCanvasActions) -> Unit,
+    actions: ChatCanvasActions,
+    mode: ChatSurfaceMode,
+): @Composable () -> Unit = {
+    CompositionLocalProvider(LocalChatCanvasOnBoard provides (mode != ChatSurfaceMode.FullScreen)) { slot(actions) }
 }
 
 /** The page's layers for its idiom, under the send flight. Skipped while only the keyboard moves. */
