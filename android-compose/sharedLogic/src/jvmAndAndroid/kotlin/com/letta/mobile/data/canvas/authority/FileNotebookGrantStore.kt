@@ -44,6 +44,17 @@ class FileNotebookGrantStore internal constructor(
         action(entry?.grant())
     }
 
+    override suspend fun <T> withGrants(
+        principal: String,
+        documentIds: Collection<NotebookDocumentId>,
+        action: suspend (Map<NotebookDocumentId, NotebookPeerGrant>) -> T,
+    ): T = locked {
+        documentIds.forEach { validateKey(principal, it) }
+        val wanted = documentIds.mapTo(HashSet()) { it.value }
+        val held = read().grants.filter { it.principal == principal && it.documentId in wanted }
+        action(held.associate { NotebookDocumentId(it.documentId) to it.grant() })
+    }
+
     override suspend fun documentsOf(principal: String): List<NotebookDocumentId> = locked {
         require(principal.isNotBlank()) { "Empty notebook grant principal" }
         read().grants.filter { it.principal == principal }.map { it.documentId }.sorted().map(::NotebookDocumentId)

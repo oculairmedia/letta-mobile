@@ -130,7 +130,7 @@ object SharedNotesWire {
     const val MAX_LISTED = 500
 
     /**
-     * The most grants one page rechecks (each recheck is its own grant transaction), so a caller
+     * The most grants one page rechecks (a bounded number per grant transaction), so a caller
      * holding many grants that cannot open the editor costs the host bounded work per request.
      */
     const val MAX_CHECKED = 2 * MAX_LISTED

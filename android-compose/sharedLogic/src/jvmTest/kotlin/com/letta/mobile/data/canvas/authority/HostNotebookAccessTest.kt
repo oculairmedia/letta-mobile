@@ -175,7 +175,7 @@ class HostNotebookAccessTest {
             val listing = HostNotebookAccess(notebooks, grants, PEER).sharedNotes()
 
             assertEquals(SharedNoteListing.Listed(listOf(SharedNote(id, "Note 0"))), listing)
-            assertEquals(SharedNotesWire.MAX_LISTED + 1, grants.rechecks, "every grant is rechecked under its own transaction")
+            assertEquals(SharedNotesWire.MAX_LISTED + 1, grants.rechecks, "every grant is rechecked once")
         }
     }
 
@@ -188,6 +188,19 @@ class HostNotebookAccessTest {
 
             assertEquals(emptyList(), listing.notes)
             assertNotNull(listing.next, "the page stopped before the last grant")
+            assertEquals(SharedNotesWire.MAX_CHECKED, grants.rechecks)
+        }
+    }
+
+    /** A full page reads the grant store once per chunk of rechecks (plus its listing), never once per grant. */
+    @Test
+    fun aFullPageReadsTheGrantStoreABoundedNumberOfTimes() = runBlocking {
+        withNotes(1) { notebooks, (id) ->
+            val grants = MemoryGrants(readOnly(SharedNotesWire.MAX_CHECKED) + (id to EDITOR))
+            assertIs<SharedNoteListing.Listed>(HostNotebookAccess(notebooks, grants, PEER).sharedNotes())
+
+            val chunks = SharedNotesWire.MAX_CHECKED / SHARED_NOTES_CHECKS_PER_TRANSACTION
+            assertEquals(1 + chunks, grants.reads, "one listing read and one transaction per chunk")
             assertEquals(SharedNotesWire.MAX_CHECKED, grants.rechecks)
         }
     }
@@ -308,10 +321,14 @@ class HostNotebookAccessTest {
 
     private fun padded(index: Int) = index.toString().padStart(5, '0')
 
-    /** Grants held in memory, listed in id order as the store contract says; counts every per-note recheck. */
+    /**
+     * Grants held in memory, listed in id order as the store contract says. Counts every grant handed
+     * to a transaction ([rechecks]) and every store read, each transaction or listing ([reads]).
+     */
     private class MemoryGrants(grants: List<Pair<NotebookDocumentId, NotebookPeerGrant>>) : NotebookGrantStore {
         private val byDocument = grants.toMap().toMutableMap()
         var rechecks = 0
+        var reads = 0
 
         fun revoke(id: NotebookDocumentId) {
             byDocument.remove(id)
@@ -323,11 +340,25 @@ class HostNotebookAccessTest {
             action: suspend (NotebookPeerGrant?) -> T,
         ): T {
             rechecks++
+            reads++
             return action(byDocument[documentId]?.takeIf { it.peerId == principal })
         }
 
-        override suspend fun documentsOf(principal: String): List<NotebookDocumentId> =
-            byDocument.filterValues { it.peerId == principal }.keys.sortedBy { it.value }
+        override suspend fun <T> withGrants(
+            principal: String,
+            documentIds: Collection<NotebookDocumentId>,
+            action: suspend (Map<NotebookDocumentId, NotebookPeerGrant>) -> T,
+        ): T {
+            rechecks += documentIds.size
+            reads++
+            val held = documentIds.mapNotNull { id -> byDocument[id]?.takeIf { it.peerId == principal }?.let { id to it } }
+            return action(held.toMap())
+        }
+
+        override suspend fun documentsOf(principal: String): List<NotebookDocumentId> {
+            reads++
+            return byDocument.filterValues { it.peerId == principal }.keys.sortedBy { it.value }
+        }
     }
 
     private companion object {

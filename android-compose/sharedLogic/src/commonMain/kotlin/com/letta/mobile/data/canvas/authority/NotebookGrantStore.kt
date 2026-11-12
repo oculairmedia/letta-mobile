@@ -21,6 +21,19 @@ interface NotebookGrantStore {
     ): T
 
     /**
+     * Run [action] under one grant transaction over the grants [principal] holds for [documentIds],
+     * read once: the map holds each of those documents that has a grant (a missing grant is absent).
+     * Like [withGrant], the transaction is serialized with provisioning and revocation for the whole
+     * [action], so a decision made from the map still holds for everything the action does with it.
+     * Keep [documentIds] bounded: the transaction lasts as long as the action takes over all of them.
+     */
+    suspend fun <T> withGrants(
+        principal: String,
+        documentIds: Collection<NotebookDocumentId>,
+        action: suspend (Map<NotebookDocumentId, NotebookPeerGrant>) -> T,
+    ): T
+
+    /**
      * The documents [principal] holds a grant for, read in one transaction, ordered by
      * [NotebookDocumentId.value] (ascending, by [String.compareTo]) so a position in the list means
      * the same thing on every call. A listing authorizes nothing: every operation on a listed

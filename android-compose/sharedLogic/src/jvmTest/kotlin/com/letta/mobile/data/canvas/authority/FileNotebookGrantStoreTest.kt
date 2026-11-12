@@ -106,6 +106,25 @@ class FileNotebookGrantStoreTest {
         assertNull(store.withGrant("principal-one", id) { it })
     }
 
+    /** One bulk transaction hands back exactly this principal's grants among the ids asked, from one read. */
+    @Test
+    fun withGrantsHandsBackOnlyThePrincipalsGrantsForTheIdsAsked() = runBlocking {
+        val file = Files.createTempDirectory("notebook-grants-bulk").resolve("grants.json")
+        fun entry(principal: String, document: String, edit: Boolean) =
+            """{"principal":"$principal","documentId":"$document","mayRead":true,"mayEdit":$edit,"mayReference":false}"""
+        val entries = listOf(entry("one", "a", true), entry("one", "b", false), entry("two", "c", true), entry("one", "d", true))
+        Files.writeString(file, """{"version":1,"grants":[${entries.joinToString(",")}]}""")
+        val asked = listOf("a", "b", "c", "missing").map(::NotebookDocumentId)
+
+        val held = FileNotebookGrantStore(file).withGrants("one", asked) { it }
+
+        val expected = mapOf(
+            NotebookDocumentId("a") to NotebookPeerGrant("one", mayRead = true, mayEdit = true),
+            NotebookDocumentId("b") to NotebookPeerGrant("one", mayRead = true),
+        )
+        assertEquals(expected, held, "another principal's grant, an id not asked and a missing grant are absent")
+    }
+
     @Test
     fun documentedFixtureLoads() = runBlocking {
         val file = Files.createTempDirectory("notebook-grants-fixture").resolve("grants.json")

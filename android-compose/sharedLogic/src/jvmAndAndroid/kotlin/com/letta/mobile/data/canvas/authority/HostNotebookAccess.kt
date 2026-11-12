@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.authority
 
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.canvas.NotebookPeerGrant
 import com.letta.mobile.data.canvas.notes.LocalNotebookNoteBackend
 import com.letta.mobile.data.canvas.notes.NotebookNoteBackend
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
@@ -73,10 +74,12 @@ class HostNotebookAccess(
 
     /**
      * One page of the notes this principal may open now, starting after [from] (null for the first
-     * page). Each grant is rechecked under its own transaction for read and edit, and a granted note
-     * missing from the store is left out, as is a grant whose id is longer than a cursor can name
-     * ([SharedNotesCursors.MAX_ID_BYTES]; the host's own note ids are far shorter). A page holds up
-     * to [SharedNotesWire.MAX_LISTED] notes that pass that check and rechecks at most [SharedNotesWire.MAX_CHECKED] grants; one that stopped
+     * page). Grants are rechecked for read and edit in id order, [SHARED_NOTES_CHECKS_PER_TRANSACTION]
+     * at a time under one grant transaction ([NotebookGrantStore.withGrants]), and each note's title is
+     * read inside the transaction that allowed it. A granted note missing from the store is left out,
+     * as is a grant whose id is longer than a cursor can name ([SharedNotesCursors.MAX_ID_BYTES]; the
+     * host's own note ids are far shorter). A page holds up to [SharedNotesWire.MAX_LISTED] notes that
+     * pass that check and rechecks at most [SharedNotesWire.MAX_CHECKED] grants; one that stopped
      * before the principal's last grant carries [SharedNoteListing.Listed.next], naming the last grant
      * it checked, so following cursors reaches every grant however many cannot open the editor.
      *
@@ -100,14 +103,21 @@ class HostNotebookAccess(
 
     private suspend fun listAfter(after: NotebookDocumentId?): SharedNoteListing {
         val candidates = candidatesAfter(after)
-        val notes = mutableListOf<SharedNote>()
-        var checked = 0
-        for (id in candidates.take(SharedNotesWire.MAX_CHECKED)) {
-            if (notes.size == SharedNotesWire.MAX_LISTED) break
-            checked++
-            openable(id)?.let(notes::add)
+        val page = SharedNotesPage()
+        for (chunk in candidates.take(SharedNotesWire.MAX_CHECKED).chunked(SHARED_NOTES_CHECKS_PER_TRANSACTION)) {
+            if (page.full()) break
+            grants.withGrants(principal, chunk) { held -> checkChunk(chunk, held, page) }
         }
-        return SharedNoteListing.Listed(notes, nextCursor(candidates, checked))
+        return SharedNoteListing.Listed(page.notes, nextCursor(candidates, page.checked))
+    }
+
+    /** Checks [chunk] in order against the grants read for it in this transaction, until the page is full. */
+    private fun checkChunk(chunk: List<NotebookDocumentId>, held: Map<NotebookDocumentId, NotebookPeerGrant>, page: SharedNotesPage) {
+        for (id in chunk) {
+            if (page.full()) return
+            page.checked++
+            openable(id, held[id])?.let(page.notes::add)
+        }
     }
 
     /** The principal's grants after [after], in id order (sorted here too, so a store's own order never moves a cursor). */
@@ -124,10 +134,28 @@ class HostNotebookAccess(
         return SharedNotesCursors.issue(principal, candidates[checked - 1])
     }
 
-    private suspend fun openable(id: NotebookDocumentId): SharedNote? {
-        return grants.withGrant(principal, id) { grant ->
-            if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
-        }
+    /** The note as listed, when [grant] (read in the current transaction) lets this principal open it. */
+    private fun openable(id: NotebookDocumentId, grant: NotebookPeerGrant?): SharedNote? {
+        if (!mayEditNotebookContent(grant)) return null
+        return notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
+    }
+}
+
+/**
+ * How many grants one listing transaction rechecks. A page reads the grant store at most
+ * MAX_CHECKED / this + 1 times (21) rather than once per grant, while the grant lock is held for one
+ * store read plus at most this many note reads, so provisioning and revocation wait for one chunk,
+ * never for a whole page.
+ */
+internal const val SHARED_NOTES_CHECKS_PER_TRANSACTION = 50
+
+/** One page being built: the notes that passed their recheck, and how many grants were checked. */
+private class SharedNotesPage {
+    val notes = mutableListOf<SharedNote>()
+    var checked = 0
+
+    fun full(): Boolean {
+        return notes.size == SharedNotesWire.MAX_LISTED
     }
 }
 
