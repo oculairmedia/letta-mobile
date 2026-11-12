@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.theme
 
+import com.letta.mobile.ui.theme.tokens.LettaRowDimens
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -63,7 +64,7 @@ object LettaDimens {
     object Space {
         val hair: Dp = 2.dp
         val xs: Dp = 4.dp
-        val sm: Dp = 8.dp
+        val sm: Dp = LettaRowDimens.spacing
         val md: Dp = 12.dp
         val lg: Dp = 16.dp
         val xl: Dp = 24.dp
@@ -93,7 +94,7 @@ object LettaDimens {
         val iconSm: Dp = 13.dp
 
         /** Glyph inside [iconButton] and [iconButtonLg]. */
-        val icon: Dp = 18.dp
+        val icon: Dp = LettaRowDimens.icon
 
         /** Single-line text field / chip height. */
         val fieldHeight: Dp = 32.dp
@@ -232,7 +233,7 @@ object LettaDimens {
      * sites currently violate this; `LowContentAlpha` catches them.
      */
     object Alpha {
-        const val disabled: Float = 0.6f
+        const val disabled: Float = LettaRowDimens.disabledAlpha
 
         /** Dividers and hairlines against a surface. */
         const val hairline: Float = 0.5f

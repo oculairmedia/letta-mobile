@@ -10771,6 +10771,13 @@ public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$None : c
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$OutcomeUnknown : com/letta/mobile/data/canvas/mount/CanvasMountResult {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/mount/CanvasMountResult$OutcomeUnknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/canvas/mount/CanvasMountResult$Replaced : com/letta/mobile/data/canvas/mount/CanvasMountResult {
 	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
 	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;

@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -69,7 +70,7 @@ class FileCanvasMountBoundedReadTest {
             val results = keys.flatMap { key ->
                 (0..9).map { proposal ->
                     async(Dispatchers.Default) {
-                        FileCanvasMountStore(root, host).bindIfAbsent(agent, key, CanvasId("proposal-$proposal"))
+                        FileCanvasMountStore(root, host).bindIfAbsent(agent, key, CanvasId("proposal-$proposal")).durable()
                     }
                 }
             }.awaitAll()
@@ -123,7 +124,7 @@ class FileCanvasMountBoundedReadTest {
         val failure = assertFailsWith<IllegalArgumentException> { store.readDefault(agent) }
         assertEquals("Mount record is too large", failure.message)
         assertEquals(oversized, Files.readString(record))
-        assertFailsWith<IllegalArgumentException> { store.setDefault(AgentId("new"), CanvasId("x".repeat(8_192))) }
+        assertIs<IllegalArgumentException>(store.setDefault(AgentId("new"), CanvasId("x".repeat(8_192))).notAppliedCause())
         assertNull(store.readDefault(AgentId("new")))
     }
 

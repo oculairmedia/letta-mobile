@@ -12,7 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.util.time.TimeLabels
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
 import com.letta.mobile.ui.components.list.RosterRowState

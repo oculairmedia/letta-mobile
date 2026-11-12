@@ -33,7 +33,7 @@ import com.letta.mobile.data.memory.memfs.MemfsFile
 import com.letta.mobile.data.memory.memfs.MemfsFileKind
 import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsTab
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.isPointerHost
 import com.letta.mobile.ui.components.list.RosterList
