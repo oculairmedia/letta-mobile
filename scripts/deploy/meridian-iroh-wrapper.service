@@ -44,6 +44,7 @@ ExecStartPre=/bin/bash -c 'for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/4
 ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
   app-server-serve-iroh \
   --app-server-url ws://127.0.0.1:4500 \
+  --app-server-pid-file /run/meridian-appserver/main.pid \
   --iroh-port 4501 \
   --iroh-secret-key-file /etc/meridian/iroh-secret.key \
   --pairing-store-file /etc/meridian/paired-peers.json \

@@ -188,6 +188,8 @@ data class SubagentChipRecord(
     val todos: List<SubagentTodo>? = null,
     /** Position of its tool call in the child's append-only native tool_calls history. */
     @SerialName("todo_revision") val todoRevision: Int = 0,
+    /** Host-proven App Server process identity at first observation; null in legacy records. */
+    @SerialName("app_server_process_identity") val appServerProcessIdentity: String? = null,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
