@@ -10872,6 +10872,8 @@ public final class com/letta/mobile/data/canvas/mount/wire/CanvasMountWire {
 	public static final field AGENT_ID Ljava/lang/String;
 	public static final field BIND Ljava/lang/String;
 	public static final field BOUND Ljava/lang/String;
+	public static final field CANDIDATES Ljava/lang/String;
+	public static final field CANVASES Ljava/lang/String;
 	public static final field CANVAS_ID Ljava/lang/String;
 	public static final field CAPABILITY Ljava/lang/String;
 	public static final field CONVERSATION_ID Ljava/lang/String;
@@ -10884,8 +10886,13 @@ public final class com/letta/mobile/data/canvas/mount/wire/CanvasMountWire {
 	public static final field FOUND Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/canvas/mount/wire/CanvasMountWire;
 	public static final field INVALID_INPUT_PREFIX Ljava/lang/String;
+	public static final field LISTED Ljava/lang/String;
+	public static final field MAX_CANDIDATES I
 	public static final field NONE Ljava/lang/String;
 	public static final field OUTCOME_UNKNOWN Ljava/lang/String;
+	public static final field OWNER_AGENT Ljava/lang/String;
+	public static final field OWNER_CONVERSATION Ljava/lang/String;
+	public static final field OWNER_KIND Ljava/lang/String;
 	public static final field READ_CAPABILITY Ljava/lang/String;
 	public static final field REASON Ljava/lang/String;
 	public static final field REASON_AUTHORITY Ljava/lang/String;
@@ -10900,6 +10907,8 @@ public final class com/letta/mobile/data/canvas/mount/wire/CanvasMountWire {
 	public static final field SOURCE_BINDING Ljava/lang/String;
 	public static final field SOURCE_DEFAULT Ljava/lang/String;
 	public static final field STATUS Ljava/lang/String;
+	public static final field TITLE Ljava/lang/String;
+	public static final field TRUNCATED Ljava/lang/String;
 	public static final field UNAVAILABLE Ljava/lang/String;
 	public static final field WON Ljava/lang/String;
 	public static final field WRITE_CAPABILITY Ljava/lang/String;
@@ -19126,6 +19135,7 @@ public final class com/letta/mobile/data/controller/node/iroh/FilePairedPeerStor
 	public fun list ()Ljava/util/List;
 	public fun remove (Ljava/lang/String;)Z
 	public fun save (Lcom/letta/mobile/data/controller/node/iroh/PairedPeer;)V
+	public fun updateEach (Lkotlin/jvm/functions/Function1;)I
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/FilePairingInviteStore : com/letta/mobile/data/controller/node/iroh/PairingInviteStore {
@@ -19234,6 +19244,7 @@ public final class com/letta/mobile/data/controller/node/iroh/InMemoryPairedPeer
 	public fun list ()Ljava/util/List;
 	public fun remove (Ljava/lang/String;)Z
 	public fun save (Lcom/letta/mobile/data/controller/node/iroh/PairedPeer;)V
+	public fun updateEach (Lkotlin/jvm/functions/Function1;)I
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/InMemoryPairingInviteStore : com/letta/mobile/data/controller/node/iroh/PairingInviteStore {
@@ -19926,6 +19937,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Paire
 	public abstract fun list ()Ljava/util/List;
 	public abstract fun remove (Ljava/lang/String;)Z
 	public abstract fun save (Lcom/letta/mobile/data/controller/node/iroh/PairedPeer;)V
+	public abstract fun updateEach (Lkotlin/jvm/functions/Function1;)I
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/PairingAdminHandlers {
@@ -20352,6 +20364,37 @@ public final class com/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes 
 
 public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountCatalog {
 	public fun <init> (Lcom/letta/mobile/data/canvas/HostCanvasDirectory;Lcom/letta/mobile/data/canvas/CanvasRelayStore;)V
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Companion;
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/PairedPeerStore;Ljava/nio/file/Path;)V
+	public final fun runOnce ()Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Companion {
+	public final fun forPairingStore (Ljava/nio/file/Path;)Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade;
+}
+
+public abstract interface class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome {
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome$AlreadyApplied : com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome$AlreadyApplied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome$Applied : com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome$Applied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome$Applied;IILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDeviceUpgrade$Outcome$Applied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getUpgraded ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory {
