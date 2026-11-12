@@ -3,9 +3,11 @@ package com.letta.mobile.ui.components.list
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.CompositionLocalProvider
+import com.letta.mobile.ui.components.LocalLettaListRowInteraction
+import com.letta.mobile.ui.components.rememberLettaListRowInteraction
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -298,8 +300,9 @@ private fun <T> RosterRowChrome(
     roster: RosterScope<T>,
     row: RosterRowContent<T>,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
+    val rowInteraction = rememberLettaListRowInteraction()
+    val interaction = rowInteraction.source
+    val hovered by rowInteraction.hovered
     val rowState = roster.rowState(line, interaction, hovered)
     val touch = LocalLettaHost.current.input == LettaInput.Touch
     val tag = roster.options.testTag.row(line.key)
@@ -314,7 +317,9 @@ private fun <T> RosterRowChrome(
     ) {
         RosterRowMenu(roster.menu(line, rowState, touch), holdDrag = drag.hold) {
             RosterGestures(RosterGestureSpec(tag, touch, hovered, roster.actions.swipe(line.item), roster.actions.quick(line.item))) {
-                row(line.item, rowState)
+                CompositionLocalProvider(
+                    LocalLettaListRowInteraction provides rowInteraction,
+                ) { row(line.item, rowState) }
             }
         }
     }
