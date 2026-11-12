@@ -2,6 +2,7 @@ package com.letta.mobile.ui.host
 
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
+import com.letta.mobile.ui.components.row.LocalLettaRowTooltip
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -185,5 +186,9 @@ val LocalLettaHost = staticCompositionLocalOf { LettaHost.Touch }
 /** Makes [host] the container host for [content]: a platform's window root calls this once. */
 @Composable
 fun ProvideLettaHost(host: LettaHost, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalLettaHost provides host, content = content)
+    CompositionLocalProvider(
+        LocalLettaHost provides host,
+        LocalLettaRowTooltip provides host.tooltip,
+        content = content,
+    )
 }

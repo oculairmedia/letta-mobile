@@ -100,8 +100,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Android `test` is the sole PR cache writer.
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # Optional packaging must not evict required Android Gradle caches.
+          cache-read-only: true
 
       - name: Restore Konan (Kotlin/Native) toolchain
         id: konan
@@ -270,7 +270,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: true
 
       - name: Install Linux packaging and X11 smoke dependencies
         run: |

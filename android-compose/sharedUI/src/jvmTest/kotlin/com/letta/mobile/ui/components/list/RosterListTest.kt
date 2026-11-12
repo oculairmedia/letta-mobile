@@ -33,7 +33,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.withKeyDown
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.ProvideLettaHost

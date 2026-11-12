@@ -14,6 +14,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -25,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.home.HomeSearchState
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
@@ -108,28 +109,22 @@ private fun SectionHeader(section: SearchSection, expanded: Boolean, onToggle: (
 
 @Composable
 private fun SearchHitRow(hit: SearchHit, section: SearchSection) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = hit.onClick)
-            .testTag(HomePageTags.searchHit(hit.id))
-            .padding(LettaDimens.Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        if (hit.agentId != null) {
-            AgentAvatar(agentId = hit.agentId, name = hit.primary, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)
-        } else {
-            Icon(section.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(hit.primary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            hit.secondary?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = section.maxSecondaryLines, overflow = TextOverflow.Ellipsis)
+    LettaListRow(
+        spec = LettaListRowSpec(
+            title = hit.primary,
+            subtitle = hit.secondary?.takeIf { it.isNotBlank() },
+            subtitleLines = section.maxSecondaryLines,
+        ),
+        onClick = hit.onClick,
+        modifier = Modifier.testTag(HomePageTags.searchHit(hit.id)),
+        leading = {
+            if (hit.agentId != null) {
+                AgentAvatar(agentId = hit.agentId, name = hit.primary, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)
+            } else {
+                Icon(section.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable

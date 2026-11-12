@@ -28,7 +28,7 @@ import com.letta.mobile.data.projects.ProjectsPageController
 import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterActions
