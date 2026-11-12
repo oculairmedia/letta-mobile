@@ -206,6 +206,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts
 
 - [Active turn v1: contract proposal](reference/contracts/active-turn-v1.md)
+- [Canvas mount v1: host-owned canvas defaults and bindings](reference/contracts/canvas-mount-v1.md)
 - [Conversation lanes v1](reference/contracts/conversation-lanes-v1.md)
 - [Current focus v1: contract proposal](reference/contracts/current-focus-v1.md)
 - [Keystore v1: provider contract](reference/contracts/keystore-v1.md)
@@ -297,6 +298,22 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 ### reference/contracts/beads.stats
 
 - [beads.stats v1](reference/contracts/beads.stats/beads-v1.md)
+
+### reference/contracts/canvas.mount.binding.bind
+
+- [canvas.mount.binding.bind: Canvas Mount v1](reference/contracts/canvas.mount.binding.bind/canvas-mount-v1.md)
+
+### reference/contracts/canvas.mount.binding.replace
+
+- [canvas.mount.binding.replace: Canvas Mount v1](reference/contracts/canvas.mount.binding.replace/canvas-mount-v1.md)
+
+### reference/contracts/canvas.mount.default.set
+
+- [canvas.mount.default.set: Canvas Mount v1](reference/contracts/canvas.mount.default.set/canvas-mount-v1.md)
+
+### reference/contracts/canvas.mount.resolve
+
+- [canvas.mount.resolve: Canvas Mount v1](reference/contracts/canvas.mount.resolve/canvas-mount-v1.md)
 
 ### reference/contracts/conversation.list
 

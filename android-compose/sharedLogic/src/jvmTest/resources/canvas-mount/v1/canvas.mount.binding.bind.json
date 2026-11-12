@@ -1,0 +1,97 @@
+{
+  "method": "canvas.mount.binding.bind",
+  "capability": "canvas.mount.v1",
+  "cases": [
+    {
+      "name": "won",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "bound",
+        "canvas_id": "canvas-3f9a",
+        "won": true,
+        "durability": "durable"
+      }
+    },
+    {
+      "name": "lost-to-visible-winner",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "bound",
+        "canvas_id": "canvas-b2c8",
+        "won": false,
+        "durability": "durable"
+      }
+    },
+    {
+      "name": "denied",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "error": "canvas.mount.denied"
+    },
+    {
+      "name": "storage-failure-before-commit",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "storage"
+      }
+    },
+    {
+      "name": "deadline-before-commit",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "unavailable",
+        "reason": "timeout_before_commit"
+      }
+    },
+    {
+      "name": "outcome-unknown",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a"
+      },
+      "result": {
+        "status": "outcome_unknown"
+      }
+    },
+    {
+      "name": "spoofed-principal",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": "canvas-3f9a",
+        "principal": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "error": "canvas.mount.invalid_input:params:unknown_field"
+    },
+    {
+      "name": "canvas-not-a-string",
+      "params": {
+        "agent_id": "agent-7c1e",
+        "conversation_id": "conv-41d0",
+        "canvas_id": 7
+      },
+      "error": "canvas.mount.invalid_input:canvas_id:not_string"
+    }
+  ]
+}
