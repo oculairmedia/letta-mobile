@@ -13,13 +13,16 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.NotebookDocumentId
@@ -45,6 +48,9 @@ import com.letta.mobile.data.shell.layout.ShellViews
 import com.letta.mobile.data.shell.layout.edit.SharedNotesPlacement
 import com.letta.mobile.data.shell.layout.edit.ShellLayoutAgentPort
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.ui.components.LettaRefreshTags
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.shell.modules.ShellModuleTags
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
@@ -101,6 +107,9 @@ class ShellDocumentModuleTest {
     private fun lanes(main: List<ModuleSlot> = listOf(PageSlot), side: List<ModuleSlot> = listOf(DocumentSlot)) =
         ShellLayoutConfig(version = ShellLayoutConfig.VERSION, lanes = mapOf(ShellLanes.MAIN to main, ShellLanes.SIDE to side))
 
+    /** The input host the window runs on: touch (a phone, the default) or pointer (a desktop). */
+    private var input = LettaHost.Touch
+
     private fun window(
         width: Dp,
         notebooks: SharedNotebooks? = host,
@@ -110,12 +119,17 @@ class ShellDocumentModuleTest {
         runDesktopComposeUiTest(width = width.value.toInt(), height = WindowHeight.value.toInt()) {
             val shell = shellHost()
             setContent {
-                ProvideShellSharedNotes(notebooks) {
-                    LettaShellWorkspace(state(layout), shell, Modifier.size(width = width, height = WindowHeight))
+                ProvideLettaHost(input) {
+                    ProvideShellSharedNotes(notebooks) {
+                        LettaShellWorkspace(state(layout), shell, Modifier.size(width = width, height = WindowHeight))
+                    }
                 }
             }
             block()
         }
+
+    private val inTheView = hasAnyAncestor(hasTestTag(ShellDocumentTags.MODULE))
+    private val theRefresh = hasContentDescription("Refresh") and inTheView
 
     private fun ComposeUiTest.exists(tag: String) = onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
@@ -223,6 +237,53 @@ class ShellDocumentModuleTest {
 
     @Test
     fun onADesktopShowMoreLoadsTheNextPage() = showMoreLoadsTheNextPage(1200.dp)
+
+    /**
+     * The list reloads the shared way (LettaRefreshable): on a pointer host through the header's one
+     * refresh, with no pull; on touch by a pull on the list, with no refresh button. Either way a note
+     * the host started sharing since the list was asked for appears.
+     */
+    @Test
+    fun onAPointerHostTheHeadersRefreshReloadsTheList() {
+        input = LettaHost.Pointer
+        window(1200.dp) {
+            await(ShellDocumentTags.row(SharedNote(Note, "Plan")))
+            onNode(hasTestTag(LettaRefreshTags.PULL) and inTheView).assertDoesNotExist()
+            host.granted.add(Later)
+            onNode(theRefresh).performClick()
+            await(ShellDocumentTags.row(SharedNote(Later, "Plan")))
+        }
+    }
+
+    private fun aPullReloadsTheList(width: Dp) = window(width) {
+        await(ShellDocumentTags.row(SharedNote(Note, "Plan")))
+        onNode(theRefresh).assertDoesNotExist()
+        host.granted.add(Later)
+        onNode(hasTestTag(LettaRefreshTags.PULL) and inTheView).performTouchInput {
+            swipeDown(startY = top + 10f, endY = bottom, durationMillis = 600)
+        }
+        await(ShellDocumentTags.row(SharedNote(Later, "Plan")))
+    }
+
+    @Test
+    fun onAPhoneAPullReloadsTheList() = aPullReloadsTheList(360.dp)
+
+    @Test
+    fun onATouchTabletAPullReloadsTheList() = aPullReloadsTheList(760.dp)
+
+    /** A pull reaches the refresh from a state with no rows, too: an unreachable host lists once a pull asks again. */
+    @Test
+    fun onTouchAPullOnTheUnreachableStateAsksAgain() {
+        host.reachable = false
+        window(360.dp) {
+            await(ShellDocumentTags.UNAVAILABLE)
+            host.reachable = true
+            onNode(hasTestTag(LettaRefreshTags.PULL) and inTheView).performTouchInput {
+                swipeDown(startY = top + 10f, endY = bottom, durationMillis = 600)
+            }
+            await(ShellDocumentTags.row(SharedNote(Note, "Plan")))
+        }
+    }
 
     @Test
     fun aHostSharingNothingShowsTheEmptyState() {

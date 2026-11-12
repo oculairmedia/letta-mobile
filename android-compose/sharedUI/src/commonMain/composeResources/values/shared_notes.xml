@@ -6,7 +6,6 @@
     <string name="shared_notes_not_shown">The layout changed before Shared notes could be shown or hidden. Try again.</string>
     <string name="shared_notes_close_view">Close shared notes</string>
     <string name="shared_notes_back_to_list">All shared notes</string>
-    <string name="shared_notes_refresh">Refresh</string>
     <string name="shared_notes_retry">Try again</string>
     <string name="shared_notes_loading">Asking the host for shared notes</string>
     <string name="shared_notes_empty">The host shares no notes with this device yet.</string>

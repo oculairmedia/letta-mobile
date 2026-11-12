@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +53,6 @@ import com.letta.mobile.sharedui.resources.shared_notes_none_yet
 import com.letta.mobile.sharedui.resources.shared_notes_not_shown
 import com.letta.mobile.sharedui.resources.shared_notes_open_denied
 import com.letta.mobile.sharedui.resources.shared_notes_open_unavailable
-import com.letta.mobile.sharedui.resources.shared_notes_refresh
 import com.letta.mobile.sharedui.resources.shared_notes_retry
 import com.letta.mobile.sharedui.resources.shared_notes_show_more
 import com.letta.mobile.sharedui.resources.shared_notes_side_lane_full
@@ -59,6 +60,9 @@ import com.letta.mobile.sharedui.resources.shared_notes_title
 import com.letta.mobile.sharedui.resources.shared_notes_unavailable
 import com.letta.mobile.sharedui.resources.shared_notes_untitled
 import com.letta.mobile.sharedui.resources.shared_notes_withdrawn
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.components.isPointerHost
 import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.document.workspace.DocumentWorkspace
@@ -179,7 +183,7 @@ internal fun ShellDocumentModule(modifier: Modifier) {
         val workspace = state.workspace
         if (workspace == null) {
             LaunchedEffect(browser) { browser.refresh() }
-            ListHeader(onRefresh = { scope.launch { browser.refresh() } })
+            ListHeader(refreshing = state.loading, onRefresh = { scope.launch { browser.refresh() } })
             SharedNoteList(state, browser, scope)
         } else {
             OpenSharedNote(workspace, browser)
@@ -187,8 +191,9 @@ internal fun ShellDocumentModule(modifier: Modifier) {
     }
 }
 
+/** The list's title, its one refresh (pointer hosts only: touch pulls the list) and the view's close. */
 @Composable
-private fun ListHeader(onRefresh: () -> Unit) {
+private fun ListHeader(refreshing: Boolean, onRefresh: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -200,9 +205,7 @@ private fun ListHeader(onRefresh: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onRefresh) {
-            Icon(LettaIcons.Refresh, contentDescription = stringResource(Res.string.shared_notes_refresh))
-        }
+        LettaRefreshAction(refreshing, onRefresh)
         CloseViewButton()
     }
 }
@@ -216,21 +219,42 @@ private fun CloseViewButton() {
     }
 }
 
+/**
+ * The list body, reloaded through [LettaRefreshable]: a pull on touch (where the pull's indicator shows
+ * the reload), the header's refresh on a pointer host (where the busy bar does). Every state scrolls,
+ * so a pull reaches the refresh from the list, an empty or refused listing and an unreachable host alike.
+ */
 @Composable
-private fun SharedNoteList(state: SharedNoteBrowserState, browser: SharedNoteBrowser, scope: CoroutineScope) {
-    if (state.loading) LettaBusyBar(Modifier.fillMaxWidth())
+private fun ColumnScope.SharedNoteList(state: SharedNoteBrowserState, browser: SharedNoteBrowser, scope: CoroutineScope) {
+    val refresh: () -> Unit = { scope.launch { browser.refresh() } }
+    if (state.loading && isPointerHost()) LettaBusyBar(Modifier.fillMaxWidth())
     state.openProblem?.let { problem -> Notice(openProblemText(problem), ShellDocumentTags.OPEN_PROBLEM, error = true) }
+    LettaRefreshable(refreshing = state.loading, onRefresh = refresh, modifier = Modifier.fillMaxWidth().weight(1f)) {
+        ListingBody(state, browser, scope, refresh)
+    }
+}
+
+/** What the host's latest listing shows: the notes, or why there are none; "Try again" asks again. */
+@Composable
+private fun ListingBody(state: SharedNoteBrowserState, browser: SharedNoteBrowser, scope: CoroutineScope, retry: () -> Unit) {
     when (val listing = state.listing) {
-        null -> Notice(Res.string.shared_notes_loading, ShellDocumentTags.LOADING)
-        SharedNoteListing.Denied -> Notice(Res.string.shared_notes_denied, ShellDocumentTags.DENIED)
-        is SharedNoteListing.Unavailable -> Column(Modifier.testTag(ShellDocumentTags.UNAVAILABLE)) {
+        null -> ScrollingNotice { Notice(Res.string.shared_notes_loading, ShellDocumentTags.LOADING) }
+        SharedNoteListing.Denied -> ScrollingNotice { Notice(Res.string.shared_notes_denied, ShellDocumentTags.DENIED) }
+        is SharedNoteListing.Unavailable -> ScrollingNotice(ShellDocumentTags.UNAVAILABLE) {
             Notice(Res.string.shared_notes_unavailable, tag = null)
-            TextButton(onClick = { scope.launch { browser.refresh() } }, modifier = Modifier.padding(start = LettaDimens.Space.sm)) {
+            TextButton(onClick = retry, modifier = Modifier.padding(start = LettaDimens.Space.sm)) {
                 Text(stringResource(Res.string.shared_notes_retry))
             }
         }
         is SharedNoteListing.Listed -> ListedNotes(listing, state, browser, scope)
     }
+}
+
+/** A state with no rows: a column that scrolls (with nothing to scroll) so a pull on it still reaches the refresh. */
+@Composable
+private fun ScrollingNotice(tag: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    val tagged = tag?.let { Modifier.testTag(it) } ?: Modifier
+    Column(tagged.fillMaxSize().verticalScroll(rememberScrollState()), content = content)
 }
 
 /**
@@ -246,10 +270,9 @@ private fun ListedNotes(
 ) {
     val more = listing.next?.let { MoreNotes(loading = state.loadingMore, failed = state.moreFailed) }
     if (listing.notes.isEmpty() && more == null) {
-        Notice(Res.string.shared_notes_empty, ShellDocumentTags.EMPTY)
+        ScrollingNotice { Notice(Res.string.shared_notes_empty, ShellDocumentTags.EMPTY) }
         return
     }
-    if (listing.notes.isEmpty()) Notice(Res.string.shared_notes_none_yet, tag = null)
     val actions = NoteActions(
         open = { note -> scope.launch { browser.open(note.id) } },
         more = { scope.launch { browser.loadMore() } },
@@ -270,6 +293,8 @@ private fun NoteRows(notes: List<SharedNote>, more: MoreNotes?, enabled: Boolean
         Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.sm).testTag(ShellDocumentTags.LIST),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
+        // Only while the host has more to check: an empty listing with nothing more is the empty state.
+        if (notes.isEmpty()) item(key = NONE_YET_KEY) { Notice(Res.string.shared_notes_none_yet, tag = null) }
         items(notes, key = { it.id.value }) { note ->
             LettaListRow(
                 spec = LettaListRowSpec(title = note.title.ifBlank { untitled }, icon = LettaIcons.FileOpen, enabled = enabled),
@@ -294,6 +319,7 @@ private fun ShowMore(more: MoreNotes, onMore: () -> Unit) {
 }
 
 private const val MORE_KEY = "shell-document-more"
+private const val NONE_YET_KEY = "shell-document-none-yet"
 
 @Composable
 private fun Notice(text: StringResource, tag: String?, error: Boolean = false) {
