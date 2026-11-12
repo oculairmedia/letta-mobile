@@ -32,7 +32,7 @@ import com.letta.mobile.data.subagents.SubagentRosterItem
 import com.letta.mobile.data.subagents.SubagentRosterStatus
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
 import com.letta.mobile.ui.components.list.RosterRowState

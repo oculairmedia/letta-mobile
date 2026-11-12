@@ -563,7 +563,6 @@
     "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.chat",
     "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.chat.session",
     "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.chat.surface",
-    "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.components",
     "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.components.list",
     "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.components.tabs",
     "com.letta.mobile.ui.chat.subagents -> com.letta.mobile.ui.host",
@@ -965,7 +964,7 @@
     "com.letta.mobile.ui.chat.surface": 57,
     "com.letta.mobile.ui.chat.surface.timeline": 60,
     "com.letta.mobile.ui.chat.surface.timeline.rows": 53,
-    "com.letta.mobile.ui.components": 57,
+    "com.letta.mobile.ui.components": 55,
     "com.letta.mobile.ui.host": 55,
     "com.letta.mobile.ui.mascot": 54,
     "com.letta.mobile.ui.theme": 70

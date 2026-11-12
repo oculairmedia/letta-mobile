@@ -43,8 +43,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import com.letta.mobile.ui.components.LettaListRow
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.picker.PickerDrillIn
 import com.letta.mobile.ui.components.picker.rememberPickerDrillIn
 import com.letta.mobile.ui.icons.LettaIcons

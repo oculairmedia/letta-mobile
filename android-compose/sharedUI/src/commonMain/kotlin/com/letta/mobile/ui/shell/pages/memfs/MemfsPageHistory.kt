@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.shell.pages.memfs
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +21,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,24 +80,16 @@ internal fun MemfsCommitList(page: MemfsPageScope) {
 
 @Composable
 private fun CommitRow(commit: MemfsCommit, selected: Boolean, onClick: () -> Unit) {
-    val background = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(background)
-            .clickable(onClick = onClick)
-            .padding(LettaDimens.Space.sm)
-            .testTag(MemfsPageTags.commit(commit.sha)),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-    ) {
-        Text(commit.message.ifBlank { NO_MESSAGE }, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(
-            listOfNotNull(commit.shortSha, commit.author, commit.timestamp.take(TIMESTAMP_MINUTES)).joinToString(" · "),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    LettaListRow(
+        spec = LettaListRowSpec(
+            title = commit.message.ifBlank { NO_MESSAGE },
+            titleLines = 2,
+            subtitle = listOfNotNull(commit.shortSha, commit.author, commit.timestamp.take(TIMESTAMP_MINUTES)).joinToString(" · "),
+            selected = selected,
+        ),
+        onClick = onClick,
+        modifier = Modifier.testTag(MemfsPageTags.commit(commit.sha)),
+    )
 }
 
 /** What the selected commit changed, file by file. */
