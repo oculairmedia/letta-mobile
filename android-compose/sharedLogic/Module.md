@@ -745,7 +745,7 @@ Workspace command routing through a direct client or Iroh host relay. Sources re
 
 # Package com.letta.mobile.qr
 
-JVM/Android QR encoding and rendering contracts backed by ZXing. They produce bit matrices; pairing validation and trust decisions remain in pairing/controller layers. Keep pairing trust decisions outside QR generation; hosts use [ZxingQrEncoder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.qr/-zxing-qr-encoder/index.html) through the pairing [QrEncoder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) contract and consume `QrCode` output.
+QR encoding for pairing codes. The common [QrCodeGenerator](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.qr/-qr-code-generator/index.html) implements ISO/IEC 18004 in pure Kotlin for every target, the browser included, and reports oversized content as a typed result rather than an exception carrying the text. Hosts draw invite codes through the pairing [QrEncoder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.pairing/-qr-encoder/index.html) contract with [PortableQrEncoder](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.qr/-portable-qr-encoder/index.html). The JVM/Android `QrCode` facade over ZXing remains for the command-line PNG and terminal renderers. Keep pairing trust decisions outside QR generation; these types only produce module grids.
 
 # Package com.letta.mobile.runtime.iroh
 

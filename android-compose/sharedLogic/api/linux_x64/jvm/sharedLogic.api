@@ -73575,6 +73575,11 @@ public final class com/letta/mobile/data/workspace/relay/WorkspaceRelayClient$Co
 	public final fun forbidden (Lcom/letta/mobile/data/transport/appserver/WorkspaceRelayAccess;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/qr/PortableQrEncoder : com/letta/mobile/data/pairing/QrEncoder {
+	public static final field INSTANCE Lcom/letta/mobile/qr/PortableQrEncoder;
+	public fun encode (Ljava/lang/String;)Lcom/letta/mobile/data/pairing/QrModules;
+}
+
 public final class com/letta/mobile/qr/QrCode {
 	public static final field INSTANCE Lcom/letta/mobile/qr/QrCode;
 	public final fun encode (Ljava/lang/String;Lcom/google/zxing/qrcode/decoder/ErrorCorrectionLevel;)Lcom/letta/mobile/qr/QrCode$Matrix;
@@ -73586,6 +73591,64 @@ public final class com/letta/mobile/qr/QrCode$Matrix {
 	public final fun get (II)Z
 	public final fun getDarkRows ()[[Z
 	public final fun getSize ()I
+}
+
+public final class com/letta/mobile/qr/QrCodeGenerator {
+	public static final field INSTANCE Lcom/letta/mobile/qr/QrCodeGenerator;
+	public final fun encode (Ljava/lang/String;Lcom/letta/mobile/qr/QrErrorCorrection;)Lcom/letta/mobile/qr/QrEncodeResult;
+	public static synthetic fun encode$default (Lcom/letta/mobile/qr/QrCodeGenerator;Ljava/lang/String;Lcom/letta/mobile/qr/QrErrorCorrection;ILjava/lang/Object;)Lcom/letta/mobile/qr/QrEncodeResult;
+}
+
+public final class com/letta/mobile/qr/QrContentTooLongException : java/lang/IllegalArgumentException {
+	public fun <init> (II)V
+	public final fun getCapacityBits ()I
+	public final fun getRequiredBits ()I
+}
+
+public abstract interface class com/letta/mobile/qr/QrEncodeResult {
+}
+
+public final class com/letta/mobile/qr/QrEncodeResult$ContentTooLong : com/letta/mobile/qr/QrEncodeResult {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/letta/mobile/qr/QrEncodeResult$ContentTooLong;
+	public static synthetic fun copy$default (Lcom/letta/mobile/qr/QrEncodeResult$ContentTooLong;IIILjava/lang/Object;)Lcom/letta/mobile/qr/QrEncodeResult$ContentTooLong;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapacityBits ()I
+	public final fun getRequiredBits ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/qr/QrEncodeResult$Encoded : com/letta/mobile/qr/QrEncodeResult {
+	public fun <init> (Lcom/letta/mobile/qr/QrMatrix;)V
+	public final fun component1 ()Lcom/letta/mobile/qr/QrMatrix;
+	public final fun copy (Lcom/letta/mobile/qr/QrMatrix;)Lcom/letta/mobile/qr/QrEncodeResult$Encoded;
+	public static synthetic fun copy$default (Lcom/letta/mobile/qr/QrEncodeResult$Encoded;Lcom/letta/mobile/qr/QrMatrix;ILjava/lang/Object;)Lcom/letta/mobile/qr/QrEncodeResult$Encoded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMatrix ()Lcom/letta/mobile/qr/QrMatrix;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/qr/QrErrorCorrection : java/lang/Enum {
+	public static final field H Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static final field L Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static final field M Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static final field Q Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static fun values ()[Lcom/letta/mobile/qr/QrErrorCorrection;
+}
+
+public final class com/letta/mobile/qr/QrMatrix {
+	public final fun getErrorCorrection ()Lcom/letta/mobile/qr/QrErrorCorrection;
+	public final fun getMask ()I
+	public final fun getSize ()I
+	public final fun getVersion ()I
+	public final fun isDark (II)Z
+	public final fun toModules ()Lcom/letta/mobile/data/pairing/QrModules;
 }
 
 public final class com/letta/mobile/qr/QrRenderer {
