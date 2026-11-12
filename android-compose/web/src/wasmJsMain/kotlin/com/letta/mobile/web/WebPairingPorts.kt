@@ -39,7 +39,8 @@ internal class WebPairingPorts(
 
     override val deviceName: String = "Browser"
 
-    override val qrEncoder = QrEncoder { error("QR codes are not drawn in the browser") }
+    /** The browser draws no QR codes: a freshly minted code is shown and copied as its link (letta-mobile-wisqe). */
+    override val qrEncoder: QrEncoder = QrEncoder.Unavailable
 
     override fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 

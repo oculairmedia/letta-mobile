@@ -37633,7 +37633,12 @@ public final class com/letta/mobile/data/pairing/PendingInvite {
 }
 
 public abstract interface class com/letta/mobile/data/pairing/QrEncoder {
+	public static final field Companion Lcom/letta/mobile/data/pairing/QrEncoder$Companion;
 	public abstract fun encode (Ljava/lang/String;)Lcom/letta/mobile/data/pairing/QrModules;
+}
+
+public final class com/letta/mobile/data/pairing/QrEncoder$Companion {
+	public final fun getUnavailable ()Lcom/letta/mobile/data/pairing/QrEncoder;
 }
 
 public final class com/letta/mobile/data/pairing/QrModules {
