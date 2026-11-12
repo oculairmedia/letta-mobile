@@ -97,8 +97,9 @@ object HostCanvasTools {
     }
 
     /**
-     * The canvases [caller] may read, its own conversation's first and marked `current`: an agent
-     * picking the first entry used to draw on another conversation's board.
+     * The canvases [caller] may read, the one its own conversation shows first and marked `current` (the
+     * conversation's mounted canvas, else its own): an agent picking the first entry used to draw on another
+     * conversation's board.
      */
     private suspend fun list(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
         val conversationId = HostCanvasToolInputs.string(input, "conversation_id")
@@ -107,7 +108,13 @@ object HostCanvasTools {
         } else {
             listOfNotNull((backend.conversation(caller, ConversationId(conversationId), claim = false) as? HostCanvasAccess.Granted)?.entry)
         }
-        val listed = entries.map { it.listed(current = it.conversationId != null && it.conversationId == caller.conversationId) }
+        val current = backend.currentCanvas(caller)
+        val ownCanvas = caller.conversationId?.let { CanvasId.forConversation(ConversationId(it)) }
+        val listed = entries.map { entry ->
+            // The conversation's own canvas is found by its conversation, as before mounts: its bound id may differ.
+            val isCurrent = if (current == ownCanvas) entry.conversationId == caller.conversationId else entry.id == current
+            entry.listed(current = current != null && isCurrent)
+        }
             .sortedByDescending { it.current }
         return success(CanvasListResult(ids = listed.map { it.canvasId }, canvases = listed))
     }

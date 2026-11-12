@@ -39,8 +39,9 @@ object IrohPeerCapabilities {
     const val SUBAGENT_SPAWN = "subagent.spawn"
     const val WORKACTIVITY_REPORT = "workactivity.report"
 
-    // letta-mobile-n2stx.5: canvas mount routes. Granted explicitly (no role includes them yet); the handler still
-    // requires the principal's canvas grant, conversation ownership and, for agent defaults, conversation.manage.
+    // letta-mobile-n2stx.5: canvas mount routes. Every role with chat access holds both (owner decision D2); the
+    // handler still checks agent and conversation scope, conversation ownership and canvas visibility. Setting an
+    // agent default is admin.full only (D1).
     /** Admits `canvas.mount.resolve`. */
     const val CANVAS_MOUNT_READ = CanvasMountWire.READ_CAPABILITY
 
@@ -64,6 +65,7 @@ object IrohPeerCapabilities {
     val DEFAULT_DESKTOP_ROLE: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE,
+        CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE,
     )
 
     /**
@@ -72,7 +74,7 @@ object IrohPeerCapabilities {
      * nothing else (no memory writes, tools, skills, schedules, projects, and
      * never admin). Wider roles are requested explicitly by the inviter.
      */
-    val CHAT_ROLE: Set<String> = setOf(CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE)
+    val CHAT_ROLE: Set<String> = setOf(CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE)
 
     /** Named roles an inviter may request instead of an explicit capability list. */
     val ROLES: Map<String, Set<String>> by lazy {
@@ -95,6 +97,7 @@ object IrohPeerCapabilities {
     val VIBESYNC_ROLE: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE,
         SUBAGENT_SPAWN, WORKACTIVITY_REPORT,
+        CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE,
     )
 
     /** Capability required for the runtime-protocol commands on the control channel. */
@@ -118,6 +121,8 @@ object IrohPeerCapabilities {
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
         method == CanvasMountWire.RESOLVE -> CANVAS_MOUNT_READ
+        // D1: the agent default is not part of the picker feature and stays host administration.
+        method == CanvasMountWire.SET_DEFAULT -> ADMIN_FULL
         method in CanvasMountWire.METHODS -> CANVAS_MOUNT_WRITE
         method in BEADS_READ_METHODS -> BEADS_READ
         method in BEADS_WRITE_METHODS -> BEADS_WRITE

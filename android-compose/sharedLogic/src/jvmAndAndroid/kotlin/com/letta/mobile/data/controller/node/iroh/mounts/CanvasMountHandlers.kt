@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.mount.CanvasMountRequest
 import com.letta.mobile.data.canvas.mount.CanvasMountResult
 import com.letta.mobile.data.canvas.mount.CanvasMountScope
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -15,16 +16,21 @@ import kotlinx.serialization.json.JsonObject
 internal class CanvasMountHost(
     /** The authorized facade for one call's authority; the only path to mount storage. */
     val mounts: (CanvasMountAuthority) -> AuthorizedCanvasMounts,
-    val grants: CanvasMountGrants,
-    val directory: CanvasMountDirectory,
+    /** The host records the authority decides from, and the viewers change pushes go to. */
+    val sources: CanvasMountSources,
     val bounds: CanvasMountBounds,
-)
+) {
+    val changes = CanvasMountChanges(sources, bounds.durability, bounds.scope)
+}
 
-/** Host-wide properties of every answer: the durability promise (O1) and the per-call deadline (F5). */
-internal class CanvasMountBounds(val durability: CanvasMountDurability, val deadline: CanvasMountDeadline) {
+/**
+ * Host-wide properties of every answer: the durability promise (O1), the per-call deadline (F5) and the host-owned
+ * [scope] background work (deadline-bounded calls, change pushes) runs in.
+ */
+internal class CanvasMountBounds(val durability: CanvasMountDurability, val deadline: CanvasMountDeadline, val scope: CoroutineScope) {
     companion object {
         fun production(scope: CoroutineScope): CanvasMountBounds =
-            CanvasMountBounds(CanvasMountDurability.ofHost(), CanvasMountDeadline.production(scope))
+            CanvasMountBounds(CanvasMountDurability.ofHost(), CanvasMountDeadline.production(scope), scope)
     }
 }
 
@@ -43,13 +49,25 @@ internal class CanvasMountHandlers(private val host: CanvasMountHost) {
             is CanvasMountInput -> parsed
         }
         val trace = CanvasMountCallTrace()
-        val mounts = host.mounts(HostCanvasMountAuthority(connection, host.grants, host.directory, trace))
-        val call = CanvasMountCall(mounts, connection.principal, input)
-        return when (val timed = host.bounds.deadline.run { call.run(route) }) {
+        val authority = HostCanvasMountAuthority(connection, host.sources.catalog, host.sources.directory, trace)
+        val call = CanvasMountCall(host.mounts(authority), connection.principal, input)
+        val outcome = when (val timed = host.bounds.deadline.run { call.run(route) }) {
             is CanvasMountTimed.Settled -> timed.value.settledWith(route, trace)
             is CanvasMountTimed.Expired -> expired(route, trace, timed.unwound)
         }
+        changedCanvas(outcome)?.let { host.changes.publish(CanvasMountChange(input.agent, input.conversation, it)) }
+        return outcome
     }
+}
+
+/**
+ * The canvas a binding now holds after a write this call committed, else null: a replace, or a bind whose winner is
+ * the caller's proposal. Defaults, reads, failures and unknown outcomes push nothing.
+ */
+private fun changedCanvas(outcome: CanvasMountOutcome): CanvasId? = when (outcome) {
+    is CanvasMountOutcome.Replaced -> outcome.canvas
+    is CanvasMountOutcome.Bound -> outcome.canvas.takeIf { outcome.won }
+    else -> null
 }
 
 /** One authorized call: every operation goes through the facade with the verified principal. */

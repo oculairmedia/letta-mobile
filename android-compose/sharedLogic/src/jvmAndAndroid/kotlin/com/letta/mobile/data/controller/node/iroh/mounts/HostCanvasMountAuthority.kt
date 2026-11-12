@@ -23,6 +23,9 @@ internal class CanvasMountConnection private constructor(
 ) {
     fun allowsAgent(agent: AgentId): Boolean = agents == null || agent.value in agents
 
+    /** No agent scope: the peer may address, and see the canvases of, every agent. */
+    val unrestrictedAgents: Boolean get() = agents == null
+
     fun allowsConversation(conversation: ConversationId): Boolean = conversations == null || conversation.value in conversations
 
     /**
@@ -82,13 +85,18 @@ internal class CanvasMountCallTrace {
  *
  * - Address: the request's principal is the connection's; the agent is in the peer's agent scope; for a binding,
  *   the conversation is in its conversation scope and the host's [directory] says the agent owns it.
- * - Propose: for a default, the peer manages conversations (O3) and the agent exists; the principal's canvas grant
- *   allows mounting the proposed canvas.
- * - See: the principal's canvas grant allows seeing the stored canvas.
+ * - Propose: for a default, the peer manages conversations (O3) and the agent exists; the proposed canvas is
+ *   visible to the connection ([visible]).
+ * - See: the stored canvas is visible to the connection.
+ *
+ * Visibility (owner decision D3): a binding's own conversation canvas is always visible to a caller allowed to
+ * address that binding; any other canvas must exist on this host and be owned by an agent in the connection's agent
+ * scope ([CanvasMountCatalog.ownership]). A canvas with no known owner is visible only with unrestricted agent
+ * scope, and a canvas the host does not have is visible to no one, so both deny exactly like any other denial.
  */
 internal class HostCanvasMountAuthority(
     private val connection: CanvasMountConnection,
-    private val grants: CanvasMountGrants,
+    private val catalog: CanvasMountCatalog,
     private val directory: CanvasMountDirectory,
     private val trace: CanvasMountCallTrace,
 ) : CanvasMountAuthority {
@@ -105,8 +113,7 @@ internal class HostCanvasMountAuthority(
         val decision = decide(request) { scope ->
             when {
                 scope is CanvasMountScope.AgentDefault && !mayChangeDefault(scope) -> CanvasMountDecision.DENY
-                grants.of(connection.principal, proposed).mayMount -> CanvasMountDecision.ALLOW
-                else -> CanvasMountDecision.DENY
+                else -> allowIf(visible(scope, proposed))
             }
         }
         if (decision == CanvasMountDecision.ALLOW) trace.enter(CanvasMountPhase.STORING)
@@ -115,13 +122,25 @@ internal class HostCanvasMountAuthority(
 
     override suspend fun maySee(request: CanvasMountRequest<CanvasMountScope>, winner: CanvasId): CanvasMountDecision {
         trace.enter(CanvasMountPhase.REVEALING)
-        return decide(request) { allowIf(grants.of(connection.principal, winner).maySee) }
+        return decide(request) { scope -> allowIf(visible(scope, winner)) }
     }
 
     private suspend fun addressConversation(scope: CanvasMountScope.Conversation): CanvasMountDecision = when {
         !connection.allowsConversation(scope.conversation) -> CanvasMountDecision.DENY
         else -> allowIf(directory.ownerOf(scope.conversation) == scope.agent)
     }
+
+    private suspend fun visible(scope: CanvasMountScope, canvas: CanvasId): Boolean {
+        val ownCanvas = (scope as? CanvasMountScope.Conversation)?.conversation?.let(CanvasId::forConversation)
+        if (canvas == ownCanvas) return true
+        return when (val ownership = catalog.ownership(canvas, directory)) {
+            CanvasOwnership.Absent -> false
+            is CanvasOwnership.Owned -> ownedVisible(ownership.agents)
+        }
+    }
+
+    private fun ownedVisible(owners: Set<AgentId>): Boolean =
+        if (owners.isEmpty()) connection.unrestrictedAgents else owners.any(connection::allowsAgent)
 
     private suspend fun mayChangeDefault(scope: CanvasMountScope.AgentDefault): Boolean =
         connection.managesConversations && directory.hasAgent(scope.agent)

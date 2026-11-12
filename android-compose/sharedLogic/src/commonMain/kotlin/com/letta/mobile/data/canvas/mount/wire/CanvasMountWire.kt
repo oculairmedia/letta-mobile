@@ -20,6 +20,12 @@ object CanvasMountWire {
     /** Sets an agent's default (last writer wins). */
     const val SET_DEFAULT: String = "canvas.mount.default.set"
 
+    /**
+     * Push frame `type` sent to the viewers of a conversation whose binding changed:
+     * `{"type": "canvas_mount_updated", "agent_id", "conversation_id", "canvas_id", "durability"}`.
+     */
+    const val EVENT_TYPE: String = "canvas_mount_updated"
+
     /** Every route, registered together or not at all. */
     val METHODS: Set<String> = setOf(RESOLVE, BIND, REPLACE, SET_DEFAULT)
 

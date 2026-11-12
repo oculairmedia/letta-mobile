@@ -44,6 +44,9 @@ sealed interface HostCanvasAccess {
  *   the canvas of the conversation its runtime is in, and no other: the App Server's runtime scope
  *   is the proof that the conversation is its own.
  * - A plugin element's props are held to [kinds], the plugin kinds this host has installed.
+ * - A call that names no canvas acts on the canvas [mounts] says the caller's own conversation is mounted on,
+ *   else that conversation's own canvas. The mount only chooses the board: the canvas's ACL still decides
+ *   whether the agent may read or write it.
  */
 @OptIn(ExperimentalUuidApi::class)
 class HostCanvasBackend(
@@ -53,6 +56,7 @@ class HostCanvasBackend(
     private val newOpId: () -> CanvasOpId = { CanvasOpId("agent-op-${Uuid.random()}") },
     private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
     private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+    private val mounts: HostCanvasMountLookup = HostCanvasMountLookup.None,
 ) {
     /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
     suspend fun open(caller: HostCanvasCaller, canvasId: CanvasId): HostCanvasAccess {
@@ -74,11 +78,32 @@ class HostCanvasBackend(
     }
 
     /**
-     * The canvas of the conversation [caller] runs in (claimed, so created, on first use), for a
-     * call that names no canvas; null when the caller is in no conversation.
+     * The canvas a call that names none acts on: the one the caller's own conversation is mounted on, else
+     * that conversation's own canvas (claimed, so created, on first use); null when the caller is in no
+     * conversation. A mounted canvas the caller's ACL does not let it read is refused, never swapped for
+     * another board.
      */
-    suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? =
-        caller.conversationId?.let { conversation(caller, ConversationId(it), claim = true) }
+    suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? {
+        val own = caller.conversationId?.let(::ConversationId) ?: return null
+        return when (val mounted = mounts.mounted(caller)) {
+            HostCanvasMount.None -> conversation(caller, own, claim = true)
+            is HostCanvasMount.Mounted -> when (mounted.canvas) {
+                CanvasId.forConversation(own) -> conversation(caller, own, claim = true)
+                else -> open(caller, mounted.canvas)
+            }
+            HostCanvasMount.Unavailable -> HostCanvasAccess.Denied(MOUNT_UNAVAILABLE)
+        }
+    }
+
+    /** The canvas [caller]'s own conversation shows now (see [ownConversation]), or null when it is unknown. */
+    suspend fun currentCanvas(caller: HostCanvasCaller): CanvasId? {
+        val own = caller.conversationId?.let(::ConversationId) ?: return null
+        return when (val mounted = mounts.mounted(caller)) {
+            HostCanvasMount.None -> CanvasId.forConversation(own)
+            is HostCanvasMount.Mounted -> mounted.canvas
+            HostCanvasMount.Unavailable -> null
+        }
+    }
 
     /** A new canvas of no conversation, owned by the local user, the caller its writer. */
     suspend fun create(caller: HostCanvasCaller, title: String): HostCanvasEntry {
@@ -195,6 +220,7 @@ class HostCanvasBackend(
 
     private companion object {
         const val CONVERSATION_CANVAS_TITLE = "Conversation canvas"
+        const val MOUNT_UNAVAILABLE = "The canvas mounted for this conversation could not be read; name a canvas_id"
 
         /** Generous: the relay acknowledges as soon as the op is durable, normally in the same call. */
         val DEFAULT_ACK_TIMEOUT: Duration = 10.seconds

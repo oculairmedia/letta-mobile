@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -38,6 +39,25 @@ interface ViewerHandle {
 
     /** Whether the client negotiated the separate persisted-activity frame. Authorization is checked separately. */
     fun receivesConversationActivity(agentId: AgentId): Boolean = false
+
+    /**
+     * The connection's current admin RPC request context (its verified identity and scopes), only while its
+     * capabilities admit [method]; null otherwise. A push that must reach only peers allowed to call [method] re-runs
+     * that method's own checks on it. Evaluated at send time. Default: null (receives nothing).
+     */
+    fun adminContextFor(method: String): AdminRpcRequestContext? = null
+}
+
+/** The connections currently viewing a conversation, for pushes scoped to that conversation's viewers. */
+fun interface ConversationViewers {
+    /** The live viewers of [conversation]. */
+    suspend fun viewersOf(conversation: ConversationId): Set<ViewerHandle>
+
+    /** Viewer sources that need no endpoint. */
+    companion object {
+        /** No endpoint: nobody is viewing anything. */
+        val None: ConversationViewers = ConversationViewers { emptySet() }
+    }
 }
 
 /** Told when a connection starts viewing a conversation. */

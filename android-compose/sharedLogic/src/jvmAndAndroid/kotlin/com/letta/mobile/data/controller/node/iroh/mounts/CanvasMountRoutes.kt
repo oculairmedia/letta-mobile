@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.mount.CanvasMountAuthority
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
+import com.letta.mobile.data.controller.node.iroh.ConversationViewers
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry
@@ -21,7 +22,7 @@ import kotlinx.coroutines.CoroutineScope
  *
  * Each call derives its principal from the connection's verified endpoint identity, parses params strictly,
  * and reaches mount storage only through [AuthorizedCanvasMounts] with a per-call host authority built from the
- * connection's own scopes, the host's canvas [CanvasMountGrants] and its [CanvasMountDirectory]. There is no
+ * connection's own scopes and the host's own records ([CanvasMountSources]). There is no
  * agent-callable surface and no listing (owner decisions O4, O5).
  */
 class CanvasMountRoutes internal constructor(
@@ -37,7 +38,7 @@ class CanvasMountRoutes internal constructor(
         location: CanvasMountStoreLocation,
         sources: CanvasMountSources,
         scope: CoroutineScope,
-    ) : this(policy, CanvasMountHost(location::mounts, sources.grants, sources.directory, CanvasMountBounds.production(scope)))
+    ) : this(policy, CanvasMountHost(location::mounts, sources, CanvasMountBounds.production(scope)))
 
     /** Installs all four routes and the capability under a secure policy; under the anonymous policy, nothing. */
     override fun register(router: AdminRpcRouter) {
@@ -68,12 +69,14 @@ class CanvasMountStoreLocation(
         AuthorizedCanvasMounts(productStateDirectory, hostId, authority)
 }
 
-/** The host-owned records the mount authority decides from. */
+/** The host-owned records the mount authority decides from, and where binding change pushes go. */
 class CanvasMountSources(
-    /** Canvas grants keyed by principal and semantic canvas id. */
-    val grants: CanvasMountGrants,
+    /** Which canvases exist on this host and which agents own them (the visibility rule's source). */
+    val catalog: CanvasMountCatalog,
     /** The host's own conversation and agent records. */
     val directory: CanvasMountDirectory,
+    /** The live viewers of each conversation; [ConversationViewers.None] pushes nothing. */
+    val viewers: ConversationViewers = ConversationViewers.None,
 )
 
 /** Exhaustive on purpose: a new policy kind must decide here whether it may serve mount routes. */
