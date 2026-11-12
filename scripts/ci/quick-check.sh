@@ -13,6 +13,9 @@
 #   ratchet       scripts/ci/baseline-ratchet-guard.py against the merge base with --base
 #   structure     scripts/ci/package_headroom.py --changed: package type caps, new import
 #                 cycles (CI's structure contract) and headroom of every touched package
+#   docs-index    scripts/docs/documentation-index.py --check (generated docs navigation)
+#   api-mirror    scripts/ci/api-dump-mirror-check.sh (linux_x64 and mingw_x64 API dumps agree)
+#   invisible     scripts/ci/check-invisible-chars.py (literal bidi / zero-width characters)
 #
 # Usage: quick-check.sh [--base REF] [--verbose]
 #   --base REF   compare against REF (default origin/main; fetch first when main moved)
@@ -47,7 +50,7 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 cd "$ROOT" || exit 2
 
-GATES=(parity platform-ui kdoc api-packages wire-contracts ratchet structure)
+GATES=(parity platform-ui kdoc api-packages wire-contracts ratchet structure docs-index api-mirror invisible)
 declare -A HINT=(
   [parity]="bind the shared contract on every platform, implement the shared type, or move the logic into sharedLogic/sharedUI; never add a scripts/ci/parity/ line (AGENTS.md 'No unshared frontend or logic')"
   [platform-ui]="build the @Composable in sharedUI and keep the platform file a container (PUI001), or shrink it below its cap (PUI002); delete stale allowlist lines (PUI003)"
@@ -56,6 +59,9 @@ declare -A HINT=(
   [wire-contracts]="add matching versioned specs/fixtures, regenerate the index, and only shrink the uncovered baseline; run :sharedLogic:jvmTest for real registry/conformance"
   [ratchet]="baselines only shrink: fix the code instead of adding or raising a baseline line"
   [structure]="split a full package or put new types in a package with headroom; drop the import that closes a cycle; lower stale lines in android-compose/architecture-tests/structure-baseline.json"
+  [docs-index]="run 'python3 scripts/docs/documentation-index.py --write' and commit the refreshed navigation"
+  [api-mirror]="after apiDump, copy each api/linux_x64 dump over its api/mingw_x64 twin (keep the klib '// Targets:' lines)"
+  [invisible]="replace each listed character with its \uXXXX escape (or delete it); SonarCloud fails the PR otherwise"
 )
 
 run_gate() {
@@ -67,6 +73,9 @@ run_gate() {
     wire-contracts) "$PY" scripts/ci/check-wire-contracts.py --check --diff-base "$MERGE_BASE" ;;
     ratchet) "$PY" scripts/ci/baseline-ratchet-guard.py --diff-base "$MERGE_BASE" ;;
     structure) "$PY" scripts/ci/package_headroom.py --changed --base "$MERGE_BASE" ;;
+    docs-index) "$PY" scripts/docs/documentation-index.py --check ;;
+    api-mirror) bash scripts/ci/api-dump-mirror-check.sh ;;
+    invisible) "$PY" scripts/ci/check-invisible-chars.py ;;
   esac
 }
 
