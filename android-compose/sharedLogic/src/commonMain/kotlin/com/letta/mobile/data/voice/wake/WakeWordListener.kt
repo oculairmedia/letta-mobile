@@ -133,24 +133,32 @@ class WakeWordListener(
         }
     }
 
+    /** Runs the session to its end, then reports how it ended: only after the source is released and the session closed. */
     private suspend fun FlowCollector<WakeWordEvent>.listen(selection: WakeWordSelection.Opened) {
+        val ending = runSession(selection)
+        mutableState.value = if (ending is WakeWordEvent.Stopped) WakeListenerState.STOPPED else WakeListenerState.UNAVAILABLE
+        emit(ending)
+    }
+
+    private suspend fun FlowCollector<WakeWordEvent>.runSession(selection: WakeWordSelection.Opened): WakeWordEvent {
         val session = selection.session
         try {
             if (source.format != selection.binding.engine.descriptor.format) {
-                return unavailable(VoiceErrorCode.UNSUPPORTED_FORMAT, selection.skipped)
+                return unavailableEvent(VoiceErrorCode.UNSUPPORTED_FORMAT, selection.skipped)
             }
             val run = ListenRun(session, source.format, config.policy)
             val outcome = runCatching { source.frames().collect { frame -> process(run, frame) } }
             val error = outcome.exceptionOrNull()
             if (error is CancellationException) throw error
-            if (error != null) return unavailable(VoiceErrorCode.ENGINE_FAILED, selection.skipped)
-            mutableState.value = WakeListenerState.STOPPED
-            emit(WakeWordEvent.Stopped)
+            return if (error == null) WakeWordEvent.Stopped else unavailableEvent(VoiceErrorCode.ENGINE_FAILED, selection.skipped)
         } finally {
             session.close()
             mutableState.compareAndSet(WakeListenerState.LISTENING, WakeListenerState.STOPPED)
         }
     }
+
+    private fun unavailableEvent(code: VoiceErrorCode, skipped: List<SkippedEngine>): WakeWordEvent =
+        WakeWordEvent.Unavailable(VoiceError(code, VoicePort.ACTIVATION), skipped)
 
     /** The first frame proves the source is open: only then is the listener reported as listening. */
     private suspend fun FlowCollector<WakeWordEvent>.process(run: ListenRun, frame: AudioFrame) {

@@ -18,6 +18,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
+import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -40,10 +41,14 @@ import kotlinx.serialization.json.put
  * An OpenAI-compatible speech client: `POST {base}/v1/audio/transcriptions` and
  * `POST {base}/v1/audio/speech`.
  *
- * A configured bearer key is sent only over https, or over plain http to a loopback host
- * (`localhost`, `127.0.0.0/8`, `::1`). Plain http to any other host, private LAN addresses
- * included, is refused with [VoiceErrorCode.INSECURE_TRANSPORT] before anything is sent: a LAN is
- * not an encrypted transport. Use https, or reach the server through a loopback tunnel.
+ * A configured bearer key is sent only over https, or over plain http to a host that is exactly a
+ * loopback literal (`localhost`, a dotted-quad `127.x.x.x`, `::1`). Plain http to any other host,
+ * private LAN addresses and look-alike names included, is refused with
+ * [VoiceErrorCode.INSECURE_TRANSPORT] before anything is sent: a LAN is not an encrypted
+ * transport. Use https, or reach the server through a loopback tunnel. A keyed URL containing any
+ * whitespace is refused outright. The request URL is parsed
+ * once, and the parsed URL is both what is checked and where the request goes; redirects are
+ * never followed.
  *
  * It builds its own isolated client on the supplied [engine] (no logging, no redirects, no shared
  * auth), sends the bearer key only when one is configured, and maps every failure to a
@@ -69,8 +74,9 @@ class SpeechEndpointClient(
 
     /** Transcribes [request]'s audio and returns the text. */
     suspend fun transcribe(request: TranscriptionRequest): VoiceText = call(SpeechOperation.TRANSCRIPTION) {
-        requireProtectedTransport(SpeechOperation.TRANSCRIPTION)
-        val response = client.post(url(TRANSCRIPTIONS_PATH)) {
+        val target = requestUrl(TRANSCRIPTIONS_PATH, SpeechOperation.TRANSCRIPTION)
+        val response = client.post {
+            url(target)
             authorize()
             setBody(transcriptionBody(request))
         }
@@ -81,8 +87,9 @@ class SpeechEndpointClient(
     /** Synthesises [request], handing the audio to [onChunk] as it streams in. */
     suspend fun synthesize(request: SpeechRequest, onChunk: suspend (AudioChunk) -> Unit) {
         call(SpeechOperation.SPEECH) {
-            requireProtectedTransport(SpeechOperation.SPEECH)
-            client.preparePost(url(SPEECH_PATH)) {
+            val target = requestUrl(SPEECH_PATH, SpeechOperation.SPEECH)
+            client.preparePost {
+                url(target)
                 authorize()
                 setBody(TextContent(speechBody(request), ContentType.Application.Json))
             }.execute { response ->
@@ -107,15 +114,18 @@ class SpeechEndpointClient(
         client.close()
     }
 
-    /** Refuses to send the bearer key unless the transport protects it. */
-    private fun requireProtectedTransport(operation: SpeechOperation) {
-        if (config.apiKey == null) return
-        if (!SpeechTransportPolicy.protectsKey(config.baseUrl)) {
+    /**
+     * Parses the request URL once; the parsed URL is both what the transport check validates and
+     * what the request is sent to. Refuses to send the bearer key unless the transport protects it.
+     */
+    private fun requestUrl(path: String, operation: SpeechOperation): Url {
+        val raw = config.baseUrl.value.trimEnd('/') + path
+        val parsed = runCatching { Url(raw) }.getOrNull()
+        if (config.apiKey != null && !SpeechTransportPolicy.protectsKey(raw, parsed)) {
             throw SpeechEndpointException(operation, VoiceErrorCode.INSECURE_TRANSPORT)
         }
+        return parsed ?: throw SpeechEndpointException(operation, VoiceErrorCode.REJECTED)
     }
-
-    private fun url(path: String): String = config.baseUrl.value.trimEnd('/') + path
 
     private fun HttpRequestBuilder.authorize() {
         config.apiKey?.let { header(HttpHeaders.Authorization, it.bearer()) }
@@ -216,18 +226,52 @@ internal object SpeechStatusCodes {
 
 /** Which endpoints may receive a bearer key. */
 internal object SpeechTransportPolicy {
-    private val loopbackNames = setOf("localhost", "::1", "[::1]")
-    private const val LOOPBACK_V4_PREFIX = "127."
-
-    /** True for https, and for plain http to a loopback host. */
-    fun protectsKey(url: SpeechEndpointUrl): Boolean {
-        val parsed = runCatching { Url(url.value) }.getOrNull() ?: return false
-        return when (parsed.protocol) {
+    /**
+     * True for https, and for plain http to a host that is exactly a loopback literal. [raw], the
+     * text [url] was parsed from, must contain no whitespace at all; an unparsable URL is refused.
+     */
+    fun protectsKey(raw: String, url: Url?): Boolean {
+        if (url == null || raw.any(Char::isWhitespace)) return false
+        return when (url.protocol) {
             URLProtocol.HTTPS -> true
-            URLProtocol.HTTP -> isLoopback(parsed.host.lowercase())
+            URLProtocol.HTTP -> LoopbackHost.matches(url.host)
             else -> false
         }
     }
+}
 
-    private fun isLoopback(host: String): Boolean = host in loopbackNames || host.startsWith(LOOPBACK_V4_PREFIX)
+/**
+ * A host that certainly means this machine: `localhost` (any case, no trailing dot), a dotted-quad
+ * IPv4 literal of four decimal octets 0-255 starting with 127, or the IPv6 loopback `::1` in its
+ * bracketed or full form. Look-alike names (`127.attacker.example`, `localhost.example.com`) and
+ * short, octal, hexadecimal, integer or IPv4-mapped forms are refused rather than guessed at.
+ */
+internal object LoopbackHost {
+    private const val LOCALHOST = "localhost"
+    private const val LOOPBACK_FIRST_OCTET = 127
+    private const val OCTETS = 4
+    private const val MAX_OCTET = 255
+    private const val MAX_OCTET_DIGITS = 3
+    private val ipv6Loopback = setOf("::1", "[::1]", "0:0:0:0:0:0:0:1", "[0:0:0:0:0:0:0:1]")
+
+    /** True when [host] is exactly a loopback name or literal. */
+    fun matches(host: String): Boolean = when {
+        host.lowercase() == LOCALHOST -> true
+        host in ipv6Loopback -> true
+        else -> isLoopbackIpv4(host)
+    }
+
+    private fun isLoopbackIpv4(host: String): Boolean {
+        val octets = host.split('.').map(::octet)
+        if (octets.size != OCTETS || null in octets) return false
+        return octets.first() == LOOPBACK_FIRST_OCTET
+    }
+
+    /** One decimal octet without leading zeros (so octal forms are refused), or null. */
+    private fun octet(text: String): Int? = when {
+        text.isEmpty() || text.length > MAX_OCTET_DIGITS -> null
+        !text.all { it in '0'..'9' } -> null
+        text.length > 1 && text.first() == '0' -> null
+        else -> text.toInt().takeIf { it <= MAX_OCTET }
+    }
 }

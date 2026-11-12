@@ -45,9 +45,10 @@ data class ChatReplyPolicy(
  * cancelled first, and the session queues the new send behind the stopping run. A reply cancelled
  * while that happens sends nothing. Late rows of earlier runs are never spoken.
  *
- * The utterance is followed by its own row (row id or client message id) and its own run, not by
- * the session-wide in-flight flag alone, so a queued utterance is not completed by an older run
- * ending. Assumes the session shows a sent utterance as a pending row until its run starts.
+ * The utterance is followed by its own row (row id or client message id) and its own run, which
+ * is identified positively, never by elimination; text of other runs is held back, never
+ * guessed at. Assumes the session shows a sent utterance as a pending row until its run starts,
+ * and that the confirmed user row carries the run id of the run it started.
  * [respond] is called from one coroutine at a time (the loop's).
  */
 class ChatSessionVoiceResponder(

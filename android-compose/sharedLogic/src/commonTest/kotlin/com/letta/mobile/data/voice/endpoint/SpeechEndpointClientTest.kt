@@ -18,6 +18,7 @@ import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -154,8 +155,24 @@ class SpeechEndpointClientTest {
         val cases = mapOf(
             "https://speech.example.net" to true,
             "http://127.0.0.1:8880" to true,
+            "http://127.255.255.254" to true,
             "http://localhost:8880" to true,
+            "http://LOCALHOST:8880" to true,
             "http://[::1]:8880" to true,
+            "http://[0:0:0:0:0:0:0:1]:8880" to true,
+            "http://localhost.:8880" to false,
+            "http://127.attacker.example" to false,
+            "http://127.0.0.1.example.com" to false,
+            "http://127.1" to false,
+            "http://2130706433" to false,
+            "http://0x7f.0.0.1" to false,
+            "http://0177.0.0.1" to false,
+            "http://127.0.0.256" to false,
+            "http://localhost.example.com" to false,
+            "http://localhost@evil.example/" to false,
+            "http://[::ffff:127.0.0.1]:8880" to false,
+            " http://localhost:8880" to false,
+            "http://localhost:8880 " to false,
             "http://192.168.1.20:8880" to false,
             "http://10.0.0.5" to false,
             "http://speech.example.net" to false,
@@ -168,6 +185,7 @@ class SpeechEndpointClientTest {
             assertEquals(if (allowed) 1 else 0, recorded.size, url)
             val failure = outcome.exceptionOrNull() as? SpeechEndpointException
             if (!allowed) assertEquals(VoiceErrorCode.INSECURE_TRANSPORT, failure?.code, url)
+            if (allowed) assertEquals(Url(url.trim()).host, recorded.single().url.host, url)
             assertFalse(secret in failure?.message.orEmpty())
         }
     }
@@ -176,5 +194,16 @@ class SpeechEndpointClientTest {
     fun plainHttpWithoutAKeyIsAllowed() = realTimeTest {
         val config = SpeechEndpointConfig(SpeechEndpointUrl("http://192.168.1.20:8880"))
         assertEquals("ok", client(config) { json("""{"text":"ok"}""") }.transcribe(transcription).value)
+    }
+
+    @Test
+    fun redirectsAreNeverFollowed() = realTimeTest {
+        val config = SpeechEndpointConfig(SpeechEndpointUrl("http://127.0.0.1:8880"), SpeechApiKey(secret))
+        val redirect = headersOf(HttpHeaders.Location, "http://evil.example/v1/audio/transcriptions")
+        val failure = assertFailsWith<SpeechEndpointException> {
+            client(config) { respond("", HttpStatusCode.Found, redirect) }.transcribe(transcription)
+        }
+        assertEquals(VoiceErrorCode.REJECTED, failure.code)
+        assertEquals(listOf("127.0.0.1"), recorded.map { it.url.host })
     }
 }

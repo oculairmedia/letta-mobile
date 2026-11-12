@@ -24,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
@@ -39,6 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EndpointEnginesTest {
@@ -159,11 +161,48 @@ class EndpointEnginesTest {
         assertEquals(3, requests)
     }
 
-    private class GatedPlayer : AudioPlayer {
+    /** Holds each clip until [gate] opens; [levelsFirst] level reports are made before waiting. */
+    private class GatedPlayer(private val levelsFirst: Int = 0) : AudioPlayer {
         val gate = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
 
         override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
-            gate.await()
+            repeat(levelsFirst) { onLevel(AudioLevel(0.5f)) }
+            try {
+                gate.await()
+            } finally {
+                if (!gate.isCompleted) cancelled.complete(Unit)
+            }
+        }
+    }
+
+    @Test
+    fun aFailureTearsThePipelineDownEvenWhenNobodyTakesTheEvent() = runTest {
+        failingRequest = 2
+        val player = GatedPlayer(levelsFirst = 200)
+        val mouth = mouth(player)
+        backgroundScope.launch { mouth.events.collect { awaitCancellation() } }
+        testScheduler.runCurrent()
+        (1..4).forEach { mouth.speak(SpeechSegment(SpeechSegmentId(it.toLong()), VoiceText("Segment $it."))) }
+        val tornDown = withContext(Dispatchers.Default) { withTimeoutOrNull(2.seconds) { player.cancelled.await() } }
+        assertEquals(Unit, tornDown)
+        assertEquals(2, requests)
+    }
+
+    @Test
+    fun grantOriginsNormaliseCaseAndNeverMatchByPrefix() {
+        val local = EndpointOrigin.of(SpeechEndpointUrl("http://localhost:8880"))!!
+        val granted = grants(VoiceEndpointGrant(local, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS))
+        val cases = mapOf(
+            "HTTP://LOCALHOST:8880" to true,
+            "http://localhost:8880/v1/" to true,
+            "http://localhost:88" to false,
+            "http://localhost:8880@evil.example" to false,
+            "http://localhost.evil.example:8880" to false,
+            "https://localhost:8880" to false,
+        )
+        cases.forEach { (url, allowed) ->
+            assertEquals(allowed, granted.allows(SpeechEndpointUrl(url), VoiceEndpointPayload.TEXT_FOR_SYNTHESIS), url)
         }
     }
 }

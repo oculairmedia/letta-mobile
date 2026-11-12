@@ -65,6 +65,7 @@ class ChatSessionVoiceResponderTest {
     private val session = ScriptedChatSession()
     private val responder = ChatSessionVoiceResponder(session)
 
+    /** A confirmed user row carries the run id of the run it started; a pending one does not. */
     private val userRow = UiMessage(id = "", role = "user", content = "spoken", timestamp = "t")
 
     private val assistantRow = UiMessage(id = "", role = "assistant", content = "", timestamp = "t", runId = "r1")
@@ -79,7 +80,7 @@ class ChatSessionVoiceResponderTest {
     private fun ask(words: VoiceText = VoiceText("what time is it")): VoiceReply = responder.respond(VoiceUtterance(words))
 
     private fun TestScope.startRun() {
-        session.append(userRow.copy(id = "u1"))
+        session.append(userRow.copy(id = "u1", runId = "r1"))
         session.update { copy(isAgentTyping = true) }
         runCurrent()
     }
@@ -174,7 +175,7 @@ class ChatSessionVoiceResponderTest {
         assertEquals(1, session.stops)
         assertEquals(listOf("first", "second"), session.sent)
         session.append(assistantRow.copy(id = "m2", content = "Late words from the first run", runId = "r1"))
-        session.append(userRow.copy(id = "u2"), assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
+        session.append(userRow.copy(id = "u2", runId = "r2"), assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
         runCurrent()
         endRun()
         assertEquals(listOf("Partial"), texts(first))
@@ -228,7 +229,7 @@ class ChatSessionVoiceResponderTest {
         session.append(assistantRow.copy(id = "m1", content = "Partial"))
         runCurrent()
         val second = collect(ask(VoiceText("second")))
-        session.append(userRow.copy(id = "u2"))
+        session.append(userRow.copy(id = "u2", runId = "r2"))
         session.append(assistantRow.copy(id = "m2", content = "Late words from the first run", runId = "r1"))
         session.append(assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
         runCurrent()
@@ -242,7 +243,7 @@ class ChatSessionVoiceResponderTest {
         session.append(userRow.copy(id = "otid1", clientMessageId = "otid1", isPending = true))
         session.update { copy(isAgentTyping = true) }
         runCurrent()
-        val confirmed = userRow.copy(id = "srv1", clientMessageId = "otid1")
+        val confirmed = userRow.copy(id = "srv1", clientMessageId = "otid1", runId = "r1")
         session.update { copy(messages = messages.map { if (it.id == "otid1") confirmed else it }.toPersistentList()) }
         session.append(assistantRow.copy(id = "m1", content = "Hi."))
         runCurrent()
@@ -266,8 +267,46 @@ class ChatSessionVoiceResponderTest {
     @Test
     fun runThatEndedBeforeDeliveryWasObservedCompletes() = runTest {
         val events = collect(ask())
-        session.append(userRow.copy(id = "u1"))
+        session.append(userRow.copy(id = "u1", runId = "r1"))
         runCurrent()
         assertEquals(listOf<VoiceReplyEvent>(VoiceReplyEvent.Completed), events)
+    }
+
+    private fun TestScope.confirmOwnRun(id: String) {
+        val confirmed = userRow.copy(id = id, runId = "r2")
+        session.update { copy(isAgentTyping = true, messages = messages.map { if (it.id == id) confirmed else it }.toPersistentList()) }
+        session.append(assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
+        runCurrent()
+        endRun()
+    }
+
+    @Test
+    fun lateRowOfARunNeverSeenBeforeIsNotTakenForTheNewRun() = runTest {
+        collect(ask(VoiceText("first")))
+        session.update { copy(isAgentTyping = true) }
+        session.append(userRow.copy(id = "u1", isPending = true))
+        runCurrent()
+        val second = collect(ask(VoiceText("second")))
+        session.append(userRow.copy(id = "u2", isPending = true))
+        runCurrent()
+        session.append(assistantRow.copy(id = "m1", content = "Late words from the first run.", runId = "r1"))
+        runCurrent()
+        confirmOwnRun("u2")
+        assertEquals(listOf("Answer two."), texts(second))
+    }
+
+    @Test
+    fun rowOfAnOlderRunAfterAPendingUtteranceIsNotTakenForItsRun() = runTest {
+        session.update { copy(isAgentTyping = true) }
+        val events = collect(ask())
+        session.append(userRow.copy(id = "u2", isPending = true))
+        runCurrent()
+        session.append(assistantRow.copy(id = "m1", content = "Older text.", runId = "r1"))
+        runCurrent()
+        endRun()
+        assertEquals(emptyList<VoiceReplyEvent>(), events)
+        confirmOwnRun("u2")
+        assertEquals(listOf("Answer two."), texts(events))
+        assertEquals(VoiceReplyEvent.Completed, events.last())
     }
 }

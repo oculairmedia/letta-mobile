@@ -84,21 +84,27 @@ class EndpointVoiceMouth(
             for ((id, clip) in clips) {
                 mutableEvents.emit(VoiceMouthEvent.Started(id))
                 val played = runCatching { player.play(clip) { mutableEvents.tryEmit(VoiceMouthEvent.OutputLevel(it)) } }
-                mutableEvents.emit(VoiceMouthEvent.OutputLevel(AudioLevel.Silent))
+                mutableEvents.tryEmit(VoiceMouthEvent.OutputLevel(AudioLevel.Silent))
                 val error = played.exceptionOrNull()
                 if (error != null) return report(workers, PipelineFailure(error, id, VoiceErrorCode.PLAYBACK_FAILED))
                 mutableEvents.emit(VoiceMouthEvent.Finished(id))
             }
         }
 
-        private suspend fun report(workers: CoroutineScope, failure: PipelineFailure) {
+        /**
+         * Tears the pipeline down first, without suspending (both workers cancelled, pending text
+         * and clips discarded), then reports. A subscriber too slow to take the event at once gets it
+         * from a separate coroutine, so delivery can never hold up the teardown.
+         */
+        private fun report(workers: CoroutineScope, failure: PipelineFailure) {
             val error = failure.error
             if (error is CancellationException) throw error
-            val code = (error as? SpeechEndpointException)?.code ?: failure.fallback
-            mutableEvents.emit(VoiceMouthEvent.Failed(VoiceError(code, VoicePort.MOUTH), failure.id))
+            workers.cancel()
             texts.cancel()
             clips.cancel()
-            workers.cancel()
+            val code = (error as? SpeechEndpointException)?.code ?: failure.fallback
+            val failed = VoiceMouthEvent.Failed(VoiceError(code, VoicePort.MOUTH), failure.id)
+            if (!mutableEvents.tryEmit(failed)) scope.launch { mutableEvents.emit(failed) }
         }
     }
 
