@@ -5,6 +5,9 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSession
 import com.letta.mobile.data.canvas.notes.NoteTestBackend
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -115,8 +118,57 @@ class SharedNoteBrowserTest {
         assertIs<SharedNoteListing.Listed>(browser.state.value.listing)
     }
 
+    @Test
+    fun overlappingRefreshesShowTheLatestAnswerAndStayLoadingUntilAllAnswer() = runTest {
+        val gated = GatedDirectory()
+        val overlapping = SharedNoteBrowser(object : SharedNotebooks {
+            override val directory = gated
+            override val opener = host.opener
+        })
+        val older = launch { overlapping.refresh() }
+        runCurrent()
+        val newer = launch { overlapping.refresh() }
+        runCurrent()
+
+        gated.answer(1, SharedNoteListing.Listed(emptyList()))
+        runCurrent()
+        assertEquals(SharedNoteListing.Listed(emptyList()), overlapping.state.value.listing, "the newer answer shows")
+        assertTrue(overlapping.state.value.loading, "the older refresh is still waiting")
+
+        gated.answer(0, SharedNoteListing.Listed(listOf(SharedNote(NOTE, "Plan"))))
+        runCurrent()
+        assertEquals(SharedNoteListing.Listed(emptyList()), overlapping.state.value.listing, "a stale answer arriving last is dropped")
+        assertFalse(overlapping.state.value.loading)
+        older.join()
+        newer.join()
+
+        val first = launch { overlapping.refresh() }
+        runCurrent()
+        val second = launch { overlapping.refresh() }
+        runCurrent()
+        first.cancel()
+        runCurrent()
+        assertTrue(overlapping.state.value.loading, "a cancelled refresh does not end the one still waiting")
+        gated.answer(3, SharedNoteListing.Listed(listOf(SharedNote(NOTE, "Plan"))))
+        second.join()
+        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(NOTE, "Plan"))), overlapping.state.value.listing, "the latest one asked wins")
+        assertFalse(overlapping.state.value.loading)
+    }
+
     private companion object {
         val NOTE = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+    }
+
+    /** A directory whose every call waits until the test answers it, by call number. */
+    private class GatedDirectory : SharedNoteDirectory {
+        // overflow: one gate per call in a single test; bounded by the calls the test makes.
+        private val gates = mutableListOf<CompletableDeferred<SharedNoteListing>>()
+
+        override suspend fun list(): SharedNoteListing = CompletableDeferred<SharedNoteListing>().also { gates += it }.await()
+
+        fun answer(call: Int, listing: SharedNoteListing) {
+            gates[call].complete(listing)
+        }
     }
 
     /** A host over one [backend] note; its knobs model a revoked grant or an unreachable host. */

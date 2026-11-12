@@ -32,21 +32,42 @@ data class SharedNoteBrowserState(
 class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
     private val mutableState = MutableStateFlow(SharedNoteBrowserState())
 
+    // Owner-dispatcher state ordering overlapping refreshes: the number of the latest one asked,
+    // of the latest one whose answer is shown, and how many are still waiting for the host.
+    private var asked = 0L
+    private var shown = 0L
+    private var waiting = 0
+
     /** The listing and the open note. */
     val state: StateFlow<SharedNoteBrowserState> = mutableState.asStateFlow()
 
-    /** Asks the host again; a failure keeps no stale list, it says the host is unavailable. */
+    /**
+     * Asks the host again; a failure keeps no stale list, it says the host is unavailable. Refreshes
+     * may overlap (the mount, Refresh, Try again, leaving a note): the latest one asked wins, so an
+     * older answer arriving last never replaces a newer one, and [SharedNoteBrowserState.loading]
+     * stays true until every refresh has its answer or was cancelled.
+     */
     suspend fun refresh() {
+        val ticket = ++asked
+        waiting++
         mutableState.update { it.copy(loading = true) }
-        val listing = try {
-            notebooks.directory.list()
-        } catch (cancelled: CancellationException) {
-            mutableState.update { it.copy(loading = false) }
-            throw cancelled
-        } catch (expectedFailure: Exception) {
-            SharedNoteListing.Unavailable(expectedFailure.message ?: "The host could not be reached")
+        var answer: SharedNoteListing? = null
+        try {
+            answer = ask()
+        } finally {
+            waiting--
+            val fresh = answer?.takeIf { ticket > shown }
+            if (fresh != null) shown = ticket
+            mutableState.update { it.copy(listing = fresh ?: it.listing, loading = waiting > 0) }
         }
-        mutableState.update { it.copy(listing = listing, loading = false) }
+    }
+
+    private suspend fun ask(): SharedNoteListing = try {
+        notebooks.directory.list()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (expectedFailure: Exception) {
+        SharedNoteListing.Unavailable(expectedFailure.message ?: "The host could not be reached")
     }
 
     /**
