@@ -15,39 +15,28 @@ private data class AnchorIdentity(val rowId: String, val clientRow: String?) {
  * The utterance is anchored as the first user row that was not in [start], matched later by row id
  * or client message id (a pending row's id changes when the server confirms it).
  *
- * Its run is identified positively, never by elimination:
- * 1. the confirmed user row carries the run id of the run it started; or
- * 2. a run was seen to start after the utterance appeared (the session was idle with the utterance
- *    present, then a run went in flight), and the run is the first run id that appears after the
- *    utterance and was not visible anywhere before that start.
- *
- * Until one of these holds, no assistant text is spoken: text of an older or concurrent run is held
- * back rather than guessed at. Assistant rows without a run id are never attributed. Limitation:
- * the chat session exposes no direct link from an assistant row to the user message that caused
- * it, nor the in-flight run's id; when the confirmed user row carries no run id and a late row of
- * an older run first appears after the new run started, rule 2 can still attribute it wrongly.
+ * Requirement: the session must expose the run started by a sent message. Today the only such
+ * link in the chat state is the run id on the confirmed user row, so that is the only way a run is
+ * attributed: an assistant row is the utterance's only when its run id equals the confirmed user
+ * row's run id. Nothing is inferred from timing, ordering or which runs were seen before. Until the
+ * link exists nothing is spoken; if it never arrives the responder fails as UNATTRIBUTED rather
+ * than speak another run's text. Live rows streamed under a provisional run id are not matched
+ * until the session gives them the durable run id.
  *
  * Not thread-safe: one tracker serves one reply's collection.
  */
 internal class ChatReplyTracker(start: ChatUiState) {
     private val baseline: Set<String> = start.messages.flatMapTo(HashSet()) { listOfNotNull(it.id, it.clientMessageId) }
-    private val seenBeforeStart: MutableSet<String> = start.messages.mapNotNullTo(HashSet()) { it.runId }
     private val agent: String? = start.agentId
     private val spokenLengths = mutableMapOf<String, Int>()
     private var anchor: AnchorIdentity? = null
     private var ownRun: String? = null
-    private var idleSinceAnchor = false
-    private var runStarted = false
 
-    /** The utterance's own run is identified, or a run started after it and has already ended. */
-    fun delivered(state: ChatUiState): Boolean {
-        if (observe(state) < 0) return false
-        return when {
-            ownRun != null -> true
-            runStarted -> !state.isRunInFlight
-            else -> false
-        }
-    }
+    /** The utterance has appeared in the conversation (whether or not its run is known). */
+    val anchored: Boolean get() = anchor != null
+
+    /** The run the utterance started is positively identified. */
+    fun delivered(state: ChatUiState): Boolean = observe(state) >= 0 && ownRun != null
 
     /** Delivery is decided either way: delivered, or the conversation moved to another agent. */
     fun settled(state: ChatUiState): Boolean = delivered(state) || agentChanged(state)
@@ -65,29 +54,12 @@ internal class ChatReplyTracker(start: ChatUiState) {
         return if (pieces.isEmpty()) null else VoiceText(pieces.joinToString(""))
     }
 
-    /** Updates what is known about the utterance's run from [state]; returns the anchor's index or -1. */
+    /** Records the utterance's run from its confirmed row; returns the anchor's index or -1. */
     private fun observe(state: ChatUiState): Int {
         val index = anchorIndex(state)
-        if (index < 0) return index
-        state.messages[index].runId?.let { ownRun = it }
-        if (!runStarted) watchForStart(state)
-        if (ownRun == null && runStarted) ownRun = firstNewRun(state, index)
+        if (index >= 0) state.messages[index].runId?.let { ownRun = it }
         return index
     }
-
-    /** Records every run visible before the utterance's run starts, and detects that start. */
-    private fun watchForStart(state: ChatUiState) {
-        if (state.isRunInFlight && idleSinceAnchor) {
-            runStarted = true
-            return
-        }
-        state.messages.mapNotNullTo(seenBeforeStart) { it.runId }
-        if (!state.isRunInFlight) idleSinceAnchor = true
-    }
-
-    private fun firstNewRun(state: ChatUiState, index: Int): String? =
-        state.messages.subList(index + 1, state.messages.size)
-            .firstNotNullOfOrNull { row -> row.runId?.takeIf { it !in seenBeforeStart } }
 
     private fun ownRows(state: ChatUiState): List<UiMessage> {
         val run = ownRun ?: return emptyList()

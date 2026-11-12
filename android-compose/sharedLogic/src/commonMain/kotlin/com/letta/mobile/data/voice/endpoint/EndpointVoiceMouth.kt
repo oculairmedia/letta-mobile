@@ -47,6 +47,12 @@ class EndpointVoiceMouth(
     /** Segments are synthesised as they arrive, so there is nothing buffered to push. */
     override fun flush() = Unit
 
+    /**
+     * Probe for tests: true when the event buffer cannot take another event right now (a subscriber
+     * is behind). When it can, a silent output level is emitted, which is harmless.
+     */
+    internal fun eventBufferFull(): Boolean = !mutableEvents.tryEmit(VoiceMouthEvent.OutputLevel(AudioLevel.Silent))
+
     override suspend fun stop() {
         val stopping = pipeline
         pipeline = MouthPipeline()

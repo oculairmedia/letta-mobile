@@ -69223,6 +69223,7 @@ public final class com/letta/mobile/data/voice/VoiceErrorCode : java/lang/Enum {
 	public static final field SYNTHESIS_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field TIMED_OUT Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field TRANSCRIPTION_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNATTRIBUTED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNAUTHORIZED Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNAVAILABLE Lcom/letta/mobile/data/voice/VoiceErrorCode;
 	public static final field UNREACHABLE Lcom/letta/mobile/data/voice/VoiceErrorCode;

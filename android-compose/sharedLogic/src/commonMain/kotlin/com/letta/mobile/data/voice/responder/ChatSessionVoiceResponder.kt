@@ -36,19 +36,22 @@ data class ChatReplyPolicy(
  * Collecting a reply sends the utterance with `sendText`, then follows the assistant text of the
  * run it started (every assistant text message after the utterance, in order, as each streams;
  * reasoning, tool rows, errors and compaction summaries are never spoken) until the run is no
- * longer in flight. A failed run reports RUN_FAILED; a run that never starts within
- * [ChatReplyPolicy.deliveryTimeout] reports NOT_DELIVERED; a run that ends without assistant text
- * completes with nothing to say. A change of agent while following reports CANCELLED. Cancelling
+ * longer in flight. A failed run reports RUN_FAILED; an utterance that never shows in the
+ * conversation within [ChatReplyPolicy.deliveryTimeout] reports NOT_DELIVERED, and one whose run
+ * cannot be identified in that time reports UNATTRIBUTED with nothing spoken; a run that ends
+ * without assistant text completes with nothing to say. A change of agent while following reports CANCELLED. Cancelling
  * stops the run with `stopRun()` and waits for it to end.
  *
  * A second utterance supersedes the first: when its reply is collected the earlier reply is
  * cancelled first, and the session queues the new send behind the stopping run. A reply cancelled
  * while that happens sends nothing. Late rows of earlier runs are never spoken.
  *
- * The utterance is followed by its own row (row id or client message id) and its own run, which
- * is identified positively, never by elimination; text of other runs is held back, never
- * guessed at. Assumes the session shows a sent utterance as a pending row until its run starts,
- * and that the confirmed user row carries the run id of the run it started.
+ * Requirement: the session must expose the run started by a sent message. The utterance is
+ * followed by its own row (row id or client message id), and an assistant row is spoken only when
+ * its run id equals the run id on the confirmed user row: the only positive link the chat state
+ * offers today. Nothing is attributed by timing or elimination; failing silent is preferred to
+ * speaking another run's text. Against a session whose confirmed user rows carry no run id, every
+ * reply ends UNATTRIBUTED.
  * [respond] is called from one coroutine at a time (the loop's).
  */
 class ChatSessionVoiceResponder(
@@ -106,7 +109,7 @@ private class ChatSessionReply(
             observed().first { (state, now) -> now == ReplyStage.CANCELLED || tracker.settled(state) }
         }
         when {
-            delivered == null -> finish(failure(VoiceErrorCode.NOT_DELIVERED))
+            delivered == null -> finish(failure(if (tracker.anchored) VoiceErrorCode.UNATTRIBUTED else VoiceErrorCode.NOT_DELIVERED))
             delivered.second == ReplyStage.CANCELLED -> Unit
             else -> observed().first { (state, now) -> progress(tracker, state, now) }
         }

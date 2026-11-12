@@ -4158,6 +4158,7 @@ final enum class com.letta.mobile.data.voice/VoiceErrorCode : kotlin/Enum<com.le
     enum entry SYNTHESIS_FAILED // com.letta.mobile.data.voice/VoiceErrorCode.SYNTHESIS_FAILED|null[0]
     enum entry TIMED_OUT // com.letta.mobile.data.voice/VoiceErrorCode.TIMED_OUT|null[0]
     enum entry TRANSCRIPTION_FAILED // com.letta.mobile.data.voice/VoiceErrorCode.TRANSCRIPTION_FAILED|null[0]
+    enum entry UNATTRIBUTED // com.letta.mobile.data.voice/VoiceErrorCode.UNATTRIBUTED|null[0]
     enum entry UNAUTHORIZED // com.letta.mobile.data.voice/VoiceErrorCode.UNAUTHORIZED|null[0]
     enum entry UNAVAILABLE // com.letta.mobile.data.voice/VoiceErrorCode.UNAVAILABLE|null[0]
     enum entry UNREACHABLE // com.letta.mobile.data.voice/VoiceErrorCode.UNREACHABLE|null[0]

@@ -83,6 +83,12 @@ enum class VoiceErrorCode(
     /** The utterance never reached the agent. */
     NOT_DELIVERED(VoiceUserAction.RETRY),
 
+    /**
+     * The utterance reached the conversation, but no answer could be tied to it with certainty
+     * (the session did not link the utterance to the run it started); nothing was spoken.
+     */
+    UNATTRIBUTED(VoiceUserAction.NONE),
+
     /** The agent's run failed. */
     RUN_FAILED(VoiceUserAction.RETRY),
 

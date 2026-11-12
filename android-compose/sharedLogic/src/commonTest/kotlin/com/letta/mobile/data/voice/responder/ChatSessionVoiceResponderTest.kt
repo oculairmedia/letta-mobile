@@ -214,10 +214,7 @@ class ChatSessionVoiceResponderTest {
         runCurrent()
         endRun()
         assertEquals(emptyList<VoiceReplyEvent>(), events)
-        session.update { copy(isAgentTyping = true) }
-        session.append(assistantRow.copy(id = "m3", content = "Answer two.", runId = "r2"))
-        runCurrent()
-        endRun()
+        confirmOwnRun("u2")
         assertEquals(listOf("Answer two."), texts(events))
         assertEquals(VoiceReplyEvent.Completed, events.last())
     }
@@ -308,5 +305,49 @@ class ChatSessionVoiceResponderTest {
         confirmOwnRun("u2")
         assertEquals(listOf("Answer two."), texts(events))
         assertEquals(VoiceReplyEvent.Completed, events.last())
+    }
+
+    @Test
+    fun olderRunsFirstRowAfterTheNewRunStartedIsNotSpoken() = runTest {
+        session.update { copy(isAgentTyping = true) }
+        val events = collect(ask())
+        session.append(userRow.copy(id = "u2", isPending = true))
+        runCurrent()
+        endRun()
+        session.update { copy(isAgentTyping = true) }
+        runCurrent()
+        session.append(assistantRow.copy(id = "m1", content = "Older late text.", runId = "r1"))
+        runCurrent()
+        confirmOwnRun("u2")
+        assertEquals(listOf("Answer two."), texts(events))
+    }
+
+    @Test
+    fun unseenLateRowBeforeTheUtteranceIsConfirmedIsNotSpoken() = runTest {
+        collect(ask(VoiceText("first")))
+        session.update { copy(isAgentTyping = true) }
+        session.append(userRow.copy(id = "u1", isPending = true))
+        runCurrent()
+        val second = collect(ask(VoiceText("second")))
+        session.append(userRow.copy(id = "u2", isPending = true))
+        runCurrent()
+        session.update { copy(isAgentTyping = true) }
+        runCurrent()
+        session.append(assistantRow.copy(id = "m1", content = "Late words from the first run.", runId = "r1"))
+        runCurrent()
+        confirmOwnRun("u2")
+        assertEquals(listOf("Answer two."), texts(second))
+    }
+
+    @Test
+    fun replyWhoseRunIsNeverIdentifiedFailsWithoutSpeaking() = runTest {
+        val events = collect(ask())
+        session.append(userRow.copy(id = "u2", isPending = true))
+        session.update { copy(isAgentTyping = true) }
+        session.append(assistantRow.copy(id = "m1", content = "Some run's text.", runId = "r9"))
+        runCurrent()
+        advanceTimeBy(ChatReplyPolicy().deliveryTimeout + 1.seconds)
+        runCurrent()
+        assertEquals(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.UNATTRIBUTED, VoicePort.RESPONDER)), events.single())
     }
 }

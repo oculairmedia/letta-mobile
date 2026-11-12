@@ -21,12 +21,15 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -161,32 +164,26 @@ class EndpointEnginesTest {
         assertEquals(3, requests)
     }
 
-    /** Holds each clip until [gate] opens; [levelsFirst] level reports are made before waiting. */
-    private class GatedPlayer(private val levelsFirst: Int = 0) : AudioPlayer {
+    /** Holds each clip until [gate] opens. */
+    private class GatedPlayer : AudioPlayer {
         val gate = CompletableDeferred<Unit>()
-        val cancelled = CompletableDeferred<Unit>()
 
         override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
-            repeat(levelsFirst) { onLevel(AudioLevel(0.5f)) }
-            try {
-                gate.await()
-            } finally {
-                if (!gate.isCompleted) cancelled.complete(Unit)
-            }
+            gate.await()
         }
     }
 
     @Test
     fun aFailureTearsThePipelineDownEvenWhenNobodyTakesTheEvent() = runTest {
-        failingRequest = 2
-        val player = GatedPlayer(levelsFirst = 200)
-        val mouth = mouth(player)
-        backgroundScope.launch { mouth.events.collect { awaitCancellation() } }
-        testScheduler.runCurrent()
-        (1..4).forEach { mouth.speak(SpeechSegment(SpeechSegmentId(it.toLong()), VoiceText("Segment $it."))) }
-        val tornDown = withContext(Dispatchers.Default) { withTimeoutOrNull(2.seconds) { player.cancelled.await() } }
-        assertEquals(Unit, tornDown)
-        assertEquals(2, requests)
+        var proven = 0
+        withContext(Dispatchers.Default) {
+            repeat(TEARDOWN_REPEATS) { attempt ->
+                val iteration = Job(coroutineContext[Job])
+                if (TeardownRig(this + iteration).prove(attempt)) proven++
+                iteration.cancel()
+            }
+        }
+        assertEquals(TEARDOWN_REPEATS, proven)
     }
 
     @Test
@@ -204,5 +201,73 @@ class EndpointEnginesTest {
         cases.forEach { (url, allowed) ->
             assertEquals(allowed, granted.allows(SpeechEndpointUrl(url), VoiceEndpointPayload.TEXT_FOR_SYNTHESIS), url)
         }
+    }
+
+    /**
+     * One deterministic teardown scenario. Request 2 (segment 2's synthesis) waits for
+     * [releaseFailure] and then fails; the player holds clip 1 and, once a subscriber holds the first
+     * event without consuming more, fills the event buffer. Every step waits on an explicit gate.
+     */
+    private inner class TeardownRig(private val scope: CoroutineScope) {
+        private var requests = 0
+        private val releaseFailure = CompletableDeferred<Unit>()
+        private val player = HoldingPlayer(levels = FLOOD_LEVELS)
+        private val granted = grants(VoiceEndpointGrant(origin, VoiceEndpointPayload.TEXT_FOR_SYNTHESIS))
+        private val client = SpeechEndpointClient(
+            MockEngine {
+                val number = ++requests
+                if (number == 2) releaseFailure.await()
+                val code = if (number == 2) HttpStatusCode.Unauthorized else HttpStatusCode.OK
+                respond("audio", code)
+            },
+            SpeechEndpointConfig(base),
+        )
+        private val mouth = EndpointVoiceMouth(EndpointSpeechSynthesizer(client, { granted }, settings), player, scope)
+
+        /** Runs the scenario once; true when every step held. */
+        suspend fun prove(attempt: Int): Boolean {
+            val subscribed = CompletableDeferred<Unit>()
+            val holding = CompletableDeferred<Unit>()
+            scope.launch {
+                mouth.events.onSubscription { subscribed.complete(Unit) }.collect {
+                    holding.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+            subscribed.await()
+            (1..4).forEach { mouth.speak(SpeechSegment(SpeechSegmentId(it.toLong()), VoiceText("Segment $it."))) }
+            holding.await()
+            player.startLevels.complete(Unit)
+            player.levelsDone.await()
+            assertTrue(mouth.eventBufferFull(), "attempt $attempt: event buffer must be full before the failure")
+            releaseFailure.complete(Unit)
+            assertEquals(Unit, withTimeoutOrNull(TEARDOWN_BUDGET) { player.cancelled.await() }, "attempt $attempt: playback cancelled")
+            assertEquals(2, requests, "attempt $attempt: no synthesis after the failure")
+            return true
+        }
+    }
+
+    /** Holds every clip until cancelled; reports [levels] output levels once [startLevels] opens. */
+    private class HoldingPlayer(private val levels: Int) : AudioPlayer {
+        val startLevels = CompletableDeferred<Unit>()
+        val levelsDone = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+
+        override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
+            startLevels.await()
+            repeat(levels) { onLevel(AudioLevel(0.5f)) }
+            levelsDone.complete(Unit)
+            try {
+                awaitCancellation()
+            } finally {
+                cancelled.complete(Unit)
+            }
+        }
+    }
+
+    private companion object {
+        const val TEARDOWN_REPEATS = 10
+        const val FLOOD_LEVELS = 200
+        val TEARDOWN_BUDGET = 5.seconds
     }
 }
