@@ -58,12 +58,16 @@ class CanvasMountToolLookupTest {
     }
 
     @Test
-    fun aMountedCanvasCreatedByAnotherAgentIsRefusedByItsAclNotSwappedForAnotherBoard() = runBlocking {
+    fun aMountedCanvasCreatedByAnotherAgentIsGrantedByTheMountWithoutTouchingItsAcl() = runBlocking {
         val foreign = backend.create(callerB, "Agent B's board")
         store.replaceBinding(AGENT_A, CONV_A, foreign.id)
-        val denied = assertIs<HostCanvasAccess.Denied>(backend.ownConversation(callerA))
-        assertTrue("cannot read" in denied.reason, denied.reason)
+        val granted = assertIs<HostCanvasAccess.Granted>(backend.ownConversation(callerA))
+        assertEquals(foreign.id, granted.entry.id)
+        assertTrue(!granted.entry.acl.canRead(callerA.agentId), "the grant is the mount's, not the ACL's")
         assertEquals(foreign.id, backend.currentCanvas(callerA))
+        assertTrue(backend.list(callerA).any { it.id == foreign.id })
+        store.replaceBinding(AGENT_A, CONV_A, CanvasId.forConversation(CONV_A))
+        assertIs<HostCanvasAccess.Denied>(backend.open(callerA, foreign.id))
         assertTrue(backend.list(callerA).none { it.id == foreign.id })
     }
 

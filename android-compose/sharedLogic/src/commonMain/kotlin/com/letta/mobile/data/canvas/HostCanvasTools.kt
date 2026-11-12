@@ -123,7 +123,7 @@ object HostCanvasTools {
 
     /**
      * `canvas_compose` on the host: the canvas resolved as every other tool
-     * resolves it ([withCanvas]'s rules), the caller held to its ACL, then [CanvasComposeHosting]
+     * resolves it ([withCanvas]'s rules), the caller held to its ACL or its live mount, then [CanvasComposeHosting]
      * compiles, checks against the log's scene and publishes through [HostCanvasBackend.publish],
      * which checks again, stamps the ops as the caller's and sends them to the relay as ONE batch
      * op, so the artifact lands whole or not at all.
@@ -142,7 +142,7 @@ object HostCanvasTools {
                 return hosting.refused(CanvasComposeHosting.deniedCode(access.reason), access.reason)
             null -> return hosting.refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_DEFAULT_CANVAS)
         }
-        if (!entry.acl.canWrite(caller.agentId)) {
+        if (!backend.mayWrite(caller, entry)) {
             val reason = "Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'"
             return hosting.refused(ComposeErrorCode.UNAUTHORIZED, reason)
         }

@@ -21,8 +21,9 @@ import kotlinx.coroutines.CoroutineScope
  *
  * Each lookup runs as [RuntimeToolAuthority.PRINCIPAL], a host-internal principal that is not a 64-hex endpoint id and
  * so can never be, or be mistaken for, a remote peer. Its authority admits only the caller's own binding and its
- * agent's default, refuses every mutation, and lets the tool learn the stored canvas; whether the agent may then read
- * or write that canvas is still decided by the canvas's own ACL in the host canvas backend.
+ * agent's default, refuses every mutation, and lets the tool learn the stored canvas. The host canvas backend derives
+ * its grant-on-mount (owner decision D5) from this same answer at every check, so the canvas found here is the only
+ * one the mount lets the agent read and write, and only while it stays mounted.
  */
 class CanvasMountToolLookup internal constructor(
     private val mounts: (CanvasMountAuthority) -> AuthorizedCanvasMounts,

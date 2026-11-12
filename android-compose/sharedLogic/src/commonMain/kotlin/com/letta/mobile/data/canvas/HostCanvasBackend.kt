@@ -45,8 +45,10 @@ sealed interface HostCanvasAccess {
  *   is the proof that the conversation is its own.
  * - A plugin element's props are held to [kinds], the plugin kinds this host has installed.
  * - A call that names no canvas acts on the canvas [mounts] says the caller's own conversation is mounted on,
- *   else that conversation's own canvas. The mount only chooses the board: the canvas's ACL still decides
- *   whether the agent may read or write it.
+ *   else that conversation's own canvas.
+ * - Owner decision D5: the canvas the caller's own conversation is mounted on NOW may also be read and written by
+ *   the caller, whatever its ACL says and even when only the relay holds it ([HostCanvasAccessRule],
+ *   [RelayOnlyCanvases]). The grant is derived from the live mount at each check and never stored.
  */
 @OptIn(ExperimentalUuidApi::class)
 class HostCanvasBackend(
@@ -58,11 +60,18 @@ class HostCanvasBackend(
     private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
     private val mounts: HostCanvasMountLookup = HostCanvasMountLookup.None,
 ) {
-    /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
+    private val access = HostCanvasAccessRule(mounts)
+    private val relayOnly = RelayOnlyCanvases(store)
+
+    /**
+     * The canvas [canvasId] for [caller]: known to the directory, its own conversation's, or a canvas only the relay
+     * holds that the caller's own conversation is mounted on now (never created by asking).
+     */
     suspend fun open(caller: HostCanvasCaller, canvasId: CanvasId): HostCanvasAccess {
         directory.get(canvasId)?.let { return readable(caller, it) }
         val own = caller.conversationId?.let(::ConversationId)
         if (own != null && canvasId == CanvasId.forConversation(own)) return claimConversation(caller, own)
+        if (access.mountedHere(caller, canvasId)) relayOnly.entry(canvasId)?.let { return HostCanvasAccess.Granted(it) }
         return HostCanvasAccess.Denied("Canvas not found: $canvasId")
     }
 
@@ -80,8 +89,8 @@ class HostCanvasBackend(
     /**
      * The canvas a call that names none acts on: the one the caller's own conversation is mounted on, else
      * that conversation's own canvas (claimed, so created, on first use); null when the caller is in no
-     * conversation. A mounted canvas the caller's ACL does not let it read is refused, never swapped for
-     * another board.
+     * conversation. The mount itself grants the caller access (D5); a mount that cannot be read, or a mounted
+     * canvas the host does not have, is refused, never swapped for another board.
      */
     suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? {
         val own = caller.conversationId?.let(::ConversationId) ?: return null
@@ -113,11 +122,20 @@ class HostCanvasBackend(
         return directory.putIfAbsent(HostCanvasEntry(bound.value, topic, title, acl = aclFor(caller)))
     }
 
-    /** Every canvas [caller] may read, its own conversation's included. */
+    /** Every canvas [caller] may read, its own conversation's and the one it is mounted on now included. */
     suspend fun list(caller: HostCanvasCaller): List<HostCanvasEntry> {
         caller.conversationId?.let { conversation(caller, ConversationId(it), claim = false) }
-        return directory.all().filter { it.acl.canRead(caller.agentId) }
+        val known = directory.all()
+        // One mount lookup for the whole list; the grant covers only the canvas it names.
+        val mounted = caller.conversationId?.let { (mounts.mounted(caller) as? HostCanvasMount.Mounted)?.canvas }
+        val readable = known.filter { it.acl.canRead(caller.agentId) || it.id == mounted }
+        val ownCanvas = caller.conversationId?.let { CanvasId.forConversation(ConversationId(it)) }
+        if (mounted == null || mounted == ownCanvas || known.any { it.id == mounted }) return readable
+        return readable + listOfNotNull(relayOnly.entry(mounted))
     }
+
+    /** Whether [caller] may write [entry] now: its ACL, or the live mount of its own conversation (D5). */
+    internal suspend fun mayWrite(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean = access.mayWrite(caller, entry)
 
     /** [entry]'s scene, projected from its whole log. */
     suspend fun scene(entry: HostCanvasEntry): HostCanvasScene {
@@ -171,7 +189,7 @@ class HostCanvasBackend(
      * with this; [publish] refuses on it.
      */
     suspend fun check(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasCheck {
-        if (!entry.acl.canWrite(caller.agentId)) {
+        if (!access.mayWrite(caller, entry)) {
             return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val scene = scene(entry)
@@ -208,8 +226,8 @@ class HostCanvasBackend(
         return readable(caller, entry)
     }
 
-    private fun readable(caller: HostCanvasCaller, entry: HostCanvasEntry): HostCanvasAccess =
-        if (entry.acl.canRead(caller.agentId)) {
+    private suspend fun readable(caller: HostCanvasCaller, entry: HostCanvasEntry): HostCanvasAccess =
+        if (access.mayRead(caller, entry)) {
             HostCanvasAccess.Granted(entry)
         } else {
             HostCanvasAccess.Denied("Unauthorized: actor '${caller.agentId}' cannot read canvas '${entry.canvasId}'")
