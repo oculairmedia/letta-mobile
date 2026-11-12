@@ -3,6 +3,8 @@ package com.letta.mobile.data.chat.send
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.transport.WsTimelineEvent
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -120,6 +122,58 @@ internal class ChatSendCoordinatorAutonomousTurnTest : ChatSendCoordinatorConver
             agentId = AGENT_ID, conversationId = CONV_A, runId = "wake-run",
         ))
         assertEquals(listOf("waiting input", "waiting input"), transport.sentTexts)
+    }
+
+    @Test
+    fun missedWakeEndWithNoReplayOrLoopStatusStillReleasesOnBackstop() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+        val chat = coordinator(RecordingTimelineWriter(), RecordingUiSink(), transport, backgroundScope) { CONV_A }
+        chat.send("waiting input").join()
+        chat.handleEvent(WsTimelineEvent.TurnStarted("local-attempt", AGENT_ID, CONV_A, "local-attempt-run"))
+        chat.handleEvent(WsTimelineEvent.Error(
+            code = "iroh_turn_engine_busy", message = "turn already active",
+            conversationId = CONV_A, turnId = "local-attempt", runId = "local-attempt-run",
+        ))
+        chat.handleEvent(WsTimelineEvent.TurnDone("local-attempt", "local-attempt-run", BridgeTurnStatus.Failed))
+        // The local attempted turn has retired. A foreign wake is never in this device's registry.
+        transport.activeChatTurn = false
+        // No foreign terminal, loop status, subscription completion, or other event is delivered.
+        advanceTimeBy(2_001)
+        runCurrent()
+        assertEquals(listOf("waiting input", "waiting input"), transport.sentTexts)
+    }
+
+    @Test
+    fun rejectedRetryAndSuspendedTimelineAppendAlwaysHaveExactlyOneVisiblePrompt() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val transport = FakeChannelTransport(mutableListOf(false, false, true), activeChatTurn = true)
+        val chat = coordinator(timeline, RecordingUiSink(), transport, backgroundScope) { CONV_A }
+        chat.send("waiting input").join()
+        val visibleCounts = mutableListOf<Int>()
+        fun visibleCount(): Int {
+            val queue = chat.sendQueue.state.value[QueueConversationId(CONV_A)] ?: ConversationSendQueue()
+            val queued = queue.items.map { it.id.value } + listOfNotNull(queue.queuedOnServer?.id?.value)
+            val transcript = timeline.externalLocals.map { it.otid }.distinct().count { it !in queued }
+            return queued.size + transcript
+        }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            chat.sendQueue.state.collect { visibleCounts += visibleCount() }
+        }
+        transport.activeChatTurn = false
+        chat.sendQueue.resume(QueueConversationId(CONV_A)).join()
+        assertEquals(1, visibleCount(), "a rejected retry must remain represented during drain backoff")
+        timeline.appendStarted = CompletableDeferred()
+        timeline.appendRelease = CompletableDeferred()
+        advanceTimeBy(51)
+        runCurrent()
+        assertTrue(timeline.appendStarted!!.isCompleted)
+        assertEquals(1, visibleCount(), "accepted transport must remain represented while timeline publication suspends")
+        timeline.appendRelease!!.complete(Unit)
+        runCurrent()
+        assertEquals(1, visibleCount(), "published prompt must move from queue to transcript without duplication")
+        assertTrue(visibleCounts.all { it == 1 }, "every queue publication must retain one prompt: $visibleCounts")
+        assertTrue(chat.sendQueue.state.value[QueueConversationId(CONV_A)]?.isEmpty != false)
+        assertEquals("waiting input", timeline.externalLocals.single().content)
     }
 
     private companion object {

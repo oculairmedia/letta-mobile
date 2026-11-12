@@ -191,13 +191,14 @@ internal class QueuedSendDriver(
     /** True when the drain is finished (dispatched, or nothing runnable); false to retry. */
     private suspend fun drainOnceLocked(conversationId: QueueConversationId): Boolean {
         if (turns.hasActiveTurn(conversationId)) return false
-        val next = queue.takeNext(conversationId) ?: return true
-        if (turns.dispatch(next)) {
-            report(QueueEvent.Dispatched, conversationId, next.id)
-            return true
-        }
-        queue.putBack(next)
-        return false
+        val waiting = queue.queueFor(conversationId)
+        val next = waiting.items.firstOrNull()?.takeUnless { waiting.paused || waiting.heldByOtherClient } ?: return true
+        // The queue owns presentation until dispatch has published the transcript row. Keeping
+        // the head here also avoids a disappear/reappear pulse when the transport rejects a retry.
+        if (!turns.dispatch(next)) return false
+        queue.remove(next.id)
+        report(QueueEvent.Dispatched, conversationId, next.id)
+        return true
     }
 
     private fun report(event: QueueEvent, conversationId: QueueConversationId, id: QueuedSendId? = null) {
