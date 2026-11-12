@@ -23,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.requestFocus
 import com.letta.mobile.ui.components.LettaListRow
@@ -115,6 +117,17 @@ class RecentRowHoverTest {
         disabled.performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(before, disabled.captureToImage().toPixelMap()[SAMPLE_X, SAMPLE_Y])
+    }
+
+    @Test
+    fun sidebarArchiveRemainsClickableAndRecentsKeepOneAnnouncement() = runComposeUiTest {
+        setContent { HoverFixture() }
+        onNodeWithText("Roster").performMouseInput { enter(center) }
+        waitForIdle()
+        onNodeWithContentDescription("Archive chat").assertHasClickAction()
+        val recent = onNodeWithTag(recentRowTag(IDLE_KEY)).fetchSemanticsNode()
+        assertEquals(listOf("Idle, now"), recent.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(emptyList(), recent.children)
     }
 
     @Test

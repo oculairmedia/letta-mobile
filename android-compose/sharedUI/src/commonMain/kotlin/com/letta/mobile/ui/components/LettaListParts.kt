@@ -134,7 +134,7 @@ fun LettaListRow(
                 .background(background)
                 .then(if (inherited == null) Modifier.hoverable(interaction.source, enabled = spec.enabled) else Modifier)
                 .pointerHoverIcon(if (spec.enabled) PointerIcon.Hand else PointerIcon.Default)
-                .semantics(mergeDescendants = true) {
+                .semantics(mergeDescendants = spec.description != null) {
                     this.selected = selected
                     spec.description?.let { contentDescription = it }
                 }
