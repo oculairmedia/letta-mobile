@@ -1,0 +1,105 @@
+package com.letta.mobile.data.controller.node.iroh.mounts
+
+import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
+import com.letta.mobile.data.canvas.mount.CanvasMountAuthority
+import com.letta.mobile.data.canvas.mount.CanvasMountPrincipal
+import com.letta.mobile.data.canvas.mount.CanvasMountRequest
+import com.letta.mobile.data.canvas.mount.CanvasMountResult
+import com.letta.mobile.data.canvas.mount.CanvasMountScope
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+
+/** Everything the routes need from the host; the raw store is reachable only through [mounts]. */
+internal class CanvasMountHost(
+    /** The authorized facade for one call's authority; the only path to mount storage. */
+    val mounts: (CanvasMountAuthority) -> AuthorizedCanvasMounts,
+    val grants: CanvasMountGrants,
+    val directory: CanvasMountDirectory,
+    val bounds: CanvasMountBounds,
+)
+
+/** Host-wide properties of every answer: the durability promise (O1) and the per-call deadline (F5). */
+internal class CanvasMountBounds(val durability: CanvasMountDurability, val deadline: CanvasMountDeadline) {
+    companion object {
+        fun production(scope: CoroutineScope): CanvasMountBounds =
+            CanvasMountBounds(CanvasMountDurability.ofHost(), CanvasMountDeadline.production(scope))
+    }
+}
+
+/**
+ * One handler for all four routes. Order of work: verified identity from the connection, strict params, then the
+ * authorized facade under the deadline. No request field reaches the authority except as a target.
+ */
+internal class CanvasMountHandlers(private val host: CanvasMountHost) {
+    suspend fun handle(route: CanvasMountRoute, params: JsonObject?, context: AdminRpcRequestContext): JsonElement =
+        outcome(route, params, context).reply(route, host.bounds.durability)
+
+    private suspend fun outcome(route: CanvasMountRoute, params: JsonObject?, context: AdminRpcRequestContext): CanvasMountOutcome {
+        val connection = CanvasMountConnection.of(context) ?: return CanvasMountOutcome.Unavailable(CanvasMountUnavailable.IDENTITY)
+        val input = when (val parsed = route.parse(params)) {
+            is CanvasMountOutcome.InvalidInput -> return parsed
+            is CanvasMountInput -> parsed
+        }
+        val trace = CanvasMountCallTrace()
+        val mounts = host.mounts(HostCanvasMountAuthority(connection, host.grants, host.directory, trace))
+        val call = CanvasMountCall(mounts, connection.principal, input)
+        return when (val timed = host.bounds.deadline.run { call.run(route) }) {
+            is CanvasMountTimed.Settled -> timed.value.settledWith(route, trace)
+            is CanvasMountTimed.Expired -> expired(route, trace, timed.unwound)
+        }
+    }
+}
+
+/** One authorized call: every operation goes through the facade with the verified principal. */
+private class CanvasMountCall(
+    private val mounts: AuthorizedCanvasMounts,
+    private val principal: CanvasMountPrincipal,
+    private val input: CanvasMountInput,
+) {
+    private val binding get() = CanvasMountRequest(principal, CanvasMountScope.Conversation(input.agent, input.conversation))
+
+    private val agentDefault get() = CanvasMountRequest(principal, CanvasMountScope.AgentDefault(input.agent))
+
+    suspend fun run(route: CanvasMountRoute): CanvasMountOutcome = when (route) {
+        CanvasMountRoute.RESOLVE -> resolve()
+        CanvasMountRoute.BIND -> mounts.bindIfAbsent(binding, input.canvas).toOutcome(CanvasMountSource.BINDING, input.canvas)
+        CanvasMountRoute.REPLACE -> mounts.replaceBinding(binding, input.canvas).toOutcome(CanvasMountSource.BINDING, null)
+        CanvasMountRoute.SET_DEFAULT -> mounts.setDefault(agentDefault, input.canvas).toOutcome(CanvasMountSource.DEFAULT, null)
+    }
+
+    /** The conversation's own binding, else its agent's default. A denial at either step is the answer. */
+    private suspend fun resolve(): CanvasMountOutcome {
+        val own = mounts.read(binding)
+        if (own != CanvasMountResult.None) return own.toOutcome(CanvasMountSource.BINDING, null)
+        return mounts.read(agentDefault).toOutcome(CanvasMountSource.DEFAULT, null)
+    }
+}
+
+/**
+ * A denial caused by a failed grant or directory lookup is not a policy answer: before anything committed it is
+ * `unavailable`; once a mutation's storage returned (the winner check) its outcome is unknown.
+ */
+private fun CanvasMountOutcome.settledWith(route: CanvasMountRoute, trace: CanvasMountCallTrace): CanvasMountOutcome = when {
+    this != CanvasMountOutcome.Denied || !trace.authorityFailed -> this
+    route.mutates && trace.phase == CanvasMountPhase.REVEALING -> CanvasMountOutcome.OutcomeUnknown
+    else -> CanvasMountOutcome.Unavailable(CanvasMountUnavailable.AUTHORITY)
+}
+
+/**
+ * Past the deadline: nothing can have committed while authorizing, nor when storage unwound by cancellation (the
+ * store propagates cancellation only before its commit point); otherwise a mutation may have committed.
+ */
+private fun expired(route: CanvasMountRoute, trace: CanvasMountCallTrace, unwound: Boolean): CanvasMountOutcome {
+    val beforeCommit = when (trace.phase) {
+        CanvasMountPhase.AUTHORIZING -> true
+        CanvasMountPhase.STORING -> unwound
+        CanvasMountPhase.REVEALING -> false
+    }
+    return if (beforeCommit || !route.mutates) {
+        CanvasMountOutcome.Unavailable(CanvasMountUnavailable.TIMEOUT_BEFORE_COMMIT)
+    } else {
+        CanvasMountOutcome.OutcomeUnknown
+    }
+}

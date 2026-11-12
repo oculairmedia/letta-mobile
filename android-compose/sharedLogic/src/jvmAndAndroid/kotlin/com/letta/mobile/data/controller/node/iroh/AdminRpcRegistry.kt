@@ -147,8 +147,7 @@ object AdminRpcRegistry {
         ConversationContextLimitHandlers.register(router, native.nativeClient)
         // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
         ConversationRecompileHandlers.register(router, native.nativeClient)
-        services.pluginRoutes?.register(router)
-            ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
+        registerHostRoutes(router, services)
 
         router.requireNonEmpty()
         val missingMethods = when (val source = services.subagentRegistrySource) {
@@ -165,6 +164,14 @@ object AdminRpcRegistry {
     }
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
+
+    /** Host-supplied route families: the plugin host, and the canvas mount routes (letta-mobile-n2stx.5). */
+    private fun registerHostRoutes(router: AdminRpcRouter, services: AdminRpcHostServices) {
+        services.pluginRoutes?.register(router)
+            ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
+        // All four canvas mount routes or none, never under the anonymous policy.
+        services.canvasMountRoutes?.register(router)
+    }
 
     private fun registerBeads(router: AdminRpcRouter, services: AdminRpcHostServices) {
         if (!services.beadsBaseUrl.isNullOrBlank()) {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
@@ -38,10 +39,19 @@ object IrohPeerCapabilities {
     const val SUBAGENT_SPAWN = "subagent.spawn"
     const val WORKACTIVITY_REPORT = "workactivity.report"
 
+    // letta-mobile-n2stx.5: canvas mount routes. Granted explicitly (no role includes them yet); the handler still
+    // requires the principal's canvas grant, conversation ownership and, for agent defaults, conversation.manage.
+    /** Admits `canvas.mount.resolve`. */
+    const val CANVAS_MOUNT_READ = CanvasMountWire.READ_CAPABILITY
+
+    /** Admits the canvas mount writes: bind, replace and default.set. */
+    const val CANVAS_MOUNT_WRITE = CanvasMountWire.WRITE_CAPABILITY
+
     val ALL: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE, ADMIN_FULL,
         SUBAGENT_SPAWN, WORKACTIVITY_REPORT, BEADS_READ, BEADS_WRITE,
+        CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE,
     )
 
     /**
@@ -107,6 +117,8 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
+        method == CanvasMountWire.RESOLVE -> CANVAS_MOUNT_READ
+        method in CanvasMountWire.METHODS -> CANVAS_MOUNT_WRITE
         method in BEADS_READ_METHODS -> BEADS_READ
         method in BEADS_WRITE_METHODS -> BEADS_WRITE
         method in WRAPPER_RECORD_READ_METHODS -> CHAT_READ
