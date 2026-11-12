@@ -111,6 +111,13 @@ internal class QueuedSendDriver(
     }
 
     private suspend fun releaseOtherClientHoldLocked(conversationId: QueueConversationId) {
+        // A foreign terminal can race the transport's retirement, or the next autonomous wake.
+        // Keep observing ownership until idle instead of spending the only backstop on a busy drain.
+        if (turns.hasActiveTurn(conversationId)) {
+            otherClientHold.reset(conversationId)
+            otherClientHold.schedule(conversationId)
+            return
+        }
         otherClientHold.cancel(conversationId)
         if (!queue.releaseOtherClientHold(conversationId)) return
         report(QueueEvent.OtherClientReleased, conversationId)

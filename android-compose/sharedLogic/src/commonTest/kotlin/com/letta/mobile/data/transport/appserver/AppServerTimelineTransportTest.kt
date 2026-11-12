@@ -114,6 +114,29 @@ class AppServerTimelineTransportTest {
         assertIs<ErrorMessage>(emitted.single())
     }
 
+    @Test
+    fun passiveViewerDoesNotProjectChildToolStepsIntoParentTimeline() = runTest {
+        val events = MutableSharedFlow<AppServerReceivedFrame>()
+        val transport = transport(events = events)
+        val received = mutableListOf<TimelineStreamFrame>()
+        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+            transport.streamConversation(ConversationId("conv-1")).collect { received += it }
+        }
+        runCurrent()
+        events.emit(AppServerProtocol.decodeFrame(
+            """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},""" +
+                """"subagent_id":"child-1","event_seq":1,"emitted_at":"2026-10-02T00:00:00Z",""" +
+                """"idempotency_key":"child-tool","delta":{"message_type":"tool_call_message","id":"child-step",""" +
+                """"tool_call":{"tool_call_id":"child-call","name":"Read","arguments":"{}"}}}""",
+            AppServerChannel.Stream,
+        ))
+        runCurrent()
+        assertTrue(received.isEmpty(), "child tool steps must never become parent rows on a passive viewer")
+        events.emit(streamDelta(ConversationId("conv-1")))
+        assertEquals(1, received.size, "the parent's own stream must remain visible")
+        collector.cancel()
+    }
+
     private fun transport(
         admin: AppServerAdminCall = AppServerAdminCall { _, _ -> null },
         events: Flow<AppServerReceivedFrame> = MutableSharedFlow(),

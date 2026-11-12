@@ -6,6 +6,8 @@ import com.letta.mobile.data.transport.WsTimelineEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -59,6 +61,65 @@ internal class ChatSendCoordinatorAutonomousTurnTest : ChatSendCoordinatorConver
         assertEquals(listOf(CONV_B), timeline.clearedActiveConversations)
         assertEquals(1, ui.turnsFinished.size)
         assertTrue(!ui.isStreaming(), "streaming must clear when autonomous turn finishes")
+    }
+
+    @Test
+    fun completedReplayOfUnobservedWakeReleasesHeldSendImmediately() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+        val chat = coordinator(RecordingTimelineWriter(), RecordingUiSink(), transport, backgroundScope) { CONV_A }
+        chat.send("waiting input").join()
+        chat.handleEvent(WsTimelineEvent.TurnStarted("local-attempt", AGENT_ID, CONV_A, "local-attempt-run"))
+        chat.handleEvent(WsTimelineEvent.Error(
+            code = "iroh_turn_engine_busy", message = "turn already active",
+            conversationId = CONV_A, turnId = "local-attempt", runId = "local-attempt-run",
+        ))
+        chat.handleEvent(WsTimelineEvent.TurnDone("local-attempt", "local-attempt-run", BridgeTurnStatus.Failed))
+        assertTrue(chat.sendQueue.state.value[QueueConversationId(CONV_A)]?.heldByOtherClient == true)
+        transport.activeChatTurn = false
+
+        // Reconnecting viewers can receive only the terminal replay fence, not the wake's start.
+        chat.handleEvent(WsTimelineEvent.SubscribeDone("unobserved-wake-run", 12, "completed"))
+
+        assertEquals(listOf("waiting input", "waiting input"), transport.sentTexts,
+            "a completed replay must release the hold without waiting for the backstop or Send now")
+    }
+
+    @Test
+    fun heldSendStillObservesIdleAfterBackstopFoundWakeRunning() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+        val chat = coordinator(RecordingTimelineWriter(), RecordingUiSink(), transport, backgroundScope) { CONV_A }
+        chat.send("waiting input").join()
+        chat.handleEvent(WsTimelineEvent.TurnStarted("local-attempt", AGENT_ID, CONV_A, "local-attempt-run"))
+        chat.handleEvent(WsTimelineEvent.Error(
+            code = "iroh_turn_engine_busy", message = "turn already active",
+            conversationId = CONV_A, turnId = "local-attempt", runId = "local-attempt-run",
+        ))
+        chat.handleEvent(WsTimelineEvent.TurnDone("local-attempt", "local-attempt-run", BridgeTurnStatus.Failed))
+        advanceTimeBy(5_000)
+        transport.activeChatTurn = false
+        advanceTimeBy(2_001)
+        runCurrent()
+        assertEquals(listOf("waiting input", "waiting input"), transport.sentTexts,
+            "a missed wake terminal must not spend the only backstop while transport is still busy")
+    }
+
+    @Test
+    fun idlePresenceReleasesHoldWithoutTheWakeTerminal() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+        val chat = coordinator(RecordingTimelineWriter(), RecordingUiSink(), transport, backgroundScope) { CONV_A }
+        chat.send("waiting input").join()
+        chat.handleEvent(WsTimelineEvent.TurnStarted("local-attempt", AGENT_ID, CONV_A, "local-attempt-run"))
+        chat.handleEvent(WsTimelineEvent.Error(
+            code = "iroh_turn_engine_busy", message = "turn already active",
+            conversationId = CONV_A, turnId = "local-attempt", runId = "local-attempt-run",
+        ))
+        chat.handleEvent(WsTimelineEvent.TurnDone("local-attempt", "local-attempt-run", BridgeTurnStatus.Failed))
+        transport.activeChatTurn = false
+        chat.handleEvent(WsTimelineEvent.RunActivity(
+            com.letta.mobile.runtime.RuntimeEventPayload.LoopPhaseChanged("WAITING_ON_INPUT"),
+            agentId = AGENT_ID, conversationId = CONV_A, runId = "wake-run",
+        ))
+        assertEquals(listOf("waiting input", "waiting input"), transport.sentTexts)
     }
 
     private companion object {

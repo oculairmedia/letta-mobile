@@ -63,9 +63,10 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     val displayOptions = params.appearance.displayOptions
     // A new set of options starts a fresh cache: its incremental tail assumes the same filter.
     val cache = remember(displayOptions) { IncrementalChatRenderItemsCache() }
-    val items = remember(state.messages, state.messageListChange, params.appearance.displayMode, state.agentId, displayOptions) {
+    val items = remember(state.messages, state.messageListChange, state.sendQueue, params.appearance, state.agentId) {
         // letta-mobile-zxk2n.5: hidden rows leave the list (and its spacing), not just their content.
-        val shown = displayOptions.visible(state.messages)
+        val visible = displayOptions.visible(state.messages)
+        val shown = if (state.sendQueue.isEmpty) visible else visible.filterNot(state.sendQueue::containsQueuedPrompt)
         val change = if (shown === state.messages) state.messageListChange else ChatMessageListChange.Full
         cache.renderItems(shown, params.appearance.displayMode, change, state.agentId)
     }

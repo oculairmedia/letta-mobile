@@ -1,7 +1,13 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.paging.ItemSnapshotList
+import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.chat.send.QueuedChatSend
+import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
@@ -14,6 +20,19 @@ import kotlin.test.assertSame
 
 /** Cached lazy providers must keep count, key, type, content and neighbours in one generation. */
 class PagedTimelineRowsTest {
+    @Test
+    fun heldAndServerQueuedPromptsHaveOnlyTheirQueueRepresentation() {
+        val send = QueuedChatSend(QueuedSendId("held-prompt"), QueueConversationId("conv-held"), "waiting input")
+        val local = UiMessage("local-row", "user", "waiting input", "", clientMessageId = send.id.value)
+        val held = ConversationSendQueue(items = listOf(send), heldByOtherClient = true)
+        val parked = ConversationSendQueue(queuedOnServer = send)
+        assertTrue(held.containsQueuedPrompt(local), "held optimistic prompt must not also draw a transcript bubble")
+        assertTrue(parked.containsQueuedPrompt(local), "server-queued optimistic prompt must stay in the queue panel only")
+        assertFalse(ConversationSendQueue().containsQueuedPrompt(local), "dispatch restores the transcript bubble")
+        assertFalse(held.containsQueuedPrompt(local.copy(clientMessageId = "different-prompt")))
+        assertFalse(held.containsQueuedPrompt(local.copy(role = "assistant")))
+    }
+
     @Test
     fun fiveToFourKeepsCachedSlotAndItsNeighbourInTheOriginalSnapshot() {
         val original = List(5) { row("old-$it") }

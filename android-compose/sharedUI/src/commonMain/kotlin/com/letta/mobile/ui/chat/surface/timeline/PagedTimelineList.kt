@@ -30,11 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.paging.filter
+import kotlinx.coroutines.flow.map
+import com.letta.mobile.ui.chat.render.ChatUiState
 import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
@@ -60,10 +62,8 @@ import org.jetbrains.compose.resources.stringResource
 @Immutable
 internal class PagedTimelineParams(
     val presentation: CanonicalTimelinePresentation,
-    val agentId: String?,
+    val state: ChatUiState,
     val thinking: Boolean,
-    /** The conversation's messages, for the thinking row's "0:12  Running Bash" clock. */
-    val thinkingMessages: List<UiMessage> = emptyList(),
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
     /** The page's hoisted scroll position for this presentation. */
@@ -90,15 +90,20 @@ internal fun PagedTimelineList(params: PagedTimelineParams, modifier: Modifier =
 @Composable
 private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier) {
     val presentation = params.presentation
-    val settled = presentation.settled.collectAsPagedTimelineItems()
+    val queued = params.state.sendQueue
+    val visibleSettled = remember(presentation, queued) {
+        presentation.settled.map { page -> page.filter { !queued.containsQueuedPrompt(it.item) } }
+    }
+    val settled = visibleSettled.collectAsPagedTimelineItems()
     val live by presentation.live.collectAsState()
-    val rows = rememberPagedRows(live, settled, if (params.thinking) 1 else 0)
+    val visibleLive = remember(live, queued) { live.filterNot(queued::containsQueuedPrompt) }
+    val rows = rememberPagedRows(visibleLive, settled, if (params.thinking) 1 else 0)
     ObserveResidentRows(presentation, settled) {
         residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
     }
 
     when (pagedOpeningOf(settled.loadState, rows.size - rows.leading)) {
-        PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize().padding(top = params.topReserve))
+        PagedOpening.Loading -> TimelineLoading(params.state.agentId, modifier.fillMaxSize().padding(top = params.topReserve))
         PagedOpening.Empty -> Box(modifier.padding(top = params.topReserve)) { params.emptyContent() }
         PagedOpening.Ready -> PagedTimelineBody(params, settled, rows, modifier)
     }
@@ -235,7 +240,7 @@ private class PagedRowsScope(
 
 private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     val rows = scope.rows
-    if (rows.leading > 0) item(key = THINKING_KEY) { ThinkingRow(scope.params.thinkingMessages) }
+    if (rows.leading > 0) item(key = THINKING_KEY) { ThinkingRow(scope.params.state.messages) }
     items(
         count = rows.size - rows.leading,
         key = { rows.key(it + rows.leading) },
@@ -351,7 +356,7 @@ private fun LazyListScope.pagedLoadFooter(scope: PagedRowsScope) {
     val load = scope.settled.loadState
     if (load.append is LoadState.Loading) {
         // The agent fetching its own history, not an anonymous spinner (wbin4.2).
-        item(key = "canonical-loading") { MascotLoading(scope.params.agentId) }
+        item(key = "canonical-loading") { MascotLoading(scope.params.state.agentId) }
     }
     val error = listOf(load.refresh, load.append, load.prepend).filterIsInstance<LoadState.Error>().firstOrNull()
     if (error != null) {
