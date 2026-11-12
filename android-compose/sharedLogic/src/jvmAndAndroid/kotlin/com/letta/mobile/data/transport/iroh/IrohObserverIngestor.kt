@@ -244,7 +244,18 @@ internal class IrohObserverIngestor(
         }
         val status = loopStatusFrame.loopStatus
         if (status.status != TurnBoundaryGate.LOOP_WAITING_ON_INPUT || status.activeRunIds.isNotEmpty()) return
-        val current = observedTurns.completeOnIdleLoop(ConversationId(scope.conversationId)) ?: return
+        val current = observedTurns.completeOnIdleLoop(ConversationId(scope.conversationId))
+        if (current == null) {
+            // A second viewer may have missed the wake entirely. Publish idle evidence without
+            // inventing a turn identity or settling any locally owned send.
+            RuntimeEventServerFrameMapper.map(
+                payload = RuntimeEventPayload.LoopPhaseChanged(status.status),
+                context = RuntimeEventServerFrameMapper.Context(
+                    agentId = scope.agentId, conversationId = scope.conversationId, turnId = "", runId = "",
+                ),
+            ).forEach { emitBoth(it) }
+            return
+        }
         RuntimeEventServerFrameMapper.map(
             payload = RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed),
             context = RuntimeEventServerFrameMapper.Context(

@@ -618,6 +618,73 @@ LETTA_IROH_VIBESYNC_BASE_URL=http://127.0.0.1:3099
 Add domain-specific bounded-service URLs only for services approved by the
 ownership matrix.
 
+### App Server process identity (`52vxf`)
+
+The repository wrapper unit passes `--app-server-pid-file /run/meridian-appserver/main.pid`
+(or use `LETTA_APP_SERVER_PID_FILE`). The matching App Server drop-in
+`scripts/deploy/meridian-appserver.process-identity.conf`, installed by `install-meridian.sh`,
+writes systemd's MainPID in ExecStartPost. Install the wrapper unit and App Server
+unit/drop-in TOGETHER with the new wrapper release under normal deployment approval:
+the wrapper unit Requires=meridian-appserver.service, and its new flag is not accepted
+by the old wrapper binary. Never install only the new wrapper unit against an old
+release. A new binary with a missing PID file starts with unknown identity (the
+fallback), rather than refusing startup; it cannot provide confirmed restart retirement.
+This change does not modify or restart live units. The App Server must be
+launched directly with Type=simple, not through a non-exec launcher, and must retain
+KillMode=control-group so its workers cannot survive it. The PID file is trusted host
+configuration: it MUST name the App Server serving the configured URL, not another service.
+
+The wrapper reads the configured PID file and `/proc/<pid>/stat` field 22 plus
+`/proc/sys/kernel/random/boot_id`, checking the PID and start time twice. This avoids
+process-name guesses, socket-owner enumeration, subprocesses, and PID-reuse ambiguity.
+Only numeric loopback WebSocket URLs (`127.0.0.1` or `::1`) qualify; remote URLs,
+hostnames, missing/malformed files, unsupported platforms (including Windows without
+`/proc`), and read failures yield unknown. The existing wire handshake has no process identity.
+
+Each newly observed durable record stores this identity. On startup a different known
+identity immediately cancels its live record as `app_server_restarted`, publishes the
+terminal change, and rejects replayed RUNNING frames. Equal identities mean a wrapper-only
+restart: silent workers keep normal snapshot protection and the six-hour TTL. Unknown
+on either side (including old-format records) retains the one-hour `restart_unobserved`
+uncertainty bound; this fallback can still cancel a live entirely silent worker. Installing
+the PID-file integration cannot retrospectively prove ownership of old records. A new
+App Server generation is distinguished from the wrapper's local connection generation.
+The provider is sampled again for every observation under the registry lock: Requires=
+does not guarantee that an App Server failure stops the wrapper. New records use the
+observation-time identity even if the App Server was replaced under a live wrapper.
+An accepted observation backfills a legacy null identity, never a populated identity;
+a later wrapper restart can then use known-identity protection instead of renewing the
+uncertainty bound. Startup reconciliation retains its own startup identity snapshot.
+
+Before the first approved rollout, preserve the old wrapper unit and release target
+(the guard deliberately refuses to overwrite a prior rollback capture):
+
+```bash
+sudo test ! -e /etc/meridian/rollback-52vxf &&
+sudo test ! -e /etc/systemd/system/meridian-appserver.service.d/process-identity.conf &&
+sudo install -d -m 0700 /etc/meridian/rollback-52vxf &&
+sudo cp -a /etc/systemd/system/meridian-iroh-wrapper.service /etc/meridian/rollback-52vxf/wrapper.service &&
+sudo sh -c 'readlink -f /opt/meridian/iroh-wrapper/current > /etc/meridian/rollback-52vxf/release'
+```
+
+Exact rollback for that first rollout, in an approved maintenance window (this
+restarts the App Server and kills its workers; do not execute during implementation):
+
+```bash
+sudo systemctl stop meridian-iroh-wrapper.service
+sudo cp -a /etc/meridian/rollback-52vxf/wrapper.service /etc/systemd/system/meridian-iroh-wrapper.service
+sudo sh -c 'ln -sfn "$(cat /etc/meridian/rollback-52vxf/release)" /opt/meridian/iroh-wrapper/current'
+sudo rm /etc/systemd/system/meridian-appserver.service.d/process-identity.conf
+sudo systemctl daemon-reload
+sudo systemctl restart meridian-appserver.service
+sudo systemctl start meridian-iroh-wrapper.service
+```
+
+Restore BOTH the old wrapper unit and old release; the old binary cannot parse the
+new unit's `--app-server-pid-file` flag. Leave the additive registry field on disk;
+older readers ignore it. Do not rerun the new installer after rollback, because it
+would reinstall the new unit and drop-in.
+
 ### Cron handover (`lgns8.24`) — DONE, executed 2026-08-01 01:05
 
 The handover was performed in the maintenance window and the App Server now

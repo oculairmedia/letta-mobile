@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.surface.timeline
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.requiresUserInput
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import kotlinx.datetime.LocalDate
@@ -66,6 +67,21 @@ internal sealed interface TimelineRow {
             counts.entries.map { it.key to it.value }
         }
     }
+}
+
+/** Snapshot queue identities at the UI-state boundary; row filters need no send-queue dependency. */
+internal fun ChatUiState.queuedPromptIdentities(): Set<String> = buildSet {
+    sendQueue.items.forEach { add(it.id.value) }
+    sendQueue.queuedOnServer?.let { add(it.id.value) }
+}
+
+/** A prompt still owned by the queue belongs in the composer, not in the transcript too. */
+internal fun Set<String>.containsQueuedPrompt(message: UiMessage): Boolean =
+    message.role == "user" && (message.clientMessageId ?: message.id) in this
+
+internal fun Set<String>.containsQueuedPrompt(item: ChatRenderItem): Boolean = when (item) {
+    is ChatRenderItem.Single -> containsQueuedPrompt(item.message)
+    is ChatRenderItem.RunBlock -> false
 }
 
 private val DoneToolStatuses = setOf("completed", "success", "ok")

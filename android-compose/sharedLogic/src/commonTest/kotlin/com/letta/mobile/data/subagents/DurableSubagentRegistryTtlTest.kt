@@ -26,6 +26,116 @@ class DurableSubagentRegistryTtlTest {
         source = SubagentChipSource.CONTROLLER_NATIVE,
     )
 
+    private fun restartWithIdentity(previous: String?, current: String?): DurableSubagentRegistry {
+        val record = SubagentChipRecord(
+            conversationId = "conv-a", agentId = "agent-1", toolCallId = "tool-process",
+            state = SubagentChipState.RUNNING, source = SubagentChipSource.CONTROLLER_NATIVE,
+            firstSeenEpochMs = now, lastSeenEpochMs = now, appServerProcessIdentity = previous,
+        )
+        return DurableSubagentRegistry(
+            store = InMemorySubagentRegistryStore(listOf(record)), clock = { now },
+            processIdentity = AppServerProcessIdentity { current },
+        )
+    }
+
+    @Test
+    fun differentKnownProcessRetiresImmediatelyAndRefusesReplay() {
+        val restarted = restartWithIdentity("boot:20:100", "boot:20:200")
+        val record = restarted.findByToolCall("conv-a", "tool-process")
+        assertEquals(SubagentChipState.CANCELLED, record?.state)
+        assertEquals("app_server_restarted", record?.terminalReason)
+        assertEquals(now, record?.terminalAtEpochMs)
+        assertEquals(true, restarted.observe(running("tool-process")) is DurableSubagentRegistry.ObserveResult.IllegalTransition)
+    }
+
+    @Test
+    fun sameKnownProcessProtectsSilentWorkerBeyondTheRestartBound() {
+        val restarted = restartWithIdentity("boot:20:100", "boot:20:100")
+        now += 61 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-process")?.state)
+    }
+
+    @Test
+    fun eitherUnknownIdentityKeepsUncertaintyFallback() {
+        listOf(null to "boot:20:100", "boot:20:100" to null, null to null).forEach { (old, current) ->
+            val restarted = restartWithIdentity(old, current)
+            assertEquals(1, restarted.liveCount())
+            now += 61 * 60_000L
+            assertEquals("restart_unobserved", restarted.expireStale().single().terminalReason)
+        }
+    }
+
+    @Test
+    fun legacyIdentityWithKnownCurrentProcessRetainsFullUncertaintyGrace() {
+        val restarted = restartWithIdentity(null, "boot:20:100")
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-process")?.state)
+        assertNull(restarted.findByToolCall("conv-a", "tool-process")?.appServerProcessIdentity)
+        now += 60 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-process")?.state)
+        now++
+        val retired = restarted.expireStale().single()
+        assertEquals(SubagentChipState.CANCELLED, retired.state)
+        assertEquals("restart_unobserved", retired.terminalReason)
+        assertNull(retired.appServerProcessIdentity)
+    }
+
+    @Test
+    fun serverReplacementDuringWrapperLifetimeUsesObservationTimeIdentity() {
+        val store = InMemorySubagentRegistryStore()
+        var identity = "boot:20:100"
+        val provider = AppServerProcessIdentity { identity }
+        val reg = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        reg.observe(running("before-replacement"))
+        identity = "boot:20:200"
+        reg.observe(running("after-replacement"))
+        assertEquals(identity, reg.findByToolCall("conv-a", "after-replacement")?.appServerProcessIdentity)
+        reg.observe(running("before-replacement"))
+        assertEquals("boot:20:100", reg.findByToolCall("conv-a", "before-replacement")?.appServerProcessIdentity)
+        val restarted = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "after-replacement")?.state)
+        assertEquals("app_server_restarted", restarted.findByToolCall("conv-a", "before-replacement")?.terminalReason)
+    }
+
+    @Test
+    fun legacyObservationBackfillsIdentityAndNextRestartKeepsSixHourBound() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-legacy"))
+        var identity = "boot:20:100"
+        val provider = AppServerProcessIdentity { identity }
+        val reg = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        assertNull(reg.findByToolCall("conv-a", "tool-legacy")?.appServerProcessIdentity)
+        identity = "boot:20:200"
+        reg.observe(running("tool-legacy"))
+        assertEquals(identity, store.load().single().appServerProcessIdentity)
+        val restarted = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        now += 61 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-legacy")?.state)
+        now += DurableSubagentRegistry.STALE_RUNNING_AFTER_MS
+        assertEquals("stale", restarted.expireStale().single().terminalReason)
+    }
+
+    @Test
+    fun processIdentityRoundTripsAndLegacyJsonDefaultsToUnknown() {
+        val reg = restartWithIdentity("boot:20:100", "boot:20:100")
+        val record = requireNotNull(reg.findByToolCall("conv-a", "tool-process"))
+        val json = kotlinx.serialization.json.Json
+        val encoded = json.encodeToString(SubagentChipRecord.serializer(), record)
+        assertEquals(record, json.decodeFromString(SubagentChipRecord.serializer(), encoded))
+        val legacy = encoded.replace(",\"app_server_process_identity\":\"boot:20:100\"", "")
+        assertEquals(null, json.decodeFromString(SubagentChipRecord.serializer(), legacy).appServerProcessIdentity)
+    }
+
+    @Test
+    fun firstObservationPersistsKnownProcessIdentity() {
+        val store = InMemorySubagentRegistryStore()
+        val reg = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = AppServerProcessIdentity { "boot:20:100" })
+        reg.observe(running("tool-new"))
+        assertEquals("boot:20:100", store.load().single().appServerProcessIdentity)
+    }
+
     @Test
     fun runningChipOlderThanTheTtlEndsAsStale() {
         val reg = registry()
@@ -66,6 +176,64 @@ class DurableSubagentRegistryTtlTest {
         assertEquals(cap, reg.size())
         assertEquals(1, reg.liveCount())
         assertEquals(SubagentChipState.RUNNING, reg.findByToolCall("conv-a", "tool-new")?.state)
+    }
+
+    @Test
+    fun restartBoundsUnobservedLegacyRecordsWithoutClaimingWorkerDeath() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-unobserved"))
+        val restarted = registry(store)
+        now += 60 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        now++
+        val retired = restarted.expireStale()
+        assertEquals(listOf("tool-unobserved"), retired.map { it.toolCallId })
+        val expired = retired.single()
+        assertEquals(SubagentChipState.CANCELLED, expired.state)
+        assertEquals("restart_unobserved", expired.terminalReason)
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(
+            true,
+            restarted.observe(running("tool-unobserved")) is DurableSubagentRegistry.ObserveResult.IllegalTransition,
+        )
+    }
+
+    @Test
+    fun wrapperRestartProtectsReobservedWorkerForTheFullTtl() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-live"))
+        val restarted = registry(store)
+        now += 30 * 60_000L
+        restarted.observe(running("tool-live"))
+        now += 31 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-live")?.state)
+    }
+
+    @Test
+    fun wrapperRestartOmissionDoesNotImmediatelyOrphanSilentWorker() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-silent"))
+        val restarted = registry(store)
+        repeat(2) {
+            val result = restarted.reconcileSnapshot(
+                com.letta.mobile.data.model.ConversationId("conv-a"),
+                com.letta.mobile.data.model.AgentId("agent-1"),
+                emptySet(), 1L,
+            )
+            assertEquals(emptyList(), result.orphaned)
+            now += 30 * 60_000L
+        }
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-silent")?.state)
+    }
+
+    @Test
+    fun newWorkersDoNotInheritTheRestartBound() {
+        val reg = registry()
+        reg.observe(running("tool-new"))
+        now += 61 * 60_000L
+        assertEquals(emptyList(), reg.expireStale())
     }
 
     @Test

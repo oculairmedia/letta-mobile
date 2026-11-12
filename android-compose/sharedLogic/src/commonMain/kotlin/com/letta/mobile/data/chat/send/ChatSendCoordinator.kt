@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.runtime.TurnBoundaryGate.Companion.LOOP_WAITING_ON_INPUT
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
@@ -521,6 +522,11 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleSubscribeDone(event: WsTimelineEvent.SubscribeDone) {
+        when (BridgeTurnStatus.fromWire(event.status)) {
+            BridgeTurnStatus.Completed, BridgeTurnStatus.Cancelled, BridgeTurnStatus.Failed ->
+                queueDriver.onForeignTerminalLocked()
+            is BridgeTurnStatus.Unknown -> Unit
+        }
         // SubscribeDone carries a run id only; resolve the owning
         // conversation from it before finalizing anything.
         val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId)) ?: return
@@ -594,8 +600,11 @@ class ChatSendCoordinator(
         return namedOrLastActive(delta.conversationId) ?: activeConversationId()
     }
 
-    private fun recordRunStateOnly(event: WsTimelineEvent.RunActivity) =
+    private suspend fun recordRunStateOnly(event: WsTimelineEvent.RunActivity) {
         runtimeEventBatcher.enqueue(event, namedOrLastActive(event.conversationId))
+        val phase = event.payload as? com.letta.mobile.runtime.RuntimeEventPayload.LoopPhaseChanged
+        if (phase?.status == LOOP_WAITING_ON_INPUT) queueDriver.onForeignTerminalLocked()
+    }
 
     /** A frame's own (alias-resolved) conversation, else the conversation this chat last sent on. */
     private fun namedOrLastActive(named: String?): String? = named?.let(::ConversationId)
