@@ -51,7 +51,17 @@ internal class OtherClientHold(
     private val backoff: Backoff,
     private val onElapsed: suspend (QueueConversationId) -> Unit,
 ) {
-    data class Backoff(val initialMs: Long = INITIAL_RETRY_MS, val maxMs: Long = MAX_RETRY_MS)
+    data class Backoff(val initialMs: Long = INITIAL_RETRY_MS, val maxMs: Long = MAX_RETRY_MS) {
+        fun delayMs(attempt: Int): Long {
+            var waitMs = initialMs.coerceAtMost(maxMs)
+            var remaining = attempt
+            while (remaining > 0 && waitMs < maxMs) {
+                waitMs = if (waitMs > maxMs / 2) maxMs else waitMs * 2
+                remaining--
+            }
+            return waitMs
+        }
+    }
 
     private val lock = SynchronizedObject()
     private val timers = HashMap<QueueConversationId, Job>()
@@ -63,7 +73,7 @@ internal class OtherClientHold(
             timers.remove(conversationId)?.cancel()
             val attempt = attempts[conversationId] ?: 0
             attempts[conversationId] = attempt + 1
-            val waitMs = retryDelayMs(attempt)
+            val waitMs = backoff.delayMs(attempt)
             timers[conversationId] = scope.launch {
                 delay(waitMs.milliseconds)
                 synchronized(lock) { timers.remove(conversationId) }
@@ -82,11 +92,6 @@ internal class OtherClientHold(
         synchronized(lock) { attempts.remove(conversationId) }
     }
 
-    private fun retryDelayMs(attempt: Int): Long {
-        var waitMs = backoff.initialMs
-        repeat(attempt) { waitMs = (waitMs * 2).coerceAtMost(backoff.maxMs) }
-        return waitMs.coerceAtMost(backoff.maxMs)
-    }
 }
 
 private const val INITIAL_RETRY_MS = 2_000L
