@@ -32,6 +32,15 @@ enum class CanvasMountSource {
     Default,
 }
 
+/** Who a mount reaches. */
+enum class CanvasMountReach {
+    /** Held by the host: every paired device and the agent's canvas tools see it. */
+    Host,
+
+    /** Held on this device for this app session only; the agent's canvas tools keep the conversation's own canvas. */
+    Device,
+}
+
 /** How sure the host is that a mount it reported survives a power cut. */
 enum class CanvasMountDurability {
     /** Written and confirmed on disk. */

@@ -20,24 +20,40 @@ class ConversationCanvasPickerTest {
     private val target = ConversationCanvasTarget(AgentId("agent-1"), ConversationId("conv-1"))
     private val foreign = CanvasId("canvas-foreign")
 
-    private class PickCase(val name: String, val supported: Boolean, val inCanvasMode: Boolean, val mounts: Boolean)
+    private class PickCase(val name: String, val supported: Boolean, val focus: (CanvasModeFocus) -> Unit, val mounts: Boolean)
 
     @Test
-    fun aPickMountsOnlyInCanvasModeOnAHostWithMounts() = runTest {
+    fun aPickMountsOnTheConversationOnScreenInEitherModeOnAHostWithMounts() = runTest {
         val cases = listOf(
-            PickCase("canvas mode, mounts", supported = true, inCanvasMode = true, mounts = true),
-            PickCase("not in canvas mode", supported = true, inCanvasMode = false, mounts = false),
-            PickCase("host without mounts", supported = false, inCanvasMode = true, mounts = false),
+            PickCase("canvas mode, mounts", supported = true, focus = { it.enter(target) }, mounts = true),
+            PickCase("chat mode, mounts", supported = true, focus = { it.show(target) }, mounts = true),
+            PickCase("no conversation on screen", supported = true, focus = {}, mounts = false),
+            PickCase("host without mounts", supported = false, focus = { it.enter(target) }, mounts = false),
         )
         for (case in cases) {
             val client = FakeCanvasMountClient(case.supported)
             val picker = ConversationCanvasPicker(ConversationCanvasResolver(client))
-            if (case.inCanvasMode) picker.focus.enter(target)
+            case.focus(picker.focus)
             val pick = picker.pick(foreign)
             assertEquals(case.mounts, pick is CanvasPick.Mounted, case.name)
             assertEquals(case.mounts, client.stored[target] == foreign, case.name)
             assertEquals(case.mounts, picker.state.first().mountsOnPick, case.name)
         }
+    }
+
+    @Test
+    fun thePickerKnowsWhetherTheBoardIsOnShow() = runTest {
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(FakeCanvasMountClient()))
+        picker.focus.show(target)
+        assertFalse(picker.inCanvasMode())
+        assertNull(picker.state.first().onBoard)
+        picker.focus.enter(target)
+        assertTrue(picker.inCanvasMode())
+        assertEquals(target.ownCanvas, picker.state.first { it.canvasMode }.onBoard)
+        picker.focus.leave(target)
+        assertEquals(target, picker.focus.onScreen.value)
+        picker.focus.hide(target)
+        assertNull(picker.mountTarget())
     }
 
     @Test

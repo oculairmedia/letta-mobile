@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -53,20 +55,29 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
     /** True while the host offers canvas mounts. */
     val supported: StateFlow<Boolean> get() = client.supported
 
+    /** Who the mounts reach: the host's, or (a host without mounts) this device's only. */
+    val reach: Flow<CanvasMountReach> get() = client.reach
+
     /** What is known about [target] now, without asking. */
     fun current(target: ConversationCanvasTarget): ConversationCanvasState =
         known.value[target] ?: ConversationCanvasState.Resolving
 
-    /** [target]'s board as it changes: asked when collected and whenever the host's support changes. */
+    /** [target]'s board as it changes: asked when collected and whenever the host's support or the mounts' reach changes. */
     fun state(target: ConversationCanvasTarget): Flow<ConversationCanvasState> = channelFlow {
-        launch { client.supported.collect { refresh(target) } }
+        launch { combine(client.supported, client.reach, ::Pair).collect { refresh(target) } }
         launch { client.changes(target).collect { accept(target, it) } }
         known.map { it[target] ?: ConversationCanvasState.Resolving }.distinctUntilChanged().collect { send(it) }
     }
 
-    /** The canvas mounted for [conversationId] of [agentId] now, asking the host; null for its own board. */
-    suspend fun mountedCanvas(agentId: AgentId, conversationId: ConversationId): CanvasId? =
-        refresh(ConversationCanvasTarget(agentId, conversationId)).mountedCanvas
+    /**
+     * The canvas mounted for [conversationId] of [agentId] now, asking the host; null for its own board.
+     * The agent's canvas tools ask this, so a mount held on this device only ([CanvasMountReach.Device])
+     * answers null: the tools keep the conversation's own canvas, as the screen tells the person.
+     */
+    suspend fun mountedCanvas(agentId: AgentId, conversationId: ConversationId): CanvasId? {
+        if (client.reach.first() == CanvasMountReach.Device) return null
+        return refresh(ConversationCanvasTarget(agentId, conversationId)).mountedCanvas
+    }
 
     /** Asks the host for [target]'s board now and publishes the answer. */
     suspend fun refresh(target: ConversationCanvasTarget): ConversationCanvasState = turn.withLock { refreshLocked(target, keep = false) }

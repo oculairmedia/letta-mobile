@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * The app's view of the host's canvas mounts: which canvas a conversation shows, and the person's
@@ -26,8 +27,12 @@ import kotlinx.coroutines.flow.emptyFlow
  *   `canvas.mount.invalid_input:<field>:<code>` to [CanvasMountProblem.InvalidInput], the answers
  *   `unavailable{reason}` to [CanvasMountProblem.Unavailable] and `outcome_unknown` (or a lost
  *   connection after the request was sent) to [CanvasMountProblem.OutcomeUnknown];
- * - feed [changes] from the host's change notification when it has one, else return an empty flow.
+ * - feed [changes] from the host's change notification when it has one, else return an empty flow;
+ * - keep the default [reach]: a host's mount reaches every paired device and the agent's tools.
  * It must never throw for a host answer; cancellation propagates.
+ *
+ * [DeviceCanvasMountClient] is the device-local implementation, and [DeviceFallbackCanvasMountClient]
+ * the one place that picks between the host's client and it.
  */
 interface CanvasMountClient {
     /** True while the connected host offers canvas mounts; while false nothing is asked. */
@@ -44,6 +49,9 @@ interface CanvasMountClient {
 
     /** Mounts the host pushes for [target] after this call; empty when the host pushes none. */
     fun changes(target: ConversationCanvasTarget): Flow<CanvasId>
+
+    /** Who the mounts this client reports reach: the host (every device and the agent's tools) or this device only. */
+    val reach: Flow<CanvasMountReach> get() = flowOf(CanvasMountReach.Host)
 
     /** A host without canvas mounts: never supported, nothing is mounted and nothing changes. */
     object Unsupported : CanvasMountClient {
