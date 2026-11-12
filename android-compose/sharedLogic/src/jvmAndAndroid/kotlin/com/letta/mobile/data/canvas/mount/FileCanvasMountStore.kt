@@ -37,13 +37,14 @@ import kotlinx.serialization.json.JsonPrimitive
  * 8 KiB and validate version, host and exact key, including misplaced/hash-collision files.
  * Values are semantic [CanvasId]s, never notebook generation IDs. Existing winners are directory-synced
  * without replacing already-forced contents. No document, provenance or client preferences change.
- * No RPC, principal inference or fallback is supplied; S2 must authorize scope, proposal AND winner.
+ * It trusts every value it is given and authorizes nothing, so it is internal: callers outside this
+ * package reach it only through [AuthorizedCanvasMounts], which authorizes scope, proposal and winner.
  */
-class FileCanvasMountStore internal constructor(
+internal class FileCanvasMountStore internal constructor(
     productStateDirectory: Path,
     private val hostId: HostId,
     private val directorySync: (Path) -> Unit,
-) {
+) : CanvasMountStorage {
     /**
      * On Windows contents are forced and atomically replaced, but directory entries are unconfirmed;
      * a newest binding lost after a power cut is simply set again.
@@ -58,15 +59,15 @@ class FileCanvasMountStore internal constructor(
     init { require(hostId.value.isNotBlank()) { "Empty mount host" } }
 
     /** Reads only this explicit binding. Null means absent; corrupt/unreadable state throws. */
-    suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId? =
+    override suspend fun readBinding(agentId: AgentId, conversationId: ConversationId): CanvasId? =
         readKey(agentId, conversationId)
 
     /** Reads only this agent's default, without granting canvas access or creating a binding. */
-    suspend fun readDefault(agentId: AgentId): CanvasId? =
+    override suspend fun readDefault(agentId: AgentId): CanvasId? =
         readKey(agentId, null)
 
     /** Atomically inserts only when absent, returning the durable winner without rewriting it. */
-    suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId =
+    override suspend fun bindIfAbsent(agentId: AgentId, conversationId: ConversationId, proposed: CanvasId): CanvasId =
         transaction(agentId, conversationId, proposed) { file ->
             val winner = read(file, agentId, conversationId)
             // Reconfirm the root's own directory entry on every mutation/retry, including creation
@@ -85,7 +86,7 @@ class FileCanvasMountStore internal constructor(
         }
 
     /** Durably replaces only this conversation's binding, leaving all other key files untouched. */
-    suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId) =
+    override suspend fun replaceBinding(agentId: AgentId, conversationId: ConversationId, canvasId: CanvasId) =
         transaction(agentId, conversationId, canvasId) { file ->
             read(file, agentId, conversationId)
             syncDirectories()
@@ -93,7 +94,7 @@ class FileCanvasMountStore internal constructor(
         }
 
     /** Durably sets only this default. Existing conversation bindings are neither read nor rewritten. */
-    suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) = transaction(agentId, null, canvasId) { file ->
+    override suspend fun setDefault(agentId: AgentId, canvasId: CanvasId) = transaction(agentId, null, canvasId) { file ->
         read(file, agentId, null)
         syncDirectories()
         write(file, Record(VERSION, hostId, agentId, null, canvasId.value))
