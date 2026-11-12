@@ -27,6 +27,9 @@ fun registerNotebookAdminRoutes(router: AdminRpcRouter, notebooks: NotebookLocal
         val id = documentId(params)
         NotebookAccessWire.reference(access(context).resolver.resolve(id))
     }
+    router.registerScoped(NotebookAccessWire.LIST) { _, context ->
+        NotebookAccessWire.sharedNotes(access(context).sharedNotes())
+    }
     router.registerScoped(NotebookAccessWire.OPEN) { params, context ->
         val id = documentId(params)
         val binding = access(context)

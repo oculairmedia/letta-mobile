@@ -16,6 +16,8 @@ import com.letta.mobile.data.canvas.references.NotebookReferenceSession
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpener
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions
+import com.letta.mobile.data.canvas.workspace.SharedNote
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
 import kotlinx.coroutines.CancellationException
@@ -63,6 +65,19 @@ class HostNotebookAccess(
                 )
             }
         }
+    }
+
+    /**
+     * The notes this principal may open now: each listed grant is rechecked under its own
+     * transaction for read and edit, and a granted note missing from the store is left out.
+     */
+    suspend fun sharedNotes(): SharedNoteListing = recover(SharedNoteListing.Unavailable("Notebook authority unavailable")) {
+        val notes = grants.documentsOf(principal).take(NotebookAccessWire.MAX_LISTED).mapNotNull { id ->
+            grants.withGrant(principal, id) { grant ->
+                if (!mayEditNotebookContent(grant)) null else notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
+            }
+        }
+        SharedNoteListing.Listed(notes)
     }
 }
 

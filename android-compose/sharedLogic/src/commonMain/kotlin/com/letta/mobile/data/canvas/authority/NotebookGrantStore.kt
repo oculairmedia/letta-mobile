@@ -19,6 +19,12 @@ interface NotebookGrantStore {
         documentId: NotebookDocumentId,
         action: suspend (NotebookPeerGrant?) -> T,
     ): T
+
+    /**
+     * The documents [principal] holds a grant for, read in one transaction, in storage order. A
+     * listing authorizes nothing: every operation on a listed document still runs [withGrant].
+     */
+    suspend fun documentsOf(principal: String): List<NotebookDocumentId>
 }
 
 /** References require both capabilities for the same exact grant. */

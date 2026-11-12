@@ -11,6 +11,8 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
+import com.letta.mobile.data.canvas.workspace.SharedNote
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ModelControlException
@@ -18,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -78,6 +81,23 @@ class RemoteNotebookAccessTest {
     }
 
     @Test
+    fun theListingShowsOnlyNotesThisPeerMayOpenNow() = withHost { host ->
+        val alice = host.client(ALICE)
+        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list())
+
+        host.grant(ALICE, edit = true)
+        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(host.id, "Shared"))), alice.directory.list())
+        assertEquals(SharedNoteListing.Listed(emptyList()), host.client(BOB).directory.list())
+
+        host.grant(ALICE, edit = false)
+        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(), "a read-only grant cannot open the editor")
+
+        host.grant(ALICE, edit = true)
+        host.revoke(ALICE)
+        assertEquals(SharedNoteListing.Listed(emptyList()), alice.directory.list(), "a revoked note leaves the listing")
+    }
+
+    @Test
     fun readOnlyGrantResolvesTheReferenceButDoesNotOpenTheEditor() = withHost { host ->
         val access = host.client(ALICE)
         host.grant(ALICE, edit = false)
@@ -95,6 +115,7 @@ class RemoteNotebookAccessTest {
         assertIs<NotebookNoteLoad.Unavailable>(access.backend.load(id))
         assertIs<NotebookNoteSave.Unavailable>(access.backend.save(id, "", "x"))
         assertEquals(NotebookReferenceLoad.Unavailable, access.resolver.resolve(id))
+        assertIs<SharedNoteListing.Unavailable>(access.directory.list())
     }
 
     @Test
@@ -106,7 +127,22 @@ class RemoteNotebookAccessTest {
             assertEquals(DocumentWorkspaceOpen.Denied, access.opener.open(id))
             assertEquals(NotebookNoteSave.Denied, access.backend.save(id, "", "x"))
             assertEquals(NotebookReferenceLoad.Denied, access.resolver.resolve(id))
+            assertEquals(SharedNoteListing.Denied, access.directory.list())
         }
+    }
+
+    @Test
+    fun aListingWithAnUnreadableEntryIsUnavailableNotShorter() {
+        val id = NotebookDocumentId("0123456789abcdef0123456789abcdef")
+        val listed = NotebookAccessWire.sharedNotes(SharedNoteListing.Listed(listOf(SharedNote(id, "T"))))
+        val broken = buildJsonObject {
+            put("status", "listed")
+            put("notes", buildJsonArray { add(JsonPrimitive("junk")) })
+        }
+
+        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(id, "T"))), NotebookAccessWire.readSharedNotes(listed))
+        assertIs<SharedNoteListing.Unavailable>(NotebookAccessWire.readSharedNotes(broken))
+        assertIs<SharedNoteListing.Unavailable>(NotebookAccessWire.readSharedNotes(null))
     }
 
     @Test

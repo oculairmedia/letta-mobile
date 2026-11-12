@@ -13,10 +13,14 @@ import com.letta.mobile.data.canvas.references.NotebookReferenceSession
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpener
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions
+import com.letta.mobile.data.canvas.workspace.SharedNoteDirectory
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
+import com.letta.mobile.data.canvas.workspace.SharedNotebooks
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
@@ -25,7 +29,7 @@ import kotlinx.serialization.json.put
  * never shows content the host did not return for the current call. A transport failure is
  * unavailable, not denied and not empty.
  */
-class RemoteNotebookAccess(rpc: AdminRpcInvoker) {
+class RemoteNotebookAccess(rpc: AdminRpcInvoker) : SharedNotebooks {
     private val host = NotebookRpc(rpc)
 
     /** Every load is a fresh `notebook.note.open`, so remounting a note rechecks the grant. */
@@ -43,8 +47,15 @@ class RemoteNotebookAccess(rpc: AdminRpcInvoker) {
         readAuthorized = ::resolve,
     )
 
+    /** Every call is a fresh `notebook.shared.list`; the host lists only notes this device may open now. */
+    override val directory = SharedNoteDirectory {
+        host.call(NotebookAccessWire.LIST, buildJsonObject {}, { SharedNoteListing.Unavailable(it) }) {
+            NotebookAccessWire.readSharedNotes(it)
+        }
+    }
+
     /** Opens a shared note only when the host grants edit access to it now. */
-    val opener = DocumentWorkspaceOpener { id ->
+    override val opener = DocumentWorkspaceOpener { id ->
         when (backend.load(id)) {
             is NotebookNoteLoad.Found -> DocumentWorkspaceOpen.Opened(
                 DocumentWorkspaceSessions(NotebookNoteSession(id, backend), NotebookReferenceSession(id, resolver)),

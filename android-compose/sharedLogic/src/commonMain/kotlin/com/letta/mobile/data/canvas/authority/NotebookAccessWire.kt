@@ -6,13 +6,18 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
+import com.letta.mobile.data.canvas.workspace.SharedNote
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /**
  * The `notebook.*` admin_rpc result shapes, shared by the host routes and the remote client so the
@@ -24,6 +29,10 @@ object NotebookAccessWire {
     const val OPEN = "notebook.note.open"
     const val SAVE = "notebook.note.save"
     const val FLUSH = "notebook.note.flush"
+    const val LIST = "notebook.shared.list"
+
+    /** The most notes one listing carries; a host with more lists its first [MAX_LISTED]. */
+    const val MAX_LISTED = 500
 
     /** The request body naming one document. */
     fun request(id: NotebookDocumentId, fields: JsonObjectBuilder.() -> Unit = {}): JsonObject =
@@ -70,6 +79,32 @@ object NotebookAccessWire {
         NotebookReferenceLoad.Denied -> response(DENIED)
         NotebookReferenceLoad.Missing -> response(MISSING)
         NotebookReferenceLoad.Unavailable -> response(UNAVAILABLE)
+    }
+
+    /** The listing result: the notes the caller may open now, at most [MAX_LISTED]. */
+    fun sharedNotes(result: SharedNoteListing): JsonObject = when (result) {
+        is SharedNoteListing.Listed -> response(LISTED) {
+            putJsonArray("notes") {
+                result.notes.take(MAX_LISTED).forEach { note ->
+                    addJsonObject {
+                        put("document_id", note.id.value)
+                        put("title", note.title)
+                    }
+                }
+            }
+        }
+        SharedNoteListing.Denied -> response(DENIED)
+        is SharedNoteListing.Unavailable -> response(UNAVAILABLE) { put("reason", result.reason) }
+    }
+
+    /** Read a listing; an entry without an id or a title makes the whole answer malformed, not shorter. */
+    fun readSharedNotes(result: JsonElement?): SharedNoteListing {
+        val body = result as? JsonObject ?: return SharedNoteListing.Unavailable(NO_RESULT)
+        return when (body.status()) {
+            LISTED -> body.notes()?.let(SharedNoteListing::Listed) ?: SharedNoteListing.Unavailable(MALFORMED_LIST)
+            DENIED -> SharedNoteListing.Denied
+            else -> SharedNoteListing.Unavailable(body.reason())
+        }
     }
 
     /** Read an open result for [id]; a snapshot for another document is unavailable. */
@@ -123,6 +158,18 @@ private fun JsonObject.conflict(id: NotebookDocumentId): NotebookNoteSave.Confli
     return snapshotAt("durable", id)?.let { NotebookNoteSave.Conflict(current, it) }
 }
 
+private fun JsonObject.notes(): List<SharedNote>? {
+    val entries = (get("notes") as? JsonArray)?.takeIf { it.size <= NotebookAccessWire.MAX_LISTED } ?: return null
+    val notes = entries.mapNotNull { entry -> (entry as? JsonObject)?.sharedNote() }
+    return notes.takeIf { it.size == entries.size }
+}
+
+private fun JsonObject.sharedNote(): SharedNote? {
+    val id = text("document_id")?.takeIf { it.isNotBlank() } ?: return null
+    val title = text("title") ?: return null
+    return SharedNote(NotebookDocumentId(id), title)
+}
+
 private fun JsonObject.snapshotAt(key: String, id: NotebookDocumentId): NotebookNoteSnapshot? {
     val item = (get(key) as? JsonObject)?.takeIf { it.text("document_id") == id.value }
     val title = item?.text("title")
@@ -138,7 +185,9 @@ private const val DENIED = "denied"
 private const val MISSING = "missing"
 private const val UNAVAILABLE = "unavailable"
 private const val SAVED = "saved"
+private const val LISTED = "listed"
 private const val CONFLICT = "conflict"
 private const val PENDING_DURABILITY = "pending_durability"
 private const val NO_RESULT = "The host returned no result"
 private const val MALFORMED = "The host returned a malformed note"
+private const val MALFORMED_LIST = "The host returned a malformed list of notes"
