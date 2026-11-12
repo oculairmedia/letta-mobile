@@ -8,6 +8,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.InternalComposeUiApi
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.platform.FrameRecomposer
+import androidx.compose.ui.platform.PlatformContext
+import androidx.compose.ui.scene.CanvasLayersComposeScene
+import androidx.compose.ui.semantics.SemanticsOwner
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
@@ -38,6 +50,48 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class RecentRowHoverTest {
+    @OptIn(InternalComposeUiApi::class)
+    @Test
+    fun pointerHostReceivesHandCursorForRecentsAndRoster() {
+        var cursor: PointerIcon = PointerIcon.Default
+        val owners = mutableListOf<SemanticsOwner>()
+        val platform = object : PlatformContext.Empty() {
+            override fun setPointerIcon(pointerIcon: PointerIcon) { cursor = pointerIcon }
+            override val semanticsOwnerListener = object : PlatformContext.SemanticsOwnerListener {
+                override fun onSemanticsOwnerAppended(semanticsOwner: SemanticsOwner) { owners.add(semanticsOwner) }
+                override fun onSemanticsOwnerRemoved(semanticsOwner: SemanticsOwner) { owners.remove(semanticsOwner) }
+                override fun onSemanticsChange(semanticsOwner: SemanticsOwner) = Unit
+                override fun onLayoutChange(semanticsOwner: SemanticsOwner, semanticsNodeId: Int) = Unit
+            }
+        }
+        val frames = FrameRecomposer(Dispatchers.Unconfined)
+        val scene = CanvasLayersComposeScene(frames, size = IntSize(400, 600), platformContext = platform)
+        try {
+            scene.setContent { HoverFixture() }
+            repeat(SETTLE_FRAMES) { index ->
+                frames.performFrame(index * FRAME_NANOS)
+                scene.measureAndLayout()
+            }
+            val nodes = owners.flatMap { it.unmergedRootSemanticsNode.flatten().toList() }
+            val recents = nodes.filter {
+                it.config.getOrNull(SemanticsProperties.TestTag) in setOf(recentRowTag(IDLE_KEY), recentRowTag(OPEN_KEY))
+            }
+            val roster = nodes.filter { node ->
+                node.config.getOrNull(SemanticsProperties.Text)?.any { it.text in setOf("Roster", "Roster open") } == true
+            }
+            assertEquals(4, recents.size + roster.size)
+            for (node in recents + roster) {
+                scene.sendPointerEvent(PointerEventType.Move, node.boundsInRoot.center)
+                assertEquals(PointerIcon.Hand, cursor)
+                scene.sendPointerEvent(PointerEventType.Exit, node.boundsInRoot.center)
+                assertEquals(PointerIcon.Default, cursor)
+            }
+        } finally {
+            scene.close()
+            frames.close()
+        }
+    }
+
     @Test
     fun focusIsVisibleAndDisabledRowsHaveNoHoverSurface() = runComposeUiTest {
         setContent {
@@ -61,6 +115,15 @@ class RecentRowHoverTest {
         disabled.performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(before, disabled.captureToImage().toPixelMap()[SAMPLE_X, SAMPLE_Y])
+    }
+
+    @Test
+    fun recentsUseThePointerHostsTitleTooltip() = runComposeUiTest {
+        setContent { HoverFixture() }
+        onNodeWithTag(recentRowTag(IDLE_KEY)).performMouseInput { enter(center) }
+        mainClock.advanceTimeBy(TOOLTIP_SETTLE_MILLIS)
+        waitForIdle()
+        onNodeWithText("Idle").assertExists()
     }
 
     @Test
@@ -114,6 +177,14 @@ private fun HoverFixture() {
     }
 }
 
+private fun SemanticsNode.flatten(): Sequence<SemanticsNode> = sequence {
+    yield(this@flatten)
+    for (child in children) yieldAll(child.flatten())
+}
+
+private const val TOOLTIP_SETTLE_MILLIS = 200L
+private const val SETTLE_FRAMES = 3
+private const val FRAME_NANOS = 16_000_000L
 private const val IDLE_KEY = "idle"
 private const val OPEN_KEY = "open"
 private const val FOCUS_TAG = "focus-row"
