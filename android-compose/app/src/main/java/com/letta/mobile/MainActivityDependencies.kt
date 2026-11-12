@@ -1,6 +1,9 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.canvas.authority.RemoteNotebookAccess
+import com.letta.mobile.data.canvas.workspace.SharedNotebooks
+import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
@@ -31,6 +34,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyCanvasBoards: Lazy<AndroidCanvasBoards>,
     private val lazyCanvasViewers: Lazy<CanvasDocumentViewerRegistry>,
     private val lazySubagentRepository: Lazy<ISubagentRepository>,
+    private val lazyAdminRpc: Lazy<AdminRpcInvoker>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
     /** The roster and the per-agent settings the mascot identity registry is derived from. */
@@ -49,4 +53,12 @@ class MainActivityDependencies @Inject constructor(
 
     /** The current session's subagent registry, where the shell's tasks modules list background tasks. */
     val subagentRepository: ISubagentRepository get() = lazySubagentRepository.get()
+
+    /**
+     * n2stx.2.2: notes the host shares with this device, over the session's admin RPC. The RPC is
+     * resolved on the first call, so first composition never waits for the transport graph.
+     */
+    val sharedNotebooks: SharedNotebooks by lazy {
+        RemoteNotebookAccess(AdminRpcInvoker { method, params -> lazyAdminRpc.get().invoke(method, params) })
+    }
 }

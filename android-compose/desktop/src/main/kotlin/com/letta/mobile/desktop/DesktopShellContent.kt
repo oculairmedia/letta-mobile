@@ -43,6 +43,7 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
+import com.letta.mobile.ui.shell.workspace.ProvideShellSharedNotes
 import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
@@ -81,29 +82,31 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
         LocalShellTaskRegistry provides context.panels.subagents.repository,
     ) {
         ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {
-            LettaShellWorkspace(
-                state = LettaShellWorkspaceState(
-                    header = header.state,
-                    navigation = desktopWorkspaceNavigation(context, frame),
-                    layout = layout.controller.workspaceLayout(layout.reducedMotion, forceCompact = phone != null),
-                ),
-                host = com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHost(
-                    frame,
-                    listOf(
-                        context.core, frame.chatState.sessionGraphId, drawer, deleteBehavior,
-                        context.core.chatController.conversationMarks.markerChoices,
+            ProvideShellSharedNotes(context.core.bootstrap.dataBindings.sharedNotebooks) {
+                LettaShellWorkspace(
+                    state = LettaShellWorkspaceState(
+                        header = header.state,
+                        navigation = desktopWorkspaceNavigation(context, frame),
+                        layout = layout.controller.workspaceLayout(layout.reducedMotion, forceCompact = phone != null),
                     ),
-                ) { currentFrame ->
-                    LettaShellWorkspaceHost(
-                        desktopWorkspaceActions(context, currentFrame, deleteBehaviorState, fontScaleSetter),
-                        desktopWorkspaceSlots(context, currentFrame),
-                        ShellWindowChrome.Hoisted { hoistedHeader.value(it) },
-                        drawer, ShellWorkspaceEvents(onWindowWidthChanged, shortcuts),
-                        conversationLanes = context.core.sessionGraph.value.conversationLanes,
-                        objectPins = context.panels.libraries.home.objectPins,
-                    )
-                },
-            )
+                    host = com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHost(
+                        frame,
+                        listOf(
+                            context.core, frame.chatState.sessionGraphId, drawer, deleteBehavior,
+                            context.core.chatController.conversationMarks.markerChoices,
+                        ),
+                    ) { currentFrame ->
+                        LettaShellWorkspaceHost(
+                            desktopWorkspaceActions(context, currentFrame, deleteBehaviorState, fontScaleSetter),
+                            desktopWorkspaceSlots(context, currentFrame),
+                            ShellWindowChrome.Hoisted { hoistedHeader.value(it) },
+                            drawer, ShellWorkspaceEvents(onWindowWidthChanged, shortcuts),
+                            conversationLanes = context.core.sessionGraph.value.conversationLanes,
+                            objectPins = context.panels.libraries.home.objectPins,
+                        )
+                    },
+                )
+            }
         }
     }
 }

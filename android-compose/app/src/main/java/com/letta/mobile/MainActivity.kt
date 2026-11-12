@@ -41,6 +41,7 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.ui.shell.workspace.LocalShellTaskRegistry
+import com.letta.mobile.ui.shell.workspace.ProvideShellSharedNotes
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
 import com.letta.mobile.ui.common.toOverlay
@@ -108,27 +109,29 @@ class MainActivity : ComponentActivity() {
                 LocalAgentDefaults provides deps.agentDefaults,
                 LocalShellTaskRegistry provides deps.subagentRepository,
             ) {
-                LettaTheme(
-                    appTheme = appThemeState.value,
-                    themePreset = themePresetState.value,
-                    dynamicColor = dynamicColorState.value,
-                ) {
-                    ProvideMascotShell(
-                        agents = deps.agentRepository.agents,
-                        settings = deps.secureSettingsStore,
-                        runs = deps.conversationRunRegistry,
+                ProvideShellSharedNotes(deps.sharedNotebooks) {
+                    LettaTheme(
+                        appTheme = appThemeState.value,
+                        themePreset = themePresetState.value,
+                        dynamicColor = dynamicColorState.value,
                     ) {
-                        Surface(modifier = debugRootPointerObserver(), color = MaterialTheme.colorScheme.background) {
-                            OverlayHostRoot(overlays) {
-                                // Mascots move between seats below the app's overlays (letta-mobile-te3n1.8).
-                                MascotTransportLayer {
-                                    com.letta.mobile.ui.screens.canvas.AndroidCanvasHost(deps, canvasOwner) {
-                                        val navController = rememberNavController()
-                                        AppNavGraph(
-                                            navController = navController,
-                                            notificationTarget = launchTarget.value,
-                                            onNotificationTargetConsumed = { launchTarget.value = null },
-                                        )
+                        ProvideMascotShell(
+                            agents = deps.agentRepository.agents,
+                            settings = deps.secureSettingsStore,
+                            runs = deps.conversationRunRegistry,
+                        ) {
+                            Surface(modifier = debugRootPointerObserver(), color = MaterialTheme.colorScheme.background) {
+                                OverlayHostRoot(overlays) {
+                                    // Mascots move between seats below the app's overlays (letta-mobile-te3n1.8).
+                                    MascotTransportLayer {
+                                        com.letta.mobile.ui.screens.canvas.AndroidCanvasHost(deps, canvasOwner) {
+                                            val navController = rememberNavController()
+                                            AppNavGraph(
+                                                navController = navController,
+                                                notificationTarget = launchTarget.value,
+                                                onNotificationTargetConsumed = { launchTarget.value = null },
+                                            )
+                                        }
                                     }
                                 }
                             }
