@@ -71,7 +71,8 @@ jobs:
           echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
       - name: Restore Konan toolchain
         id: konan
         # The K/N toolchain version is the catalog's kotlin version, so the key
@@ -134,11 +135,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
-          # Let same-repo PRs refresh Gradle User Home caches for later workflow
-          # runs. Fork PRs stay read-only to avoid untrusted Gradle User Home
-          # cache writes. Project-local state is handled by the separate
-          # same-repo-only cache step below.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # Budget: target <8 GB repository-wide under GitHub's 10 GB limit.
+          # PR merge refs duplicated ~3.6 GB of dependencies/transforms; all PRs
+          # read main's Gradle caches, but only main writes them. Optional heavy
+          # workflows are read-only. Keep job snapshots (shared artifacts are
+          # deduplicated by setup-gradle), so narrow jobs cannot replace wider ones.
+          # Project-local state retains its separate same-repo-only cache below.
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Cache project-local Gradle state
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -466,9 +470,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
-          # The required test job is the sole PR cache writer. Advisory jobs
-          # restore shared entries without uploading competing snapshots.
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # Only main saves; PRs restore without competing merge-ref snapshots.
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Run detekt against the per-module baselines
         run: ./gradlew detekt --continue -Parchitecture.strict=true
@@ -525,8 +529,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
-          # The required test job is the sole PR cache writer.
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # Only main saves; PRs restore the matching job's cache.
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Render the shared chat rows against their goldens
         run: ./gradlew :feature-chat:rowGoldenReport
@@ -581,8 +586,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
-          # The required test job is the sole PR cache writer.
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          # Only main saves; PRs restore the matching job's cache.
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Restore Konan (Kotlin/Native) toolchain
         id: konan
@@ -689,7 +695,8 @@ jobs:
           java-version: 26
       - uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
       - name: Verify documentation tooling
         env:
           DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
@@ -770,7 +777,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Setup Rust with WASM target
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249  # stable
@@ -927,7 +935,8 @@ jobs:
           # Restore Gradle User Home state from prior trusted workflow runs;
           # keep all PR matrix consumers read-only and leave project-local state to the
           # separate same-repo-only cache below.
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Restore project-local Gradle state
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -1016,7 +1025,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+          cache-cleanup: on-success
 
       - name: Build wrapper distribution
         run: ./gradlew :iroh-wrapper-cli:installDist
