@@ -1,11 +1,10 @@
 package com.letta.mobile.data.canvas.workspace
 
 import com.letta.mobile.data.canvas.NotebookDocumentId
-import com.letta.mobile.data.canvas.notes.NotebookNoteBackend
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSession
-import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
+import com.letta.mobile.data.canvas.notes.NoteTestBackend
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,7 +25,7 @@ class SharedNoteBrowserTest {
 
     @Test
     fun aHostSharingNothingListsAnEmptyListNotAFailure() = runTest {
-        host.granted.clear()
+        host.revoke()
         browser.refresh()
         assertEquals(SharedNoteListing.Listed(emptyList()), browser.state.value.listing)
         assertFalse(browser.state.value.loading)
@@ -34,7 +33,7 @@ class SharedNoteBrowserTest {
 
     @Test
     fun anUnreachableHostIsUnavailableAndAThrowingDirectoryIsToo() = runTest {
-        host.reachable = false
+        host.unreach()
         browser.refresh()
         assertIs<SharedNoteListing.Unavailable>(browser.state.value.listing)
 
@@ -56,21 +55,20 @@ class SharedNoteBrowserTest {
         note.edit("edited")
         assertTrue(note.save())
 
-        assertEquals("edited", host.markdown.getValue(listed.id))
+        assertEquals("edited", host.backend.source.markdown)
         assertNull(browser.state.value.openProblem)
     }
 
     @Test
     fun aNoteRevokedAfterListingDoesNotOpenAndSaysWhy() = runTest {
         browser.refresh()
-        host.granted.clear()
+        host.revoke()
 
         assertFalse(browser.open(NOTE))
         assertNull(browser.state.value.workspace)
         assertEquals(DocumentWorkspaceProblem.DENIED, browser.state.value.openProblem)
 
-        host.granted += NOTE
-        host.reachable = false
+        host.unreach()
         assertFalse(browser.open(NOTE))
         assertEquals(DocumentWorkspaceProblem.UNAVAILABLE, browser.state.value.openProblem)
     }
@@ -82,7 +80,7 @@ class SharedNoteBrowserTest {
         val note = assertNotNull(workspace.state.value.current).note
         note.edit("unsaved after revoke")
 
-        host.granted.clear()
+        host.revoke()
         assertFalse(note.save())
         assertTrue(workspace.withdrawn())
         assertFalse(workspace.close(), "the durability barrier alone cannot leave an unsavable draft")
@@ -90,7 +88,7 @@ class SharedNoteBrowserTest {
         assertTrue(browser.closeNote())
         assertNull(browser.state.value.workspace)
         assertEquals(SharedNoteListing.Listed(emptyList()), browser.state.value.listing, "leaving lists again")
-        assertEquals("shared text", host.markdown.getValue(NOTE), "nothing reached the host after the revoke")
+        assertEquals("shared text", host.backend.source.markdown, "nothing reached the host after the revoke")
     }
 
     @Test
@@ -100,7 +98,7 @@ class SharedNoteBrowserTest {
         note.edit("saved on the way out")
 
         assertTrue(browser.closeNote())
-        assertEquals("saved on the way out", host.markdown.getValue(NOTE))
+        assertEquals("saved on the way out", host.backend.source.markdown)
         assertNull(browser.state.value.workspace)
     }
 
@@ -121,42 +119,34 @@ class SharedNoteBrowserTest {
         val NOTE = NotebookDocumentId("0123456789abcdef0123456789abcdef")
     }
 
-    /** A host holding one note; [granted] and [reachable] decide every call, as the real host does. */
-    private class BrowserHost : SharedNotebooks, NotebookNoteBackend {
-        val markdown = mutableMapOf(NOTE to "shared text")
-        val granted = mutableSetOf(NOTE)
-        var reachable = true
+    /** A host over one [backend] note; its knobs model a revoked grant or an unreachable host. */
+    private class BrowserHost : SharedNotebooks {
+        val backend = NoteTestBackend(NOTE).also { it.source = it.source.copy(title = "Plan", markdown = "shared text") }
+        private var shared = listOf(SharedNote(NOTE, "Plan"))
+        private var reachable = true
 
         override val directory = SharedNoteDirectory {
-            if (reachable) SharedNoteListing.Listed(granted.map { SharedNote(it, "Plan") }) else SharedNoteListing.Unavailable("down")
+            if (reachable) SharedNoteListing.Listed(shared) else SharedNoteListing.Unavailable("down")
         }
 
-        override val opener = DocumentWorkspaceOpener { id ->
-            when (load(id)) {
-                is NotebookNoteLoad.Found -> DocumentWorkspaceOpen.Opened(DocumentWorkspaceSessions(NotebookNoteSession(id, this), null))
-                NotebookNoteLoad.Denied -> DocumentWorkspaceOpen.Denied
-                else -> DocumentWorkspaceOpen.Unavailable
-            }
+        override val opener = DocumentWorkspaceOpener { id -> opened(id, backend.load(id)) }
+
+        fun revoke() {
+            shared = emptyList()
+            backend.loadResult = NotebookNoteLoad.Denied
+            backend.saveResult = NotebookNoteSave.Denied
         }
 
-        override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad = when {
-            !reachable -> NotebookNoteLoad.Unavailable("down")
-            id !in granted -> NotebookNoteLoad.Denied
-            else -> markdown[id]?.let { NotebookNoteLoad.Found(NotebookNoteSnapshot(id, "Plan", it)) } ?: NotebookNoteLoad.NotFound
+        fun unreach() {
+            reachable = false
+            backend.loadResult = NotebookNoteLoad.Unavailable("down")
+            backend.saveResult = NotebookNoteSave.Unavailable("down")
         }
 
-        override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave {
-            val current = when (val loaded = load(id)) {
-                is NotebookNoteLoad.Found -> loaded.snapshot
-                NotebookNoteLoad.Denied -> return NotebookNoteSave.Denied
-                else -> return NotebookNoteSave.Unavailable("down")
-            }
-            if (current.markdown != expected) return NotebookNoteSave.Conflict(current)
-            markdown[id] = replacement
-            return NotebookNoteSave.Saved(current.copy(markdown = replacement))
+        private fun opened(id: NotebookDocumentId, loaded: NotebookNoteLoad): DocumentWorkspaceOpen = when (loaded) {
+            is NotebookNoteLoad.Found -> DocumentWorkspaceOpen.Opened(DocumentWorkspaceSessions(NotebookNoteSession(id, backend), null))
+            NotebookNoteLoad.Denied -> DocumentWorkspaceOpen.Denied
+            else -> DocumentWorkspaceOpen.Unavailable
         }
-
-        override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave =
-            if (applied.id in granted) NotebookNoteSave.Saved(applied) else NotebookNoteSave.Denied
     }
 }

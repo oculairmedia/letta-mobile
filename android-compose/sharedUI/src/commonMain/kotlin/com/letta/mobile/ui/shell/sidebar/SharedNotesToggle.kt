@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.shell.modules
+package com.letta.mobile.ui.shell.sidebar
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf

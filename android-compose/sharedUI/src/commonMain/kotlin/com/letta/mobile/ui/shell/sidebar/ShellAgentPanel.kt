@@ -65,8 +65,6 @@ import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shared_notes_hide
 import com.letta.mobile.sharedui.resources.shared_notes_show
-import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.shell.modules.LocalSharedNotesToggle
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -284,8 +282,7 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
     val state = frame.state
     val actions = frame.actions
     var menuOpen by remember { mutableStateOf(false) }
-    // The agent menu's items carry no icons; the collapsed sidebar's overflow keeps it.
-    val sharedNotes = sharedNotesMenuItem()?.copy(icon = null)
+    val sharedNotes = sharedNotesMenuItem()
     Box {
         Icon(
             imageVector = Icons.Outlined.MoreVert,
@@ -320,7 +317,7 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
 internal fun sharedNotesMenuItem(): LettaMenuItem? {
     val toggle = LocalSharedNotesToggle.current ?: return null
     val label = stringResource(if (toggle.shown) Res.string.shared_notes_hide else Res.string.shared_notes_show)
-    return LettaMenuItem(label = label, icon = LettaIcons.FileOpen, onClick = toggle.toggle)
+    return LettaMenuItem(label = label, onClick = toggle.toggle)
 }
 
 /** The dialog the agent menu has open, if any; the panel frame holds it. */

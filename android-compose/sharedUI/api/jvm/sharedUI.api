@@ -8035,17 +8035,6 @@ public final class com/letta/mobile/ui/shell/header/UnifiedShellSearch {
 	public static synthetic fun sections$default (Lcom/letta/mobile/ui/shell/header/UnifiedShellSearch;Lcom/letta/mobile/ui/shell/header/UnifiedSearchQuery;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;Ljava/util/List;IILjava/lang/Object;)Ljava/util/List;
 }
 
-public final class com/letta/mobile/ui/shell/modules/SharedNotesToggle {
-	public static final field $stable I
-	public fun <init> (ZLkotlin/jvm/functions/Function0;)V
-	public final fun getShown ()Z
-	public final fun getToggle ()Lkotlin/jvm/functions/Function0;
-}
-
-public final class com/letta/mobile/ui/shell/modules/SharedNotesToggleKt {
-	public static final fun getLocalSharedNotesToggle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-}
-
 public final class com/letta/mobile/ui/shell/modules/ShellModuleTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/modules/ShellModuleTags;
@@ -10224,6 +10213,17 @@ public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellC
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellChatOptionsKt;
 	public fun <init> ()V
 	public final fun getLambda$1504641410$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
+public final class com/letta/mobile/ui/shell/sidebar/SharedNotesToggle {
+	public static final field $stable I
+	public fun <init> (ZLkotlin/jvm/functions/Function0;)V
+	public final fun getShown ()Z
+	public final fun getToggle ()Lkotlin/jvm/functions/Function0;
+}
+
+public final class com/letta/mobile/ui/shell/sidebar/SharedNotesToggleKt {
+	public static final fun getLocalSharedNotesToggle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions {

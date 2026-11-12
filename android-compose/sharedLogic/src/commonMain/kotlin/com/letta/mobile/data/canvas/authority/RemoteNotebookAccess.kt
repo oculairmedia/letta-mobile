@@ -114,3 +114,7 @@ private class NotebookRpc(private val rpc: AdminRpcInvoker) {
 
 /** The admin_rpc errors a host returns when it refuses the caller rather than failing the call. */
 private val HOST_REFUSALS = setOf("unauthorized", "forbidden")
+
+/** Shared notes over the admin RPC [admin] resolves on each call, so building this never waits for the transport. */
+fun remoteNotebooksOver(admin: () -> AdminRpcInvoker): SharedNotebooks =
+    RemoteNotebookAccess(AdminRpcInvoker { method, params -> admin().invoke(method, params) })

@@ -55,8 +55,8 @@ import com.letta.mobile.ui.components.row.LettaListRow
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.document.workspace.DocumentWorkspace
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.shell.modules.LocalSharedNotesToggle
-import com.letta.mobile.ui.shell.modules.SharedNotesToggle
+import com.letta.mobile.ui.shell.sidebar.LocalSharedNotesToggle
+import com.letta.mobile.ui.shell.sidebar.SharedNotesToggle
 import com.letta.mobile.ui.shell.modules.UnavailableModule
 import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
@@ -76,6 +76,20 @@ import org.jetbrains.compose.resources.stringResource
  */
 val LocalShellSharedNotes = staticCompositionLocalOf<SharedNoteBrowser?> { null }
 
+/** The notes the host shares with this device, bound by the platform shell; null where it cannot reach any. */
+val LocalSharedNotebooks = staticCompositionLocalOf<SharedNotebooks?> { null }
+
+/**
+ * The one browser the workspace provides: an already provided one, else one over [LocalSharedNotebooks],
+ * kept for as long as that binding stands.
+ */
+@Composable
+internal fun rememberSharedNoteBrowser(): SharedNoteBrowser? {
+    val provided = LocalShellSharedNotes.current
+    val notebooks = LocalSharedNotebooks.current
+    return remember(provided, notebooks) { provided ?: notebooks?.let(::SharedNoteBrowser) }
+}
+
 /** Lets every shared-notes view inside [content] list and open notes through [notebooks]. */
 @Composable
 fun ProvideShellSharedNotes(notebooks: SharedNotebooks?, content: @Composable () -> Unit) {
@@ -90,8 +104,7 @@ fun ProvideShellSharedNotes(notebooks: SharedNotebooks?, content: @Composable ()
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
-internal fun rememberSharedNotesToggle(): SharedNotesToggle? {
-    val browser = LocalShellSharedNotes.current
+internal fun rememberSharedNotesToggle(browser: SharedNoteBrowser?): SharedNotesToggle? {
     val port = LocalShellLayoutAgentPort.current
     val store by port.attached.collectAsState()
     val layouts = remember(port) { port.attached.flatMapLatest { it?.config ?: flowOf(null) } }

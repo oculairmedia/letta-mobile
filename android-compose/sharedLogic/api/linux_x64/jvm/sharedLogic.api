@@ -9048,6 +9048,10 @@ public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccess :
 	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
 }
 
+public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccessKt {
+	public static final fun remoteNotebooksOver (Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;
+}
+
 public final class com/letta/mobile/data/canvas/authority/SharedNotesWire {
 	public static final field INSTANCE Lcom/letta/mobile/data/canvas/authority/SharedNotesWire;
 	public static final field LIST Ljava/lang/String;

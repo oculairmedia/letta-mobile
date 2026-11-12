@@ -54,7 +54,7 @@ fun ShellSidebarOverflowMenu(overflow: ShellSidebarOverflow, modifier: Modifier 
     )
     val newChat = stringResource(Res.string.shell_new_chat)
     val settings = stringResource(Res.string.shell_settings)
-    val sharedNotes = sharedNotesMenuItem()
+    val sharedNotes = sharedNotesMenuItem()?.copy(icon = LettaIcons.FileOpen)
     Box(modifier) {
         LocalLettaHost.current.tooltip(stringResource(Res.string.shell_sidebar_more)) {
             IconButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = label }) {
