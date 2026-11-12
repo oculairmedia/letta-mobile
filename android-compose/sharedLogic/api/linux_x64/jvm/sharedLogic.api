@@ -7674,6 +7674,7 @@ public abstract interface class com/letta/mobile/data/canvas/CanvasRelayStore {
 	public static final field DEFAULT_PAGE I
 	public abstract fun append (Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasOp;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun bind (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun boundCanvas (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun head (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun readAfter (Ljava/lang/String;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun readAfter$default (Lcom/letta/mobile/data/canvas/CanvasRelayStore;Ljava/lang/String;JILkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -8337,6 +8338,7 @@ public final class com/letta/mobile/data/canvas/FileCanvasRelayStore : com/letta
 	public fun <init> (Ljava/nio/file/Path;)V
 	public fun append (Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasOp;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun bind (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun boundCanvas (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun head (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readAfter (Ljava/lang/String;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -8375,11 +8377,12 @@ public final class com/letta/mobile/data/canvas/HostCanvasAccess$Granted : com/l
 }
 
 public final class com/letta/mobile/data/canvas/HostCanvasBackend {
-	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasRelayHost;Lcom/letta/mobile/data/canvas/CanvasRelayStore;Lcom/letta/mobile/data/canvas/HostCanvasDirectory;Lkotlin/jvm/functions/Function0;JLcom/letta/mobile/data/canvas/plugin/PluginKindCatalog;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasRelayHost;Lcom/letta/mobile/data/canvas/CanvasRelayStore;Lcom/letta/mobile/data/canvas/HostCanvasDirectory;Lkotlin/jvm/functions/Function0;JLcom/letta/mobile/data/canvas/plugin/PluginKindCatalog;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasRelayHost;Lcom/letta/mobile/data/canvas/CanvasRelayStore;Lcom/letta/mobile/data/canvas/HostCanvasDirectory;Lkotlin/jvm/functions/Function0;JLcom/letta/mobile/data/canvas/plugin/PluginKindCatalog;Lcom/letta/mobile/data/canvas/HostCanvasMountLookup;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/CanvasRelayHost;Lcom/letta/mobile/data/canvas/CanvasRelayStore;Lcom/letta/mobile/data/canvas/HostCanvasDirectory;Lkotlin/jvm/functions/Function0;JLcom/letta/mobile/data/canvas/plugin/PluginKindCatalog;Lcom/letta/mobile/data/canvas/HostCanvasMountLookup;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun check (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lcom/letta/mobile/data/canvas/HostCanvasEntry;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun conversation-oKnGafo (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun create (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun currentCanvas (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun list (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun open (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun ownConversation (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -8474,6 +8477,43 @@ public final synthetic class com/letta/mobile/data/canvas/HostCanvasEntry$$seria
 
 public final class com/letta/mobile/data/canvas/HostCanvasEntry$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/HostCanvasMount {
+}
+
+public final class com/letta/mobile/data/canvas/HostCanvasMount$Mounted : com/letta/mobile/data/canvas/HostCanvasMount {
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/HostCanvasMount$Mounted;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/HostCanvasMount$Mounted;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/HostCanvasMount$Mounted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvas ()Lcom/letta/mobile/data/model/CanvasId;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/HostCanvasMount$None : com/letta/mobile/data/canvas/HostCanvasMount {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/HostCanvasMount$None;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/HostCanvasMount$Unavailable : com/letta/mobile/data/canvas/HostCanvasMount {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/HostCanvasMount$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/HostCanvasMountLookup {
+	public static final field Companion Lcom/letta/mobile/data/canvas/HostCanvasMountLookup$Companion;
+	public abstract fun mounted (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/HostCanvasMountLookup$Companion {
+	public final fun getNone ()Lcom/letta/mobile/data/canvas/HostCanvasMountLookup;
 }
 
 public abstract interface class com/letta/mobile/data/canvas/HostCanvasPublish {
@@ -8588,6 +8628,7 @@ public final class com/letta/mobile/data/canvas/InMemoryCanvasRelayStore : com/l
 	public fun <init> ()V
 	public fun append (Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasOp;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun bind (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun boundCanvas (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun head (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readAfter (Ljava/lang/String;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -10865,6 +10906,44 @@ public final class com/letta/mobile/data/canvas/mount/CanvasMountScope$Conversat
 	public final fun getConversation-nFOXY6g ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/mount/wire/CanvasMountWire {
+	public static final field AGENT_ID Ljava/lang/String;
+	public static final field BIND Ljava/lang/String;
+	public static final field BOUND Ljava/lang/String;
+	public static final field CANVAS_ID Ljava/lang/String;
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field CONVERSATION_ID Ljava/lang/String;
+	public static final field DEFAULT_SET Ljava/lang/String;
+	public static final field DENIED Ljava/lang/String;
+	public static final field DURABILITY Ljava/lang/String;
+	public static final field DURABLE Ljava/lang/String;
+	public static final field ENTRY_UNCONFIRMED Ljava/lang/String;
+	public static final field EVENT_TYPE Ljava/lang/String;
+	public static final field FOUND Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/mount/wire/CanvasMountWire;
+	public static final field INVALID_INPUT_PREFIX Ljava/lang/String;
+	public static final field NONE Ljava/lang/String;
+	public static final field OUTCOME_UNKNOWN Ljava/lang/String;
+	public static final field READ_CAPABILITY Ljava/lang/String;
+	public static final field REASON Ljava/lang/String;
+	public static final field REASON_AUTHORITY Ljava/lang/String;
+	public static final field REASON_IDENTITY Ljava/lang/String;
+	public static final field REASON_STORAGE Ljava/lang/String;
+	public static final field REASON_TIMEOUT_BEFORE_COMMIT Ljava/lang/String;
+	public static final field REPLACE Ljava/lang/String;
+	public static final field REPLACED Ljava/lang/String;
+	public static final field RESOLVE Ljava/lang/String;
+	public static final field SET_DEFAULT Ljava/lang/String;
+	public static final field SOURCE Ljava/lang/String;
+	public static final field SOURCE_BINDING Ljava/lang/String;
+	public static final field SOURCE_DEFAULT Ljava/lang/String;
+	public static final field STATUS Ljava/lang/String;
+	public static final field UNAVAILABLE Ljava/lang/String;
+	public static final field WON Ljava/lang/String;
+	public static final field WRITE_CAPABILITY Ljava/lang/String;
+	public final fun getMETHODS ()Ljava/util/Set;
 }
 
 public final class com/letta/mobile/data/canvas/names/CanvasToolNames {
@@ -18730,11 +18809,12 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyTranspor
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcHostServices {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBeadsBaseUrl ()Ljava/lang/String;
 	public final fun getBeadsRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getBeadsTokenFile ()Ljava/lang/String;
+	public final fun getCanvasMountRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getController ()Lcom/letta/mobile/data/controller/AppServerController;
 	public final fun getPluginRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getSubagentRegistrySource ()Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;
@@ -19047,6 +19127,15 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Conve
 	public abstract fun broadcast (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public abstract interface class com/letta/mobile/data/controller/node/iroh/ConversationViewers {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/ConversationViewers$Companion;
+	public abstract fun viewersOf-1iDlvEA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/ConversationViewers$Companion {
+	public final fun getNone ()Lcom/letta/mobile/data/controller/node/iroh/ConversationViewers;
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/EphemeralIrohSecretKeyStore : com/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore {
 	public fun <init> ()V
 	public fun loadOrCreate (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -19349,6 +19438,7 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public final fun connect (Lcomputer/iroh/EndpointAddr;[BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun conversationActivityTarget ()Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeTarget;
 	public final fun conversationChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeTarget;
+	public final fun conversationViewers ()Lcom/letta/mobile/data/controller/node/iroh/ConversationViewers;
 	public final fun create (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getAdminRpcRouter ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
 	public final fun nodeIdHex ()Ljava/lang/String;
@@ -19484,6 +19574,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohPeerCapabiliti
 	public static final field ADMIN_FULL Ljava/lang/String;
 	public static final field BEADS_READ Ljava/lang/String;
 	public static final field BEADS_WRITE Ljava/lang/String;
+	public static final field CANVAS_MOUNT_READ Ljava/lang/String;
+	public static final field CANVAS_MOUNT_WRITE Ljava/lang/String;
 	public static final field CHAT_READ Ljava/lang/String;
 	public static final field CHAT_SEND Ljava/lang/String;
 	public static final field CONVERSATION_MANAGE Ljava/lang/String;
@@ -20169,6 +20261,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ViewerHandle {
+	public fun adminContextFor (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
 	public abstract fun getConnectionId ()Ljava/lang/String;
 	public fun receivesAgentEvents ()Z
 	public fun receivesConversationActivity-qkT7gGE (Ljava/lang/String;)Z
@@ -20177,6 +20270,7 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/ViewerHandle$DefaultImpls {
+	public static fun adminContextFor (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
 	public static fun receivesAgentEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
 	public static fun receivesConversationActivity-qkT7gGE (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;Ljava/lang/String;)Z
 	public static fun receivesConversationEvents (Lcom/letta/mobile/data/controller/node/iroh/ViewerHandle;)Z
@@ -20299,6 +20393,44 @@ public final class com/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes 
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/beads/BeadsRoutes;
 	public final fun getReads ()Ljava/util/Map;
 	public final fun getWrites ()Ljava/util/Map;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountCatalog {
+	public fun <init> (Lcom/letta/mobile/data/canvas/HostCanvasDirectory;Lcom/letta/mobile/data/canvas/CanvasRelayStore;)V
+}
+
+public abstract interface class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory$Companion;
+	public abstract fun hasAgent-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun ownerOf-j8v1v1I (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory$Companion {
+	public final fun appServer (Lcom/letta/mobile/data/transport/appserver/AppServerClient;)Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountRoutes : com/letta/mobile/data/controller/node/iroh/AdminRpcRoutes {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountStoreLocation;Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountSources;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;)V
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountSources {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountCatalog;Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory;Lcom/letta/mobile/data/controller/node/iroh/ConversationViewers;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountCatalog;Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory;Lcom/letta/mobile/data/controller/node/iroh/ConversationViewers;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCatalog ()Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountCatalog;
+	public final fun getDirectory ()Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountDirectory;
+	public final fun getViewers ()Lcom/letta/mobile/data/controller/node/iroh/ConversationViewers;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountStoreLocation {
+	public synthetic fun <init> (Ljava/nio/file/Path;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getHostId-VGA35RE ()Ljava/lang/String;
+	public final fun getProductStateDirectory ()Ljava/nio/file/Path;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountToolLookup : com/letta/mobile/data/canvas/HostCanvasMountLookup {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountStoreLocation;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun mounted (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/records/FileWrapperRecordStore : com/letta/mobile/data/controller/node/iroh/records/WrapperRecordStore {
