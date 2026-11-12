@@ -90,7 +90,7 @@ internal fun PagedTimelineList(params: PagedTimelineParams, modifier: Modifier =
 @Composable
 private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier) {
     val presentation = params.presentation
-    val queued = params.state.sendQueue
+    val queued = remember(params.state.sendQueue) { params.state.queuedPromptIdentities() }
     val visibleSettled = remember(presentation, queued) {
         presentation.settled.map { page -> page.filter { !queued.containsQueuedPrompt(it.item) } }
     }

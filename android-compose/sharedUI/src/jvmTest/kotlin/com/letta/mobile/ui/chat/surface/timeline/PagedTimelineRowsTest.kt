@@ -13,6 +13,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.data.timeline.TimelineMessageId
 import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -24,11 +25,12 @@ class PagedTimelineRowsTest {
     fun heldAndServerQueuedPromptsHaveOnlyTheirQueueRepresentation() {
         val send = QueuedChatSend(QueuedSendId("held-prompt"), QueueConversationId("conv-held"), "waiting input")
         val local = UiMessage("local-row", "user", "waiting input", "", clientMessageId = send.id.value)
-        val held = ConversationSendQueue(items = listOf(send), heldByOtherClient = true)
-        val parked = ConversationSendQueue(queuedOnServer = send)
+        val held = ChatUiState(sendQueue = ConversationSendQueue(items = listOf(send), heldByOtherClient = true))
+            .queuedPromptIdentities()
+        val parked = ChatUiState(sendQueue = ConversationSendQueue(queuedOnServer = send)).queuedPromptIdentities()
         assertTrue(held.containsQueuedPrompt(local), "held optimistic prompt must not also draw a transcript bubble")
         assertTrue(parked.containsQueuedPrompt(local), "server-queued optimistic prompt must stay in the queue panel only")
-        assertFalse(ConversationSendQueue().containsQueuedPrompt(local), "dispatch restores the transcript bubble")
+        assertFalse(ChatUiState().queuedPromptIdentities().containsQueuedPrompt(local), "dispatch restores the transcript bubble")
         assertFalse(held.containsQueuedPrompt(local.copy(clientMessageId = "different-prompt")))
         assertFalse(held.containsQueuedPrompt(local.copy(role = "assistant")))
     }
