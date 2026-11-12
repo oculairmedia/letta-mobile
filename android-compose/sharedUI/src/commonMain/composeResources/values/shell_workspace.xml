@@ -17,7 +17,6 @@
     <string name="shell_canvas_current_state">Shown on this conversation’s board</string>
     <string name="shell_canvas_use_own">Use this conversation’s own canvas</string>
     <string name="shell_canvas_new">New canvas</string>
-    <string name="shell_canvas_jump">Canvases</string>
     <string name="shell_canvas_jump_description">Jump to canvases</string>
     <string name="shell_canvas_mount_denied">This device can’t switch this conversation’s canvas.</string>
     <string name="shell_canvas_mount_invalid">That canvas can’t be used here.</string>

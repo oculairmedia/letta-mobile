@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,14 +11,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import com.composables.icons.lucide.ArrowDown
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Undo2
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.shell_canvas_jump
 import com.letta.mobile.sharedui.resources.shell_canvas_jump_description
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_denied
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_invalid
@@ -123,12 +119,15 @@ internal fun NewCanvasButton(onNewCanvas: () -> Unit) {
     }
 }
 
-/** Beside the chats' filter: jumps down the one list to its Canvases section. */
+/**
+ * Beside the chats' filter: jumps down the one list to its Canvases section. An icon, not a
+ * label: in a narrow sidebar a label wrapped letter by letter and stretched the filter row.
+ */
 @Composable
 internal fun CanvasJumpButton(onJump: () -> Unit) {
     val description = stringResource(Res.string.shell_canvas_jump_description)
-    TextButton(onClick = onJump, modifier = Modifier.testTag(ShellCanvasTags.JUMP).semantics { contentDescription = description }) {
-        Text(stringResource(Res.string.shell_canvas_jump), style = MaterialTheme.typography.labelMedium)
+    IconButton(onClick = onJump, modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(ShellCanvasTags.JUMP)) {
+        Icon(Lucide.ArrowDown, contentDescription = description, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
