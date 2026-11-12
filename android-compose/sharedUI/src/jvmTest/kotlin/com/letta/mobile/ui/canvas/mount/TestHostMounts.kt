@@ -12,9 +12,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 
-/** A host's mounts in memory for UI tests; [refusal] answers the next writes instead. */
+/** A host's mounts in memory for UI tests; [refusal] answers the next writes instead; [support] flips the host's offer. */
 internal class TestHostMounts(supported: Boolean = true) : CanvasMountClient {
-    override val supported: StateFlow<Boolean> = MutableStateFlow(supported)
+    val support = MutableStateFlow(supported)
+    override val supported: StateFlow<Boolean> get() = support
     val stored = mutableMapOf<ConversationCanvasTarget, CanvasId>()
     var refusal: CanvasMountProblem? = null
 

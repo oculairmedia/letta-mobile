@@ -10,13 +10,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runComposeUiTest
+import com.letta.mobile.data.canvas.mount.client.CanvasMountClient
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver
 import com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget
+import com.letta.mobile.data.canvas.mount.client.DeviceFallbackCanvasMountClient
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -44,6 +47,32 @@ class ConversationCanvasFrameTest {
 
         onBoard = false
         waitForIdle()
+        assertNull(picker.focus.current.value)
+        // Chat mode: the page is still on screen, so a pick still mounts on this conversation.
+        assertEquals(target, picker.focus.onScreen.value)
+    }
+
+    @Test
+    fun aDeviceMountSwapsTheBoardInPlaceAndLeavingThePageClearsTheFocus() = runComposeUiTest {
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(DeviceFallbackCanvasMountClient(CanvasMountClient.Unsupported)))
+        var showing by mutableStateOf(true)
+        setContent {
+            ProvideConversationCanvasPicker(picker) {
+                CompositionLocalProvider(LocalChatCanvasOnBoard provides true) {
+                    if (showing) ConversationCanvasFrame(target) { shown -> Text(shown?.value ?: OWN) }
+                }
+            }
+        }
+        waitForIdle()
+        onNodeWithText(OWN).assertExists()
+
+        runBlocking { picker.pick(mounted) }
+        waitForIdle()
+        onNodeWithText(mounted.value).assertExists()
+
+        showing = false
+        waitForIdle()
+        assertNull(picker.focus.onScreen.value)
         assertNull(picker.focus.current.value)
     }
 
