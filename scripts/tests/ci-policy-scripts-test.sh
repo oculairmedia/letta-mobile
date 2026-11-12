@@ -292,7 +292,26 @@ perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
 assert_contains "$perf_workflow" '- "feat/**"'
 assert_contains "$perf_workflow" '- "cursor/**"'
 assert_contains "$perf_workflow" '- "codex/**"'
-assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
+assert_contains "$perf_workflow" 'cache-read-only: true'
+
+# Required Gradle caches belong to main, never ephemeral PR merge refs.
+# Keep job-scoped snapshots: setup-gradle deduplicates their shared artifacts.
+while IFS= read -r setup_block; do
+  assert_contains "$setup_block" 'cache-read-only: ${{ github.event_name == '\''pull_request'\'' || github.ref != '\''refs/heads/main'\'' }}'
+  assert_contains "$setup_block" 'cache-cleanup: on-success'
+done < <(awk '/uses: gradle\/actions\/setup-gradle@/ { block=$0; active=1; next }
+  active && /^      - / { gsub(/\n/, "|", block); print block; active=0 }
+  active { block=block "\n" $0 }
+  END { if (active) { gsub(/\n/, "|", block); print block } }' "$android_workflow")
+
+for optional_workflow in desktop android-perf iroh-probe pagination-replay-fuzz; do
+  optional_text="$(<"$SOURCE_ROOT/.github/workflows/$optional_workflow.yml")"
+  setup_count="$(grep -c 'uses: gradle/actions/setup-gradle@' <<<"$optional_text")"
+  readonly_count="$(grep -c 'cache-read-only: true' <<<"$optional_text")"
+  assert_eq "$readonly_count" "$setup_count"
+done
+embedded_workflow="$(<"$SOURCE_ROOT/.github/workflows/embedded-runtime-node18.yml")"
+assert_contains "$embedded_workflow" 'cache-read-only: ${{ github.event_name == '\''pull_request'\'' }}'
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'
 assert_not_contains "$perf_workflow" '  macrobenchmark:'
