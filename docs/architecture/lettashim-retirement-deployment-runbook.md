@@ -649,15 +649,21 @@ on either side (including old-format records) retains the one-hour `restart_unob
 uncertainty bound; this fallback can still cancel a live entirely silent worker. Installing
 the PID-file integration cannot retrospectively prove ownership of old records. A new
 App Server generation is distinguished from the wrapper's local connection generation.
+The provider is sampled again for every observation under the registry lock: Requires=
+does not guarantee that an App Server failure stops the wrapper. New records use the
+observation-time identity even if the App Server was replaced under a live wrapper.
+An accepted observation backfills a legacy null identity, never a populated identity;
+a later wrapper restart can then use known-identity protection instead of renewing the
+uncertainty bound. Startup reconciliation retains its own startup identity snapshot.
 
 Before the first approved rollout, preserve the old wrapper unit and release target
 (the guard deliberately refuses to overwrite a prior rollback capture):
 
 ```bash
-sudo test ! -e /etc/meridian/rollback-52vxf
-sudo test ! -e /etc/systemd/system/meridian-appserver.service.d/process-identity.conf
-sudo install -d -m 0700 /etc/meridian/rollback-52vxf
-sudo cp -a /etc/systemd/system/meridian-iroh-wrapper.service /etc/meridian/rollback-52vxf/wrapper.service
+sudo test ! -e /etc/meridian/rollback-52vxf &&
+sudo test ! -e /etc/systemd/system/meridian-appserver.service.d/process-identity.conf &&
+sudo install -d -m 0700 /etc/meridian/rollback-52vxf &&
+sudo cp -a /etc/systemd/system/meridian-iroh-wrapper.service /etc/meridian/rollback-52vxf/wrapper.service &&
 sudo sh -c 'readlink -f /opt/meridian/iroh-wrapper/current > /etc/meridian/rollback-52vxf/release'
 ```
 

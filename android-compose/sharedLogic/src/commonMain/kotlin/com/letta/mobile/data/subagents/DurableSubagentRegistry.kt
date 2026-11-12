@@ -49,14 +49,17 @@ class DurableSubagentRegistry(
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** How long a live chip may go unobserved; see [staleRunningChips]. */
     private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
-    /** Host-local proof; unknown on remote or unsupported hosts. Captured once at registry startup. */
-    processIdentity: AppServerProcessIdentity = AppServerProcessIdentity { null },
+    /** Host-local proof, sampled at startup and each observation; unknown on unsupported hosts. */
+    private val processIdentity: AppServerProcessIdentity = AppServerProcessIdentity { null },
 ) {
     internal val supportsDurableDismissal: Boolean = store.durable
     private val lock = SynchronizedObject()
     private val snapshotAbsence = SubagentSnapshotAbsence()
     private val startedAtEpochMs = clock()
-    private val currentProcessIdentity = runCatching { processIdentity.current() }.getOrNull()?.takeIf { it.isNotBlank() }
+    private val startupProcessIdentity = readProcessIdentity()
+
+    private fun readProcessIdentity(): String? =
+        runCatching { processIdentity.current() }.getOrNull()?.takeIf { it.isNotBlank() }
     private var startupRetired = emptyList<SubagentChipRecord>()
     // Connection generations are local counters, not App Server process identities.
     // Only records loaded at startup get this uncertainty bound; a sighting removes it.
@@ -92,7 +95,7 @@ class DurableSubagentRegistry(
                 if (record.terminalReason == "restart_unobserved") "restart.unobserved" else "ttl.expired",
                 "reason" attr record.terminalReason,
                 "previousAppServerGeneration" attr (record.appServerProcessIdentity ?: "unknown"),
-                "currentAppServerGeneration" attr (currentProcessIdentity ?: "unknown"),
+                "currentAppServerGeneration" attr (startupProcessIdentity ?: "unknown"),
                 "conversationId" attr record.conversationId,
                 "toolCallId" attr record.toolCallId,
                 "subagentType" attr record.subagentType,
@@ -104,7 +107,7 @@ class DurableSubagentRegistry(
     }
 
     private fun retirePreviousProcess() {
-        val current = currentProcessIdentity ?: return
+        val current = startupProcessIdentity ?: return
         startupRetired = synchronized(lock) {
             entries.values.filter {
                 !it.state.isTerminal && it.appServerProcessIdentity != null && it.appServerProcessIdentity != current
@@ -175,7 +178,7 @@ class DurableSubagentRegistry(
             entries.clear()
             loaded.forEach { entries[it.key] = it }
             restartUnobserved.addAll(loaded.filter {
-                !it.state.isTerminal && (currentProcessIdentity == null || it.appServerProcessIdentity == null)
+                !it.state.isTerminal && (startupProcessIdentity == null || it.appServerProcessIdentity == null)
             }.map { it.key })
         }
         if (loaded.isNotEmpty()) {
@@ -251,8 +254,9 @@ class DurableSubagentRegistry(
 
     private fun observeLocked(observation: SubagentChipObservation): ObserveResult {
         val now = clock()
+        val observedProcessIdentity = readProcessIdentity()
         val existing = entries[observation.key]
-            ?: return ObserveResult.Accepted(insertLocked(observation, now))
+            ?: return ObserveResult.Accepted(insertLocked(observation, now, observedProcessIdentity))
 
         // letta-mobile-7vs4s: precedence is checked BEFORE the lifecycle edge so
         // a stale weak source can neither advance nor rewind a strong fact.
@@ -265,7 +269,9 @@ class DurableSubagentRegistry(
             return ObserveResult.IllegalTransition(existing, observation)
         }
 
-        val merged = existing.mergedWith(observation, now)
+        val merged = existing.mergedWith(observation, now).copy(
+            appServerProcessIdentity = existing.appServerProcessIdentity ?: observedProcessIdentity,
+        )
         entries[observation.key] = merged
         // Any accepted sighting, even from an incomplete snapshot, is positive evidence of life.
         snapshotAbsence.seen(observation.key)
@@ -281,7 +287,11 @@ class DurableSubagentRegistry(
         return ObserveResult.Accepted(merged)
     }
 
-    private fun insertLocked(observation: SubagentChipObservation, now: Long): SubagentChipRecord {
+    private fun insertLocked(
+        observation: SubagentChipObservation,
+        now: Long,
+        observedProcessIdentity: String?,
+    ): SubagentChipRecord {
         val record = SubagentChipRecord(
             conversationId = observation.conversationId,
             agentId = observation.agentId,
@@ -304,7 +314,7 @@ class DurableSubagentRegistry(
             todos = observation.todos,
             todoRevision = observation.todoRevision,
             lastActivityEpochMs = now,
-            appServerProcessIdentity = currentProcessIdentity,
+            appServerProcessIdentity = observedProcessIdentity,
         )
         entries[observation.key] = record
         enforceCapacityLocked()

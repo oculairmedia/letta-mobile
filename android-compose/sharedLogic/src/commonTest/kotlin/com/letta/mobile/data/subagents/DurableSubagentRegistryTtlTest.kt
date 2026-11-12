@@ -82,6 +82,42 @@ class DurableSubagentRegistryTtlTest {
     }
 
     @Test
+    fun serverReplacementDuringWrapperLifetimeUsesObservationTimeIdentity() {
+        val store = InMemorySubagentRegistryStore()
+        var identity = "boot:20:100"
+        val provider = AppServerProcessIdentity { identity }
+        val reg = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        reg.observe(running("before-replacement"))
+        identity = "boot:20:200"
+        reg.observe(running("after-replacement"))
+        assertEquals(identity, reg.findByToolCall("conv-a", "after-replacement")?.appServerProcessIdentity)
+        reg.observe(running("before-replacement"))
+        assertEquals("boot:20:100", reg.findByToolCall("conv-a", "before-replacement")?.appServerProcessIdentity)
+        val restarted = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "after-replacement")?.state)
+        assertEquals("app_server_restarted", restarted.findByToolCall("conv-a", "before-replacement")?.terminalReason)
+    }
+
+    @Test
+    fun legacyObservationBackfillsIdentityAndNextRestartKeepsSixHourBound() {
+        val store = InMemorySubagentRegistryStore()
+        registry(store).observe(running("tool-legacy"))
+        var identity = "boot:20:100"
+        val provider = AppServerProcessIdentity { identity }
+        val reg = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        assertNull(reg.findByToolCall("conv-a", "tool-legacy")?.appServerProcessIdentity)
+        identity = "boot:20:200"
+        reg.observe(running("tool-legacy"))
+        assertEquals(identity, store.load().single().appServerProcessIdentity)
+        val restarted = DurableSubagentRegistry(store = store, clock = { now }, processIdentity = provider)
+        now += 61 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-legacy")?.state)
+        now += DurableSubagentRegistry.STALE_RUNNING_AFTER_MS
+        assertEquals("stale", restarted.expireStale().single().terminalReason)
+    }
+
+    @Test
     fun processIdentityRoundTripsAndLegacyJsonDefaultsToUnknown() {
         val reg = restartWithIdentity("boot:20:100", "boot:20:100")
         val record = requireNotNull(reg.findByToolCall("conv-a", "tool-process"))
