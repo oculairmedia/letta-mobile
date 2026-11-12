@@ -151,7 +151,8 @@ class SharedNoteBrowserTest {
         assertTrue(overlapping.state.value.loading, "a cancelled refresh does not end the one still waiting")
         gated.answer(3, SharedNoteListing.Listed(listOf(SharedNote(NOTE, "Plan"))))
         second.join()
-        assertEquals(SharedNoteListing.Listed(listOf(SharedNote(NOTE, "Plan"))), overlapping.state.value.listing, "the latest one asked wins")
+        val latest = SharedNoteListing.Listed(listOf(SharedNote(NOTE, "Plan")))
+        assertEquals(latest, overlapping.state.value.listing, "the latest one asked wins")
         assertFalse(overlapping.state.value.loading)
     }
 
