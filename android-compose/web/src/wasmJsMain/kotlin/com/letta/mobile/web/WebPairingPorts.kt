@@ -9,6 +9,7 @@ import com.letta.mobile.data.pairing.composition.RelayPairingNetwork
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.qr.PortableQrEncoder
 import com.letta.mobile.ui.pairing.AgentChoice
 import com.letta.mobile.ui.pairing.composition.PairingShellPorts
 import com.letta.mobile.web.data.RelayInviteAuthenticator
@@ -21,8 +22,8 @@ import kotlin.time.Clock
  * letta-mobile-wisqe S1b: what the browser owns for pairing. Its persistent Iroh identity (S1a,
  * `iroh-identity.js` through `index.html`), the relay as its only network, the web backend as the
  * paired host's home, and the live session's admin_rpc; the card and everything it runs are built
- * by shared code ([com.letta.mobile.ui.pairing.composition.installAndPairBindings]). The browser
- * has no QR encoder, so invite links are shown and copied as text.
+ * by shared code ([com.letta.mobile.ui.pairing.composition.installAndPairBindings]). Invite codes
+ * are drawn by the common [PortableQrEncoder], the same encoder as the other targets.
  */
 internal class WebPairingPorts(
     private val backend: WebBackend,
@@ -39,8 +40,7 @@ internal class WebPairingPorts(
 
     override val deviceName: String = "Browser"
 
-    /** The browser draws no QR codes: a freshly minted code is shown and copied as its link (letta-mobile-wisqe). */
-    override val qrEncoder: QrEncoder = QrEncoder.Unavailable
+    override val qrEncoder: QrEncoder = PortableQrEncoder
 
     override fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
 

@@ -16,15 +16,15 @@ class QrModules(val size: Int, private val dark: (row: Int, col: Int) -> Boolean
 
 /**
  * Platform port: render text as a QR grid (zxing on JVM/Android); throws if it cannot fit. A platform
- * that draws no QR codes at all uses [Unavailable], which answers null: the invite is then shown and
- * shared as its link text instead (letta-mobile-wisqe).
+ * that draws no QR codes at all uses [Unavailable], which answers null, so the inviter still gets a
+ * usable invite: it is shown and shared as its link text instead of failing after the host minted it.
  */
 fun interface QrEncoder {
     /** The grid for [content], or null when this platform has no QR encoder. */
     fun encode(content: String): QrModules?
 
     companion object {
-        /** No QR encoder on this platform (the browser today): every code is shown as its link. */
+        /** No QR encoder on this platform: every code is shown as its link. */
         val Unavailable: QrEncoder = QrEncoder { null }
     }
 }

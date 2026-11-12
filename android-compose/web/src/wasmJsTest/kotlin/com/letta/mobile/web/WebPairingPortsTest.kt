@@ -7,16 +7,18 @@ import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.web.data.WebPairedHostStore
 import com.letta.mobile.web.data.WebSettingsStore
 import kotlin.test.Test
-import kotlin.test.assertNull
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
-/** letta-mobile-wisqe: the browser has no QR encoder, so it says so instead of throwing after the host minted a code. */
+/** The browser draws a freshly minted invite as a QR grid with the portable encoder. */
 class WebPairingPortsTest {
     @Test
-    fun theBrowserReportsNoQrInsteadOfThrowing() {
+    fun theBrowserDrawsTheInviteAsAQrGrid() {
         val config = LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "", accessToken = null)
         val hostStore = WebPairedHostStore(mutableStateOf(config), WebSettingsStore(InMemorySecureSettingsStore()))
         val ports = WebPairingPorts(WebBackend(config), ShellWorkspaceState(), hostStore, adminRpc = null)
 
-        assertNull(ports.qrEncoder.encode("meridian://pair?qr=letta-qr-v1.x"))
+        val grid = assertNotNull(ports.qrEncoder.encode("meridian://pair?qr=letta-qr-v1.x"))
+        assertTrue(grid.size >= 21, "a QR grid is at least version 1 (21x21), was ${grid.size}")
     }
 }
