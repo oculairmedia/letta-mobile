@@ -62,6 +62,9 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
         }
     }
 
+    /** Closes the ear for good, waiting (bounded) for it to let go; null when it has (or none was open). */
+    suspend fun close(): LoopInput? = job?.let { release(it) }
+
     /** Tells the ear whether the app's own speech is playing, on change. */
     fun reportOutput(model: LoopModel): LoopInput? {
         if (model.outputActive == outputHint) return null
@@ -87,7 +90,8 @@ internal class EarSupervisor(private val wiring: LoopWiring) {
         }
         val clean = withTimeoutOrNull(wiring.config.releaseTimeout) {
             running.join()
-            releasedCleanly?.await() ?: true
+            // An ear job cancelled before it ever ran never opened the ear: nothing to release.
+            releasedCleanly?.takeIf { it.isCompleted }?.await() ?: true
         }
         if (clean != true) return wiring.unresponsive(VoicePort.EAR)
         job = null

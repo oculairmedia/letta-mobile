@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -11,9 +12,13 @@ import kotlinx.coroutines.test.runCurrent
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/** A loop over scripted fakes on the test scheduler. */
+/** A loop over scripted fakes on the test scheduler, owned by [owner] (the test's background scope by default). */
 @OptIn(ExperimentalCoroutinesApi::class)
-internal class LoopHarness(private val test: TestScope, config: VoiceLoopConfig = VoiceLoopConfig()) {
+internal class LoopHarness(
+    private val test: TestScope,
+    config: VoiceLoopConfig = VoiceLoopConfig(),
+    owner: CoroutineScope = test.backgroundScope,
+) {
     val log = EngineLog()
     val ear = FakeEar(log)
     val mouth = FakeMouth(log)
@@ -24,7 +29,7 @@ internal class LoopHarness(private val test: TestScope, config: VoiceLoopConfig 
     val loop = VoiceLoop(
         VoiceEngines(ear, responder, mouth),
         config,
-        VoiceLoopRuntime(test.backgroundScope, StandardTestDispatcher(test.testScheduler), clock),
+        VoiceLoopRuntime(owner, StandardTestDispatcher(test.testScheduler), clock),
     )
 
     val state: VoiceLoopState get() = loop.state.value

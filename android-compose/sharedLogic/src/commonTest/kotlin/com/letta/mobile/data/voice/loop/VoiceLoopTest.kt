@@ -24,9 +24,12 @@ import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -476,6 +479,33 @@ class VoiceLoopTest {
         assertEquals(1, h.responder.last.cancels)
         assertFalse(h.ear.listening)
         assertEquals(VoicePhase.IDLE, h.state.phase)
+    }
+
+    @Test
+    fun shutdownAfterTheOwnerScopeEndedStillStopsPlaybackAndTheAnswer() = runTest {
+        val owner = backgroundScope + Job(backgroundScope.coroutineContext[Job])
+        val h = LoopHarness(this, owner = owner)
+        h.speaking()
+        owner.cancel()
+        h.settle()
+        h.loop.shutdown()
+        h.loop.shutdown()
+        assertEquals(1, h.mouth.stops)
+        assertEquals(1, h.responder.last.cancels)
+        assertFalse(h.ear.listening)
+        assertEquals(VoicePhase.IDLE, h.state.phase)
+    }
+
+    @Test
+    fun noLoopCoroutineOutlivesShutdown() = runTest {
+        val ownerJob = Job(backgroundScope.coroutineContext[Job])
+        val h = LoopHarness(this, owner = backgroundScope + ownerJob)
+        h.speaking()
+        assertTrue(ownerJob.children.any())
+        h.loop.shutdown()
+        assertEquals(emptyList(), ownerJob.children.toList())
+        assertEquals(1, h.mouth.stops)
+        assertEquals(1, h.responder.last.cancels)
     }
 
     @Test

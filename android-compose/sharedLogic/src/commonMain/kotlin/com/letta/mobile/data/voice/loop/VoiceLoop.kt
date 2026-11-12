@@ -15,7 +15,9 @@ import com.letta.mobile.data.voice.loop.machine.VoiceLoopMachine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +26,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * The hands-free voice loop: listen, send the utterance, speak the answer, listen again.
@@ -77,6 +82,8 @@ class VoiceLoop(
     private val mutableState = MutableStateFlow(VoiceLoopState(phaseSince = runtime.clock.now()))
     private val closing = MutableStateFlow(false)
     private var terminated = false
+    private var released = false
+    private val shutdownLock = Mutex()
     private val processor: Job = scope.launch { for (input in inputs) process(input) }
 
     /** The loop's state, for a page and the avatar. */
@@ -132,22 +139,33 @@ class VoiceLoop(
     }
 
     /**
-     * Stops everything, waits until the stop has been applied and every engine has let go (each
-     * wait bounded by the release budget), then ends the loop's coroutines. Prefer this to [close].
-     * From the moment it is called, activations and retries are ignored, and inputs still queued
-     * behind the stop have no effect. It also returns if the processing coroutine has ended.
+     * Stops everything and ends the loop. Before it returns: playback is stopped, every answer is
+     * cancelled through the responder (which stops its server-side run, or leaves a pending stop for
+     * a run that has not started yet), the ear is closed, each wait bounded by the release budget,
+     * and then every coroutine the loop started has completed. Prefer this to [close].
+     *
+     * Safe from any state and more than once: the release runs once; when the processing coroutine
+     * has already ended (the owner's scope was cancelled, or [close] was called) it runs in the
+     * caller instead. It finishes even if the caller is cancelled meanwhile. From the moment it is
+     * called, activations and retries are ignored, and inputs still queued behind the stop have no
+     * effect. Do not call it from a coroutine the loop started.
      */
-    suspend fun shutdown() {
+    suspend fun shutdown(): Unit = withContext(NonCancellable) {
         closing.value = true
         val done = CompletableDeferred<Unit>()
         if (inputs.trySend(LoopInput.Stop(done = done)).isSuccess) {
             processor.invokeOnCompletion { done.complete(Unit) }
             done.await()
         }
-        close()
+        shutdownLock.withLock { if (!released) releaseOrphaned() }
+        inputs.close()
+        job.cancelAndJoin()
     }
 
-    /** Ends the loop's coroutines at once, without releasing the engines; use [shutdown] for an orderly end. */
+    /**
+     * Ends the loop's coroutines at once, without releasing the engines: playback and answers may
+     * go on. Use [shutdown] for an orderly end (it also works after this).
+     */
     fun close() {
         job.cancel()
         inputs.close()
@@ -170,9 +188,23 @@ class VoiceLoop(
             val step = VoiceLoopMachine.reduce(model, input)
             model = step.model
             pending += runner.apply(step)
+            if (input.isTerminalStop()) pending += runner.releaseAll().also { released = true }
         }
         publish()
         acknowledgements.forEach { it.complete(Unit) }
+    }
+
+    /**
+     * The release for a loop whose processing coroutine ended before applying the terminal stop:
+     * runs in the caller once that coroutine has completed, so nothing else touches the runner.
+     */
+    private suspend fun releaseOrphaned() {
+        processor.join()
+        terminated = true
+        val stopped = VoiceLoopMachine.reduce(model, LoopInput.Stop()).model
+        released = true
+        model = runner.releaseAll().fold(stopped) { current, fault -> VoiceLoopMachine.reduce(current, fault).model }
+        publish()
     }
 
     /** Stale ear events, and everything but stops and faults after the terminal stop, change nothing. */
@@ -189,6 +221,9 @@ class VoiceLoop(
     }
 
 }
+
+/** The stop [VoiceLoop.shutdown] sends: after it the loop releases every engine and accepts only stops and faults. */
+private fun LoopInput.isTerminalStop(): Boolean = this is LoopInput.Stop && done != null
 
 /** Feeds an engine's events to the loop; an event stream that fails becomes a fault for [port]. */
 private suspend fun <T> SendChannel<LoopInput>.forward(events: Flow<T>, port: VoicePort, input: (T) -> LoopInput) {

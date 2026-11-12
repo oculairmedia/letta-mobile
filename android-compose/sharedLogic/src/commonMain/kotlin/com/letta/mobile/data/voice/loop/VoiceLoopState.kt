@@ -59,7 +59,7 @@ data class VoiceEngines(
 
 /** Where the loop runs: the owner's [scope], the [dispatcher] it serialises on and its [clock]. */
 data class VoiceLoopRuntime(
-    /** The lifecycle owner's scope; cancelling it ends the loop. */
+    /** The lifecycle owner's scope; cancelling it ends the loop without releasing the engines (call shutdown for that). */
     val scope: CoroutineScope,
     /** The dispatcher the loop's coroutines run on. */
     val dispatcher: CoroutineDispatcher,

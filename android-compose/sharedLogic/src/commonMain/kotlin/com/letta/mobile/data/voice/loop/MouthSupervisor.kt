@@ -14,15 +14,19 @@ import kotlinx.coroutines.withTimeoutOrNull
  * throws is not a release either: the mouth stays held and the next attempt starts a new stop.
  * While held, nothing is spoken, the microphone is not opened, and every attempt reports
  * UNRESPONSIVE (the code the loop uses for "cannot confirm release"). Engine calls that throw
- * become ENGINE_FAILED faults. Used from the loop's processing coroutine.
+ * become ENGINE_FAILED faults. Used from the loop's processing coroutine, and by [release] from
+ * whichever coroutine shuts the loop down once that coroutine has ended.
  */
 internal class MouthSupervisor(private val wiring: LoopWiring) {
     private var attempt: CompletableDeferred<Boolean>? = null
     private var held = false
+    private var quiet = true
 
     /** Hands [segment] to the mouth once any earlier stop has confirmed. */
-    suspend fun speak(segment: SpeechSegment): LoopInput? =
-        awaitRelease() ?: wiring.call(VoicePort.MOUTH) { wiring.engines.mouth.speak(segment) }
+    suspend fun speak(segment: SpeechSegment): LoopInput? = awaitRelease() ?: wiring.call(VoicePort.MOUTH) {
+        quiet = false
+        wiring.engines.mouth.speak(segment)
+    }
 
     /** Tells the mouth no more text is coming for now. */
     fun flush(): LoopInput? = wiring.call(VoicePort.MOUTH) { wiring.engines.mouth.flush() }
@@ -33,6 +37,21 @@ internal class MouthSupervisor(private val wiring: LoopWiring) {
         val clean = withTimeoutOrNull(wiring.config.releaseTimeout) { running.await() }
         if (clean != null) attempt = null
         held = clean != true
+        quiet = !held
+        return if (held) wiring.unresponsive(VoicePort.MOUTH) else null
+    }
+
+    /**
+     * The final stop, run in the calling coroutine (so it works after the loop's scope has ended):
+     * stops the mouth unless it has confirmed a stop since it last spoke, waiting (bounded) for a
+     * clean return. A stop that misses the budget or throws is reported UNRESPONSIVE.
+     */
+    suspend fun release(): LoopInput? {
+        if (quiet) return null
+        val clean = withTimeoutOrNull(wiring.config.releaseTimeout) { stopCleanly() } == true
+        attempt = null
+        held = !clean
+        quiet = clean
         return if (held) wiring.unresponsive(VoicePort.MOUTH) else null
     }
 

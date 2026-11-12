@@ -72,6 +72,20 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
         return faults
     }
 
+    /**
+     * The final release, run in the calling coroutine so it also works after the loop's scope has
+     * ended: ends the first-text timer, stops the mouth (unless it confirmed a stop since it last
+     * spoke), cancels every answer (each answer's own cancel stops its server-side run or leaves a
+     * pending stop for it) and closes the ear, each bounded by the release budget. Returns the
+     * faults for whatever did not let go.
+     */
+    suspend fun releaseAll(): List<LoopInput> {
+        timer?.cancel()
+        timer = null
+        timerTurn = null
+        return listOfNotNull(mouth.release(), replies.cancelAll(), ear.close())
+    }
+
     private fun LoopEffect.startsOutput(): Boolean = this is LoopEffect.Speak || this is LoopEffect.FlushMouth
 
     private suspend fun openEar(step: Step): List<LoopInput> {
