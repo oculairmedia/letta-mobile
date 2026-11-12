@@ -183,7 +183,7 @@ class AppServerTimelineTransport(
         conversation: ConversationId,
     ): AppServerInboundFrame.StreamDelta? {
         val delta = received.frame as? AppServerInboundFrame.StreamDelta ?: return null
-        if (delta.runtime.conversationId != conversation.value) return null
+        if (delta.runtime.conversationId != conversation.value || delta.subagentId != null) return null
         return delta.takeUnless { isSending(conversation) }
     }
 

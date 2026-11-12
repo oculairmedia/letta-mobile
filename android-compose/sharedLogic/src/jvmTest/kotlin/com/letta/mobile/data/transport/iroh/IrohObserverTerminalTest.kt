@@ -77,6 +77,20 @@ internal class IrohObserverTerminalTest : IrohObserverFixture() {
     }
 
     @Test
+    fun idleLoopWithoutObservedTurnStillPublishesScopedIdlePresence() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(loopStatusFrame(LoopFrameSpec("agent-1", "conv-auto", 1L, "WAITING_ON_INPUT")), 1L),
+        )
+        val idle = assertIs<ServerFrame.RunActivity>(emitted.single())
+        assertEquals("conv-auto", idle.conversationId)
+        assertEquals("agent-1", idle.agentId)
+        assertEquals("WAITING_ON_INPUT", (idle.payload as com.letta.mobile.runtime.RuntimeEventPayload.LoopPhaseChanged).status)
+        assertTrue(emitted.none { it is ServerFrame.TurnDone }, "idle presence must not forge an unscoped terminal")
+    }
+
+    @Test
     fun retiredEngineTurnFinishedIsSkippedByObserver() = testScope.runTest {
         val emitted = CopyOnWriteArrayList<ServerFrame>()
         val registry = IrohTurnRegistry()
