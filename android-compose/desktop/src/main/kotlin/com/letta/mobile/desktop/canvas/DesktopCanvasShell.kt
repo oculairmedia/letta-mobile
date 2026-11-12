@@ -33,6 +33,7 @@ internal class DesktopCanvasShell(
     val boards: CanvasBoardSessions = CanvasBoardSessions(store, DesktopCanvasHostSync.options, sessions),
 ) {
     private val page = CanvasPageBoard(boards)
+    val picker = com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker(DesktopCanvasHostSync.mounts) // this window's
     var activeSession: CanvasSession? by page
 
     fun open(id: CanvasId) = library.open(id, boards, page::take)

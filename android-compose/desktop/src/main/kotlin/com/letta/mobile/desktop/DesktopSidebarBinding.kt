@@ -155,6 +155,7 @@ internal fun desktopSidebarActions(
         },
         onOpenCanvas = { context.openCanvas(it) },
         onArchiveCanvas = canvasShell.library::setArchived,
+        onNewCanvas = { canvasShell.createNew(frame.value.focus.selectedAgentId) },
         conversationMarks = chatController.conversationMarks.rowActions(),
         chatOptions = desktopChatOptionsActions(chatController, setFontScale),
     )

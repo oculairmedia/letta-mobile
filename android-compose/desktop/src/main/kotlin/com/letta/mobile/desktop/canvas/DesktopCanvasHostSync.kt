@@ -87,4 +87,5 @@ object DesktopCanvasHostSync {
 
     /** The name peers see beside this user's cursor: the signed-in operating-system account. */
     val localPeerName: String? get() = System.getProperty("user.name")?.takeIf { it.isNotBlank() }
+    val mounts = com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver(DesktopCanvasMountClient) // windows and tools
 }

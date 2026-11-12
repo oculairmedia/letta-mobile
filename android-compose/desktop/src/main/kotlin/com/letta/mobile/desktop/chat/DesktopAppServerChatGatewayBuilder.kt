@@ -12,6 +12,7 @@ import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.StreamIntegrityBinding
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.AppServerTurnStackSpec
@@ -281,7 +282,9 @@ internal fun desktopCanvasToolRegistry(
     agentToolsModes: AgentToolsModePolicy = desktopAgentToolsModePolicy(),
 ): ExternalToolRegistry = agentToolsModes.withoutCli().apply(
     ExternalToolRegistry.hostTools(
-        if (isIroh) emptyList() else CanvasExternalTools.all(DesktopNotebookCanvasStore.documents, canvasSessions) + ShellLayoutTool(),
+        if (isIroh) emptyList() else CanvasExternalTools.all(
+            DesktopNotebookCanvasStore.documents, canvasSessions, mounts = DesktopCanvasHostSync.mounts,
+        ) + ShellLayoutTool(),
     ),
 )
 

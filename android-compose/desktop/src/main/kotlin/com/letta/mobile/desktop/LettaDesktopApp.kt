@@ -65,7 +65,7 @@ internal fun LettaDesktopApp(
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
-        ProvideCanvasHostWithBoards(context.core.canvasShell.viewers, context.core.canvasShell.boards) {
+        ProvideCanvasHostWithBoards(context.core.canvasShell.viewers, context.core.canvasShell.boards, context.core.canvasShell.picker) {
             DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
                 // Boards register where the canvas_* tools look and open by id for canvas modules; the header hoists into the title bar.
                 val header = DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange)
