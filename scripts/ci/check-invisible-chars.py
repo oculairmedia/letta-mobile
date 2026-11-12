@@ -30,25 +30,44 @@ def is_emoji(char):
     return code >= 0x1F000 or 0x2600 <= code <= 0x27BF or char == VARIATION_SELECTOR
 
 
+def is_leading_bom(char, index):
+    return char == BOM and index == 0
+
+
+def is_joiner_between_emoji(text, index):
+    """True when the character at [index] is a zero-width joiner flanked by emoji."""
+    if text[index] != ZERO_WIDTH_JOINER or index == 0:
+        return False
+    after = text[index + 1] if index + 1 < len(text) else None
+    return is_emoji(text[index - 1]) and is_emoji(after)
+
+
+def is_allowed(text, index):
+    return is_leading_bom(text[index], index) or is_joiner_between_emoji(text, index)
+
+
 def findings(text):
     """Yield (line, column, code point) for every reportable character in [text]."""
     for match in CHARACTERS.finditer(text):
-        index, char = match.start(), match.group()
-        if char == BOM and index == 0:
-            continue
-        after = text[index + 1] if index + 1 < len(text) else None
-        if char == ZERO_WIDTH_JOINER and index > 0 and is_emoji(text[index - 1]) and is_emoji(after):
+        index = match.start()
+        if is_allowed(text, index):
             continue
         line = text.count(NEWLINE, 0, index) + 1
         column = index - text.rfind(NEWLINE, 0, index)
-        yield line, column, ord(char)
+        yield line, column, ord(match.group())
+
+
+def is_source_file(name, path):
+    if not name:
+        return False
+    return path.suffix in EXTENSIONS and path.is_file()
 
 
 def tracked_sources(root):
     output = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], check=True, capture_output=True).stdout
     for name in output.decode("utf-8").split("\0"):
         path = root / name
-        if name and path.suffix in EXTENSIONS and path.is_file():
+        if is_source_file(name, path):
             yield path
 
 
