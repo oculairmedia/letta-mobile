@@ -3967,6 +3967,19 @@ final enum class com.letta.mobile.data.transport.appserver/WorkspaceRelayMethod 
     }
 }
 
+final enum class com.letta.mobile.qr/QrErrorCorrection : kotlin/Enum<com.letta.mobile.qr/QrErrorCorrection> { // com.letta.mobile.qr/QrErrorCorrection|null[0]
+    enum entry H // com.letta.mobile.qr/QrErrorCorrection.H|null[0]
+    enum entry L // com.letta.mobile.qr/QrErrorCorrection.L|null[0]
+    enum entry M // com.letta.mobile.qr/QrErrorCorrection.M|null[0]
+    enum entry Q // com.letta.mobile.qr/QrErrorCorrection.Q|null[0]
+
+    final val entries // com.letta.mobile.qr/QrErrorCorrection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.qr/QrErrorCorrection> // com.letta.mobile.qr/QrErrorCorrection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.qr/QrErrorCorrection // com.letta.mobile.qr/QrErrorCorrection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.qr/QrErrorCorrection> // com.letta.mobile.qr/QrErrorCorrection.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.ui.ambient/AmbientMotionStatus : kotlin/Enum<com.letta.mobile.ui.ambient/AmbientMotionStatus> { // com.letta.mobile.ui.ambient/AmbientMotionStatus|null[0]
     enum entry Active // com.letta.mobile.ui.ambient/AmbientMotionStatus.Active|null[0]
     enum entry Completed // com.letta.mobile.ui.ambient/AmbientMotionStatus.Completed|null[0]
@@ -24579,6 +24592,37 @@ sealed interface com.letta.mobile.data.workspace/WorkspaceFileContent { // com.l
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileContent.TooLarge.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.workspace/WorkspaceFileContent.TooLarge.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileContent.TooLarge.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.qr/QrEncodeResult { // com.letta.mobile.qr/QrEncodeResult|null[0]
+    final class ContentTooLong : com.letta.mobile.qr/QrEncodeResult { // com.letta.mobile.qr/QrEncodeResult.ContentTooLong|null[0]
+        constructor <init>(kotlin/Int, kotlin/Int) // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+        final val capacityBits // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.capacityBits|{}capacityBits[0]
+            final fun <get-capacityBits>(): kotlin/Int // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.capacityBits.<get-capacityBits>|<get-capacityBits>(){}[0]
+        final val requiredBits // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.requiredBits|{}requiredBits[0]
+            final fun <get-requiredBits>(): kotlin/Int // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.requiredBits.<get-requiredBits>|<get-requiredBits>(){}[0]
+
+        final fun component1(): kotlin/Int // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.component1|component1(){}[0]
+        final fun component2(): kotlin/Int // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.component2|component2(){}[0]
+        final fun copy(kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.qr/QrEncodeResult.ContentTooLong // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.copy|copy(kotlin.Int;kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.qr/QrEncodeResult.ContentTooLong.toString|toString(){}[0]
+    }
+
+    final class Encoded : com.letta.mobile.qr/QrEncodeResult { // com.letta.mobile.qr/QrEncodeResult.Encoded|null[0]
+        constructor <init>(com.letta.mobile.qr/QrMatrix) // com.letta.mobile.qr/QrEncodeResult.Encoded.<init>|<init>(com.letta.mobile.qr.QrMatrix){}[0]
+
+        final val matrix // com.letta.mobile.qr/QrEncodeResult.Encoded.matrix|{}matrix[0]
+            final fun <get-matrix>(): com.letta.mobile.qr/QrMatrix // com.letta.mobile.qr/QrEncodeResult.Encoded.matrix.<get-matrix>|<get-matrix>(){}[0]
+
+        final fun component1(): com.letta.mobile.qr/QrMatrix // com.letta.mobile.qr/QrEncodeResult.Encoded.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.qr/QrMatrix = ...): com.letta.mobile.qr/QrEncodeResult.Encoded // com.letta.mobile.qr/QrEncodeResult.Encoded.copy|copy(com.letta.mobile.qr.QrMatrix){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.qr/QrEncodeResult.Encoded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.qr/QrEncodeResult.Encoded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.qr/QrEncodeResult.Encoded.toString|toString(){}[0]
     }
 }
 
@@ -67916,6 +67960,29 @@ final class com.letta.mobile.data.workspace/WorkspaceFileViewerState { // com.le
     final fun toString(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileViewerState.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.qr/QrContentTooLongException : kotlin/IllegalArgumentException { // com.letta.mobile.qr/QrContentTooLongException|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int) // com.letta.mobile.qr/QrContentTooLongException.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val capacityBits // com.letta.mobile.qr/QrContentTooLongException.capacityBits|{}capacityBits[0]
+        final fun <get-capacityBits>(): kotlin/Int // com.letta.mobile.qr/QrContentTooLongException.capacityBits.<get-capacityBits>|<get-capacityBits>(){}[0]
+    final val requiredBits // com.letta.mobile.qr/QrContentTooLongException.requiredBits|{}requiredBits[0]
+        final fun <get-requiredBits>(): kotlin/Int // com.letta.mobile.qr/QrContentTooLongException.requiredBits.<get-requiredBits>|<get-requiredBits>(){}[0]
+}
+
+final class com.letta.mobile.qr/QrMatrix { // com.letta.mobile.qr/QrMatrix|null[0]
+    final val errorCorrection // com.letta.mobile.qr/QrMatrix.errorCorrection|{}errorCorrection[0]
+        final fun <get-errorCorrection>(): com.letta.mobile.qr/QrErrorCorrection // com.letta.mobile.qr/QrMatrix.errorCorrection.<get-errorCorrection>|<get-errorCorrection>(){}[0]
+    final val mask // com.letta.mobile.qr/QrMatrix.mask|{}mask[0]
+        final fun <get-mask>(): kotlin/Int // com.letta.mobile.qr/QrMatrix.mask.<get-mask>|<get-mask>(){}[0]
+    final val size // com.letta.mobile.qr/QrMatrix.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.letta.mobile.qr/QrMatrix.size.<get-size>|<get-size>(){}[0]
+    final val version // com.letta.mobile.qr/QrMatrix.version|{}version[0]
+        final fun <get-version>(): kotlin/Int // com.letta.mobile.qr/QrMatrix.version.<get-version>|<get-version>(){}[0]
+
+    final fun isDark(kotlin/Int, kotlin/Int): kotlin/Boolean // com.letta.mobile.qr/QrMatrix.isDark|isDark(kotlin.Int;kotlin.Int){}[0]
+    final fun toModules(): com.letta.mobile.data.pairing/QrModules // com.letta.mobile.qr/QrMatrix.toModules|toModules(){}[0]
+}
+
 final class com.letta.mobile.ui.ambient/AmbientBand { // com.letta.mobile.ui.ambient/AmbientBand|null[0]
     constructor <init>(kotlin/Float, kotlin/Float) // com.letta.mobile.ui.ambient/AmbientBand.<init>|<init>(kotlin.Float;kotlin.Float){}[0]
 
@@ -76014,6 +76081,14 @@ final object com.letta.mobile.data.workspace/WorkspacePaths { // com.letta.mobil
     final fun isAbsolute(kotlin/String): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspacePaths.isAbsolute|isAbsolute(kotlin.String){}[0]
     final fun languageHint(kotlin/String): kotlin/String? // com.letta.mobile.data.workspace/WorkspacePaths.languageHint|languageHint(kotlin.String){}[0]
     final fun resolve(kotlin/String, kotlin/String?): kotlin/String // com.letta.mobile.data.workspace/WorkspacePaths.resolve|resolve(kotlin.String;kotlin.String?){}[0]
+}
+
+final object com.letta.mobile.qr/PortableQrEncoder : com.letta.mobile.data.pairing/QrEncoder { // com.letta.mobile.qr/PortableQrEncoder|null[0]
+    final fun encode(kotlin/String): com.letta.mobile.data.pairing/QrModules // com.letta.mobile.qr/PortableQrEncoder.encode|encode(kotlin.String){}[0]
+}
+
+final object com.letta.mobile.qr/QrCodeGenerator { // com.letta.mobile.qr/QrCodeGenerator|null[0]
+    final fun encode(kotlin/String, com.letta.mobile.qr/QrErrorCorrection = ...): com.letta.mobile.qr/QrEncodeResult // com.letta.mobile.qr/QrCodeGenerator.encode|encode(kotlin.String;com.letta.mobile.qr.QrErrorCorrection){}[0]
 }
 
 final object com.letta.mobile.ui.ambient/AmbientMotion { // com.letta.mobile.ui.ambient/AmbientMotion|null[0]
