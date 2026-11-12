@@ -84,6 +84,13 @@ internal sealed interface CanvasMountOutcome {
         override fun body(durability: CanvasMountDurability): JsonElement = canvasBody(status, canvas, durability) {}
     }
 
+    /** `canvas.mount.candidates`: [candidates] in order, at most [CanvasMountWire.MAX_CANDIDATES]. */
+    data class Listed(val candidates: List<CanvasMountCandidate>, val truncated: Boolean) : CanvasMountOutcome {
+        override val status: String get() = CanvasMountWire.LISTED
+
+        override fun body(durability: CanvasMountDurability): JsonElement = listedBody(candidates, truncated)
+    }
+
     data object None : CanvasMountOutcome {
         override val status: String get() = CanvasMountWire.NONE
     }

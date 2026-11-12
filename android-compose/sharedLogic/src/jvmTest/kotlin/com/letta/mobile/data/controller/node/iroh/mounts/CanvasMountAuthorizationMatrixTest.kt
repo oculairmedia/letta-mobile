@@ -58,7 +58,7 @@ private enum class Winner(val board: Board?) {
 }
 
 /** The answer the policy requires. */
-private enum class Expect { ROUTER_FORBIDDEN, DENIED, NONE, FOUND, BOUND_WON, BOUND_LOST, REPLACED, DEFAULT_SET }
+private enum class Expect { ROUTER_FORBIDDEN, DENIED, NONE, FOUND, BOUND_WON, BOUND_LOST, REPLACED, DEFAULT_SET, LISTED }
 
 private class Case(val route: CanvasMountRoute, val scope: Scope, val proposal: Board, val winner: Winner) {
     override fun toString(): String = "$route/$scope/$proposal/$winner"
@@ -87,6 +87,7 @@ class CanvasMountAuthorizationMatrixTest {
         val reply = harness.call(case.route, paramsFor(case.route, case.scope.conversation, case.proposal.id), case.scope.peer)
         val expected = expected(case)
         verify(reply, expected, case)
+        if (expected == Expect.LISTED) everyCandidateIsAProposalTheHostAccepts(harness, reply, case)
         if (expected == Expect.DENIED || expected == Expect.ROUTER_FORBIDDEN) {
             assertFalse(case.winner.board?.id?.value.orEmpty().let { it.isNotEmpty() && it in reply.raw }, "$case leaked the winner")
             assertEquals(case.winner.board?.id, stored(harness, case), "$case changed the record")
@@ -109,6 +110,7 @@ class CanvasMountAuthorizationMatrixTest {
         when (expected) {
             Expect.ROUTER_FORBIDDEN -> assertEquals(AgentScopeGuard.DENIED, reply.error, label)
             Expect.DENIED -> assertEquals(DENIED_RESPONSE, reply.raw, label)
+            Expect.LISTED -> assertEquals(listedFor(case), reply.listed, label)
             else -> assertEquals(success(expected, case), Triple(reply.status, reply.canvas, reply.won), label)
         }
     }
@@ -138,8 +140,27 @@ class CanvasMountAuthorizationMatrixTest {
 
     private fun expectedBinding(case: Case): Expect = when (case.route) {
         CanvasMountRoute.RESOLVE -> expectedRead(case)
+        CanvasMountRoute.CANDIDATES -> Expect.LISTED
         CanvasMountRoute.BIND -> if (case.scope.sees(case.proposal)) expectedBind(case) else Expect.DENIED
         else -> if (case.scope.sees(case.proposal)) Expect.REPLACED else Expect.DENIED
+    }
+
+    /**
+     * D6, stated independently: the binding's own canvas first, then every directory canvas the scope sees, in host
+     * order. Relay-only canvases (no known owner) are never enumerated.
+     */
+    private fun listedFor(case: Case): List<String> {
+        val own = CanvasId.forConversation(case.scope.conversation).value
+        return listOf(own) + Board.entries.filter { it.registered && it.owner != null && case.scope.sees(it) }.map { it.id.value }
+    }
+
+    /** Candidates never list a canvas a proposal would deny: each listed canvas is replaced into the binding for real. */
+    private suspend fun everyCandidateIsAProposalTheHostAccepts(harness: MountHarness, reply: Reply, case: Case) {
+        reply.listed.orEmpty().forEach { listed ->
+            val params = bindingParams(AGENT_A, case.scope.conversation, CanvasId(listed))
+            val proposal = harness.call(CanvasMountRoute.REPLACE, params, case.scope.peer)
+            assertEquals(CanvasMountWire.REPLACED, proposal.status, "$case listed $listed but a proposal of it -> $proposal")
+        }
     }
 
     private fun expectedRead(case: Case): Expect {

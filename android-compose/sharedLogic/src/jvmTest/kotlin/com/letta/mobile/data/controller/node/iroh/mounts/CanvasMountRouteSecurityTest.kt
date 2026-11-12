@@ -52,7 +52,8 @@ private enum class Spoof(val key: String) {
 class CanvasMountRouteSecurityTest {
     @Test
     fun denialsAreByteIdenticalForExistingAbsentAndHiddenWinnerRecords() = runBlocking {
-        CanvasMountRoute.entries.forEach { route ->
+        // Candidates hold no record and reveal no winner; their denials are covered in CanvasMountCandidatesTest.
+        CanvasMountRoute.entries.filter { it != CanvasMountRoute.CANDIDATES }.forEach { route ->
             val scopedOut = A_SCOPED.copy(conversations = setOf("conv-elsewhere"))
             // Resolve and bind are refused by the hidden winner; replace and default.set by the hidden proposal.
             val revealsWinner = route == CanvasMountRoute.RESOLVE || route == CanvasMountRoute.BIND
@@ -282,7 +283,9 @@ class CanvasMountRouteSecurityTest {
 
     @Test
     fun chatAccessRolesMayResolveAndSwitchButOnlyAdminsSetAgentDefaults() {
-        assertEquals(IrohPeerCapabilities.CANVAS_MOUNT_READ, IrohPeerCapabilities.forAdminMethod(CanvasMountWire.RESOLVE))
+        listOf(CanvasMountWire.RESOLVE, CanvasMountWire.CANDIDATES).forEach {
+            assertEquals(IrohPeerCapabilities.CANVAS_MOUNT_READ, IrohPeerCapabilities.forAdminMethod(it), it)
+        }
         listOf(CanvasMountWire.BIND, CanvasMountWire.REPLACE).forEach {
             assertEquals(IrohPeerCapabilities.CANVAS_MOUNT_WRITE, IrohPeerCapabilities.forAdminMethod(it), it)
         }

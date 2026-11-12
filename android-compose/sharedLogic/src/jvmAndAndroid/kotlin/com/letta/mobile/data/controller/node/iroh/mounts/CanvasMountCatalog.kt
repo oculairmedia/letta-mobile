@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh.mounts
 import com.letta.mobile.data.canvas.CanvasRelayProtocol
 import com.letta.mobile.data.canvas.CanvasRelayStore
 import com.letta.mobile.data.canvas.HostCanvasDirectory
+import com.letta.mobile.data.canvas.HostCanvasEntry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -45,6 +46,9 @@ class CanvasMountCatalog(
         val bound = relay.boundCanvas(CanvasRelayProtocol.canvasTopic(canvas)) == canvas
         return if (bound) CanvasOwnership.Owned(emptySet()) else CanvasOwnership.Absent
     }
+
+    /** Every canvas the host's agent canvas directory records, the only canvases `canvas.mount.candidates` enumerates. */
+    internal suspend fun known(): List<HostCanvasEntry> = canvases.all()
 
     private fun writers(agents: Set<String>): CanvasOwnership = CanvasOwnership.Owned(agents.mapTo(mutableSetOf(), ::AgentId))
 

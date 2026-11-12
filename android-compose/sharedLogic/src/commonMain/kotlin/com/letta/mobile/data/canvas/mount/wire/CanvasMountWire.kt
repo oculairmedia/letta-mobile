@@ -26,10 +26,19 @@ object CanvasMountWire {
      */
     const val EVENT_TYPE: String = "canvas_mount_updated"
 
-    /** Every route, registered together or not at all. */
-    val METHODS: Set<String> = setOf(RESOLVE, BIND, REPLACE, SET_DEFAULT)
+    /**
+     * Lists, read-only and bounded to [MAX_CANDIDATES], the canvases the caller may mount for one binding: exactly
+     * the canvases a bind or replace proposal of that binding would accept (owner decision D6).
+     */
+    const val CANDIDATES: String = "canvas.mount.candidates"
 
-    /** Peer capability that admits [RESOLVE]. */
+    /** Every route, registered together or not at all. */
+    val METHODS: Set<String> = setOf(RESOLVE, BIND, REPLACE, SET_DEFAULT, CANDIDATES)
+
+    /** Hard cap on the canvases one [CANDIDATES] answer lists; [TRUNCATED] says whether more were left out. */
+    const val MAX_CANDIDATES: Int = 100
+
+    /** Peer capability that admits [RESOLVE] and [CANDIDATES]. */
     const val READ_CAPABILITY: String = "canvas.mount.read"
 
     /** Peer capability that admits [BIND], [REPLACE] and [SET_DEFAULT]. */
@@ -58,6 +67,27 @@ object CanvasMountWire {
 
     /** Result field of [UNAVAILABLE]: one of the fixed `REASON_` values. */
     const val REASON: String = "reason"
+
+    /** Result status of [CANDIDATES]. */
+    const val LISTED: String = "listed"
+
+    /** Result field of [LISTED]: the candidate canvases, the binding's own canvas first. */
+    const val CANVASES: String = "canvases"
+
+    /** Candidate field: the canvas title the host directory records, absent when unknown. */
+    const val TITLE: String = "title"
+
+    /** Candidate field: [OWNER_CONVERSATION] or [OWNER_AGENT]; never an owner id. */
+    const val OWNER_KIND: String = "owner_kind"
+
+    /** The canvas belongs to a conversation (its canonical canvas). */
+    const val OWNER_CONVERSATION: String = "conversation"
+
+    /** The canvas was created by an agent outside any conversation. */
+    const val OWNER_AGENT: String = "agent"
+
+    /** Result field of [LISTED]: true when more candidates exist than [MAX_CANDIDATES]. */
+    const val TRUNCATED: String = "truncated"
 
     /** A resolve found a canvas the caller may see. */
     const val FOUND: String = "found"

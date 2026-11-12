@@ -60,9 +60,21 @@ class CanvasMountContractFixturesTest {
                 CanvasMountOutcome.Bound(checkNotNull(canvas), result.getValue(CanvasMountWire.WON).jsonPrimitive.boolean)
             CanvasMountWire.REPLACED -> CanvasMountOutcome.Replaced(checkNotNull(canvas))
             CanvasMountWire.DEFAULT_SET -> CanvasMountOutcome.DefaultSet(checkNotNull(canvas))
+            CanvasMountWire.LISTED -> listed(result)
             else -> plain(result)
         }
     }
+
+    private fun listed(result: JsonObject): CanvasMountOutcome = CanvasMountOutcome.Listed(
+        result.getValue(CanvasMountWire.CANVASES).jsonArray.map { it.jsonObject }.map { candidate ->
+            CanvasMountCandidate(
+                CanvasId(candidate.getValue(CanvasMountWire.CANVAS_ID).jsonPrimitive.content),
+                candidate[CanvasMountWire.TITLE]?.jsonPrimitive?.content,
+                candidate.getValue(CanvasMountWire.OWNER_KIND).jsonPrimitive.content,
+            )
+        },
+        truncated = result.getValue(CanvasMountWire.TRUNCATED).jsonPrimitive.boolean,
+    )
 
     private fun plain(result: JsonObject): CanvasMountOutcome = when (result.getValue(CanvasMountWire.STATUS).jsonPrimitive.content) {
         CanvasMountWire.NONE -> CanvasMountOutcome.None

@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -215,6 +216,14 @@ internal class Reply(val raw: String) {
     val durability: String? get() = result?.field(CanvasMountWire.DURABILITY)
     val won: Boolean? get() = result?.get(CanvasMountWire.WON)?.jsonPrimitive?.booleanOrNull
 
+    /** The canvas ids of a `listed` answer, in order; null for any other answer. */
+    val listed: List<String>?
+        get() = (result?.get(CanvasMountWire.CANVASES) as? JsonArray)?.map {
+            it.jsonObject.getValue(CanvasMountWire.CANVAS_ID).jsonPrimitive.content
+        }
+
+    val truncated: Boolean? get() = result?.get(CanvasMountWire.TRUNCATED)?.jsonPrimitive?.booleanOrNull
+
     override fun toString(): String = raw
 
     private fun JsonObject.field(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
@@ -233,7 +242,7 @@ internal fun defaultParams(agent: AgentId, canvas: CanvasId): JsonObject = build
 
 /** The params [route] needs to address agent A's [conversation] with [canvas]. */
 internal fun paramsFor(route: CanvasMountRoute, conversation: ConversationId, canvas: CanvasId): JsonObject = when (route) {
-    CanvasMountRoute.RESOLVE -> bindingParams(AGENT_A, conversation)
+    CanvasMountRoute.RESOLVE, CanvasMountRoute.CANDIDATES -> bindingParams(AGENT_A, conversation)
     CanvasMountRoute.SET_DEFAULT -> defaultParams(AGENT_A, canvas)
     else -> bindingParams(AGENT_A, conversation, canvas)
 }

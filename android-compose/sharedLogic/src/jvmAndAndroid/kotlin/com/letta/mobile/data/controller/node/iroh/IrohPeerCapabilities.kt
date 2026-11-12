@@ -42,7 +42,7 @@ object IrohPeerCapabilities {
     // letta-mobile-n2stx.5: canvas mount routes. Every role with chat access holds both (owner decision D2); the
     // handler still checks agent and conversation scope, conversation ownership and canvas visibility. Setting an
     // agent default is admin.full only (D1).
-    /** Admits `canvas.mount.resolve`. */
+    /** Admits the read-only `canvas.mount.resolve` and `canvas.mount.candidates`. */
     const val CANVAS_MOUNT_READ = CanvasMountWire.READ_CAPABILITY
 
     /** Admits the canvas mount writes: bind, replace and default.set. */
@@ -120,7 +120,7 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
-        method == CanvasMountWire.RESOLVE -> CANVAS_MOUNT_READ
+        method == CanvasMountWire.RESOLVE || method == CanvasMountWire.CANDIDATES -> CANVAS_MOUNT_READ
         // D1: the agent default is not part of the picker feature and stays host administration.
         method == CanvasMountWire.SET_DEFAULT -> ADMIN_FULL
         method in CanvasMountWire.METHODS -> CANVAS_MOUNT_WRITE

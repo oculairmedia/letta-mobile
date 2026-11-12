@@ -35,7 +35,7 @@ internal class CanvasMountBounds(val durability: CanvasMountDurability, val dead
 }
 
 /**
- * One handler for all four routes. Order of work: verified identity from the connection, strict params, then the
+ * One handler for all five routes. Order of work: verified identity from the connection, strict params, then the
  * authorized facade under the deadline. No request field reaches the authority except as a target.
  */
 internal class CanvasMountHandlers(private val host: CanvasMountHost) {
@@ -50,7 +50,8 @@ internal class CanvasMountHandlers(private val host: CanvasMountHost) {
         }
         val trace = CanvasMountCallTrace()
         val authority = HostCanvasMountAuthority(connection, host.sources.catalog, host.sources.directory, trace)
-        val call = CanvasMountCall(host.mounts(authority), connection.principal, input)
+        val candidates = CanvasMountCandidates(authority, host.sources.catalog)
+        val call = CanvasMountCall(host.mounts(authority), candidates, connection.principal, input)
         val outcome = when (val timed = host.bounds.deadline.run { call.run(route) }) {
             is CanvasMountTimed.Settled -> timed.value.settledWith(route, trace)
             is CanvasMountTimed.Expired -> expired(route, trace, timed.unwound)
@@ -70,9 +71,13 @@ private fun changedCanvas(outcome: CanvasMountOutcome): CanvasId? = when (outcom
     else -> null
 }
 
-/** One authorized call: every operation goes through the facade with the verified principal. */
+/**
+ * One authorized call: every mount record operation goes through the facade with the verified principal; the
+ * read-only candidates listing goes through the same per-call authority and touches no mount record.
+ */
 private class CanvasMountCall(
     private val mounts: AuthorizedCanvasMounts,
+    private val candidates: CanvasMountCandidates,
     private val principal: CanvasMountPrincipal,
     private val input: CanvasMountInput,
 ) {
@@ -85,6 +90,7 @@ private class CanvasMountCall(
         CanvasMountRoute.BIND -> mounts.bindIfAbsent(binding, input.canvas).toOutcome(CanvasMountSource.BINDING, input.canvas)
         CanvasMountRoute.REPLACE -> mounts.replaceBinding(binding, input.canvas).toOutcome(CanvasMountSource.BINDING, null)
         CanvasMountRoute.SET_DEFAULT -> mounts.setDefault(agentDefault, input.canvas).toOutcome(CanvasMountSource.DEFAULT, null)
+        CanvasMountRoute.CANDIDATES -> candidates.list(binding)
     }
 
     /** The conversation's own binding, else its agent's default. A denial at either step is the answer. */
@@ -100,7 +106,10 @@ private class CanvasMountCall(
  * `unavailable`; once a mutation's storage returned (the winner check) its outcome is unknown.
  */
 private fun CanvasMountOutcome.settledWith(route: CanvasMountRoute, trace: CanvasMountCallTrace): CanvasMountOutcome = when {
-    this != CanvasMountOutcome.Denied || !trace.authorityFailed -> this
+    !trace.authorityFailed -> this
+    // A candidate the authority could not decide was left out: never answer a partial list as if it were whole.
+    this is CanvasMountOutcome.Listed -> CanvasMountOutcome.Unavailable(CanvasMountUnavailable.AUTHORITY)
+    this != CanvasMountOutcome.Denied -> this
     route.mutates && trace.phase == CanvasMountPhase.REVEALING -> CanvasMountOutcome.OutcomeUnknown
     else -> CanvasMountOutcome.Unavailable(CanvasMountUnavailable.AUTHORITY)
 }

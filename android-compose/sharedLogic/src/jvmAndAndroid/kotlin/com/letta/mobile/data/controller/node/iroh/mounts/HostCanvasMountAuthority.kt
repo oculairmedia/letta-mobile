@@ -88,6 +88,7 @@ internal class CanvasMountCallTrace {
  * - Propose: for a default, the peer manages conversations (O3) and the agent exists; the proposed canvas is
  *   visible to the connection ([visible]).
  * - See: the stored canvas is visible to the connection.
+ * - List (`canvas.mount.candidates`, [mayList]): exactly the proposal rule, so nothing is listed a proposal refuses.
  *
  * Visibility (owner decision D3): a binding's own conversation canvas is always visible to a caller allowed to
  * address that binding; any other canvas must exist on this host and be owned by an agent in the connection's agent
@@ -110,14 +111,21 @@ internal class HostCanvasMountAuthority(
         }
 
     override suspend fun mayPropose(request: CanvasMountRequest<CanvasMountScope>, proposed: CanvasId): CanvasMountDecision {
-        val decision = decide(request) { scope ->
-            when {
-                scope is CanvasMountScope.AgentDefault && !mayChangeDefault(scope) -> CanvasMountDecision.DENY
-                else -> allowIf(visible(scope, proposed))
-            }
-        }
+        val decision = decide(request) { scope -> proposal(scope, proposed) }
         if (decision == CanvasMountDecision.ALLOW) trace.enter(CanvasMountPhase.STORING)
         return decision
+    }
+
+    /**
+     * Whether `canvas.mount.candidates` may list [canvas] for the addressed record: exactly the proposal rule of
+     * [mayPropose] (owner decision D6), without entering the storing phase, since nothing is stored.
+     */
+    suspend fun mayList(request: CanvasMountRequest<CanvasMountScope>, canvas: CanvasId): CanvasMountDecision =
+        decide(request) { scope -> proposal(scope, canvas) }
+
+    private suspend fun proposal(scope: CanvasMountScope, proposed: CanvasId): CanvasMountDecision = when {
+        scope is CanvasMountScope.AgentDefault && !mayChangeDefault(scope) -> CanvasMountDecision.DENY
+        else -> allowIf(visible(scope, proposed))
     }
 
     override suspend fun maySee(request: CanvasMountRequest<CanvasMountScope>, winner: CanvasId): CanvasMountDecision {

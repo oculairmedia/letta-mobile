@@ -2721,6 +2721,21 @@
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "canvas.mount.candidates",
+      "handler": "CanvasMountRoutes.kt",
+      "current_backend": "host canvas directory read through the per-call mount authority, paired-peer Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/canvas-mount-v1.md",
+      "authorization_class": "admin_read",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "letta-mobile-n2stx.5 (D6): registered only with a secure auth policy and a host mount store (method omitted otherwise). Read-only, at most 100 canvases. Principal = verified endpoint id; canvas.mount.read (chat roles), agent/conversation scope, conversation ownership; lists exactly what a proposal would accept.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
     }
   ],
   "unsupported_native_operations": [
