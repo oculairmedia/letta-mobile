@@ -27,14 +27,14 @@ object QrCodeGenerator {
     private fun build(version: Int, level: QrErrorCorrection, codewords: IntArray, fixedMask: Int?): QrMatrix {
         val base = QrGrid(version)
         base.drawFunctionPatterns(level)
-        base.placeCodewords(codewords)
+        base.placeCodewords(QrBitSource(codewords))
         val mask = fixedMask ?: (0 until MASK_COUNT).minBy { QrMaskPenalty.score(masked(base, level, it)) }
         return QrMatrix(version, level, mask, masked(base, level, mask).dark.copyOf())
     }
 
     private fun masked(base: QrGrid, level: QrErrorCorrection, mask: Int): QrGrid = base.copy().apply {
-        applyMask(mask)
-        drawFormat(level, mask)
+        applyMask(QrMask(mask))
+        drawFormat(level, QrMask(mask))
     }
 
     private const val MASK_COUNT = 8
