@@ -4687,6 +4687,7 @@ abstract interface com.letta.mobile.data.beads/BeadsBackend { // com.letta.mobil
 
 abstract interface com.letta.mobile.data.canvas.authority/NotebookGrantStore { // com.letta.mobile.data.canvas.authority/NotebookGrantStore|null[0]
     abstract suspend fun <#A1: kotlin/Any?> withGrant(kotlin/String, com.letta.mobile.data.canvas/NotebookDocumentId, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.canvas/NotebookPeerGrant?, #A1>): #A1 // com.letta.mobile.data.canvas.authority/NotebookGrantStore.withGrant|withGrant(kotlin.String;com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.canvas.NotebookPeerGrant?,0:0>){0§<kotlin.Any?>}[0]
+    abstract suspend fun <#A1: kotlin/Any?> withGrants(kotlin/String, kotlin.collections/Collection<com.letta.mobile.data.canvas/NotebookDocumentId>, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas/NotebookPeerGrant>, #A1>): #A1 // com.letta.mobile.data.canvas.authority/NotebookGrantStore.withGrants|withGrants(kotlin.String;kotlin.collections.Collection<com.letta.mobile.data.canvas.NotebookDocumentId>;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<com.letta.mobile.data.canvas.NotebookDocumentId,com.letta.mobile.data.canvas.NotebookPeerGrant>,0:0>){0§<kotlin.Any?>}[0]
     abstract suspend fun documentsOf(kotlin/String): kotlin.collections/List<com.letta.mobile.data.canvas/NotebookDocumentId> // com.letta.mobile.data.canvas.authority/NotebookGrantStore.documentsOf|documentsOf(kotlin.String){}[0]
 }
 
@@ -7936,6 +7937,11 @@ sealed interface com.letta.mobile.data.canvas.workspace/SharedNoteListing { // c
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.toString|toString(){}[0]
+
+        final object Companion { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion|null[0]
+            final const val INVALID_CURSOR // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.INVALID_CURSOR|{}INVALID_CURSOR[0]
+                final fun <get-INVALID_CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.INVALID_CURSOR.<get-INVALID_CURSOR>|<get-INVALID_CURSOR>(){}[0]
+        }
     }
 
     final object Denied : com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Denied|null[0]
