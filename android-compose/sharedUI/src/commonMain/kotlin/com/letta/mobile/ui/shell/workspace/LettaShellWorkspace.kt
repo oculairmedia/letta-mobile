@@ -70,6 +70,7 @@ import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
 import com.letta.mobile.ui.shell.sidebar.LocalPanelLane
+import com.letta.mobile.ui.shell.modules.LocalSharedNotesToggle
 import com.letta.mobile.ui.settings.LocalShellLayoutReset
 import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
@@ -131,6 +132,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalRailLane provides remember(state.layout.lanes) { state.layout.lanes.railLane().map { it.view } },
                                 LocalPanelLane provides remember(state.layout.lanes) { state.layout.lanes.panelLane().map { it.view } },
                                 LocalShellLayoutReset provides rememberShellLayoutReset(),
+                                LocalSharedNotesToggle provides rememberSharedNotesToggle(),
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {

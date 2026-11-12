@@ -24,6 +24,7 @@ import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.sidebar.sharedNotesMenuItem
 import com.letta.mobile.ui.shell.sidebar.shellSectionIcon
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
@@ -38,7 +39,8 @@ private val OverflowSections = listOf(
 
 /**
  * The sections that live inside the collapsible sidebar (New chat, Memory, Schedules, Channels,
- * Skills, Settings), reachable without reopening it. Conversation history is the
+ * Skills, Settings), reachable without reopening it, and the shared-notes toggle when the host
+ * can reach shared notes. Conversation history is the
  * command palette's (Ctrl/Cmd+K).
  */
 @Composable
@@ -52,6 +54,7 @@ fun ShellSidebarOverflowMenu(overflow: ShellSidebarOverflow, modifier: Modifier 
     )
     val newChat = stringResource(Res.string.shell_new_chat)
     val settings = stringResource(Res.string.shell_settings)
+    val sharedNotes = sharedNotesMenuItem()
     Box(modifier) {
         LocalLettaHost.current.tooltip(stringResource(Res.string.shell_sidebar_more)) {
             IconButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = label }) {
@@ -72,6 +75,7 @@ fun ShellSidebarOverflowMenu(overflow: ShellSidebarOverflow, modifier: Modifier 
                     val sectionLabel = WorkPlayLens.destinationLabel(mode, section)
                     add(LettaMenuItem(label = sectionLabel, icon = shellSectionIcon(mode, section)) { overflow.onDestination(section) })
                 }
+                sharedNotes?.let(::add)
                 // Settings is not a lens section (the lens only renames the agent's sections).
                 add(LettaMenuItem(label = settings, icon = LettaIcons.Settings, onClick = overflow.onSettings))
             },

@@ -1,0 +1,17 @@
+<resources>
+    <string name="shared_notes_title">Shared notes</string>
+    <string name="shared_notes_show">Shared notes</string>
+    <string name="shared_notes_hide">Hide shared notes</string>
+    <string name="shared_notes_close_view">Close shared notes</string>
+    <string name="shared_notes_back_to_list">All shared notes</string>
+    <string name="shared_notes_refresh">Refresh</string>
+    <string name="shared_notes_retry">Try again</string>
+    <string name="shared_notes_loading">Asking the host for shared notes</string>
+    <string name="shared_notes_empty">The host shares no notes with this device yet.</string>
+    <string name="shared_notes_unavailable">The host is not reachable right now.</string>
+    <string name="shared_notes_denied">The host does not let this device see its notes.</string>
+    <string name="shared_notes_untitled">Untitled note</string>
+    <string name="shared_notes_open_denied">The host no longer shares that note with this device.</string>
+    <string name="shared_notes_open_unavailable">That note could not be opened. The host may be unreachable.</string>
+    <string name="shared_notes_withdrawn">The host stopped sharing this note. Changes you have not saved cannot be saved.</string>
+</resources>
