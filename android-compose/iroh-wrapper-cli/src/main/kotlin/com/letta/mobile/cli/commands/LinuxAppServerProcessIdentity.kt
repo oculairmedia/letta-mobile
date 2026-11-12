@@ -14,18 +14,29 @@ internal class LinuxAppServerProcessIdentity(
 ) : AppServerProcessIdentity {
     override fun current(): String? {
         return runCatching {
-            val url = URI(serverUrl ?: return null)
-            if (url.scheme !in setOf("ws", "wss") || url.host !in LOOPBACK_HOSTS) return null
+            if (!isLocalServer()) return null
             val file = pidFile ?: return null
-            val pid = Files.readString(file).trim().toLongOrNull()?.takeIf { it > 0 } ?: return null
-            val boot = UUID.fromString(Files.readString(procRoot.resolve("sys/kernel/random/boot_id")).trim()).toString()
-            val statFile = procRoot.resolve("$pid/stat")
-            val start = startTime(Files.readString(statFile), pid) ?: return null
-            // Fail closed if the PID file or process changed while we were reading it.
-            if (Files.readString(file).trim() != pid.toString()) return null
-            if (startTime(Files.readString(statFile), pid) != start) return null
-            "$boot:$pid:$start"
+            val pid = readPid(file) ?: return null
+            readIdentity(file, pid)
         }.getOrNull()
+    }
+
+    private fun isLocalServer(): Boolean {
+        val url = URI(serverUrl ?: return false)
+        return url.scheme in setOf("ws", "wss") && url.host in LOOPBACK_HOSTS
+    }
+
+    private fun readPid(file: Path): Long? =
+        Files.readString(file).trim().toLongOrNull()?.takeIf { it > 0 }
+
+    private fun readIdentity(file: Path, pid: Long): String? {
+        val boot = UUID.fromString(Files.readString(procRoot.resolve("sys/kernel/random/boot_id")).trim()).toString()
+        val statFile = procRoot.resolve("$pid/stat")
+        val start = startTime(Files.readString(statFile), pid) ?: return null
+        // Fail closed if the PID file or process changed while we were reading it.
+        if (Files.readString(file).trim() != pid.toString()) return null
+        if (startTime(Files.readString(statFile), pid) != start) return null
+        return "$boot:$pid:$start"
     }
 
     private fun startTime(stat: String, pid: Long): Long? {

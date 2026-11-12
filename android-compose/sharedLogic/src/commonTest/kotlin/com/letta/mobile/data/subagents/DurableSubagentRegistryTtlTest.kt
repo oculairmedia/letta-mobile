@@ -67,6 +67,21 @@ class DurableSubagentRegistryTtlTest {
     }
 
     @Test
+    fun legacyIdentityWithKnownCurrentProcessRetainsFullUncertaintyGrace() {
+        val restarted = restartWithIdentity(null, "boot:20:100")
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-process")?.state)
+        assertNull(restarted.findByToolCall("conv-a", "tool-process")?.appServerProcessIdentity)
+        now += 60 * 60_000L
+        assertEquals(emptyList(), restarted.expireStale())
+        assertEquals(SubagentChipState.RUNNING, restarted.findByToolCall("conv-a", "tool-process")?.state)
+        now++
+        val retired = restarted.expireStale().single()
+        assertEquals(SubagentChipState.CANCELLED, retired.state)
+        assertEquals("restart_unobserved", retired.terminalReason)
+        assertNull(retired.appServerProcessIdentity)
+    }
+
+    @Test
     fun processIdentityRoundTripsAndLegacyJsonDefaultsToUnknown() {
         val reg = restartWithIdentity("boot:20:100", "boot:20:100")
         val record = requireNotNull(reg.findByToolCall("conv-a", "tool-process"))

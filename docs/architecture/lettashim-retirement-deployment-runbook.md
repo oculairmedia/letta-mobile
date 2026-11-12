@@ -623,8 +623,13 @@ ownership matrix.
 The repository wrapper unit passes `--app-server-pid-file /run/meridian-appserver/main.pid`
 (or use `LETTA_APP_SERVER_PID_FILE`). The matching App Server drop-in
 `scripts/deploy/meridian-appserver.process-identity.conf`, installed by `install-meridian.sh`,
-writes systemd's MainPID in ExecStartPost. Deploy both templates together under normal
-approval; this change does not modify or restart live units. The App Server must be
+writes systemd's MainPID in ExecStartPost. Install the wrapper unit and App Server
+unit/drop-in TOGETHER with the new wrapper release under normal deployment approval:
+the wrapper unit Requires=meridian-appserver.service, and its new flag is not accepted
+by the old wrapper binary. Never install only the new wrapper unit against an old
+release. A new binary with a missing PID file starts with unknown identity (the
+fallback), rather than refusing startup; it cannot provide confirmed restart retirement.
+This change does not modify or restart live units. The App Server must be
 launched directly with Type=simple, not through a non-exec launcher, and must retain
 KillMode=control-group so its workers cannot survive it. The PID file is trusted host
 configuration: it MUST name the App Server serving the configured URL, not another service.
@@ -644,6 +649,35 @@ on either side (including old-format records) retains the one-hour `restart_unob
 uncertainty bound; this fallback can still cancel a live entirely silent worker. Installing
 the PID-file integration cannot retrospectively prove ownership of old records. A new
 App Server generation is distinguished from the wrapper's local connection generation.
+
+Before the first approved rollout, preserve the old wrapper unit and release target
+(the guard deliberately refuses to overwrite a prior rollback capture):
+
+```bash
+sudo test ! -e /etc/meridian/rollback-52vxf
+sudo test ! -e /etc/systemd/system/meridian-appserver.service.d/process-identity.conf
+sudo install -d -m 0700 /etc/meridian/rollback-52vxf
+sudo cp -a /etc/systemd/system/meridian-iroh-wrapper.service /etc/meridian/rollback-52vxf/wrapper.service
+sudo sh -c 'readlink -f /opt/meridian/iroh-wrapper/current > /etc/meridian/rollback-52vxf/release'
+```
+
+Exact rollback for that first rollout, in an approved maintenance window (this
+restarts the App Server and kills its workers; do not execute during implementation):
+
+```bash
+sudo systemctl stop meridian-iroh-wrapper.service
+sudo cp -a /etc/meridian/rollback-52vxf/wrapper.service /etc/systemd/system/meridian-iroh-wrapper.service
+sudo sh -c 'ln -sfn "$(cat /etc/meridian/rollback-52vxf/release)" /opt/meridian/iroh-wrapper/current'
+sudo rm /etc/systemd/system/meridian-appserver.service.d/process-identity.conf
+sudo systemctl daemon-reload
+sudo systemctl restart meridian-appserver.service
+sudo systemctl start meridian-iroh-wrapper.service
+```
+
+Restore BOTH the old wrapper unit and old release; the old binary cannot parse the
+new unit's `--app-server-pid-file` flag. Leave the additive registry field on disk;
+older readers ignore it. Do not rerun the new installer after rollback, because it
+would reinstall the new unit and drop-in.
 
 ### Cron handover (`lgns8.24`) — DONE, executed 2026-08-01 01:05
 
