@@ -281,9 +281,46 @@ class QueuedSendDriverTest {
         assertEquals(listOf("head"), rig.queuedTexts())
     }
 
-    private class ScriptedTurns(var busy: Boolean) : QueuedSendTurns {
+    @Test
+    fun throwingRetryRemainsVisibleAndKeepsDrainingUntilPublished() = runTest {
+        val rig = rig(busy = true)
+        val retry = QueuedChatSend(QueuedSendId("retry-prompt"), CONV, "retry input", attempt = 1)
+        rig.turns.serialized { rig.driver.enqueueLocked(retry) }
+        rig.turns.dispatchFailure = IllegalStateException("retry transport rejected")
+        val firstDrain = runCatching { rig.finishTurn() }
+        assertTrue(firstDrain.isSuccess, "a transient throwing retry must not terminate the drain")
+        advanceTimeBy(RETRY_DELAY_MS * 2 + 1)
+        runCurrent()
+        assertTrue(rig.turns.attempts.size >= 3, "throwing dispatch must keep retrying without Send now")
+        assertEquals(listOf(retry), rig.queue.queueFor(CONV).items)
+        assertTrue(rig.turns.dispatched.isEmpty())
+        assertTrue(rig.turns.visibleCounts.all { it == 1 }, "queue plus transcript must represent the retry once")
+        rig.turns.dispatchFailure = null
+        advanceTimeBy(RETRY_DELAY_MS + 1)
+        runCurrent()
+        assertTrue(rig.queue.queueFor(CONV).isEmpty)
+        assertEquals(listOf("retry input"), rig.turns.dispatched)
+    }
+
+    @Test
+    fun cancellationFromRetryDispatchPropagatesAndRetainsHead() = runTest {
+        val rig = rig(busy = true)
+        val retry = QueuedChatSend(QueuedSendId("cancelled-retry"), CONV, "retry input", attempt = 1)
+        rig.turns.serialized { rig.driver.enqueueLocked(retry) }
+        rig.turns.dispatchFailure = kotlinx.coroutines.CancellationException("cancelled dispatch")
+        val failure = runCatching { rig.finishTurn() }.exceptionOrNull()
+        assertTrue(failure is kotlinx.coroutines.CancellationException)
+        assertEquals(listOf(retry), rig.queue.queueFor(CONV).items)
+        advanceTimeBy(RETRY_DELAY_MS * 3)
+        assertEquals(1, rig.turns.attempts.size, "cancellation must not schedule another attempt")
+    }
+
+    private class ScriptedTurns(var busy: Boolean, private val queue: ChatSendQueue) : QueuedSendTurns {
         private val lock = Mutex()
         var accept = true
+        var dispatchFailure: Throwable? = null
+        val attempts = mutableListOf<QueuedChatSend>()
+        val visibleCounts = mutableListOf<Int>()
         val dispatched = mutableListOf<String>()
         val composerClears = mutableListOf<Boolean>()
         val aborted = mutableListOf<QueueConversationId>()
@@ -295,6 +332,10 @@ class QueuedSendDriverTest {
             return busy
         }
         override suspend fun dispatch(item: QueuedChatSend, clearComposer: Boolean): Boolean {
+            attempts += item
+            val queued = queue.queueFor(item.conversationId).items
+            visibleCounts += queued.size + dispatched.count { text -> queued.none { it.text == text } }
+            dispatchFailure?.let { throw it }
             if (!accept) return false
             dispatched += item.text
             composerClears += clearComposer
@@ -341,7 +382,7 @@ class QueuedSendDriverTest {
 
     private fun TestScope.rig(busy: Boolean): Rig {
         val queue = ChatSendQueue()
-        val turns = ScriptedTurns(busy)
+        val turns = ScriptedTurns(busy, queue)
         val driverScope: CoroutineScope = backgroundScope
         return Rig(this, queue, turns, QueuedSendDriver(
             driverScope, queue, turns,

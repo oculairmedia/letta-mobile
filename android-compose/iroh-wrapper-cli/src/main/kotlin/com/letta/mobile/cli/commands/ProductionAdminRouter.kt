@@ -32,6 +32,9 @@ fun buildProductionAdminRouter(
      * previous in-memory-only behaviour.
      */
     subagentRegistryFile: String? = null,
+    /** Host-local App Server process proof, unknown for remote or unsupported hosts. */
+    appServerProcessIdentity: com.letta.mobile.data.subagents.AppServerProcessIdentity =
+        com.letta.mobile.data.subagents.AppServerProcessIdentity { null },
     pairingService: IrohPairingService? = null,
     nativeClient: AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
@@ -101,7 +104,7 @@ fun buildProductionAdminRouter(
         ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()
     val nativeSource = if (subagentRegistrySource == null) {
         ControllerSubagentRegistrySource(
-            com.letta.mobile.data.subagents.DurableSubagentRegistry(store = subagentStore),
+            com.letta.mobile.data.subagents.DurableSubagentRegistry(store = subagentStore, processIdentity = appServerProcessIdentity),
         ).also { source ->
             subagentPublisher?.let { build -> source.changeListener = build(source) }
             if (nativeClient != null && eventScope != null) {

@@ -268,9 +268,8 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
     PagedTimelineList(
         PagedTimelineParams(
             presentation = paged,
-            agentId = params.state.agentId,
+            state = params.state,
             thinking = params.state.isAgentTyping && showThinkingRow,
-            thinkingMessages = params.state.messages,
             bindings = params.bindings,
             bottomReserve = params.bottomReserve,
             listState = params.listState,

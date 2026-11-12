@@ -60,12 +60,13 @@ internal const val LOADING_OLDER_KEY = "__loading_older__"
 @Composable
 internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier = Modifier) {
     val state = params.state
+    val queued = remember(state.sendQueue) { state.queuedPromptIdentities() }
     val displayOptions = params.appearance.displayOptions
     // A new set of options starts a fresh cache: its incremental tail assumes the same filter.
     val cache = remember(displayOptions) { IncrementalChatRenderItemsCache() }
-    val items = remember(state.messages, state.messageListChange, params.appearance.displayMode, state.agentId, displayOptions) {
+    val items = remember(state.messages, state.messageListChange, queued, params.appearance, state.agentId) {
         // letta-mobile-zxk2n.5: hidden rows leave the list (and its spacing), not just their content.
-        val shown = displayOptions.visible(state.messages)
+        val shown = displayOptions.visible(state.messages).let { if (queued.isEmpty()) it else it.filterNot(queued::containsQueuedPrompt) }
         val change = if (shown === state.messages) state.messageListChange else ChatMessageListChange.Full
         cache.renderItems(shown, params.appearance.displayMode, change, state.agentId)
     }
