@@ -9,6 +9,7 @@ import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountCatalog
+import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDeviceUpgrade
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDirectory
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountRoutes
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountSources
@@ -61,3 +62,13 @@ internal class CanvasMountWiring private constructor(
 
 /** The operator's choices: [enabled] is `--enable-canvas-mounts` (default off); [secretKeyFile] the node key file. */
 internal class CanvasMountOptions(val enabled: Boolean, val secretKeyFile: String?)
+
+/**
+ * Owner decision D7: the one-time upgrade that gives devices paired before canvas mounts the two mount capabilities
+ * ([CanvasMountDeviceUpgrade]). Runs only when [options] enable mounts and pairing has a store ([pairedPeers]); null
+ * (nothing read or written) otherwise.
+ */
+internal fun upgradePairedDevicesForCanvasMounts(options: CanvasMountOptions, pairedPeers: Path?): CanvasMountDeviceUpgrade.Outcome? {
+    if (!options.enabled || pairedPeers == null) return null
+    return CanvasMountDeviceUpgrade.forPairingStore(pairedPeers).runOnce()
+}

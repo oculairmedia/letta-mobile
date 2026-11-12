@@ -397,6 +397,8 @@ class AppServerServeIrohCommand : CliktCommand(
             notebookStore = store
             notebookProtocol = protocol
             val canvasRelay = startCanvasRelay(scope)
+            upgradePairedDevicesForCanvasMounts(CanvasMountOptions(enableCanvasMounts, irohSecretKeyPath), access.pairedPeerStorePath())
+                ?.let { println("[iroh-app-server] Canvas mounts: paired-device capability upgrade $it") }
             pluginHost = startPluginHost(PluginHostFlags(pluginsMode, pluginsDir), pluginCanvas, productionToolRegistry, scope)
             // The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at
             // bind); its App Server client is created after, so the receiver reads it late.

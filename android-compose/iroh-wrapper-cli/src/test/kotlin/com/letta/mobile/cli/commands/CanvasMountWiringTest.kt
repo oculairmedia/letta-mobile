@@ -8,7 +8,11 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.ConversationViewers
+import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
+import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
+import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDeviceUpgrade
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.lang.reflect.Proxy
 import java.nio.file.Files
@@ -42,7 +46,7 @@ class CanvasMountWiringTest {
     }
 
     @Test
-    fun withTheFlagASecureHostRegistersAllFourRoutesAndAdvertisesTheCapability() = runBlocking {
+    fun withTheFlagASecureHostRegistersEveryRouteAndAdvertisesTheCapability() = runBlocking {
         val wiring = enabled()
         val router = router(wiring.routes(IrohAuthPolicy.PairedPeersOnly, client(), ConversationViewers.None))
         assertTrue(router.registeredMethods.containsAll(CanvasMountWire.METHODS))
@@ -65,6 +69,22 @@ class CanvasMountWiringTest {
             runBlocking { CanvasMountWiring.of(CanvasMountOptions(enabled = true, secretKeyFile = null), productState, records, scope) }
         }
         assertEquals(true, failure.message?.contains("--iroh-secret-key-file"))
+    }
+
+    @Test
+    fun thePairedDeviceUpgradeRunsOnlyWithTheFlagAndAPairingStore() {
+        val peers = productState.resolve("paired-peers.json")
+        val chatBefore = IrohPeerCapabilities.CHAT_ROLE - IrohPeerCapabilities.CANVAS_MOUNT_READ - IrohPeerCapabilities.CANVAS_MOUNT_WRITE
+        FilePairedPeerStore(peers).save(PairedPeer("phone", "phone", pairedAtMs = 1L, capabilities = chatBefore))
+
+        assertNull(upgradePairedDevicesForCanvasMounts(CanvasMountOptions(enabled = false, secretKeyFile = keyFile), peers))
+        assertEquals(chatBefore, FilePairedPeerStore(peers).get("phone")?.capabilities)
+        assertNull(upgradePairedDevicesForCanvasMounts(CanvasMountOptions(enabled = true, secretKeyFile = keyFile), null))
+
+        val enabled = CanvasMountOptions(enabled = true, secretKeyFile = keyFile)
+        assertEquals(CanvasMountDeviceUpgrade.Outcome.Applied(upgraded = 1), upgradePairedDevicesForCanvasMounts(enabled, peers))
+        assertEquals(IrohPeerCapabilities.CHAT_ROLE, FilePairedPeerStore(peers).get("phone")?.capabilities)
+        assertEquals(CanvasMountDeviceUpgrade.Outcome.AlreadyApplied, upgradePairedDevicesForCanvasMounts(enabled, peers))
     }
 
     private suspend fun enabled(): CanvasMountWiring =

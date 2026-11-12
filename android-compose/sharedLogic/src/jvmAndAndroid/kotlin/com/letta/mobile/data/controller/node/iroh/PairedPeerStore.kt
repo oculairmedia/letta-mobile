@@ -42,6 +42,12 @@ interface PairedPeerStore {
     fun save(peer: PairedPeer)
 
     fun remove(nodeId: String): Boolean
+
+    /**
+     * Applies [change] to every stored peer in ONE read-modify-write, so a concurrent pair or revoke is never lost
+     * or undone; writes only when some record changed and answers how many did.
+     */
+    fun updateEach(change: (PairedPeer) -> PairedPeer): Int
 }
 
 class InMemoryPairedPeerStore : PairedPeerStore {
@@ -58,7 +64,21 @@ class InMemoryPairedPeerStore : PairedPeerStore {
     }
 
     @Synchronized override fun remove(nodeId: String): Boolean = peers.remove(nodeId) != null
+
+    @Synchronized override fun updateEach(change: (PairedPeer) -> PairedPeer): Int {
+        val changed = changedPeers(peers.values, change)
+        changed.forEach { peers[it.nodeId] = it }
+        return changed.size
+    }
 }
+
+/** The peers [change] alters; a change may never re-key a record (its node id is its identity). */
+private fun changedPeers(peers: Collection<PairedPeer>, change: (PairedPeer) -> PairedPeer): List<PairedPeer> =
+    peers.mapNotNull { peer ->
+        val updated = change(peer)
+        require(updated.nodeId == peer.nodeId) { "a paired peer update may not change its node id" }
+        updated.takeIf { it != peer }
+    }
 
 /**
  * JSON-file-backed store with atomic writes ([AtomicJsonFile]); the file holds
@@ -90,6 +110,13 @@ class FilePairedPeerStore(private val path: Path) : PairedPeerStore {
         val present = nodeId in current
         if (present) persist(current - nodeId)
         present
+    }
+
+    override fun updateEach(change: (PairedPeer) -> PairedPeer): Int = AtomicJsonFile.withProcessLock(path) {
+        val current = load()
+        val changed = changedPeers(current.values, change)
+        if (changed.isNotEmpty()) persist(current + changed.associateBy { it.nodeId })
+        changed.size
     }
 
     private fun load(): Map<String, PairedPeer> {
