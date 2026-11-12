@@ -1,6 +1,7 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -194,6 +195,8 @@ internal class ExternalToolDispatcher(
                         toolName = request.toolName,
                         input = request.input,
                         caller = ExternalToolCaller(
+                            // n2stx.2.4: the App Server stamped this scope on the frame; the model cannot choose it.
+                            identity = CallerIdentity.VERIFIED,
                             agentId = request.runtime?.agentId,
                             conversationId = request.runtime?.conversationId,
                             // letta-mobile-bglj6.12: the model's tool call id, the key the

@@ -245,8 +245,11 @@ item, field, purpose, path or value.
 - **R4 Agent principal.** No admin RPC connection is ever an agent: `secret.request` and
   `secret.request.status` answer `forbidden` to every connection. Agents call the host tool
   `secret_request` (actions `create` and `status`), which is bound to the agent id the host runtime
-  stamped on the tool call, never to an argument; a call without one answers `forbidden`. Its
-  result is the route's result and its error the route's code.
+  stamped on the tool call, never to an argument. The caller's identity must be verified
+  (`CallerIdentity.VERIFIED`: the App Server's runtime stamp, or a Meridian live-call token); a
+  claimed identity (Meridian env-scoped binding, a bare agent id, a scope relayed from another
+  host) or a call without an agent answers `forbidden` before any argument is read (owner decision
+  2026-11-11). Its result is the route's result and its error the route's code.
 - **R5 Order.** Principal, then strict params (exactly the method's fields, all JSON strings), then
   for `submit` the value (length and padding checked against 65 536 bytes before any byte is
   allocated, then decoded straight into the keystore secret type), then visibility of the named

@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -101,7 +102,7 @@ class CanvasComposeDataKindsRenderTest {
     /** The fixture composed through the host tool, and a session that took the relay's log. */
     private fun composed(): Pair<ComposeReceipt, CanvasSession> = runBlocking {
         val input = CanvasComposeContract.json.parseToJsonElement(File(REQUEST_FIXTURE).readText()).jsonObject
-        val caller = ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION, toolCallId = CALL)
+        val caller = ExternalToolCaller(CallerIdentity.VERIFIED, agentId = AGENT, conversationId = CONVERSATION, toolCallId = CALL)
         val result = assertIs<ExternalToolResult.Success>(registry.invoke(CanvasToolContract.COMPOSE, input, caller), "refused")
         val receipt = CanvasComposeContract.json.decodeFromString(ComposeReceipt.serializer(), result.content)
         val session = CanvasSession.create(

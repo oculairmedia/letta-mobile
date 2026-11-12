@@ -1,5 +1,6 @@
 package com.letta.mobile.data.meridian.endpoint
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -97,7 +98,7 @@ internal class CallerEchoTool : HostExternalTool {
     override val capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller(agentId))
+        invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agentId))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         callers += caller

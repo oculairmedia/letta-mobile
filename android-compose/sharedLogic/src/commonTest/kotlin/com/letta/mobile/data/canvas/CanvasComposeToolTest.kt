@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.refusal
 import com.letta.mobile.data.canvas.compose.CanvasComposeGuide
@@ -71,7 +72,11 @@ class CanvasComposeToolTest {
     ).also(sessions::register)
 
     private suspend fun compose(request: String, agent: String? = AGENT, conversation: String? = CONVERSATION, toolCallId: String? = "call-1") =
-        registry.invoke(CanvasToolContract.COMPOSE, Json.parseToJsonElement(request).jsonObject, ExternalToolCaller(agent, conversation, toolCallId))
+        registry.invoke(
+            CanvasToolContract.COMPOSE,
+            Json.parseToJsonElement(request).jsonObject,
+            ExternalToolCaller(VERIFIED, agent, conversation, toolCallId),
+        )
 
     private suspend fun revision(): Long = Json { ignoreUnknownKeys = true }.decodeFromString<CanvasGetSceneResult>(
         assertIs<ExternalToolResult.Success>(

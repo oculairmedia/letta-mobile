@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.node.iroh.AdminRpcBiStream
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRecvStream
@@ -54,7 +55,7 @@ class SecretRequestRouteSentinelTest {
 
     private val markers = listOf(
         "routed", "replay", "admin-token", "unauthenticated", "limited", "wrong-agent", "agent", "smuggled",
-        "not-base64", "locked", "exploded", "expired", "stream", "torn-frame", "tool-arg",
+        "not-base64", "locked", "exploded", "expired", "stream", "torn-frame", "tool-arg", "claimed",
     ).associateWith { TestSecret("SENTINEL-s2-91c4e7-$it") }
 
     private fun marker(name: String): TestSecret = markers.getValue(name)
@@ -121,6 +122,9 @@ class SecretRequestRouteSentinelTest {
         }
         observe(routes.dispatch(SecretRequestRoute.SUBMIT, raw, HUMAN))
         observe(routes.tool(JsonObject(statusInput(id) + ("value" to JsonPrimitive(marker("tool-arg").base64()))), REQUESTER))
+        val claimed = JsonObject(statusInput(id) + ("value" to JsonPrimitive(marker("claimed").base64())))
+        observe(routes.tool(claimed, REQUESTER, CallerIdentity.CLAIMED))
+        observe(routes.tool(createInput(marker("claimed").text), REQUESTER, CallerIdentity.CLAIMED))
     }
 
     private suspend fun failingFlows() {

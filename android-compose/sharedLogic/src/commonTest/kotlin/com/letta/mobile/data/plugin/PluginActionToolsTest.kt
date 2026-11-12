@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.canvas.CanvasSceneCheck
 import com.letta.mobile.data.canvas.CanvasSceneValidator
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
@@ -62,7 +63,7 @@ class PluginActionToolsTest {
         assertEquals(example.actions.getValue("start").input, advertised.first().parameters)
 
         val input = json("""{"label":"x"}""").jsonObject
-        val result = registry.invoke("example_start", input, ExternalToolCaller("agent-1", "conv-1", "call-1"))
+        val result = registry.invoke("example_start", input, ExternalToolCaller(CallerIdentity.VERIFIED, "agent-1", "conv-1", "call-1"))
         assertEquals(ExternalToolResult.Success("letta.example/start $input by agent-1"), result)
 
         PluginActionTools.publish(source, installed, invoker)

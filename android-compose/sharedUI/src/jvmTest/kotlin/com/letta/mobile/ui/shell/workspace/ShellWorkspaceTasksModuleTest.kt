@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
@@ -310,7 +311,7 @@ class ShellWorkspaceTasksModuleTest {
         onNodeWithTag(SHELL_TASKS_MODULE_TAG).assertDoesNotExist()
 
         val input = Json.parseToJsonElement("""{"action":"apply","ops":[{"op":"add","lane":"side","view":"shell.tasks","index":0}]}""")
-        val result = runBlocking { tool.invoke(input.jsonObject, ExternalToolCaller(agentId = Agent)) }
+        val result = runBlocking { tool.invoke(input.jsonObject, ExternalToolCaller(CallerIdentity.VERIFIED, agentId = Agent)) }
         assertIs<ExternalToolResult.Success>(result, "the agent's edit applies")
         assertListsTheOpenConversation()
         waitUntil(timeoutMillis = TimeoutMillis) { onAllNodesWithText("Layout changed by Ada").fetchSemanticsNodes().isNotEmpty() }

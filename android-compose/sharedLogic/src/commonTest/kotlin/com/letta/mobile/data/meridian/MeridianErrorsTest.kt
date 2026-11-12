@@ -1,5 +1,6 @@
 package com.letta.mobile.data.meridian
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -109,7 +110,7 @@ class MeridianErrorsTest {
 
     @Test
     fun aCallWithoutAnAgentIsDenied() = runTest {
-        val response = run(listOf("canvas", "scene"), caller = ExternalToolCaller(agentId = null))
+        val response = run(listOf("canvas", "scene"), caller = ExternalToolCaller(CallerIdentity.VERIFIED, agentId = null))
         assertEquals(MeridianExit.DENIED, response.exitCode)
         assertEquals("denied", (response.json()["error"] as JsonPrimitive).content)
     }
@@ -126,7 +127,7 @@ class MeridianErrorsTest {
             limited.stdout,
         )
         assertEquals(MeridianExit.OK, run(listOf("canvas", "--help"), router = router).exitCode)
-        val other = ExternalToolCaller(MeridianTestHost.AGENT, "conv-other")
+        val other = ExternalToolCaller(CallerIdentity.VERIFIED, MeridianTestHost.AGENT, "conv-other")
         assertEquals(MeridianExit.OK, run(listOf("canvas", "list"), router = router, caller = other).exitCode, "per conversation")
         now += 60_000L
         assertEquals(MeridianExit.OK, run(listOf("canvas", "list"), router = router).exitCode, "a new window")

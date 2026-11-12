@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -172,7 +173,8 @@ class ShellLayoutAgentToolUiTest {
         }
 
     private fun ComposeUiTest.agentCalls(input: String): ExternalToolResult {
-        val result = runBlocking { tool.invoke(Json.parseToJsonElement(input).jsonObject, ExternalToolCaller(agentId = "agent-a")) }
+        val caller = ExternalToolCaller(VERIFIED, agentId = "agent-a")
+        val result = runBlocking { tool.invoke(Json.parseToJsonElement(input).jsonObject, caller) }
         waitForIdle()
         return result
     }
@@ -486,7 +488,7 @@ class ShellLayoutAgentToolUiTest {
         shell(1200.dp) { assertTrue(port.attached.value != null) }
         assertEquals(null, port.attached.value)
         assertTrue("No app shell" in assertIs<ExternalToolResult.Error>(runBlocking {
-            tool.invoke(Json.parseToJsonElement("""{"action":"get"}""").jsonObject, ExternalToolCaller(agentId = "agent-a"))
+            tool.invoke(Json.parseToJsonElement("""{"action":"get"}""").jsonObject, ExternalToolCaller(VERIFIED, agentId = "agent-a"))
         }).error)
     }
 }

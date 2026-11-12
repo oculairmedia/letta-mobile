@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.shell.layout.ModuleSlot
@@ -72,7 +73,7 @@ class ShellLayoutHostOwnedTest {
         port.attach(store)
         val tool = ShellLayoutTool(port)
         val input = """{"action":"apply","ops":[{"op":"add","lane":"main","view":"shell.secret-request","index":0}]}"""
-        val result = tool.invoke(Json.parseToJsonElement(input).jsonObject, ExternalToolCaller(agentId = "agent-layout-test"))
+        val result = tool.invoke(Json.parseToJsonElement(input).jsonObject, ExternalToolCaller(VERIFIED, agentId = "agent-layout-test"))
         val errors = Json.parseToJsonElement(assertIs<ExternalToolResult.Error>(result).error).jsonObject["errors"]!!.jsonArray
         assertEquals("host_owned_view", errors.first().jsonObject["rule"]!!.jsonPrimitive.content)
         assertEquals(ShellLayoutConfig.Default, store.config.value)

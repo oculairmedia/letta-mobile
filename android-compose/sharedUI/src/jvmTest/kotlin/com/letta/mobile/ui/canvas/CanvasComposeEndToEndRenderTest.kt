@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -124,7 +125,7 @@ class CanvasComposeEndToEndRenderTest {
     private data class Composed(val receipt: ComposeReceipt, val answer: String)
 
     private suspend fun call(tool: String, input: JsonObject, toolCallId: String? = null): ExternalToolResult =
-        registry.invoke(tool, input, ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION, toolCallId = toolCallId))
+        registry.invoke(tool, input, ExternalToolCaller(VERIFIED, agentId = AGENT, conversationId = CONVERSATION, toolCallId = toolCallId))
 
     private suspend fun compose(compose: ComposeCall): Composed {
         val input = json.parseToJsonElement(compose.input).jsonObject

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.meridian.endpoint
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.meridian.MeridianError
 import com.letta.mobile.data.meridian.MeridianErrorCode
@@ -53,7 +54,7 @@ class MeridianCallerBinder(
         return when {
             live != null -> Result.success(live.toCaller())
             mode == MeridianCallerBindingMode.ENV_SCOPED && (claimedAgent != null || claimedConversation != null) ->
-                Result.success(ExternalToolCaller(claimedAgent, claimedConversation))
+                Result.success(ExternalToolCaller(CallerIdentity.CLAIMED, claimedAgent, claimedConversation))
             token == null -> denied(
                 "no tool token: meridian runs from an agent's shell tool, which gets LETTA_TOOL_TOKEN for that one call",
             )
@@ -62,6 +63,8 @@ class MeridianCallerBinder(
     }
 
     private fun MeridianLiveCall.toCaller() = ExternalToolCaller(
+        // The token was issued for this one live shell call; its scope is the App Server's stamp.
+        identity = CallerIdentity.VERIFIED,
         agentId = scope.agentId.takeUnless { scope.isAgentFree },
         conversationId = scope.conversationId,
         // The first meridian invocation of a shell call carries the call's own id, so a compose

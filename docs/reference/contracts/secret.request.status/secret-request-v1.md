@@ -9,7 +9,7 @@
   is echoed.
 - Result: `{}` while open, then `{receipt: {status, itemId, fieldName, reason?}}`.
 - Principal: the requesting agent, bound by the host tool `secret_request` to the agent id the host runtime
-  stamped on the tool call. No admin RPC connection is an agent: every connection caller, `admin.full`
+  stamped on the tool call; a claimed (unverified) identity is refused `forbidden`. No admin RPC connection is an agent: every connection caller, `admin.full`
   included, gets `forbidden` before params are read.
 - Refusals are `{"success": false, "error": "<code>"}`; `invalid_request` carries its problem as
   `invalid_request:<problem>`.

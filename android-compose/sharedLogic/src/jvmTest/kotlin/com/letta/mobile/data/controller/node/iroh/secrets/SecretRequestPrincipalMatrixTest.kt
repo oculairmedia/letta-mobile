@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.secrets.request.RequestingAgent
@@ -7,6 +8,7 @@ import com.letta.mobile.data.secrets.request.SecretRequestId
 import com.letta.mobile.data.secrets.request.SecretRequestState
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,8 +21,13 @@ import kotlin.test.assertTrue
  */
 class SecretRequestPrincipalMatrixTest {
     /** Who calls, and through which door the transport would let them in. */
-    private enum class Who(val context: AdminRpcRequestContext?, val agent: RequestingAgent?) {
+    private enum class Who(
+        val context: AdminRpcRequestContext?,
+        val agent: RequestingAgent?,
+        val identity: CallerIdentity = CallerIdentity.VERIFIED,
+    ) {
         AGENT(null, REQUESTER),
+        CLAIMED_AGENT(null, REQUESTER, CallerIdentity.CLAIMED),
         OTHER_AGENT(null, BYSTANDER),
         PAIRED_HUMAN(HUMAN, null),
         ADMIN_TOKEN_PROCESS(ADMIN_TOKEN, null),
@@ -33,6 +40,7 @@ class SecretRequestPrincipalMatrixTest {
 
     /** The expected outcome ("ok" or the refusal text) of every route for [who]. */
     private fun expected(route: SecretRequestRoute, who: Who): String = when {
+        who.identity == CallerIdentity.CLAIMED -> forbidden
         who.agent != null -> agentExpectation(route, who)
         who == Who.PAIRED_HUMAN -> humanExpectation(route)
         who == Who.WRONG_AGENT_HUMAN -> wrongAgentExpectation(route)
@@ -64,6 +72,7 @@ class SecretRequestPrincipalMatrixTest {
 
     /** The outcome of [route] for [who] on request [id]: "ok" or the refusal text. */
     private suspend fun outcome(harness: SecretRouteHarness, route: SecretRequestRoute, who: Who, id: SecretRequestId): String {
+        if (who.identity == CallerIdentity.CLAIMED) return claimedOutcome(harness, route, id)
         val context = who.context ?: return agentOutcome(harness, route, checkNotNull(who.agent), id)
         val response = harness.dispatch(route, params(route, id), context)
         return if (resultOf(response) != null) "ok" else errorOf(response)
@@ -77,6 +86,14 @@ class SecretRequestPrincipalMatrixTest {
     ): String {
         val answer = harness.feature.handlers.handle(route, params(route, id), SecretRequestCaller.Agent(agent), "test")
         return (answer as? SecretRouteAnswer.Refused)?.text ?: "ok"
+    }
+
+    /** A claimed identity reaches only the tool; every action it could name, the route's own included, is refused. */
+    private suspend fun claimedOutcome(harness: SecretRouteHarness, route: SecretRequestRoute, id: SecretRequestId): String {
+        val action = mapOf(SecretRequestRoute.REQUEST to "create", SecretRequestRoute.STATUS to "status")[route] ?: route.method
+        val input = JsonObject((params(route, id) ?: JsonObject(emptyMap())) + ("action" to JsonPrimitive(action)))
+        val result = harness.tool(input, REQUESTER, CallerIdentity.CLAIMED)
+        return (result as? ExternalToolResult.Error)?.error ?: "ok"
     }
 
     @Test

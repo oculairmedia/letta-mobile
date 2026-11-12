@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeGuide
 import com.letta.mobile.data.canvas.compose.CanvasComposeIds
@@ -46,7 +47,7 @@ class HostCanvasComposeToolsTest {
         ): ExternalToolResult = registry.invoke(
             CanvasToolContract.COMPOSE,
             Json.parseToJsonElement(request).jsonObject,
-            ExternalToolCaller(agentId = agent, conversationId = conversation, toolCallId = toolCallId),
+            ExternalToolCaller(CallerIdentity.VERIFIED, agentId = agent, conversationId = conversation, toolCallId = toolCallId),
         )
 
         suspend fun logged(): List<CanvasRelayEntry> = store.readAfter(TOPIC, 0L)

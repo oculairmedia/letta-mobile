@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalTool
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
@@ -31,7 +32,8 @@ class PluginActionTool(val definition: PluginToolDefinition, private val invoker
     /** Unused for a [HostExternalTool], which is advertised regardless; required by [ExternalTool]. */
     override val capability: Capability = Capability.ImageHydration
 
-    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = invoke(input, ExternalToolCaller(agentId))
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agentId))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult = invoker.invoke(definition, input, caller)
 }

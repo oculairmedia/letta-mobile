@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
@@ -93,9 +94,9 @@ internal class SecretRouteHarness(val parts: SecretRouteParts = SecretRouteParts
     suspend fun dispatch(route: SecretRequestRoute, params: JsonObject?, context: AdminRpcRequestContext): String =
         router.dispatch(AdminRpcInvocation(REQUEST_ID, route.method, params, context))
 
-    /** Calls the tool as [agent] (null: no agent stamped). */
-    suspend fun tool(input: JsonObject, agent: RequestingAgent?): ExternalToolResult =
-        tool.invoke(input, ExternalToolCaller(agent?.agentId?.value, CONVERSATION))
+    /** Calls the tool as [agent] (null: no agent stamped) with the given provenance of that identity. */
+    suspend fun tool(input: JsonObject, agent: RequestingAgent?, identity: CallerIdentity = CallerIdentity.VERIFIED): ExternalToolResult =
+        tool.invoke(input, ExternalToolCaller(identity, agent?.agentId?.value, CONVERSATION))
 
     /** Creates a pending request through the tool as [agent] and answers its id. */
     suspend fun create(agent: RequestingAgent = REQUESTER): SecretRequestId {

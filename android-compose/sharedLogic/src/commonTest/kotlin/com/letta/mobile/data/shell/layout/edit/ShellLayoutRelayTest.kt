@@ -1,5 +1,6 @@
 package com.letta.mobile.data.shell.layout.edit
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.relay.AppToolCallId
@@ -32,7 +33,7 @@ import kotlin.test.assertTrue
  * between them are not exercised here.
  */
 class ShellLayoutRelayTest {
-    private val caller = ExternalToolCaller(agentId = "agent-layout", conversationId = "conv-layout", toolCallId = "tc-7")
+    private val caller = ExternalToolCaller(VERIFIED, agentId = "agent-layout", conversationId = "conv-layout", toolCallId = "tc-7")
     private val recentsFirst = """{"action":"apply","ops":[{"op":"move","lane":"home","view":"home.recents","index":0}]}"""
 
     private fun json(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject

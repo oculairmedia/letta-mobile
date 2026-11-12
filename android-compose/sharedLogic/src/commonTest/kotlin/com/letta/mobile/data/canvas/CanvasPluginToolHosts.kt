@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -23,7 +24,11 @@ internal sealed class PluginToolHost(val name: String) {
     abstract suspend fun logged(): List<CanvasOp>?
 
     suspend fun call(tool: String, input: JsonObject, agent: String = AGENT): ExternalToolResult =
-        registry.invoke(tool, JsonObject(input + ("canvas_id" to Json.parseToJsonElement("\"$CANVAS\""))), ExternalToolCaller(agent, CONVERSATION, TOOL_CALL))
+        registry.invoke(
+            tool,
+            JsonObject(input + ("canvas_id" to Json.parseToJsonElement("\"$CANVAS\""))),
+            ExternalToolCaller(VERIFIED, agent, CONVERSATION, TOOL_CALL),
+        )
 
     suspend fun applyOps(vararg ops: String, dryRun: Boolean = false, agent: String = AGENT): ExternalToolResult =
         call(CanvasToolContract.APPLY_OPS, opsInput(*ops, dryRun = dryRun), agent)
