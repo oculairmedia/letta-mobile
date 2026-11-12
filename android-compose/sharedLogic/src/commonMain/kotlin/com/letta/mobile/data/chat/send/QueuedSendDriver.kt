@@ -34,6 +34,7 @@ private enum class QueueEvent(val wireName: String) {
     SendNow("queue.sendNow"),
     Dispatched("queue.dispatched"),
     DrainDeferred("queue.drainDeferred"),
+    DrainRecovered("queue.drainRecovered"),
     HeldByOtherClient("queue.heldByOtherClient"),
     OtherClientReleased("queue.otherClientReleased"),
 }
@@ -47,8 +48,9 @@ private enum class QueueEvent(val wireName: String) {
  * ([onStopped]), matching the App Server, which parks its own queue on `abort_message`.
  *
  * The transport retires a turn a moment after its terminal frame is published, so a drain that
- * still sees the turn retries briefly instead of dispatching into a busy rejection. It gives up
- * after [retryAttempts]: the items stay queued and the next terminal, send or resume drains again.
+ * still sees the turn retries briefly instead of dispatching into a busy rejection, then keeps
+ * retrying with capped exponential backoff. Readiness signals interrupt the wait without resuming
+ * a queue the user paused.
  */
 internal class QueuedSendDriver(
     private val scope: CoroutineScope,
@@ -57,11 +59,14 @@ internal class QueuedSendDriver(
     private val retry: DrainRetry = DrainRetry(),
     otherClientBackoff: OtherClientHold.Backoff = OtherClientHold.Backoff(),
 ) {
-    /** How long a drain keeps retrying a conversation whose turn has not retired yet. */
+    /** Fast retirement retry cadence before capped backoff begins. */
     data class DrainRetry(val delayMs: Long = DRAIN_RETRY_DELAY_MS, val attempts: Int = DRAIN_RETRY_ATTEMPTS)
 
     private val drainLock = SynchronizedObject()
     private val drains = HashMap<QueueConversationId, Job>()
+    private val backoff = OtherClientHold.Backoff(initialMs = DRAIN_BACKOFF_INITIAL_MS)
+    private val retryCounts = HashMap<QueueConversationId, Int>()
+    private val backingOff = HashSet<QueueConversationId>()
     private val otherClientHold = OtherClientHold(scope, otherClientBackoff) { conversationId ->
         turns.serialized { releaseOtherClientHoldLocked(conversationId) }
     }
@@ -107,9 +112,18 @@ internal class QueuedSendDriver(
     }
 
     /** A terminal this device does not own: another client's turn may have ended, so try again. */
-    suspend fun onForeignTerminalLocked() {
-        queue.heldConversations().forEach { releaseOtherClientHoldLocked(it) }
+    suspend fun onForeignTerminalLocked(alreadyDrained: QueueConversationId? = null) {
+        queue.state.value.keys.toList().forEach {
+            when {
+                queue.queueFor(it).heldByOtherClient -> releaseOtherClientHoldLocked(it)
+                it == alreadyDrained -> Unit
+                else -> drainLocked(it)
+            }
+        }
     }
+
+    /** Reconnected transport: retry waiting heads now, without releasing a user pause. */
+    suspend fun onTransportReadyLocked() = onForeignTerminalLocked()
 
     private suspend fun releaseOtherClientHoldLocked(conversationId: QueueConversationId) {
         // A foreign terminal can race the transport's retirement, or the next autonomous wake.
@@ -127,16 +141,25 @@ internal class QueuedSendDriver(
 
     /** A user Stop: hold what is queued. */
     fun onStopped(conversationId: QueueConversationId) {
+        cancelDrain(conversationId)
         if (queue.pause(conversationId)) report(QueueEvent.Paused, conversationId)
     }
 
     /** A terminal disconnect: hold every queue rather than drop what the user typed. */
     fun onDisconnected() {
-        queue.pauseAll().forEach { report(QueueEvent.Paused, it) }
+        queue.pauseAll().forEach {
+            cancelDrain(it)
+            report(QueueEvent.Paused, it)
+        }
     }
 
     suspend fun cancel(id: QueuedSendId): Boolean = turns.serialized {
         val removed = queue.remove(id) ?: return@serialized false
+        if (queue.queueFor(removed.conversationId).items.isEmpty()) {
+            cancelDrain(removed.conversationId)
+            retryCounts.remove(removed.conversationId)
+            backingOff.remove(removed.conversationId)
+        }
         report(QueueEvent.Cancelled, removed.conversationId, id)
         true
     }
@@ -165,9 +188,14 @@ internal class QueuedSendDriver(
     private fun abortRunningTurn(conversationId: QueueConversationId): Boolean =
         turns.hasActiveTurn(conversationId) && turns.abortTurn(conversationId)
 
-    /** Runs the head now if it can; otherwise retries briefly off the lock. */
+    /** Runs the head now, interrupting any pending backoff on a readiness signal. */
     private suspend fun drainLocked(conversationId: QueueConversationId) {
+        cancelDrain(conversationId)
         if (!drainOnceLocked(conversationId)) scheduleDrain(conversationId)
+    }
+
+    private fun cancelDrain(conversationId: QueueConversationId) {
+        synchronized(drainLock) { drains.remove(conversationId)?.cancel() }
     }
 
     private fun scheduleDrain(conversationId: QueueConversationId) {
@@ -182,46 +210,62 @@ internal class QueuedSendDriver(
     }
 
     private suspend fun drainWithRetry(conversationId: QueueConversationId) {
-        repeat(retry.attempts) {
-            delay(retry.delayMs.milliseconds)
-            if (turns.serialized { drainOnceLocked(conversationId) }) return
+        var attempt = 0
+        while (true) {
+            val waitMs = if (attempt < retry.attempts) retry.delayMs else backoff.delayMs(attempt - retry.attempts)
+            delay(waitMs.milliseconds)
+            val finished = turns.serialized {
+                attempt = (retryCounts[conversationId] ?: 0) + 1
+                retryCounts[conversationId] = attempt
+                val drained = drainOnceLocked(conversationId)
+                if (!drained && attempt >= retry.attempts && backingOff.add(conversationId)) {
+                    report(QueueEvent.DrainDeferred, conversationId, attempts = attempt)
+                }
+                drained
+            }
+            if (finished) return
         }
-        report(QueueEvent.DrainDeferred, conversationId)
     }
 
     /** True when the drain is finished (dispatched, or nothing runnable); false to retry. */
     private suspend fun drainOnceLocked(conversationId: QueueConversationId): Boolean {
-        if (turns.hasActiveTurn(conversationId)) return false
         val waiting = queue.queueFor(conversationId)
         val next = waiting.items.firstOrNull()?.takeUnless { waiting.paused || waiting.heldByOtherClient } ?: return true
+        if (turns.hasActiveTurn(conversationId)) return false
         // The queue owns presentation until dispatch has published the transcript row. Keeping
         // the head here also avoids a disappear/reappear pulse when the transport rejects a retry.
         val dispatched = runCatching { turns.dispatch(next) }.getOrElse { failure ->
             if (failure is CancellationException || failure !is Exception) throw failure
-            Telemetry.error(
-                TELEMETRY_TAG, "queue.drainFailed", failure,
-                "conversationId" attr conversationId.value, "otid" attr next.id.value,
-                "attempt" attr next.attempt,
-            )
             false
         }
         if (!dispatched) return false
         queue.remove(next.id)
+        val attempts = retryCounts.remove(conversationId)
+        if (backingOff.remove(conversationId)) {
+            report(QueueEvent.DrainRecovered, conversationId, next.id, attempts = attempts)
+        }
         report(QueueEvent.Dispatched, conversationId, next.id)
         return true
     }
 
-    private fun report(event: QueueEvent, conversationId: QueueConversationId, id: QueuedSendId? = null) {
+    private fun report(
+        event: QueueEvent,
+        conversationId: QueueConversationId,
+        id: QueuedSendId? = null,
+        attempts: Int? = null,
+    ) {
         Telemetry.event(
             TELEMETRY_TAG, event.wireName,
             "conversationId" attr conversationId.value,
             "otid" attr id?.value,
             "depth" attr queue.queueFor(conversationId).items.size,
+            "attempts" attr attempts,
         )
     }
 
     private companion object {
         const val TELEMETRY_TAG = "ChatSendQueue"
+        const val DRAIN_BACKOFF_INITIAL_MS = 500L
         const val DRAIN_RETRY_DELAY_MS = 50L
         const val DRAIN_RETRY_ATTEMPTS = 40
     }

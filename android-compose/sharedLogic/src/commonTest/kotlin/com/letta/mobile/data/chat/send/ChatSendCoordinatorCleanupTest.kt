@@ -51,6 +51,58 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorCleanupTest {
     @Test
+    fun `transport reconnect wakes queued head without waiting for backoff`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val transport = FakeChannelTransport(MutableList(1_000) { false })
+        val coordinator = coordinator(timeline, RecordingUiSink(), transport, scope = backgroundScope)
+        coordinator.send("outage").join()
+        advanceTimeBy(10_000)
+        assertTrue(timeline.externalLocals.isEmpty())
+        transport.sendResults.clear()
+        val attempts = transport.sentTexts.size
+        val state = transport.state as MutableStateFlow<ChannelTransportState>
+        state.value = ChannelTransportState.Connecting(reconnecting = true)
+        state.value = ChannelTransportState.Connected("server", "reconnected", "device")
+        assertEquals(attempts + 1, transport.sentTexts.size)
+        assertEquals(listOf("outage"), timeline.externalLocals.map { it.content })
+    }
+
+    @Test
+    fun `queued dispatch transport exception retains the user prompt until recovery`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val transport = FakeChannelTransport(MutableList(1_000) { false })
+        val coordinator = coordinator(timeline, RecordingUiSink(), transport, scope = backgroundScope)
+        coordinator.send("outage").join()
+        transport.sendObserver = { error("transport unavailable") }
+        advanceTimeBy(10_000)
+        assertEquals(listOf("outage"), coordinator.sendQueue.state.value.values.flatMap { it.items }.map { it.text })
+        assertTrue(timeline.externalLocals.isEmpty())
+        transport.sendObserver = {}
+        transport.sendResults.clear()
+        advanceTimeBy(30_001)
+        assertEquals(listOf("outage"), timeline.externalLocals.map { it.content })
+        assertTrue(coordinator.sendQueue.state.value.values.all { it.items.isEmpty() })
+    }
+
+    @Test
+    fun `subscribe terminal settles its old turn before draining a new input`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(false, true, true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport, scope = backgroundScope)
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("foreign-turn", AGENT_ID, "conv-1", "foreign-run"))
+        coordinator.send("first").join()
+        coordinator.send("second").join()
+        transport.activeChatTurn = false
+        transport.sendObserver = { transport.activeChatTurn = true }
+        coordinator.handleEvent(WsTimelineEvent.SubscribeDone("foreign-run", lastSeq = 1L, status = "completed"))
+        assertEquals(listOf("first"), timeline.externalLocals.map { it.content })
+        assertTrue(timeline.sentLocals.isEmpty(), "the old terminal must not settle the newly admitted prompt")
+        assertTrue(ui.isStreaming(), "the newly admitted turn owns presence")
+        assertEquals(listOf("second"), coordinator.sendQueue.state.value.values.flatMap { it.items }.map { it.text })
+    }
+
+    @Test
     fun `next send heals stale presence when transport has no active turn`() =
         runTest(UnconfinedTestDispatcher()) {
             val timeline = RecordingTimelineWriter()

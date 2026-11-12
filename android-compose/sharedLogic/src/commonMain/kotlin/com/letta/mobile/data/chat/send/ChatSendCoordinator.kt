@@ -15,6 +15,7 @@ import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.util.Telemetry
@@ -124,6 +125,13 @@ class ChatSendCoordinator(
     )
 
     init {
+        scope.launch {
+            wsChatBridge.connection.collect { connection ->
+                if (connection is WsConnectionState.Connected) {
+                    turnStateMutex.withLock { queueDriver.onTransportReadyLocked() }
+                }
+            }
+        }
         scope.launch {
             // A Retry queues its prompt in the outbox. Each queued attempt is submitted here once,
             // including retries queued before this coordinator subscribed.
@@ -442,7 +450,8 @@ class ChatSendCoordinator(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            if (pending.attempt > 0) throw failure
+            val queueOwnsSend = queuedSends.queueFor(pending.conversationId).items.any { it.id == pending.id }
+            if (pending.attempt > 0 || queueOwnsSend) throw failure
             Telemetry.error("AdminChatVM", "ws.send.pendingRejected", failure)
             foreground.sendFailed(ConversationId(pending.conversationId.value),
                 "Couldn’t save this message. Dismiss an unsent message or try a smaller message.")
@@ -522,19 +531,19 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleSubscribeDone(event: WsTimelineEvent.SubscribeDone) {
-        when (BridgeTurnStatus.fromWire(event.status)) {
-            BridgeTurnStatus.Completed, BridgeTurnStatus.Cancelled, BridgeTurnStatus.Failed ->
-                queueDriver.onForeignTerminalLocked()
-            is BridgeTurnStatus.Unknown -> Unit
-        }
-        // SubscribeDone carries a run id only; resolve the owning
-        // conversation from it before finalizing anything.
-        val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId)) ?: return
-        if (state.otid != null || ui.isStreaming()) {
+        val status = BridgeTurnStatus.fromWire(event.status)
+        // Settle the old run before readiness can admit a new send into that same state.
+        val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId))
+        val drained = if (state != null && (state.otid != null || ui.isStreaming())) {
             finishActiveTurn(state, TurnSettlementRequest(
-                WsTimelineEvent.TurnDone(state.turnId.orEmpty(), event.runId, BridgeTurnStatus.fromWire(event.status)),
+                WsTimelineEvent.TurnDone(state.turnId.orEmpty(), event.runId, status),
                 reason = "subscribeDone", recordEvent = false,
             ))
+        } else null
+        when (status) {
+            BridgeTurnStatus.Completed, BridgeTurnStatus.Cancelled, BridgeTurnStatus.Failed ->
+                queueDriver.onForeignTerminalLocked(drained)
+            is BridgeTurnStatus.Unknown -> Unit
         }
     }
 
@@ -788,13 +797,18 @@ class ChatSendCoordinator(
         }
     }
 
-    private suspend fun finishActiveTurn(state: ConversationTurnState, request: TurnSettlementRequest) {
+    private suspend fun finishActiveTurn(
+        state: ConversationTurnState,
+        request: TurnSettlementRequest,
+    ): QueueConversationId {
         val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() } ?: IdFormats.defaultConversationIdFor(agentId)
         val writes = settlement.finish(
             state, request,
             if (request.event.status is BridgeTurnStatus.Cancelled) serverQueueMarks.cancelledTerminalNotice(state.inFlightSend) else null,
         )
-        releaseTerminalQueue(QueueConversationId(conversationId), writes)
+        val drained = QueueConversationId(conversationId)
+        releaseTerminalQueue(drained, writes)
+        return drained
     }
 
     /** Cancellation retires the turn but never starts another send; ordinary write failures do. */
@@ -836,8 +850,8 @@ class ChatSendCoordinator(
         // naming its turn is that turn's; one naming only a run is ours only if we track something.
         val owned = owner.isTracking || event.turnId.isNotBlank()
         owner.recordTerminalIdentity(event)
-        finishActiveTurn(owner, TurnSettlementRequest(event, reason = "turnDone", ownedTurn = owned))
-        if (send == null) queueDriver.onForeignTerminalLocked()
+        val drained = finishActiveTurn(owner, TurnSettlementRequest(event, reason = "turnDone", ownedTurn = owned))
+        if (send == null) queueDriver.onForeignTerminalLocked(drained)
     }
 
     /**
