@@ -20,6 +20,8 @@ an engine such as vibesync uses in place of its own registry. Writes are a later
 - **Host:** the Iroh wrapper process that serves admin RPC for one machine's Letta backend. It owns
   the registry and validates everything below.
 - **Project:** one unit of work with one identity (`projectId`) and at most one PM agent on a host.
+- **Key:** a project's stable short name on a host (`key`), for example `fixture-project`. People type
+  it and an engine may store it; `projectId` stays the identity.
 - **Checkout:** one folder on the host holding a project's repository. A project may have several.
 - **Workspace root:** a folder the host is told to look in, declared per machine by name (for
   example `stacks`). A root's name is stable; its path is the machine's own business.
@@ -36,6 +38,7 @@ machine carries the same identity.
 | --- | --- | --- | --- |
 | `schemaVersion` | integer | yes | `1` |
 | `projectId` | string | yes | lower-case UUID, 36 characters; generated once, never reused |
+| `key` | string | yes | short name: `[a-z0-9][a-z0-9-]{0,63}`; unique on a host (§2, K rules) |
 | `name` | string | yes | 1 to 120 characters of plain text |
 | `engine` | object | no | engine settings, below |
 
@@ -72,6 +75,7 @@ The host holds one record per project. This is what the read methods return.
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `projectId` | string | yes | as in the project file |
+| `key` | string | see K5 | the project's short name on this host |
 | `name` | string | yes | as in the project file; for an unconfirmed project, the folder name |
 | `state` | string | yes | `active`, `unconfirmed`, `archived` or `invalid` |
 | `invalidReason` | string | only when `invalid` | one of the reasons below |
@@ -106,8 +110,9 @@ States:
 - `unconfirmed`: a folder the host found whose repository is not ours, or which nobody has confirmed.
   The host has written nothing into it.
 - `archived`: kept for history; no engine work.
-- `invalid`: the project file breaks §1. `invalidReason` is one of `file_too_large`, `not_json`,
-  `duplicate_key`, `missing_field`, `field_out_of_range`, `unsupported_schema_version`.
+- `invalid`: the project file breaks §1, or its key cannot be used (K3, K4). `invalidReason` is one
+  of `file_too_large`, `not_json`, `duplicate_key`, `missing_field`, `field_out_of_range`,
+  `unsupported_schema_version`, `key_conflict`, `key_changed`.
 
 Rules:
 
@@ -122,6 +127,24 @@ Rules:
 - **R6** Role names are lower-case identifiers (`coder`, `reviewer`, `tester`, `mayor`). A role the
   project has no agent for is absent.
 - **R7** `repository.slug` is `owner/name`. It is absent when the origin remote does not name one.
+
+Key rules:
+
+- **K1** `key` is the project's stable short name on a host: what people type, and what an engine may
+  keep in its configuration and in its own records. `projectId` remains the identity.
+- **K2** A key is lower-case and matches the grammar exactly. The host does not fold case or trim; a
+  lookup key outside the grammar is refused (`key_malformed`).
+- **K3** A key is unique on a host. When a second project arrives carrying a key that another project
+  on the host already holds, the first keeps it. The second is `invalid` with `key_conflict` until
+  its file names a key that is free.
+- **K4** A registered key does not change in v1. When the project file's `key` differs from the one
+  the host registered, the record keeps the registered key and the project is `invalid` with
+  `key_changed` until the file is restored. Renaming is a later stage (§7).
+- **K5** An `active` or `archived` record always carries `key`. An `unconfirmed` record has none. An
+  `invalid` record carries the registered key when the host has one.
+- **K6** The key is committed, so one project has the same key on every host. Two different projects
+  may hold the same key on different hosts; a reader that works across hosts keeps `projectId`
+  beside the key.
 
 ## 3. Read methods
 
@@ -156,7 +179,8 @@ Result:
 
 ### `project.registry.get`
 
-Params: `{ "projectId": <id> }`. Result: one record (§2).
+Params: exactly one of `{ "projectId": <id> }` and `{ "key": <key> }`. Result: one record (§2). Both
+forms answer the same record.
 
 ### Errors
 
@@ -167,10 +191,11 @@ A refusal keeps the admin RPC envelope: `{"success": false, "error": <code>}`, p
 | --- | --- | --- |
 | `invalid_request` | the params break a rule; `problem` says which | both |
 | `cursor_stale` | the registry changed since the cursor was issued | `project.registry.list` |
-| `unknown_project` | no record has that `projectId` | `project.registry.get` |
+| `unknown_project` | no record has that `projectId` or `key` | `project.registry.get` |
 
 Problems for `invalid_request`: `limit_out_of_range`, `cursor_malformed`, `if_revision_with_cursor`,
-`project_id_malformed`.
+`project_id_malformed`, `key_malformed`, `project_ref_missing` (neither `projectId` nor `key`),
+`project_ref_both` (both).
 
 A caller without the capability gets the router's usual authorization refusal, which this document
 does not define.
@@ -199,10 +224,15 @@ does not define.
 
 - **X1** Take engine settings from the record, not from the project file. The host is the one
   validator.
-- **X2** Work in the `primary` checkout. A record with no checkout cannot be worked on.
+- **X2** Work in the `primary` checkout. A record with no checkout cannot be worked on. v1 has no
+  tracker field: a project's tracker, when it has one, is reached through the primary checkout.
 - **X3** Treat `unconfirmed`, `archived` and `invalid` records, and any record with
   `engine.enabled: false`, as not runnable.
 - **X4** Ignore unknown fields and unknown `state` values; an unknown state is not runnable.
+- **X5** `engine.enabled` permits work; it does not start it. What else a project needs before work
+  starts (a ready label, a formula the engine knows) is the engine's rule.
+- **X6** Name a project by `key` or `projectId`. `name`, a folder name and `repository.slug` can all
+  change, or be absent.
 
 ## 7. Not in v1
 
@@ -210,6 +240,7 @@ does not define.
   until the stage that moves them to the host.
 - The create operation, the folder watcher and the workspace-root declaration format.
 - Creating role agents, and deriving a peer's agent scope from the registry.
+- Renaming a key.
 - A push channel, and listing another host's projects.
 
 ## 8. Open for review
@@ -222,6 +253,9 @@ does not define.
 4. **F6**: the host cannot know an engine's formula names, so it checks the grammar only. An earlier
    draft had the host check the name itself.
 5. **P3**: is 15 seconds the right polling floor?
+6. **K4**: a changed key makes the project `invalid` instead of renaming it. Is that right for v1?
+7. **K2**: existing identifiers that are not lower-case, contain spaces, or collide once lower-cased
+   need a decision when the registry is first filled.
 
 ## 9. Fixtures
 
@@ -232,5 +266,6 @@ does not define.
 | `record-active.json` | an active record with two checkouts and three role agents (§2) |
 | `record-unconfirmed.json` | an unconfirmed record (§2, R4) |
 | `record-invalid.json` | an invalid record with its reason (§2) |
+| `record-key-conflict.json` | a project whose key another project already holds (§2, K3) |
 | `project.registry.list.json` | list cases: first page, next page, filter, not modified and refusals (§3) |
-| `project.registry.get.json` | get cases: found, unknown and malformed (§3) |
+| `project.registry.get.json` | get cases: found by id and by key, unknown, and refusals (§3) |

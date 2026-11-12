@@ -70,6 +70,7 @@ class ProjectRegistryV1FixturesTest {
             assertTrue((file.keys - "_contract" - FILE_REQUIRED - "engine").isEmpty(), "$name has no other field")
             assertEquals(SCHEMA_VERSION, file.getValue("schemaVersion").jsonPrimitive.int, "$name schema version")
             assertTrue(PROJECT_ID.matches(file.text("projectId")), "$name project id is a lower-case UUID")
+            assertTrue(KEY.matches(file.text("key")), "$name key grammar (K2)")
             assertTrue(file.text("name").length in 1..MAX_NAME, "$name name length")
             file["engine"]?.jsonObject?.let { assertEngineSettings(name, it) }
             // F1: no path and no agent id anywhere in the file.
@@ -97,6 +98,7 @@ class ProjectRegistryV1FixturesTest {
             (record.keys - "_contract").forEach { assertTrue(named(it), "$label: field $it is named in the contract") }
             assertTrue(record.text("state") in STATES, "$label state")
             assertTrue(PROJECT_ID.matches(record.text("projectId")), "$label project id")
+            record["key"]?.let { assertTrue(KEY.matches(it.jsonPrimitive.content), "$label key grammar (K2)") }
             assertEquals(record.text("state") == "invalid", "invalidReason" in record, "$label: a reason only when invalid")
             record["invalidReason"]?.let { assertTrue(it.jsonPrimitive.content in INVALID_REASONS, "$label invalid reason") }
             record["repository"]?.jsonObject?.let { assertTrue(SLUG.matches(it.text("slug")), "$label repository slug (R7)") }
@@ -106,6 +108,44 @@ class ProjectRegistryV1FixturesTest {
             assertEngineSettings(label, engine)
         }
         (STATES + INVALID_REASONS).forEach { assertTrue(named(it), "$it is named in the contract") }
+    }
+
+    @Test
+    fun keysAreUniquePerProjectAndPresentExactlyWhereTheContractSays() {
+        val all = records()
+        all.forEach { (label, record) ->
+            when (record.text("state")) {
+                "active", "archived" -> assertTrue("key" in record, "$label: a runnable or archived record carries its key (K5)")
+                "unconfirmed" -> assertFalse("key" in record, "$label: an unconfirmed record has no key (K5)")
+            }
+        }
+        // K3: one key, one project. A project refused for holding a taken key carries none.
+        val owners = all.mapNotNull { (_, record) -> record["key"]?.let { it.jsonPrimitive.content to record.text("projectId") } }
+        owners.groupBy({ it.first }, { it.second }).forEach { (key, ids) ->
+            assertEquals(1, ids.toSet().size, "key $key belongs to one project (K3)")
+        }
+        val conflict = fixture("record-key-conflict.json")
+        assertEquals("key_conflict", conflict.text("invalidReason"))
+        assertFalse("key" in conflict, "a project refused for a taken key has no registered key (K3, K5)")
+        // The committed file and the record agree on the key of the same project.
+        val file = fixture("project-file.json")
+        val record = fixture("record-active.json")
+        assertEquals(file.text("projectId"), record.text("projectId"), "the full project file and the active record are one project")
+        assertEquals(file.text("key"), record.text("key"), "file and record carry the same key (K6)")
+    }
+
+    @Test
+    fun aProjectIsFetchedByIdOrByKeyAndBothAnswerTheSameRecord() {
+        val cases = fixture(GET_FIXTURE).cases().associateBy { it.text("name") }
+        val byId = cases.getValue("found")
+        val byKey = cases.getValue("found_by_key")
+        assertEquals(setOf("projectId"), byId.getValue("params").jsonObject.keys)
+        assertEquals(setOf("key"), byKey.getValue("params").jsonObject.keys)
+        assertEquals(byId.getValue("result"), byKey.getValue("result"), "both forms answer the same record")
+        assertEquals(byKey.getValue("params").jsonObject.text("key"), byKey.getValue("result").jsonObject.text("key"))
+        cases.values.filter { "result" in it }.forEach { case ->
+            assertEquals(1, case.getValue("params").jsonObject.size, "${case.text("name")}: exactly one of projectId and key")
+        }
     }
 
     @Test
@@ -234,24 +274,31 @@ class ProjectRegistryV1FixturesTest {
         const val MAX_LIMIT = 100
         const val DEFAULT_LIMIT = 50
         val PROJECT_ID = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+        val KEY = Regex("[a-z0-9][a-z0-9-]{0,63}")
         val FORMULA = Regex("[a-z0-9][a-z0-9-]{0,63}")
         val READY_LABEL = Regex("[a-z0-9][a-z0-9:_-]{0,63}")
         val SLUG = Regex("[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
         val ROLE = Regex("[a-z][a-z0-9-]*")
         val PROJECT_FILES = listOf("project-file.json", "project-file-minimal.json")
-        val RECORD_FILES = listOf("record-active.json", "record-unconfirmed.json", "record-invalid.json")
+        val RECORD_FILES = listOf(
+            "record-active.json", "record-unconfirmed.json", "record-invalid.json", "record-key-conflict.json",
+        )
         val EXPECTED_FIXTURES = (PROJECT_FILES + RECORD_FILES + LIST_FIXTURE + GET_FIXTURE).toSet()
-        val FILE_REQUIRED = setOf("schemaVersion", "projectId", "name")
+        val FILE_REQUIRED = setOf("schemaVersion", "projectId", "key", "name")
         val ENGINE_SETTINGS = setOf("formula", "readyLabel", "poolSize", "ciChecks")
         val RECORD_REQUIRED = setOf("projectId", "name", "state", "checkouts", "roleAgents", "engine", "revision")
-        val RECORD_OPTIONAL = setOf("invalidReason", "repository", "pmAgentId", "providerKind")
+        val RECORD_OPTIONAL = setOf("key", "invalidReason", "repository", "pmAgentId", "providerKind")
         val CHECKOUT_FIELDS = setOf("root", "relativePath", "path", "primary")
         val LIST_RESULT_FIELDS = setOf("revision", "notModified", "items", "nextCursor")
         val STATES = setOf("active", "unconfirmed", "archived", "invalid")
         val INVALID_REASONS = setOf(
             "file_too_large", "not_json", "duplicate_key", "missing_field", "field_out_of_range", "unsupported_schema_version",
+            "key_conflict", "key_changed",
         )
         val ERROR_CODES = setOf("invalid_request", "cursor_stale", "unknown_project")
-        val PROBLEMS = setOf("limit_out_of_range", "cursor_malformed", "if_revision_with_cursor", "project_id_malformed")
+        val PROBLEMS = setOf(
+            "limit_out_of_range", "cursor_malformed", "if_revision_with_cursor", "project_id_malformed",
+            "key_malformed", "project_ref_missing", "project_ref_both",
+        )
     }
 }
