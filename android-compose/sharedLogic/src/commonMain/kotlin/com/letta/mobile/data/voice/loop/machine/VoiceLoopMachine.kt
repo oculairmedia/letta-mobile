@@ -35,13 +35,17 @@ internal object VoiceLoopMachine {
 internal object ControlRules {
     fun on(model: LoopModel, input: LoopInput): Step = when (input) {
         is LoopInput.Activate -> activate(model, input.kind)
-        LoopInput.EndTurn -> if (model.phase == VoicePhase.LISTENING) Step(model, listOf(LoopEffect.CommitTurn)) else Step(model)
+        LoopInput.EndTurn -> endTurn(model)
         is LoopInput.Stop -> Transitions.halt(model, VoicePhase.IDLE, null)
         LoopInput.RetryCapture -> retry(model)
         is LoopInput.Notice -> Step(model.withView { copy(notice = input.error) })
         is LoopInput.Fault -> Transitions.fail(model, input.error)
         else -> Step(model)
     }
+
+    /** Ending the turn commits what was heard, and only while listening. */
+    private fun endTurn(model: LoopModel): Step =
+        if (model.phase == VoicePhase.LISTENING) Step(model, listOf(LoopEffect.CommitTurn)) else Step(model)
 
     private fun activate(model: LoopModel, kind: VoiceActivationKind): Step = when (model.phase) {
         VoicePhase.IDLE, VoicePhase.FAILED -> Step(listen(model, kind))
