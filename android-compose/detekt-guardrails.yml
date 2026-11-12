@@ -75,6 +75,7 @@ letta-mobile-guardrails:
   WallClockInSharedLogic:
     active: true
     includes:
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/transport/iroh/IrohConnectionSupervisor.kt"
       - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
       - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
       - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
