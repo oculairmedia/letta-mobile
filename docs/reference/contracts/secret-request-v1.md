@@ -1,12 +1,13 @@
 # Secret request v1: secure secret-input flow
 
-Status: **PROPOSED for review; contract, shared logic and host service stage.** This stage
+Status: **PROPOSED for review; contract, shared logic, host service and route stages.** Stage 1
 supplies the shared models (`:sharedLogic`, package `com.letta.mobile.data.secrets.request`), a
 durable journal (package `com.letta.mobile.data.secrets.journal`), the host service (package `com.letta.mobile.data.secrets.host`, JVM only) and the
-shared fixtures below. It registers no admin RPC route, agent tool, App Server command or
-capability, and ships no client UI, secure-window binding or real keystore provider. Sections
-marked *route* state what the stage that registers the methods must enforce; nothing in this
-stage enforces them.
+shared fixtures below. Stage 2 registers the admin RPC routes and the agent tool (package
+`com.letta.mobile.data.controller.node.iroh.secrets`, JVM only), the route wire (package
+`com.letta.mobile.data.secrets.wire`) and the client over the routes (package
+`com.letta.mobile.data.secrets.client`); see Routes. No stage ships a real keystore provider.
+Sections marked *route* state what the route stage enforces.
 
 Agents need secrets (API keys, tokens) and until now the only way to hand one over was to paste it
 into a conversation, where it stays in the transcript, the prompt and every log. This flow keeps
@@ -117,19 +118,21 @@ for `failed`.
 - **M2** `secret.request.status` is a poll. The host service can also await a receipt
   (`awaitReceipt`); how the agent is told that its request settled is decided with the agent
   integration (open decision 5).
-- **M3** *route* A refusal keeps the admin RPC envelope: `{"success": false, "error": <code>}`, plus
-  `"problem": <problem>` for `invalid_request`.
+- **M3** *route* A refusal keeps the admin RPC envelope: `{"success": false, "error": <text>}`, where
+  `<text>` is the code, or for `invalid_request` the code, `:` and the problem
+  (`"invalid_request:purpose_blank"`). The admin RPC envelope has no other field a handler can set.
 
 ### Errors
 
 | Code | When | Calls |
 | --- | --- | --- |
 | `invalid_request` | The agent's request breaks a rule; `problem` says which | `secret.request` |
-| `forbidden` | The caller is not the human principal | Human calls |
+| `forbidden` | A human call from anything but the human principal; an agent call from anything but the agent tool (no admin RPC connection is an agent) | All |
 | `not_pending` | Unknown, pruned, malformed, expired, cancelled, answered or being written: one code for all, nothing written | `submit`, `cancel` |
-| `invalid_value` | The value is empty or over 65 536 bytes; the request stays pending | `submit` |
+| `invalid_value` | The value is empty, over 65 536 bytes, or not canonical padded base64; the request stays pending | `submit` |
 | `unknown_request` | No such request for this caller; another agent's request answers the same | `status`, `get` |
 | `journal_unavailable` | The journal cannot be read or written; nothing was written to the keystore by this call | All |
+| `invalid_params` | *route* The params are not exactly the method's fields, or a field is not a JSON string; nothing about the params is echoed | All |
 
 Problems for `invalid_request`: `purpose_blank`, `purpose_too_long`, `purpose_not_plain_text`,
 `item_malformed`, `field_malformed`, `item_outside_scope`, `too_many_pending`.
@@ -213,12 +216,44 @@ verified value is stored or nothing new is left behind:
 | --- | --- | --- |
 | Requesting agent | Its own `requestId`, `expiresAtMs`, receipt (`status`, `itemId`, `fieldName`, `reason`) | The value, its length, other agents' requests, who answered |
 | Other agents | Nothing about the request (`unknown_request`) | Anything |
-| Human (paired device, `admin.full`) | Every request: target, requesting agent, purpose, timing, state, reason | The value after submission (never returned) |
+| Human (paired device, `admin.full`) | Every request of an agent in the device's agent scope: target, requesting agent, purpose, timing, state, reason | The value after submission (never returned); requests of agents outside its scope |
 | Journal, logs, telemetry | Ids, targets, purpose (journal only), states, timestamps, fixed codes, bounded id labels | The value, provider diagnostics, exception text |
 | Keystore provider | The value, at the fixed target | The purpose, the agent |
 
 Telemetry records only fixed codes and an 11-character label of a well-formed request id; never an
 item, field, purpose, path or value.
+
+## Routes
+
+*route* Stage 2 (letta-mobile-n2stx.2.4), in `com.letta.mobile.data.controller.node.iroh.secrets`.
+
+- **R1 Registration.** `SecretRequestFeature.forHost` builds the routes and the tool only when the
+  endpoint's auth policy is secure (bearer token, peer allowlist or paired peers only) and a
+  keystore provider is configured; otherwise it answers null and the host registers, advertises and
+  offers nothing. The routes refuse to register under the anonymous test policy even when handed
+  one. The classes exist only in the JVM host (decision 8). All six methods register together, and
+  only then is host capability `secret.request.v1` advertised.
+- **R2 Gate.** At the connection's capability gate the human methods need peer capability
+  `secret.request.answer` and the agent methods `secret.request.agent` (`admin.full` passes both, as
+  for every method). No role grants either.
+- **R3 Human principal.** Built from the request context the serving Iroh connection made: it must
+  be authenticated, carry a 64-hex verified endpoint id, be a paired device by its stored record
+  (`pairedDevice`; a bootstrap session such as a host-local process holding the admin token is not),
+  and hold `admin.full` (`grantedCapabilities`). The device's agent scope applies: `list` shows only
+  requests of agents in scope; `get` of a request outside it answers `unknown_request` and
+  `submit`/`cancel` answer `not_pending`, byte for byte as for an unknown id.
+- **R4 Agent principal.** No admin RPC connection is ever an agent: `secret.request` and
+  `secret.request.status` answer `forbidden` to every connection. Agents call the host tool
+  `secret_request` (actions `create` and `status`), which is bound to the agent id the host runtime
+  stamped on the tool call, never to an argument; a call without one answers `forbidden`. Its
+  result is the route's result and its error the route's code.
+- **R5 Order.** Principal, then strict params (exactly the method's fields, all JSON strings), then
+  for `submit` the value (length and padding checked against 65 536 bytes before any byte is
+  allocated, then decoded straight into the keystore secret type), then visibility of the named
+  request, then the service. A malformed id answers like an unknown one.
+- **R6 No value out.** No result, refusal, telemetry event or `toString` carries a value. The routes
+  log method, side, transport and outcome code only; the stream server answers a frame it cannot
+  parse with fixed text.
 
 ## Journal
 
@@ -248,7 +283,8 @@ The normative examples are in
 one file per method: `{method, caller, cases: [{name, params, result | error}]}`. Their values are
 sentinels. `SecretRequestContractFixturesTest` decodes every case into the typed models, re-encodes
 it to an equal JSON value, checks validation against the documented problems and checks the name
-grammars against the keystore SPI. They are not admin RPC route fixtures: no route exists yet.
+grammars against the keystore SPI. They are model fixtures; the admin RPC route fixtures are the
+per-method wire contracts under `docs/reference/contracts/secret.request*/secret-request-v1.md`.
 
 ## Tests and what they cannot see
 
@@ -261,8 +297,7 @@ Server's logs, the admin RPC transport, a real provider's own storage or the cli
 
 ## Non-goals
 
-No route registration, tool or capability in this stage; no client UI or secure window; no real
-keystore provider or vault contact. Out of v1 entirely: agent-callable keystore reads; rotation;
+No real keystore provider or vault contact in any stage so far (stage 4). Out of v1 entirely: agent-callable keystore reads; rotation;
 deleting a single field; multiple fields per request; requests for another agent; delegation of
 answering to an agent; reading a value back to any client; recovering the outcome of an
 interrupted write.

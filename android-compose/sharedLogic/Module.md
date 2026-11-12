@@ -275,6 +275,10 @@ Host construction separates endpoint network/identity binding (`IrohEndpointBind
 
 `conversation.list` supports opt-in `visible_only: true` for unfiltered requests without `summary_search`. It shares the held full list with per-agent pages, removes agent-free, hidden-agent, hidden-conversation, archived and unauthorized rows before pagination, and returns newest-first recents (default 30). `after` names a visible conversation; unknown cursors restart from the top. Limits retain App Server integer/negative-prefix semantics; absent or invalid limits default to 30 in this mode. Legacy unfiltered, per-agent and search requests are unchanged. Visible mode requires the host's local agent visibility index; without it the opt-in request fails with `capability_unavailable` rather than return potentially hidden-agent rows. Above the held-list cap or without a usable signature, recents fetch the full list without retaining it rather than filter a truncated raw page.
 
+# Package com.letta.mobile.data.controller.node.iroh.secrets
+
+The secret request admin RPC routes and the agent's `secret_request` tool on the JVM host. [SecretRequestFeature](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.secrets/-secret-request-feature/index.html) builds both only for a secure auth policy with a keystore provider; the human principal comes from the serving connection (a paired device holding `admin.full`), the agent principal only from the runtime-stamped tool call, and no route returns or logs a value.
+
 # Package com.letta.mobile.data.controller.node.iroh.discovery
 
 JVM/Android host discovery primes externally created local conversations before wrapper list requests. It bounds and throttles retrievals, invalidates held lists after successful priming, and leaves authorization and output filtering to the owning admin handler.
@@ -537,7 +541,7 @@ Agent secret sources and vault state/controller logic. Secret values have redact
 
 # Package com.letta.mobile.data.secrets.client
 
-Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; no implementation here talks to a host. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
+Client side of the secure secret-input flow. `SecretRequestClient` is the port the form uses to list pending requests, submit a value and decline; [AdminRpcSecretRequestClient](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.client/-admin-rpc-secret-request-client/index.html) implements it over the host's admin RPC routes, inert when the host does not advertise them. `SecretBuffer` is the one place a typed value lives and `SecretInput` carries it to the port once: both redact themselves, are never saved or logged, and are zeroed on every exit path. `SecretFormMachine` is the pure state machine and `SecretFormController` applies it. Nothing in this package registers a route or a tool.
 
 # Package com.letta.mobile.data.secrets.host
 
@@ -550,6 +554,10 @@ Durable storage of secret requests so single use and expiry survive a host resta
 # Package com.letta.mobile.data.secrets.request
 
 Shared models of the secret request contract: typed ids and names with the keystore grammar, the agent request and receipt, the request record clients see, validation of agent-authored purposes, and the lifecycle as pure functions in [SecretRequestLifecycle](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.request/-secret-request-lifecycle/index.html). Nothing here carries a secret value; clients and the host share these types.
+
+# Package com.letta.mobile.data.secrets.wire
+
+The admin RPC wire of the secret request routes, shared by host and client: method sets, capabilities and params fields in [SecretRequestRouteWire](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.wire/-secret-request-route-wire/index.html), and the submitted value's base64 codec in [SecretValueBase64](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.secrets.wire/-secret-value-base64/index.html), which encodes into and decodes from arrays its caller zeroes and never makes a string of a value.
 
 # Package com.letta.mobile.data.serialization
 
