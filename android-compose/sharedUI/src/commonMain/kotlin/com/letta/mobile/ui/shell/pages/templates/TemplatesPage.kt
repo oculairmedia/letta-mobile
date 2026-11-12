@@ -17,7 +17,7 @@ import com.letta.mobile.data.templates.AgentTemplatesController
 import com.letta.mobile.data.templates.AgentTemplatesState
 import com.letta.mobile.data.templates.StarterAgentTemplate
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterListTag

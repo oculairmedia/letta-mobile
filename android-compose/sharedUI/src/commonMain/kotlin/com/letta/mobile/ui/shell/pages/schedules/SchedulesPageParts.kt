@@ -24,7 +24,7 @@ import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.schedules.ScheduleDef
 import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.SchedulesView
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow

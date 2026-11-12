@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface.recents
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,24 +12,19 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_recents_empty
@@ -157,41 +151,18 @@ private fun RecentRowAvatar(content: RecentInteractionsContent, row: ShellConver
 @Composable
 private fun RecentInteractionRow(row: ShellConversationRowModel, avatar: @Composable () -> Unit, onOpen: () -> Unit) {
     val label = recentRowLabel(row)
-    Row(
+    LettaListRow(
+        spec = LettaListRowSpec(
+            title = row.title, trailing = row.timeLabel, selected = row.selected,
+            emphasized = row.selected, quiet = row.archived, muted = row.archived, role = Role.Button,
+            description = label,
+        ),
+        onClick = onOpen,
+        leading = avatar,
         modifier = Modifier
-            .fillMaxWidth()
             .heightIn(min = ChatHeadDimens.recentsRowMinHeight)
-            .testTag(recentRowTag(row.id))
-            .clickable(role = Role.Button, onClick = onOpen)
-            // Merged rather than cleared, so the avatar's tag stays findable; the texts add nothing to the label.
-            .semantics(mergeDescendants = true) {
-                contentDescription = label
-                selected = row.selected
-                role = Role.Button
-                onClick { onOpen(); true }
-            }
-            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
-            .then(if (row.archived) Modifier.alpha(LettaDimens.Alpha.disabled) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        avatar()
-        Text(
-            row.title,
-            modifier = Modifier.weight(1f).clearAndSetSemantics {},
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (row.selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (row.archived) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            row.timeLabel,
-            modifier = Modifier.clearAndSetSemantics {},
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+            .testTag(recentRowTag(row.id)),
+    )
 }
 
 @Composable

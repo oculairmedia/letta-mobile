@@ -16,8 +16,8 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.chat.AgentOrb
-import com.letta.mobile.ui.components.LettaListRow
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
