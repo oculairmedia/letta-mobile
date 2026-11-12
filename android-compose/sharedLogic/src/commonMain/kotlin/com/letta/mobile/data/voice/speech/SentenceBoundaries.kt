@@ -33,9 +33,15 @@ internal class SentenceScan(
     private val limit: Int,
     private val mode: ScanMode,
 ) {
-    /** The end (exclusive) of the first complete sentence, or null when none is complete yet. */
+    /**
+     * The end (exclusive) of the first complete sentence, or null when none is complete yet. Nothing
+     * inside an HTML tag or a Markdown link target counts, finished or not, so a sentence end within
+     * markup never releases part of it; a `<` that does not start a tag (`2 < 3`) is ordinary text.
+     */
     fun firstEnd(): TextIndex? {
+        val markup = MarkupRegions()
         for (index in 0 until limit) {
+            if (markup.covers(text, index)) continue
             endAt(TextIndex(index))?.let { return it }
         }
         return null
@@ -100,6 +106,35 @@ internal class SentenceScan(
             "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc", "inc", "ltd", "co", "no",
             "approx", "fig", "e.g", "i.e", "u.s", "a.m", "p.m",
         )
+    }
+}
+
+/** Tracks, character by character, whether the scan is inside an HTML tag or a Markdown link target. */
+private class MarkupRegions {
+    private var closer: Char? = null
+
+    /** True when the character at [index] opens, lies inside or closes a markup region. */
+    fun covers(text: CharSequence, index: Int): Boolean {
+        val char = text[index]
+        val open = closer
+        if (open != null) {
+            if (char == open) closer = null
+            return true
+        }
+        closer = closerFor(text, index)
+        return closer != null
+    }
+
+    private fun closerFor(text: CharSequence, index: Int): Char? = when {
+        startsTag(text, index) -> '>'
+        text[index] == '(' && text.getOrNull(index - 1) == ']' -> ')'
+        else -> null
+    }
+
+    private fun startsTag(text: CharSequence, index: Int): Boolean {
+        if (text[index] != '<') return false
+        val next = text.getOrNull(index + 1) ?: return false
+        return next.isLetter() || next == '/'
     }
 }
 

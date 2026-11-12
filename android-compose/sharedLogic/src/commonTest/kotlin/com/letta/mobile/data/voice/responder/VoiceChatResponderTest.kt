@@ -21,10 +21,47 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
 
+/** The ids the fake session hands out, in send order, and one sent by someone else. */
+private object Sent {
+    val FIRST = ClientMessageId("c1")
+    val SECOND = ClientMessageId("c2")
+    val SOMEONE_ELSE = ClientMessageId("x9")
+}
+
+/** Run ids the tests use. */
+private object Runs {
+    val R1 = VoiceRunId("r1")
+    val R2 = VoiceRunId("r2")
+    val R5 = VoiceRunId("r5")
+    val UNRELATED = VoiceRunId("someone-else")
+    val LIVE = VoiceRunId("iroh-run-1")
+    val DURABLE = VoiceRunId("run-42")
+}
+
+/** Row keys the tests use. */
+private object Keys {
+    val U1 = VoiceRowKey("u1")
+    val OTHER = VoiceRowKey("other")
+    val THINK = VoiceRowKey("think")
+    val E1 = VoiceRowKey("e1")
+    val M0 = VoiceRowKey("m0")
+    val M1 = VoiceRowKey("m1")
+    val M2 = VoiceRowKey("m2")
+    val M3 = VoiceRowKey("m3")
+    val M5 = VoiceRowKey("m5")
+}
+
+/** What the person says. */
+private object Say {
+    val ASK = VoiceText("what time is it")
+    val FIRST = VoiceText("first")
+    val SECOND = VoiceText("second")
+}
+
 /** A voice chat session the test scripts: sends get ids c1, c2, ...; stops are recorded. */
 private class FakeVoiceChatSession : VoiceChatSession {
     private val mutableState = MutableStateFlow(VoiceChatState(conversation = VoiceConversationKey("a1")))
-    val sent = mutableListOf<String>()
+    val sent = mutableListOf<VoiceText>()
     var stops = 0
         private set
     var endRunOnStop = true
@@ -32,7 +69,7 @@ private class FakeVoiceChatSession : VoiceChatSession {
     override val state: StateFlow<VoiceChatState> = mutableState
 
     override suspend fun send(text: VoiceText): SentUtterance {
-        sent += text.value
+        sent += text
         return SentUtterance(ClientMessageId("c${sent.size}"))
     }
 
@@ -47,32 +84,35 @@ private class FakeVoiceChatSession : VoiceChatSession {
 
     fun replace(row: VoiceChatRow) = update { copy(rows = rows.map { if (it.key == row.key) row else it }) }
 
-    /** Publishes that sent message [id] started the run with [runIds], now in flight. */
-    fun start(id: String, vararg runIds: String) = update {
-        val runs = runIds.map(::VoiceRunId).toSet()
-        copy(startedRuns = startedRuns + (ClientMessageId(id) to runs), activeRuns = activeRuns + runs)
+    /** Publishes that sent message [id] started the run known as [run] (and [alias]), now in flight. */
+    fun start(id: ClientMessageId, run: VoiceRunId, alias: VoiceRunId? = null) = update {
+        val runs = setOfNotNull(run, alias)
+        copy(startedRuns = startedRuns + (id to runs), activeRuns = activeRuns + runs)
     }
 
-    fun end(vararg runIds: String) = update { copy(activeRuns = activeRuns - runIds.map(::VoiceRunId).toSet()) }
+    fun end(run: VoiceRunId, other: VoiceRunId? = null) = update { copy(activeRuns = activeRuns - setOfNotNull(run, other)) }
 
-    fun failRun(run: String) = update { copy(failedRuns = setOf(VoiceRunId(run)), activeRuns = activeRuns - VoiceRunId(run)) }
+    fun failRun(run: VoiceRunId) = update { copy(failedRuns = setOf(run), activeRuns = activeRuns - run) }
+
+    fun moveTo(conversation: VoiceConversationKey) = update { copy(conversation = conversation) }
 }
 
-private fun user(key: String, sentAs: String? = null) =
-    VoiceChatRow(VoiceRowKey(key), VoiceRowKind.USER, VoiceText("what time is it"), sentAs?.let(::ClientMessageId))
+private fun user(key: VoiceRowKey, sentAs: ClientMessageId? = null) = VoiceChatRow(key, VoiceRowKind.USER, Say.ASK, sentAs)
 
-private fun assistant(key: String, words: String, run: String) =
-    VoiceChatRow(VoiceRowKey(key), VoiceRowKind.ASSISTANT_TEXT, VoiceText(words), runId = VoiceRunId(run))
+private fun reply(key: VoiceRowKey, words: VoiceText, run: VoiceRunId) =
+    VoiceChatRow(key, VoiceRowKind.ASSISTANT_TEXT, words, runId = run)
 
-private fun row(key: String, kind: VoiceRowKind, run: String) =
-    VoiceChatRow(VoiceRowKey(key), kind, VoiceText("x"), runId = VoiceRunId(run))
+private fun marker(key: VoiceRowKey, kind: VoiceRowKind, run: VoiceRunId) = VoiceChatRow(key, kind, VoiceText("x"), runId = run)
+
+/** One way a started run can end, and what the reply reports for it. */
+private data class Ending(val apply: (FakeVoiceChatSession) -> Unit, val expected: VoiceReplyEvent)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VoiceChatResponderTest {
     private val session = FakeVoiceChatSession()
     private val responder = VoiceChatResponder(session)
 
-    private fun ask(words: VoiceText = VoiceText("what time is it")): VoiceReply = responder.respond(VoiceUtterance(words))
+    private fun ask(words: VoiceText = Say.ASK): VoiceReply = responder.respond(VoiceUtterance(words))
 
     private fun TestScope.collect(reply: VoiceReply): MutableList<VoiceReplyEvent> {
         val events = mutableListOf<VoiceReplyEvent>()
@@ -93,10 +133,10 @@ class VoiceChatResponderTest {
     @Test
     fun followsItsOwnRunAsItStreams() = runTest {
         val events = collect(ask())
-        assertEquals(listOf("what time is it"), session.sent)
-        settle { add(user("u1", "c1")); start("c1", "r1"); add(assistant("m1", "It is", "r1")) }
-        settle { replace(assistant("m1", "It is noon.", "r1")) }
-        settle { end("r1") }
+        assertEquals(listOf(Say.ASK), session.sent)
+        settle { add(user(Keys.U1, Sent.FIRST)); start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("It is"), Runs.R1)) }
+        settle { replace(reply(Keys.M1, VoiceText("It is noon."), Runs.R1)) }
+        settle { end(Runs.R1) }
         assertEquals(listOf("It is", " noon."), texts(events))
         assertEquals(VoiceReplyEvent.Completed, events.last())
     }
@@ -105,74 +145,84 @@ class VoiceChatResponderTest {
     fun onlyAssistantTextOfItsRunIsSpoken() = runTest {
         val events = collect(ask())
         settle {
-            start("c1", "r1")
-            add(row("think", VoiceRowKind.OTHER, "r1"), assistant("m0", "Someone else's reply.", "r0"), assistant("m1", "Found it.", "r1"))
+            start(Sent.FIRST, Runs.R1)
+            add(marker(Keys.THINK, VoiceRowKind.OTHER, Runs.R1), reply(Keys.M0, VoiceText("Someone else's reply."), Runs.R5))
+            add(reply(Keys.M1, VoiceText("Found it."), Runs.R1))
         }
-        settle { end("r1") }
+        settle { end(Runs.R1) }
         assertEquals(listOf("Found it."), texts(events))
     }
 
     @Test
     fun successiveMessagesOfTheRunAreSeparated() = runTest {
         val events = collect(ask())
-        settle { start("c1", "r1"); add(assistant("m1", "First.", "r1"), assistant("m2", "Second.", "r1")) }
-        settle { end("r1") }
+        settle {
+            start(Sent.FIRST, Runs.R1)
+            add(reply(Keys.M1, VoiceText("First."), Runs.R1), reply(Keys.M2, VoiceText("Second."), Runs.R1))
+        }
+        settle { end(Runs.R1) }
         assertEquals(listOf("First.\nSecond."), texts(events))
     }
 
     @Test
     fun runEndings() = runTest {
-        val cases = listOf<Pair<(FakeVoiceChatSession) -> Unit, VoiceReplyEvent>>(
-            { s: FakeVoiceChatSession -> s.end("r1") } to VoiceReplyEvent.Completed,
-            { s: FakeVoiceChatSession -> s.failRun("r1") } to failed(VoiceErrorCode.RUN_FAILED),
-            { s: FakeVoiceChatSession -> s.add(row("e1", VoiceRowKind.ERROR, "r1")); s.end("r1") } to failed(VoiceErrorCode.RUN_FAILED),
-            { s: FakeVoiceChatSession -> s.update { copy(conversation = VoiceConversationKey("a2")) } } to failed(VoiceErrorCode.CANCELLED),
+        val cases = listOf(
+            Ending({ it.end(Runs.R1) }, VoiceReplyEvent.Completed),
+            Ending({ it.failRun(Runs.R1) }, failed(VoiceErrorCode.RUN_FAILED)),
+            Ending({ it.add(marker(Keys.E1, VoiceRowKind.ERROR, Runs.R1)); it.end(Runs.R1) }, failed(VoiceErrorCode.RUN_FAILED)),
+            Ending({ it.moveTo(VoiceConversationKey("a2")) }, failed(VoiceErrorCode.CANCELLED)),
         )
-        cases.forEachIndexed { index, (ending, expected) ->
+        cases.forEachIndexed { index, ending ->
             val local = FakeVoiceChatSession()
             val events = mutableListOf<VoiceReplyEvent>()
-            val reply = VoiceChatResponder(local).respond(VoiceUtterance(VoiceText("hi")))
+            val reply = VoiceChatResponder(local).respond(VoiceUtterance(Say.ASK))
             backgroundScope.launch { reply.events.collect { events += it } }
             runCurrent()
-            local.start("c1", "r1")
+            local.start(Sent.FIRST, Runs.R1)
             runCurrent()
-            ending(local)
+            ending.apply(local)
             runCurrent()
-            assertEquals(listOf(expected), events, "case $index")
+            assertEquals(listOf(ending.expected), events, "case $index")
         }
     }
 
     @Test
     fun sameTextRowsInSeparateUpdatesNeverSpeakTheOtherReply() = runTest {
         val events = collect(ask())
-        settle { add(user("other"), assistant("m5", "Their answer.", "r5")); start("x9", "r5") }
-        settle { add(user("u1", "c1")); start("c1", "r2"); add(assistant("m3", "Answer two.", "r2")) }
-        settle { end("r5", "r2") }
+        settle { add(user(Keys.OTHER), reply(Keys.M5, VoiceText("Their answer."), Runs.R5)); start(Sent.SOMEONE_ELSE, Runs.R5) }
+        settle { add(user(Keys.U1, Sent.FIRST)); start(Sent.FIRST, Runs.R2); add(reply(Keys.M3, VoiceText("Answer two."), Runs.R2)) }
+        settle { end(Runs.R5, Runs.R2) }
         assertEquals(listOf("Answer two."), texts(events))
     }
 
     @Test
     fun speechStartsOnlyOnceTheSessionPublishesTheRun() = runTest {
         val events = collect(ask())
-        settle { add(user("u1", "c1"), assistant("m3", "Answer.", "r2")); update { copy(activeRuns = setOf(VoiceRunId("r2"))) } }
+        settle {
+            add(user(Keys.U1, Sent.FIRST), reply(Keys.M3, VoiceText("Answer."), Runs.R2))
+            update { copy(activeRuns = setOf(Runs.R2)) }
+        }
         assertEquals(emptyList(), texts(events))
-        settle { start("c1", "r2") }
+        settle { start(Sent.FIRST, Runs.R2) }
         assertEquals(listOf("Answer."), texts(events))
     }
 
     @Test
     fun textUnderTheProvisionalOrTheDurableRunIdIsOurs() = runTest {
         val events = collect(ask())
-        settle { start("c1", "iroh-run-1", "run-42"); add(assistant("m1", "Live part.", "iroh-run-1")) }
-        settle { add(assistant("m2", "Durable part.", "run-42")) }
-        settle { end("iroh-run-1", "run-42") }
+        settle { start(Sent.FIRST, Runs.LIVE, Runs.DURABLE); add(reply(Keys.M1, VoiceText("Live part."), Runs.LIVE)) }
+        settle { add(reply(Keys.M2, VoiceText("Durable part."), Runs.DURABLE)) }
+        settle { end(Runs.LIVE, Runs.DURABLE) }
         assertEquals(listOf("Live part.", "\nDurable part."), texts(events))
     }
 
     @Test
     fun identityNeverPublishedFailsUnattributedSilently() = runTest {
         val events = collect(ask())
-        settle { add(user("u1", "c1"), assistant("m1", "Some answer.", "r1")); update { copy(activeRuns = setOf(VoiceRunId("r1"))) } }
+        settle {
+            add(user(Keys.U1, Sent.FIRST), reply(Keys.M1, VoiceText("Some answer."), Runs.R1))
+            update { copy(activeRuns = setOf(Runs.R1)) }
+        }
         advanceTimeBy(ChatReplyPolicy().deliveryTimeout + 1.seconds)
         runCurrent()
         assertEquals(listOf<VoiceReplyEvent>(failed(VoiceErrorCode.UNATTRIBUTED)), events)
@@ -188,13 +238,17 @@ class VoiceChatResponderTest {
 
     @Test
     fun secondUtteranceStopsOnlyTheFirstRunBeforeSending() = runTest {
-        val first = collect(ask(VoiceText("first")))
-        settle { start("c1", "r1"); add(assistant("m1", "Partial", "r1")) }
-        val second = collect(ask(VoiceText("second")))
+        val first = collect(ask(Say.FIRST))
+        settle { start(Sent.FIRST, Runs.R1); add(reply(Keys.M1, VoiceText("Partial"), Runs.R1)) }
+        val second = collect(ask(Say.SECOND))
         assertEquals(1, session.stops)
-        assertEquals(listOf("first", "second"), session.sent)
-        settle { add(assistant("m2", "Late words from the first run", "r1")); start("c2", "r2"); add(assistant("m3", "Answer two.", "r2")) }
-        settle { end("r2") }
+        assertEquals(listOf(Say.FIRST, Say.SECOND), session.sent)
+        settle {
+            add(reply(Keys.M2, VoiceText("Late words from the first run"), Runs.R1))
+            start(Sent.SECOND, Runs.R2)
+            add(reply(Keys.M3, VoiceText("Answer two."), Runs.R2))
+        }
+        settle { end(Runs.R2) }
         assertEquals(listOf("Partial"), texts(first))
         assertEquals(listOf("Answer two."), texts(second))
     }
@@ -202,15 +256,15 @@ class VoiceChatResponderTest {
     @Test
     fun cancelStopsOnlyItsOwnRunningRun() = runTest {
         assertEquals(VoiceCancelOutcome.ALREADY_FINISHED, ask().cancel())
-        assertEquals(emptyList<String>(), session.sent)
-        session.update { copy(activeRuns = setOf(VoiceRunId("someone-else"))) }
+        assertEquals(emptyList<VoiceText>(), session.sent)
+        session.update { copy(activeRuns = setOf(Runs.UNRELATED)) }
         val notYetRunning = ask()
         collect(notYetRunning)
         assertEquals(VoiceCancelOutcome.ALREADY_FINISHED, notYetRunning.cancel())
         assertEquals(0, session.stops)
         val running = ask()
         collect(running)
-        settle { start("c2", "r3") }
+        settle { start(Sent.SECOND, Runs.R2) }
         session.endRunOnStop = false
         val outcome = backgroundScope.launch { assertEquals(VoiceCancelOutcome.UNRESPONSIVE, running.cancel()) }
         advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
@@ -221,14 +275,14 @@ class VoiceChatResponderTest {
 
     @Test
     fun replyCancelledWhileThePreviousRunStopsSendsNothing() = runTest {
-        collect(ask(VoiceText("first")))
-        settle { start("c1", "r1") }
+        collect(ask(Say.FIRST))
+        settle { start(Sent.FIRST, Runs.R1) }
         session.endRunOnStop = false
-        val second = ask(VoiceText("second"))
+        val second = ask(Say.SECOND)
         collect(second)
         backgroundScope.launch { second.cancel() }
         advanceTimeBy(ChatReplyPolicy().stopTimeout + 1.seconds)
         runCurrent()
-        assertEquals(listOf("first"), session.sent)
+        assertEquals(listOf(Say.FIRST), session.sent)
     }
 }

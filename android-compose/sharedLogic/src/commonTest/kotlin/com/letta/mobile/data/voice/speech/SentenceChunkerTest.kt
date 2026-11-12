@@ -119,4 +119,16 @@ class SentenceChunkerTest {
         )
         cases.forEach { (deltas, expected) -> assertEquals(expected, chunk(*deltas, max = 16)) }
     }
+
+    @Test
+    fun aSentenceEndInsideMarkupNeverSplitsIt() {
+        val longTag = "<span title=\"" + "x".repeat(60) + ". "
+        val cases = listOf(
+            arrayOf(longTag) to emptyList(),
+            arrayOf("See [docs](https://x.io/a.b. c) now.") to listOf("See docs", "now."),
+            arrayOf("Text <a title=\"x. y\">link</a> after.") to listOf("Text link", "after."),
+            arrayOf("2 < 3. Next one.") to listOf("2 < 3.", "Next one."),
+        )
+        cases.forEach { (deltas, expected) -> assertEquals(expected, chunk(*deltas, max = 16), deltas.joinToString()) }
+    }
 }
