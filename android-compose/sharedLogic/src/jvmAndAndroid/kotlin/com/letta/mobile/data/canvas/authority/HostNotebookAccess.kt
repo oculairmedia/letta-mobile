@@ -10,6 +10,7 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSession
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.notes.notebookStorageId
+import com.letta.mobile.data.canvas.notes.notebookStorageIdOrNull
 import com.letta.mobile.data.canvas.references.NotebookReferenceAccess
 import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
 import com.letta.mobile.data.canvas.references.NotebookReferenceResolver
@@ -77,9 +78,9 @@ class HostNotebookAccess(
      * page). Grants are rechecked for read and edit in id order, [SHARED_NOTES_CHECKS_PER_TRANSACTION]
      * at a time under one grant transaction ([NotebookGrantStore.withGrants]), and each note's title is
      * read inside the transaction that allowed it. A granted note missing from the store is left out,
-     * as is a grant whose id is longer than a cursor can name ([SharedNotesCursors.MAX_ID_BYTES]; the
-     * host's own note ids are far shorter). A page holds up to [SharedNotesWire.MAX_LISTED] notes that
-     * pass that check and rechecks at most [SharedNotesWire.MAX_CHECKED] grants; one that stopped
+     * as is a grant whose id cannot name a local notebook, or is longer than a cursor can name
+     * ([SharedNotesCursors.MAX_ID_BYTES]; the host's own note ids are far shorter). A page holds up to
+     * [SharedNotesWire.MAX_LISTED] notes that pass that check and rechecks at most [SharedNotesWire.MAX_CHECKED] grants; one that stopped
      * before the principal's last grant carries [SharedNoteListing.Listed.next], naming the last grant
      * it checked, so following cursors reaches every grant however many cannot open the editor.
      *
@@ -134,10 +135,15 @@ class HostNotebookAccess(
         return SharedNotesCursors.issue(principal, candidates[checked - 1])
     }
 
-    /** The note as listed, when [grant] (read in the current transaction) lets this principal open it. */
+    /**
+     * The note as listed, when [grant] (read in the current transaction) lets this principal open it. A
+     * grant whose id cannot name a local notebook opens nothing and is left out, still counted as
+     * checked so the cursor moves past it; a failing read of a real note id still fails the page.
+     */
     private fun openable(id: NotebookDocumentId, grant: NotebookPeerGrant?): SharedNote? {
         if (!mayEditNotebookContent(grant)) return null
-        return notebooks.read(notebookStorageId(id))?.let { SharedNote(id, it.title) }
+        val storage = notebookStorageIdOrNull(id) ?: return null
+        return notebooks.read(storage)?.let { SharedNote(id, it.title) }
     }
 }
 

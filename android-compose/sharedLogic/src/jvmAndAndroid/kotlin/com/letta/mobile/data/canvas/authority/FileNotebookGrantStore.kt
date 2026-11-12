@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.authority
 
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import com.letta.mobile.data.canvas.NotebookPeerGrant
+import com.letta.mobile.data.canvas.notes.namesLocalNotebook
 import com.letta.mobile.data.hoststate.DurableHostFile
 import com.letta.mobile.data.hoststate.HostDirectoryDurability
 import com.letta.mobile.data.hoststate.StrictHostJson
@@ -60,9 +61,15 @@ class FileNotebookGrantStore internal constructor(
         read().grants.filter { it.principal == principal }.map { it.documentId }.sorted().map(::NotebookDocumentId)
     }
 
-    /** Add or replace one pair. These capabilities do not authorize plugin or agent-tool use. */
+    /**
+     * Add or replace one pair. These capabilities do not authorize plugin or agent-tool use. The document
+     * must be one a local notebook ID can name ([namesLocalNotebook]); anything else is refused. A stored
+     * grant read from the file is not held to that rule, so an older entry never fails the store: it can
+     * open nothing and the shared-notes listing skips it.
+     */
     suspend fun provision(documentId: NotebookDocumentId, grant: NotebookPeerGrant) = administration {
         validateKey(grant.peerId, documentId)
+        require(namesLocalNotebook(documentId)) { "Notebook grant document must be a local notebook ID" }
         require(!grant.mayExecutePlugins && !grant.mayUseAgentTools) { "Unsupported notebook grant capability" }
         val current = read()
         val updated = current.grants.filterNot { it.principal == grant.peerId && it.documentId == documentId.value }

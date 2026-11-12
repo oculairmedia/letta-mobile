@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.NotebookItem
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.canvas.NotebookHistoryArchive
 import com.letta.mobile.data.canvas.NotebookPeerGrant
+import com.letta.mobile.data.canvas.notes.notebookStorageId
 import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
 import com.letta.mobile.data.canvas.references.NotebookReferenceContent
 import com.letta.mobile.data.canvas.references.NotebookReferenceSession
@@ -20,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.automerge.ObjectId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -220,6 +222,43 @@ class HostNotebookAccessTest {
         }
     }
 
+    /**
+     * Editable grants whose ids cannot name a local notebook (stored before provisioning checked ids)
+     * open nothing and are skipped, more than a page of them ahead of real notes and one between them,
+     * and the walk still reaches every note after them.
+     */
+    @Test
+    fun grantsWhoseIdsCannotNameANotebookAreSkippedAndDoNotHideLaterNotes() = runBlocking {
+        withNotes(2) { notebooks, ids ->
+            val (first, last) = ids.sortedBy { it.value }
+            val between = NotebookDocumentId("${first.value}-not-a-notebook")
+            val grants = MemoryGrants(editableInvalid(SharedNotesWire.MAX_CHECKED + 10) + listOf(first, between, last).map { it to EDITOR })
+            val pages = walk(HostNotebookAccess(notebooks, grants, PEER))
+
+            assertEquals(2, pages.size, "the first page stops inside the invalid grants and hands back a cursor")
+            assertEquals(listOf(first, last), pages.flatMap { page -> page.notes.map { it.id } })
+            assertNull(pages.last().next)
+            assertEquals(SharedNotesWire.MAX_CHECKED + 13, grants.rechecks, "each grant is rechecked once across the walk")
+        }
+    }
+
+    /** Skipping ids that cannot name a notebook does not hide a real failure: a note that cannot be read fails the page. */
+    @Test
+    fun aNoteThatCannotBeReadStillMakesThePageUnavailable() = runBlocking {
+        withNotes(1) { notebooks, (id) ->
+            val handle = requireNotNull(notebooks.open(notebookStorageId(id)))
+            handle.withDocument { document ->
+                document.startTransaction().use { tx ->
+                    tx.set(ObjectId.ROOT, "title", true)
+                    tx.commit()
+                }
+            }.get()
+            val grants = MemoryGrants(editableInvalid(1) + (id to EDITOR))
+
+            assertIs<SharedNoteListing.Unavailable>(HostNotebookAccess(notebooks, grants, PEER).sharedNotes())
+        }
+    }
+
     /** With nothing changing, the pages together list every openable note exactly once, in id order. */
     @Test
     fun pagesNeitherRepeatNorSkipANoteWhileNothingChanges() = runBlocking {
@@ -306,6 +345,9 @@ class HostNotebookAccessTest {
         }
         return pages
     }
+
+    /** Editable grants for ids no local notebook can have, sorting before any note id the store issues (hex). */
+    private fun editableInvalid(count: Int) = (0 until count).map { NotebookDocumentId("-invalid-${padded(it)}") to EDITOR }
 
     /** Ids that sort before any note id the store issues (hex), so these grants come first in id order. */
     private fun readOnly(count: Int) = (0 until count).map { NotebookDocumentId("-read-only-${padded(it)}") to READ_ONLY }
