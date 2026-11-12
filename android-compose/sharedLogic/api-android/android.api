@@ -18691,13 +18691,14 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyTranspor
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcHostServices {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBeadsBaseUrl ()Ljava/lang/String;
 	public final fun getBeadsRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getBeadsTokenFile ()Ljava/lang/String;
 	public final fun getController ()Lcom/letta/mobile/data/controller/AppServerController;
 	public final fun getPluginRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public final fun getSecretRequestRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
 	public final fun getSubagentRegistrySource ()Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;
 	public final fun getVibesyncBaseUrl ()Ljava/lang/String;
 }
@@ -18760,20 +18761,24 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry {
 
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext$Companion;
-	public fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;)V
-	public synthetic fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;)V
+	public synthetic fun <init> (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun canAccessConversation (Ljava/lang/String;)Z
 	public final fun component1 ()Z
 	public final fun component2 ()Ljava/util/Set;
 	public final fun component3 ()Ljava/util/Set;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public final fun component5 ()Z
+	public final fun component6 ()Ljava/util/Set;
+	public final fun copy (ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ZLjava/util/Set;Ljava/util/Set;Ljava/lang/String;ZLjava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAuthenticated ()Z
 	public final fun getAuthenticatedEndpointId ()Ljava/lang/String;
 	public final fun getAuthorizedAgentIds ()Ljava/util/Set;
 	public final fun getAuthorizedConversationIds ()Ljava/util/Set;
+	public final fun getGrantedCapabilities ()Ljava/util/Set;
+	public final fun getPairedDevice ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -19454,6 +19459,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohPeerCapabiliti
 	public static final field NOTEBOOK_AUTHENTICATED Ljava/lang/String;
 	public static final field PROJECTS_MANAGE Ljava/lang/String;
 	public static final field SCHEDULE_MANAGE Ljava/lang/String;
+	public static final field SECRET_REQUEST_AGENT Ljava/lang/String;
+	public static final field SECRET_REQUEST_ANSWER Ljava/lang/String;
 	public static final field SKILLS_MANAGE Ljava/lang/String;
 	public static final field SUBAGENT_SPAWN Ljava/lang/String;
 	public static final field TOOLS_MANAGE Ljava/lang/String;
@@ -48657,6 +48664,23 @@ public final class com/letta/mobile/data/secrets/VaultAgent {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/secrets/client/AdminRpcSecretRequestClient : com/letta/mobile/data/secrets/client/SecretRequestClient {
+	public static final field Companion Lcom/letta/mobile/data/secrets/client/AdminRpcSecretRequestClient$Companion;
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/client/SecretRequestLink;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/secrets/client/SecretRequestLink;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun decline-8eGxqyg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun pending (Lcom/letta/mobile/data/secrets/client/SecretRequestScope;)Lkotlinx/coroutines/flow/Flow;
+	public fun submit-7DbFAfA (Ljava/lang/String;Lcom/letta/mobile/data/secrets/client/SecretInput;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/secrets/client/AdminRpcSecretRequestClient$Companion {
+	public final fun getDEFAULT_POLL_INTERVAL-UwyO8pc ()J
+}
+
+public final class com/letta/mobile/data/secrets/client/AdminRpcSecretRequestClientKt {
+	public static final fun asSecretRequestLink (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lcom/letta/mobile/data/secrets/client/SecretRequestLink;
+}
+
 public final class com/letta/mobile/data/secrets/client/SecretBuffer {
 	public static final field Companion Lcom/letta/mobile/data/secrets/client/SecretBuffer$Companion;
 	public static final field MAX_CHARS I
@@ -48921,6 +48945,11 @@ public abstract interface class com/letta/mobile/data/secrets/client/SecretReque
 	public abstract fun decline-8eGxqyg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun pending (Lcom/letta/mobile/data/secrets/client/SecretRequestScope;)Lkotlinx/coroutines/flow/Flow;
 	public abstract fun submit-7DbFAfA (Ljava/lang/String;Lcom/letta/mobile/data/secrets/client/SecretInput;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/secrets/client/SecretRequestLink {
+	public abstract fun call (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getHostCapabilities ()Ljava/util/Set;
 }
 
 public abstract interface class com/letta/mobile/data/secrets/client/SecretRequestScope {
@@ -49206,6 +49235,12 @@ public final class com/letta/mobile/data/secrets/request/SecretReceiptStatus : j
 
 public final class com/letta/mobile/data/secrets/request/SecretReceiptStatus$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/request/SecretRefusalText {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/request/SecretRefusalText;
+	public final fun of (Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;)Ljava/lang/String;
+	public final fun parse (Ljava/lang/String;)Lcom/letta/mobile/data/secrets/request/SecretRequestRefusal;
 }
 
 public final class com/letta/mobile/data/secrets/request/SecretRequestCreated {
@@ -49772,6 +49807,7 @@ public final class com/letta/mobile/data/secrets/request/SecretRequestValidation
 public final class com/letta/mobile/data/secrets/request/SecretServiceError : java/lang/Enum {
 	public static final field Companion Lcom/letta/mobile/data/secrets/request/SecretServiceError$Companion;
 	public static final field FORBIDDEN Lcom/letta/mobile/data/secrets/request/SecretServiceError;
+	public static final field INVALID_PARAMS Lcom/letta/mobile/data/secrets/request/SecretServiceError;
 	public static final field INVALID_REQUEST Lcom/letta/mobile/data/secrets/request/SecretServiceError;
 	public static final field INVALID_VALUE Lcom/letta/mobile/data/secrets/request/SecretServiceError;
 	public static final field JOURNAL_UNAVAILABLE Lcom/letta/mobile/data/secrets/request/SecretServiceError;
@@ -49900,6 +49936,30 @@ public final synthetic class com/letta/mobile/data/secrets/request/VerifiedEndpo
 
 public final class com/letta/mobile/data/secrets/request/VerifiedEndpointId$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/secrets/wire/SecretRequestRouteWire {
+	public static final field AGENT_CAPABILITY Ljava/lang/String;
+	public static final field ANSWER_CAPABILITY Ljava/lang/String;
+	public static final field CAPABILITY Ljava/lang/String;
+	public static final field FIELD_NAME Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/wire/SecretRequestRouteWire;
+	public static final field PURPOSE Ljava/lang/String;
+	public static final field REQUEST_ID Ljava/lang/String;
+	public static final field VALUE Ljava/lang/String;
+	public static final field VAULT_ITEM_NAME Ljava/lang/String;
+	public final fun getAGENT_METHODS ()Ljava/util/Set;
+	public final fun getHUMAN_METHODS ()Ljava/util/Set;
+	public final fun getMETHODS ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/data/secrets/wire/SecretValueBase64 {
+	public static final field INSTANCE Lcom/letta/mobile/data/secrets/wire/SecretValueBase64;
+	public static final field MAX_ENCODED_CHARS I
+	public static final field MAX_VALUE_BYTES I
+	public final fun decode (Ljava/lang/CharSequence;)[B
+	public final fun decodedLength (Ljava/lang/CharSequence;)Ljava/lang/Integer;
+	public final fun encode ([B)[C
 }
 
 public final class com/letta/mobile/data/serialization/LettaJson {

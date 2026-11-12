@@ -3122,6 +3122,7 @@ final enum class com.letta.mobile.data.secrets.request/SecretRequestState : kotl
 
 final enum class com.letta.mobile.data.secrets.request/SecretServiceError : kotlin/Enum<com.letta.mobile.data.secrets.request/SecretServiceError> { // com.letta.mobile.data.secrets.request/SecretServiceError|null[0]
     enum entry FORBIDDEN // com.letta.mobile.data.secrets.request/SecretServiceError.FORBIDDEN|null[0]
+    enum entry INVALID_PARAMS // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_PARAMS|null[0]
     enum entry INVALID_REQUEST // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_REQUEST|null[0]
     enum entry INVALID_VALUE // com.letta.mobile.data.secrets.request/SecretServiceError.INVALID_VALUE|null[0]
     enum entry JOURNAL_UNAVAILABLE // com.letta.mobile.data.secrets.request/SecretServiceError.JOURNAL_UNAVAILABLE|null[0]
@@ -6133,6 +6134,13 @@ abstract interface com.letta.mobile.data.secrets.client/SecretRequestClient { //
     abstract fun pending(com.letta.mobile.data.secrets.client/SecretRequestScope): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>> // com.letta.mobile.data.secrets.client/SecretRequestClient.pending|pending(com.letta.mobile.data.secrets.client.SecretRequestScope){}[0]
     abstract suspend fun decline(com.letta.mobile.data.secrets.request/SecretRequestId): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/SecretRequestClient.decline|decline(com.letta.mobile.data.secrets.request.SecretRequestId){}[0]
     abstract suspend fun submit(com.letta.mobile.data.secrets.request/SecretRequestId, com.letta.mobile.data.secrets.client/SecretInput): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/SecretRequestClient.submit|submit(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.client.SecretInput){}[0]
+}
+
+abstract interface com.letta.mobile.data.secrets.client/SecretRequestLink { // com.letta.mobile.data.secrets.client/SecretRequestLink|null[0]
+    abstract val hostCapabilities // com.letta.mobile.data.secrets.client/SecretRequestLink.hostCapabilities|{}hostCapabilities[0]
+        abstract fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.secrets.client/SecretRequestLink.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
+
+    abstract suspend fun call(kotlin/String, kotlin/String): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AdminRpcResponse // com.letta.mobile.data.secrets.client/SecretRequestLink.call|call(kotlin.String;kotlin.String){}[0]
 }
 
 abstract interface com.letta.mobile.data.secrets.journal/SecretRequestJournal { // com.letta.mobile.data.secrets.journal/SecretRequestJournal|null[0]
@@ -59200,6 +59208,19 @@ final class com.letta.mobile.data.search/MessageSearchSelection { // com.letta.m
     final fun toggled(com.letta.mobile.data.search/MessageSearchRole): com.letta.mobile.data.search/MessageSearchSelection // com.letta.mobile.data.search/MessageSearchSelection.toggled|toggled(com.letta.mobile.data.search.MessageSearchRole){}[0]
 }
 
+final class com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient : com.letta.mobile.data.secrets.client/SecretRequestClient { // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient|null[0]
+    constructor <init>(com.letta.mobile.data.secrets.client/SecretRequestLink, kotlin.time/Duration = ...) // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.<init>|<init>(com.letta.mobile.data.secrets.client.SecretRequestLink;kotlin.time.Duration){}[0]
+
+    final fun pending(com.letta.mobile.data.secrets.client/SecretRequestScope): kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>> // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.pending|pending(com.letta.mobile.data.secrets.client.SecretRequestScope){}[0]
+    final suspend fun decline(com.letta.mobile.data.secrets.request/SecretRequestId): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.decline|decline(com.letta.mobile.data.secrets.request.SecretRequestId){}[0]
+    final suspend fun submit(com.letta.mobile.data.secrets.request/SecretRequestId, com.letta.mobile.data.secrets.client/SecretInput): com.letta.mobile.data.secrets.client/SecretClientOutcome // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.submit|submit(com.letta.mobile.data.secrets.request.SecretRequestId;com.letta.mobile.data.secrets.client.SecretInput){}[0]
+
+    final object Companion { // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.Companion|null[0]
+        final val DEFAULT_POLL_INTERVAL // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.Companion.DEFAULT_POLL_INTERVAL|{}DEFAULT_POLL_INTERVAL[0]
+            final fun <get-DEFAULT_POLL_INTERVAL>(): kotlin.time/Duration // com.letta.mobile.data.secrets.client/AdminRpcSecretRequestClient.Companion.DEFAULT_POLL_INTERVAL.<get-DEFAULT_POLL_INTERVAL>|<get-DEFAULT_POLL_INTERVAL>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.secrets.client/SecretBuffer { // com.letta.mobile.data.secrets.client/SecretBuffer|null[0]
     constructor <init>() // com.letta.mobile.data.secrets.client/SecretBuffer.<init>|<init>(){}[0]
 
@@ -75447,6 +75468,11 @@ final object com.letta.mobile.data.secrets.journal/SecretRequestJournalRules { /
     final fun require(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>) // com.letta.mobile.data.secrets.journal/SecretRequestJournalRules.require|require(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>){}[0]
 }
 
+final object com.letta.mobile.data.secrets.request/SecretRefusalText { // com.letta.mobile.data.secrets.request/SecretRefusalText|null[0]
+    final fun of(com.letta.mobile.data.secrets.request/SecretRequestRefusal): kotlin/String // com.letta.mobile.data.secrets.request/SecretRefusalText.of|of(com.letta.mobile.data.secrets.request.SecretRequestRefusal){}[0]
+    final fun parse(kotlin/String): com.letta.mobile.data.secrets.request/SecretRequestRefusal? // com.letta.mobile.data.secrets.request/SecretRefusalText.parse|parse(kotlin.String){}[0]
+}
+
 final object com.letta.mobile.data.secrets.request/SecretRequestLifecycle { // com.letta.mobile.data.secrets.request/SecretRequestLifecycle|null[0]
     final fun apply(com.letta.mobile.data.secrets.request/SecretRequestRecord, com.letta.mobile.data.secrets.request/SecretRequestEvent, kotlin.time/Instant): com.letta.mobile.data.secrets.request/SecretRequestTransition // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.apply|apply(com.letta.mobile.data.secrets.request.SecretRequestRecord;com.letta.mobile.data.secrets.request.SecretRequestEvent;kotlin.time.Instant){}[0]
     final fun expireDue(kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord>, kotlin.time/Instant): kotlin.collections/List<com.letta.mobile.data.secrets.request/SecretRequestRecord> // com.letta.mobile.data.secrets.request/SecretRequestLifecycle.expireDue|expireDue(kotlin.collections.List<com.letta.mobile.data.secrets.request.SecretRequestRecord>;kotlin.time.Instant){}[0]
@@ -75493,6 +75519,43 @@ final object com.letta.mobile.data.secrets.request/SecretRequestMethods { // com
         final fun <get-STATUS>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.STATUS.<get-STATUS>|<get-STATUS>(){}[0]
     final const val SUBMIT // com.letta.mobile.data.secrets.request/SecretRequestMethods.SUBMIT|{}SUBMIT[0]
         final fun <get-SUBMIT>(): kotlin/String // com.letta.mobile.data.secrets.request/SecretRequestMethods.SUBMIT.<get-SUBMIT>|<get-SUBMIT>(){}[0]
+}
+
+final object com.letta.mobile.data.secrets.wire/SecretRequestRouteWire { // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire|null[0]
+    final const val AGENT_CAPABILITY // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.AGENT_CAPABILITY|{}AGENT_CAPABILITY[0]
+        final fun <get-AGENT_CAPABILITY>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.AGENT_CAPABILITY.<get-AGENT_CAPABILITY>|<get-AGENT_CAPABILITY>(){}[0]
+    final const val ANSWER_CAPABILITY // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.ANSWER_CAPABILITY|{}ANSWER_CAPABILITY[0]
+        final fun <get-ANSWER_CAPABILITY>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.ANSWER_CAPABILITY.<get-ANSWER_CAPABILITY>|<get-ANSWER_CAPABILITY>(){}[0]
+    final const val CAPABILITY // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.CAPABILITY|{}CAPABILITY[0]
+        final fun <get-CAPABILITY>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.CAPABILITY.<get-CAPABILITY>|<get-CAPABILITY>(){}[0]
+    final const val FIELD_NAME // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.FIELD_NAME|{}FIELD_NAME[0]
+        final fun <get-FIELD_NAME>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.FIELD_NAME.<get-FIELD_NAME>|<get-FIELD_NAME>(){}[0]
+    final const val PURPOSE // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.PURPOSE|{}PURPOSE[0]
+        final fun <get-PURPOSE>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.PURPOSE.<get-PURPOSE>|<get-PURPOSE>(){}[0]
+    final const val REQUEST_ID // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.REQUEST_ID|{}REQUEST_ID[0]
+        final fun <get-REQUEST_ID>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.REQUEST_ID.<get-REQUEST_ID>|<get-REQUEST_ID>(){}[0]
+    final const val VALUE // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.VALUE|{}VALUE[0]
+        final fun <get-VALUE>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.VALUE.<get-VALUE>|<get-VALUE>(){}[0]
+    final const val VAULT_ITEM_NAME // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.VAULT_ITEM_NAME|{}VAULT_ITEM_NAME[0]
+        final fun <get-VAULT_ITEM_NAME>(): kotlin/String // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.VAULT_ITEM_NAME.<get-VAULT_ITEM_NAME>|<get-VAULT_ITEM_NAME>(){}[0]
+
+    final val AGENT_METHODS // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.AGENT_METHODS|{}AGENT_METHODS[0]
+        final fun <get-AGENT_METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.AGENT_METHODS.<get-AGENT_METHODS>|<get-AGENT_METHODS>(){}[0]
+    final val HUMAN_METHODS // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.HUMAN_METHODS|{}HUMAN_METHODS[0]
+        final fun <get-HUMAN_METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.HUMAN_METHODS.<get-HUMAN_METHODS>|<get-HUMAN_METHODS>(){}[0]
+    final val METHODS // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.METHODS|{}METHODS[0]
+        final fun <get-METHODS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.secrets.wire/SecretRequestRouteWire.METHODS.<get-METHODS>|<get-METHODS>(){}[0]
+}
+
+final object com.letta.mobile.data.secrets.wire/SecretValueBase64 { // com.letta.mobile.data.secrets.wire/SecretValueBase64|null[0]
+    final const val MAX_ENCODED_CHARS // com.letta.mobile.data.secrets.wire/SecretValueBase64.MAX_ENCODED_CHARS|{}MAX_ENCODED_CHARS[0]
+        final fun <get-MAX_ENCODED_CHARS>(): kotlin/Int // com.letta.mobile.data.secrets.wire/SecretValueBase64.MAX_ENCODED_CHARS.<get-MAX_ENCODED_CHARS>|<get-MAX_ENCODED_CHARS>(){}[0]
+    final const val MAX_VALUE_BYTES // com.letta.mobile.data.secrets.wire/SecretValueBase64.MAX_VALUE_BYTES|{}MAX_VALUE_BYTES[0]
+        final fun <get-MAX_VALUE_BYTES>(): kotlin/Int // com.letta.mobile.data.secrets.wire/SecretValueBase64.MAX_VALUE_BYTES.<get-MAX_VALUE_BYTES>|<get-MAX_VALUE_BYTES>(){}[0]
+
+    final fun decode(kotlin/CharSequence): kotlin/ByteArray? // com.letta.mobile.data.secrets.wire/SecretValueBase64.decode|decode(kotlin.CharSequence){}[0]
+    final fun decodedLength(kotlin/CharSequence): kotlin/Int? // com.letta.mobile.data.secrets.wire/SecretValueBase64.decodedLength|decodedLength(kotlin.CharSequence){}[0]
+    final fun encode(kotlin/ByteArray): kotlin/CharArray // com.letta.mobile.data.secrets.wire/SecretValueBase64.encode|encode(kotlin.ByteArray){}[0]
 }
 
 final object com.letta.mobile.data.secrets/AgentSecretKeys { // com.letta.mobile.data.secrets/AgentSecretKeys|null[0]
@@ -76805,6 +76868,7 @@ final fun (com.letta.mobile.data.timeline/TimelineSettledRecord).com.letta.mobil
 final fun (com.letta.mobile.data.timeline/TimelineSettledRecord).com.letta.mobile.data.timeline/toRenderItem(kotlin/String? = ...): com.letta.mobile.data.chat.projection/ChatRenderItem? // com.letta.mobile.data.timeline/toRenderItem|toRenderItem@com.letta.mobile.data.timeline.TimelineSettledRecord(kotlin.String?){}[0]
 final fun (com.letta.mobile.data.transport.api/IChannelTransport).com.letta.mobile.data.chat.recompile/asAdminRpcLink(): com.letta.mobile.data.chat.recompile/IrohAdminRpcLink // com.letta.mobile.data.chat.recompile/asAdminRpcLink|asAdminRpcLink@com.letta.mobile.data.transport.api.IChannelTransport(){}[0]
 final fun (com.letta.mobile.data.transport.api/IChannelTransport).com.letta.mobile.data.repository/conversationChanges(): kotlinx.coroutines.flow/Flow<kotlin/Pair<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/AgentId?>> // com.letta.mobile.data.repository/conversationChanges|conversationChanges@com.letta.mobile.data.transport.api.IChannelTransport(){}[0]
+final fun (com.letta.mobile.data.transport.api/IChannelTransport).com.letta.mobile.data.secrets.client/asSecretRequestLink(): com.letta.mobile.data.secrets.client/SecretRequestLink // com.letta.mobile.data.secrets.client/asSecretRequestLink|asSecretRequestLink@com.letta.mobile.data.transport.api.IChannelTransport(){}[0]
 final fun (com.letta.mobile.data.transport.appserver/AppServerApprovalResponseDecision).com.letta.mobile.data.controller/withSelectedSuggestions(kotlin.collections/List<kotlin/String>): com.letta.mobile.data.transport.appserver/AppServerApprovalResponseDecision // com.letta.mobile.data.controller/withSelectedSuggestions|withSelectedSuggestions@com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision(kotlin.collections.List<kotlin.String>){}[0]
 final fun (com.letta.mobile.data.transport.appserver/AppServerInfoData).com.letta.mobile.data.transport.appserver/requireCompatibleWith(com.letta.mobile.data.transport.appserver/AppServerCompatibilityRequirement): com.letta.mobile.data.transport.appserver/AppServerInfoData // com.letta.mobile.data.transport.appserver/requireCompatibleWith|requireCompatibleWith@com.letta.mobile.data.transport.appserver.AppServerInfoData(com.letta.mobile.data.transport.appserver.AppServerCompatibilityRequirement){}[0]
 final fun (com.letta.mobile.data.transport.appserver/AppServerProbeResult).com.letta.mobile.data.controller.reconnect/summary(): kotlin/String // com.letta.mobile.data.controller.reconnect/summary|summary@com.letta.mobile.data.transport.appserver.AppServerProbeResult(){}[0]
