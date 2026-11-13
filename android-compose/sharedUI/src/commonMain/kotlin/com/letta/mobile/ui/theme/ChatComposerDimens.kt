@@ -32,15 +32,6 @@ object ChatComposerDimens {
     /** The share column in the context breakdown, wide enough for "100%". */
     val contextShareColumn: Dp = 52.dp
 
-    /**
-     * Voice mode's band above the bar holds this height in every state while voice mode is on, so
-     * a state change never moves the bar or the conversation: on a pointer layout...
-     */
-    internal val voiceBandPointer: Dp = LettaDimens.Space.xxl * 2
-
-    /** ...and on a touch layout: a touch target with a little air for the wave. */
-    internal val voiceBandTouch: Dp = LettaDimens.Control.minTouchTarget + LettaDimens.Space.sm
-
     /** The `@` mention suggestions cap at this height and scroll. */
     val mentionPickerMaxHeight: Dp = 320.dp
 

@@ -198,6 +198,8 @@ private fun ComposerAboveCard(model: ComposerModel) {
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
     )
     model.composer.error?.let { message -> ComposerErrorRow(message = message, onDismiss = actions::clearComposerError) }
+    // Voice mode's failures and missing setup, with Retry or Set up, in the same notice slot.
+    ComposerVoiceNotice()
     // The dock stays one compact bar; the directory is chrome of the full page.
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
@@ -215,6 +217,4 @@ private fun ComposerAboveCard(model: ComposerModel) {
         )
     }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)
-    // Last, so it sits directly on the bar.
-    ComposerVoiceStatus()
 }

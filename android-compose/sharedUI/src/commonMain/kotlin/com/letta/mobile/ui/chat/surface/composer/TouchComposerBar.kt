@@ -232,9 +232,12 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
     var focused by remember { mutableStateOf(false) }
     val look = animatedTouchBarLook(model, focused)
     val padding = touchBarPadding()
+    val shape = RoundedCornerShape(topStart = look.corner, topEnd = look.corner)
     Surface(
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.testTag(ComposerTestTags.TOUCH_BAR),
-        shape = RoundedCornerShape(topStart = look.corner, topEnd = look.corner),
+        // Voice mode's outline follows the bar's shape: the bar runs flush to the screen's sides and
+        // bottom, so what shows is a glowing top edge and its rounded corners.
+        modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.voiceOutline(shape).testTag(ComposerTestTags.TOUCH_BAR),
+        shape = shape,
         color = look.color,
         contentColor = scheme.onSurface,
         tonalElevation = look.elevation,

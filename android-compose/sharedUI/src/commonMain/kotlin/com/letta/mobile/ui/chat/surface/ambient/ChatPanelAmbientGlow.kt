@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.AmbientVoice
+import com.letta.mobile.ui.ambient.AmbientVoiceRole
+import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientBand
 import com.letta.mobile.ui.ambient.AmbientMotion
@@ -170,12 +173,6 @@ internal sealed interface AmbientGlowPlacement {
      * [ChatSurfaceDimens.collapsedHaloBleed] and fades out at its edges, a soft halo on the canvas.
      */
     data object Halo : AmbientGlowPlacement
-
-    /**
-     * Filling voice mode's band above the chat bar while it waits for the reply: the light rises
-     * from the band's bottom edge over most of its height, inside the band's own rounded shape.
-     */
-    data object VoiceBand : AmbientGlowPlacement
 }
 
 /**
@@ -196,11 +193,13 @@ internal fun ChatPanelAmbientGlow(
     val reducedMotion = LocalReducedMotion.current
     // Outside the visible gate: the glow comes and goes with every run, its compiled shader stays.
     val shaders = LocalAmbientGlowShaders.current ?: rememberAmbientGlowShaders()
-    val status = ambient.status
+    // Voice mode: while it follows a voice the glow runs in that voice's colour at its level.
+    val voice = LocalAmbientVoice.current
+    val status = if (voice != null) AmbientMotionStatus.Running else ambient.status
     val spec = AmbientMotion.spec(status)
     val glide = if (reducedMotion) 0 else ChatMotionTokens.AmbientGlow.GLIDE_MILLIS
     val tint = animateColorAsState(
-        targetValue = ambientTint(status, MaterialTheme.colorScheme),
+        targetValue = voice?.let { voiceTint(it, MaterialTheme.colorScheme) } ?: ambientTint(status, MaterialTheme.colorScheme),
         animationSpec = tween(durationMillis = glide, easing = EaseInOutCubic),
         label = "chatAmbientTint",
     )
@@ -236,6 +235,8 @@ internal fun ChatPanelAmbientGlow(
             agitation = agitation,
             envelope = envelope.asState(),
             streamPulse = ambient.streamPulse,
+            // Under reduced motion only the colour follows the voice: the still tint, no level.
+            voice = voice.takeUnless { reducedMotion },
         ),
         animate = !reducedMotion,
         placement = placement,
@@ -252,6 +253,7 @@ private class GlowInputs(
     val agitation: State<Float>,
     val envelope: State<Float>,
     val streamPulse: Long,
+    val voice: AmbientVoice? = null,
 )
 
 @Composable
@@ -279,9 +281,9 @@ private fun GlowLayer(
                 val uniforms = AmbientGlowUniforms(
                     phase = motion.phase.floatValue,
                     agitation = inputs.agitation.value,
-                    envelope = inputs.envelope.value,
-                    streamEnergy = motion.streamEnergy.floatValue,
-                    band = bandFor(placement),
+                    envelope = inputs.voice?.envelope(inputs.envelope.value) ?: inputs.envelope.value,
+                    streamEnergy = inputs.voice?.streamEnergy(motion.streamEnergy.floatValue) ?: motion.streamEnergy.floatValue,
+                    band = if (placement is AmbientGlowPlacement.Halo) HALO_BAND else PANEL_BAND,
                     tint = inputs.tint.value,
                     fieldHeight = fieldHeightFor(placement),
                     gain = GLOW_GAIN,
@@ -326,7 +328,7 @@ private fun rememberSettledRedraw(inputs: GlowInputs, motion: GlowMotion): Mutab
  * rises from behind the composer bar, never as a band floating across the conversation.
  */
 private fun DrawScope.fieldHeightFor(placement: AmbientGlowPlacement): Float = when (placement) {
-    is AmbientGlowPlacement.AboveComposer, AmbientGlowPlacement.VoiceBand -> size.height
+    is AmbientGlowPlacement.AboveComposer -> size.height
     // The halo's light rises from the bar the mascot stands on: the field ends at the row's foot,
     // not at the bottom of the bleed below it (which the bar covers).
     AmbientGlowPlacement.Halo -> (size.height - ChatSurfaceDimens.collapsedHaloBleed.toPx()).coerceAtLeast(1f)
@@ -408,6 +410,15 @@ internal fun ambientTint(status: AmbientMotionStatus, scheme: ColorScheme): Colo
     AmbientMotionStatus.Running, AmbientMotionStatus.Active -> scheme.tertiary
     AmbientMotionStatus.Failed -> scheme.error
     AmbientMotionStatus.Completed -> scheme.secondary
+}
+
+/**
+ * The glow's colour while it follows a voice: the person's own colour, or the agent's running tint
+ * (the thinking colour) while its reply is spoken.
+ */
+internal fun voiceTint(voice: AmbientVoice, scheme: ColorScheme): Color = when (voice.role) {
+    AmbientVoiceRole.You -> Color(voice.youTintArgb)
+    AmbientVoiceRole.Agent -> ambientTint(AmbientMotionStatus.Running, scheme)
 }
 
 /** One frame's uniforms for the shared ambient shader (AMBIENT_GLOW_SHADER_SOURCE's contract). */
@@ -509,18 +520,8 @@ internal const val CHAT_AMBIENT_GLOW_TAG = "chat-ambient-glow"
 internal val AmbientGlowAnimatedKey = SemanticsPropertyKey<Boolean>("AmbientGlowAnimated")
 internal var SemanticsPropertyReceiver.ambientGlowAnimated by AmbientGlowAnimatedKey
 
-/** Where the glow sits in its field for [placement]. */
-private fun bandFor(placement: AmbientGlowPlacement): AmbientBand = when (placement) {
-    is AmbientGlowPlacement.AboveComposer -> PANEL_BAND
-    AmbientGlowPlacement.Halo -> HALO_BAND
-    AmbientGlowPlacement.VoiceBand -> VOICE_BAND
-}
-
 /** The halo is short: it lifts its glow over most of its height rather than a thin edge strip. */
 private val HALO_BAND = AmbientBand(top = 0.05f, peak = 0.8f)
-
-/** Voice mode's band is shorter still: the glow fills it from its foot nearly to its top. */
-private val VOICE_BAND = AmbientBand(top = 0.0f, peak = 0.9f)
 
 /**
  * The panel's band: taller than a page's, since a panel a third of the window high would

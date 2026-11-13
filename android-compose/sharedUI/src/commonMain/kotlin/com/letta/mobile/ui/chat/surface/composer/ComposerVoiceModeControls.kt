@@ -5,25 +5,13 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
@@ -40,22 +28,22 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.composables.icons.lucide.AudioLines
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MicOff
 import com.composables.icons.lucide.Volume2
-import com.composables.icons.lucide.X
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceUserAction
 import com.letta.mobile.data.voice.session.VoiceModeState
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.chat.voice.VoiceModeHandle
+import com.letta.mobile.ui.components.LettaInlineNotice
 import com.letta.mobile.ui.chat.voice.VoiceModeTags
 import com.letta.mobile.ui.chat.voice.voiceErrorText
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_action_dismiss
-import com.letta.mobile.sharedui.resources.voice_action_interrupt
 import com.letta.mobile.sharedui.resources.voice_action_retry
 import com.letta.mobile.sharedui.resources.voice_action_setup
 import com.letta.mobile.sharedui.resources.voice_error_no_conversation
@@ -77,7 +65,6 @@ import com.letta.mobile.sharedui.resources.voice_status_setup
 import com.letta.mobile.sharedui.resources.voice_status_speaking
 import com.letta.mobile.sharedui.resources.voice_status_speaking_press
 import com.letta.mobile.sharedui.resources.voice_status_thinking
-import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource
@@ -116,111 +103,93 @@ internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, mo
 }
 
 /**
- * Voice mode's band directly above the chat bar while voice mode is not off, inside the chat column
- * (never over the conversation or the window): a fixed-height band in the prompt card's shape whose
- * backdrop shows what voice mode is doing ([voiceBandVisual]: the reactive wave on the microphone
- * while listening and hearing, the thinking glow while waiting, the wave on the reply while
- * speaking, the still surface after a failure), under its one status line: what it is doing
- * ("Listening…"; while speaking "Speaking… — talk to interrupt", or "— press to interrupt" where
- * speaking does not interrupt, with an Interrupt action that stops the reply and listens), or why it
- * stopped with the action that helps (Retry, Set up), and a close control that stops voice mode.
- * The line is a polite live region.
+ * What voice mode is doing, as the prompt field's placeholder while voice mode is on and the field is
+ * empty ("Listening…", "Hearing you…", "Thinking…", "Speaking… — press to interrupt"); null while it
+ * is off or waits on something (the notice above the card says what), so the field keeps its own
+ * placeholder. The prompt's outline carries the state when the person has typed.
  */
 @Composable
-internal fun VoiceStatusStrip(handle: VoiceModeHandle, modifier: Modifier = Modifier) {
+internal fun voicePlaceholder(): String? {
+    val handle = LocalVoiceMode.current ?: return null
     val state by handle.state.collectAsState()
     val byVoice by handle.controller.bargeInByVoice.collectAsState()
-    if (state == VoiceModeState.Off) return
-    val line = statusLine(state, byVoice)
-    val visual = voiceBandVisual(state)
-    val moving = !LocalReducedMotion.current && visual != VoiceBandVisual.Still
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(voiceBandHeight())
-            .testTag(VoiceModeTags.STRIP)
-            .semantics {
-                voiceBandVisual = visual
-                voiceBandAnimated = moving
-            },
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            VoiceBandBackdrop(visual, handle, Modifier.matchParentSize())
-            VoiceStatusLine(line, handle)
-        }
-    }
+    val text = when (state) {
+        VoiceModeState.Listening, is VoiceModeState.TurnFailed -> Res.string.voice_status_listening
+        VoiceModeState.Hearing -> Res.string.voice_status_hearing
+        VoiceModeState.WaitingForReply -> Res.string.voice_status_thinking
+        VoiceModeState.Speaking -> speakingHint(byVoice)
+        else -> null
+    } ?: return null
+    return stringResource(text)
 }
 
-/** The band's status text, its action and its close control, laid over the backdrop. */
+/**
+ * Voice mode's notice in the composer's notice slot above the prompt card, when something needs the
+ * person: the failure or the missing setup, permission or conversation, with the action that helps
+ * (Retry, Set up) and, where voice mode has stopped, a dismiss that turns it off. The page's own
+ * inline notice ([LettaInlineNotice]); nothing while voice mode is off or simply running.
+ */
 @Composable
-private fun VoiceStatusLine(line: StatusLine, handle: VoiceModeHandle) {
-    Row(
-        modifier = Modifier.fillMaxSize().padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xs),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(line.text),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (line.problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
-        )
-        line.action?.let { action -> StripAction(action, handle) }
-        IconButton(
-            onClick = handle.controller::stop,
-            modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(VoiceModeTags.STRIP_CLOSE),
-        ) {
-            val dismiss = stringResource(Res.string.voice_action_dismiss)
-            Icon(Lucide.X, contentDescription = dismiss, modifier = Modifier.size(LettaDimens.Control.iconSm))
-        }
+internal fun ComposerVoiceNotice() {
+    val handle = LocalVoiceMode.current ?: return
+    val state by handle.state.collectAsState()
+    val notice = voiceNotice(state) ?: return
+    val kind = notice.action
+    LettaInlineNotice(
+        message = stringResource(notice.text),
+        modifier = Modifier
+            .widthIn(max = ChatColumnMaxWidth)
+            .testTag(VoiceModeTags.STRIP)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        actionLabel = kind?.let { stringResource(it.label) }.orEmpty(),
+        onAction = kind?.let { action -> { act(action, handle) } },
+        actionTag = VoiceModeTags.STRIP_ACTION,
+        dismissLabel = stringResource(Res.string.voice_action_dismiss),
+        onDismiss = if (notice.dismissible) handle.controller::stop else null,
+        dismissTag = VoiceModeTags.STRIP_CLOSE,
+    )
+}
+
+/** Does what the notice's [action] offers. */
+private fun act(action: NoticeAction, handle: VoiceModeHandle) {
+    when (action) {
+        NoticeAction.RETRY -> handle.controller.retry()
+        NoticeAction.PRESS_AGAIN -> handle.press()
+        NoticeAction.SETUP -> handle.setupOpen = true
     }
 }
 
-/** What the strip offers next to its text. */
-private enum class StripActionKind(val label: StringResource) {
+/** What the notice offers. */
+private enum class NoticeAction(val label: StringResource) {
     RETRY(Res.string.voice_action_retry),
     PRESS_AGAIN(Res.string.voice_action_retry),
-    INTERRUPT(Res.string.voice_action_interrupt),
     SETUP(Res.string.voice_action_setup),
 }
 
-@Composable
-private fun StripAction(action: StripActionKind, handle: VoiceModeHandle) {
-    TextButton(
-        onClick = {
-            when (action) {
-                StripActionKind.RETRY -> handle.controller.retry()
-                StripActionKind.PRESS_AGAIN -> handle.press()
-                StripActionKind.INTERRUPT -> handle.press()
-                StripActionKind.SETUP -> handle.setupOpen = true
-            }
-        },
-        contentPadding = PaddingValues(horizontal = LettaDimens.Space.sm),
-        modifier = Modifier.heightIn(min = LettaDimens.Control.iconButton).testTag(VoiceModeTags.STRIP_ACTION),
-    ) {
-        Text(stringResource(action.label), style = MaterialTheme.typography.labelMedium)
-    }
+@Immutable
+private class VoiceNotice(val text: StringResource, val action: NoticeAction?, val dismissible: Boolean)
+
+/** The notice for [state], or null where there is nothing to act on. */
+private fun voiceNotice(state: VoiceModeState): VoiceNotice? = when (state) {
+    is VoiceModeState.TurnFailed -> VoiceNotice(voiceErrorText(state.code), turnFailureAction(state), dismissible = false)
+    is VoiceModeState.Error -> VoiceNotice(voiceErrorText(state.code), errorAction(state.code), dismissible = true)
+    is VoiceModeState.NeedsSetup -> VoiceNotice(Res.string.voice_status_setup, NoticeAction.SETUP, dismissible = true)
+    VoiceModeState.NeedsMicPermission -> VoiceNotice(Res.string.voice_status_permission, NoticeAction.PRESS_AGAIN, dismissible = true)
+    VoiceModeState.NeedsConversation -> VoiceNotice(Res.string.voice_error_no_conversation, null, dismissible = true)
+    else -> null
 }
 
-@Immutable
-private class StatusLine(val text: StringResource, val action: StripActionKind? = null, val problem: Boolean = false)
+/** Voice mode listens on after a failed utterance: Retry sends it again; pressing the button would stop voice mode. */
+private fun turnFailureAction(state: VoiceModeState.TurnFailed): NoticeAction? = when {
+    state.retryable -> NoticeAction.RETRY
+    state.code.action == VoiceUserAction.OPEN_SETTINGS -> NoticeAction.SETUP
+    else -> null
+}
 
-private fun statusLine(state: VoiceModeState, byVoice: Boolean): StatusLine = when (state) {
-    VoiceModeState.Listening -> StatusLine(Res.string.voice_status_listening)
-    VoiceModeState.Hearing -> StatusLine(Res.string.voice_status_hearing)
-    VoiceModeState.WaitingForReply -> StatusLine(Res.string.voice_status_thinking)
-    VoiceModeState.Speaking -> StatusLine(speakingHint(byVoice), StripActionKind.INTERRUPT)
-    is VoiceModeState.NeedsSetup -> StatusLine(Res.string.voice_status_setup, StripActionKind.SETUP, problem = true)
-    VoiceModeState.NeedsMicPermission -> StatusLine(Res.string.voice_status_permission, StripActionKind.PRESS_AGAIN, problem = true)
-    VoiceModeState.NeedsConversation -> StatusLine(Res.string.voice_error_no_conversation, problem = true)
-    is VoiceModeState.Error -> StatusLine(voiceErrorText(state.code), errorAction(state.code), problem = true)
-    is VoiceModeState.TurnFailed -> StatusLine(voiceErrorText(state.code), turnFailureAction(state), problem = true)
-    VoiceModeState.Off -> StatusLine(Res.string.voice_mode_state_off)
+private fun errorAction(code: VoiceErrorCode): NoticeAction = when (code.action) {
+    VoiceUserAction.RETRY -> NoticeAction.RETRY
+    VoiceUserAction.OPEN_SETTINGS -> NoticeAction.SETUP
+    VoiceUserAction.NONE -> NoticeAction.PRESS_AGAIN
 }
 
 /** The speaking hint: talking interrupts only where the microphone path allows it; elsewhere a press does. */
@@ -232,19 +201,6 @@ private fun buttonDescription(state: VoiceModeState): StringResource = when {
     state == VoiceModeState.Speaking -> Res.string.voice_mode_interrupt
     state.active -> Res.string.voice_mode_stop
     else -> Res.string.voice_mode_start
-}
-
-/** Voice mode listens on after a failed utterance: Retry sends it again; pressing the button would stop voice mode. */
-private fun turnFailureAction(state: VoiceModeState.TurnFailed): StripActionKind? = when {
-    state.retryable -> StripActionKind.RETRY
-    state.code.action == VoiceUserAction.OPEN_SETTINGS -> StripActionKind.SETUP
-    else -> null
-}
-
-private fun errorAction(code: VoiceErrorCode): StripActionKind? = when (code.action) {
-    VoiceUserAction.RETRY -> StripActionKind.RETRY
-    VoiceUserAction.OPEN_SETTINGS -> StripActionKind.SETUP
-    VoiceUserAction.NONE -> StripActionKind.PRESS_AGAIN
 }
 
 /** The button's glyph, colours and spoken state for one voice mode state. */

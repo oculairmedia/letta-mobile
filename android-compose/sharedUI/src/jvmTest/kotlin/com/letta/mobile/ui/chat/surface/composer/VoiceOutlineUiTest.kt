@@ -199,6 +199,12 @@ class VoiceOutlineUiTest {
         val fixed = fixedTags(style)
         val off = fixed.associateWith { bounds(it) }
         val timelineOff = bounds(TIMELINE)
+        // Typed text changes Send's own look (enabled), so with text the baseline is voice mode off with text.
+        page.text = "typed"
+        waitForIdle()
+        val typedOff = fixed.associateWith { bounds(it) }
+        page.text = ""
+        waitForIdle()
         assertEquals(VoiceGlowRole.Idle, semantic(bar, VoiceOutlineRoleKey), "no outline while voice mode is off at $width ($style)")
 
         val roles = mutableMapOf<VoiceModeState, VoiceGlowRole>()
@@ -218,7 +224,7 @@ class VoiceOutlineUiTest {
             waitForIdle()
             onNodeWithText(placeholder, useUnmergedTree = true).assertDoesNotExist()
             assertEquals(role, semantic(bar, VoiceOutlineRoleKey), "the outline carries the state once text is typed $where")
-            fixed.forEach { tag -> assertEquals(off.getValue(tag), bounds(tag), "$tag keeps its bounds with text $where") }
+            fixed.forEach { tag -> assertEquals(typedOff.getValue(tag), bounds(tag), "$tag keeps its bounds with text $where") }
         }
         assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.WaitingForReply], "hearing and thinking differ in colour at $width ($style)")
         assertNotEquals(roles[VoiceModeState.Hearing], roles[VoiceModeState.Speaking], "hearing and speaking differ in colour at $width ($style)")

@@ -128,10 +128,9 @@ private enum class Layout(val style: LettaInput, val mode: ChatSurfaceMode, val 
 }
 
 /**
- * The chat bar's voice mode button and status strip: the button is the first of the trailing
- * actions, directly before Send, in every composer layout; it never moves Send and never runs the
- * prompt field under it, at the phone, tablet and desktop widths. The strip sits on the bar and the
- * permission mode's line under it, and neither moves when voice mode changes.
+ * The chat bar's voice mode button: the first of the trailing actions, directly before Send, in
+ * every composer layout; it never moves Send and never runs the prompt field under it, at the phone,
+ * tablet and desktop widths. Voice mode's own arrangement around the prompt is VoiceOutlineUiTest's.
  */
 class VoiceModeComposerUiTest {
     private val drafted = ChatComposerUiState(
@@ -286,47 +285,6 @@ class VoiceModeComposerUiTest {
         waitForState({ handle }, VoiceModeState.Listening)
     }
 
-    /** Voice mode on and off in [layout] at [width]: the strip on the bar, and the bar and its under line still. */
-    private fun keepsTheStack(width: Dp, layout: Layout, under: String) = runComposeUiTest {
-        var handle: VoiceModeHandle? = null
-        showComposer(width, layout.style, onHandle = { handle = it })
-        val where = "at $width ($layout)"
-        onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
-        val barBefore = bounds(layout.bar)
-        val underBefore = bounds(under)
-
-        onNodeWithTag(VoiceModeTags.BUTTON).performClick()
-        waitForState({ handle }, VoiceModeState.Listening)
-        waitForIdle()
-        val strip = bounds(VoiceModeTags.STRIP)
-        assertEquals(barBefore, bounds(layout.bar), "the bar stays put with the strip up $where")
-        assertEquals(underBefore, bounds(under), "the line under the bar stays put $where")
-        assertTrue(strip.bottom <= barBefore.top, "the strip sits above the bar $where")
-        assertTrue(underBefore.top >= barBefore.bottom || barBefore.contains(underBefore), "the line is under the row $where")
-
-        onNodeWithTag(VoiceModeTags.STRIP_CLOSE).performClick()
-        waitForState({ handle }, VoiceModeState.Off)
-        waitForIdle()
-        assertEquals(barBefore, bounds(layout.bar), "the bar stays put once the strip goes $where")
-        assertEquals(underBefore, bounds(under), "the line stays put once the strip goes $where")
-    }
-
-    @Test
-    fun theStripAndTheModeLineKeepTheCardStillAt1200() =
-        keepsTheStack(1200.dp, Layout.Card, ComposerTestTags.PERMISSION_MODE_LINE)
-
-    @Test
-    fun theStripAndTheModeLineKeepTheCardStillAt760() =
-        keepsTheStack(760.dp, Layout.Card, ComposerTestTags.PERMISSION_MODE_LINE)
-
-    @Test
-    fun theStripKeepsThePhoneBarStillAt360() =
-        keepsTheStack(360.dp, Layout.Touch, ComposerTestTags.TOUCH_BAR)
-
-    @Test
-    fun theStripKeepsTheTouchBarStillAt700() =
-        keepsTheStack(700.dp, Layout.Touch, ComposerTestTags.TOUCH_BAR)
-
     @Test
     fun aTapTurnsVoiceModeOnAndASecondTapTurnsItOff() = runComposeUiTest {
         var handle: VoiceModeHandle? = null
@@ -341,23 +299,14 @@ class VoiceModeComposerUiTest {
         onNodeWithTag(VoiceModeTags.BUTTON)
             .assertContentDescriptionEquals("Stop voice conversation")
             .assert(stateDescription("On, listening"))
-        onNodeWithText("Listening…").assertExists()
+        onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true)
+            .assert(SemanticsMatcher.expectValue(VoiceOutlineRoleKey, VoiceGlowRole.You))
 
         onNodeWithTag(VoiceModeTags.BUTTON).performClick()
         waitForState({ handle }, VoiceModeState.Off)
         waitForIdle()
         onNodeWithTag(VoiceModeTags.STRIP).assertDoesNotExist()
         onNodeWithTag(VoiceModeTags.BUTTON).assertContentDescriptionEquals("Start voice conversation")
-    }
-
-    @Test
-    fun theStripsCloseStopsVoiceMode() = runComposeUiTest {
-        var handle: VoiceModeHandle? = null
-        showComposer(1200.dp, LettaInput.Pointer, onHandle = { handle = it })
-        onNodeWithTag(VoiceModeTags.BUTTON).performClick()
-        waitForState({ handle }, VoiceModeState.Listening)
-        onNodeWithTag(VoiceModeTags.STRIP_CLOSE).performClick()
-        waitForState({ handle }, VoiceModeState.Off)
     }
 
     @Test
