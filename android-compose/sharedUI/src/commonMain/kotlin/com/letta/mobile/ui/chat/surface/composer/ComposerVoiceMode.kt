@@ -9,9 +9,9 @@ import com.letta.mobile.ui.chat.voice.LocalVoiceMode
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The chat bar's voice mode button where the page has voice mode, [size] across like the bar's other
- * icon buttons. It sits beside, and is distinct from, the platform's dictation mic: dictation types
- * into the draft; voice mode is a hands-free conversation.
+ * The chat bar's voice mode button where the page has voice mode, [size] across like the Send it sits
+ * before in the trailing slot. It is distinct from the platform's dictation mic: dictation types into
+ * the draft; voice mode is a hands-free conversation.
  */
 @Composable
 internal fun ComposerVoiceModeButton(
@@ -22,6 +22,10 @@ internal fun ComposerVoiceModeButton(
     val voice = LocalVoiceMode.current ?: return
     VoiceModeButton(voice, size = size, iconSize = iconSize, modifier = modifier)
 }
+
+/** The page has voice mode, so the composer's trailing slot holds its button. */
+@Composable
+internal fun hasVoiceMode(): Boolean = LocalVoiceMode.current != null
 
 /** Voice mode's one-line status, directly above the chat bar, while it is not off. */
 @Composable

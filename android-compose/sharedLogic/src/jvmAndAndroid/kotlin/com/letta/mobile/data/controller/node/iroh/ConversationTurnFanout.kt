@@ -389,7 +389,8 @@ internal class ConversationTurnFanout(
         if (drain) queue.drain(viewer)
     }
 
-    private suspend fun writeProtocolFrameTo(viewer: ViewerHandle, type: String, fields: JsonObject) {
+    /** One non-delta App Server frame to [viewer] alone, with its own envelope. */
+    internal suspend fun writeProtocolFrameTo(viewer: ViewerHandle, type: String, fields: JsonObject) {
         if (viewer is IrohViewerHandle) {
             viewer.writeProtocolFrame(type, runtime, fields)
         } else {

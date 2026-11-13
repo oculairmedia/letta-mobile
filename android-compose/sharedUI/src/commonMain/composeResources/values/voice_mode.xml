@@ -3,6 +3,7 @@
     <!-- The chat bar's voice mode button. -->
     <string name="voice_mode_start">Start voice conversation</string>
     <string name="voice_mode_stop">Stop voice conversation</string>
+    <string name="voice_mode_sheet_row">Voice conversation</string>
     <string name="voice_mode_state_off">Off</string>
     <string name="voice_mode_state_setup">Needs setup</string>
     <string name="voice_mode_state_permission">Microphone not allowed</string>

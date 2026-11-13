@@ -88,7 +88,7 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
                 ComposerTextField(model = model, style = FullFieldStyle, modifier = Modifier.padding(end = fieldEndPadding))
                 ComposerControlRow(model = model, onAttachImage = onAttachImage)
             }
-            ComposerActionButton(model, Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm))
+            ComposerTrailingActions(model, Modifier.align(Alignment.TopEnd))
         }
     }
 }
@@ -135,7 +135,7 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
                     .heightIn(min = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2)
                     .padding(
                         start = LettaDimens.Space.sm,
-                        end = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2,
+                        end = trailingActionsWidth(),
                         top = LettaDimens.Space.xs,
                         bottom = LettaDimens.Space.xs,
                     ),
@@ -146,14 +146,46 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
                 ComposerExpandButton(onExpand = { model.onIntent(ChatSurfaceIntent.Expand) })
                 ComposerPlusButton(model, onAttachImage)
                 ComposerTextField(model = model, style = dockedFieldStyle(DockedFieldStyle, fieldHeight), modifier = Modifier.weight(1f))
-                ComposerVoiceModeButton()
                 ComposerVoiceButton(model)
             }
-            ComposerActionButton(model, Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm))
+            ComposerTrailingActions(model, Modifier.align(Alignment.TopEnd))
         }
     }
 }
 
-// The column already has md end padding; reserve the rest of the button, inset and gap.
-internal fun cornerContentPadding(): Dp =
-    LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2 - LettaDimens.Space.md
+/**
+ * The trailing action slot of the card and of the docked bar, in their top-end corner: the voice-mode
+ * button where the page has voice mode, then Send (or Stop while a run streams), one round cluster
+ * spaced like the bar's other controls. It is the one place a trailing action goes.
+ *
+ * Another trailing action goes in this row, before [ComposerActionButton], and its width into
+ * [trailingActionsWidth], which the prompt field and the docked row reserve so nothing slides under
+ * the slot. The Touch bar's counterpart is its TouchTrailingSlot.
+ */
+@Composable
+private fun ComposerTrailingActions(model: ComposerModel, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm)
+            .testTag(ComposerTestTags.TRAILING_ACTIONS),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ComposerVoiceModeButton(size = LettaDimens.Control.actionButton)
+        ComposerActionButton(model)
+    }
+}
+
+/**
+ * The width [ComposerTrailingActions] takes: Send, the voice-mode button and its gap where the page
+ * has voice mode, the slot's inset and the gap before what precedes it.
+ */
+@Composable
+private fun trailingActionsWidth(): Dp {
+    val send = LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2
+    return if (hasVoiceMode()) send + LettaDimens.Control.actionButton + LettaDimens.Space.sm else send
+}
+
+// The column already has md end padding; reserve the rest of the trailing slot.
+@Composable
+private fun cornerContentPadding(): Dp = trailingActionsWidth() - LettaDimens.Space.md
