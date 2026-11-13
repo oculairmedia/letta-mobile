@@ -92,24 +92,30 @@ def header_end(text, start, pos, char):
     return None
 
 
+def bracket_step(closers, char):
+    """Updates the stack of expected closing brackets; True when [char] was a bracket."""
+    if char in OPENERS:
+        closers.append(OPENERS[char])
+        return True
+    if closers and char == closers[-1]:
+        closers.pop()
+        return True
+    return False
+
+
 def class_body_start(text, start):
     """Offset of the `{` that opens the class declared just before [start], or None for a body-less declaration.
 
     Brackets are matched by kind, so the `>` of a function type arrow (`() -> Unit`) never closes an open `(`.
     """
     closers = []
-    pos = start
-    while pos < len(text):
+    for pos in range(start, len(text)):
         char = text[pos]
-        if char in OPENERS:
-            closers.append(OPENERS[char])
-        elif closers and char == closers[-1]:
-            closers.pop()
-        elif not closers:
-            end = header_end(text, start, pos, char)
-            if end is not None:
-                return end if end >= 0 else None
-        pos += 1
+        if bracket_step(closers, char) or closers:
+            continue
+        end = header_end(text, start, pos, char)
+        if end is not None:
+            return end if end >= 0 else None
     return None
 
 
