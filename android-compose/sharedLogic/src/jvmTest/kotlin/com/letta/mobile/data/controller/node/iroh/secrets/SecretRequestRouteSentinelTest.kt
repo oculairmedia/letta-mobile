@@ -33,16 +33,20 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
  * Sends unique marker values through every route flow (the real router, the Iroh stream server
- * and its frame codec, the tool and the handler as an agent) and scans every sink for each marker
- * in its raw, base64, base64url, hex and reversed forms: journal bytes, every telemetry event as
- * its log line, attributes and throwable, everything printed to stdout and stderr, every response
- * to every principal, tool results, exception messages and the `toString` of every model. The test
- * keystore is the only place a marker may be.
+ * and its frame codec, the Iroh control channel's frame handler, the tool and the handler as an
+ * agent) and scans every sink for any 12-character slice of each marker's raw, base64, base64url
+ * and hex forms (and the whole reversed forms): journal bytes, every telemetry event as its log
+ * line, attributes and throwable, everything printed to stdout and stderr, every response to every
+ * principal on every channel, tool results, exception messages and the `toString` of every model.
+ * A slice catches a parser that quotes part of a frame. The test keystore is the only place a
+ * marker may be. Marker names stay at most 11 characters, so every slice holds part of the shared
+ * prefix and an ordinary word in a sink can never match.
  */
 class SecretRequestRouteSentinelTest {
     private val directory: Path = Files.createTempDirectory("secret-route-sentinel")
@@ -54,8 +58,9 @@ class SecretRequestRouteSentinelTest {
     private val observed = mutableListOf<String>()
 
     private val markers = listOf(
-        "routed", "replay", "admin-token", "unauthenticated", "limited", "wrong-agent", "agent", "smuggled",
+        "routed", "replay", "admin-token", "unauth", "limited", "wrong-agent", "agent", "smuggled",
         "not-base64", "locked", "exploded", "expired", "stream", "torn-frame", "tool-arg", "claimed",
+        "ctl-torn", "ctl-open",
     ).associateWith { TestSecret("SENTINEL-s2-91c4e7-$it") }
 
     private fun marker(name: String): TestSecret = markers.getValue(name)
@@ -98,7 +103,7 @@ class SecretRequestRouteSentinelTest {
         routes.submitAs(HUMAN, id, marker("replay"))
         val denied = mapOf(
             "admin-token" to ADMIN_TOKEN,
-            "unauthenticated" to UNAUTHENTICATED,
+            "unauth" to UNAUTHENTICATED,
             "limited" to LIMITED_HUMAN,
             "wrong-agent" to WRONG_AGENT_HUMAN,
         )
@@ -152,6 +157,30 @@ class SecretRequestRouteSentinelTest {
         observe(serveOne(routes, IrohFrameCodec.encodeFrame(torn)))
     }
 
+    /**
+     * Malformed submissions on the Iroh control channel, through the connection's real frame
+     * handler: a torn frame and a frame whose value string never ends. Each is answered with fixed
+     * text.
+     */
+    private suspend fun controlChannelFlows() {
+        val routes = harness()
+        val id = routes.create()
+        val connection = controlConnection(routes)
+        val torn = submitFrame(id, marker("ctl-torn")).dropLast(3)
+        val open = submitFrame(id, marker("ctl-open")).substringBeforeLast(marker("ctl-open").base64()) +
+            marker("ctl-open").base64()
+        val answers = listOf(torn, open).map { frame -> connection.controlFrame(frame) }
+        observe(*answers.toTypedArray())
+        assertTrue(answers.all { it.orEmpty().startsWith("""{"type":"error","message":"Failed to parse frame (""") }, "$answers")
+    }
+
+    private fun submitFrame(id: SecretRequestId, secret: TestSecret): String = buildJsonObject {
+        put("type", "admin_rpc")
+        put("request_id", "control")
+        put("method", SecretRequestMethods.SUBMIT)
+        put("params", submitParams(id, secret))
+    }.toString()
+
     /** One admin_rpc stream exchange through the real stream server and frame codec; answers the frames written back. */
     private suspend fun serveOne(routes: SecretRouteHarness, encoded: ByteArray): List<String> {
         val stream = OneShotStream(encoded)
@@ -175,6 +204,7 @@ class SecretRequestRouteSentinelTest {
         refusedValueFlows()
         failingFlows()
         streamFlows()
+        controlChannelFlows()
 
         assertEquals(marker("routed").text, vault.storedText(TARGET_REF), "positive control: the vault holds the answered value")
         assertTrue(observed.any { "\"success\":true" in it }, "positive control: a submission succeeded")
@@ -197,20 +227,32 @@ class SecretRequestRouteSentinelTest {
         val params = submitParams(UNKNOWN_ID, marker("routed")).toString()
         assertTrue(forms(marker("routed")).any { it in params }, "the scan recognizes the encoded value")
     }
+
+    /** Positive control for the slices: what the control channel used to answer quoted part of the value. */
+    @Test
+    fun theScanWouldSeeAParserQuotingPartOfAFrame() {
+        val torn = submitFrame(UNKNOWN_ID, marker("ctl-torn")).dropLast(3)
+        val parserText = assertFailsWith<Exception> { kotlinx.serialization.json.Json.parseToJsonElement(torn) }.message.orEmpty()
+        assertTrue(forms(marker("ctl-torn")).any { it in parserText }, "a parser message quotes the frame: $parserText")
+        assertFalse(forms(marker("ctl-torn")).any { it in "Failed to parse frame (JsonDecodingException)" })
+    }
 }
 
-private fun forms(secret: TestSecret): List<String> {
+/** Every 12-character slice of [secret]'s raw, base64, base64url and hex forms, and the whole reversed forms. */
+private fun forms(secret: TestSecret): Set<String> {
     val bytes = secret.bytes()
     val base64 = Base64.getEncoder().encodeToString(bytes)
-    return listOf(
+    val encodings = listOf(
         secret.text,
-        secret.text.reversed(),
         base64,
-        base64.reversed(),
         Base64.getUrlEncoder().withoutPadding().encodeToString(bytes),
         bytes.joinToString("") { "%02x".format(it) },
     )
+    val slices = encodings.flatMap { it.windowed(SLICE_LENGTH) }
+    return (slices + listOf(secret.text.reversed(), base64.reversed())).toSet()
 }
+
+private const val SLICE_LENGTH = 12
 
 /** A stream that delivers [request] once, then end of stream, and keeps what the server writes. */
 private class OneShotStream(private val request: ByteArray) : AdminRpcBiStream {

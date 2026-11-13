@@ -609,7 +609,9 @@ class IrohNodeConnection(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            """{"type":"error","message":"Failed to parse frame: ${e.message?.replace("\"", "\\\"")}"}"""
+            // Fixed text: a JSON parser's message quotes the frame, and a frame can carry a secret
+            // (secret.request.submit), so nothing of the frame may come back.
+            """{"type":"error","message":"Failed to parse frame (${e::class.simpleName})"}"""
         }
     }
 
