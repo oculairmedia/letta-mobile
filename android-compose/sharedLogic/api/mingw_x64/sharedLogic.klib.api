@@ -5143,8 +5143,8 @@ abstract interface com.letta.mobile.data.canvas/CanvasRelayLink { // com.letta.m
 abstract interface com.letta.mobile.data.canvas/CanvasRelayStore { // com.letta.mobile.data.canvas/CanvasRelayStore|null[0]
     abstract suspend fun append(kotlin/String, com.letta.mobile.data.canvas/CanvasOp, kotlin/String): com.letta.mobile.data.canvas/CanvasRelayAppend // com.letta.mobile.data.canvas/CanvasRelayStore.append|append(kotlin.String;com.letta.mobile.data.canvas.CanvasOp;kotlin.String){}[0]
     abstract suspend fun bind(kotlin/String, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.canvas/CanvasRelayStore.bind|bind(kotlin.String;com.letta.mobile.data.model.CanvasId){}[0]
-    abstract suspend fun boundCanvas(kotlin/String): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas/CanvasRelayStore.boundCanvas|boundCanvas(kotlin.String){}[0]
     abstract suspend fun head(kotlin/String): kotlin/Long // com.letta.mobile.data.canvas/CanvasRelayStore.head|head(kotlin.String){}[0]
+    abstract suspend fun isBound(kotlin/String, com.letta.mobile.data.model/CanvasId): kotlin/Boolean // com.letta.mobile.data.canvas/CanvasRelayStore.isBound|isBound(kotlin.String;com.letta.mobile.data.model.CanvasId){}[0]
     abstract suspend fun readAfter(kotlin/String, kotlin/Long, kotlin/Int = ...): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasRelayEntry> // com.letta.mobile.data.canvas/CanvasRelayStore.readAfter|readAfter(kotlin.String;kotlin.Long;kotlin.Int){}[0]
 
     final object Companion { // com.letta.mobile.data.canvas/CanvasRelayStore.Companion|null[0]
@@ -33839,8 +33839,8 @@ final class com.letta.mobile.data.canvas/InMemoryCanvasRelayStore : com.letta.mo
 
     final suspend fun append(kotlin/String, com.letta.mobile.data.canvas/CanvasOp, kotlin/String): com.letta.mobile.data.canvas/CanvasRelayAppend // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.append|append(kotlin.String;com.letta.mobile.data.canvas.CanvasOp;kotlin.String){}[0]
     final suspend fun bind(kotlin/String, com.letta.mobile.data.model/CanvasId): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.bind|bind(kotlin.String;com.letta.mobile.data.model.CanvasId){}[0]
-    final suspend fun boundCanvas(kotlin/String): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.boundCanvas|boundCanvas(kotlin.String){}[0]
     final suspend fun head(kotlin/String): kotlin/Long // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.head|head(kotlin.String){}[0]
+    final suspend fun isBound(kotlin/String, com.letta.mobile.data.model/CanvasId): kotlin/Boolean // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.isBound|isBound(kotlin.String;com.letta.mobile.data.model.CanvasId){}[0]
     final suspend fun readAfter(kotlin/String, kotlin/Long, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasRelayEntry> // com.letta.mobile.data.canvas/InMemoryCanvasRelayStore.readAfter|readAfter(kotlin.String;kotlin.Long;kotlin.Int){}[0]
 }
 
