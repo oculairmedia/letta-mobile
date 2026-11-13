@@ -1,5 +1,7 @@
 package com.letta.mobile.di
 
+import com.letta.mobile.data.canvas.authority.remoteNotebooksOver
+import com.letta.mobile.data.canvas.workspace.SharedNotebooks
 import com.letta.mobile.data.model.RecentModelsStore
 import com.letta.mobile.data.model.SettingsStoreRecentModels
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
@@ -9,6 +11,7 @@ import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
+import dagger.Lazy
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,6 +35,11 @@ object ModelControlModule {
     @Provides
     @Singleton
     fun provideModelControlSession(rpc: AdminRpcInvoker): ModelControlSession = ModelControlSession(rpc)
+
+    /** n2stx.2.2: notes the host shares with this device; the RPC resolves on the first call, not at composition. */
+    @Provides
+    @Singleton
+    fun provideSharedNotebooks(rpc: Lazy<AdminRpcInvoker>): SharedNotebooks = remoteNotebooksOver { rpc.get() }
 
     @Provides
     @Singleton

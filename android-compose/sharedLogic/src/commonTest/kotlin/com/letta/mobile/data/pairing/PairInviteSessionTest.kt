@@ -68,12 +68,39 @@ class PairInviteSessionTest {
     private val host = FakeHost { now }.apply { devices += "old" }
     private val encoded = mutableListOf<String>()
 
-    private fun TestScope.session() = PairInviteSession(
+    private val drawing = QrEncoder { content -> encoded += content; QrModules(1) { _, _ -> true } }
+
+    private fun TestScope.session(encoder: QrEncoder = drawing) = PairInviteSession(
         PairingAdminRepository(host),
-        { content -> encoded += content; QrModules(1) { _, _ -> true } },
+        encoder,
         TestScope(StandardTestDispatcher(testScheduler)),
         clock = { now },
     )
+
+    @Test
+    fun whenNoQrCanBeDrawnTheMintedCodeIsShownAsItsLinkAndNotLost() = runTest {
+        val session = session(QrEncoder { null })
+        session.mint(PairInviteRequest("browser"))
+        advanceUntilIdle()
+        val state = session.state.value
+        assertNull(state.error, "a platform without QR codes is not an error")
+        assertNull(state.qr)
+        assertEquals("meridian://pair?qr=letta-qr-v1.x1", state.invite?.pairLink)
+        assertEquals("inv-1", assertIs<InvitePhase.Showing>(session.phase()).invite.inviteId)
+        assertEquals(1, host.minted)
+        assertTrue(host.calls.none { it.first == "pair.invite.revoke" })
+    }
+
+    @Test
+    fun withAQrEncoderTheCodeIsDrawnFromTheSameLink() = runTest {
+        val session = session()
+        session.mint(PairInviteRequest("pixel"))
+        advanceUntilIdle()
+        assertEquals(listOf("meridian://pair?qr=letta-qr-v1.x1"), encoded)
+        assertNotNull(session.state.value.qr)
+        assertEquals("meridian://pair?qr=letta-qr-v1.x1", session.state.value.invite?.pairLink)
+        assertNull(session.state.value.error)
+    }
 
     @Test
     fun mintRequestsAScopedLeastPrivilegeFiveMinuteInvite() = runTest {

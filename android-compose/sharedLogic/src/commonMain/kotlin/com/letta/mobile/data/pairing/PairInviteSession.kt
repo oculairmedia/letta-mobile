@@ -14,9 +14,14 @@ class QrModules(val size: Int, private val dark: (row: Int, col: Int) -> Boolean
     fun isDark(row: Int, col: Int): Boolean = dark(row, col)
 }
 
-/** Platform port: render text as a QR grid (zxing on JVM/Android); throws if it cannot fit. */
+/**
+ * Platform port: render text as a QR grid; throws if it cannot fit. An encoder that cannot draw a
+ * code answers null, so the inviter still gets a usable invite: it is shown and shared as its link
+ * text instead of failing after the host minted it.
+ */
 fun interface QrEncoder {
-    fun encode(content: String): QrModules
+    /** The grid for [content], or null when no QR can be drawn for it. */
+    fun encode(content: String): QrModules?
 }
 
 /** What the inviter's screen shows. */
@@ -89,7 +94,7 @@ class PairInviteSession(
         _state.update { it.copy(selfNodeId = nodeId?.lowercase()) }
     }
 
-    fun revokeDevice(nodeId: String) = tracked(Tracked.DEVICE, nodeId, REVOKE_FAILED) { repository.revokeDevice(nodeId) }
+    fun revokeDevice(nodeId: String) = tracked(deviceRows, nodeId) { repository.revokeDevice(nodeId) }
 
     /** "Revoke all other devices": every paired device except this one. Needs this device to be known. */
     fun revokeAllOthers() {
@@ -99,7 +104,7 @@ class PairInviteSession(
     }
 
     /** Cancel a pending invite (the on-screen one or one from the list). */
-    fun revokeInvite(inviteId: String) = tracked(Tracked.INVITE, inviteId, CANCEL_FAILED) {
+    fun revokeInvite(inviteId: String) = tracked(inviteRows, inviteId) {
         repository.revokeInvite(inviteId).also { revoked ->
             if (revoked && _state.value.invite?.inviteId == inviteId) {
                 _state.update { it.copy(invite = null, qr = null, cancelled = true) }
@@ -137,32 +142,33 @@ class PairInviteSession(
         }
     }
 
-    private enum class Tracked { DEVICE, INVITE }
+    /**
+     * One kind of row a revoke/cancel targets: the in-flight id set it marks in [PairInviteUiState] and
+     * what to tell the user if the host does not confirm the action.
+     */
+    private class TrackedRows(
+        val failure: String,
+        val ids: (PairInviteUiState) -> Set<String>,
+        val withIds: (PairInviteUiState, Set<String>) -> PairInviteUiState,
+    )
 
-    private fun PairInviteUiState.withTracked(kind: Tracked, id: String, on: Boolean): PairInviteUiState = when (kind) {
-        Tracked.DEVICE -> copy(revoking = if (on) revoking + id else revoking - id)
-        Tracked.INVITE -> copy(cancelling = if (on) cancelling + id else cancelling - id)
-    }
+    private val deviceRows = TrackedRows(REVOKE_FAILED, { it.revoking }) { state, ids -> state.copy(revoking = ids) }
+    private val inviteRows = TrackedRows(CANCEL_FAILED, { it.cancelling }) { state, ids -> state.copy(cancelling = ids) }
 
-    private fun isTracked(kind: Tracked, id: String): Boolean = when (kind) {
-        Tracked.DEVICE -> id in _state.value.revoking
-        Tracked.INVITE -> id in _state.value.cancelling
-    }
-
-    /** Run one revoke/cancel independently of [run]'s busy gate, marking [id] until the host answers. */
-    private fun tracked(kind: Tracked, id: String, failure: String, action: suspend () -> Boolean) {
-        if (isTracked(kind, id)) return
-        _state.update { it.withTracked(kind, id, on = true).copy(error = null) }
+    /** Run one revoke/cancel independently of [run]'s busy gate, marking [id] in [rows] until the host answers. */
+    private fun tracked(rows: TrackedRows, id: String, action: suspend () -> Boolean) {
+        if (id in rows.ids(_state.value)) return
+        _state.update { rows.withIds(it, rows.ids(it) + id).copy(error = null) }
         scope.launch {
             try {
-                if (!action()) _state.update { it.copy(error = failure) }
+                if (!action()) _state.update { it.copy(error = rows.failure) }
                 reload()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _state.update { it.copy(error = userMessage(error)) }
             } finally {
-                _state.update { it.withTracked(kind, id, on = false) }
+                _state.update { rows.withIds(it, rows.ids(it) - id) }
             }
         }
     }
