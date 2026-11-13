@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderField
+import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
@@ -76,10 +76,10 @@ internal fun ProviderFormFields(form: ProviderConnectForm, onChange: (ProviderCo
 private fun AuthMethodChips(form: ProviderConnectForm, onChange: (ProviderConnectForm) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         form.provider.authMethods.forEachIndexed { index, method ->
-            FilterChip(
-                selected = index == form.methodIndex,
+            LettaChipTab(
+                text = method.label,
+                active = index == form.methodIndex,
                 onClick = { onChange(form.withMethod(index)) },
-                label = { Text(method.label) },
             )
         }
     }
