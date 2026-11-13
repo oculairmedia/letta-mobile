@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.shell.pages.templates
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,13 +9,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.templates.AgentTemplatesController
 import com.letta.mobile.data.templates.AgentTemplatesState
 import com.letta.mobile.data.templates.StarterAgentTemplate
 import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
@@ -72,7 +71,9 @@ fun TemplatesPage(state: AgentTemplatesState, actions: TemplatesPageActions, mod
                 modifier = Modifier.testTag(TemplatesPageTags.UNAVAILABLE),
             )
         }
-        state.error?.let { TemplatesError(it, actions.onDismissError) }
+        state.error?.let {
+            LettaInlineError(it, Modifier.testTag(TemplatesPageTags.ERROR), title = null, onDismiss = actions.onDismissError)
+        }
         RosterList(
             RosterSpec(
                 sections = listOf(RosterSection(key = "templates", items = state.templates)),
@@ -101,16 +102,7 @@ private fun CreateButton(template: StarterAgentTemplate, state: AgentTemplatesSt
     ) { Text(if (creating) CREATING else CREATE) }
 }
 
-@Composable
-private fun TemplatesError(message: String, onDismiss: () -> Unit) {
-    Row(Modifier.fillMaxWidth().testTag(TemplatesPageTags.ERROR), verticalAlignment = Alignment.CenterVertically) {
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-        TextButton(onClick = onDismiss) { Text(DISMISS) }
-    }
-}
-
 private const val INTRO = "Start a new agent from a template. It opens in a chat once it is created."
 private const val EMPTY = "No templates"
 private const val CREATE = "Create"
 private const val CREATING = "Creating…"
-private const val DISMISS = "Dismiss"

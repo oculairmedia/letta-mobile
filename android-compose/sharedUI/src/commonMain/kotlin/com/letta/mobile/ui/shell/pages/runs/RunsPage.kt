@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -24,6 +23,8 @@ import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.runs.RunMonitorState
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaInlineError
+import com.letta.mobile.ui.components.LettaInlineErrorTags
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
@@ -46,7 +47,8 @@ object RunsPageTags {
     const val ACTIVE_ONLY = "runs-page-active-only"
     const val SUMMARY = "runs-page-summary"
     const val ERROR = "runs-page-error"
-    const val RETRY = "runs-page-retry"
+    /** The load error's Retry: the shared [LettaInlineError]'s own. */
+    const val RETRY = LettaInlineErrorTags.RETRY
     const val OPERATION_ERROR = "runs-page-operation-error"
     const val DETAIL = "runs-page-detail"
     val LIST = RosterListTag("runs-page-list")
@@ -111,7 +113,9 @@ fun RunsPage(
     val monitor = state.monitor
     Column(modifier.fillMaxSize().testTag(RunsPageTags.PAGE).padding(horizontal = LettaDimens.Space.md)) {
         RunsHeader(monitor, actions, slots)
-        monitor.operationError?.let { RunsOperationError(it, actions.onDismissError) }
+        monitor.operationError?.let {
+            LettaInlineError(it, Modifier.testTag(RunsPageTags.OPERATION_ERROR), title = null, onDismiss = actions.onDismissError)
+        }
         val error = monitor.error
         if (error != null && monitor.runs.isEmpty()) {
             RunsLoadError(error, actions.onRefresh)
@@ -193,27 +197,11 @@ private fun emptyHint(monitor: RunMonitorState): String = when {
 
 @Composable
 private fun RunsLoadError(message: String, onRetry: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg).testTag(RunsPageTags.ERROR),
-    ) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        TextButton(onClick = onRetry, modifier = Modifier.testTag(RunsPageTags.RETRY)) { Text(RETRY) }
-    }
-}
-
-@Composable
-private fun RunsOperationError(message: String, onDismiss: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().testTag(RunsPageTags.OPERATION_ERROR),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-        TextButton(onClick = onDismiss) { Text(DISMISS) }
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg)) {
+        LettaInlineError(message, Modifier.testTag(RunsPageTags.ERROR), title = null, onRetry = onRetry)
     }
 }
 
 private const val SEARCH_PLACEHOLDER = "Search runs"
 private const val ALL = "All"
 private const val ACTIVE = "Active"
-private const val RETRY = "Retry"
-private const val DISMISS = "Dismiss"

@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,7 +25,11 @@ import com.letta.mobile.ui.theme.LettaDimens
  * everywhere and offers its retry in place. Replaces desktop's DesktopInlineError and the pages'
  * own error cards.
  *
- * [title] is null for a one-line note; [onRetry] null for a message with nothing to retry.
+ * [title] is null for a one-line note; [onRetry] null for a message with nothing to retry;
+ * [onDismiss] non-null adds a "Dismiss" after the retry, for an operation failure the user clears.
+ *
+ * [modifier] goes on the outer surface, so a page's own test tag passed in it stays findable; the
+ * shared [LettaInlineErrorTags.ERROR] sits on the content row inside it.
  */
 @Composable
 fun LettaInlineError(
@@ -33,15 +38,18 @@ fun LettaInlineError(
     title: String? = DEFAULT_TITLE,
     onRetry: (() -> Unit)? = null,
     retrying: Boolean = false,
+    onDismiss: (() -> Unit)? = null,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = MaterialTheme.shapes.medium,
-        modifier = modifier.fillMaxWidth().testTag(LettaInlineErrorTags.ERROR),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(if (title == null) LettaDimens.Space.md else LettaDimens.Space.lg),
+            modifier = Modifier
+                .testTag(LettaInlineErrorTags.ERROR)
+                .padding(if (title == null) LettaDimens.Space.md else LettaDimens.Space.lg),
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -59,6 +67,9 @@ fun LettaInlineError(
                     Text(if (retrying) "Retrying…" else "Retry")
                 }
             }
+            if (onDismiss != null) {
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag(LettaInlineErrorTags.DISMISS)) { Text("Dismiss") }
+            }
         }
     }
 }
@@ -70,4 +81,5 @@ private const val MESSAGE_ALPHA = 0.84f
 object LettaInlineErrorTags {
     const val ERROR = "letta-inline-error"
     const val RETRY = "letta-inline-error-retry"
+    const val DISMISS = "letta-inline-error-dismiss"
 }

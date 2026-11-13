@@ -22,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +40,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -57,26 +57,15 @@ internal fun HomeHeader(page: HomePageScope) {
             page.options.headerActions?.invoke(this)
         }
         if (!page.wide && page.options.showSearch) HomeSearchField(page, Modifier.fillMaxWidth())
-        page.state.stats.error?.let { HomeErrorBanner(it, page.actions::refresh, page.state.stats.loading) }
-    }
-}
-
-/** A backend figure failed to load; the rest of the page still works, so this is a note, not a wall. */
-@Composable
-private fun HomeErrorBanner(message: String, onRetry: () -> Unit, loading: Boolean) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        modifier = Modifier.fillMaxWidth().testTag(HomePageTags.ERROR),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = LettaDimens.Space.md)) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.weight(1f).padding(vertical = LettaDimens.Space.sm),
+        // A backend figure failed to load; the rest of the page still works, so this is a note, not a wall.
+        page.state.stats.error?.let { message ->
+            LettaInlineError(
+                message,
+                Modifier.testTag(HomePageTags.ERROR),
+                title = null,
+                onRetry = page.actions::refresh,
+                retrying = page.state.stats.loading,
             )
-            TextButton(onClick = onRetry, enabled = !loading) { Text("Retry") }
         }
     }
 }

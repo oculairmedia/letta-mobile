@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterActions
@@ -74,7 +75,14 @@ fun ConversationsPage(state: ConversationsPageState, actions: ConversationsPageA
     Column(modifier.testTag(ConversationsPageTags.PAGE).padding(horizontal = LettaDimens.Space.md)) {
         val error = state.error
         when {
-            error != null -> ConversationsPageRefreshable(actions) { ConversationsPageError(error, actions.onReload) }
+            error != null -> ConversationsPageRefreshable(actions) {
+                LettaInlineError(
+                    error,
+                    Modifier.padding(LettaDimens.Space.lg).testTag(ConversationsPageTags.ERROR),
+                    title = null,
+                    onRetry = actions.onReload,
+                )
+            }
             state.noAgents && !state.loading -> ConversationsPageRefreshable(actions) { ConversationsPageNoAgents(actions.onCreateAgent) }
             else -> ConversationsRoster(state, actions)
         }
@@ -179,14 +187,6 @@ private fun ConversationsFilterRow(filter: ShellArchiveFilter, actions: Conversa
         Spacer(Modifier.weight(1f))
         LettaRefreshAction(refreshing = false, onRefresh = actions.onReload, modifier = Modifier.testTag(ConversationsPageTags.REFRESH))
         TextButton(onClick = onShowArchived, modifier = Modifier.testTag(ConversationsPageTags.ARCHIVED)) { Text("Archived chats") }
-    }
-}
-
-@Composable
-private fun ConversationsPageError(message: String, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(LettaDimens.Space.lg).testTag(ConversationsPageTags.ERROR)) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        TextButton(onClick = onRetry) { Text("Retry") }
     }
 }
 
