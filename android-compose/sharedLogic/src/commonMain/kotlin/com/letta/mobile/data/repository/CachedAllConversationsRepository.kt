@@ -100,7 +100,7 @@ open class CachedAllConversationsRepository(
 
     /**
      * A push re-reads only the conversations it names (`conversation.get`), never their agents'
-     * pages: a turn's pushes used to re-list its agent every few seconds (letta-mobile-ybdv3). A
+     * pages: a turn's pushes used to re-list its agent every few seconds. A
      * row that cannot be read alone falls back to the shared owner/roster reconciliation.
      */
     private suspend fun applyPush(dirty: Map<ConversationId, AgentId?>) {

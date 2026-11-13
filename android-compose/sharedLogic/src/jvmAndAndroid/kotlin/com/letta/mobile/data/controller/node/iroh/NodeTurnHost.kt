@@ -42,7 +42,7 @@ class NodeTurnHost internal constructor(
     /** Turns currently running on this host, attached or detached (telemetry/tests). */
     val liveTurnCount: Int get() = live.get()
 
-    /** letta-mobile-6vf4r (S3): each conversation's relayed turn whose run is bound and not finished. */
+    /** Each conversation's relayed turn whose run is bound and not finished. */
     private val runningTurns = ConcurrentHashMap<String, IrohRelayedTurnProtocol>()
 
     internal fun markRunning(protocol: IrohRelayedTurnProtocol) {

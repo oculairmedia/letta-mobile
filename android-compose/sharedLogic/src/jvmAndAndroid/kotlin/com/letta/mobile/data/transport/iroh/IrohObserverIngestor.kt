@@ -272,7 +272,7 @@ internal class IrohObserverIngestor(
     }
 
     /**
-     * letta-mobile-6vf4r (S3): another device's turn is running here. The node replays its
+     * Another device's turn is running here. The node replays its
      * `update_loop_status` to a viewer that opens the conversation mid-turn, so this device knows a
      * turn runs before (or without) any of its deltas: the run becomes the observed turn (its idle
      * loop status completes it) and its phase reaches the status line.

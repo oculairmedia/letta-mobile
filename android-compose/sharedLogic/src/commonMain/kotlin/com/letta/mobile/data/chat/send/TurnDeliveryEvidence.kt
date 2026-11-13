@@ -69,7 +69,7 @@ private fun ConversationTurnState.countsAsActiveTurnDelivery(
 }
 
 /**
- * letta-mobile-6vf4r: until this turn has a real run, [runMatchesActiveTurn] accepts any run, so the
+ * Until this turn has a real run, [runMatchesActiveTurn] accepts any run, so the
  * reply of another device's turn streaming into this conversation counted as this send's delivery.
  * The host then refused this send as busy, and the bounce (which needs "nothing delivered") lost
  * to the generic dead-turn notice. A frame stamped with a different turn id is not this turn's.
