@@ -130,9 +130,11 @@ abstract class AppModule {
             documents: com.letta.mobile.data.canvas.CanvasDocumentStore,
             assets: com.letta.mobile.data.storage.AssetStore,
         ): com.letta.mobile.data.canvas.CanvasRelayClient = com.letta.mobile.data.canvas.storedBoardsRelayClient(
-            documents = documents,
-            opLog = opLog,
-            delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
+            stores = com.letta.mobile.data.canvas.StoredBoardStores(
+                documents = documents,
+                opLog = opLog,
+                delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
+            ),
             assets = assets,
         )
 

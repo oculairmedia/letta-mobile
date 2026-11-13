@@ -57,9 +57,7 @@ class KeyValueCanvasStorage(
      * bounded - a never-shared board's first join seeded from the board ([StoreCanvasSnapshotSeed]).
      */
     fun relayClient(assets: AssetStore? = null): CanvasRelayClient = storedBoardsRelayClient(
-        documents = documents,
-        opLog = opLog,
-        delivery = delivery,
+        stores = StoredBoardStores(documents, opLog, delivery),
         assets = assets,
         snapshotSeed = StoreCanvasSnapshotSeed(documents, opLog),
     )

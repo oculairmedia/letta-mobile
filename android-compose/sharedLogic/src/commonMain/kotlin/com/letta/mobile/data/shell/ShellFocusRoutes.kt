@@ -49,18 +49,36 @@ internal fun initialFocusSnapshot(
  */
 fun ShellWorkspaceState.projectFocus(references: List<ShellConversationRef>, select: (ConversationId) -> Unit) {
     if (sourceKey == null || page !is ShellDestination.Chat) return
-    val focus = currentFocus
     val token = requestToken()
-    val target = when (focus.chatMode) {
+    val target = focusedTarget(references) ?: return
+    val reference = references.singleOrNull { it.id == target }
+    if (reference == null) {
+        selectUnlisted(target, select)
+    } else {
+        selectListed(token, target, reference, select)
+    }
+}
+
+private fun ShellWorkspaceState.focusedTarget(references: List<ShellConversationRef>): ConversationId? {
+    val focus = currentFocus
+    return when (focus.chatMode) {
         CurrentFocusChatMode.Exact -> focus.conversationId
         CurrentFocusChatMode.Resume -> focus.agentId?.let { resolveAgentChat(it, references) }
         CurrentFocusChatMode.New -> null
-    } ?: return
-    val reference = references.singleOrNull { it.id == target }
-    if (reference == null && focus.chatMode == CurrentFocusChatMode.Exact) {
-        select(target)
-        return
     }
-    val agent = reference?.agent ?: return
+}
+
+/** An exact target the catalog does not list yet is selected anyway; any other waits for the catalog. */
+private fun ShellWorkspaceState.selectUnlisted(target: ConversationId, select: (ConversationId) -> Unit) {
+    if (currentFocus.chatMode == CurrentFocusChatMode.Exact) select(target)
+}
+
+private fun ShellWorkspaceState.selectListed(
+    token: CurrentFocusRequest,
+    target: ConversationId,
+    reference: ShellConversationRef,
+    select: (ConversationId) -> Unit,
+) {
+    val agent = reference.agent ?: return
     if (completeFocus(token, target, agent, reference)) select(target)
 }

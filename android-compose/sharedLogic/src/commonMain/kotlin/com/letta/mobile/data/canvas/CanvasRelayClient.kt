@@ -637,23 +637,28 @@ class CanvasRelayClient(
     }
 }
 
+/** The three stores an app's boards live in, which [storedBoardsRelayClient] binds a relay over. */
+data class StoredBoardStores(
+    val documents: CanvasDocumentStore,
+    val opLog: CanvasOpLog,
+    val delivery: CanvasDeliveryStore,
+)
+
 /**
  * The relay client over an app's stored boards, bound the same on every host: topics by
  * conversation ([relayTopicOf]) and ops for a board no window has open written straight into the
- * stored board ([StoreCanvasClosedBoardApplier], letta-mobile-qygvv.23). [snapshotSeed] seeds a
- * never-shared board's first join where the op log is bounded.
+ * stored board ([StoreCanvasClosedBoardApplier]). [snapshotSeed] seeds a never-shared board's
+ * first join where the op log is bounded.
  */
 fun storedBoardsRelayClient(
-    documents: CanvasDocumentStore,
-    opLog: CanvasOpLog,
-    delivery: CanvasDeliveryStore,
+    stores: StoredBoardStores,
     assets: AssetStore? = null,
     snapshotSeed: CanvasSnapshotSeed? = null,
 ): CanvasRelayClient = CanvasRelayClient(
-    opLog = opLog,
-    delivery = delivery,
-    topicOf = { documents.relayTopicOf(it) },
+    opLog = stores.opLog,
+    delivery = stores.delivery,
+    topicOf = { stores.documents.relayTopicOf(it) },
     assets = assets,
-    closedBoard = StoreCanvasClosedBoardApplier(documents, opLog),
+    closedBoard = StoreCanvasClosedBoardApplier(stores.documents, stores.opLog),
     snapshotSeed = snapshotSeed,
 )

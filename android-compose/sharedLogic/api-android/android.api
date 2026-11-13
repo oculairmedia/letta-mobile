@@ -6964,8 +6964,8 @@ public final class com/letta/mobile/data/canvas/CanvasRelayClient$RelayView {
 }
 
 public final class com/letta/mobile/data/canvas/CanvasRelayClientKt {
-	public static final fun storedBoardsRelayClient (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSnapshotSeed;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
-	public static synthetic fun storedBoardsRelayClient$default (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSnapshotSeed;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
+	public static final fun storedBoardsRelayClient (Lcom/letta/mobile/data/canvas/StoredBoardStores;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSnapshotSeed;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
+	public static synthetic fun storedBoardsRelayClient$default (Lcom/letta/mobile/data/canvas/StoredBoardStores;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSnapshotSeed;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
 }
 
 public abstract interface class com/letta/mobile/data/canvas/CanvasRelayConnection {
@@ -8955,6 +8955,21 @@ public final class com/letta/mobile/data/canvas/StoreCanvasClosedBoardApplier : 
 public final class com/letta/mobile/data/canvas/StoreCanvasSnapshotSeed : com/letta/mobile/data/canvas/CanvasSnapshotSeed {
 	public fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;)V
 	public fun seed (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/StoredBoardStores {
+	public fun <init> (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;)V
+	public final fun component1 ()Lcom/letta/mobile/data/canvas/CanvasDocumentStore;
+	public final fun component2 ()Lcom/letta/mobile/data/canvas/CanvasOpLog;
+	public final fun component3 ()Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;
+	public final fun copy (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;)Lcom/letta/mobile/data/canvas/StoredBoardStores;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/StoredBoardStores;Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/StoredBoardStores;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDelivery ()Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;
+	public final fun getDocuments ()Lcom/letta/mobile/data/canvas/CanvasDocumentStore;
+	public final fun getOpLog ()Lcom/letta/mobile/data/canvas/CanvasOpLog;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/canvas/UnauthorizedCanvasMutationException : com/letta/mobile/data/document/UnauthorizedDocumentMutationException {

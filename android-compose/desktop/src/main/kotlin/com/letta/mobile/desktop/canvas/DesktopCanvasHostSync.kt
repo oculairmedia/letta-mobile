@@ -14,6 +14,7 @@ import com.letta.mobile.data.canvas.CanvasRelayClient
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.FileCanvasDeliveryStore
 import com.letta.mobile.data.canvas.FileCanvasOpLog
+import com.letta.mobile.data.canvas.StoredBoardStores
 import com.letta.mobile.data.canvas.storedBoardsRelayClient
 import com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient
 import kotlinx.coroutines.CoroutineScope
@@ -60,10 +61,10 @@ object DesktopCanvasHostSync {
     )
 
     val relay: CanvasRelayClient = storedBoardsRelayClient(
-        documents = DesktopNotebookCanvasStore.documents,
-        opLog = opLog,
-        delivery = FileCanvasDeliveryStore(
-            DesktopCanvasDocumentStore.defaultRootDirectory().resolve("delivery.json").toFile(),
+        stores = StoredBoardStores(
+            DesktopNotebookCanvasStore.documents,
+            opLog,
+            FileCanvasDeliveryStore(DesktopCanvasDocumentStore.defaultRootDirectory().resolve("delivery.json").toFile()),
         ),
         assets = assets,
     )
