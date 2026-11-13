@@ -12,6 +12,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -39,6 +40,25 @@ class NodeTurnHost internal constructor(
 
     /** Turns currently running on this host, attached or detached (telemetry/tests). */
     val liveTurnCount: Int get() = live.get()
+
+    /** letta-mobile-6vf4r (S3): each conversation's relayed turn whose run is bound and not finished. */
+    private val runningTurns = ConcurrentHashMap<String, IrohRelayedTurnProtocol>()
+
+    internal fun markRunning(protocol: IrohRelayedTurnProtocol) {
+        runningTurns[protocol.runtime.conversationId] = protocol
+    }
+
+    /** Clears [protocol]'s entry only: a newer turn of the same conversation keeps its own. */
+    internal fun markIdle(protocol: IrohRelayedTurnProtocol) {
+        runningTurns.remove(protocol.runtime.conversationId, protocol)
+    }
+
+    /**
+     * Tells [viewer], which just started viewing [conversationId], about the turn running there:
+     * the same `update_loop_status` (active_run_ids, client_message_ids_by_run_id) its initiator got.
+     */
+    internal suspend fun replayLoopStatus(conversationId: String, viewer: ViewerHandle): Boolean =
+        runningTurns[conversationId]?.replayLoopStatusTo(viewer) ?: false
 
     /**
      * Runs [turn] on the node scope and waits for it. If the caller (the initiator's connection)

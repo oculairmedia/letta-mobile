@@ -107,6 +107,14 @@ class IrohNodeEndpoint(
      */
     private var turnHost: NodeTurnHost? = null
 
+    init {
+        // letta-mobile-6vf4r (S3): a connection that starts viewing a conversation mid-turn learns
+        // the running turn from its `update_loop_status`, next to the subagent/approval replays.
+        connectionRegistry.addViewerJoinedListener { conversationId, viewer ->
+            turnHost?.replayLoopStatus(conversationId, viewer)
+        }
+    }
+
     /**
      * Delivers device-wide `agent_updated` frames to every live connection allowed to read agents
      * ([IrohPeerCapabilities.CHAT_READ], the `agent.list` capability), on its stream channel.

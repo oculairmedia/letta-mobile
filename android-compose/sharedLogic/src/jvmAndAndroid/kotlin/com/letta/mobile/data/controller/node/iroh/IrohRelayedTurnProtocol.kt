@@ -109,6 +109,9 @@ internal class IrohRelayedTurnProtocol(
      */
     var postTurnScope: CoroutineScope? = null
 
+    /** The node's turn host, told while this turn's run is bound so a late viewer can learn it. */
+    var host: NodeTurnHost? = null
+
     /** Installed around the engine's collect so the engine's acceptance reaches [acknowledge]. */
     val listener = TurnInputAcknowledgementListener { ack -> acknowledge(ack) }
 
@@ -187,13 +190,27 @@ internal class IrohRelayedTurnProtocol(
         runId = boundRunId
         if (announcedRunId == boundRunId || finished) return
         announcedRunId = boundRunId
+        host?.markRunning(this)
         fanout.writeInitiatorProtocolFrame("update_loop_status", loopStatusFields(LOOP_PROCESSING))
+    }
+
+    /** The processing loop status, to a viewer that joined after [announceRunning]; false once finished. */
+    suspend fun replayLoopStatusTo(viewer: ViewerHandle): Boolean {
+        if (finished || announcedRunId == null) return false
+        fanout.writeProtocolFrameTo(viewer, "update_loop_status", loopStatusFields(LOOP_PROCESSING))
+        Telemetry.event(
+            "IrohNode", "loop_status.replayed",
+            "conversationId" attr runtime.conversationId,
+            "runId" attr (runId ?: "<none>"),
+        )
+        return true
     }
 
     /** App Server order after the stop_reason delta: idle loop status, then turn_finished. */
     private suspend fun finish(end: RelayedTurnEnd) {
         if (finished) return
         finished = true
+        host?.markIdle(this)
         fanout.writeInitiatorProtocolFrame(
             "update_loop_status",
             loopStatusFields(TurnBoundaryGate.LOOP_WAITING_ON_INPUT),
@@ -263,6 +280,7 @@ internal class IrohRelayedTurnProtocol(
     suspend fun finishWithServerFrame(turnFinished: TapFrame) {
         if (finished) return
         finished = true
+        host?.markIdle(this)
         if (!idleForwarded) {
             fanout.writeInitiatorProtocolFrame("update_loop_status", loopStatusFields(TurnBoundaryGate.LOOP_WAITING_ON_INPUT))
         }
@@ -376,7 +394,10 @@ private suspend fun relayQueueAfterTurn(
 
 /** Runs this turn's post-turn queue relay on [host], not on the initiator's connection. */
 internal fun IrohRelayedTurnProtocol.onHost(host: NodeTurnHost): IrohRelayedTurnProtocol =
-    apply { postTurnScope = host.scope }
+    apply {
+        postTurnScope = host.scope
+        this.host = host
+    }
 
 /** How long after `turn_finished` the conversation's queue updates are still relayed. */
 private const val POST_TURN_QUEUE_WINDOW_MS = 5_000L
