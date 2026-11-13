@@ -1,7 +1,6 @@
 package com.letta.mobile.data.shell.layout.edit
 
 import com.letta.mobile.data.controller.capability.Capability
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
@@ -29,7 +28,7 @@ class ShellLayoutTool(private val port: ShellLayoutAgentPort = ShellLayoutAgentP
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agent: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agent))
+        invoke(input, ExternalToolCaller.claimed(agent))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val reading = ShellLayoutToolInput.read(input)

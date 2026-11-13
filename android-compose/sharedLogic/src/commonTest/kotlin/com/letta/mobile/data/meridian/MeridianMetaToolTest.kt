@@ -1,6 +1,5 @@
 package com.letta.mobile.data.meridian
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -84,7 +83,7 @@ class MeridianMetaToolTest {
     @Test
     fun aCallWithoutAnAgentIsDeniedNotRunAsSomeoneElse() = runTest {
         val meta = metaHost()
-        val result = meta.registry.invoke("meridian", call("canvas scene"), ExternalToolCaller(CallerIdentity.VERIFIED, agentId = null))
+        val result = meta.registry.invoke("meridian", call("canvas scene"), ExternalToolCaller.verified(agentId = null))
         val error = assertIs<ExternalToolResult.Error>(result)
         assertTrue(error.error.startsWith("{\"error\":\"denied\""), error.error)
     }

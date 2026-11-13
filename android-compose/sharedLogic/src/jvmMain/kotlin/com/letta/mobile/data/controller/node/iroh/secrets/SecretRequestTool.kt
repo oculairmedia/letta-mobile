@@ -43,7 +43,7 @@ internal class SecretRequestTool(private val handlers: SecretRequestHandlers) : 
 
     /** The legacy entry carries a bare agent id nothing vouches for: claimed, so always refused. */
     override suspend fun invoke(input: JsonObject, agent: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agent))
+        invoke(input, ExternalToolCaller.claimed(agent))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val agent = verifiedAgentOf(caller) ?: return refusal(SecretServiceError.FORBIDDEN)
@@ -120,7 +120,7 @@ internal class SecretRequestTool(private val handlers: SecretRequestHandlers) : 
 
 /** The requesting agent when the host or runtime vouched for it; null for a claimed or missing identity. */
 private fun verifiedAgentOf(caller: ExternalToolCaller): RequestingAgent? =
-    caller.agentId?.takeIf { caller.identity == CallerIdentity.VERIFIED && it.isNotBlank() }?.let { RequestingAgent(AgentId(it)) }
+    caller.agentId?.takeIf { caller.isVerified && it.isNotBlank() }?.let { RequestingAgent(AgentId(it)) }
 
 private fun kotlinx.serialization.json.JsonObjectBuilder.stringProperty(name: String, maxLength: Int) {
     putJsonObject(name) {

@@ -2,7 +2,6 @@
 
 package com.letta.mobile.ui.canvas
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -210,7 +209,7 @@ class CanvasGetLayoutRenderTest {
     }
 
     private suspend fun call(tool: String, input: JsonObject): ExternalToolResult =
-        registry.invoke(tool, input, ExternalToolCaller(CallerIdentity.VERIFIED, agentId = AGENT, conversationId = CONVERSATION))
+        registry.invoke(tool, input, ExternalToolCaller.claimed(agentId = AGENT, conversationId = CONVERSATION))
 
     private suspend fun catchUp(session: CanvasSession) {
         relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), cursor).forEach { entry ->

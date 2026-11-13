@@ -97,7 +97,7 @@ internal class SecretRouteHarness(val parts: SecretRouteParts = SecretRouteParts
 
     /** Calls the tool as [agent] (null: no agent stamped) with the given provenance of that identity. */
     suspend fun tool(input: JsonObject, agent: RequestingAgent?, identity: CallerIdentity = CallerIdentity.VERIFIED): ExternalToolResult =
-        tool.invoke(input, ExternalToolCaller(identity, agent?.agentId?.value, CONVERSATION))
+        tool.invoke(input, callerOf(identity, agent?.agentId?.value))
 
     /** Creates a pending request through the tool as [agent] and answers its id. */
     suspend fun create(agent: RequestingAgent = REQUESTER): SecretRequestId {
@@ -112,6 +112,11 @@ internal class SecretRouteHarness(val parts: SecretRouteParts = SecretRouteParts
     companion object {
         const val REQUEST_ID = "t"
         private const val CONVERSATION = "conv-secret-test"
+
+        private fun callerOf(identity: CallerIdentity, agentId: String?): ExternalToolCaller = when (identity) {
+            CallerIdentity.VERIFIED -> ExternalToolCaller.verified(agentId, CONVERSATION)
+            CallerIdentity.CLAIMED -> ExternalToolCaller.claimed(agentId, CONVERSATION)
+        }
     }
 }
 

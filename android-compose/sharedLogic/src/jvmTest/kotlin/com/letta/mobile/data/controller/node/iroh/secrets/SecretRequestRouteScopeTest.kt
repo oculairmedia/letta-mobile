@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.node.iroh.secrets
 
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.secrets.host.SecretItemScope
 import com.letta.mobile.data.secrets.host.SecretRequestSettings
@@ -26,7 +25,7 @@ class SecretRequestRouteScopeTest {
         JsonObject(createInput() + (SecretRequestRouteWire.VAULT_ITEM_NAME to JsonPrimitive(item)))
 
     private suspend fun SecretRequestFeature.createAsRequester(item: String): ExternalToolResult =
-        hostTools.single().invoke(createFor(item), ExternalToolCaller(CallerIdentity.VERIFIED, REQUESTER.agentId.value))
+        hostTools.single().invoke(createFor(item), ExternalToolCaller.verified(REQUESTER.agentId.value))
 
     @Test
     fun forHostServesTheScopeItIsGivenEvenOverAWiderOneInTheSettings() = runTest {

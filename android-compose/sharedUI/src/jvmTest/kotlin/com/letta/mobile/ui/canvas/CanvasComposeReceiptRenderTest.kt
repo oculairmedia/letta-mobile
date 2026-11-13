@@ -2,7 +2,6 @@
 
 package com.letta.mobile.ui.canvas
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -98,7 +97,7 @@ class CanvasComposeReceiptRenderTest {
             val result = registry.invoke(
                 CanvasToolContract.COMPOSE,
                 input,
-                ExternalToolCaller(CallerIdentity.VERIFIED, agentId = AGENT, conversationId = CONVERSATION, toolCallId = CALL),
+                ExternalToolCaller.claimed(agentId = AGENT, conversationId = CONVERSATION, toolCallId = CALL),
             )
             val answer = assertIs<ExternalToolResult.Success>(result, "compose refused").content
             val receipt = CanvasComposeContract.json.decodeFromString(ComposeReceipt.serializer(), answer)

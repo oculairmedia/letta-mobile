@@ -1,7 +1,6 @@
 package com.letta.mobile.data.meridian
 
 import com.letta.mobile.data.controller.capability.Capability
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
@@ -33,7 +32,7 @@ class MeridianMetaTool(private val router: () -> MeridianCommandRouter) : HostEx
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agentId))
+        invoke(input, ExternalToolCaller.claimed(agentId))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val command = (input[COMMAND] as? JsonPrimitive)?.takeIf { it.isString }?.content

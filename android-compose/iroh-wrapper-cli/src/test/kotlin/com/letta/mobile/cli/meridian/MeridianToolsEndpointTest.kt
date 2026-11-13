@@ -1,6 +1,5 @@
 package com.letta.mobile.cli.meridian
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity.CLAIMED
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -208,7 +207,7 @@ class MeridianToolsEndpointTest {
         }
         override val capability = Capability.ImageHydration
 
-        override suspend fun invoke(input: JsonObject, agentId: String?) = invoke(input, ExternalToolCaller(CLAIMED, agentId))
+        override suspend fun invoke(input: JsonObject, agentId: String?) = invoke(input, ExternalToolCaller.claimed(agentId))
 
         override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
             callers += caller

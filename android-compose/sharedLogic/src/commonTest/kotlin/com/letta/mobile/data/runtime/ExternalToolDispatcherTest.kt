@@ -1,7 +1,6 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.controller.extras.identity.CallerIdentity.CLAIMED
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.ExternalTool
@@ -72,7 +71,7 @@ class ExternalToolDispatcherTest {
         }
         dispatcher(RecordingClient(vouchesForRuntimeScope = true), registry = registryOf(tool)).answerRequest()
         // letta-mobile-bglj6.12: and the request's tool_call_id, which the timeline keys the call on.
-        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller(VERIFIED, "agent-1", "conv-1", TOOL_CALL_ID), seen)
+        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller.verified("agent-1", "conv-1", TOOL_CALL_ID), seen)
     }
 
     /** The scope is only as trustworthy as the client that delivered it: a client that does not own its App Server connection is claimed. */

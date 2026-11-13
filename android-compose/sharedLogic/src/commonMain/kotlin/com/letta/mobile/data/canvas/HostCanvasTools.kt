@@ -4,7 +4,6 @@ import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.capability.Capability
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
@@ -215,7 +214,7 @@ private class HostCanvasTool(
     override val capability: Capability = Capability.ImageHydration
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-        invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agentId))
+        invoke(input, ExternalToolCaller.claimed(agentId))
 
     override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val agentId = caller.agentId

@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.canvas
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import androidx.compose.ui.geometry.Offset
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGetSceneResult
@@ -110,7 +109,7 @@ class CanvasConnectFollowTest {
 
     private companion object {
         const val CONVERSATION = "conv-connect-follow"
-        val CALLER = ExternalToolCaller(CallerIdentity.VERIFIED, agentId = "agent-1", conversationId = CONVERSATION)
+        val CALLER = ExternalToolCaller.claimed(agentId = "agent-1", conversationId = CONVERSATION)
         val FRAMES = mapOf(
             "n-a" to CanvasDocumentFrame(16f, 24f, 140f, 80f),
             "n-b" to CanvasDocumentFrame(240f, 24f, 140f, 80f),

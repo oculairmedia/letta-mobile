@@ -1,6 +1,5 @@
 package com.letta.mobile.data.meridian
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.canvas.CanvasPreviewRender
 import com.letta.mobile.data.canvas.CanvasPreviewRenderer
 import com.letta.mobile.data.canvas.CanvasRelayHost
@@ -84,7 +83,7 @@ internal class MeridianTestHost(
         override val capability: Capability get() = delegate.capability
 
         override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
-            invoke(input, ExternalToolCaller(CallerIdentity.CLAIMED, agentId))
+            invoke(input, ExternalToolCaller.claimed(agentId))
 
         override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
             calls += Call(name, input, caller)
@@ -123,7 +122,7 @@ internal class MeridianTestHost(
         const val AGENT = "agent-1"
         const val CONVERSATION = "conv-meridian"
         const val TOOL_CALL = "toolu_meridian_1"
-        val CALLER = ExternalToolCaller(CallerIdentity.VERIFIED, AGENT, CONVERSATION, TOOL_CALL)
+        val CALLER = ExternalToolCaller.verified(AGENT, CONVERSATION, TOOL_CALL)
 
         val PLUGIN_DEFINITION = PluginToolDefinition(
             pluginId = "letta.example",

@@ -1,6 +1,5 @@
 package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
@@ -85,7 +84,7 @@ class CanvasRelayPluginAssetsE2ETest {
             """"frame":{"x":40,"y":60,"width":320,"height":240},"snapshot":{"assetRef":"${snapshot.ref}","mediaType":"image/png"},""" +
             """"fallback":{"title":"Example widget"}}"""
         val input = Json.parseToJsonElement("""{"ops":[$op]}""").jsonObject
-        val caller = ExternalToolCaller(VERIFIED, AGENT, CONVERSATION, "toolu_1")
+        val caller = ExternalToolCaller.verified(AGENT, CONVERSATION, "toolu_1")
         assertIs<ExternalToolResult.Success>(tools.invoke(CanvasToolContract.APPLY_OPS, input, caller))
         runCurrent()
 

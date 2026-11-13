@@ -1,6 +1,5 @@
 package com.letta.mobile.data.plugin.host
 
-import com.letta.mobile.data.controller.extras.identity.CallerIdentity
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.HostCanvasAccess
 import com.letta.mobile.data.canvas.HostCanvasCaller
@@ -73,9 +72,9 @@ class CallerBoardConcurrencyTest {
         }
         val invoker = PluginToolInvoker { LivePlugin(driver, handlers, board) }
 
-        val a = async { invoker.invoke(tool, input("A"), ExternalToolCaller(CallerIdentity.VERIFIED, "agent-1", "conv-A", "call-a")) }
+        val a = async { invoker.invoke(tool, input("A"), ExternalToolCaller.verified("agent-1", "conv-A", "call-a")) }
         assertEquals("A", driver.started.receive())
-        val b = async { invoker.invoke(tool, input("B"), ExternalToolCaller(CallerIdentity.VERIFIED, "agent-2", "conv-B", "call-b")) }
+        val b = async { invoker.invoke(tool, input("B"), ExternalToolCaller.verified("agent-2", "conv-B", "call-b")) }
         assertEquals("B", driver.started.receive())
         driver.release("A")
         assertIs<ExternalToolResult.Error>(a.await(), "ambiguous: two calls in flight and the emit names neither")
@@ -102,9 +101,9 @@ class CallerBoardConcurrencyTest {
 
     /** A starts and waits; B starts and waits; A finishes while B is in flight; then B finishes. */
     private suspend fun kotlinx.coroutines.test.TestScope.interleave(invoker: PluginToolInvoker, driver: GatedDriver) {
-        val a = async { invoker.invoke(tool, input("A"), ExternalToolCaller(CallerIdentity.VERIFIED, "agent-1", "conv-A", "call-a")) }
+        val a = async { invoker.invoke(tool, input("A"), ExternalToolCaller.verified("agent-1", "conv-A", "call-a")) }
         assertEquals("A", driver.started.receive())
-        val b = async { invoker.invoke(tool, input("B"), ExternalToolCaller(CallerIdentity.VERIFIED, "agent-2", "conv-B", "call-b")) }
+        val b = async { invoker.invoke(tool, input("B"), ExternalToolCaller.verified("agent-2", "conv-B", "call-b")) }
         assertEquals("B", driver.started.receive())
         driver.release("A")
         assertIs<ExternalToolResult.Success>(a.await())
