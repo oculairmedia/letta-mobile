@@ -59,18 +59,18 @@ import com.letta.mobile.ui.theme.LettaMotionTokens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The prompt card's control row: the plus (attach / open canvas), the model and effort chips,
- * the permission-mode chip, the context chip (unless it rides the hint footer, see
- * [ComposerModel.contextInHintFooter]) and the platform's voice button.
- * Below [ChatComposerDimens.controlsWrapBreakpoint] the permission-mode and context chips wrap
- * to a second row so the primary controls stay reachable. Lifted from desktop's
- * ComposerControlRow.
+ * The prompt card's control row: the plus (attach / open canvas), the one model control (model and
+ * effort, [ComposerModelControl]), the context chip (unless it rides the line under the card, see
+ * [ComposerModel.contextInHintFooter]) and the platform's voice button. The permission mode is not
+ * here: it is the quiet line under the card ([ComposerUnderCardLine]).
+ * Below [ChatComposerDimens.controlsWrapBreakpoint] the context chip wraps to a second row so the
+ * primary controls stay reachable. Lifted from desktop's ComposerControlRow.
  */
 @Composable
 internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth().testTag(ComposerTestTags.CONTROLS)) {
         val narrow = maxWidth < ChatComposerDimens.controlsWrapBreakpoint
-        val secondary = secondaryControls(model)
+        val usage = model.composer.contextUsage.takeUnless { model.contextInHintFooter }
         Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             ControlsRow {
                 if (model.offersOpenCanvas) ComposerShowCanvasButton(onShowCanvas = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
@@ -81,29 +81,21 @@ internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit)
                     horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (model.showModel) model.composer.model?.let { ComposerModelControls(it, model.actions, model.host) }
-                    if (!narrow) secondary?.invoke()
+                    if (model.showModel) model.composer.model?.let { ComposerModelControl(it, model.host) }
+                    if (!narrow) usage?.let { ComposerContextIndicator(it) }
                 }
                 ComposerVoiceButton(model)
             }
-            if (narrow && secondary != null) WrappedControlsRow { secondary() }
+            if (narrow && usage != null) WrappedControlsRow { ComposerContextIndicator(usage) }
         }
-        // The one model picker: the chip, `/models` and a run error's "Switch model" open it.
-        model.host.modelPicker?.let { ModelPickerHost(it, selectedValue = model.composer.model?.currentHandle) }
-    }
-}
-
-/**
- * The chips that wrap to their own row on a narrow card: the permission mode and (when it is not
- * in the hint footer) the context window. Null when there are none.
- */
-private fun secondaryControls(model: ComposerModel): (@Composable () -> Unit)? {
-    val permission = model.composer.permissionMode
-    val usage = model.composer.contextUsage.takeUnless { model.contextInHintFooter }
-    if (permission == null && usage == null) return null
-    return {
-        permission?.let { ComposerPermissionModeChip(it, model.actions::setPermissionMode) }
-        usage?.let { ComposerContextIndicator(it) }
+        // The one model picker: the control, `/models` and a run error's "Switch model" open it.
+        model.host.modelPicker?.let { picker ->
+            ModelPickerHost(
+                picker,
+                selectedValue = model.composer.model?.currentHandle,
+                effort = composerEffortSection(model.composer.model, model.actions),
+            )
+        }
     }
 }
 

@@ -29,12 +29,13 @@ import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 
-/** letta-mobile-bglj6.1.9 / bglj6.1.23: the Touch composer bar's parity with the legacy composer. */
+/** The Touch composer bar's parity with the legacy composer, and the permission mode's line under it. */
 class TouchComposerBarUiTest {
     @Composable
     private fun TouchPanel(inputs: ComposerInputs) {
@@ -68,16 +69,19 @@ class TouchComposerBarUiTest {
         onNodeWithContentDescription("Add to message").assertExists()
     }
 
-    /** The permission mode is a row of the "+" sheet, not a chip floating above the bar. */
+    /** The permission mode is the quiet line under the bar's row, not a row of the "+" sheet. */
     @Test
-    fun thePlusSheetOffersThePermissionModeAndItsPicker() = runComposeUiTest {
+    fun theLineUnderTheBarOffersThePermissionModeAndItsPicker() = runComposeUiTest {
         val actions = RecordingChatActions()
         val mode = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
         setContent { TouchPanel(ComposerInputs(composer = ready().copy(permissionMode = mode), actions = actions)) }
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
-        onNodeWithContentDescription("Add to message").performClick()
-        onNodeWithText("Permission mode: Approve all").performClick()
+        // The "+" is attach-only: the mode left its sheet.
+        onNodeWithContentDescription("Attach image").assertExists()
+        onNode(hasTestTag(ComposerTestTags.TOUCH_UNDER_BAR) and hasAnyDescendant(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE)))
+            .assertExists()
+        onNodeWithText("Approve all").assertExists()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).performClick()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertExists()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + AppServerPermissionMode.Standard.name).performClick()
 
@@ -86,7 +90,7 @@ class TouchComposerBarUiTest {
     }
 
     @Test
-    fun aLockedModeStaysInTheSheetGreyedWithItsReasonAboveTheBar() = runComposeUiTest {
+    fun aLockedModeLineStaysGreyedWithItsReasonAboveTheBar() = runComposeUiTest {
         val locked = ChatPermissionModeUiState(
             selected = AppServerPermissionMode.Standard,
             unavailableReason = "Not supported over Iroh yet",
@@ -94,10 +98,11 @@ class TouchComposerBarUiTest {
         setContent { TouchPanel(ComposerInputs(composer = ready().copy(permissionMode = locked), actions = RecordingChatActions())) }
 
         onNodeWithText("Not supported over Iroh yet").assertExists()
-        onNodeWithContentDescription("Add to message").performClick()
-        onNodeWithText("Permission mode: Ask for approval").assertExists()
-        onNode(hasTestTag(ComposerTestTags.TOUCH_SHEET_ROW) and hasAnyDescendant(hasText("Permission mode: Ask for approval")))
+        onNodeWithText("Ask for approval").assertExists()
+        onNode(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE) and hasText("Ask for approval"))
             .assertIsNotEnabled()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).performClick()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertDoesNotExist()
     }
 
     @Test
@@ -112,8 +117,18 @@ class TouchComposerBarUiTest {
                 ),
             )
         }
-        // With the mode left out the "+" is attach-only again.
+        // The dock stays one compact bar: no line under it, and the "+" is attach-only.
         onNodeWithContentDescription("Attach image").assertExists()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertDoesNotExist()
+        onNodeWithTag(ComposerTestTags.TOUCH_UNDER_BAR).assertDoesNotExist()
+    }
+
+    /** The line shows on the full page with the keyboard down; it steps aside with the keyboard up, and is never docked. */
+    @Test
+    fun theUnderBarLineStepsAsideForTheKeyboardAndTheDock() {
+        assertTrue(touchUnderBarShown(docked = false, keyboardOpen = false))
+        assertFalse(touchUnderBarShown(docked = false, keyboardOpen = true))
+        assertFalse(touchUnderBarShown(docked = true, keyboardOpen = false))
     }
 
     @Test
