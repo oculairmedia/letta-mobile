@@ -31,6 +31,8 @@ import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.AmbientVoiceRole
+import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.util.Telemetry
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect
@@ -66,9 +68,14 @@ internal fun DesktopAmbientChatBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val spec = remember(status) { AmbientMotion.spec(status) }
-    val targetColor = remember(status, colorScheme, identitySeed) {
-        when (status) {
+    // Voice mode: while it follows a voice (LocalAmbientVoice) the glow runs in that voice's colour
+    // at its level; without one, everything below is exactly the run's glow.
+    val voice = LocalAmbientVoice.current
+    val glowStatus = if (voice != null) AmbientMotionStatus.Running else status
+    val spec = remember(glowStatus) { AmbientMotion.spec(glowStatus) }
+    val targetColor = remember(glowStatus, colorScheme, identitySeed, voice) {
+        if (voice?.role == AmbientVoiceRole.You) return@remember Color(voice.youTintArgb)
+        when (glowStatus) {
             AmbientMotionStatus.Idle -> Color.Transparent
             AmbientMotionStatus.Running, AmbientMotionStatus.Active ->
                 identitySeed?.let { lerp(colorScheme.tertiary, it, IdentityBlend) } ?: colorScheme.tertiary
@@ -94,10 +101,10 @@ internal fun DesktopAmbientChatBackground(
 
     // Bloom→settle intensity envelope; continuous states just ease to steady.
     val envelope = remember { Animatable(spec.settledEnvelope) }
-    LaunchedEffect(status) {
+    LaunchedEffect(glowStatus) {
         // Same shared ramp as the Android renderer: climb into a bloom, never step into
         // one. See AmbientMotion.ramp for the flash this removed.
-        val ramp = AmbientMotion.ramp(current = envelope.value, status = status)
+        val ramp = AmbientMotion.ramp(current = envelope.value, status = glowStatus)
         if (ramp.risesFirst) {
             // Ease IN to the bloom for the same reason as the Android renderer: an
             // ease-out climb front-loads the brightening and reads as a flash.
@@ -168,13 +175,13 @@ internal fun DesktopAmbientChatBackground(
     Box(modifier = modifier) {
         if (visible) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                val intensity = envelope.value
+                val intensity = voice?.envelope(envelope.value) ?: envelope.value
                 if (shaderBuilder != null) {
                     shaderBuilder.uniform("uSize", size.width, size.height)
                     shaderBuilder.uniform("uTime", phase)
                     shaderBuilder.uniform("uAgitation", agitation)
                     shaderBuilder.uniform("uEnvelope", intensity)
-                    shaderBuilder.uniform("uStreamEnergy", 0f)
+                    shaderBuilder.uniform("uStreamEnergy", voice?.streamEnergy(0f) ?: 0f)
                     shaderBuilder.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
                     shaderBuilder.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
                     shaderBuilder.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)

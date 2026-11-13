@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
 import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.AmbientVoice
+import com.letta.mobile.ui.ambient.AmbientVoiceRole
+import com.letta.mobile.ui.ambient.LocalAmbientVoice
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource
@@ -100,7 +103,11 @@ fun AmbientShaderAgentBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
-    val status = remember(agentStatus) { AmbientAgentStatus.from(agentStatus) }
+    // Voice mode: while it follows a voice (LocalAmbientVoice) the glow runs in that voice's colour
+    // at its level; without one, everything below is exactly the run's glow.
+    val voice = LocalAmbientVoice.current
+    val following = voice != null
+    val status = remember(agentStatus, following) { if (following) AmbientAgentStatus.Running else AmbientAgentStatus.from(agentStatus) }
     val spec = remember(status) { AmbientMotion.spec(status.toMotionStatus()) }
     val colorScheme = MaterialTheme.colorScheme
     // The tint used to be a Material *container* role, which is low-chroma and lightish
@@ -108,8 +115,8 @@ fun AmbientShaderAgentBackground(
     // in HCT at an explicit tone and chroma from the hue the status already implies:
     // dark and vivid, and adjacent to the theme rather than a palette of its own.
     val onDark = colorScheme.background.luminance() <= 0.5f
-    val targetColor = remember(status, colorScheme, identitySeed, onDark) {
-        val hueSource = when (status) {
+    val targetColor = remember(status, colorScheme, identitySeed, onDark, voice) {
+        val hueSource = if (voice?.role == AmbientVoiceRole.You) Color(voice.youTintArgb) else when (status) {
             AmbientAgentStatus.Idle -> Color.Transparent
             AmbientAgentStatus.Running,
             AmbientAgentStatus.Active -> identitySeed ?: colorScheme.primary
@@ -196,6 +203,8 @@ fun AmbientShaderAgentBackground(
                 agitation = agitation,
                 envelope = envelope.asState(),
                 streamActivityPulse = streamActivityPulse,
+                // Under reduced motion only the colour follows the voice: the still tint, no level.
+                voice = voice.takeUnless { reducedMotion },
                 composerHeight = composerHeight,
                 modifier = Modifier.matchParentSize(),
             )
@@ -214,6 +223,7 @@ private fun AmbientCanvas(
     streamActivityPulse: Long,
     composerHeight: () -> androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    voice: AmbientVoice? = null,
 ) {
     // The clock is read only inside the draw lambdas below: a frame redraws, never recomposes.
     val motion = rememberAmbientMotion(animate, speed, streamActivityPulse)
@@ -224,8 +234,8 @@ private fun AmbientCanvas(
             shader.setFloatUniform("uTime", motion.phase.floatValue)
             shader.setFloatUniform("uSize", size.width, size.height)
             shader.setFloatUniform("uAgitation", agitation)
-            shader.setFloatUniform("uEnvelope", envelope.value)
-            shader.setFloatUniform("uStreamEnergy", motion.streamEnergy.floatValue)
+            shader.setFloatUniform("uEnvelope", voice?.envelope(envelope.value) ?: envelope.value)
+            shader.setFloatUniform("uStreamEnergy", voice?.streamEnergy(motion.streamEnergy.floatValue) ?: motion.streamEnergy.floatValue)
             shader.setFloatUniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
             val composer = composerHeight()
             val band = AmbientMotion.bandAboveComposer(
@@ -244,8 +254,8 @@ private fun AmbientCanvas(
                 tint = tint,
                 phase = motion.phase.floatValue,
                 agitation = agitation,
-                envelope = envelope.value,
-                streamEnergy = motion.streamEnergy.floatValue,
+                envelope = voice?.envelope(envelope.value) ?: envelope.value,
+                streamEnergy = voice?.streamEnergy(motion.streamEnergy.floatValue) ?: motion.streamEnergy.floatValue,
             )
         }
     }
