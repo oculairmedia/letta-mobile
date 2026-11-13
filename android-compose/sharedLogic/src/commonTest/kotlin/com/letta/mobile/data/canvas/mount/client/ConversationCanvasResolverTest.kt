@@ -162,6 +162,56 @@ class ConversationCanvasResolverTest {
     }
 
     @Test
+    fun theConversationsChoiceWinsOverItsAgentsDefaultWhichWinsOverItsOwnBoard() = runTest {
+        val agentDefault = CanvasId("canvas-agent-default")
+        val client = FakeCanvasMountClient()
+        val resolver = ConversationCanvasResolver(client)
+        assertEquals(ConversationCanvasState.Own, resolver.refresh(target), "no choice, no default: its own board")
+
+        client.agentDefaults[target.agentId] = agentDefault
+        assertEquals(ConversationCanvasState.Mounted(agentDefault, CanvasMountSource.Default), resolver.refresh(target))
+
+        client.stored[target] = foreign
+        assertEquals(ConversationCanvasState.Mounted(foreign, CanvasMountSource.Binding), resolver.refresh(target))
+    }
+
+    @Test
+    fun choosingTheOwnBoardIsAChoiceThatWinsOverTheAgentsDefault() = runTest {
+        val client = FakeCanvasMountClient().apply {
+            agentDefaults[target.agentId] = CanvasId("canvas-agent-default")
+            stored[target] = foreign
+        }
+        val resolver = ConversationCanvasResolver(client)
+        assertIs<CanvasMountChange.Applied>(resolver.unmount(target))
+        assertEquals(target.ownCanvas, client.stored[target], "bound to its own canvas, not cleared")
+        assertEquals(ConversationCanvasState.Own, resolver.refresh(target))
+    }
+
+    @Test
+    fun aPushedOwnCanvasIsResolvedThroughTheWholeOrder() = runTest {
+        val agentDefault = CanvasId("canvas-agent-default")
+        val client = FakeCanvasMountClient().apply { agentDefaults[target.agentId] = agentDefault }
+        val resolver = ConversationCanvasResolver(client)
+        resolver.accept(target, foreign)
+        // The host cleared the choice: the agent's default shows, not the own board.
+        resolver.accept(target, target.ownCanvas)
+        assertEquals(ConversationCanvasState.Mounted(agentDefault, CanvasMountSource.Default), resolver.current(target))
+
+        client.stored[target] = target.ownCanvas
+        resolver.accept(target, target.ownCanvas)
+        assertEquals(ConversationCanvasState.Own, resolver.current(target))
+    }
+
+    @Test
+    fun thisDeviceHoldsTheOwnBoardAsAChoice() = runTest {
+        val device = DeviceCanvasMountClient()
+        device.mount(target, foreign)
+        device.unmount(target)
+        assertEquals(CanvasMountLookup.Found(target.ownCanvas, CanvasMountSource.Binding), device.resolve(target))
+        assertEquals(ConversationCanvasState.Own, ConversationCanvasResolver(device).refresh(target))
+    }
+
+    @Test
     fun aPushedClearPutsTheConversationBackOnItsOwnBoard() = runTest {
         val resolver = ConversationCanvasResolver(FakeCanvasMountClient())
         resolver.accept(target, foreign)

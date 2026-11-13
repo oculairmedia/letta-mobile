@@ -43,7 +43,8 @@ class DeviceCanvasMountClientTest {
         assertEquals(CanvasMountLookup.None, client.resolve(other), "another conversation keeps its own board")
 
         assertEquals(CanvasMountChange.Applied(target.ownCanvas), client.unmount(target))
-        assertEquals(CanvasMountLookup.None, client.resolve(target))
+        // The own board is held as the conversation's choice, as a host binding would hold it.
+        assertEquals(CanvasMountLookup.Found(target.ownCanvas, CanvasMountSource.Binding), client.resolve(target))
     }
 
     @Test
@@ -51,7 +52,7 @@ class DeviceCanvasMountClientTest {
         val client = DeviceCanvasMountClient()
         client.mount(target, board)
         client.mount(target, target.ownCanvas)
-        assertEquals(CanvasMountLookup.None, client.resolve(target))
+        assertEquals(CanvasMountLookup.Found(target.ownCanvas, CanvasMountSource.Binding), client.resolve(target))
     }
 
     @Test

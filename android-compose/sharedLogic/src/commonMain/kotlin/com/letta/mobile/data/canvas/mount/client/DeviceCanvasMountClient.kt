@@ -35,15 +35,12 @@ class DeviceCanvasMountClient : CanvasMountClient {
 
     /** Mounting the conversation's own canvas is the same as [unmount]. */
     override suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange {
-        if (canvas == target.ownCanvas) return unmount(target)
         held.update { it + (target to canvas) }
         return CanvasMountChange.Applied(canvas)
     }
 
-    override suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange {
-        held.update { it - target }
-        return CanvasMountChange.Applied(target.ownCanvas)
-    }
+    /** Holds the own board as the conversation's choice, as a host binding would, rather than forgetting the choice. */
+    override suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange = mount(target, target.ownCanvas)
 
     /** [target]'s board after each change made after this call (its own canvas once unmounted). */
     override fun changes(target: ConversationCanvasTarget): Flow<CanvasId> =

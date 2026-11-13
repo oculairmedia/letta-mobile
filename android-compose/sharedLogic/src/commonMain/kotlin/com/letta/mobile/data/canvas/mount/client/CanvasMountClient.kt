@@ -13,6 +13,10 @@ import kotlinx.coroutines.flow.flowOf
  * switch to another. The host owns the mount, so every paired device and the agent's canvas tools
  * see the same board. Callers go through [ConversationCanvasResolver], never this port directly.
  *
+ * Which canvas a conversation shows is decided in one order: the conversation's own choice (its
+ * binding, which may name its own canvas), else its agent's default canvas, else the conversation's
+ * own board.
+ *
  * An implementation over the host's admin RPC must:
  * - publish [supported] true only while the connected host advertises the `canvas.mount.v1`
  *   capability, and false again when the connection changes;
@@ -21,8 +25,10 @@ import kotlinx.coroutines.flow.flowOf
  *   [CanvasMountLookup.None];
  * - map [mount] to `canvas.mount.binding.replace {agent_id, conversation_id, canvas_id}` and
  *   `replaced` to [CanvasMountChange.Applied];
- * - map [unmount] to `canvas.mount.binding.clear` when the host offers it, else to a replace with
- *   the conversation's own canvas ([ConversationCanvasTarget.ownCanvas]);
+ * - map [unmount] to a `canvas.mount.binding.replace` with the conversation's own canvas
+ *   ([ConversationCanvasTarget.ownCanvas]), never to `canvas.mount.binding.clear`: choosing the own
+ *   board is the conversation's own choice and wins over its agent's default, which a clear would
+ *   fall through to;
  * - map the refusals `canvas.mount.denied` to [CanvasMountProblem.Denied] and
  *   `canvas.mount.invalid_input:<field>:<code>` to [CanvasMountProblem.InvalidInput], the answers
  *   `unavailable{reason}` to [CanvasMountProblem.Unavailable] and `outcome_unknown` (or a lost
@@ -53,7 +59,7 @@ interface CanvasMountClient {
     /** Mounts [canvas] for [target] only, replacing whatever it showed. */
     suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange
 
-    /** Puts [target] back on its own board. */
+    /** Chooses [target]'s own board for it, explicitly, so it wins over its agent's default; never a clear. */
     suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange
 
     /** The board [target] shows after each change the host pushes after this call (its own canvas once unmounted); empty when the host pushes none. */

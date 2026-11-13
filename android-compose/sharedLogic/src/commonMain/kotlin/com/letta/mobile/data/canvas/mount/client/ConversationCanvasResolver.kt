@@ -89,16 +89,25 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
     suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange =
         write(target, canvas) { client.mount(target, canvas) }
 
-    /** Puts [target] back on its own board. */
+    /** Chooses [target]'s own board for it, which wins over its agent's default ([CanvasMountClient.unmount]). */
     suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange =
         write(target, target.ownCanvas) { client.unmount(target) }
 
     /**
-     * Takes the board the host pushed for [target] (its own canvas once unmounted), in turn with
-     * lookups and writes; ignored once the host no longer offers mounts.
+     * Takes the board the host pushed for [target], in turn with lookups and writes; ignored once the
+     * host no longer offers mounts. A push of its own canvas may mean nothing is chosen any more, so
+     * it is resolved again through the whole order (its choice, its agent's default, its own board).
      */
     suspend fun accept(target: ConversationCanvasTarget, canvas: CanvasId) = turn.withLock {
-        if (client.supported.value) publish(target, stateOf(target, CanvasMountLookup.Found(canvas, CanvasMountSource.Binding)))
+        if (!client.supported.value) return@withLock
+        val pushed = stateOf(target, CanvasMountLookup.Found(canvas, CanvasMountSource.Binding))
+        if (canvas == target.ownCanvas) refreshPushedOwn(target, pushed) else publish(target, pushed)
+    }
+
+    /** A pushed own canvas, resolved again; the push itself stands when the host cannot say. */
+    private suspend fun refreshPushedOwn(target: ConversationCanvasTarget, pushed: ConversationCanvasState) {
+        val answer = lookup(target)
+        publish(target, if (answer is CanvasMountLookup.Failed) pushed else stateOf(target, answer))
     }
 
     private suspend fun write(
