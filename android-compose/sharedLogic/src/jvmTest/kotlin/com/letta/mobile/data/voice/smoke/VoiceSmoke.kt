@@ -23,6 +23,7 @@ import com.letta.mobile.data.voice.endpoint.EndpointSpeechSynthesizer
 import com.letta.mobile.data.voice.endpoint.EndpointTranscriber
 import com.letta.mobile.data.voice.endpoint.EndpointVoiceMouth
 import com.letta.mobile.data.voice.endpoint.SpeechApiKey
+import com.letta.mobile.data.voice.endpoint.SpeechEndpointAddress
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
 import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
@@ -33,7 +34,6 @@ import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.data.voice.vad.ear.VadVoiceEar
 import io.ktor.client.engine.cio.CIO
-import io.ktor.http.Url
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -42,7 +42,7 @@ import java.nio.file.Files
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Headless device smoke runner for a person at the keyboard (letta-mobile-fs20b). Never run by a
+ * Headless device smoke runner for a person at the keyboard. Never run by a
  * test; it opens the real microphone and speakers.
  *
  * - `record [seconds]`: records from the default microphone (3 s by default) to a WAVE file in a
@@ -110,7 +110,9 @@ private suspend fun loop(args: LoopArgs) {
     val origin = checkNotNull(EndpointOrigin.of(url)) { "not an http(s) URL" }
     val grants = VoiceEndpointGrants(VoiceEndpointPayload.entries.map { VoiceEndpointGrant(origin, it) }.toSet())
     val key = System.getenv("VOICE_SMOKE_API_KEY")?.takeIf { it.isNotBlank() }?.let(::SpeechApiKey)
-    if (key != null && !SpeechTransportPolicy.protectsKey(url.value, runCatching { Url(url.value) }.getOrNull())) {
+    val base = SpeechEndpointAddress.resolve(url, emptyList())
+        ?: return println("refused (${explain(VoiceErrorCode.INVALID_ENDPOINT)}): ${url.value}; nothing was sent.")
+    if (key != null && !SpeechTransportPolicy.protectsKey(base)) {
         return println(
             "refused (${VoiceErrorCode.INSECURE_TRANSPORT}): VOICE_SMOKE_API_KEY is set but ${url.value} is not https or a " +
                 "loopback host (localhost, 127.x.x.x, ::1); nothing was sent. Use https or a loopback tunnel.",
@@ -178,6 +180,7 @@ private class EchoTurns(private val ear: VadVoiceEar, private val mouth: Endpoin
 /** A failure code, with a hint for the ones a person can fix from the command line. */
 private fun explain(code: VoiceErrorCode): String = when (code) {
     VoiceErrorCode.INSECURE_TRANSPORT -> "$code (a key over plain http to a non-loopback host; use https or a loopback tunnel)"
+    VoiceErrorCode.INVALID_ENDPOINT -> "$code (use a plain base URL: no query, fragment or user info)"
     VoiceErrorCode.UNSUPPORTED_FORMAT -> "$code (the server did not return WAVE audio)"
     VoiceErrorCode.PERMISSION_REQUIRED -> "$code (microphone permission or destination grant missing)"
     VoiceErrorCode.UNAUTHORIZED -> "$code (check VOICE_SMOKE_API_KEY)"

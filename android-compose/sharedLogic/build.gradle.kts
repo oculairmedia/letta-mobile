@@ -332,7 +332,7 @@ listOf("check" to "checkContractReferenceDocs", "write" to "writeContractReferen
     }
 }
 
-// Headless voice device smoke runner (letta-mobile-fs20b). Opens the real microphone and
+// Headless voice device smoke runner. Opens the real microphone and
 // speakers, so it is never part of a build or test run; a person runs it by hand:
 //   ./gradlew :sharedLogic:voiceSmoke --args="record"
 //   ./gradlew :sharedLogic:voiceSmoke --args="loop http://127.0.0.1:8880"
