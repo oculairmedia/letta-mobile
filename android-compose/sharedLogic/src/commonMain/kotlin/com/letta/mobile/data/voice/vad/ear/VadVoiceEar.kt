@@ -73,7 +73,9 @@ data class VadEarConfig(
  * [close]. Cancelling a listen does not wipe it: the loop closes the microphone on a failure and
  * calls [retry] only once the reopened ear reports [VoiceEarEvent.ListeningStarted]. [retry] returns
  * false whenever the handle is no longer kept. A transcribed turn, and a retry cancelled mid-way,
- * are wiped at once; utterances carry no capture handle.
+ * are wiped at once; utterances carry no capture handle. A failure that arrives after the next
+ * turn's speech has started offers no handle. At most four finished turns wait for transcription;
+ * a turn beyond that is wiped and reported as TRANSCRIPTION_FAILED without a handle.
  *
  * Collecting [listen] opens the source; cancelling releases it before the collection completes,
  * and nothing is emitted after. A source that fails or ends reports one [VoiceEarEvent.Failed] with
@@ -99,8 +101,7 @@ class VadVoiceEar(
 
     override fun retry(handle: CapturedAudioHandle): Boolean {
         val held = memory.take(handle) ?: return false
-        memory.retries.trySend(held)
-        return true
+        return memory.requestRetry(held)
     }
 
     /** Wipes any retained capture and refuses further listens and retries. */

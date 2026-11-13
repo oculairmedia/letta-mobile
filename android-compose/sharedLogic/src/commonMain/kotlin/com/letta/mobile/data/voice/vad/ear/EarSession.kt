@@ -42,19 +42,29 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
-/** A finished turn's audio under its handle, with what was measured about it; [wipe] zeroes the audio. */
+/**
+ * A finished turn's audio under its handle, with what was measured about it and the speech
+ * generation it belongs to; [wipe] zeroes the audio.
+ */
 internal class CapturedTurn(
     val handle: CapturedAudioHandle,
     val samples: ShortArray,
     val report: EarTurnReport = EarTurnReport.Unmeasured,
+    val generation: Long = 0,
 ) {
     fun wipe() = samples.fill(0)
 }
 
-/** What an ear keeps between listens: the retained capture, pending requests and the output hint. */
+/**
+ * What an ear keeps between listens: the retained capture, pending requests and the output hint.
+ * Closing and a new turn's speech race with the transcription worker and [VadVoiceEar.retry] on
+ * other threads, so each hand-over stores first and checks after, while [close] and
+ * [speechStarted] flag first and wipe after: whichever runs second sees the other.
+ */
 internal class EarMemory {
     private val retained = MutableStateFlow<CapturedTurn?>(null)
     private val handles = MutableStateFlow(0L)
+    private val speech = MutableStateFlow(0L)
     private val closed = MutableStateFlow(false)
     val retries = Channel<CapturedTurn>(Channel.CONFLATED) { it.wipe() }
     val commits = Channel<Unit>(Channel.CONFLATED)
@@ -62,13 +72,40 @@ internal class EarMemory {
 
     val isClosed: Boolean get() = closed.value
 
+    /** Advances each time a turn's speech starts; a capture from an older generation has expired. */
+    val speechGeneration: Long get() = speech.value
+
     fun nextHandle(): CapturedAudioHandle = CapturedAudioHandle(handles.updateAndGet { it + 1 })
 
-    /** Keeps [turn] for one retry, wiping whatever was kept before. */
-    fun retain(turn: CapturedTurn) {
-        if (isClosed) return turn.wipe()
-        retained.getAndUpdate { turn }?.wipe()
+    /** A new turn's speech started: the kept capture, and any still being transcribed, expire. */
+    fun speechStarted() {
+        speech.updateAndGet { it + 1 }
+        forget()
     }
+
+    /**
+     * Keeps [turn] for one retry, wiping whatever was kept before. Returns false, with [turn] wiped,
+     * when the ear is closed or newer speech has started.
+     */
+    fun retain(turn: CapturedTurn): Boolean {
+        if (isCurrent(turn)) {
+            retained.getAndUpdate { turn }?.wipe()
+            if (isCurrent(turn)) return true
+            retained.compareAndSet(turn, null)
+        }
+        turn.wipe()
+        return false
+    }
+
+    /** Queues [turn] for its retry; false, with [turn] wiped, when the ear was closed meanwhile. */
+    fun requestRetry(turn: CapturedTurn): Boolean {
+        retries.trySend(turn)
+        if (!isClosed) return true
+        drainRetries()
+        return false
+    }
+
+    private fun isCurrent(turn: CapturedTurn): Boolean = !isClosed && turn.generation == speech.value
 
     /** Wipes the kept capture, if any. */
     fun forget() {
@@ -91,7 +128,37 @@ internal class EarMemory {
     fun close() {
         closed.value = true
         forget()
+        drainRetries()
+    }
+
+    private fun drainRetries() {
         while (true) retries.tryReceive().getOrNull()?.wipe() ?: break
+    }
+}
+
+/**
+ * Finished turns waiting for the transcription worker: at most [capacity], each within the hard
+ * cap, so the audio held stays bounded however far transcription falls behind. A turn beyond that
+ * is refused and wiped; [discard] wipes whatever is still queued when the listen ends.
+ */
+internal class PendingTurns(capacity: Int = MAX_PENDING_TURNS) {
+    private val queue = Channel<CapturedTurn>(capacity) { it.wipe() }
+
+    val turns: ReceiveChannel<CapturedTurn> get() = queue
+
+    /** Queues [turn]; false, with [turn] wiped, when the queue is full. */
+    fun offer(turn: CapturedTurn): Boolean {
+        val queued = queue.trySend(turn).isSuccess
+        if (!queued) turn.wipe()
+        return queued
+    }
+
+    /** Drops and wipes every queued turn; nothing can be queued after. */
+    fun discard() = queue.cancel()
+
+    companion object {
+        /** Turns that may wait for transcription at once. */
+        const val MAX_PENDING_TURNS = 4
     }
 }
 
@@ -119,8 +186,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val tracker = TurnTracker(parts.config.policy, format, detector.hop)
     private val splitter = HopSplitter(detector.hop)
     private val recorder = CaptureRecorder(samplesOf(parts.config.policy.preRoll), limit())
-    // overflow: one entry per finished spoken turn (each within the hard cap); undelivered turns are wiped on close.
-    private val turns = Channel<CapturedTurn>(Channel.UNLIMITED) { it.wipe() }
+    private val pending = PendingTurns()
     private val observer = parts.config.observer
     private var started = false
     private var peakDb = SILENT_DB
@@ -129,7 +195,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         memory.drainCommits()
         if (memory.isClosed) return fail(VoiceErrorCode.UNAVAILABLE)
         if (!accepts(parts.source)) return fail(VoiceErrorCode.UNSUPPORTED_FORMAT)
-        out.launch { TranscriptionWorker(parts, out, turns).run() }
+        out.launch { TranscriptionWorker(parts, out, pending.turns).run() }
         val frames = parts.source.frames()
             .map<AudioFrame, FrameItem> { FrameItem.Frame(it) }
             .catch { emit(FrameItem.Failed(it)) }
@@ -145,7 +211,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         } finally {
             recorder.wipe()
             splitter.wipe()
-            turns.close()
+            pending.discard()
         }
     }
 
@@ -206,7 +272,7 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
 
     private suspend fun speechStarted(hop: Hop?) {
         record(hop)
-        memory.forget()
+        memory.speechStarted()
         observer.turnOpened()
         out.send(VoiceEarEvent.SpeechStarted)
     }
@@ -215,7 +281,8 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
         record(hop)
         val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
         observer.turnClosed(report, reason)
-        turns.send(CapturedTurn(memory.nextHandle(), recorder.finish(), report))
+        val turn = CapturedTurn(memory.nextHandle(), recorder.finish(), report, memory.speechGeneration)
+        if (!pending.offer(turn)) out.send(VoiceEarEvent.Failed(VoiceError(VoiceErrorCode.TRANSCRIPTION_FAILED, VoicePort.EAR)))
     }
 
     private suspend fun fail(code: VoiceErrorCode): Nothing {
@@ -272,8 +339,8 @@ private class TranscriptionWorker(
             job.turn.wipe()
             return out.send(VoiceEarEvent.Failed(failure))
         }
-        memory.retain(job.turn)
-        out.send(VoiceEarEvent.Failed(failure, retry = job.turn.handle))
+        val kept = memory.retain(job.turn)
+        out.send(VoiceEarEvent.Failed(failure, retry = job.turn.handle.takeIf { kept }))
     }
 
     /** The transcript as the turn's utterance, or an empty one (the loop listens on) when the policy drops it. */
