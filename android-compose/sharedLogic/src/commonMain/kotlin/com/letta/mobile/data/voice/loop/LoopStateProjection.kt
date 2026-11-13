@@ -16,6 +16,7 @@ internal object LoopStateProjection {
             inputLevel = view.inputLevel,
             outputLevel = view.outputLevel,
             microphoneOpen = view.micOpen,
+            userSpeaking = model.turn.userSpeaking,
             failure = view.failure,
             activationNotice = view.notice,
             activation = view.activation,

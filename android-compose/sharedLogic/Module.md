@@ -689,7 +689,7 @@ Releasing a transport's resources (a QUIC endpoint and its transport, a WebSocke
 
 # Package com.letta.mobile.data.voice
 
-Shared vocabulary of the hands-free voice loop: spoken text that never prints its words, audio levels, the utterance an ear produces (text, an optional immediate reply and an optional structured action decision), tagged errors with a suggested user action, the person's voice settings and the loop's phases and configuration. Destination consent for remote speech endpoints is a separate stored value, [VoiceEndpointGrants](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.consent/-voice-endpoint-grants/index.html), so a settings export never carries it. Nothing here is wired to a page or a platform yet.
+Shared vocabulary of the hands-free voice loop: spoken text that never prints its words, audio levels, the utterance an ear produces (text, an optional immediate reply and an optional structured action decision), tagged errors with a suggested user action, the person's voice settings and the loop's phases and configuration. Destination consent for remote speech endpoints is a separate stored value, [VoiceEndpointGrants](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.consent/-voice-endpoint-grants/index.html), so a settings export never carries it. The session package wires it to the chat page as voice mode.
 
 # Package com.letta.mobile.data.voice.activation
 
@@ -746,6 +746,10 @@ The responder for the conversation's agent, over its own port, [VoiceChatSession
 # Package com.letta.mobile.data.voice.responder.chat
 
 The app's chat session as a [VoiceChatSession](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.responder/-voice-chat-session/index.html). The chat page's rows become voice rows (the person's messages, the agent's plain text, errors; reasoning, tool calls, approvals and everything else are never spoken) under keys that stay put while text streams, while a pending message confirms and while a run id is promoted. Each send's otid and the runs it started come from an [IdentifiedChatSend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.sentruns/-identified-chat-send/index.html), and stopping is the page's own Stop. Building the adapter starts nothing; no host builds one yet.
+
+# Package com.letta.mobile.data.voice.session
+
+Voice mode for one chat page, assembled from the pieces below: [VoiceModeController](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-mode-controller/index.html) builds and owns one voice loop at a time over a platform's [VoiceAudio](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-audio/index.html), the stored endpoint setup and the chat session a host opens, and publishes a small [VoiceModeState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-mode-state/index.html) for the chat bar. A press checks the setup, then the microphone permission, then starts; the microphone and speaker are released on stop, on a conversation change and on shutdown. [VoiceSetupStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.voice.session/-voice-setup-store/index.html) keeps the endpoint address and the destination grants as separate values and the API key only in the host's secure store, validates addresses with the endpoint client's own rules and checks reachability without sending audio or text. Nothing here logs audio, transcripts, addresses or keys.
 
 # Package com.letta.mobile.data.voice.speech
 

@@ -29,6 +29,8 @@ data class VoiceLoopState(
     val outputLevel: AudioLevel = AudioLevel.Silent,
     /** Whether the microphone is open. */
     val microphoneOpen: Boolean = false,
+    /** The ear heard the person start a turn that has not ended yet (still speaking, or being transcribed). */
+    val userSpeaking: Boolean = false,
     /** Why the loop stopped, in [VoicePhase.FAILED]. */
     val failure: VoiceError? = null,
     /** A degraded optional helper (a missing wake-word asset); the loop still works. */
