@@ -48,7 +48,10 @@ sealed interface HostCanvasAccess {
  *   else that conversation's own canvas.
  * - Owner decision D5: the canvas the caller's own conversation is mounted on NOW may also be read and written by
  *   the caller, whatever its ACL says and even when only the relay holds it ([HostCanvasAccessRule],
- *   [RelayOnlyCanvases]). The grant is derived from the live mount at each check and never stored.
+ *   [RelayOnlyCanvases]). The grant is derived from the live mount at each check and never stored. A plugin's
+ *   placement resolves its board through [open] and [ownConversation] as the call it is attributed to, so it
+ *   inherits this grant too, background and late emits of that call included
+ *   (the plugin host's `CallerBoard`).
  */
 @OptIn(ExperimentalUuidApi::class)
 class HostCanvasBackend(

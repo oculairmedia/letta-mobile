@@ -203,7 +203,10 @@ written by that caller (the runtime-stamped agent of that conversation), even wh
 another agent and even when only the relay holds it (an app-made canvas, opened read-only, never
 created by the check). The grant is derived from the live mount at every check and no ACL is
 changed, so replacing or removing the mount revokes it on the next call. It covers only that
-canvas, only for that agent in that conversation; other conversations and agents gain nothing. A
+canvas, only for that agent in that conversation; other conversations and agents gain nothing,
+except that a plugin called by that agent in that conversation places as that call and so inherits
+the grant, including the call's late and background emits, while the mount stays (current
+behaviour, pending an owner decision). A
 mount that cannot be read, or a mounted canvas the host does not have, is a refusal, never another
 board.
 

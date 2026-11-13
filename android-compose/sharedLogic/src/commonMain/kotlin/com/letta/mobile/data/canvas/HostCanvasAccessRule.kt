@@ -11,7 +11,8 @@ import com.letta.mobile.data.model.ConversationId
  * runtime-stamped caller's own conversation is mounted on right now (its binding, else its agent's default) and
  * covers exactly that canvas. No canvas ACL is ever changed, so replacing or removing the mount revokes the access on
  * the very next check. A caller in no conversation, an unreadable mount, and every other canvas get nothing from it.
- * The ACL is consulted first, so a caller its ACL already admits never reads the mount store.
+ * The ACL is consulted first, so a caller its ACL already admits never reads the mount store. A plugin placing for a
+ * call is judged as that call's caller, so it gets the same grant while the mount lasts.
  */
 internal class HostCanvasAccessRule(private val mounts: HostCanvasMountLookup) {
     suspend fun mayRead(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean =
