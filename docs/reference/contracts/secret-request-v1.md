@@ -70,7 +70,10 @@ Each is a test target of `:sharedLogic:jvmTest` (`com.letta.mobile.data.secrets.
   root and every item is refused. A wider, shared root is configured explicitly by the host owner
   (`SecretItemScope.Shared`); there is no unrestricted scope, and `SecretRequestFeature.forHost`
   takes the scope as a required argument. A request outside the scope is `item_outside_scope`.
-- **N3** One agent may have at most 8 pending requests. A journal holds at most 512 records.
+- **N3** One agent may have at most 8 pending requests (`too_many_pending`) and may create at most
+  8 requests in any 15 minutes, a sliding window counted from the journal (`too_many_requests`;
+  declined, expired and failed requests count too). The journal keeps at most 16 settled requests
+  per agent, newest first. A journal holds at most 512 records.
 - **N4** A request expires 15 minutes after creation. The agent cannot choose the lifetime.
 
 ### Purpose
@@ -145,7 +148,7 @@ for `failed`.
 | `busy` | Another submission's write did not finish within the lock wait (default 2 s); nothing was decoded, claimed or written and the request stays pending | `submit` |
 
 Problems for `invalid_request`: `purpose_blank`, `purpose_too_long`, `purpose_not_plain_text`,
-`item_malformed`, `field_malformed`, `item_outside_scope`, `too_many_pending`.
+`item_malformed`, `field_malformed`, `item_outside_scope`, `too_many_pending`, `too_many_requests`.
 
 Failure reasons in a `failed` receipt, each a fixed code with no provider text:
 
@@ -302,9 +305,11 @@ item, field, purpose, path or value.
   UTF-8 JSON, has duplicate keys, has an unknown version, or holds records that break the rules
   (malformed ids or names, duplicate ids, inconsistent status, more than 512 records) is never
   reset or rewritten; every operation answers `journal_unavailable`.
-- **J5** *Bounds.* Terminal records are pruned 24 hours after they settle; pending and submitting
-  records are never pruned. An update that would exceed 512 records or 2 MiB is refused. A pruned
-  id answers like an unknown one.
+- **J5** *Bounds.* Terminal records are pruned 24 hours after they settle, and beyond the newest 16
+  per agent; pending and submitting records are never pruned. A new request that would push the
+  journal over 512 records or 2 MiB first makes room by pruning settled records created before
+  the 15-minute creation window, then, if that is not enough, every settled record; only then is
+  it refused (`journal_unavailable`). A pruned id answers like an unknown one.
 - **J6** Only a missing journal file reads as empty. Deleting it forgets every request, so its
   directory must be writable only by the host.
 

@@ -33,6 +33,13 @@ enum class SecretRequestProblem {
     /** The agent already has [SecretRequestLimits.MAX_PENDING_PER_AGENT] pending requests. */
     @SerialName("too_many_pending")
     TOO_MANY_PENDING,
+
+    /**
+     * The agent already created [SecretRequestLimits.MAX_CREATED_PER_WINDOW] requests within the
+     * last [SecretRequestLimits.CREATION_WINDOW_MS]; it may ask again once the oldest leaves the window.
+     */
+    @SerialName("too_many_requests")
+    TOO_MANY_REQUESTS,
 }
 
 /** The outcome of validating an agent's request. */

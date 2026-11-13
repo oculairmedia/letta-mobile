@@ -49,6 +49,10 @@ internal object SecretRequestTelemetry {
         Telemetry.event(TAG, "keystore.overran", "request" attr label(requestId), level = Telemetry.Level.WARN)
     }
 
+    fun journalPruned(room: String) {
+        Telemetry.event(TAG, "journal.pruned_for_space", "room" attr room, level = Telemetry.Level.WARN)
+    }
+
     fun journalUnavailable(problem: SecretJournalProblem) {
         Telemetry.event(TAG, "journal.unavailable", "problem" attr problem.name.lowercase(), level = Telemetry.Level.ERROR)
     }

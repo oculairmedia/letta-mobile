@@ -63,7 +63,7 @@ class SecretRequestService(
     provider: KeystoreProvider,
     private val settings: SecretRequestSettings = SecretRequestSettings(),
 ) {
-    private val ledger = SecretRequestLedger(journal, settings.clock)
+    private val ledger = SecretRequestLedger(journal, settings.clock, settings.policy)
     private val writer = SecretVaultWriter(provider)
     private val keystore = SecretKeystoreName(provider.describe().id.value)
     private val submissions = SecretSubmissions(ledger, writer, settings)
@@ -85,9 +85,10 @@ class SecretRequestService(
         val replacesExisting = bounded(settings.keystoreDeadline) { writer.holdsValue(targetOf(valid)) } ?: false
         val record = newRecord(agent, valid, replacesExisting)
         return journaled {
-            when (ledger.add(record, settings.policy.maxPendingPerAgent)) {
+            when (ledger.add(record)) {
                 AddOutcome.ADDED -> created(record)
-                AddOutcome.TOO_MANY_PENDING -> tooManyPending()
+                AddOutcome.TOO_MANY_PENDING -> refusedRequest(SecretRequestProblem.TOO_MANY_PENDING)
+                AddOutcome.TOO_MANY_REQUESTS -> refusedRequest(SecretRequestProblem.TOO_MANY_REQUESTS)
                 AddOutcome.DUPLICATE_ID -> SecretServiceResult.Refused(SecretServiceError.JOURNAL_UNAVAILABLE)
             }
         }
@@ -225,8 +226,7 @@ private fun created(record: SecretRequestRecord): SecretServiceResult<SecretRequ
     return SecretServiceResult.Ok(SecretRequestCreated(record.requestId, record.status.state, record.timing.expiresAtMs))
 }
 
-private fun tooManyPending(): SecretServiceResult<SecretRequestCreated> {
-    val problem = SecretRequestProblem.TOO_MANY_PENDING
+private fun refusedRequest(problem: SecretRequestProblem): SecretServiceResult<SecretRequestCreated> {
     SecretRequestTelemetry.requestRefused(problem)
     return SecretServiceResult.Refused(SecretServiceError.INVALID_REQUEST, problem)
 }

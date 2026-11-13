@@ -74,8 +74,9 @@ sealed interface SecretItemScope {
 
 /**
  * What the host allows agents to request: which items ([itemScope], per agent unless the host
- * owner chose otherwise), how long a request stays pending, and how many requests one agent may
- * have pending at once.
+ * owner chose otherwise), how long a request stays pending, how many requests one agent may have
+ * pending at once and create within a sliding window, and how many settled ones the journal keeps
+ * per agent. Together the last three bound what one agent can put in the journal.
  */
 data class SecretRequestPolicy(
     /** Which items agents may name. */
@@ -84,7 +85,20 @@ data class SecretRequestPolicy(
     val ttl: Duration = SecretRequestLimits.DEFAULT_TTL_MS.milliseconds,
     /** The most pending requests per agent. */
     val maxPendingPerAgent: Int = SecretRequestLimits.MAX_PENDING_PER_AGENT,
-)
+    /** The most requests one agent may create within [creationWindow]. */
+    val maxCreatedPerWindow: Int = SecretRequestLimits.MAX_CREATED_PER_WINDOW,
+    /** The sliding window of [maxCreatedPerWindow]. */
+    val creationWindow: Duration = SecretRequestLimits.CREATION_WINDOW_MS.milliseconds,
+    /**
+     * The most settled requests kept per agent; the oldest go first. At least [maxCreatedPerWindow],
+     * so the requests that count against the window are never pruned by this cap.
+     */
+    val maxSettledPerAgent: Int = SecretRequestLimits.MAX_SETTLED_PER_AGENT,
+) {
+    init {
+        require(maxSettledPerAgent >= maxCreatedPerWindow) { "maxSettledPerAgent must be at least maxCreatedPerWindow" }
+    }
+}
 
 /** Where request ids get their randomness; it must be cryptographically secure. */
 fun interface SecretRandomSource {
