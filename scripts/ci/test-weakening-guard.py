@@ -69,25 +69,46 @@ def clean_kotlin_token(match):
     return ('UNUSED' + ' ' * (len(token) - 6)) if token == '"unused"' else re.sub(r"[^\n]", " ", token)
 
 
+OPENERS = {"(": ")", "[": "]", "<": ">"}
+CONTINUES_AFTER = (":", ",", "(")
+CONTINUES_BEFORE = (":", ",", "(", "{", "where ")
+
+
+def header_continues(text, start, pos):
+    """A newline inside a class header continues it only next to a supertype, parameter or where clause."""
+    previous = text[start:pos].rstrip()
+    following = text[pos + 1:].lstrip()
+    return previous.endswith(CONTINUES_AFTER) or following.startswith(CONTINUES_BEFORE)
+
+
+def header_end(text, start, pos, char):
+    """At bracket depth zero: the body's offset, a negative number for a body-less header, or None to keep scanning."""
+    if char == "{":
+        return pos
+    if char in "};=":
+        return -1
+    if char == "\n" and not header_continues(text, start, pos):
+        return -1
+    return None
+
+
 def class_body_start(text, start):
-    depth = 0
+    """Offset of the `{` that opens the class declared just before [start], or None for a body-less declaration.
+
+    Brackets are matched by kind, so the `>` of a function type arrow (`() -> Unit`) never closes an open `(`.
+    """
+    closers = []
     pos = start
     while pos < len(text):
         char = text[pos]
-        if char in "([<":
-            depth += 1
-        elif char in ")]>":
-            depth = max(0, depth - 1)
-        elif depth == 0:
-            if char == "{":
-                return pos
-            if char in "};=":
-                return None
-            if char == "\n":
-                previous = text[start:pos].rstrip()
-                following = text[pos + 1:].lstrip()
-                if not (previous.endswith((":", ",", "(")) or following.startswith((":", ",", "(", "{", "where "))):
-                    return None
+        if char in OPENERS:
+            closers.append(OPENERS[char])
+        elif closers and char == closers[-1]:
+            closers.pop()
+        elif not closers:
+            end = header_end(text, start, pos, char)
+            if end is not None:
+                return end if end >= 0 else None
         pos += 1
     return None
 
