@@ -28,6 +28,8 @@ import com.letta.mobile.data.projects.ProjectsPageController
 import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaInlineError
+import com.letta.mobile.ui.components.LettaInlineErrorTags
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
@@ -51,7 +53,8 @@ object ProjectsPageTags {
     const val CREATE = "projects-page-create"
     const val NOTICE = "projects-page-notice"
     const val ERROR = "projects-page-error"
-    const val RETRY = "projects-page-retry"
+    /** The load error's Retry: the shared [LettaInlineError]'s own. */
+    const val RETRY = LettaInlineErrorTags.RETRY
     const val DETAIL = "projects-page-detail"
     const val EDITOR = "projects-page-editor"
     const val UNAVAILABLE = "projects-page-unavailable"
@@ -215,9 +218,8 @@ private fun emptyHint(state: ProjectsPageState): String =
 
 @Composable
 private fun ProjectsLoadError(message: String, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg).testTag(ProjectsPageTags.ERROR)) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        TextButton(onClick = onRetry, modifier = Modifier.testTag(ProjectsPageTags.RETRY)) { Text(RETRY) }
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg)) {
+        LettaInlineError(message, Modifier.testTag(ProjectsPageTags.ERROR), title = null, onRetry = onRetry)
     }
 }
 
@@ -250,7 +252,6 @@ internal const val PIN = "Pin to top"
 internal const val UNPIN = "Unpin from top"
 private const val SEARCH_PLACEHOLDER = "Search projects"
 private const val NEW_PROJECT = "New project"
-private const val RETRY = "Retry"
 private const val DISMISS = "Dismiss"
 internal const val UNAVAILABLE_TITLE = "Projects need an Iroh host"
 private const val UNAVAILABLE_BODY = "Projects come from a VibeSync host relayed over Iroh. This backend has none: connect to an Iroh host to see its projects."
