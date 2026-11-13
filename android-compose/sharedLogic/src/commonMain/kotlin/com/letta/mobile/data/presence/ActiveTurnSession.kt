@@ -192,6 +192,8 @@ class ActiveTurnSession(
             identity?.takeUnless { captured.phase == ActiveTurnPhase.Idle }?.let { serverRuns.value[conversation to it] }
         }?.let(::RunId)
         if (captured.phase != ActiveTurnPhase.Idle && server == null) return
+        // The run store behind run.get never holds an App Server run: its turn events are the only authority.
+        if (server?.isAppServerRunId() == true) return
         // A read that fails (the host no longer has the run, or cannot be reached) is not evidence of
         // a terminal, and it must not reach the caller: a presentation reconciles as it is recreated.
         val runs = runCatching { read(conversation, agent, server) }.getOrElse { failure ->
