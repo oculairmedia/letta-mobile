@@ -20,7 +20,7 @@ interface CanvasRelayStore {
 
     /**
      * Whether [canvas] is already bound under its own canvas topic or, with [via], under that
-     * conversation's topic ([relayTopicOf]). Read-only: unlike [bind] it never creates a binding,
+     * conversation's topic ([CanvasRelayProtocol.bindingTopic]). Read-only: unlike [bind] it never creates a binding,
      * so a lookup cannot bring a canvas into existence.
      */
     suspend fun isBound(canvas: CanvasId, via: ConversationId? = null): Boolean
@@ -42,10 +42,6 @@ interface CanvasRelayStore {
     }
 }
 
-/** The topic [canvas] is bound under: [via]'s conversation topic, else the canvas's own topic. */
-fun relayTopicOf(canvas: CanvasId, via: ConversationId?): String =
-    via?.let(CanvasRelayProtocol::conversationTopic) ?: CanvasRelayProtocol.canvasTopic(canvas)
-
 data class CanvasRelayAppend(val cursor: Long, val duplicate: Boolean)
 
 /** One op in a topic's log: [cursor] counts from 1, [origin] is who the host received it from. */
@@ -63,7 +59,7 @@ class InMemoryCanvasRelayStore : CanvasRelayStore {
     }
 
     override suspend fun isBound(canvas: CanvasId, via: ConversationId?): Boolean =
-        mutex.withLock { bindings[relayTopicOf(canvas, via)] == canvas }
+        mutex.withLock { bindings[CanvasRelayProtocol.bindingTopic(canvas, via)] == canvas }
 
     override suspend fun append(topic: String, op: CanvasOp, origin: String): CanvasRelayAppend = mutex.withLock {
         val seen = cursorsByOp.getOrPut(topic) { mutableMapOf() }

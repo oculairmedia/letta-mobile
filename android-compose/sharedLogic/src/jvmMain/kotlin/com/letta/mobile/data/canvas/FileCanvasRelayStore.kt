@@ -50,7 +50,7 @@ class FileCanvasRelayStore(private val root: Path) : CanvasRelayStore {
     }
 
     override suspend fun isBound(canvas: CanvasId, via: ConversationId?): Boolean = io {
-        val file = dirOf(relayTopicOf(canvas, via)).resolve(BINDING)
+        val file = dirOf(CanvasRelayProtocol.bindingTopic(canvas, via)).resolve(BINDING)
         Files.isRegularFile(file) && Files.readString(file).trim() == canvas.value
     }
 
