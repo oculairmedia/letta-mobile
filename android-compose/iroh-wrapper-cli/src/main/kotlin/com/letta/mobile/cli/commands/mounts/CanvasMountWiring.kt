@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands.mounts
 
 import com.letta.mobile.data.canvas.CanvasRelayStore
+import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.HostCanvasDirectory
 import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
@@ -35,7 +36,7 @@ internal class CanvasMountWiring private constructor(
     private val scope: CoroutineScope,
 ) {
     /** What the host canvas tools read to find the canvas a call naming none acts on. */
-    val toolLookup: HostCanvasMountLookup = CanvasMountToolLookup(location, scope)
+    val toolLookup: HostCanvasMountLookup<HostCanvasCaller> = CanvasMountToolLookup(location, scope)
 
     /**
      * The six canvas mount routes for [policy] (they register nothing under the anonymous test policy); null without an App

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
+import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.CanvasMountAuthority
 import com.letta.mobile.data.canvas.mount.CanvasMountDecision
@@ -29,13 +30,13 @@ import kotlinx.coroutines.CoroutineScope
 class CanvasMountToolLookup internal constructor(
     private val mounts: (CanvasMountAuthority) -> AuthorizedCanvasMounts,
     private val deadline: CanvasMountDeadline,
-) : HostCanvasMountLookup {
+) : HostCanvasMountLookup<HostCanvasCaller> {
     /** Production lookup over the host's mount records at [location]; calls run, bounded, in the host-owned [scope]. */
     constructor(location: CanvasMountStoreLocation, scope: CoroutineScope) : this(location::mounts, CanvasMountDeadline.production(scope))
 
-    override suspend fun mounted(agentId: String, conversationId: String): HostCanvasMount {
-        val agent = AgentId(agentId)
-        val conversation = ConversationId(conversationId)
+    override suspend fun mounted(caller: HostCanvasCaller): HostCanvasMount {
+        val conversation = caller.conversationId?.let(::ConversationId) ?: return HostCanvasMount.None
+        val agent = AgentId(caller.agentId)
         val facade = mounts(RuntimeToolAuthority(agent, conversation))
         return when (val timed = deadline.run { resolve(facade, agent, conversation) }) {
             is CanvasMountTimed.Settled -> timed.value.asMount()

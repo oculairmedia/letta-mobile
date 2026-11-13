@@ -14,20 +14,20 @@ import com.letta.mobile.data.model.ConversationId
 // plugin placing for a call is judged as that call's caller, so it gets the same grant while the mount lasts.
 
 /** Whether [caller] may read [entry]: its ACL, or the live mount of the caller's own conversation. */
-internal suspend fun HostCanvasMountLookup.mayRead(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean =
+internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mayRead(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean =
     entry.acl.canRead(caller.agentId) || mountedHere(caller, entry.id)
 
 /** Whether [caller] may write [entry]: its ACL, or the live mount of the caller's own conversation. */
-internal suspend fun HostCanvasMountLookup.mayWrite(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean =
+internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mayWrite(caller: HostCanvasCaller, entry: HostCanvasEntry): Boolean =
     entry.acl.canWrite(caller.agentId) || mountedHere(caller, entry.id)
 
 /** True only when [caller]'s own conversation is mounted on [canvas] now. */
-internal suspend fun HostCanvasMountLookup.mountedHere(caller: HostCanvasCaller, canvas: CanvasId): Boolean =
+internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mountedHere(caller: HostCanvasCaller, canvas: CanvasId): Boolean =
     (mountOf(caller) as? HostCanvasMount.Mounted)?.canvas == canvas
 
 /** The mount of [caller]'s own conversation; a caller in no conversation has none. */
-internal suspend fun HostCanvasMountLookup.mountOf(caller: HostCanvasCaller): HostCanvasMount =
-    caller.conversationId?.let { mounted(caller.agentId, it) } ?: HostCanvasMount.None
+internal suspend fun HostCanvasMountLookup<HostCanvasCaller>.mountOf(caller: HostCanvasCaller): HostCanvasMount =
+    if (caller.conversationId == null) HostCanvasMount.None else mounted(caller)
 
 /** The mounted canvas, typed. */
 internal val HostCanvasMount.Mounted.canvas: CanvasId get() = CanvasId(canvasId)

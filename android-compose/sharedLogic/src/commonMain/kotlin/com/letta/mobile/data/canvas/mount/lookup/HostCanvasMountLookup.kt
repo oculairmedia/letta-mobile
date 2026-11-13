@@ -1,7 +1,7 @@
 package com.letta.mobile.data.canvas.mount.lookup
 
-// Plain string ids on purpose: this package sits between the canvas package and the mount store, and importing the
-// shared id types here would join an existing package cycle.
+// This package imports nothing: it sits between the canvas package and the mount store, and importing either the
+// canvas types or the shared id types here would join an existing package cycle. The caller type is a parameter.
 
 /** What the host-owned canvas mount of a caller's own conversation says, for a tool call that names no canvas. */
 sealed interface HostCanvasMount {
@@ -16,16 +16,16 @@ sealed interface HostCanvasMount {
 }
 
 /**
- * Reads, and can never change, the canvas mounted for the agent and conversation the runtime stamped on a call;
- * nothing in a tool's input reaches it. Agents cannot mount canvases (owner decision O4).
+ * Reads, and can never change, the canvas mounted for the agent and conversation the runtime stamped on a call
+ * ([C], the host canvas caller); nothing in a tool's input reaches it. Agents cannot mount canvases (owner decision O4).
  */
-fun interface HostCanvasMountLookup {
-    /** The mount of the conversation [conversationId] of the agent [agentId]. */
-    suspend fun mounted(agentId: String, conversationId: String): HostCanvasMount
+fun interface HostCanvasMountLookup<in C> {
+    /** The mount of [caller]'s own conversation; none for a caller in no conversation. */
+    suspend fun mounted(caller: C): HostCanvasMount
 
     /** Lookups that need no host mount store. */
     companion object {
         /** Hosts without canvas mounts: every conversation shows its own canvas. */
-        val None: HostCanvasMountLookup = HostCanvasMountLookup { _, _ -> HostCanvasMount.None }
+        fun <C> none(): HostCanvasMountLookup<C> = HostCanvasMountLookup { HostCanvasMount.None }
     }
 }

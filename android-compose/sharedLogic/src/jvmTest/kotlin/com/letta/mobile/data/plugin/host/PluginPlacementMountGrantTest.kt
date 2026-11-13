@@ -37,8 +37,8 @@ class PluginPlacementMountGrantTest {
         store,
         directory,
         kinds = catalog,
-        mounts = HostCanvasMountLookup { _, conversation ->
-            mounted?.takeIf { conversation == CONVERSATION_A }?.let { HostCanvasMount.Mounted(it.value) } ?: HostCanvasMount.None
+        mounts = HostCanvasMountLookup<HostCanvasCaller> { caller ->
+            mounted?.takeIf { caller.conversationId == CONVERSATION_A }?.let { HostCanvasMount.Mounted(it.value) } ?: HostCanvasMount.None
         },
     )
     private val board = CallerBoard(backend)

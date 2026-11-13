@@ -62,7 +62,7 @@ class HostCanvasBackend(
     private val newOpId: () -> CanvasOpId = { CanvasOpId("agent-op-${Uuid.random()}") },
     private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
     private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
-    private val mounts: HostCanvasMountLookup = HostCanvasMountLookup.None,
+    private val mounts: HostCanvasMountLookup<HostCanvasCaller> = HostCanvasMountLookup.none(),
 ) {
     /**
      * The canvas [canvasId] for [caller]: known to the directory, its own conversation's, or a canvas only the relay
