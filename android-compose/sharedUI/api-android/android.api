@@ -10520,10 +10520,11 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellDocumentModuleKt;
 	public fun <init> ()V
 	public final fun getLambda$-1176053500$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-1919427139$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1214912758$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1958376124$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-649303998$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-832080371$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-994009631$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1244612492$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1920503931$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$370358104$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
