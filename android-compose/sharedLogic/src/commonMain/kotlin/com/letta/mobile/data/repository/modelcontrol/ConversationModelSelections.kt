@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
  *  - the host: a listed or fetched [Conversation] carries `model` / `model_settings` /
  *    `context_window_limit` ([seedFromHost]), so an override made anywhere (CLI, desktop, another
  *    phone) shows after a cold start;
- *  - this session: a switch made here ([record]) wins until the host reports the same model, which
- *    confirms it, so a list fetched before the switch landed cannot undo it.
+ *  - this session: a switch made here ([record]) survives the pre-switch host model. A report of
+ *    the picked model confirms it; a different model supersedes it as a switch made elsewhere.
  *
  * Pickers and composer labels render [effectiveModel] / [resolve]: the conversation's model, else
  * the agent's.
@@ -45,7 +45,7 @@ class ConversationModelSelections {
     /**
      * Takes the host's word for each of [conversations]: its model override (none means it runs its
      * agent's model) and the window and effort the host records for it. A pick made this session
-     * stays in force until the host reports that same model.
+     * survives the pre-switch model until confirmed, but yields to a different host model.
      */
     fun seedFromHost(conversations: Iterable<Conversation>) = ledger.report(conversations)
 
