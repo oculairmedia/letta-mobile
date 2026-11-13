@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -131,7 +130,7 @@ class SkillsPageTest {
         onNodeWithText("Couldn't remove notion: not a symlink").assertIsDisplayed()
         onNodeWithTag(SkillsPageTags.skill("notion")).assertExists()
         onNodeWithTag("skills-error").assertDoesNotExist()
-        onNodeWithContentDescription("Dismiss").performClick()
+        onNodeWithText("Dismiss").performClick()
         assertTrue(dismissed)
     }
 
