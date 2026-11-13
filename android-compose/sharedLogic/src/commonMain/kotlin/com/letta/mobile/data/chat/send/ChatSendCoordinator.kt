@@ -118,7 +118,7 @@ class ChatSendCoordinator(
     )
 
     private val identified = IdentifiedPipelineSend(
-        scope, turnStateMutex, otidGenerator,
+        scope, turnStateMutex, otidGenerator, { Telemetry.error("AdminChatVM", "identifiedSend.failedAfterAccept", it) },
         target = { activeConversationId().also { eventSubscription.claimForSend() } },
     ) { text, target -> sendInternalLocked(text, emptyList(), target) }
 

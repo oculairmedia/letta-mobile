@@ -1,6 +1,5 @@
 package com.letta.mobile.data.chat.sentruns
 
-import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -21,13 +20,14 @@ import kotlinx.coroutines.withContext
  * Once started, a send is not withdrawn by its caller's cancellation: the enqueue runs to its end
  * and the caller still receives the otid it was enqueued under, so a message that went out always
  * has an identity its sender can follow or stop. Likewise when the pipeline's work after accepting
- * the send fails (a timeline write, say): the failure is reported and the caller still receives
- * the otid. A failure before the send was accepted reaches the caller, with no otid.
+ * the send fails (a timeline write, say): the failure goes to [failedAfterAccept] and the caller
+ * still receives the otid. A failure before the send was accepted reaches the caller, with no otid.
  */
 internal class IdentifiedPipelineSend(
     private val scope: CoroutineScope,
     private val lock: Mutex,
     private val generateOtid: () -> String,
+    private val failedAfterAccept: (Throwable) -> Unit,
     private val target: () -> String?,
     private val sendLocked: suspend (text: String, target: String?) -> Unit,
 ) {
@@ -57,11 +57,11 @@ internal class IdentifiedPipelineSend(
 
     /**
      * The send threw [failure]: the otid taken, when [ledger] shows the pipeline had already
-     * accepted that send (the failure is reported); otherwise [failure] is rethrown.
+     * accepted that send (the failure goes to [failedAfterAccept]); otherwise [failure] is rethrown.
      */
     private fun acceptedDespite(failure: Throwable, ledger: SentRunLedger): SentMessageId {
         val sent = taken?.let(::SentMessageId)?.takeIf(ledger::wasSent) ?: throw failure
-        Telemetry.error("IdentifiedSend", "send.failedAfterAccept", failure)
+        failedAfterAccept(failure)
         return sent
     }
 }
