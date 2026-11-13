@@ -16,6 +16,7 @@ object IrohPeerCapabilities {
     const val NOTEBOOK_AUTHENTICATED = "notebook.authenticated"
     private val NOTEBOOK_METHODS = setOf(
         "notebook.reference.resolve", "notebook.note.open", "notebook.note.save", "notebook.note.flush",
+        "notebook.shared.list",
     )
     const val CHAT_READ = "chat.read"
     const val CHAT_SEND = "chat.send"

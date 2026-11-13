@@ -4584,6 +4584,10 @@ abstract fun interface com.letta.mobile.data.canvas.workspace/DocumentWorkspaceO
     abstract suspend fun open(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener.open|open(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.canvas.workspace/SharedNoteDirectory { // com.letta.mobile.data.canvas.workspace/SharedNoteDirectory|null[0]
+    abstract suspend fun list(com.letta.mobile.data.canvas.workspace/SharedNotesCursor?): com.letta.mobile.data.canvas.workspace/SharedNoteListing // com.letta.mobile.data.canvas.workspace/SharedNoteDirectory.list|list(com.letta.mobile.data.canvas.workspace.SharedNotesCursor?){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.canvas/CanvasClosedBoardApplier { // com.letta.mobile.data.canvas/CanvasClosedBoardApplier|null[0]
     abstract suspend fun apply(com.letta.mobile.data.model/CanvasId, com.letta.mobile.data.canvas/CanvasOp, kotlin/String?): kotlin/Boolean // com.letta.mobile.data.canvas/CanvasClosedBoardApplier.apply|apply(com.letta.mobile.data.model.CanvasId;com.letta.mobile.data.canvas.CanvasOp;kotlin.String?){}[0]
     open suspend fun known(): kotlin.collections/List<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.canvas/CanvasClosedBoardApplier.known|known(){}[0]
@@ -4694,7 +4698,7 @@ abstract fun interface com.letta.mobile.data.pairing/PairingRedeemer { // com.le
 }
 
 abstract fun interface com.letta.mobile.data.pairing/QrEncoder { // com.letta.mobile.data.pairing/QrEncoder|null[0]
-    abstract fun encode(kotlin/String): com.letta.mobile.data.pairing/QrModules // com.letta.mobile.data.pairing/QrEncoder.encode|encode(kotlin.String){}[0]
+    abstract fun encode(kotlin/String): com.letta.mobile.data.pairing/QrModules? // com.letta.mobile.data.pairing/QrEncoder.encode|encode(kotlin.String){}[0]
 }
 
 abstract fun interface com.letta.mobile.data.plugin.view/PluginViewConsent { // com.letta.mobile.data.plugin.view/PluginViewConsent|null[0]
@@ -5037,6 +5041,8 @@ abstract interface com.letta.mobile.data.beads/BeadsBackend { // com.letta.mobil
 
 abstract interface com.letta.mobile.data.canvas.authority/NotebookGrantStore { // com.letta.mobile.data.canvas.authority/NotebookGrantStore|null[0]
     abstract suspend fun <#A1: kotlin/Any?> withGrant(kotlin/String, com.letta.mobile.data.canvas/NotebookDocumentId, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.canvas/NotebookPeerGrant?, #A1>): #A1 // com.letta.mobile.data.canvas.authority/NotebookGrantStore.withGrant|withGrant(kotlin.String;com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.canvas.NotebookPeerGrant?,0:0>){0§<kotlin.Any?>}[0]
+    abstract suspend fun <#A1: kotlin/Any?> withGrants(kotlin/String, kotlin.collections/Collection<com.letta.mobile.data.canvas/NotebookDocumentId>, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas/NotebookPeerGrant>, #A1>): #A1 // com.letta.mobile.data.canvas.authority/NotebookGrantStore.withGrants|withGrants(kotlin.String;kotlin.collections.Collection<com.letta.mobile.data.canvas.NotebookDocumentId>;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<com.letta.mobile.data.canvas.NotebookDocumentId,com.letta.mobile.data.canvas.NotebookPeerGrant>,0:0>){0§<kotlin.Any?>}[0]
+    abstract suspend fun documentsOf(kotlin/String): kotlin.collections/List<com.letta.mobile.data.canvas/NotebookDocumentId> // com.letta.mobile.data.canvas.authority/NotebookGrantStore.documentsOf|documentsOf(kotlin.String){}[0]
 }
 
 abstract interface com.letta.mobile.data.canvas.library/CanvasPage { // com.letta.mobile.data.canvas.library/CanvasPage|null[0]
@@ -5053,6 +5059,13 @@ abstract interface com.letta.mobile.data.canvas.notes/NotebookNoteBackend { // c
     abstract suspend fun flush(com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot): com.letta.mobile.data.canvas.notes/NotebookNoteSave // com.letta.mobile.data.canvas.notes/NotebookNoteBackend.flush|flush(com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot){}[0]
     abstract suspend fun load(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.canvas.notes/NotebookNoteLoad // com.letta.mobile.data.canvas.notes/NotebookNoteBackend.load|load(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
     abstract suspend fun save(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/String, kotlin/String): com.letta.mobile.data.canvas.notes/NotebookNoteSave // com.letta.mobile.data.canvas.notes/NotebookNoteBackend.save|save(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.String;kotlin.String){}[0]
+}
+
+abstract interface com.letta.mobile.data.canvas.workspace/SharedNotebooks { // com.letta.mobile.data.canvas.workspace/SharedNotebooks|null[0]
+    abstract val directory // com.letta.mobile.data.canvas.workspace/SharedNotebooks.directory|{}directory[0]
+        abstract fun <get-directory>(): com.letta.mobile.data.canvas.workspace/SharedNoteDirectory // com.letta.mobile.data.canvas.workspace/SharedNotebooks.directory.<get-directory>|<get-directory>(){}[0]
+    abstract val opener // com.letta.mobile.data.canvas.workspace/SharedNotebooks.opener|{}opener[0]
+        abstract fun <get-opener>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener // com.letta.mobile.data.canvas.workspace/SharedNotebooks.opener.<get-opener>|<get-opener>(){}[0]
 }
 
 abstract interface com.letta.mobile.data.canvas/CanvasArchiveStore { // com.letta.mobile.data.canvas/CanvasArchiveStore|null[0]
@@ -8342,6 +8355,48 @@ sealed interface com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen { 
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing|null[0]
+    final class Listed : com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed|null[0]
+        constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote>, com.letta.mobile.data.canvas.workspace/SharedNotesCursor? = ...) // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.workspace.SharedNote>;com.letta.mobile.data.canvas.workspace.SharedNotesCursor?){}[0]
+
+        final val next // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.next|{}next[0]
+            final fun <get-next>(): com.letta.mobile.data.canvas.workspace/SharedNotesCursor? // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.next.<get-next>|<get-next>(){}[0]
+        final val notes // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.notes|{}notes[0]
+            final fun <get-notes>(): kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.notes.<get-notes>|<get-notes>(){}[0]
+
+        final fun component1(): kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.component1|component1(){}[0]
+        final fun component2(): com.letta.mobile.data.canvas.workspace/SharedNotesCursor? // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.component2|component2(){}[0]
+        final fun copy(kotlin.collections/List<com.letta.mobile.data.canvas.workspace/SharedNote> = ..., com.letta.mobile.data.canvas.workspace/SharedNotesCursor? = ...): com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.copy|copy(kotlin.collections.List<com.letta.mobile.data.canvas.workspace.SharedNote>;com.letta.mobile.data.canvas.workspace.SharedNotesCursor?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Listed.toString|toString(){}[0]
+    }
+
+    final class Unavailable : com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.toString|toString(){}[0]
+
+        final object Companion { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion|null[0]
+            final const val INVALID_CURSOR // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.INVALID_CURSOR|{}INVALID_CURSOR[0]
+                final fun <get-INVALID_CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.INVALID_CURSOR.<get-INVALID_CURSOR>|<get-INVALID_CURSOR>(){}[0]
+        }
+    }
+
+    final object Denied : com.letta.mobile.data.canvas.workspace/SharedNoteListing { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Denied|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Denied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Denied.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Denied.toString|toString(){}[0]
     }
 }
 
@@ -30317,11 +30372,13 @@ final class com.letta.mobile.data.beads/KtorBeadsBackend : com.letta.mobile.data
     }
 }
 
-final class com.letta.mobile.data.canvas.authority/RemoteNotebookAccess { // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess|null[0]
+final class com.letta.mobile.data.canvas.authority/RemoteNotebookAccess : com.letta.mobile.data.canvas.workspace/SharedNotebooks { // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess|null[0]
     constructor <init>(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker) // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker){}[0]
 
     final val backend // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.backend|{}backend[0]
         final fun <get-backend>(): com.letta.mobile.data.canvas.notes/NotebookNoteBackend // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.backend.<get-backend>|<get-backend>(){}[0]
+    final val directory // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.directory|{}directory[0]
+        final fun <get-directory>(): com.letta.mobile.data.canvas.workspace/SharedNoteDirectory // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.directory.<get-directory>|<get-directory>(){}[0]
     final val opener // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.opener|{}opener[0]
         final fun <get-opener>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.opener.<get-opener>|<get-opener>(){}[0]
     final val resolver // com.letta.mobile.data.canvas.authority/RemoteNotebookAccess.resolver|{}resolver[0]
@@ -31453,6 +31510,66 @@ final class com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState { // c
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.workspace/SharedNote { // com.letta.mobile.data.canvas.workspace/SharedNote|null[0]
+    constructor <init>(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/String) // com.letta.mobile.data.canvas.workspace/SharedNote.<init>|<init>(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.String){}[0]
+
+    final val id // com.letta.mobile.data.canvas.workspace/SharedNote.id|{}id[0]
+        final fun <get-id>(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas.workspace/SharedNote.id.<get-id>|<get-id>(){}[0]
+    final val title // com.letta.mobile.data.canvas.workspace/SharedNote.title|{}title[0]
+        final fun <get-title>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNote.title.<get-title>|<get-title>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas.workspace/SharedNote.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNote.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.canvas/NotebookDocumentId = ..., kotlin/String = ...): com.letta.mobile.data.canvas.workspace/SharedNote // com.letta.mobile.data.canvas.workspace/SharedNote.copy|copy(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNote.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNote.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNote.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.workspace/SharedNoteBrowser { // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.workspace/SharedNotebooks) // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.<init>|<init>(com.letta.mobile.data.canvas.workspace.SharedNotebooks){}[0]
+
+    final val state // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState> // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.state.<get-state>|<get-state>(){}[0]
+
+    final suspend fun closeNote(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.closeNote|closeNote(){}[0]
+    final suspend fun loadMore(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.loadMore|loadMore(){}[0]
+    final suspend fun open(com.letta.mobile.data.canvas/NotebookDocumentId): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.open|open(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
+    final suspend fun refresh() // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.refresh|refresh(){}[0]
+    final suspend fun workspaceEmptied() // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.workspaceEmptied|workspaceEmptied(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState { // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.workspace/SharedNoteListing? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas/NotebookDocumentId? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ...) // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.<init>|<init>(com.letta.mobile.data.canvas.workspace.SharedNoteListing?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.NotebookDocumentId?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?){}[0]
+
+    final val listing // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.listing|{}listing[0]
+        final fun <get-listing>(): com.letta.mobile.data.canvas.workspace/SharedNoteListing? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.listing.<get-listing>|<get-listing>(){}[0]
+    final val loading // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.loading|{}loading[0]
+        final fun <get-loading>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.loading.<get-loading>|<get-loading>(){}[0]
+    final val loadingMore // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.loadingMore|{}loadingMore[0]
+        final fun <get-loadingMore>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.loadingMore.<get-loadingMore>|<get-loadingMore>(){}[0]
+    final val moreFailed // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.moreFailed|{}moreFailed[0]
+        final fun <get-moreFailed>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.moreFailed.<get-moreFailed>|<get-moreFailed>(){}[0]
+    final val openProblem // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.openProblem|{}openProblem[0]
+        final fun <get-openProblem>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.openProblem.<get-openProblem>|<get-openProblem>(){}[0]
+    final val opening // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.opening|{}opening[0]
+        final fun <get-opening>(): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.opening.<get-opening>|<get-opening>(){}[0]
+    final val workspace // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.workspace|{}workspace[0]
+        final fun <get-workspace>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.workspace.<get-workspace>|<get-workspace>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas.workspace/SharedNoteListing? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component6|component6(){}[0]
+    final fun component7(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component7|component7(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.workspace/SharedNoteListing? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas/NotebookDocumentId? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ...): com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.copy|copy(com.letta.mobile.data.canvas.workspace.SharedNoteListing?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.NotebookDocumentId?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.canvas/CanvasApplyOpsArgs { // com.letta.mobile.data.canvas/CanvasApplyOpsArgs|null[0]
@@ -71954,6 +72071,17 @@ final value class com.letta.mobile.data.beads/BeadsIssueId { // com.letta.mobile
     final fun toString(): kotlin/String // com.letta.mobile.data.beads/BeadsIssueId.toString|toString(){}[0]
 }
 
+final value class com.letta.mobile.data.canvas.workspace/SharedNotesCursor { // com.letta.mobile.data.canvas.workspace/SharedNotesCursor|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.canvas.workspace/SharedNotesCursor.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.canvas.workspace/SharedNotesCursor.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNotesCursor.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNotesCursor.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNotesCursor.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNotesCursor.toString|toString(){}[0]
+}
+
 final value class com.letta.mobile.data.canvas/CanvasConversationTarget { // com.letta.mobile.data.canvas/CanvasConversationTarget|null[0]
     constructor <init>(kotlin/String = ...) // com.letta.mobile.data.canvas/CanvasConversationTarget.<init>|<init>(kotlin.String){}[0]
 
@@ -74842,6 +74970,28 @@ final object com.letta.mobile.data.canvas.authority/NotebookAccessWire { // com.
     final fun request(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/Function1<kotlinx.serialization.json/JsonObjectBuilder, kotlin/Unit> = ...): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.request|request(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.Function1<kotlinx.serialization.json.JsonObjectBuilder,kotlin.Unit>){}[0]
     final fun save(com.letta.mobile.data.canvas.notes/NotebookNoteSave): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.save|save(com.letta.mobile.data.canvas.notes.NotebookNoteSave){}[0]
     final fun snapshot(com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/NotebookAccessWire.snapshot|snapshot(com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot){}[0]
+}
+
+final object com.letta.mobile.data.canvas.authority/SharedNotesWire { // com.letta.mobile.data.canvas.authority/SharedNotesWire|null[0]
+    final const val CURSOR // com.letta.mobile.data.canvas.authority/SharedNotesWire.CURSOR|{}CURSOR[0]
+        final fun <get-CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.CURSOR.<get-CURSOR>|<get-CURSOR>(){}[0]
+    final const val INVALID_CURSOR // com.letta.mobile.data.canvas.authority/SharedNotesWire.INVALID_CURSOR|{}INVALID_CURSOR[0]
+        final fun <get-INVALID_CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.INVALID_CURSOR.<get-INVALID_CURSOR>|<get-INVALID_CURSOR>(){}[0]
+    final const val LIST // com.letta.mobile.data.canvas.authority/SharedNotesWire.LIST|{}LIST[0]
+        final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.LIST.<get-LIST>|<get-LIST>(){}[0]
+    final const val MAX_CHECKED // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CHECKED|{}MAX_CHECKED[0]
+        final fun <get-MAX_CHECKED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CHECKED.<get-MAX_CHECKED>|<get-MAX_CHECKED>(){}[0]
+    final const val MAX_CURSOR_CHARS // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CURSOR_CHARS|{}MAX_CURSOR_CHARS[0]
+        final fun <get-MAX_CURSOR_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CURSOR_CHARS.<get-MAX_CURSOR_CHARS>|<get-MAX_CURSOR_CHARS>(){}[0]
+    final const val MAX_LISTED // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED|{}MAX_LISTED[0]
+        final fun <get-MAX_LISTED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED.<get-MAX_LISTED>|<get-MAX_LISTED>(){}[0]
+    final const val NEXT_CURSOR // com.letta.mobile.data.canvas.authority/SharedNotesWire.NEXT_CURSOR|{}NEXT_CURSOR[0]
+        final fun <get-NEXT_CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.NEXT_CURSOR.<get-NEXT_CURSOR>|<get-NEXT_CURSOR>(){}[0]
+
+    final fun cursorOf(kotlin/String): com.letta.mobile.data.canvas.workspace/SharedNotesCursor? // com.letta.mobile.data.canvas.authority/SharedNotesWire.cursorOf|cursorOf(kotlin.String){}[0]
+    final fun readSharedNotes(kotlinx.serialization.json/JsonElement?): com.letta.mobile.data.canvas.workspace/SharedNoteListing // com.letta.mobile.data.canvas.authority/SharedNotesWire.readSharedNotes|readSharedNotes(kotlinx.serialization.json.JsonElement?){}[0]
+    final fun request(com.letta.mobile.data.canvas.workspace/SharedNotesCursor?): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/SharedNotesWire.request|request(com.letta.mobile.data.canvas.workspace.SharedNotesCursor?){}[0]
+    final fun sharedNotes(com.letta.mobile.data.canvas.workspace/SharedNoteListing): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas.authority/SharedNotesWire.sharedNotes|sharedNotes(com.letta.mobile.data.canvas.workspace.SharedNoteListing){}[0]
 }
 
 final object com.letta.mobile.data.canvas.bubble/CanvasBubbleLayoutCodec { // com.letta.mobile.data.canvas.bubble/CanvasBubbleLayoutCodec|null[0]
@@ -77772,6 +77922,15 @@ final object com.letta.mobile.data.session.graph/SharedSessionGraph { // com.let
     final fun transportBound(com.letta.mobile.data.transport.api/IChannelTransport, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.context/ContextReadingSnapshots? = ..., com.letta.mobile.data.session.graph/SubagentListing = ...): com.letta.mobile.data.session.graph/TransportBoundSessionRepositories // com.letta.mobile.data.session.graph/SharedSessionGraph.transportBound|transportBound(com.letta.mobile.data.transport.api.IChannelTransport;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.context.ContextReadingSnapshots?;com.letta.mobile.data.session.graph.SubagentListing){}[0]
 }
 
+final object com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement { // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement|null[0]
+    final val SLOT // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.SLOT|{}SLOT[0]
+        final fun <get-SLOT>(): com.letta.mobile.data.shell.layout/ModuleSlot // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.SLOT.<get-SLOT>|<get-SLOT>(){}[0]
+
+    final fun overCompactPage(com.letta.mobile.data.shell.layout/ShellLayoutConfig): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.overCompactPage|overCompactPage(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    final fun shown(com.letta.mobile.data.shell.layout/ShellLayoutConfig): kotlin/Boolean // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.shown|shown(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+    final fun toggled(com.letta.mobile.data.shell.layout/ShellLayoutConfig): com.letta.mobile.data.shell.layout.edit/ShellLayoutEditResult // com.letta.mobile.data.shell.layout.edit/SharedNotesPlacement.toggled|toggled(com.letta.mobile.data.shell.layout.ShellLayoutConfig){}[0]
+}
+
 final object com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog { // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog|null[0]
     final const val MAX_OBJECT_LENGTH // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.MAX_OBJECT_LENGTH|{}MAX_OBJECT_LENGTH[0]
         final fun <get-MAX_OBJECT_LENGTH>(): kotlin/Int // com.letta.mobile.data.shell.layout.edit/ShellLayoutCatalog.MAX_OBJECT_LENGTH.<get-MAX_OBJECT_LENGTH>|<get-MAX_OBJECT_LENGTH>(){}[0]
@@ -77841,6 +78000,8 @@ final object com.letta.mobile.data.shell.layout/ShellLanes { // com.letta.mobile
 final object com.letta.mobile.data.shell.layout/ShellViews { // com.letta.mobile.data.shell.layout/ShellViews|null[0]
     final val CANVAS // com.letta.mobile.data.shell.layout/ShellViews.CANVAS|{}CANVAS[0]
         final fun <get-CANVAS>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.CANVAS.<get-CANVAS>|<get-CANVAS>(){}[0]
+    final val DOCUMENT // com.letta.mobile.data.shell.layout/ShellViews.DOCUMENT|{}DOCUMENT[0]
+        final fun <get-DOCUMENT>(): com.letta.mobile.data.model.view/RuntimeViewId // com.letta.mobile.data.shell.layout/ShellViews.DOCUMENT.<get-DOCUMENT>|<get-DOCUMENT>(){}[0]
     final val HostOwned // com.letta.mobile.data.shell.layout/ShellViews.HostOwned|{}HostOwned[0]
         final fun <get-HostOwned>(): kotlin.collections/Set<com.letta.mobile.data.model.view/RuntimeViewId> // com.letta.mobile.data.shell.layout/ShellViews.HostOwned.<get-HostOwned>|<get-HostOwned>(){}[0]
     final val NOTE // com.letta.mobile.data.shell.layout/ShellViews.NOTE|{}NOTE[0]
@@ -78922,6 +79083,7 @@ final val com.letta.mobile.util/textOrNull // com.letta.mobile.util/textOrNull|@
 
 final fun (com.letta.mobile.data.a2ui/A2uiAction).com.letta.mobile.data.a2ui/toToolApprovalSubmission(): com.letta.mobile.data.a2ui/A2uiToolApprovalSubmission? // com.letta.mobile.data.a2ui/toToolApprovalSubmission|toToolApprovalSubmission@com.letta.mobile.data.a2ui.A2uiAction(){}[0]
 final fun (com.letta.mobile.data.agenteditor/AgentEditorState).com.letta.mobile.data.agenteditor/errorNote(): com.letta.mobile.data.settings/SettingsRow.Note? // com.letta.mobile.data.agenteditor/errorNote|errorNote@com.letta.mobile.data.agenteditor.AgentEditorState(){}[0]
+final fun (com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController).com.letta.mobile.data.canvas.workspace/withdrawn(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/withdrawn|withdrawn@com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController(){}[0]
 final fun (com.letta.mobile.data.canvas/CanvasOp).com.letta.mobile.data.canvas/withActor(com.letta.mobile.data.model/CanvasActorId): com.letta.mobile.data.canvas/CanvasOp // com.letta.mobile.data.canvas/withActor|withActor@com.letta.mobile.data.canvas.CanvasOp(com.letta.mobile.data.model.CanvasActorId){}[0]
 final fun (com.letta.mobile.data.canvas/CanvasOp).com.letta.mobile.data.canvas/withStamp(com.letta.mobile.data.model/CanvasOpId, kotlin/Long): com.letta.mobile.data.canvas/CanvasOp // com.letta.mobile.data.canvas/withStamp|withStamp@com.letta.mobile.data.canvas.CanvasOp(com.letta.mobile.data.model.CanvasOpId;kotlin.Long){}[0]
 final fun (com.letta.mobile.data.canvas/CanvasRelayLink).com.letta.mobile.data.canvas/asRelayConnection(): com.letta.mobile.data.canvas/CanvasRelayConnection // com.letta.mobile.data.canvas/asRelayConnection|asRelayConnection@com.letta.mobile.data.canvas.CanvasRelayLink(){}[0]
@@ -79118,6 +79280,7 @@ final fun com.letta.mobile.data.a2ui/resolveA2uiActionContext(kotlinx.serializat
 final fun com.letta.mobile.data.agents/deriveAgentSpaces(kotlin.collections/List<com.letta.mobile.data.agents/AgentRailGroup>): kotlin.collections/List<com.letta.mobile.data.agents/AgentRailSpace> // com.letta.mobile.data.agents/deriveAgentSpaces|deriveAgentSpaces(kotlin.collections.List<com.letta.mobile.data.agents.AgentRailGroup>){}[0]
 final fun com.letta.mobile.data.canvas.authority/mayEditNotebookContent(com.letta.mobile.data.canvas/NotebookPeerGrant?): kotlin/Boolean // com.letta.mobile.data.canvas.authority/mayEditNotebookContent|mayEditNotebookContent(com.letta.mobile.data.canvas.NotebookPeerGrant?){}[0]
 final fun com.letta.mobile.data.canvas.authority/mayResolveNotebookReference(com.letta.mobile.data.canvas/NotebookPeerGrant?): kotlin/Boolean // com.letta.mobile.data.canvas.authority/mayResolveNotebookReference|mayResolveNotebookReference(com.letta.mobile.data.canvas.NotebookPeerGrant?){}[0]
+final fun com.letta.mobile.data.canvas.authority/remoteNotebooksOver(kotlin/Function0<com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker>): com.letta.mobile.data.canvas.workspace/SharedNotebooks // com.letta.mobile.data.canvas.authority/remoteNotebooksOver|remoteNotebooksOver(kotlin.Function0<com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker>){}[0]
 final fun com.letta.mobile.data.canvas/mayEditNotebook(com.letta.mobile.data.canvas/NotebookPeerGrant?): kotlin/Boolean // com.letta.mobile.data.canvas/mayEditNotebook|mayEditNotebook(com.letta.mobile.data.canvas.NotebookPeerGrant?){}[0]
 final fun com.letta.mobile.data.canvas/mayExecuteNotebookItem(com.letta.mobile.data.canvas/NotebookItemContract?, com.letta.mobile.data.canvas/NotebookPeerGrant?): kotlin/Boolean // com.letta.mobile.data.canvas/mayExecuteNotebookItem|mayExecuteNotebookItem(com.letta.mobile.data.canvas.NotebookItemContract?;com.letta.mobile.data.canvas.NotebookPeerGrant?){}[0]
 final fun com.letta.mobile.data.canvas/mayReadNotebook(com.letta.mobile.data.canvas/NotebookPeerGrant?): kotlin/Boolean // com.letta.mobile.data.canvas/mayReadNotebook|mayReadNotebook(com.letta.mobile.data.canvas.NotebookPeerGrant?){}[0]

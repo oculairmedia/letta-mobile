@@ -1,0 +1,168 @@
+{
+  "_contract": "project-registry-v1 \u00a73",
+  "method": "project.registry.get",
+  "capability": "projects.read",
+  "cases": [
+    {
+      "name": "found",
+      "params": {
+        "projectId": "3f6c1e52-8a4d-4c0b-9e7a-1b2c3d4e5f60"
+      },
+      "result": {
+        "projectId": "3f6c1e52-8a4d-4c0b-9e7a-1b2c3d4e5f60",
+        "key": "fixture-project",
+        "name": "Fixture project",
+        "state": "active",
+        "repository": {
+          "slug": "example-owner/fixture-project"
+        },
+        "checkouts": [
+          {
+            "root": "stacks",
+            "relativePath": "fixture-project",
+            "path": "/srv/roots/stacks/fixture-project",
+            "primary": true
+          },
+          {
+            "root": "scratch",
+            "relativePath": "fixture-project-review",
+            "path": "/srv/roots/scratch/fixture-project-review",
+            "primary": false
+          }
+        ],
+        "pmAgentId": "agent-fixture-pm",
+        "roleAgents": {
+          "coder": "agent-fixture-coder",
+          "reviewer": "agent-fixture-reviewer",
+          "tester": "agent-fixture-tester"
+        },
+        "providerKind": "letta-code-iroh",
+        "engine": {
+          "enabled": true,
+          "formula": "implement-fix",
+          "readyLabel": "scheduler:eligible",
+          "poolSize": 1,
+          "ciChecks": [
+            "test",
+            "build-apk-pass",
+            "shared-multiplatform",
+            "detekt"
+          ]
+        },
+        "revision": "r-000041"
+      }
+    },
+    {
+      "name": "found_by_key",
+      "params": {
+        "key": "fixture-project"
+      },
+      "result": {
+        "projectId": "3f6c1e52-8a4d-4c0b-9e7a-1b2c3d4e5f60",
+        "key": "fixture-project",
+        "name": "Fixture project",
+        "state": "active",
+        "repository": {
+          "slug": "example-owner/fixture-project"
+        },
+        "checkouts": [
+          {
+            "root": "stacks",
+            "relativePath": "fixture-project",
+            "path": "/srv/roots/stacks/fixture-project",
+            "primary": true
+          },
+          {
+            "root": "scratch",
+            "relativePath": "fixture-project-review",
+            "path": "/srv/roots/scratch/fixture-project-review",
+            "primary": false
+          }
+        ],
+        "pmAgentId": "agent-fixture-pm",
+        "roleAgents": {
+          "coder": "agent-fixture-coder",
+          "reviewer": "agent-fixture-reviewer",
+          "tester": "agent-fixture-tester"
+        },
+        "providerKind": "letta-code-iroh",
+        "engine": {
+          "enabled": true,
+          "formula": "implement-fix",
+          "readyLabel": "scheduler:eligible",
+          "poolSize": 1,
+          "ciChecks": [
+            "test",
+            "build-apk-pass",
+            "shared-multiplatform",
+            "detekt"
+          ]
+        },
+        "revision": "r-000041"
+      }
+    },
+    {
+      "name": "unknown",
+      "params": {
+        "projectId": "00000000-0000-4000-8000-000000000000"
+      },
+      "error": {
+        "success": false,
+        "error": "unknown_project"
+      }
+    },
+    {
+      "name": "unknown_key",
+      "params": {
+        "key": "no-such-project"
+      },
+      "error": {
+        "success": false,
+        "error": "unknown_project"
+      }
+    },
+    {
+      "name": "malformed_id",
+      "params": {
+        "projectId": "Fixture Project"
+      },
+      "error": {
+        "success": false,
+        "error": "invalid_request",
+        "problem": "project_id_malformed"
+      }
+    },
+    {
+      "name": "key_not_lower_case",
+      "params": {
+        "key": "Fixture-Project"
+      },
+      "error": {
+        "success": false,
+        "error": "invalid_request",
+        "problem": "key_malformed"
+      }
+    },
+    {
+      "name": "neither_id_nor_key",
+      "params": {},
+      "error": {
+        "success": false,
+        "error": "invalid_request",
+        "problem": "project_ref_missing"
+      }
+    },
+    {
+      "name": "both_id_and_key",
+      "params": {
+        "projectId": "3f6c1e52-8a4d-4c0b-9e7a-1b2c3d4e5f60",
+        "key": "fixture-project"
+      },
+      "error": {
+        "success": false,
+        "error": "invalid_request",
+        "problem": "project_ref_both"
+      }
+    }
+  ]
+}

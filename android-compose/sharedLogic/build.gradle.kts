@@ -242,6 +242,10 @@ contractReferenceJvmTests.configure {
         .withPropertyName("wireContractUncoveredBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir("src/commonTest/resources/contracts")
         .withPropertyName("wireContractFixtures").withPathSensitivity(PathSensitivity.RELATIVE)
+    // Fixture tests read the contract documents themselves (lane-inbox-v1, project-registry-v1, the
+    // per-method specs). A documents-only change must rerun them, not reuse a cached result.
+    inputs.dir("../../docs/reference/contracts")
+        .withPropertyName("wireContractDocuments").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("letta.contractReferenceDocs.mode", "check")
     filter {
         excludeTestsMatching("com.letta.mobile.util.PaginationReplayFuzzCampaignRunnerTest")

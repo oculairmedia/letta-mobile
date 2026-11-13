@@ -1,6 +1,7 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.canvas.workspace.SharedNotebooks
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
@@ -31,6 +32,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyCanvasBoards: Lazy<AndroidCanvasBoards>,
     private val lazyCanvasViewers: Lazy<CanvasDocumentViewerRegistry>,
     private val lazySubagentRepository: Lazy<ISubagentRepository>,
+    private val lazySharedNotebooks: Lazy<SharedNotebooks>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
     /** The roster and the per-agent settings the mascot identity registry is derived from. */
@@ -49,4 +51,5 @@ class MainActivityDependencies @Inject constructor(
 
     /** The current session's subagent registry, where the shell's tasks modules list background tasks. */
     val subagentRepository: ISubagentRepository get() = lazySubagentRepository.get()
+    val sharedNotebooks: SharedNotebooks get() = lazySharedNotebooks.get()
 }
