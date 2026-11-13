@@ -25,7 +25,9 @@ import kotlinx.serialization.json.JsonObject
  * Order of work on every call: the principal from [SecretRequestCaller] (never from params), then
  * the strict params, then (human calls naming a request) whether the request exists and belongs to
  * an agent the device may see, then the service. A request that does not exist and one the caller
- * may not see answer the same code, so a denial tells nothing about other requests.
+ * may not see answer the same code, byte for byte, so a denial here tells nothing about other
+ * requests. (A call the connection's capability gate denies never gets here; the gate's envelope
+ * also names the missing capability.)
  */
 internal class SecretRequestHandlers(
     private val service: SecretRequestService,

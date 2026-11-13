@@ -264,10 +264,15 @@ item, field, purpose, path or value.
 *route* Stage 2 (letta-mobile-n2stx.2.4), in `com.letta.mobile.data.controller.node.iroh.secrets`.
 
 - **R1 Registration.** `SecretRequestFeature.forHost` builds the routes and the tool only when the
-  endpoint's auth policy is secure (bearer token, peer allowlist or paired peers only) and a
+  auth policy it is given is secure (bearer token, peer allowlist or paired peers only) and a
   keystore provider is configured; otherwise it answers null and the host registers, advertises and
   offers nothing. The routes refuse to register under the anonymous test policy even when handed
-  one. The classes exist only in the JVM host (decision 8). All six methods register together, and
+  one. Two limits: the policy is whatever the caller passes, since the factory cannot see the
+  endpoint, so this check is only as good as the future wiring; the per-call backstop is R3 (an
+  anonymous endpoint's sessions are never paired devices, so even routes built for a secure policy
+  refuse them, test-pinned). And today the feature is inert because nothing in production calls
+  `forHost` at all (no keystore provider exists yet), not because `forHost` answers null on real
+  hosts. The classes exist only in the JVM host (decision 8). All six methods register together, and
   only then is host capability `secret.request.v1` advertised.
 - **R2 Gate.** At the connection's capability gate the human methods need peer capability
   `secret.request.answer` and the agent methods `secret.request.agent` (`admin.full` passes both, as
@@ -277,7 +282,9 @@ item, field, purpose, path or value.
   (`pairedDevice`; a bootstrap session such as a host-local process holding the admin token is not),
   and hold `admin.full` (`grantedCapabilities`). The device's agent scope applies: `list` shows only
   requests of agents in scope; `get` of a request outside it answers `unknown_request` and
-  `submit`/`cancel` answer `not_pending`, byte for byte as for an unknown id.
+  `submit`/`cancel` answer `not_pending`, byte for byte as for an unknown id. Byte-identical holds
+  for every denial the handler makes; a call the connection's capability gate denies (R2) never
+  reaches the handler and gets the gate's envelope, which also carries a `capability` field.
 - **R4 Agent principal.** No admin RPC connection is ever an agent: `secret.request` and
   `secret.request.status` answer `forbidden` to every connection. Agents call the host tool
   `secret_request` (actions `create` and `status`), which is bound to the agent id the host runtime

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.secrets
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.InMemoryPairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohConnectionAuthentication
 import com.letta.mobile.data.controller.node.iroh.IrohNodeConnection
@@ -16,20 +17,31 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 
 /**
- * A node connection serving [routes]' router, built like the endpoint builds one for a paired
- * device but over no real QUIC connection: enough to hand frames to its control-channel handler.
- * Its controller refuses every call, so a frame that reaches a turn fails loudly.
+ * A node connection serving [routes]' router, built like the endpoint builds one for a peer at
+ * [HUMAN_ENDPOINT] under [policy] but over no real QUIC connection: enough to hand frames to its
+ * control-channel handler and read the request context it builds. Its controller refuses every
+ * call, so a frame that reaches a turn fails loudly.
  */
-internal fun controlConnection(routes: SecretRouteHarness): IrohNodeConnection = IrohNodeConnection(
+internal fun controlConnection(
+    routes: SecretRouteHarness,
+    policy: IrohAuthPolicy = IrohAuthPolicy.PairedPeersOnly,
+): IrohNodeConnection = IrohNodeConnection(
     connection = Connection(NoHandle),
     controller = refusingController(),
     adminRpcRouter = routes.router,
     authentication = IrohConnectionAuthentication(
-        authPolicy = IrohAuthPolicy.PairedPeersOnly,
+        authPolicy = policy,
         pairingService = IrohPairingService(InMemoryPairedPeerStore()),
         remoteEndpointId = HUMAN_ENDPOINT,
     ),
 )
+
+/** The admin RPC request context this connection builds for its peer's calls (its private builder). */
+internal fun IrohNodeConnection.requestContext(): AdminRpcRequestContext {
+    val builder = IrohNodeConnection::class.java.getDeclaredMethod("currentAdminRpcRequestContext")
+    builder.isAccessible = true
+    return builder.invoke(this) as AdminRpcRequestContext
+}
 
 /**
  * The control channel's answer to [frameJson], from the connection's private frame handler (the

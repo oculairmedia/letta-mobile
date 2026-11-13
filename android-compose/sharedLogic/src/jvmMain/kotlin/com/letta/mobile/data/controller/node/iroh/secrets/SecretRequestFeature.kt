@@ -21,8 +21,10 @@ import kotlinx.serialization.json.JsonElement
  * tool for agents ([hostTools]), both over one [SecretRequestService].
  *
  * Built only by [forHost], which answers null (the host registers, advertises and offers nothing)
- * unless the endpoint's auth policy is a secure one and a keystore provider is configured. The class
- * lives in `jvmMain` because the keystore SPI does (owner decision 8): no other host can build it.
+ * unless the auth policy it is given is a secure one and a keystore provider is configured. Nothing
+ * in production calls [forHost] yet (no keystore provider exists), which is what keeps the feature
+ * inert today. The class lives in `jvmMain` because the keystore SPI does (owner decision 8): no
+ * other host can build it.
  */
 class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal val handlers: SecretRequestHandlers) {
     /** The six routes; pass to [com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices.secretRequestRoutes]. */
