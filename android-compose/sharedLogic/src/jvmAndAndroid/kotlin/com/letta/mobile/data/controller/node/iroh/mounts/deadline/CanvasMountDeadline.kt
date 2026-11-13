@@ -26,8 +26,8 @@ internal class CanvasMountDeadline(
 ) {
 
     /** Runs [work]; [CanvasMountTimed.Expired] once [limit] passes. Cancelling the caller cancels the work. */
-    suspend fun run(work: suspend () -> CanvasMountOutcome): CanvasMountTimed {
-        val settled = CompletableDeferred<CanvasMountOutcome>()
+    suspend fun <T> run(work: suspend () -> T): CanvasMountTimed<T> {
+        val settled = CompletableDeferred<T>()
         val job = scope.launch {
             runCatchingCancellable { work() }.fold(settled::complete, settled::completeExceptionally)
         }
@@ -50,10 +50,10 @@ internal class CanvasMountDeadline(
 }
 
 /** How a bounded call ended. */
-internal sealed interface CanvasMountTimed {
+internal sealed interface CanvasMountTimed<out T> {
     /** The work finished in time with [value]. */
-    data class Settled(val value: CanvasMountOutcome) : CanvasMountTimed
+    data class Settled<out T>(val value: T) : CanvasMountTimed<T>
 
     /** The deadline passed; [unwound] says the work then ended by cancellation without producing anything. */
-    data class Expired(val unwound: Boolean) : CanvasMountTimed
+    data class Expired(val unwound: Boolean) : CanvasMountTimed<Nothing>
 }
