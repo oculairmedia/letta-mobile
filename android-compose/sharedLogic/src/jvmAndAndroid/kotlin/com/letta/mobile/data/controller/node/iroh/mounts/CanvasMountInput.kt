@@ -31,12 +31,13 @@ internal enum class CanvasMountInputProblem(val wire: String) {
     UNKNOWN_FIELD("unknown_field"),
 }
 
-/** The five routes: wire method, exact params, and whether the route mutates. */
+/** The six routes: wire method, exact params, and whether the route mutates. */
 internal enum class CanvasMountRoute(val method: String, val fields: List<CanvasMountField>, val mutates: Boolean) {
     RESOLVE(CanvasMountWire.RESOLVE, ADDRESS_FIELDS, mutates = false),
     BIND(CanvasMountWire.BIND, BINDING_FIELDS, mutates = true),
     REPLACE(CanvasMountWire.REPLACE, BINDING_FIELDS, mutates = true),
     SET_DEFAULT(CanvasMountWire.SET_DEFAULT, listOf(CanvasMountField.AGENT, CanvasMountField.CANVAS), mutates = true),
+    CLEAR_DEFAULT(CanvasMountWire.CLEAR_DEFAULT, listOf(CanvasMountField.AGENT), mutates = true),
     CANDIDATES(CanvasMountWire.CANDIDATES, ADDRESS_FIELDS, mutates = false),
     ;
 

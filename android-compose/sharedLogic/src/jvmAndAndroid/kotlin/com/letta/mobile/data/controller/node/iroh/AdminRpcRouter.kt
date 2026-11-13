@@ -47,6 +47,11 @@ data class AdminRpcRequestContext(
     val authorizedAgentIds: Set<String>? = null,
     /** Iroh endpoint identity established by the serving connection, never request parameters. */
     val authenticatedEndpointId: String? = null,
+    /**
+     * Capabilities the serving connection read from the peer's own record for this request, for handlers that
+     * re-check a grant themselves; null = not established (treat as none). Never request parameters.
+     */
+    val grantedCapabilities: Set<String>? = null,
 ) {
     fun canAccessConversation(conversationId: String): Boolean =
         authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)

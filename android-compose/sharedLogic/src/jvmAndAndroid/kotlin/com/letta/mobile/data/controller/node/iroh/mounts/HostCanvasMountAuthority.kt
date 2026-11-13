@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.mount.CanvasMountPrincipal
 import com.letta.mobile.data.canvas.mount.CanvasMountRequest
 import com.letta.mobile.data.canvas.mount.CanvasMountScope
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
+import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -13,13 +14,15 @@ import com.letta.mobile.util.runCatchingCancellable
 
 /**
  * What the serving connection itself established about the caller; nothing here comes from request params.
- * [agents] is the paired peer's agent scope and [conversations] its conversation-content scope (null = all),
- * exactly as the connection put them in [AdminRpcRequestContext].
+ * [agents] is the paired peer's agent scope and [conversations] its conversation-content scope (null = all), and
+ * [capabilities] the grants the connection read from the peer's own record (null = none established), exactly as the
+ * connection put them in [AdminRpcRequestContext].
  */
 internal class CanvasMountConnection private constructor(
     val principal: CanvasMountPrincipal,
     private val agents: Set<String>?,
     private val conversations: Set<String>?,
+    private val capabilities: Set<String>?,
 ) {
     fun allowsAgent(agent: AgentId): Boolean = agents == null || agent.value in agents
 
@@ -34,6 +37,13 @@ internal class CanvasMountConnection private constructor(
      */
     val managesConversations: Boolean get() = conversations == null
 
+    /**
+     * Whether the connection holds `canvas.mount.write` (or `admin.full`), checked here as well as by the capability
+     * table, so an agent default can never be changed by a caller whose connection did not establish the grant.
+     */
+    val writesMounts: Boolean
+        get() = capabilities?.let { IrohPeerCapabilities.isAllowed(it, IrohPeerCapabilities.CANVAS_MOUNT_WRITE) } == true
+
     companion object {
         private val ENDPOINT_ID = Regex("[0-9a-f]{64}")
 
@@ -42,7 +52,7 @@ internal class CanvasMountConnection private constructor(
             val endpoint = context.authenticatedEndpointId?.takeIf { context.authenticated } ?: return null
             if (!ENDPOINT_ID.matches(endpoint)) return null
             val principal = CanvasMountPrincipal.fromVerifiedConnection(endpoint) ?: return null
-            return CanvasMountConnection(principal, context.authorizedAgentIds, context.authorizedConversationIds)
+            return CanvasMountConnection(principal, context.authorizedAgentIds, context.authorizedConversationIds, context.grantedCapabilities)
         }
     }
 }
@@ -85,8 +95,9 @@ internal class CanvasMountCallTrace {
  *
  * - Address: the request's principal is the connection's; the agent is in the peer's agent scope; for a binding,
  *   the conversation is in its conversation scope and the host's [directory] says the agent owns it.
- * - Propose: for a default, the peer manages conversations (O3) and the agent exists; the proposed canvas is
- *   visible to the connection ([visible]).
+ * - Propose: for a default, the connection holds `canvas.mount.write`, the agent is in its agent scope and exists;
+ *   the proposed canvas is visible to the connection ([visible]), the same rule as a binding proposal.
+ * - Clear (a default only, [mayClear]): exactly the default's change rule, with no canvas to judge.
  * - See: the stored canvas is visible to the connection.
  * - List (`canvas.mount.candidates`, [mayList]): exactly the proposal rule, so nothing is listed a proposal refuses.
  *
@@ -129,6 +140,12 @@ internal class HostCanvasMountAuthority(
         else -> allowIf(visible(scope, proposed))
     }
 
+    override suspend fun mayClear(request: CanvasMountRequest<CanvasMountScope>): CanvasMountDecision {
+        val decision = decide(request) { scope -> allowIf(scope is CanvasMountScope.AgentDefault && mayChangeDefault(scope)) }
+        if (decision == CanvasMountDecision.ALLOW) trace.enter(CanvasMountPhase.STORING)
+        return decision
+    }
+
     override suspend fun maySee(request: CanvasMountRequest<CanvasMountScope>, winner: CanvasId): CanvasMountDecision {
         trace.enter(CanvasMountPhase.REVEALING)
         return decide(request) { scope -> allowIf(visible(scope, winner)) }
@@ -153,8 +170,9 @@ internal class HostCanvasMountAuthority(
     private fun ownedVisible(owners: Set<AgentId>): Boolean =
         if (owners.isEmpty()) connection.unrestrictedAgents else owners.any(connection::allowsAgent)
 
+    /** Owner decision: any mount-write connection may change the default of an agent in its agent scope. */
     private suspend fun mayChangeDefault(scope: CanvasMountScope.AgentDefault): Boolean =
-        connection.managesConversations && directory.hasAgent(scope.agent)
+        connection.writesMounts && connection.allowsAgent(scope.agent) && directory.hasAgent(scope.agent)
 
     private suspend fun decide(
         request: CanvasMountRequest<CanvasMountScope>,

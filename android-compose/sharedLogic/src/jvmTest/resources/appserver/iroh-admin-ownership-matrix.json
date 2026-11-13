@@ -2717,7 +2717,22 @@
       "data_store": "controller_state_file",
       "fallback": "deny_fail_closed",
       "migration_slice": "none",
-      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; admin.full only (not part of the picker feature) plus unrestricted conversation scope; host-decided canvas visibility.",
+      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas.mount.write (chat roles while mounts are enabled), re-checked by the handler, agent_id within the peer agent scope and known to the host; the proposed canvas passes the same host-decided visibility rule as a binding proposal.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
+      "method": "canvas.mount.default.clear",
+      "handler": "CanvasMountRoutes.kt",
+      "current_backend": "host-owned canvas-mounts/ sidecar through AuthorizedCanvasMounts, paired-peer Iroh admin_rpc only",
+      "owner": "controller_native",
+      "public_contract": "docs/reference/contracts/canvas-mount-v1.md",
+      "authorization_class": "admin_write",
+      "data_store": "controller_state_file",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "none",
+      "notes": "letta-mobile-n2stx.5: registered only with a secure auth policy and a host mount store (method omitted otherwise). Principal = verified endpoint id; canvas.mount.write (chat roles while mounts are enabled), re-checked by the handler, agent_id within the peer agent scope and known to the host; removes the agent default so conversations without a binding show their own canvas.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "deny_fail_closed"

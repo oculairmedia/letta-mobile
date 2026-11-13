@@ -312,6 +312,10 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 - [canvas.mount.candidates: Canvas Mount v1](reference/contracts/canvas.mount.candidates/canvas-mount-v1.md)
 
+### reference/contracts/canvas.mount.default.clear
+
+- [canvas.mount.default.clear: Canvas Mount v1](reference/contracts/canvas.mount.default.clear/canvas-mount-v1.md)
+
 ### reference/contracts/canvas.mount.default.set
 
 - [canvas.mount.default.set: Canvas Mount v1](reference/contracts/canvas.mount.default.set/canvas-mount-v1.md)

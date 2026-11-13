@@ -37,6 +37,9 @@ private enum class Scope(val peer: Peer, val conversation: ConversationId) {
 
     /** Addresses agent A with a conversation that belongs to agent B. */
     FOREIGN_CONVERSATION(PEER, CONV_B),
+
+    /** Unrestricted scopes, but the connection holds only `canvas.mount.read`: no agent default change. */
+    READ_ONLY(PEER.copy(capabilities = setOf(CanvasMountWire.READ_CAPABILITY)), CONV_A),
     ;
 
     val unrestrictedAgents: Boolean get() = peer.agents == null
@@ -58,7 +61,7 @@ private enum class Winner(val board: Board?) {
 }
 
 /** The answer the policy requires. */
-private enum class Expect { ROUTER_FORBIDDEN, DENIED, NONE, FOUND, BOUND_WON, BOUND_LOST, REPLACED, DEFAULT_SET, LISTED }
+private enum class Expect { ROUTER_FORBIDDEN, DENIED, NONE, FOUND, BOUND_WON, BOUND_LOST, REPLACED, DEFAULT_SET, DEFAULT_CLEARED, LISTED }
 
 private class Case(val route: CanvasMountRoute, val scope: Scope, val proposal: Board, val winner: Winner) {
     override fun toString(): String = "$route/$scope/$proposal/$winner"
@@ -92,17 +95,21 @@ class CanvasMountAuthorizationMatrixTest {
             assertFalse(case.winner.board?.id?.value.orEmpty().let { it.isNotEmpty() && it in reply.raw }, "$case leaked the winner")
             assertEquals(case.winner.board?.id, stored(harness, case), "$case changed the record")
         }
+        if (expected == Expect.DEFAULT_CLEARED) assertEquals(null, stored(harness, case), "$case left the default")
     }
+
+    private val Case.addressesDefault: Boolean
+        get() = route == CanvasMountRoute.SET_DEFAULT || route == CanvasMountRoute.CLEAR_DEFAULT
 
     private suspend fun seed(harness: MountHarness, case: Case) {
         val canvas = case.winner.board?.id ?: return
         val store = harness.store()
-        if (case.route == CanvasMountRoute.SET_DEFAULT) store.setDefault(AGENT_A, canvas)
+        if (case.addressesDefault) store.setDefault(AGENT_A, canvas)
         else store.bindIfAbsent(AGENT_A, case.scope.conversation, canvas)
     }
 
     private suspend fun stored(harness: MountHarness, case: Case): CanvasId? =
-        if (case.route == CanvasMountRoute.SET_DEFAULT) harness.store().readDefault(AGENT_A)
+        if (case.addressesDefault) harness.store().readDefault(AGENT_A)
         else harness.store().readBinding(AGENT_A, case.scope.conversation)
 
     private fun verify(reply: Reply, expected: Expect, case: Case) {
@@ -121,19 +128,24 @@ class CanvasMountAuthorizationMatrixTest {
         Expect.BOUND_WON -> Triple(CanvasMountWire.BOUND, case.proposal.id.value, true)
         Expect.BOUND_LOST -> Triple(CanvasMountWire.BOUND, case.winner.board?.id?.value, false)
         Expect.REPLACED -> Triple(CanvasMountWire.REPLACED, case.proposal.id.value, null)
+        Expect.DEFAULT_CLEARED -> Triple(CanvasMountWire.DEFAULT_CLEARED, null, null)
         else -> Triple(CanvasMountWire.DEFAULT_SET, case.proposal.id.value, null)
     }
 
     private fun expected(case: Case): Expect = when {
         case.scope == Scope.AGENT_OUT -> Expect.ROUTER_FORBIDDEN
-        case.route == CanvasMountRoute.SET_DEFAULT -> expectedDefault(case)
+        case.addressesDefault -> expectedDefault(case)
         case.scope == Scope.CONVERSATION_OUT || case.scope == Scope.FOREIGN_CONVERSATION -> Expect.DENIED
         else -> expectedBinding(case)
     }
 
-    /** O3: an agent default needs unrestricted conversation scope; no conversation is addressed. */
+    /**
+     * Owner decision: an agent default needs `canvas.mount.write` and the agent in the agent scope (no conversation is
+     * addressed, so conversation scope plays no part); a set also needs the proposed canvas visible, a clear proposes none.
+     */
     private fun expectedDefault(case: Case): Expect = when {
-        case.scope == Scope.CONVERSATION_OUT -> Expect.DENIED
+        case.scope == Scope.READ_ONLY -> Expect.DENIED
+        case.route == CanvasMountRoute.CLEAR_DEFAULT -> Expect.DEFAULT_CLEARED
         case.scope.sees(case.proposal) -> Expect.DEFAULT_SET
         else -> Expect.DENIED
     }

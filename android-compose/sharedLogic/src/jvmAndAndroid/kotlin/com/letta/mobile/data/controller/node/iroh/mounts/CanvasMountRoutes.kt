@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * The authenticated canvas mount admin RPC routes (`docs/reference/contracts/canvas-mount-v1.md`).
  *
- * [register] installs all five [CanvasMountWire.METHODS] and advertises [CanvasMountWire.CAPABILITY] only when
+ * [register] installs all six [CanvasMountWire.METHODS] and advertises [CanvasMountWire.CAPABILITY] only when
  * [policy] is a secure one (bearer token, peer allowlist or paired peers). Under the anonymous test policy it
  * registers nothing and advertises nothing. [policy] must be the policy the serving endpoint enforces.
  *
@@ -40,7 +40,7 @@ class CanvasMountRoutes internal constructor(
         scope: CoroutineScope,
     ) : this(policy, CanvasMountHost(location::mounts, sources, CanvasMountBounds.production(scope)))
 
-    /** Installs all five routes and the capability under a secure policy; under the anonymous policy, nothing. */
+    /** Installs all six routes and the capability under a secure policy; under the anonymous policy, nothing. */
     override fun register(router: AdminRpcRouter) {
         if (!policy.admitsCanvasMounts()) {
             Telemetry.event(CANVAS_MOUNT_TAG, "routes.withheld", "reason" attr "insecure_policy")

@@ -52,8 +52,10 @@ private enum class Spoof(val key: String) {
 class CanvasMountRouteSecurityTest {
     @Test
     fun denialsAreByteIdenticalForExistingAbsentAndHiddenWinnerRecords() = runBlocking {
-        // Candidates hold no record and reveal no winner; their denials are covered in CanvasMountCandidatesTest.
-        CanvasMountRoute.entries.filter { it != CanvasMountRoute.CANDIDATES }.forEach { route ->
+        // Candidates hold no record and reveal no winner (their denials are in CanvasMountCandidatesTest); a default
+        // clear proposes and reveals no canvas (its denial is aDefaultClearWithoutMountWriteIsDeniedLikeAnyOther).
+        val hidingRoutes = CanvasMountRoute.entries - CanvasMountRoute.CANDIDATES - CanvasMountRoute.CLEAR_DEFAULT
+        hidingRoutes.forEach { route ->
             val scopedOut = A_SCOPED.copy(conversations = setOf("conv-elsewhere"))
             // Resolve and bind are refused by the hidden winner; replace and default.set by the hidden proposal.
             val revealsWinner = route == CanvasMountRoute.RESOLVE || route == CanvasMountRoute.BIND
@@ -282,14 +284,13 @@ class CanvasMountRouteSecurityTest {
     }
 
     @Test
-    fun chatAccessRolesMayResolveAndSwitchButOnlyAdminsSetAgentDefaults() {
+    fun chatAccessRolesMayResolveSwitchAndChangeAgentDefaultsOnlyWhileMountsAreEnabled() {
         listOf(CanvasMountWire.RESOLVE, CanvasMountWire.CANDIDATES).forEach {
             assertEquals(IrohPeerCapabilities.CANVAS_MOUNT_READ, IrohPeerCapabilities.forAdminMethod(it), it)
         }
-        listOf(CanvasMountWire.BIND, CanvasMountWire.REPLACE).forEach {
+        listOf(CanvasMountWire.BIND, CanvasMountWire.REPLACE, CanvasMountWire.SET_DEFAULT, CanvasMountWire.CLEAR_DEFAULT).forEach {
             assertEquals(IrohPeerCapabilities.CANVAS_MOUNT_WRITE, IrohPeerCapabilities.forAdminMethod(it), it)
         }
-        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod(CanvasMountWire.SET_DEFAULT))
         val mountCapabilities = setOf(IrohPeerCapabilities.CANVAS_MOUNT_READ, IrohPeerCapabilities.CANVAS_MOUNT_WRITE)
         assertTrue(IrohPeerCapabilities.ALL.containsAll(mountCapabilities))
         assertTrue(IrohPeerCapabilities.roles(mountsEnabled = false).values.none { it.any(mountCapabilities::contains) })
@@ -298,8 +299,40 @@ class CanvasMountRouteSecurityTest {
         chatRoles.forEach { (role, capabilities) -> assertTrue(capabilities.containsAll(mountCapabilities), role) }
         chatRoles.forEach { (role, capabilities) ->
             val required = IrohPeerCapabilities.forAdminMethod(CanvasMountWire.SET_DEFAULT)
-            assertFalse(IrohPeerCapabilities.isAllowed(capabilities, required), role)
+            assertTrue(IrohPeerCapabilities.isAllowed(capabilities, required), role)
         }
+    }
+
+    @Test
+    fun aDefaultClearWithoutMountWriteIsDeniedLikeAnyOther() = runBlocking {
+        val readOnly = PEER.copy(capabilities = setOf(CanvasMountWire.READ_CAPABILITY))
+        val noGrants = PEER.copy(capabilities = null)
+        val absent = hosted().call(CanvasMountRoute.CLEAR_DEFAULT, clearParams(AGENT_A), readOnly)
+        val existing = hosted().apply { seedBoth(SECRET_CANVAS) }
+        val denied = existing.call(CanvasMountRoute.CLEAR_DEFAULT, clearParams(AGENT_A), readOnly)
+        val unestablished = existing.call(CanvasMountRoute.CLEAR_DEFAULT, clearParams(AGENT_A), noGrants)
+        val unknownAgent = existing.call(CanvasMountRoute.CLEAR_DEFAULT, clearParams(AgentId("agent-missing")), PEER)
+        listOf(absent, denied, unestablished, unknownAgent).forEach { assertEquals(DENIED_RESPONSE, it.raw) }
+        assertEquals(SECRET_CANVAS, existing.store().readDefault(AGENT_A), "a denied clear leaves the default")
+        assertEquals(CanvasMountWire.DEFAULT_CLEARED, existing.call(CanvasMountRoute.CLEAR_DEFAULT, clearParams(AGENT_A), A_SCOPED).status)
+        assertNull(existing.store().readDefault(AGENT_A))
+    }
+
+    @Test
+    fun anAgentDefaultSetIsEnforcedByTheHandlerNotOnlyTheCapabilityTable() = runBlocking {
+        val harness = hosted()
+        val readOnly = PEER.copy(capabilities = setOf(CanvasMountWire.READ_CAPABILITY))
+        val noGrants = PEER.copy(capabilities = null)
+        listOf(readOnly, noGrants).forEach { peer ->
+            assertEquals(DENIED_RESPONSE, harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_A, OWN), peer).raw)
+        }
+        val admin = PEER.copy(capabilities = setOf(IrohPeerCapabilities.ADMIN_FULL))
+        assertNull(harness.store().readDefault(AGENT_A))
+        // In scope with mount write: an own canvas is accepted, another agent's (invisible) canvas is not.
+        assertEquals(DENIED_RESPONSE, harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_A, SECRET_CANVAS), A_SCOPED).raw)
+        assertEquals(CanvasMountWire.DEFAULT_SET, harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_A, OWN), A_SCOPED).status)
+        assertEquals(CanvasMountWire.DEFAULT_SET, harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_A, OWN), admin).status)
+        assertEquals(AgentScopeGuard.DENIED, harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_B, OWN), A_SCOPED).error)
     }
 
     /** A harness whose host knows [OWN] (agent A's) and [SECRET_CANVAS] (agent B's). */

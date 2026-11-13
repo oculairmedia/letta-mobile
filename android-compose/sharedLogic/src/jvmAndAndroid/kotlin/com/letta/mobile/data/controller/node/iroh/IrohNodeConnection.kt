@@ -368,6 +368,7 @@ class IrohNodeConnection(
                 viewedConversationId = viewerSubscription?.currentConversation,
             ),
             authorizedAgentIds = sessionAuth.agentScope(),
+            grantedCapabilities = capabilities.takeIf { isAuthenticated },
         )
     }
 

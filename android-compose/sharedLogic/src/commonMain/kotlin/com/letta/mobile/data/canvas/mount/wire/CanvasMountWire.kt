@@ -5,10 +5,13 @@ package com.letta.mobile.data.canvas.mount.wire
  * shared by the host routes and a later client. Only names live here: no behaviour, no client.
  */
 object CanvasMountWire {
-    /** Host capability advertised exactly when all four routes are registered. */
+    /** Host capability advertised exactly when all six routes are registered. */
     const val CAPABILITY: String = "canvas.mount.v1"
 
-    /** Reads a conversation's binding, falling back to its agent's default. */
+    /**
+     * Reads what a conversation shows: its own binding, else its agent's default; [NONE] means neither exists and the
+     * conversation shows its own canvas.
+     */
     const val RESOLVE: String = "canvas.mount.resolve"
 
     /** Binds a conversation only when it has no binding; answers the durable winner. */
@@ -17,8 +20,14 @@ object CanvasMountWire {
     /** Replaces a conversation's binding (last writer wins). */
     const val REPLACE: String = "canvas.mount.binding.replace"
 
-    /** Sets an agent's default (last writer wins). */
+    /**
+     * Sets an agent's default (last writer wins): what the agent's conversations without a binding of their own show
+     * instead of their own canvas.
+     */
     const val SET_DEFAULT: String = "canvas.mount.default.set"
+
+    /** Removes an agent's default, so its conversations without a binding show their own canvas again. */
+    const val CLEAR_DEFAULT: String = "canvas.mount.default.clear"
 
     /**
      * Push frame `type` sent to the viewers of a conversation whose binding changed:
@@ -33,7 +42,7 @@ object CanvasMountWire {
     const val CANDIDATES: String = "canvas.mount.candidates"
 
     /** Every route, registered together or not at all. */
-    val METHODS: Set<String> = setOf(RESOLVE, BIND, REPLACE, SET_DEFAULT, CANDIDATES)
+    val METHODS: Set<String> = setOf(RESOLVE, BIND, REPLACE, SET_DEFAULT, CLEAR_DEFAULT, CANDIDATES)
 
     /** Hard cap on the canvases one [CANDIDATES] answer lists; [TRUNCATED] says whether more were left out. */
     const val MAX_CANDIDATES: Int = 100
@@ -41,7 +50,7 @@ object CanvasMountWire {
     /** Peer capability that admits [RESOLVE] and [CANDIDATES]. */
     const val READ_CAPABILITY: String = "canvas.mount.read"
 
-    /** Peer capability that admits [BIND], [REPLACE] and [SET_DEFAULT]. */
+    /** Peer capability that admits [BIND], [REPLACE], [SET_DEFAULT] and [CLEAR_DEFAULT]. */
     const val WRITE_CAPABILITY: String = "canvas.mount.write"
 
     /** The agent that owns the addressed record (a target, never the caller). */
@@ -103,6 +112,9 @@ object CanvasMountWire {
 
     /** An agent default now holds the caller's canvas. */
     const val DEFAULT_SET: String = "default_set"
+
+    /** The agent has no default now (whether or not it had one). */
+    const val DEFAULT_CLEARED: String = "default_cleared"
 
     /** Failed before any change; the current mount stays as it is. */
     const val UNAVAILABLE: String = "unavailable"

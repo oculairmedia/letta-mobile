@@ -35,7 +35,7 @@ internal class CanvasMountBounds(val durability: CanvasMountDurability, val dead
 }
 
 /**
- * One handler for all five routes. Order of work: verified identity from the connection, strict params, then the
+ * One handler for all six routes. Order of work: verified identity from the connection, strict params, then the
  * authorized facade under the deadline. No request field reaches the authority except as a target.
  */
 internal class CanvasMountHandlers(private val host: CanvasMountHost) {
@@ -90,10 +90,14 @@ private class CanvasMountCall(
         CanvasMountRoute.BIND -> mounts.bindIfAbsent(binding, input.canvas).toOutcome(CanvasMountSource.BINDING, input.canvas)
         CanvasMountRoute.REPLACE -> mounts.replaceBinding(binding, input.canvas).toOutcome(CanvasMountSource.BINDING, null)
         CanvasMountRoute.SET_DEFAULT -> mounts.setDefault(agentDefault, input.canvas).toOutcome(CanvasMountSource.DEFAULT, null)
+        CanvasMountRoute.CLEAR_DEFAULT -> mounts.clearDefault(agentDefault).toOutcome(CanvasMountSource.DEFAULT, null)
         CanvasMountRoute.CANDIDATES -> candidates.list(binding)
     }
 
-    /** The conversation's own binding, else its agent's default. A denial at either step is the answer. */
+    /**
+     * The resolution order: the conversation's own binding, else its agent's default, else [CanvasMountOutcome.None]
+     * (the conversation shows its own canvas). A denial at either step is the answer.
+     */
     private suspend fun resolve(): CanvasMountOutcome {
         val own = mounts.read(binding)
         if (own != CanvasMountResult.None) return own.toOutcome(CanvasMountSource.BINDING, null)

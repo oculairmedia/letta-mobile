@@ -84,6 +84,16 @@ internal sealed interface CanvasMountOutcome {
         override fun body(durability: CanvasMountDurability): JsonElement = canvasBody(status, canvas, durability) {}
     }
 
+    /** The agent default is durably absent. */
+    data object DefaultCleared : CanvasMountOutcome {
+        override val status: String get() = CanvasMountWire.DEFAULT_CLEARED
+
+        override fun body(durability: CanvasMountDurability): JsonElement = buildJsonObject {
+            put(CanvasMountWire.STATUS, status)
+            put(CanvasMountWire.DURABILITY, durability.wire)
+        }
+    }
+
     /** `canvas.mount.candidates`: [candidates] in order, at most [CanvasMountWire.MAX_CANDIDATES]. */
     data class Listed(val candidates: List<CanvasMountCandidate>, val truncated: Boolean) : CanvasMountOutcome {
         override val status: String get() = CanvasMountWire.LISTED
@@ -166,6 +176,7 @@ private fun CanvasMountResult.canvasOutcome(source: CanvasMountSource, proposed:
 
 private fun CanvasMountResult.plainOutcome(): CanvasMountOutcome = when (this) {
     CanvasMountResult.None -> CanvasMountOutcome.None
+    CanvasMountResult.DefaultCleared -> CanvasMountOutcome.DefaultCleared
     CanvasMountResult.Denied -> CanvasMountOutcome.Denied
     is CanvasMountResult.StorageFailure -> CanvasMountOutcome.Unavailable(CanvasMountUnavailable.STORAGE, reason)
     // The handler validated every id first, so the facade's own bound check cannot fail here.

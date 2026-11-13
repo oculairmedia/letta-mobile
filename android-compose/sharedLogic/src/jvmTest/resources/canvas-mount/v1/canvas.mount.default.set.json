@@ -15,7 +15,7 @@
       }
     },
     {
-      "name": "denied-without-conversation-manage",
+      "name": "denied-canvas-not-visible-or-no-mount-write",
       "params": {
         "agent_id": "agent-7c1e",
         "canvas_id": "canvas-3f9a"

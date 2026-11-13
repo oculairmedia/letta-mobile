@@ -78,6 +78,7 @@ class CanvasMountContractFixturesTest {
 
     private fun plain(result: JsonObject): CanvasMountOutcome = when (result.getValue(CanvasMountWire.STATUS).jsonPrimitive.content) {
         CanvasMountWire.NONE -> CanvasMountOutcome.None
+        CanvasMountWire.DEFAULT_CLEARED -> CanvasMountOutcome.DefaultCleared
         CanvasMountWire.OUTCOME_UNKNOWN -> CanvasMountOutcome.OutcomeUnknown
         else -> CanvasMountOutcome.Unavailable(
             CanvasMountUnavailable.entries.single { it.wire == result.getValue(CanvasMountWire.REASON).jsonPrimitive.content },

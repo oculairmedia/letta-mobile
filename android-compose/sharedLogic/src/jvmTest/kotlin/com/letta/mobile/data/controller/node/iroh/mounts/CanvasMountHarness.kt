@@ -53,17 +53,22 @@ internal val CONV_B = ConversationId("conv-b")
 /** The fixed request id: identical requests must produce byte-identical responses. */
 internal const val REQUEST_ID = "req-1"
 
-/** A verified connection: endpoint identity plus the scopes the connection itself established. */
+/** The two mount capabilities a chat role holds on a host with mounts enabled. */
+internal val MOUNT_GRANTS: Set<String> = setOf(CanvasMountWire.READ_CAPABILITY, CanvasMountWire.WRITE_CAPABILITY)
+
+/** A verified connection: endpoint identity plus the scopes and grants the connection itself established. */
 internal data class Peer(
     val endpoint: String,
     val agents: Set<String>? = null,
     val conversations: Set<String>? = null,
+    val capabilities: Set<String>? = MOUNT_GRANTS,
 ) {
     fun context(): AdminRpcRequestContext = AdminRpcRequestContext(
         authenticated = true,
         authorizedConversationIds = conversations,
         authorizedAgentIds = agents,
         authenticatedEndpointId = endpoint,
+        grantedCapabilities = capabilities,
     )
 
     companion object {
@@ -240,10 +245,13 @@ internal fun defaultParams(agent: AgentId, canvas: CanvasId): JsonObject = build
     put(CanvasMountWire.CANVAS_ID, canvas.value)
 }
 
+internal fun clearParams(agent: AgentId): JsonObject = buildJsonObject { put(CanvasMountWire.AGENT_ID, agent.value) }
+
 /** The params [route] needs to address agent A's [conversation] with [canvas]. */
 internal fun paramsFor(route: CanvasMountRoute, conversation: ConversationId, canvas: CanvasId): JsonObject = when (route) {
     CanvasMountRoute.RESOLVE, CanvasMountRoute.CANDIDATES -> bindingParams(AGENT_A, conversation)
     CanvasMountRoute.SET_DEFAULT -> defaultParams(AGENT_A, canvas)
+    CanvasMountRoute.CLEAR_DEFAULT -> clearParams(AGENT_A)
     else -> bindingParams(AGENT_A, conversation, canvas)
 }
 

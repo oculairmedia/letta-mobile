@@ -17,17 +17,20 @@ internal fun bindingRequest(agent: String, conversation: String, caller: String 
 internal fun defaultRequest(agent: String, caller: String = "caller") =
     CanvasMountRequest(principal(caller), CanvasMountScope.AgentDefault(AgentId(agent)))
 
-/** Answers each of the three questions with a fixed [Answer], whatever the request. */
+/** Answers each question with a fixed [Answer], whatever the request. */
 internal class TableAuthority(
     private val scope: Answer,
     private val proposal: Answer = Answer.ALLOW,
     private val winner: Answer = Answer.ALLOW,
+    private val clear: Answer = Answer.ALLOW,
 ) : CanvasMountAuthority {
     override suspend fun mayAddress(request: CanvasMountRequest<CanvasMountScope>) = decide(scope)
 
     override suspend fun mayPropose(request: CanvasMountRequest<CanvasMountScope>, proposed: CanvasId) = decide(proposal)
 
     override suspend fun maySee(request: CanvasMountRequest<CanvasMountScope>, winner: CanvasId) = decide(this.winner)
+
+    override suspend fun mayClear(request: CanvasMountRequest<CanvasMountScope>) = decide(clear)
 
     private fun decide(answer: Answer): CanvasMountDecision = when (answer) {
         Answer.ALLOW -> CanvasMountDecision.ALLOW
@@ -55,6 +58,11 @@ internal class RecordingAuthority(
     override suspend fun maySee(request: CanvasMountRequest<CanvasMountScope>, winner: CanvasId): CanvasMountDecision {
         log += "see:${winner.value}"
         return answers.maySee(request, winner)
+    }
+
+    override suspend fun mayClear(request: CanvasMountRequest<CanvasMountScope>): CanvasMountDecision {
+        log += "clear"
+        return answers.mayClear(request)
     }
 }
 
@@ -84,6 +92,12 @@ internal class RecordingStorage(
         touch("setDefault")
         stored = canvasId
         return CanvasMountMutation.Applied(canvasId, written = true)
+    }
+
+    override suspend fun clearDefault(agentId: AgentId): CanvasMountMutation {
+        val existed = touch("clearDefault") != null
+        stored = null
+        return CanvasMountMutation.Removed(written = existed)
     }
 
     private suspend fun touch(operation: String): CanvasId? {

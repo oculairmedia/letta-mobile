@@ -46,7 +46,10 @@ object IrohPeerCapabilities {
     /** Admits the read-only `canvas.mount.resolve` and `canvas.mount.candidates`. */
     const val CANVAS_MOUNT_READ = CanvasMountWire.READ_CAPABILITY
 
-    /** Admits the canvas mount writes: bind and replace. */
+    /**
+     * Admits the canvas mount writes: bind, replace, default.set and default.clear. The handler re-checks it for the
+     * agent default, together with the agent scope and the proposed canvas's visibility.
+     */
     const val CANVAS_MOUNT_WRITE = CanvasMountWire.WRITE_CAPABILITY
 
     /** The two canvas mount capabilities, granted with a role only while canvas mounts are enabled. */
@@ -152,8 +155,6 @@ object IrohPeerCapabilities {
     fun forAdminMethod(method: String): String = when {
         method in NOTEBOOK_METHODS -> NOTEBOOK_AUTHENTICATED
         method == CanvasMountWire.RESOLVE || method == CanvasMountWire.CANDIDATES -> CANVAS_MOUNT_READ
-        // D1: the agent default is not part of the picker feature and stays host administration.
-        method == CanvasMountWire.SET_DEFAULT -> ADMIN_FULL
         method in CanvasMountWire.METHODS -> CANVAS_MOUNT_WRITE
         method in BEADS_READ_METHODS -> BEADS_READ
         method in BEADS_WRITE_METHODS -> BEADS_WRITE

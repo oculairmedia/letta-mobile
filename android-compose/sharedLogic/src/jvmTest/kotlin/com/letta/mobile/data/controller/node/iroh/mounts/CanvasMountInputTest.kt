@@ -45,6 +45,8 @@ private val CASES = listOf(
     Malformed(CanvasMountRoute.BIND, bind("note" to text("anything")), "params", "unknown_field"),
     Malformed(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A, CANVAS), "params", "unknown_field"),
     Malformed(CanvasMountRoute.SET_DEFAULT, bindingParams(AGENT_A, CONV_A, CANVAS), "params", "unknown_field"),
+    Malformed(CanvasMountRoute.CLEAR_DEFAULT, defaultParams(AGENT_A, CANVAS), "params", "unknown_field"),
+    Malformed(CanvasMountRoute.CLEAR_DEFAULT, JsonObject(emptyMap()), "agent_id", "missing"),
     Malformed(CanvasMountRoute.REPLACE, bind(CanvasMountWire.AGENT_ID to JsonObject(emptyMap())), "agent_id", "not_string"),
 )
 
