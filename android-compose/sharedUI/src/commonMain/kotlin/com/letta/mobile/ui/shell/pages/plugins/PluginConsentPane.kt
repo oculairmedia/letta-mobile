@@ -69,8 +69,18 @@ private fun ConsentItemRow(item: PluginConsentItem, decision: Boolean?, onDecide
             item.description?.let { Detail(it) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-            LettaChipTab(ALLOW, active = decision == true, onClick = { onDecide(true) }, modifier = Modifier.testTag(PluginsPageTags.allow(item)))
-            LettaChipTab(DENY, active = decision == false, onClick = { onDecide(false) }, modifier = Modifier.testTag(PluginsPageTags.deny(item)))
+            LettaChipTab(
+                ALLOW,
+                active = decision == true,
+                onClick = { onDecide(true) },
+                modifier = Modifier.testTag(PluginsPageTags.allow(item)),
+            )
+            LettaChipTab(
+                DENY,
+                active = decision == false,
+                onClick = { onDecide(false) },
+                modifier = Modifier.testTag(PluginsPageTags.deny(item)),
+            )
         }
     }
 }
