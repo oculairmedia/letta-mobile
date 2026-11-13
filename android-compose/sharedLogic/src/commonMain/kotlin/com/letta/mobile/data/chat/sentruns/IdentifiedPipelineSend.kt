@@ -42,8 +42,9 @@ internal class IdentifiedPipelineSend(
         IdentifiedSendBinding(ledger.state) { text -> send(OutgoingText(text, target()), ledger) }
 
     private suspend fun send(outgoing: OutgoingText, ledger: SentRunLedger): SentMessageId? {
-        val enqueued = scope.async { lock.withLock { enqueue(outgoing, ledger) } }
-        return withContext(NonCancellable) { enqueued.await() }
+        // The child returns its outcome as a value: a failure must reach this caller, never cancel [scope].
+        val enqueued = scope.async { runCatching { lock.withLock { enqueue(outgoing, ledger) } } }
+        return withContext(NonCancellable) { enqueued.await() }.getOrThrow()
     }
 
     /** Under [lock]: sends [outgoing] and returns the otid it was enqueued under, if any. */
