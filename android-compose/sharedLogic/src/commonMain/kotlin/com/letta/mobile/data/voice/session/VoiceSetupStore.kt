@@ -27,7 +27,15 @@ data class VoiceSetup(
     val grants: VoiceEndpointGrants = VoiceEndpointGrants(),
     /** Whether an API key is kept in the secure store. */
     val hasApiKey: Boolean = false,
+    /**
+     * The person asked to interrupt replies by speaking even though the microphone is not
+     * echo-cancelled (they use headphones). Where it is echo-cancelled, speaking always interrupts.
+     */
+    val interruptBySpeaking: Boolean = false,
 ) {
+    /** Whether speaking over a reply interrupts it, on a microphone path that is [echoCancelled] or not. */
+    fun bargeInByVoice(echoCancelled: Boolean): Boolean = echoCancelled || interruptBySpeaking
+
     /** Whether the person agreed to send both audio and reply text to the configured endpoint. */
     val consented: Boolean
         get() {
@@ -140,6 +148,12 @@ class VoiceSetupStore(
         }
     }
 
+    /** Stores whether to interrupt replies by speaking without echo cancellation; takes effect from the next start. */
+    fun setInterruptBySpeaking(enabled: Boolean) {
+        settings.putString(KEY_INTERRUPT_BY_SPEAKING, enabled.toString())
+        state.value = read()
+    }
+
     /** The key a [draft] would leave stored: the typed one, none when blanked, else the stored one. */
     fun keyAfter(draft: VoiceSetupDraft): String? = when {
         secrets == null -> null
@@ -160,6 +174,7 @@ class VoiceSetupStore(
         endpoint = VoiceEndpointSettings(baseUrl = settings.getString(KEY_BASE_URL)?.takeIf { it.isNotBlank() }?.let(::SpeechEndpointUrl)),
         grants = VoiceEndpointGrants(parseGrants(settings.getString(KEY_GRANTS).orEmpty())),
         hasApiKey = storedKey() != null,
+        interruptBySpeaking = settings.getString(KEY_INTERRUPT_BY_SPEAKING) == true.toString(),
     )
 
     private fun parseGrants(text: String): Set<VoiceEndpointGrant> = text.split(GRANT_SEPARATOR).mapNotNull { entry ->
@@ -177,6 +192,9 @@ class VoiceSetupStore(
 
         /** The API key; hosts must register it as a sensitive key of their secure store. */
         const val KEY_API_KEY: String = "voice.endpoint.apiKey"
+
+        /** Whether to interrupt replies by speaking on a microphone without echo cancellation. */
+        const val KEY_INTERRUPT_BY_SPEAKING: String = "voice.interruptBySpeaking"
 
         private const val GRANT_SEPARATOR = "\n"
         private const val FIELD_SEPARATOR = " "

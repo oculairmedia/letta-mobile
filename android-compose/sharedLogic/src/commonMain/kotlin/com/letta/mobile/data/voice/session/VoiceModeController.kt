@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.session
 
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceLoopConfig
+import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
@@ -33,6 +34,9 @@ enum class VoicePress {
     /** Voice mode was on and is stopping. */
     STOPPED,
 
+    /** The reply was being spoken: it stops and voice mode listens again (it stays on). */
+    INTERRUPTED,
+
     /** The setup is incomplete: open the Voice settings. Nothing started. */
     OPEN_SETUP,
 
@@ -49,10 +53,13 @@ enum class VoicePress {
  * the chat bar.
  *
  * A press checks the setup first (a gap opens the Voice settings and starts nothing), then the
- * microphone permission (a refusal settles in [VoiceModeState.NeedsMicPermission]), then starts. The
- * microphone and the speaker are released when: [stop] is called (a second press), the session's
- * conversation changes to another one, or [shutdown] runs (the page leaves, the window closes; hosts
- * also call [stop] when the app goes to the background). A failure keeps the session so [retry] can
+ * microphone permission (a refusal settles in [VoiceModeState.NeedsMicPermission]), then starts. A
+ * press while the reply is being spoken only interrupts it and voice mode listens on;
+ * where the microphone is not echo-cancelled (and the person has not asked to interrupt by speaking)
+ * that press is the only way to interrupt, since the ear ignores the microphone while the app speaks
+ * ([bargeInByVoice]). The microphone and the speaker are released when: [stop] is called (a press
+ * while not speaking), the session's conversation changes to another one, or [shutdown] runs (the
+ * page leaves, the window closes; hosts also call [stop] when the app goes to the background). A failure keeps the session so [retry] can
  * hand the ear its kept capture; the loop has already closed the microphone by then.
  *
  * A failed utterance (not delivered, unattributed, a failed run, an answer that timed out, a failed
@@ -90,16 +97,28 @@ class VoiceModeController(
     /** What the chat bar shows. */
     val state: StateFlow<VoiceModeState> = mutableState.asStateFlow()
 
+    private val mutableBargeInByVoice = MutableStateFlow(false)
+
+    /**
+     * Whether speaking interrupts the reply in the current (or last) session: false where voice mode
+     * runs half-duplex and only a press interrupts. The status strip words its hint from it.
+     */
+    val bargeInByVoice: StateFlow<Boolean> = mutableBargeInByVoice.asStateFlow()
+
     init {
         runtime.scope.launch(runtime.dispatcher) { store.setup.collect { offer(Command.SetupChanged) } }
     }
 
     /**
-     * The voice button: stops voice mode while it is [VoiceModeState.active]; otherwise checks the
-     * setup, then the microphone permission, then starts. Call from the UI thread.
+     * The voice button (and the status strip's Interrupt): while the reply is being spoken it stops
+     * it at once (the speaker is flushed, not drained) and voice mode listens again, without
+     * leaving voice mode; nothing happens if the reply has already ended when the press is applied.
+     * Otherwise it stops voice mode while it is [VoiceModeState.active], or checks the setup, then
+     * the microphone permission, then starts. Call from the UI thread.
      */
     fun press(): VoicePress = when {
         closing.value -> VoicePress.IGNORED
+        mutableState.value == VoiceModeState.Speaking -> VoicePress.INTERRUPTED.also { offer(Command.Interrupt) }
         mutableState.value.active -> VoicePress.STOPPED.also { stop() }
         else -> pressToStart()
     }
@@ -153,6 +172,7 @@ class VoiceModeController(
             is Command.Start -> begin(command.session)
             is Command.Stop -> end(VoiceModeState.Off, command.reason)
             is Command.Retry -> retryOrBegin(command.session)
+            Command.Interrupt -> live?.interruptSpeech()
             Command.SetupChanged -> clearResolvedSetup()
             is Command.Idle -> showIdle(command.state)
             is Command.Close -> end(VoiceModeState.Off, SHUTDOWN).also { command.done.complete(Unit) }
@@ -197,7 +217,8 @@ class VoiceModeController(
         }
         val started = launchLoop(session, setup) ?: return
         live = started
-        telemetry.started()
+        mutableBargeInByVoice.value = started.set.bargeInByVoice
+        telemetry.started(echoCancelled = started.set.echoCancelled, bargeInByVoice = started.set.bargeInByVoice)
         mutableState.value = VoiceModeState.Listening
         started.loop.activate(VoiceActivationKind.TAP)
     }
@@ -215,7 +236,8 @@ class VoiceModeController(
             mutableState.value = VoiceModeState.Error(VoiceErrorCode.PREPARATION_FAILED)
             return null
         }
-        val loop = VoiceLoop(set.engines, config, runtime.copy(scope = scope, observer = telemetry.loop))
+        val loopConfig = config.copy(voiceInterrupts = config.voiceInterrupts && set.bargeInByVoice)
+        val loop = VoiceLoop(set.engines, loopConfig, runtime.copy(scope = scope, observer = telemetry.loop))
         val follower = scope.launch { loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gap) } }
         val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(telemetry::loopState) }
         val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
@@ -243,7 +265,12 @@ class VoiceModeController(
         const val SHUTDOWN = "shutdown"
     }
 
-    private class LiveVoice(val loop: VoiceLoop, val set: VoiceEngineSet, val job: Job, val watchers: List<Job>)
+    private class LiveVoice(val loop: VoiceLoop, val set: VoiceEngineSet, val job: Job, val watchers: List<Job>) {
+        /** A tap while speaking: the loop stops playback, drops what was pending and listens. */
+        fun interruptSpeech() {
+            if (loop.state.value.phase == VoicePhase.SPEAKING) loop.activate(VoiceActivationKind.TAP)
+        }
+    }
 
     private sealed interface Command {
         class Start(val session: VoiceChatSession?) : Command
@@ -251,6 +278,8 @@ class VoiceModeController(
         data class Stop(val reason: String) : Command
 
         class Retry(val session: VoiceChatSession?) : Command
+
+        data object Interrupt : Command
 
         data object SetupChanged : Command
 

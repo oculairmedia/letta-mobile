@@ -52,7 +52,10 @@ sealed interface VoiceModeState {
         override val active: Boolean get() = true
     }
 
-    /** The agent's reply is being spoken; speaking over it interrupts it. */
+    /**
+     * The agent's reply is being spoken. A press interrupts it; speaking over it does too only where
+     * [VoiceModeController.bargeInByVoice] is true.
+     */
     data object Speaking : VoiceModeState {
         override val active: Boolean get() = true
     }

@@ -25,6 +25,19 @@ class VoiceSetupStoreTest {
     private val store = VoiceSetupStore(settings, secrets)
 
     @Test
+    fun interruptingBySpeakingIsOffByDefaultKeptAcrossSavesAndAlwaysOnWithEchoCancellation() {
+        assertFalse(store.setup.value.interruptBySpeaking)
+        assertFalse(store.setup.value.bargeInByVoice(echoCancelled = false))
+        assertTrue(store.setup.value.bargeInByVoice(echoCancelled = true))
+        store.setInterruptBySpeaking(true)
+        store.save(VoiceSetupDraft("http://127.0.0.1:8880", consent = true))
+        assertTrue(VoiceSetupStore(settings, secrets).setup.value.interruptBySpeaking)
+        assertTrue(store.setup.value.bargeInByVoice(echoCancelled = false))
+        store.setInterruptBySpeaking(false)
+        assertFalse(store.setup.value.bargeInByVoice(echoCancelled = false))
+    }
+
+    @Test
     fun aPlainUrlWithConsentGrantsBothPayloadsToItsOriginOnly() {
         assertNull(store.save(VoiceSetupDraft("http://127.0.0.1:8880", consent = true)))
         val setup = store.setup.value

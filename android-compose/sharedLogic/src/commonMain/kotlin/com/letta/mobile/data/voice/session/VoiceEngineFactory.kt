@@ -46,10 +46,19 @@ class VoiceEngineRequest internal constructor(
     override fun toString(): String = "VoiceEngineRequest(keySet=${apiKey != null})"
 }
 
-/** One session's engines, and how to let go of what they hold once the loop has shut down. */
+/**
+ * One session's engines, and how to let go of what they hold once the loop has shut down; with
+ * whether the microphone path is [echoCancelled] and whether these engines let the person
+ * interrupt by speaking ([bargeInByVoice]; false means a half-duplex ear that ignores the
+ * microphone while the app speaks, so only a press interrupts).
+ */
 class VoiceEngineSet(
     /** The ear, responder and mouth. */
     val engines: VoiceEngines,
+    /** Whether the platform cancels the app's own playback out of the microphone. */
+    val echoCancelled: Boolean = false,
+    /** Whether speech over the app's output interrupts it. */
+    val bargeInByVoice: Boolean = true,
     private val onRelease: () -> Unit,
 ) {
     /** Releases the engines' resources (the retained capture, the HTTP client). Call once, after the loop's shutdown. */
@@ -66,9 +75,10 @@ fun interface VoiceEngineFactory {
  * The endpoint engines over a platform's [audio]: a voice-activity ear on the microphone (reopened
  * when a device goes away) that transcribes each turn through the endpoint, the agent's chat as the
  * responder, and a mouth that synthesises WAVE audio through the endpoint and plays it on the
- * speaker. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
- * release. Every engine reports its decisions as `VoiceMode` telemetry (states, reasons, ids,
- * counts and levels; never audio, text, the key or the address).
+ * speaker. Where the microphone is not echo-cancelled and the person has not asked to interrupt
+ * by speaking, the ear is half-duplex. Each session gets its own HTTP client on a fresh engine
+ * from [httpEngine], closed on release. Every engine reports its decisions as `VoiceMode`
+ * telemetry (states, reasons, ids, counts and levels; never audio, text, the key or the address).
  */
 class EndpointVoiceEngineFactory(
     private val audio: VoiceAudio,
@@ -83,13 +93,16 @@ class EndpointVoiceEngineFactory(
         val telemetry = request.telemetry
         val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)), telemetry)
         val microphone = RecoveringFrameSource(audio.microphone(format), deviceChanges = audio.deviceChanges())
-        val ear = VadVoiceEar(microphone, transcriber, VadEarConfig(format, observer = VoiceEarTelemetry(telemetry)))
+        val echoCancelled = microphone.echoCancelled
+        val bargeInByVoice = request.setup.bargeInByVoice(echoCancelled)
+        val earConfig = VadEarConfig(format, observer = VoiceEarTelemetry(telemetry), halfDuplex = !bargeInByVoice)
+        val ear = VadVoiceEar(microphone, transcriber, earConfig)
         val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
         val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope), telemetry)
         val session = TelemetryVoiceChatSession(request.session, telemetry)
         val responder = TelemetryResponder(VoiceChatResponder(session), telemetry, session)
         val engines = VoiceEngines(ear = ear, responder = responder, mouth = mouth)
-        return VoiceEngineSet(engines) {
+        return VoiceEngineSet(engines, echoCancelled, bargeInByVoice) {
             ear.close()
             client.close()
             engine.close()

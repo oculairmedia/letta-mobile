@@ -62,7 +62,11 @@ private class FakeMicrophone(var allowed: Boolean, var answer: Boolean = allowed
 
 /** The controller over the loop's scripted fakes, on the test scheduler. */
 @OptIn(ExperimentalCoroutinesApi::class)
-private class ControllerHarness(private val test: TestScope, microphoneAllowed: Boolean = true) {
+private class ControllerHarness(
+    private val test: TestScope,
+    microphoneAllowed: Boolean = true,
+    bargeInByVoice: Boolean = true,
+) {
     val log = EngineLog()
     val ear = FakeEar(log)
     val mouth = FakeMouth(log)
@@ -80,7 +84,7 @@ private class ControllerHarness(private val test: TestScope, microphoneAllowed: 
         store = store,
         engines = VoiceEngineFactory {
             creates++
-            VoiceEngineSet(VoiceEngines(ear, responder, mouth)) { releases++ }
+            VoiceEngineSet(VoiceEngines(ear, responder, mouth), bargeInByVoice = bargeInByVoice) { releases++ }
         },
         microphone = microphone,
         runtime = VoiceLoopRuntime(test.backgroundScope, StandardTestDispatcher(test.testScheduler), clock),
@@ -165,10 +169,37 @@ class VoiceModeControllerTest {
         h.mouth.started(SpeechSegmentId(1))
         h.settle()
         assertEquals(VoiceModeState.Speaking, h.state)
-        assertEquals(VoicePress.STOPPED, h.press())
+        assertEquals(VoicePress.INTERRUPTED, h.press())
         assertTrue("mouth:stop" in h.log.entries, "a press while speaking stops the speaker")
+        assertEquals(VoiceModeState.Listening, h.state, "and voice mode listens on")
+        assertTrue(h.ear.listening)
+        assertEquals(VoicePress.STOPPED, h.press())
         assertEquals(VoiceModeState.Off, h.state)
         assertFalse(h.ear.listening)
+    }
+
+    @Test
+    fun halfDuplexSpeechOverTheReplyIsIgnoredAndOnlyAPressInterrupts() = runTest {
+        val h = ControllerHarness(this, bargeInByVoice = false)
+        h.configure()
+        h.press()
+        assertEquals(false, h.controller.bargeInByVoice.value)
+        h.ear.say(VoiceText("what time is it"))
+        h.settle()
+        h.responder.last.send(VoiceReplyEvent.Text(VoiceText("It is noon. ")))
+        h.settle()
+        h.mouth.started(SpeechSegmentId(1))
+        h.settle()
+        assertEquals(VoiceModeState.Speaking, h.state)
+        h.ear.hear(VoiceEarEvent.SpeechStarted)
+        h.settle()
+        assertEquals(VoiceModeState.Speaking, h.state, "the app's own voice through the speakers interrupts nothing")
+        assertEquals(0, h.mouth.stops)
+        assertEquals(VoicePress.INTERRUPTED, h.press())
+        assertEquals(1, h.mouth.stops)
+        assertEquals(VoiceModeState.Listening, h.state)
+        assertTrue(h.ear.listening)
+        assertEquals(1, h.ear.opens(), "voice mode never left: the microphone stayed open")
     }
 
     @Test

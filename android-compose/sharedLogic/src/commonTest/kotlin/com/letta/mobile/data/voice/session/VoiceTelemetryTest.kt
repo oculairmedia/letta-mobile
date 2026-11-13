@@ -1,6 +1,7 @@
 package com.letta.mobile.data.voice.session
 
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
@@ -158,6 +159,39 @@ class VoiceTelemetryTest {
         assertEquals("3", attr(named("speech.started"), "segment"))
         assertEquals("BAD_RESPONSE", attr(named("speech.failed"), "kind"))
         assertNoText()
+    }
+
+    @Test
+    fun aSegmentThatPlaysToItsEndIsReportedAsEnded() = runTest {
+        val mouth = TelemetryMouth(
+            object : VoiceMouth {
+                override val events: Flow<VoiceMouthEvent> =
+                    flowOf(VoiceMouthEvent.Started(SpeechSegmentId(2)), VoiceMouthEvent.Finished(SpeechSegmentId(2)))
+
+                override fun speak(segment: SpeechSegment) = Unit
+
+                override fun flush() = Unit
+
+                override suspend fun stop() = Unit
+            },
+            telemetry,
+        )
+        mouth.events.toList()
+        assertEquals("2", attr(named("speech.ended"), "segment"))
+    }
+
+    @Test
+    fun theStartSaysWhetherTheMicrophoneIsEchoCancelledAndAStopHowLongTheSpeakerTookToFallSilent() {
+        telemetry.started(echoCancelled = false, bargeInByVoice = false)
+        telemetry.loop.speechStopped(SpeechStopReason.BUTTON, 42.milliseconds)
+        telemetry.loop.speechStopped(SpeechStopReason.MODE_STOPPED, 7.milliseconds)
+
+        val started = named("mode.started")
+        assertEquals("false", attr(started, "echoCancelled"))
+        assertEquals("false", attr(started, "bargeInByVoice"))
+        val stops = voiceEvents().filter { it.name == "speech.stopped" }
+        assertEquals(listOf("BUTTON", "MODE_STOPPED"), stops.map { attr(it, "reason") })
+        assertEquals(listOf("42", "7"), stops.map { attr(it, "silentMs") })
     }
 
     @Test

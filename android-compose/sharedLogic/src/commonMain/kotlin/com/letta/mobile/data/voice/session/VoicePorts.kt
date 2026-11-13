@@ -21,6 +21,13 @@ interface VoiceAudio {
     fun speaker(): AudioPlayer
 }
 
+/**
+ * Whether this platform's voice-mode microphone path is echo-cancelled
+ * ([AudioFrameSource.echoCancelled]); creating the source opens nothing, so this is safe to read
+ * before any session (the Voice settings use it).
+ */
+val VoiceAudio.echoCancelled: Boolean get() = microphone(AudioFrameFormat()).echoCancelled
+
 /** Whether the app may record, asked for on demand (Android's runtime permission; always granted on desktop). */
 interface MicrophoneAccess {
     /** True when recording is allowed right now. */

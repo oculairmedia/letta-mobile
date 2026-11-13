@@ -3,6 +3,7 @@ package com.letta.mobile.data.voice.session
 import com.letta.mobile.data.flow.DerivedStateFlow
 import com.letta.mobile.data.voice.InterruptStatus
 import com.letta.mobile.data.voice.SpeechSkipReason
+import com.letta.mobile.data.voice.SpeechStopReason
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.VoiceText
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlin.concurrent.Volatile
 import kotlin.math.roundToInt
+import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -62,10 +64,13 @@ internal class VoiceTelemetry(private val timeSource: TimeSource = TimeSource.Mo
     fun event(name: String, vararg attrs: Pair<String, TelemetryValue>) =
         Telemetry.event(TAG, name, *attrs, "tMs" attr since?.elapsedNow()?.inWholeMilliseconds)
 
-    /** Voice mode started a session: the session's clock starts here. */
-    fun started() {
+    /**
+     * Voice mode started a session: the session's clock starts here. Reports whether the microphone
+     * path is echo-cancelled and whether speaking interrupts replies (false: half-duplex).
+     */
+    fun started(echoCancelled: Boolean = false, bargeInByVoice: Boolean = true) {
         since = timeSource.markNow()
-        event("mode.started")
+        event("mode.started", "echoCancelled" attr echoCancelled, "bargeInByVoice" attr bargeInByVoice)
     }
 
     /** Voice mode stopped for [reason]. */
@@ -93,10 +98,17 @@ internal class VoiceTelemetry(private val timeSource: TimeSource = TimeSource.Mo
         "floorDb" attr report.floorDb?.roundToInt(),
     )
 
-    /** The loop's own decisions: `speech.skipped` with its reason and how many segments. */
+    /**
+     * The loop's own decisions: `speech.skipped` with its reason and how many segments, and
+     * `speech.stopped` with its reason and `silentMs`, the time from the stop request until the
+     * speaker was released.
+     */
     val loop: VoiceLoopObserver = object : VoiceLoopObserver {
         override fun speechSkipped(reason: SpeechSkipReason, segments: Int) =
             event("speech.skipped", "reason" attr reason.name, "segments" attr segments)
+
+        override fun speechStopped(reason: SpeechStopReason, silentAfter: Duration) =
+            event("speech.stopped", "reason" attr reason.name, "silentMs" attr silentAfter.inWholeMilliseconds)
     }
 
     private companion object {
@@ -319,13 +331,15 @@ internal class TelemetryResponder(
 
 /**
  * [delegate] with each segment it is asked to speak reported by character count, and each
- * segment's playback start, end or failure (by error kind) as the loop reads it.
+ * segment's playback start (`speech.started`), natural end (`speech.ended`) or failure
+ * (`speech.failed`, by error kind) as the loop reads it. A stop is reported by the loop
+ * (`speech.stopped`).
  */
 internal class TelemetryMouth(private val delegate: VoiceMouth, private val telemetry: VoiceTelemetry) : VoiceMouth by delegate {
     override val events: Flow<VoiceMouthEvent> = delegate.events.onEach { event ->
         when (event) {
             is VoiceMouthEvent.Started -> telemetry.event("speech.started", "segment" attr event.id.value)
-            is VoiceMouthEvent.Finished -> telemetry.event("speech.played", "segment" attr event.id.value)
+            is VoiceMouthEvent.Finished -> telemetry.event("speech.ended", "segment" attr event.id.value)
             is VoiceMouthEvent.Failed -> telemetry.event(
                 "speech.failed",
                 "segment" attr event.id.value,
