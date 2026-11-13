@@ -56,7 +56,6 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_unrestricted
 import com.letta.mobile.sharedui.resources.composer_permission_mode_unrestricted_hint
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
@@ -118,7 +117,7 @@ internal fun permissionModeEntry(state: ChatPermissionModeUiState): PermissionMo
 
 /**
  * The permission mode as one quiet line under the pointer card: the entry's icon, its label in small
- * muted text (ellipsized, never wrapped) and a chevron; pressing it opens [ComposerPermissionModePicker]
+ * muted text (ellipsized, never wrapped), no chevron; pressing it opens [ComposerPermissionModePicker]
  * above it. Its note stays above the composer ([ComposerPermissionModeNoteRow]). One focus stop,
  * announced as the permission mode with the mode (and the runtime it governs) as its state.
  */
@@ -153,12 +152,6 @@ internal fun ComposerPermissionModeLine(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
-            )
-            Icon(
-                LettaIcons.KeyboardArrowDown,
-                contentDescription = null,
-                tint = muted,
-                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
         ComposerPermissionModePicker(state, open, onSelect, onDismiss = { open = false })

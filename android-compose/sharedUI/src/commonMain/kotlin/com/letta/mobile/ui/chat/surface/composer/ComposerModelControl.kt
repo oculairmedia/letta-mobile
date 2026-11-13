@@ -16,8 +16,12 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_effort_default
+import com.letta.mobile.sharedui.resources.composer_effort_group
+import com.letta.mobile.sharedui.resources.composer_effort_header
+import com.letta.mobile.sharedui.resources.composer_effort_unavailable
 import com.letta.mobile.sharedui.resources.composer_model_control
 import com.letta.mobile.sharedui.resources.composer_model_effort_state
 import com.letta.mobile.sharedui.resources.composer_model_fallback
@@ -25,8 +29,9 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatModelHandle
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.context.ModelPickerEffortChoice
+import com.letta.mobile.ui.context.ModelPickerEffortSection
 import com.letta.mobile.ui.context.ModelPickerHost
-import com.letta.mobile.ui.modelcontrol.ModelPickerEffortSection
 import com.letta.mobile.ui.providers.icons.ProviderIcons
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -76,18 +81,37 @@ private fun currentModelEfforts(model: ChatModelUiState): List<String> =
     ComposerEffort.sorted(model.options.firstOrNull { it.handle == model.currentHandle }?.reasoningEfforts.orEmpty())
 
 /**
- * The picker's effort section for the current model: its levels, the one in force, and a choice
- * written through [ChatActions.selectModel] as the conversation's effort. Null without a current model.
+ * The picker's effort section for the current model: "Default" then its levels in ladder order, the
+ * one in force selected, a choice written through [ChatActions.selectModel] as the conversation's
+ * effort; for a model without levels, the reason instead. Null without a current model.
  */
 @Composable
 internal fun composerEffortSection(model: ChatModelUiState?, actions: ChatActions): ModelPickerEffortSection? {
     val handle = model?.currentHandle ?: return null
+    val modelLabel = model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) }
+    val efforts = currentModelEfforts(model)
+    val choices = if (efforts.isEmpty()) emptyList() else effortChoices(efforts, model.currentEffort)
     return ModelPickerEffortSection(
-        modelLabel = model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) },
-        efforts = currentModelEfforts(model),
-        current = model.currentEffort,
+        header = stringResource(Res.string.composer_effort_header),
+        groupLabel = stringResource(Res.string.composer_effort_group, modelLabel),
+        choices = choices,
+        unavailableReason = if (efforts.isEmpty()) stringResource(Res.string.composer_effort_unavailable, modelLabel) else null,
         onSelect = { choice -> actions.selectModel(ChatModelHandle(handle), choice) },
     )
+}
+
+/** "Default" (the provider's), then each of [efforts], [current] selected (none selects "Default"). */
+@Composable
+private fun effortChoices(efforts: List<String>, current: String?): List<ModelPickerEffortChoice> {
+    val default = ModelPickerEffortChoice(
+        key = ModelPickerEffortChoice.DEFAULT_KEY,
+        label = stringResource(Res.string.composer_effort_default),
+        selected = current == null,
+        choice = ReasoningEffortChoice.ProviderDefault,
+    )
+    return listOf(default) + efforts.map { effort ->
+        ModelPickerEffortChoice(effort, ComposerEffort.labelOf(effort), effort == current, ReasoningEffortChoice.Named(effort))
+    }
 }
 
 /**

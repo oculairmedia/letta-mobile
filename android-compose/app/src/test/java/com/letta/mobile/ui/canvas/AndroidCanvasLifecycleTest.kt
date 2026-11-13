@@ -65,6 +65,7 @@ class AndroidCanvasLifecycleTest {
         lazySecureSettingsStore = mockk(), lazyConversationRunRegistry = mockk(), lazyAttentionPrefs = mockk(),
         lazyAgentDefaults = mockk(), lazyCanvasBoards = Lazy { retained },
         lazyCanvasViewers = Lazy { CanvasDocumentViewerRegistry() }, lazySubagentRepository = mockk(),
+        lazySharedNotebooks = mockk(),
     )
 
     @Test

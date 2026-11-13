@@ -150,6 +150,7 @@ private fun androidState(shell: WorkspaceShell, agents: List<Agent>, fleet: List
             lanes = shell.layout.lanes.config.collectAsStateWithLifecycle().value,
             sidebarVisible = shell.layout.state.isSidebarVisible,
             reducedMotion = rememberReducedMotionEnabled(),
+            lanesStore = shell.layout.lanes,
         ),
     )
 }
