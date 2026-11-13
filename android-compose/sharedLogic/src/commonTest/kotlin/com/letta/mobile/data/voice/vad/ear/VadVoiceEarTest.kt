@@ -188,7 +188,8 @@ class VadVoiceEarTest {
 
     @Test
     fun theEchoGuardIgnoresModerateSpeechWhileTheAppSpeaks() = runTest {
-        val source = ScriptedSource(frames(PRE_ROLL_VALUE, 4) + frames(600, 12) + frames(0, 40) + frames(SPEECH_VALUE, 12))
+        // Barge-in needs 400 ms of voice (25 hops): 14 frames are 28 hops.
+        val source = ScriptedSource(frames(PRE_ROLL_VALUE, 4) + frames(600, 12) + frames(0, 40) + frames(SPEECH_VALUE, 14))
         val transcriber = ScriptedTranscriber(heard("stop"))
         val ear = valueEar(source, transcriber)
         ear.setOutputActive(true)

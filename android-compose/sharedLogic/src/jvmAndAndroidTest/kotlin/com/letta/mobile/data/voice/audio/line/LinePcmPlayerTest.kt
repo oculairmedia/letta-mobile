@@ -64,7 +64,30 @@ private val options = PlayerOptions(stallTimeout = 50.milliseconds, drainPoll = 
 private fun wavClip(samples: Int, rate: Int = 24_000) =
     AudioClip(WavCodec.encode(PcmAudio(ShortArray(samples) { 1_000 }, PcmFormat(rate))), AudioEncoding.WAV)
 
+/**
+ * A clip shaped like the local Qwen3-TTS server's streamed answer: 24 kHz mono 16-bit PCM WAVE
+ * whose RIFF and data sizes are the streaming placeholder 0xFFFFFFFF.
+ */
+private fun streamedWavClip(samples: ShortArray): AudioClip {
+    val canonical = WavCodec.encode(PcmAudio(samples, PcmFormat(24_000)))
+    for (sizeField in listOf(4, 40)) for (byte in 0 until 4) canonical[sizeField + byte] = 0xFF.toByte()
+    return AudioClip(canonical, AudioEncoding.WAV)
+}
+
 class LinePcmPlayerTest {
+    @Test
+    fun aStreamedWaveWithPlaceholderSizesIsPlayedWholeAtItsRate() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript())
+        val samples = ShortArray(7_200) { (it % 200 - 100).toShort() }
+        var opened: PcmFormat? = null
+        val recording = object : PcmOutputDevice {
+            override fun open(format: PcmFormat): PcmOutputLine = speaker.open(format).also { opened = format }
+        }
+        LinePcmPlayer(recording, options).play(streamedWavClip(samples)) {}
+        assertEquals(PcmFormat(24_000), opened)
+        assertEquals(samples.toList(), speaker.written.toList())
+    }
+
     @Test
     fun aWaveClipIsWrittenWholeWithOneLevelPerChunk() = runBlocking {
         val speaker = FakeSpeaker(SpeakerScript())

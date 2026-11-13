@@ -9,8 +9,10 @@ import com.letta.mobile.data.voice.endpoint.EndpointTranscriber
 import com.letta.mobile.data.voice.engine.VoiceEar
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
 import com.letta.mobile.data.voice.vad.EndOfTurnPolicy
+import com.letta.mobile.data.voice.vad.EnergyDetectorConfig
 import com.letta.mobile.data.voice.vad.EnergySpeechDetector
 import com.letta.mobile.data.voice.vad.SpeechDetectorFactory
+import com.letta.mobile.data.voice.vad.VadSensitivity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 
@@ -37,8 +39,14 @@ data class VadEarConfig(
     val format: AudioFrameFormat = AudioFrameFormat(),
     /** When turns start and end. */
     val policy: EndOfTurnPolicy = EndOfTurnPolicy(),
+    /** How readily the built-in detector hears speech; used by the default [detectors]. */
+    val sensitivity: VadSensitivity = VadSensitivity.NORMAL,
     /** The voice-activity detector, created afresh for every listen. */
-    val detectors: SpeechDetectorFactory = EnergySpeechDetector.factory(),
+    val detectors: SpeechDetectorFactory = EnergySpeechDetector.factory(EnergyDetectorConfig.forSensitivity(sensitivity)),
+    /** Which transcripts are dropped instead of sent (noise the recogniser wrote words for). */
+    val transcripts: TranscriptPolicy = TranscriptPolicy(),
+    /** Hears the ear's turn decisions, for diagnostics. */
+    val observer: EarObserver = EarObserver.None,
 ) {
     init {
         require(format.channels == 1) { "The voice-activity ear listens to mono audio" }
@@ -48,7 +56,10 @@ data class VadEarConfig(
 /**
  * A [VoiceEar] built from a frame [source], a voice-activity detector, an end-of-turn policy and a
  * [transcriber]. It decides end of turn itself (trailing silence, the hard cap, or [commitTurn]) and
- * then transcribes the turn, pre-roll included.
+ * then transcribes the turn, pre-roll included. A sound that never had enough voice is dropped
+ * before transcription, and a transcript the [VadEarConfig.transcripts] policy drops (empty, no
+ * words, a stock noise phrase from a short quiet turn) ends the turn as an empty utterance, so the
+ * loop listens on and nothing is sent.
  *
  * Events: [VoiceEarEvent.ListeningStarted] with the first frame, [VoiceEarEvent.InputLevel] per
  * frame, [VoiceEarEvent.SpeechStarted] once speech has lasted the policy's minimum (the barge-in
