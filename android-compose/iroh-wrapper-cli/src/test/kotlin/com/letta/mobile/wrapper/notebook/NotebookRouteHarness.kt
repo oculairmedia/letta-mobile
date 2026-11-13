@@ -25,10 +25,15 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** A paired peer's authenticated connection to [router], as the host sees it. */
-internal fun notebookPeer(router: AdminRpcRouter, peer: String): IrohNodeConnection {
-    val peers = InMemoryPairedPeerStore()
-    peers.save(PairedPeer(nodeId = peer, name = peer, pairedAtMs = 0L, capabilities = emptySet()))
+/** A store holding [peer] paired with [capabilities]. */
+internal fun pairedPeers(peer: String, capabilities: Set<String> = emptySet()): InMemoryPairedPeerStore =
+    InMemoryPairedPeerStore().apply { save(PairedPeer(nodeId = peer, name = peer, pairedAtMs = 0L, capabilities = capabilities)) }
+
+/**
+ * [peer]'s connection to [router], as the host sees it: authenticated while [peers] holds its pairing
+ * (by default a pairing with no capabilities), unauthenticated when it does not.
+ */
+internal fun notebookPeer(router: AdminRpcRouter, peer: String, peers: InMemoryPairedPeerStore = pairedPeers(peer)): IrohNodeConnection {
     val controller = AppServerController::class.java.cast(Proxy.newProxyInstance(
         AppServerController::class.java.classLoader, arrayOf(AppServerController::class.java),
     ) { _, method, _ -> error("Unexpected controller call ${method.name}") })
