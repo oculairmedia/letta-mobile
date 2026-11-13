@@ -37,7 +37,7 @@ class ShellLayoutController(private val store: ShellLayoutStore, val lanes: Shel
      */
     @Composable
     fun workspaceLayout(reducedMotion: Boolean = false, forceCompact: Boolean = false): ShellWorkspaceLayout =
-        ShellWorkspaceLayout(lanes.config.collectAsState().value, state.isSidebarVisible, reducedMotion, forceCompact)
+        ShellWorkspaceLayout(lanes.config.collectAsState().value, state.isSidebarVisible, reducedMotion, forceCompact, lanesStore = lanes)
 }
 
 /** The layout store for [backend] in [preferences]: one record per backend config. */

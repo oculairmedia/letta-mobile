@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
                 LocalAttentionPrefs provides deps.attentionPrefs,
                 LocalAgentDefaults provides deps.agentDefaults,
                 LocalShellTaskRegistry provides deps.subagentRepository,
+                com.letta.mobile.ui.shell.workspace.LocalSharedNotebooks provides deps.sharedNotebooks,
             ) {
                 LettaTheme(
                     appTheme = appThemeState.value,

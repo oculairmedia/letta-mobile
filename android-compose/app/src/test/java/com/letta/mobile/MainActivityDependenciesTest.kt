@@ -2,6 +2,7 @@ package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.canvas.library.CanvasBoardSessions
+import com.letta.mobile.data.canvas.workspace.SharedNotebooks
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -32,6 +33,7 @@ class MainActivityDependenciesTest {
     })
     private val canvasViewers = CountingLazy(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerRegistry())
     private val subagentRepository = CountingLazy(mockk<ISubagentRepository>())
+    private val sharedNotebooks = CountingLazy(mockk<SharedNotebooks>())
 
     private fun newDependencies(
         boardProvider: Lazy<com.letta.mobile.ui.screens.canvas.AndroidCanvasBoards> = canvasBoards,
@@ -46,6 +48,7 @@ class MainActivityDependenciesTest {
         lazyCanvasBoards = boardProvider,
         lazyCanvasViewers = canvasViewers,
         lazySubagentRepository = subagentRepository,
+        lazySharedNotebooks = sharedNotebooks,
     )
 
     @Test
@@ -61,6 +64,7 @@ class MainActivityDependenciesTest {
         assertEquals(0, canvasBoards.resolutions)
         assertEquals(0, canvasViewers.resolutions)
         assertEquals(0, subagentRepository.resolutions)
+        assertEquals(0, sharedNotebooks.resolutions)
     }
 
     @Test
@@ -77,6 +81,7 @@ class MainActivityDependenciesTest {
         assertSame(canvasBoards.value, dependencies.canvasOwner)
         assertSame(canvasViewers.value, dependencies.canvasViewers)
         assertSame(subagentRepository.value, dependencies.subagentRepository)
+        assertSame(sharedNotebooks.value, dependencies.sharedNotebooks)
         assertEquals(1, settingsRepository.resolutions)
     }
 
