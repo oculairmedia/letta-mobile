@@ -109,7 +109,7 @@ class ControlCapabilityHandlersTest {
     ): AdminRpcRouter {
         val r = AdminRpcRouter()
         HealthAdminHandlers.register(r, controller)
-        ModelAdminHandlers.register(r, client)
+        ModelAdminHandlers.register(r, NativeReadTiers(nativeClient = client))
         SkillAdminHandlers.register(r, nativeClient = client)
         ConversationAdminHandlers.register(r, NativeReadTiers(nativeClient = client))
         return r
