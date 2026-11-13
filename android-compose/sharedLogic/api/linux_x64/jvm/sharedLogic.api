@@ -48495,6 +48495,7 @@ public final class com/letta/mobile/data/runtime/TurnFailureNotices {
 	public static final field CONNECTION_LOST_KIND Ljava/lang/String;
 	public static final field GENERIC_MESSAGE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/runtime/TurnFailureNotices;
+	public static final field OTHER_DEVICE_BUSY_KIND Ljava/lang/String;
 	public final fun forCancelledTerminal ()Lcom/letta/mobile/data/runtime/TurnFailureNotice;
 	public final fun forFailedTerminal (Ljava/lang/String;ZZLjava/lang/String;)Lcom/letta/mobile/data/runtime/TurnFailureNotice;
 	public static synthetic fun forFailedTerminal$default (Lcom/letta/mobile/data/runtime/TurnFailureNotices;Ljava/lang/String;ZZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/runtime/TurnFailureNotice;
