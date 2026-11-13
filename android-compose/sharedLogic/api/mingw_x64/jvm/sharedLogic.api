@@ -9004,9 +9004,11 @@ public final class com/letta/mobile/data/canvas/UnauthorizedCanvasMutationExcept
 
 public final class com/letta/mobile/data/canvas/authority/FileNotebookGrantStore : com/letta/mobile/data/canvas/authority/NotebookGrantStore {
 	public fun <init> (Ljava/nio/file/Path;)V
+	public fun documentsOf (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun provision (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/NotebookPeerGrant;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun revoke (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun withGrants (Ljava/lang/String;Ljava/util/Collection;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/authority/HostNotebookAccess {
@@ -9014,6 +9016,8 @@ public final class com/letta/mobile/data/canvas/authority/HostNotebookAccess {
 	public final fun getBackend ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;
 	public final fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
 	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
+	public final fun sharedNotes-e-n832c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sharedNotes-e-n832c$default (Lcom/letta/mobile/data/canvas/authority/HostNotebookAccess;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/authority/NotebookAccessWire {
@@ -9035,7 +9039,9 @@ public final class com/letta/mobile/data/canvas/authority/NotebookAccessWire {
 }
 
 public abstract interface class com/letta/mobile/data/canvas/authority/NotebookGrantStore {
+	public abstract fun documentsOf (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun withGrants (Ljava/lang/String;Ljava/util/Collection;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/authority/NotebookGrantStoreKt {
@@ -9043,11 +9049,31 @@ public final class com/letta/mobile/data/canvas/authority/NotebookGrantStoreKt {
 	public static final fun mayResolveNotebookReference (Lcom/letta/mobile/data/canvas/NotebookPeerGrant;)Z
 }
 
-public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccess {
+public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccess : com/letta/mobile/data/canvas/workspace/SharedNotebooks {
 	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;)V
 	public final fun getBackend ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;
-	public final fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
+	public fun getDirectory ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteDirectory;
+	public fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
 	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
+}
+
+public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccessKt {
+	public static final fun remoteNotebooksOver (Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;
+}
+
+public final class com/letta/mobile/data/canvas/authority/SharedNotesWire {
+	public static final field CURSOR Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/authority/SharedNotesWire;
+	public static final field INVALID_CURSOR Ljava/lang/String;
+	public static final field LIST Ljava/lang/String;
+	public static final field MAX_CHECKED I
+	public static final field MAX_CURSOR_CHARS I
+	public static final field MAX_LISTED I
+	public static final field NEXT_CURSOR Ljava/lang/String;
+	public final fun cursorOf-BnZTiBg (Ljava/lang/String;)Ljava/lang/String;
+	public final fun readSharedNotes (Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
+	public final fun request-wIa-Xck (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
+	public final fun sharedNotes (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;)Lkotlinx/serialization/json/JsonObject;
 }
 
 public final class com/letta/mobile/data/canvas/bubble/CanvasBubbleLayout {
@@ -11980,6 +12006,121 @@ public final class com/letta/mobile/data/canvas/workspace/DocumentWorkspaceState
 	public final fun getTransitioning ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNote {
+	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNote;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNote;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNote;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteBrowser {
+	public fun <init> (Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;)V
+	public final fun closeNote (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun loadMore (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun open (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun refresh (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun workspaceEmptied (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteBrowserKt {
+	public static final fun withdrawn (Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;)Z
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteBrowserState {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun component6 ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;
+	public final fun component7 ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;
+	public final fun copy (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteBrowserState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteBrowserState;Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteBrowserState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getListing ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
+	public final fun getLoading ()Z
+	public final fun getLoadingMore ()Z
+	public final fun getMoreFailed ()Z
+	public final fun getOpenProblem ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;
+	public final fun getOpening ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun getWorkspace ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/workspace/SharedNoteDirectory {
+	public abstract fun list-e-n832c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Denied : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2-Lsr3kjc ()Ljava/lang/String;
+	public final fun copy-e962Jwc (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
+	public static synthetic fun copy-e962Jwc$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNext-Lsr3kjc ()Ljava/lang/String;
+	public final fun getNotes ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+	public static final field Companion Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable$Companion;
+	public static final field INVALID_CURSOR Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable$Companion {
+}
+
+public abstract interface class com/letta/mobile/data/canvas/workspace/SharedNotebooks {
+	public abstract fun getDirectory ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteDirectory;
+	public abstract fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNotesCursor {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNotesCursor;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/channel/ChannelDisplayItem {
@@ -53447,12 +53588,21 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Com
 public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellViews;
 	public final fun getCANVAS-p0dNODo ()Ljava/lang/String;
+	public final fun getDOCUMENT-p0dNODo ()Ljava/lang/String;
 	public final fun getHostOwned ()Ljava/util/Set;
 	public final fun getNOTE-p0dNODo ()Ljava/lang/String;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
 	public final fun getSECRET_REQUEST-p0dNODo ()Ljava/lang/String;
 	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
 	public final fun getTASKS-p0dNODo ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/SharedNotesPlacement {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/SharedNotesPlacement;
+	public final fun getSLOT ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public final fun overCompactPage (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
+	public final fun shown (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
+	public final fun toggled (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult;
 }
 
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAction : java/lang/Enum {

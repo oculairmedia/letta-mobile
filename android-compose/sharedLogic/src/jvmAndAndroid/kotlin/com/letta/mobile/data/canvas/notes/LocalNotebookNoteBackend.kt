@@ -87,11 +87,25 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
 
 /** Decode the exact logical notebook ID expected by the existing local repository. */
 internal fun notebookStorageId(id: NotebookDocumentId): DocumentId {
-    require(id.value.length == 32 && id.value.all { it in '0'..'9' || it in 'a'..'f' }) {
-        "Notebook ID must be the local store's lowercase hex DocumentId"
-    }
+    return requireNotNull(notebookStorageIdOrNull(id)) { "Notebook ID must be the local store's lowercase hex DocumentId" }
+}
+
+/** [notebookStorageId], or null when [id] cannot name a local notebook (see [namesLocalNotebook]). */
+internal fun notebookStorageIdOrNull(id: NotebookDocumentId): DocumentId? {
+    if (!namesLocalNotebook(id)) return null
     return DocumentId.fromBytes(id.value.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
 }
+
+/** Whether [id] has the only form a local notebook ID takes: a DocumentId's 16 bytes as 32 lowercase hex digits. */
+internal fun namesLocalNotebook(id: NotebookDocumentId): Boolean {
+    return id.value.length == LOCAL_NOTEBOOK_ID_CHARS && id.value.all(::isLowercaseHexDigit)
+}
+
+private fun isLowercaseHexDigit(char: Char): Boolean {
+    return char in '0'..'9' || char in 'a'..'f'
+}
+
+private const val LOCAL_NOTEBOOK_ID_CHARS = 32
 
 /** The inverse of [notebookStorageId]: a storage DocumentId as the notebook ID notes and references use. */
 internal fun notebookDocumentId(id: DocumentId): NotebookDocumentId =

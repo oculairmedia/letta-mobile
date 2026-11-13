@@ -62,7 +62,11 @@ import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAtWork
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.shared_notes_hide
+import com.letta.mobile.sharedui.resources.shared_notes_show
 import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.stringResource
 
 /** Test tags for the agent panel's parts. */
 object ShellAgentPanelTags {
@@ -278,6 +282,7 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
     val state = frame.state
     val actions = frame.actions
     var menuOpen by remember { mutableStateOf(false) }
+    val sharedNotes = sharedNotesMenuItem()
     Box {
         Icon(
             imageVector = Icons.Outlined.MoreVert,
@@ -297,10 +302,22 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
                 LettaMenuItem(label = "Memory") { actions.onOpenSection(LensDestination.Memory) },
                 LettaMenuItem(label = "Archived chats") { frame.onOpenDialog(ShellPanelDialog.Archived) },
                 state.chatOptions?.let { LettaMenuItem(label = "Chat options") { frame.onOpenDialog(ShellPanelDialog.ChatOptions) } },
+                sharedNotes,
                 LettaMenuItem(label = "Settings", onClick = actions.onOpenSettings),
             ),
         )
     }
+}
+
+/**
+ * Shows or hides the shared-notes view beside the agent's chat; null while the host cannot reach
+ * shared notes, so the menu never offers a view that would only say it is unavailable.
+ */
+@Composable
+internal fun sharedNotesMenuItem(): LettaMenuItem? {
+    val toggle = LocalSharedNotesToggle.current ?: return null
+    val label = stringResource(if (toggle.shown) Res.string.shared_notes_hide else Res.string.shared_notes_show)
+    return LettaMenuItem(label = label, onClick = toggle.toggle)
 }
 
 /** The dialog the agent menu has open, if any; the panel frame holds it. */

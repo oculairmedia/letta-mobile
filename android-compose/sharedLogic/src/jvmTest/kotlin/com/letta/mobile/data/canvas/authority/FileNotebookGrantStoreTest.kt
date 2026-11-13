@@ -38,7 +38,7 @@ class FileNotebookGrantStoreTest {
     private suspend fun directorySyncFailureAfterReplacement(expected: NotebookPeerGrant?): NotebookPeerGrant? {
         assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grant-directory-sync").resolve("grants.json")
-        val id = NotebookDocumentId("document")
+        val id = NOTE
         if (expected == null) FileNotebookGrantStore(file).provision(id, NotebookPeerGrant("principal", mayRead = true))
         val injected = AtomicBoolean(false)
         val store = FileNotebookGrantStore(file) { directory ->
@@ -94,16 +94,35 @@ class FileNotebookGrantStoreTest {
         assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grants").resolve("grants.json")
         val store = FileNotebookGrantStore(file)
-        val id = NotebookDocumentId("document-one")
+        val id = NOTE
         val grant = NotebookPeerGrant("principal-one", mayRead = true, mayEdit = true, mayReference = true)
         assertNull(store.withGrant("principal-one", id) { it })
         store.provision(id, grant)
         val reloaded = FileNotebookGrantStore(file)
         assertEquals(grant, reloaded.withGrant("principal-one", id) { it })
         assertNull(reloaded.withGrant("principal-two", id) { it })
-        assertNull(reloaded.withGrant("principal-one", NotebookDocumentId("document-two")) { it })
+        assertNull(reloaded.withGrant("principal-one", NotebookDocumentId("fedcba9876543210fedcba9876543210")) { it })
         reloaded.revoke("principal-one", id)
         assertNull(store.withGrant("principal-one", id) { it })
+    }
+
+    /** One bulk transaction hands back exactly this principal's grants among the ids asked, from one read. */
+    @Test
+    fun withGrantsHandsBackOnlyThePrincipalsGrantsForTheIdsAsked() = runBlocking {
+        val file = Files.createTempDirectory("notebook-grants-bulk").resolve("grants.json")
+        fun entry(principal: String, document: String, edit: Boolean) =
+            """{"principal":"$principal","documentId":"$document","mayRead":true,"mayEdit":$edit,"mayReference":false}"""
+        val entries = listOf(entry("one", "a", true), entry("one", "b", false), entry("two", "c", true), entry("one", "d", true))
+        Files.writeString(file, """{"version":1,"grants":[${entries.joinToString(",")}]}""")
+        val asked = listOf("a", "b", "c", "missing").map(::NotebookDocumentId)
+
+        val held = FileNotebookGrantStore(file).withGrants("one", asked) { it }
+
+        val expected = mapOf(
+            NotebookDocumentId("a") to NotebookPeerGrant("one", mayRead = true, mayEdit = true),
+            NotebookDocumentId("b") to NotebookPeerGrant("one", mayRead = true),
+        )
+        assertEquals(expected, held, "another principal's grant, an id not asked and a missing grant are absent")
     }
 
     @Test
@@ -144,13 +163,38 @@ class FileNotebookGrantStoreTest {
         Unit
     }
 
+    /**
+     * Provisioning refuses a document id no local notebook can have, before the file is touched, while a
+     * stored entry with such an id (written before the rule) still loads beside valid ones, unchanged.
+     */
+    @Test
+    fun provisionRefusesADocumentIdThatCannotNameALocalNotebook() = runBlocking {
+        val file = Files.createTempDirectory("notebook-grants-invalid-id").resolve("grants.json")
+        val store = FileNotebookGrantStore(file, directoryDurabilitySupported = true) {}
+        val grant = NotebookPeerGrant("principal", mayRead = true, mayEdit = true)
+        val invalid = listOf("document", NOTE.value.uppercase(), NOTE.value + "0", NOTE.value.dropLast(1) + "g")
+
+        for (id in invalid) {
+            val refused = assertFailsWith<IllegalArgumentException>(id) { store.provision(NotebookDocumentId(id), grant) }
+            assertEquals("Notebook grant document must be a local notebook ID", refused.message)
+        }
+        assertFalse(Files.exists(file), "a refused grant writes nothing")
+        val stored = """{"version":1,"grants":[{"principal":"principal","documentId":"document","mayRead":true,""" +
+            """"mayEdit":true,"mayReference":false},{"principal":"principal","documentId":"${NOTE.value}","mayRead":true,""" +
+            """"mayEdit":false,"mayReference":false}]}"""
+        Files.writeString(file, stored)
+        assertEquals(grant, store.withGrant("principal", NotebookDocumentId("document")) { it })
+        assertEquals(listOf(NOTE, NotebookDocumentId("document")), store.documentsOf("principal"))
+        assertEquals(stored, Files.readString(file), "reading never rewrites the file")
+    }
+
     @Test
     fun revokeWaitsForActiveTransactionAcrossStoreInstances() = runBlocking {
         assumeDurableGrantHost()
         val file = Files.createTempDirectory("notebook-grants-lock").resolve("grants.json")
         val store = FileNotebookGrantStore(file)
         val peer = "principal"
-        val id = NotebookDocumentId("document")
+        val id = NOTE
         store.provision(id, NotebookPeerGrant(peer, mayEdit = true))
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
@@ -169,5 +213,9 @@ class FileNotebookGrantStoreTest {
         operation.await()
         revoke.await()
         assertNull(store.withGrant(peer, id) { it })
+    }
+
+    private companion object {
+        val NOTE = NotebookDocumentId("0123456789abcdef0123456789abcdef")
     }
 }

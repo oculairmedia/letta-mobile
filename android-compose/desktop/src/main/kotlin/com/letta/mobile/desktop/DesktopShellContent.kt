@@ -79,6 +79,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
         com.letta.mobile.ui.runtime.LocalAgentDefaults provides context.core.agentDefaults,
         LocalReducedMotion provides layout.reducedMotion,
         LocalShellTaskRegistry provides context.panels.subagents.repository,
+        com.letta.mobile.ui.shell.workspace.LocalSharedNotebooks provides context.core.bootstrap.dataBindings.sharedNotebooks,
     ) {
         ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {
             LettaShellWorkspace(
