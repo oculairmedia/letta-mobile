@@ -64,7 +64,12 @@ class ChatRowRunToolGroupBeatUiTest {
 
     private enum class Fold { Opened, Default }
 
-    private fun ComposeUiTest.show(item: ChatRenderItem, host: LettaHost, width: Int, fold: Fold, working: Boolean = false) {
+    /** The environment and run state one case renders the row in. */
+    private data class Setting(val host: LettaHost, val width: Int, val fold: Fold, val working: Boolean = false)
+
+    private fun ComposeUiTest.show(item: ChatRenderItem, setting: Setting) {
+        val (host, width) = setting
+        val (fold, working) = setting.fold to setting.working
         val newest = item.messages().last().id
         val context = ChatRowContext(
             itemState = ChatRenderItemState(
@@ -93,7 +98,7 @@ class ChatRowRunToolGroupBeatUiTest {
 
     @Test
     fun proseThenToolsSitsOneBeatApartAtEveryWidth() = everyEnvironment { host, width ->
-        show(proseThenTools, host, width, Fold.Opened)
+        show(proseThenTools, Setting(host, width, Fold.Opened))
         assertProseThenToolsBeat(width)
         // Touch keeps its hidden action over the first line; a pointer host reserves no line here.
         if (host == LettaHost.Pointer) {
@@ -104,13 +109,13 @@ class ChatRowRunToolGroupBeatUiTest {
 
     @Test
     fun aWorkingRunKeepsTheSameBeat() = everyEnvironment { host, width ->
-        show(workingProseThenTools, host, width, Fold.Default, working = true)
+        show(workingProseThenTools, Setting(host, width, Fold.Default, working = true))
         assertProseThenToolsBeat(width)
     }
 
     @Test
     fun toolsThenProseSitsOneBeatApartAndKeepsTheReplyActions() = everyEnvironment { host, width ->
-        show(toolsThenProse, host, width, Fold.Opened)
+        show(toolsThenProse, Setting(host, width, Fold.Opened))
         val group = bounds(ChatRowTestTags.RUN_TOOL_STEPS)
         val agent = bounds(ChatRowTestTags.AGENT_TEXT)
         assertNear(ChatRowSpacing.grouped, agent.top - group.bottom, "tools -> prose beat ($host @ $width)")
@@ -122,7 +127,7 @@ class ChatRowRunToolGroupBeatUiTest {
     @Test
     fun aFoldedRunKeepsItsReplyActionsLine() {
         runDesktopComposeUiTest(width = WINDOW_DP, height = WINDOW_DP) {
-            show(proseThenTools, LettaHost.Pointer, 1200, Fold.Default)
+            show(proseThenTools, Setting(LettaHost.Pointer, 1200, Fold.Default))
             assertEquals(0, onAllNodesWithTag(ChatRowTestTags.RUN_TOOL_STEPS).fetchSemanticsNodes().size)
             val text = proseText()
             val actions = bounds(ChatRowTestTags.AGENT_TEXT_ACTIONS)
