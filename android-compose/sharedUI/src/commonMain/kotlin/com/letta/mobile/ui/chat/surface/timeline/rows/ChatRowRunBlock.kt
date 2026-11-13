@@ -37,8 +37,8 @@ import kotlinx.collections.immutable.toImmutableList
 /**
  * A run of assistant messages sharing a run id, drawn as the Android
  * timeline draws it (feature-chat RunBlock): its steps in order: each reasoning as a one-line
- * "Thought" disclosure, every tool call of the run folded into one "Ran 2 commands" summary, and
- * the narration as plain text.
+ * "Thought" disclosure, every tool call of the run gathered into one group of step lines, and the
+ * narration as plain text.
  *
  *  (hard cut S4): the geometry is the legacy RunBlock's. The run's header sits on
  * its own line; under it the body lifts up into its floor, working and settled alike, so settling only
@@ -52,7 +52,10 @@ import kotlinx.collections.immutable.toImmutableList
  *
  * one disclosure per level. The run's tool calls list as step rows
  * ([RunToolSteps]: LettaListRow, the summary line's own status glyph, one chevron per step with
- * details) straight under the summary line; there is no intermediate "Ran 2 commands" row.
+ * details) straight under the summary line; there is no intermediate disclosure row. Several calls
+ * read under a plain, non-disclosing group label ("Ran commands") at the same inset as the steps.
+ * Prose that more visible steps follow sits one grouped beat above them: on a pointer host it
+ * reserves no hover-actions line ([LocalReplyActionsLine]).
  */
 @Composable
 @NonRestartableComposable
@@ -329,12 +332,20 @@ private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope)
                     // Image output is conversation content, not work hidden by the run's disclosure.
                     RunStepImages(positioned, body, row)
                 } else {
-                    RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
+                    // Prose the run's visible steps follow reserves no hover-actions line: the next step
+                    // sits one beat under its words, as it does on a touch host.
+                    val followed = steps.subList(index + 1, steps.size).any { it.showsIn(body) }
+                    CompositionLocalProvider(LocalReplyActionsLine provides !followed) {
+                        RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
+                    }
                 }
             }
         }
     }
 }
+
+/** Whether the step draws anything in [body]: prose always, work only while open, tool images always. */
+private fun RunStep.showsIn(body: RunBodyState): Boolean = !isWork() || !body.collapsed || hasImages()
 
 private fun RunStep.hasImages(): Boolean =
     (this as? RunStep.ToolCalls)?.calls?.toolCalls?.any { it.generatedImageAttachments.isNotEmpty() } == true

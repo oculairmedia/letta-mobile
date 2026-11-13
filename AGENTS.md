@@ -116,7 +116,7 @@ Local quality: run `bash scripts/tests/ci-policy-scripts-test.sh`, then `bash sc
   - **Mirror names** (`parity_gates.py mirror-names`): no `Desktop*`/`Web*`/`Android*`/`Wasm*` type whose remaining name is a shared type it does not implement, or that mirrors another platform's type without both implementing one shared contract (`scripts/ci/parity/mirror-name-baseline.txt`).
   - **Duplicate code** (`DuplicateCodeRatchetTest` in `:architecture-tests:architectureTest`): PMD CPD over all production Kotlin; a clone between two modules fails unless baselined in `architecture-tests/duplicate-code-baseline.txt`, and a pair that shrank must lower its line.
   - **Ratchet** (`scripts/ci/baseline-ratchet-guard.py --diff-base origin/main`): the baselines in `scripts/ci/ratchet-baselines.txt` only shrink. Lines may be deleted and counts lowered; an added or raised line fails, and there is no label, PR-body line or env var that relaxes any of this. Local run of all of it: `python3 scripts/ci/parity_gates.py && bash scripts/ci/platform-ui-gate.sh --enforce && python3 scripts/ci/baseline-ratchet-guard.py --diff-base origin/main`.
-  - **Quick check after every edit** (`letta-mobile-ivqlv`): `bash scripts/ci/quick-check.sh` runs all of the above plus `check-kdoc-hygiene.py`, `check-api-package-coverage.py` and the structure contract (package type caps and new import cycles, which otherwise only fail in the Gradle `structureReport` step) in parallel, without Gradle, in seconds; one PASS/FAIL line per gate with the fix, then the type headroom of every package your diff touches. Run it after edits and before every push (`PRE_PUSH_QUICK_CHECK=1` makes the pre-push hook run it). Its structure numbers are CI's: `scripts/ci/package_headroom.py` rebuilds the architecture-tests export from source and the `test` job fails if it ever disagrees with that export (`--compare`).
+  - **Quick check after every edit** (`letta-mobile-ivqlv`): `bash scripts/ci/quick-check.sh` runs all of the above plus `check-kdoc-hygiene.py`, `check-api-package-coverage.py` and the structure contract (package type caps and new import cycles, which otherwise only fail in the Gradle `structureReport` step) in parallel, without Gradle, in seconds; one PASS/FAIL line per gate with the fix, then the type headroom of every package your diff touches. It also runs `documentation-index.py --check`, `api-dump-mirror-check.sh` and `check-invisible-chars.py` (literal bidi / zero-width characters, which SonarCloud rejects). `bash scripts/ci/preflight.sh` is the same run under the preflight name. Run it after edits and before every push (`PRE_PUSH_QUICK_CHECK=1` makes the pre-push hook run it). Its structure numbers are CI's: `scripts/ci/package_headroom.py` rebuilds the architecture-tests export from source and the `test` job fails if it ever disagrees with that export (`--compare`).
   - **Plan gate: show headroom.** A plan that adds types or imports must include the output of `python3 scripts/ci/package_headroom.py --package <pkg> ... --would-import <from.pkg>-><to.pkg> ...` for every package that gains a type and every new package-to-package import. A package at its cap (`headroom 0`, most packages over 50 types are) takes no new type: put it in a package with headroom or split first. A `--would-import` FAIL means the import closes a cycle: depend the other way or move the type.
 
 **When CI fails on your PR:**
@@ -732,6 +732,14 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   findings; regenerate a baseline (`./gradlew detektBaseline`, JDK 21) only to accept debt
   deliberately, in its own commit. `guardrailDetekt` (`detekt-guardrails.yml`, changed files,
   no baseline) runs inside the required `test` job.
+  Besides the custom policy rules it enforces CodeScene's limits (functions over 4 parameters,
+  cyclomatic complexity 9+, conditions with more than one boolean operator), `NoRunBlockingInProduction`,
+  `UnboundedBufferNeedsPolicy` (opt out with an `// overflow: <reason>` comment) and
+  `WallClockInSharedLogic` only in the paths listed under each rule's `includes`, which were clean
+  when added; add a path only once it has zero findings. `InvisibleOrBidiCharacter` applies everywhere.
+  `ExceptionMessageToClientOrTelemetry`, `HostOrUrlStringMatching` and `SecretBearingDataClass` are
+  implemented but off until their existing findings are fixed. Run them all locally with
+  `./gradlew :quality:detekt-rules:guardrailDetekt` before pushing Kotlin changes.
 
 ### Flaky unit tests
 

@@ -52,6 +52,27 @@ class ActiveTurnSessionTest {
     }
 
     @Test
+    fun appServerRunIsNeverLookedUpInTheBackendRunStore() = runTest {
+        // The host's run.get reads only the local backend store (run-<uuid>); it refuses every App Server
+        // id (local-run-N), so the 5 s watch must not send one.
+        val reads = mutableListOf<RunId?>()
+        val session = ActiveTurnSession(backgroundScope, now = { testScheduler.currentTime }, readRuns = { _, _, run ->
+            reads += run
+            error("run ${run?.value} not found")
+        })
+        val owner = session.owner(conversation, agent)
+        session.onEvent(ActiveTurnRuntimeEvent(conversation, agent, draft(RuntimeRunStatus.Started).payload,
+            RunId("command"), RunId("local-run-507")))
+        assertEquals(ActiveTurnPhase.Thinking, owner.state.value.phase)
+        advanceTimeBy(15_001)
+        runCurrent()
+        session.reconcile(conversation, agent)
+        assertEquals(emptyList<RunId?>(), reads)
+        assertEquals(ActiveTurnPhase.Thinking, owner.state.value.phase)
+        session.close()
+    }
+
+    @Test
     fun presentationReplacementRetainsOwnerAndSecondStopDispatchesOnlyOnce() = runTest {
         val session = ActiveTurnSession(backgroundScope, now = { testScheduler.currentTime })
         val first = session.owner(conversation, agent)

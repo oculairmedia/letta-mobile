@@ -73,7 +73,14 @@ sealed interface IrohTryStartResult {
  * All operations identify a turn by its immutable value objects, preventing unrelated
  * conversations from affecting each other's send jobs, terminals, or frame ownership.
  */
-class IrohTurnRegistry {
+class IrohTurnRegistry() {
+    private var clock: () -> Long = kotlin.time.TimeSource.Monotonic.markNow().let { origin ->
+        { origin.elapsedNow().inWholeMilliseconds }
+    }
+
+    internal constructor(clock: () -> Long) : this() {
+        this.clock = clock
+    }
     private val activeTurns = ConcurrentHashMap<String, IrohActiveTurn>()
     private val activeSendJobs = ConcurrentHashMap<String, Job>()
     private val frameOwnership = ConcurrentHashMap<String, IrohFrameOwner>()
@@ -137,14 +144,14 @@ class IrohTurnRegistry {
 
     fun isRetiredRun(runId: IrohRunId): Boolean {
         val retiredAt = recentlyRetiredRuns[runId.value] ?: return false
-        val valid = System.currentTimeMillis() - retiredAt <= RETIRED_RUN_TTL_MS
+        val valid = clock() - retiredAt <= RETIRED_RUN_TTL_MS
         if (!valid) recentlyRetiredRuns.remove(runId.value, retiredAt)
         return valid
     }
 
     internal fun isRetiredTurn(turnId: IrohTurnId): Boolean {
         val retiredAt = recentlyRetiredTurns[turnId.value] ?: return false
-        val valid = System.currentTimeMillis() - retiredAt <= RETIRED_RUN_TTL_MS
+        val valid = clock() - retiredAt <= RETIRED_RUN_TTL_MS
         if (!valid) recentlyRetiredTurns.remove(turnId.value, retiredAt)
         return valid
     }
@@ -238,14 +245,14 @@ class IrohTurnRegistry {
 
     private fun rememberRetiredRun(runId: IrohRunId) {
         if (runId.value.isBlank()) return
-        val now = System.currentTimeMillis()
+        val now = clock()
         recentlyRetiredRuns.entries.removeIf { now - it.value > RETIRED_RUN_TTL_MS }
         recentlyRetiredRuns[runId.value] = now
     }
 
     private fun rememberRetiredTurn(turnId: IrohTurnId) {
         if (turnId.value.isBlank()) return
-        val now = System.currentTimeMillis()
+        val now = clock()
         recentlyRetiredTurns.entries.removeIf { now - it.value > RETIRED_RUN_TTL_MS }
         recentlyRetiredTurns[turnId.value] = now
     }
