@@ -20,6 +20,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.data.lanes.ConversationLaneProjection
 import com.letta.mobile.data.shell.layout.ShellLayoutConfig
+import com.letta.mobile.data.shell.layout.ShellLayoutConfigStore
 import com.letta.mobile.data.repository.api.SubagentParentScope
 
 object LettaShellWorkspaceTags {
@@ -64,6 +65,12 @@ data class ShellWorkspaceLayout(
     val reducedMotion: Boolean = false,
     /** Fold the rail and sidebar into the drawer whatever the width (the desktop's phone preview). */
     val forceCompact: Boolean = false,
+    /**
+     * The store [lanes] is read from ([ShellLayoutController.lanes]). The person's own layout toggles
+     * in this workspace (Shared notes) edit this store, never whichever shell another window attached
+     * to the process-wide port last. Null offers no such toggle.
+     */
+    val lanesStore: ShellLayoutConfigStore? = null,
 )
 
 /** Whether the compact window's navigation drawer is open; a host that opens it from its own chrome passes one in. */
