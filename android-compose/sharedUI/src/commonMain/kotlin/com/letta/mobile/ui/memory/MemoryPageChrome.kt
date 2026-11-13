@@ -87,7 +87,12 @@ internal fun MemoryAgentPicker(
     val selected = agents.firstOrNull { it.id == selectedAgentId }
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth)) {
-            Text(selected?.name ?: CHOOSE_AGENT, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Text(
+                selected?.name ?: CHOOSE_AGENT,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
             DisclosureChevron(
                 expanded = false,
                 emphasis = ChevronEmphasis.Emphasized,

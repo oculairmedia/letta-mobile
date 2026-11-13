@@ -44,7 +44,13 @@ class LettaPageHeaderTest {
                             primaryAction = LettaMenuItem(label = "New schedule", onClick = { clicks += "new" }),
                             caption = "Times in UTC-5",
                             context = { Text("PM-letta-mobile", Modifier.testTag(CONTEXT)) },
-                            refresh = { LettaRefreshAction(refreshing = false, onRefresh = { clicks += "refresh" }, modifier = Modifier.testTag(REFRESH)) },
+                            refresh = {
+                                LettaRefreshAction(
+                                    refreshing = false,
+                                    onRefresh = { clicks += "refresh" },
+                                    modifier = Modifier.testTag(REFRESH),
+                                )
+                            },
                             controls = { Text("Agenda", Modifier.testTag(CONTROLS)) },
                         ) { Text("stats", Modifier.testTag(CONTENT)) }
                     }
@@ -64,7 +70,10 @@ class LettaPageHeaderTest {
                 val context = bounds(CONTEXT)
                 val refresh = bounds(REFRESH)
                 val action = bounds(ACTION)
-                assertTrue(title.left < context.left && context.right <= refresh.left && refresh.right <= action.left, "title, context, refresh, action at $width: $title $context $refresh $action")
+                assertTrue(
+                    title.left < context.left && context.right <= refresh.left && refresh.right <= action.left,
+                    "title, context, refresh, action at $width: $title $context $refresh $action",
+                )
                 assertTrue(context.top < title.bottom && context.bottom > title.top, "context shares the title's row at $width")
                 assertEquals(width.dp - GUTTER_WIDE, action.right, "the action ends on the page gutter at $width")
                 assertEquals(GUTTER_WIDE, title.left)
