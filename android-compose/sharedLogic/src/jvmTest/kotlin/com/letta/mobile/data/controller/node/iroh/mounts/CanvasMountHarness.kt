@@ -7,14 +7,15 @@ import com.letta.mobile.data.canvas.HostCanvasEntry
 import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
-import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.canvas.mount.FileCanvasMountStore
+import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
-import com.letta.mobile.data.controller.node.iroh.ConversationViewers
 import com.letta.mobile.data.controller.node.iroh.ViewerHandle
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.mounts.deadline.CanvasMountDeadline
+import com.letta.mobile.data.controller.node.iroh.mounts.directory.CanvasMountDirectory
 import com.letta.mobile.data.hoststate.DurableHostFileHooks
 import com.letta.mobile.data.hoststate.HostDirectoryDurability
 import com.letta.mobile.data.model.AgentId
@@ -199,7 +200,7 @@ internal class MountHarness(
         val sources = CanvasMountSources(
             CanvasMountCatalog(records.canvases, records.relay),
             records.directory,
-            ConversationViewers { conversation -> records.viewers[conversation].orEmpty() },
+            { conversation -> records.viewers[conversation].orEmpty() },
         )
         val host = CanvasMountHost(
             mounts = { authority -> AuthorizedCanvasMounts(store(), authority) },

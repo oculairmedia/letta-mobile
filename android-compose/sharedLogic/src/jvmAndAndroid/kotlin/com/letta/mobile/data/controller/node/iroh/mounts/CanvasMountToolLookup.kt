@@ -1,8 +1,5 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
-import com.letta.mobile.data.canvas.HostCanvasCaller
-import com.letta.mobile.data.canvas.HostCanvasMount
-import com.letta.mobile.data.canvas.HostCanvasMountLookup
 import com.letta.mobile.data.canvas.mount.AuthorizedCanvasMounts
 import com.letta.mobile.data.canvas.mount.CanvasMountAuthority
 import com.letta.mobile.data.canvas.mount.CanvasMountDecision
@@ -10,6 +7,10 @@ import com.letta.mobile.data.canvas.mount.CanvasMountPrincipal
 import com.letta.mobile.data.canvas.mount.CanvasMountRequest
 import com.letta.mobile.data.canvas.mount.CanvasMountResult
 import com.letta.mobile.data.canvas.mount.CanvasMountScope
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
+import com.letta.mobile.data.controller.node.iroh.mounts.deadline.CanvasMountDeadline
+import com.letta.mobile.data.controller.node.iroh.mounts.deadline.CanvasMountTimed
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -32,9 +33,9 @@ class CanvasMountToolLookup internal constructor(
     /** Production lookup over the host's mount records at [location]; calls run, bounded, in the host-owned [scope]. */
     constructor(location: CanvasMountStoreLocation, scope: CoroutineScope) : this(location::mounts, CanvasMountDeadline.production(scope))
 
-    override suspend fun mounted(caller: HostCanvasCaller): HostCanvasMount {
-        val conversation = caller.conversationId?.let(::ConversationId) ?: return HostCanvasMount.None
-        val agent = AgentId(caller.agentId)
+    override suspend fun mounted(agentId: String, conversationId: String): HostCanvasMount {
+        val agent = AgentId(agentId)
+        val conversation = ConversationId(conversationId)
         val facade = mounts(RuntimeToolAuthority(agent, conversation))
         return when (val timed = deadline.run { resolve(facade, agent, conversation) }) {
             is CanvasMountTimed.Settled -> timed.value.asMount()
@@ -50,7 +51,7 @@ class CanvasMountToolLookup internal constructor(
     }
 
     private fun CanvasMountOutcome.asMount(): HostCanvasMount = when (this) {
-        is CanvasMountOutcome.Found -> HostCanvasMount.Mounted(canvas)
+        is CanvasMountOutcome.Found -> HostCanvasMount.Mounted(canvas.value)
         CanvasMountOutcome.None -> HostCanvasMount.None
         else -> HostCanvasMount.Unavailable
     }

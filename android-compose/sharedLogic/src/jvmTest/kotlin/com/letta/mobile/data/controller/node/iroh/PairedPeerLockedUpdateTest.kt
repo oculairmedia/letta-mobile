@@ -1,6 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDeviceUpgrade
+import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread

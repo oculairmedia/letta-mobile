@@ -148,8 +148,7 @@ class IrohNodeEndpoint(
     }
 
     /** The live viewers of each conversation, for pushes that must reach only that conversation's viewers. */
-    fun conversationViewers(): ConversationViewers =
-        ConversationViewers { conversation -> connectionRegistry.viewersFor(conversation.value) }
+    fun conversationViewers(): ConversationViewers = { conversation -> connectionRegistry.viewersFor(conversation.value) }
 
     /**
      * Wires [publisher] to this endpoint. Its

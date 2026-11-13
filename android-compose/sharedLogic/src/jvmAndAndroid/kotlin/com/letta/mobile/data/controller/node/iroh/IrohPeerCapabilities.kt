@@ -129,7 +129,7 @@ object IrohPeerCapabilities {
      * hand-scoped grant and is kept exactly.
      */
     fun grantAsOfNow(capabilities: Set<String>, mountsEnabled: Boolean): Set<String> {
-        val base = MOUNT_ROLE_NAMES.map(ROLES::getValue)
+        val base = MOUNT_ROLE_NAMES.map { ROLES.getValue(it) }
             .firstOrNull { it == capabilities || it + MOUNT_CAPABILITIES == capabilities } ?: return capabilities
         return if (mountsEnabled) base + MOUNT_CAPABILITIES else base
     }

@@ -215,32 +215,30 @@ class IrohNodeConnection(
             streamWriteMutex = streamWriteMutex,
             frameParts = { peerSupportsFrameParts() },
             maxFrameBytes = MAX_FRAME_BYTES,
-            pushGates = ViewerPushGates(
-                // Agent pushes reach only authenticated peers allowed to read agents (chat.read, the
-                // agent.list capability), the same gate admin_rpc applies per method.
-                agentEvents = {
-                    authenticated.get() && IrohPeerCapabilities.isAllowed(effectiveCapabilities(), IrohPeerCapabilities.CHAT_READ)
-                },
-                // Conversation pushes name conversations, so they reach only peers whose conversation
-                // scope is unrestricted (the same rule conversation.list scoping applies, lgns8.12).
-                conversationActivity = { agentId ->
-                    com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY in peerCapabilities.get() &&
-                        IrohPeerCapabilities.isAgentInScope(sessionAuth.agentScope(), agentId)
-                },
-                conversationEvents = {
-                    val capabilities = effectiveCapabilities()
-                    authenticated.get() &&
-                        IrohPeerCapabilities.isAllowed(capabilities, IrohPeerCapabilities.CHAT_READ) &&
-                        IrohPeerCapabilities.conversationScope(capabilities, viewedConversationId = null) == null
-                },
-                // Method-scoped pushes (canvas mounts) re-run the method's own checks on this context; it is given
-                // only while the same per-method capability gate admin_rpc applies admits the method.
-                adminContext = { method ->
-                    val required = IrohPeerCapabilities.forAdminMethod(method)
-                    currentAdminRpcRequestContext().takeIf { sessionAuth.allowsAdminCapability(required) }
-                },
-            ),
+            // Agent pushes reach only authenticated peers allowed to read agents (chat.read, the
+            // agent.list capability), the same gate admin_rpc applies per method.
+            agentEventsGate = {
+                authenticated.get() && IrohPeerCapabilities.isAllowed(effectiveCapabilities(), IrohPeerCapabilities.CHAT_READ)
+            },
+            // Conversation pushes name conversations, so they reach only peers whose conversation
+            // scope is unrestricted (the same rule conversation.list scoping applies, lgns8.12).
+            conversationActivityGate = { agentId ->
+                com.letta.mobile.data.transport.ServerFrame.ConversationActivity.CAPABILITY in peerCapabilities.get() &&
+                    IrohPeerCapabilities.isAgentInScope(sessionAuth.agentScope(), agentId)
+            },
+            conversationEventsGate = {
+                val capabilities = effectiveCapabilities()
+                authenticated.get() &&
+                    IrohPeerCapabilities.isAllowed(capabilities, IrohPeerCapabilities.CHAT_READ) &&
+                    IrohPeerCapabilities.conversationScope(capabilities, viewedConversationId = null) == null
+            },
         )
+        // Method-scoped pushes (canvas mounts) re-run the method's own checks on this context; it is given
+        // only while the same per-method capability gate admin_rpc applies admits the method.
+        handle.adminContextGate = { method ->
+            val required = IrohPeerCapabilities.forAdminMethod(method)
+            currentAdminRpcRequestContext().takeIf { sessionAuth.allowsAdminCapability(required) }
+        }
         selfViewer = handle
         return handle
     }

@@ -6,7 +6,9 @@ import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.ConversationViewers
+import com.letta.mobile.data.controller.node.iroh.NoConversationViewers
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.mounts.directory.CanvasMountDirectory
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.attr
@@ -75,8 +77,8 @@ class CanvasMountSources(
     val catalog: CanvasMountCatalog,
     /** The host's own conversation and agent records. */
     val directory: CanvasMountDirectory,
-    /** The live viewers of each conversation; [ConversationViewers.None] pushes nothing. */
-    val viewers: ConversationViewers = ConversationViewers.None,
+    /** The live viewers of each conversation; [NoConversationViewers] pushes nothing. */
+    val viewers: ConversationViewers = NoConversationViewers,
 )
 
 /** Exhaustive on purpose: a new policy kind must decide here whether it may serve mount routes. */

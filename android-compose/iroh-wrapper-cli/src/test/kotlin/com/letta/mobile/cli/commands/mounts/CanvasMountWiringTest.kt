@@ -1,4 +1,4 @@
-package com.letta.mobile.cli.commands
+package com.letta.mobile.cli.commands.mounts
 
 import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
@@ -7,12 +7,12 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
-import com.letta.mobile.data.controller.node.iroh.ConversationViewers
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
+import com.letta.mobile.data.controller.node.iroh.NoConversationViewers
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
-import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDeviceUpgrade
+import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.lang.reflect.Proxy
 import java.nio.file.Files
@@ -39,7 +39,7 @@ class CanvasMountWiringTest {
     fun withoutTheFlagNothingIsBuiltRegisteredOrAdvertised() = runBlocking {
         val wiring = CanvasMountWiring.of(CanvasMountOptions(enabled = false, secretKeyFile = keyFile), productState, records, scope)
         assertNull(wiring)
-        val router = router(wiring?.routes(IrohAuthPolicy.PairedPeersOnly, client(), ConversationViewers.None))
+        val router = router(wiring?.routes(IrohAuthPolicy.PairedPeersOnly, client(), NoConversationViewers))
         assertTrue(router.registeredMethods.none { it in CanvasMountWire.METHODS })
         assertFalse(CanvasMountWire.CAPABILITY in router.featureCapabilities)
         assertFalse(Files.exists(productState.resolve("canvas-mounts")))
@@ -48,7 +48,7 @@ class CanvasMountWiringTest {
     @Test
     fun withTheFlagASecureHostRegistersEveryRouteAndAdvertisesTheCapability() = runBlocking {
         val wiring = enabled()
-        val router = router(wiring.routes(IrohAuthPolicy.PairedPeersOnly, client(), ConversationViewers.None))
+        val router = router(wiring.routes(IrohAuthPolicy.PairedPeersOnly, client(), NoConversationViewers))
         assertTrue(router.registeredMethods.containsAll(CanvasMountWire.METHODS))
         assertTrue(CanvasMountWire.CAPABILITY in router.featureCapabilities)
     }
@@ -56,8 +56,8 @@ class CanvasMountWiringTest {
     @Test
     fun withTheFlagTheAnonymousPolicyOrAMissingAppServerStillRegistersNothing() = runBlocking {
         val wiring = enabled()
-        val insecure = router(wiring.routes(IrohAuthPolicy.InsecureAnonymousForTestOnly, client(), ConversationViewers.None))
-        val noAppServer = wiring.routes(IrohAuthPolicy.PairedPeersOnly, null, ConversationViewers.None)
+        val insecure = router(wiring.routes(IrohAuthPolicy.InsecureAnonymousForTestOnly, client(), NoConversationViewers))
+        val noAppServer = wiring.routes(IrohAuthPolicy.PairedPeersOnly, null, NoConversationViewers)
         assertTrue(insecure.registeredMethods.none { it in CanvasMountWire.METHODS })
         assertFalse(CanvasMountWire.CAPABILITY in insecure.featureCapabilities)
         assertNull(noAppServer)

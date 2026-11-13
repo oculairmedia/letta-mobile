@@ -1,4 +1,4 @@
-package com.letta.mobile.data.controller.node.iroh.mounts
+package com.letta.mobile.data.controller.node.iroh.mounts.directory
 
 import com.letta.mobile.data.controller.node.iroh.NativeAdmin
 import com.letta.mobile.data.model.AgentId

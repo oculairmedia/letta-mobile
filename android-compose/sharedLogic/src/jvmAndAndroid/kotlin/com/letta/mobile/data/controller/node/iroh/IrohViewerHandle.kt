@@ -52,15 +52,6 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
  * dead viewer, and never throws into the caller
  * (a slow/dead observer must never block the initiator's turn).
  */
-/** Which device-wide and method-scoped pushes a viewer's connection may receive, evaluated at send time. Default: none. */
-internal class ViewerPushGates(
-    val agentEvents: () -> Boolean = { false },
-    val conversationActivity: (String) -> Boolean = { false },
-    val conversationEvents: () -> Boolean = { false },
-    /** The connection's admin context while its capabilities admit the method; null otherwise. */
-    val adminContext: (String) -> AdminRpcRequestContext? = { null },
-)
-
 internal class IrohViewerHandle(
     override val connectionId: String,
     private val sink: ViewerFrameSink,
@@ -68,17 +59,25 @@ internal class IrohViewerHandle(
     private val streamWriteMutex: Mutex,
     private val frameParts: () -> Boolean,
     private val maxFrameBytes: Int,
-    private val pushGates: ViewerPushGates = ViewerPushGates(),
+    private val agentEventsGate: () -> Boolean = { false },
+    private val conversationActivityGate: (String) -> Boolean = { false },
+    private val conversationEventsGate: () -> Boolean = { false },
 ) : ViewerHandle {
+    /**
+     * The connection's admin RPC context while its capabilities admit the method, null otherwise; evaluated at send
+     * time for method-scoped pushes. Set by the owning connection before the handle is shared. Default: none.
+     */
+    @Volatile
+    var adminContextGate: (String) -> AdminRpcRequestContext? = { null }
 
-    override fun receivesAgentEvents(): Boolean = pushGates.agentEvents()
+    override fun receivesAgentEvents(): Boolean = agentEventsGate()
 
     override fun receivesConversationActivity(agentId: AgentId): Boolean =
-        receivesConversationEvents() && pushGates.conversationActivity(agentId.value)
+        receivesConversationEvents() && conversationActivityGate(agentId.value)
 
-    override fun receivesConversationEvents(): Boolean = pushGates.conversationEvents()
+    override fun receivesConversationEvents(): Boolean = conversationEventsGate()
 
-    override fun adminContextFor(method: String): AdminRpcRequestContext? = pushGates.adminContext(method)
+    override fun adminContextFor(method: String): AdminRpcRequestContext? = adminContextGate(method)
 
     /**
      * Re-wrap an already-cumulated + cm-stream-tagged assistant/tool/terminal

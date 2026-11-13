@@ -8,6 +8,8 @@ import com.letta.mobile.data.canvas.mount.CanvasMountRequest
 import com.letta.mobile.data.canvas.mount.CanvasMountScope
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
+import com.letta.mobile.data.controller.node.iroh.mounts.directory.CanvasMountDirectory
+import com.letta.mobile.data.controller.node.iroh.mounts.directory.MemoisedMountDirectory
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId

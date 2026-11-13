@@ -5,10 +5,10 @@ import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.HostCanvasEntry
-import com.letta.mobile.data.canvas.HostCanvasMount
-import com.letta.mobile.data.canvas.HostCanvasMountLookup
 import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMount
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.catalog
@@ -37,8 +37,8 @@ class PluginPlacementMountGrantTest {
         store,
         directory,
         kinds = catalog,
-        mounts = HostCanvasMountLookup { caller ->
-            mounted?.takeIf { caller.conversationId == CONVERSATION_A }?.let { HostCanvasMount.Mounted(it) } ?: HostCanvasMount.None
+        mounts = HostCanvasMountLookup { _, conversation ->
+            mounted?.takeIf { conversation == CONVERSATION_A }?.let { HostCanvasMount.Mounted(it.value) } ?: HostCanvasMount.None
         },
     )
     private val board = CallerBoard(backend)

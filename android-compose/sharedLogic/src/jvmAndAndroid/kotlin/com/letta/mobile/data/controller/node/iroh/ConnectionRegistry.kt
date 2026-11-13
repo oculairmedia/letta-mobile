@@ -48,17 +48,11 @@ interface ViewerHandle {
     fun adminContextFor(method: String): AdminRpcRequestContext? = null
 }
 
-/** The connections currently viewing a conversation, for pushes scoped to that conversation's viewers. */
-fun interface ConversationViewers {
-    /** The live viewers of [conversation]. */
-    suspend fun viewersOf(conversation: ConversationId): Set<ViewerHandle>
+/** The live viewers of a conversation, for pushes scoped to that conversation's viewers. */
+typealias ConversationViewers = suspend (ConversationId) -> Set<ViewerHandle>
 
-    /** Viewer sources that need no endpoint. */
-    companion object {
-        /** No endpoint: nobody is viewing anything. */
-        val None: ConversationViewers = ConversationViewers { emptySet() }
-    }
-}
+/** Viewers without an endpoint: nobody is viewing anything. */
+val NoConversationViewers: ConversationViewers = { emptySet() }
 
 /** Told when a connection starts viewing a conversation. */
 fun interface ViewerJoinedListener {

@@ -1,4 +1,4 @@
-package com.letta.mobile.data.controller.node.iroh.mounts
+package com.letta.mobile.data.controller.node.iroh.mounts.deadline
 
 import com.letta.mobile.util.runCatchingCancellable
 import kotlin.time.Duration
@@ -16,7 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * I/O cannot hold the request either.
  * Past [limit] the work is cancelled and given [grace] to unwind: before a mutation's commit point cancellation
  * propagates out of the store, after it the store still returns its outcome (see the mount store), so the caller
- * can tell the two apart with [CanvasMountCallTrace]. A cancelled call never reaches the commit point later: the
+ * can tell the two apart with the call trace. A cancelled call never reaches the commit point later: the
  * store checks cancellation on entry and immediately before its atomic move.
  */
 internal class CanvasMountDeadline(

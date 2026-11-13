@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.CanvasRelayProtocol
 import com.letta.mobile.data.canvas.CanvasRelayStore
 import com.letta.mobile.data.canvas.HostCanvasDirectory
 import com.letta.mobile.data.canvas.HostCanvasEntry
+import com.letta.mobile.data.controller.node.iroh.mounts.directory.CanvasMountDirectory
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId

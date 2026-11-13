@@ -36,7 +36,7 @@ internal class CanvasMountChanges(
 ) {
     fun publish(change: CanvasMountChange) {
         scope.launch {
-            val viewers = runCatchingCancellable { sources.viewers.viewersOf(change.conversation) }.getOrDefault(emptySet())
+            val viewers = runCatchingCancellable { sources.viewers(change.conversation) }.getOrDefault(emptySet())
             val frame = frameOf(change)
             val delivered = viewers.count { viewer -> mayReceive(viewer, change) && viewer.writeFrame(frame) }
             Telemetry.event(CANVAS_MOUNT_TAG, "change.published", "viewers" attr viewers.size, "delivered" attr delivered)

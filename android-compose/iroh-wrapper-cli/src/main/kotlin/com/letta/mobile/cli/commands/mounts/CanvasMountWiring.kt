@@ -1,20 +1,20 @@
-package com.letta.mobile.cli.commands
+package com.letta.mobile.cli.commands.mounts
 
 import com.letta.mobile.data.canvas.CanvasRelayStore
 import com.letta.mobile.data.canvas.HostCanvasDirectory
-import com.letta.mobile.data.canvas.HostCanvasMountLookup
+import com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.ConversationViewers
 import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountCatalog
-import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDeviceUpgrade
-import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountDirectory
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountRoutes
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountSources
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountStoreLocation
 import com.letta.mobile.data.controller.node.iroh.mounts.CanvasMountToolLookup
+import com.letta.mobile.data.controller.node.iroh.mounts.directory.CanvasMountDirectory
+import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.nio.file.Path

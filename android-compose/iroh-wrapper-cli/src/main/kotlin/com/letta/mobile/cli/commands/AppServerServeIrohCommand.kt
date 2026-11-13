@@ -1,5 +1,9 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.commands.mounts.CanvasMountOptions
+import com.letta.mobile.cli.commands.mounts.CanvasMountWiring
+import com.letta.mobile.cli.commands.mounts.HostCanvasRecords
+import com.letta.mobile.cli.commands.mounts.upgradePairedDevicesForCanvasMounts
 import com.letta.mobile.cli.commands.network.NetworkInterfaceFlags
 import com.letta.mobile.cli.process.LinuxAppServerProcessIdentity
 
@@ -874,7 +878,7 @@ class AppServerServeIrohCommand : CliktCommand(
             store = canvasStore,
             directory = hostCanvases,
             kinds = pluginKinds,
-            mounts = canvasMounts?.toolLookup ?: com.letta.mobile.data.canvas.HostCanvasMountLookup.None,
+            mounts = canvasMounts?.toolLookup ?: com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup.None,
         )
         hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(backend)
         pluginCanvas = PluginHostCanvas(backend, assetStore, pluginKinds)
