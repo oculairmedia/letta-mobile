@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes
 import com.letta.mobile.data.controller.node.iroh.adminError
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.secrets.host.SecretItemScope
 import com.letta.mobile.data.secrets.host.SecretRequestService
 import com.letta.mobile.data.secrets.host.SecretRequestSettings
 import com.letta.mobile.data.secrets.journal.SecretRequestJournal
@@ -35,11 +36,23 @@ class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal
         /**
          * The feature for a host whose endpoint enforces [policy], writing through [keystore] and
          * recording requests in [journal]; null under the anonymous test policy or without a keystore.
+         *
+         * [itemScope] has no default on purpose: the host must say which items agents may name.
+         * [SecretItemScope.PerAgent] (each agent only under `agents/<its id>`) is the recommended
+         * choice; a [SecretItemScope.Shared] root is a deliberate, wider choice of the host owner.
+         * It replaces the scope in [settings].
+         *
+         * [policy] must be the very policy the serving endpoint enforces: this factory cannot see
+         * the endpoint, so the anonymous-policy check here and in [routes] is only as good as the
+         * value the wiring passes. The backstop does not depend on it: the human principal also
+         * needs a paired device by its stored record on every call, which no session of an
+         * anonymous endpoint without pairing ever is.
          */
         fun forHost(
             policy: IrohAuthPolicy,
             keystore: KeystoreProvider?,
             journal: SecretRequestJournal,
+            itemScope: SecretItemScope,
             settings: SecretRequestSettings = SecretRequestSettings(),
         ): SecretRequestFeature? {
             if (keystore == null || !policy.admitsSecretRequests()) {
@@ -47,7 +60,8 @@ class SecretRequestFeature internal constructor(policy: IrohAuthPolicy, internal
                 Telemetry.event(SECRET_ROUTE_TAG, "feature.withheld", "reason" attr reason)
                 return null
             }
-            return SecretRequestFeature(policy, SecretRequestHandlers(SecretRequestService(journal, keystore, settings)))
+            val scoped = settings.copy(policy = settings.policy.copy(itemScope = itemScope))
+            return SecretRequestFeature(policy, SecretRequestHandlers(SecretRequestService(journal, keystore, scoped)))
         }
     }
 }

@@ -8,6 +8,7 @@ import com.letta.mobile.data.secrets.request.SecretRequestId
 import com.letta.mobile.data.secrets.journal.SecretRequestJournal
 import com.letta.mobile.data.secrets.request.SecretRequestPrincipal
 import com.letta.mobile.data.secrets.request.SecretRequestTestData
+import com.letta.mobile.data.secrets.request.VaultItemName
 import com.letta.mobile.data.secrets.request.VerifiedEndpointId
 import com.letta.mobile.plugin.keystore.KeystoreCapability
 import com.letta.mobile.plugin.keystore.KeystoreDescriptor
@@ -34,6 +35,12 @@ internal val TEST_VAULT = KeystoreProviderId("test.vault")
 
 /** The slot [SecretRequestTestData.TARGET] names. */
 internal val TARGET_REF = SecretRef(TEST_VAULT, SecretPath("team/openai"), SecretField("api_key"))
+
+/**
+ * The policy most tests run under: a shared `team` root, so the requester and the bystander can
+ * both name [SecretRequestTestData.TARGET]. The per-agent default has its own tests.
+ */
+internal val TEAM_SCOPE = SecretRequestPolicy(itemScope = SecretItemScope.Shared(VaultItemName("team")))
 
 /** The human principal every answer test uses. */
 internal val HUMAN = SecretRequestPrincipal(
@@ -141,6 +148,11 @@ internal class TestKeystoreProvider(
         slots[ref] = text.encodeToByteArray()
     }
 
+    /** Removes the slot at [ref] directly, as if the owner had deleted it. */
+    fun remove(ref: SecretRef) {
+        slots.remove(ref)
+    }
+
     /** The text stored at [ref], or null. */
     fun storedText(ref: SecretRef): String? = slots[ref]?.decodeToString()
 
@@ -160,7 +172,7 @@ internal class ServiceHarness(
     val clock: TestClock = TestClock(),
     random: SecretRandomSource = CountingRandom(),
 ) {
-    val service = SecretRequestService(journal, provider, SecretRequestSettings(clock = clock, random = random))
+    val service = SecretRequestService(journal, provider, SecretRequestSettings(TEAM_SCOPE, clock, random))
 
     /** Creates a pending request for [agent] and answers its id. */
     suspend fun pending(agent: RequestingAgent = REQUESTER): SecretRequestId {

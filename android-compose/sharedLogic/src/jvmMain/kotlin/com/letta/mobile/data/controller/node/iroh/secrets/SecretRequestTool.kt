@@ -75,8 +75,10 @@ internal class SecretRequestTool(private val handlers: SecretRequestHandlers) : 
                 "{receipt: {status: saved|cancelled|expired|failed, itemId, fieldName, reason?}}. Poll status; a request " +
                 "expires 15 minutes after it is made. purpose is shown to the person labelled as written by you: plain text " +
                 "only (no markup, links, line breaks or invisible characters), at most 280 characters. vaultItemName is a " +
-                "path such as team/openai; fieldName is a name such as api_key; adding a new field to an existing item is " +
-                "refused (target_not_writable). Errors are fixed codes such as invalid_request:purpose_too_long or unknown_request."
+                "path under agents/<your agent id>/ such as agents/<your agent id>/openai (anything else is refused with " +
+                "item_outside_scope unless the host allows a shared root); fieldName is a name such as api_key; adding a " +
+                "new field to an existing item is refused (target_not_writable). Errors are fixed codes such as " +
+                "invalid_request:purpose_too_long or unknown_request."
 
         private val INPUT_SCHEMA: JsonObject = buildJsonObject {
             put("type", "object")

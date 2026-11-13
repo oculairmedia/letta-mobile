@@ -48,7 +48,11 @@ import kotlin.time.Instant
  * - **Human only.** [submit], [cancel], [list] and [get] need a [SecretRequestPrincipal] whose
  *   [SecretRequestPrincipal.mayAnswer] is true; agent origins are refused.
  * - **Fixed target.** The keystore, item and field are fixed when the request is created; nothing
- *   at submission can change them.
+ *   at submission can change them. The item must lie in the policy's [SecretItemScope] for the
+ *   requesting agent (per agent unless the host owner chose a shared root).
+ * - **No silent replace.** An existing value is replaced only when the request was created while
+ *   the slot already held one ([SecretRequestDetails.replacesExisting], decided by the host); a
+ *   slot that appears later fails the submission with `target_changed` and nothing is written.
  * - **No value in a sink.** The value travels only inside [SecretValue], is wiped when [submit]
  *   returns on every path, and never reaches the journal, telemetry, a receipt or an error.
  * - **Nothing partial.** See [SecretVaultWriter]: create-then-verify, undo on mismatch, no retry.
@@ -68,15 +72,19 @@ class SecretRequestService(
 
     /**
      * Creates a pending request for [agent] (the verified requesting agent) from its [request],
-     * after validation. The target is fixed here.
+     * after validation against the policy's item scope for that agent. The target is fixed here,
+     * and so is whether it replaces an existing value: the host reads the slot now
+     * ([SecretRequestDetails.replacesExisting]); the agent's answer is the same either way.
      */
     suspend fun request(agent: RequestingAgent, request: AgentSecretRequest): SecretServiceResult<SecretRequestCreated> {
-        val validation = SecretRequestValidation.validate(request, settings.policy.itemScope)
+        val scope = settings.policy.itemScope.rootFor(agent) ?: COVERS_NOTHING
+        val validation = SecretRequestValidation.validate(request, scope)
         if (validation is SecretRequestValidation.Invalid) {
             SecretRequestTelemetry.requestRefused(validation.problem)
             return SecretServiceResult.Refused(SecretServiceError.INVALID_REQUEST, validation.problem)
         }
-        val record = newRecord(agent, (validation as SecretRequestValidation.Valid).request)
+        val valid = (validation as SecretRequestValidation.Valid).request
+        val record = newRecord(agent, valid, writer.holdsValue(targetOf(valid)))
         return journaled {
             when (ledger.add(record, settings.policy.maxPendingPerAgent)) {
                 AddOutcome.ADDED -> created(record)
@@ -166,7 +174,7 @@ class SecretRequestService(
         val claim = ledger.transition(requestId, SecretRequestEvent.Claim)
         val claimed = (claim as? LedgerOutcome.Applied)?.record ?: return refuseAnswer(requestId, SecretServiceError.NOT_PENDING)
         return try {
-            val outcome = writeMutex.withLock { writer.write(claimed.details.target, value) }
+            val outcome = writeMutex.withLock { writer.write(claimed.details, value) }
             settle(ledger.transition(requestId, outcome), requestId)
         } finally {
             ledger.release(requestId)
@@ -180,12 +188,15 @@ class SecretRequestService(
         return SecretServiceResult.Ok(receipt)
     }
 
-    private fun newRecord(agent: RequestingAgent, request: AgentSecretRequest): SecretRequestRecord {
+    private fun targetOf(request: AgentSecretRequest): SecretRequestTarget =
+        SecretRequestTarget(keystore, request.vaultItemName, request.fieldName)
+
+    private fun newRecord(agent: RequestingAgent, request: AgentSecretRequest, replacesExisting: Boolean): SecretRequestRecord {
         val now = settings.clock.now().toEpochMilliseconds()
-        val target = SecretRequestTarget(keystore, request.vaultItemName, request.fieldName)
+        val purpose = AuthoredPurpose(request.purpose, TextAuthor.AGENT)
         return SecretRequestRecord(
             requestId = newRequestId(settings.random),
-            details = SecretRequestDetails(agent.agentId, target, AuthoredPurpose(request.purpose, TextAuthor.AGENT)),
+            details = SecretRequestDetails(agent.agentId, targetOf(request), purpose, replacesExisting),
             timing = SecretRequestTiming(now, now + settings.policy.ttl.inWholeMilliseconds),
             status = SecretRequestStatus(SecretRequestState.PENDING),
         )
@@ -200,6 +211,9 @@ class SecretRequestService(
 
     private companion object {
         const val MIN_WAIT_MS = 1_000L
+
+        /** A scope root no well-formed item equals or lies under: for an agent the policy gives no root. */
+        val COVERS_NOTHING = com.letta.mobile.data.secrets.request.VaultItemName("")
     }
 }
 

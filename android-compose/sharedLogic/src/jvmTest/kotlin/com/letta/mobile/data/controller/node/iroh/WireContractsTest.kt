@@ -287,6 +287,7 @@ class WireContractsTest {
             com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy.PairedPeersOnly,
             com.letta.mobile.data.secrets.host.TestKeystoreProvider(),
             com.letta.mobile.data.secrets.journal.InMemorySecretRequestJournal(),
+            com.letta.mobile.data.secrets.host.SecretItemScope.PerAgent,
         ),
     ).routes
 

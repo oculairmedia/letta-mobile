@@ -1,5 +1,6 @@
 package com.letta.mobile.data.secrets.host
 
+import com.letta.mobile.data.secrets.request.RequestingAgent
 import com.letta.mobile.data.secrets.request.SecretRequestLimits
 import com.letta.mobile.data.secrets.request.SecretRequestProblem
 import com.letta.mobile.data.secrets.request.SecretServiceError
@@ -27,13 +28,57 @@ sealed interface SecretServiceResult<out T> {
 }
 
 /**
- * What the host allows agents to request: an optional item scope every requested item must lie in
- * (null allows any well-formed item), how long a request stays pending, and how many requests one
- * agent may have pending at once.
+ * Which items an agent may name in a request. Every item an agent requests must equal the root
+ * [rootFor] answers for it or lie under it by whole segments; a request outside it is refused with
+ * [SecretRequestProblem.ITEM_OUTSIDE_SCOPE].
+ *
+ * There is no unrestricted scope: [PerAgent] is the default, and anything wider is a [Shared] root
+ * the host owner names on purpose.
+ */
+sealed interface SecretItemScope {
+    /** The root [agent]'s items must lie in, or null when [agent] may name no item at all. */
+    fun rootFor(agent: RequestingAgent): VaultItemName?
+
+    /**
+     * Each agent may name only items under `agents/<its own agent id>`, the id taken from the
+     * verified caller, so one agent can never name (and so never overwrite) another agent's items.
+     * An agent id that is not a single item segment gets no root, so every item is refused.
+     */
+    data object PerAgent : SecretItemScope {
+        /** The first segment of every per-agent root. */
+        const val PREFIX: String = "agents"
+
+        override fun rootFor(agent: RequestingAgent): VaultItemName? {
+            val id = agent.agentId.value
+            return VaultItemName("$PREFIX/$id").takeIf { '/' !in id && it.isWellFormed }
+        }
+    }
+
+    /**
+     * Every agent may name items under [root]: a wider scope that only the host owner may choose,
+     * because every agent then shares the items under it (a request still never replaces an
+     * existing value unless the person was told it would when the request was made).
+     */
+    data class Shared(
+        /** The item every request must name or lie under. */
+        val root: VaultItemName,
+    ) : SecretItemScope {
+        init {
+            require(root.isWellFormed) { "A shared item scope must be a well-formed item name" }
+        }
+
+        override fun rootFor(agent: RequestingAgent): VaultItemName = root
+    }
+}
+
+/**
+ * What the host allows agents to request: which items ([itemScope], per agent unless the host
+ * owner chose otherwise), how long a request stays pending, and how many requests one agent may
+ * have pending at once.
  */
 data class SecretRequestPolicy(
-    /** The item every request must name or lie under; null for no restriction. */
-    val itemScope: VaultItemName? = null,
+    /** Which items agents may name. */
+    val itemScope: SecretItemScope = SecretItemScope.PerAgent,
     /** How long a request stays pending. */
     val ttl: Duration = SecretRequestLimits.DEFAULT_TTL_MS.milliseconds,
     /** The most pending requests per agent. */

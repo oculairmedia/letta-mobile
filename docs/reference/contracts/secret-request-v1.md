@@ -64,8 +64,12 @@ Each is a test target of `:sharedLogic:jvmTest` (`com.letta.mobile.data.secrets.
 
 - **N1** Names are compared as exact strings: no case folding, normalization or decoding. A
   malformed name is refused, never repaired.
-- **N2** The host may confine items to a scope (an item name; requested items must equal it or lie
-  under it by whole segments). Without one any well-formed item is accepted.
+- **N2** Every requested item must equal the agent's scope root or lie under it by whole segments.
+  The default root is per agent, `agents/<agentId>` (the verified requesting agent's id), so an
+  agent can never name another agent's items; an agent id that is not one item segment gets no
+  root and every item is refused. A wider, shared root is configured explicitly by the host owner
+  (`SecretItemScope.Shared`); there is no unrestricted scope, and `SecretRequestFeature.forHost`
+  takes the scope as a required argument. A request outside the scope is `item_outside_scope`.
 - **N3** One agent may have at most 8 pending requests. A journal holds at most 512 records.
 - **N4** A request expires 15 minutes after creation. The agent cannot choose the lifetime.
 
@@ -101,14 +105,19 @@ A *request* (what a client sees) is:
   "details": {
     "requestingAgent": "agent-...",
     "target": {"keystore": "local.vault", "item": "agents/notes/openai", "field": "api_key"},
-    "purpose": {"text": "...", "author": "agent"}
+    "purpose": {"text": "...", "author": "agent"},
+    "replacesExisting": true
   },
   "timing": {"createdAtMs": 0, "expiresAtMs": 0},
   "status": {"state": "pending", "reason": "...", "settledAtMs": 0}
 }
 ```
 
-`status.reason` is present only for `failed`; `status.settledAtMs` only for terminal states. A
+`status.reason` is present only for `failed`; `status.settledAtMs` only for terminal states.
+`details.replacesExisting` is present (and `true`) only when the target slot already held a value
+when the host created the request: the host reads the slot itself at creation, never takes it
+from the agent, and a client shows it as "this replaces an existing value". The agent's answers
+never carry it. A
 *receipt* is `{status, itemId, fieldName, reason?}`: `status` is `saved`, `cancelled`, `expired`
 or `failed`; `itemId` and `fieldName` are the target's item and field; `reason` is present only
 for `failed`.
@@ -151,6 +160,14 @@ Failure reasons in a `failed` receipt, each a fixed code with no provider text:
 | `verify_failed` | The read-back did not match; the write was undone |
 | `rollback_failed` | The read-back did not match and undoing the write failed too; an operator must check the item |
 | `interrupted` | The host stopped (or could not record the outcome) while the write was in progress; the outcome is unknown |
+| `target_changed` | The slot held no value when the request was made (`replacesExisting` absent) but holds one now; nothing was replaced |
+
+What a receipt reveals about the keystore: `target_not_writable` tells the agent that the item
+exists while the field does not (or that the keystore cannot list), and `target_changed` that the
+slot gained a value after the request was made. No other answer depends on what the keystore
+holds: creating a request answers the same whether or not the slot exists, and `saved` does not
+say whether a value was replaced. Under the per-agent scope both reveal only items in the agent's
+own namespace.
 
 ## Lifecycle
 
@@ -178,8 +195,10 @@ pending --submit (claim)--> submitting --verified--> saved
 The host writes the value to `{keystore, item, field}` through the keystore SPI so that either the
 verified value is stored or nothing new is left behind:
 
-- **W1** An existing slot is replaced (`put` mode `replace`); its previous value is read first and
-  held in host memory only, then wiped. A mismatch restores it.
+- **W1** An existing slot is replaced (`put` mode `replace`) only when the request carries
+  `replacesExisting`; its previous value is read first and held in host memory only, then wiped. A
+  mismatch restores it. A slot that came into existence after the request was made is never
+  replaced: the submission settles `failed` (`target_changed`) and nothing is written.
 - **W2** A missing slot is created (`put` mode `create`) only when the keystore can `list` and the
   listing proves the whole item is absent, so undoing it is deleting the item. A missing slot in an
   existing item, or in an item whose absence cannot be proved, is refused with
@@ -313,7 +332,10 @@ Each was settled conservatively for v1 and is listed for the owner:
    could leave a partial store. Allowing it needs a keystore field delete (a keystore minor).
 2. **`submitting` is a visible lifecycle state** for the human's client (needed for crash safety);
    receipts still carry only the four terminal statuses.
-3. **No item scope by default** (N2). A host can confine agent requests to a prefix.
+3. **Per-agent item scope by default and no silent replace** (N2, W1): author's choice after the
+   2026-11-13 security review, awaiting owner confirmation. Before it, any well-formed item was
+   accepted and an existing slot was replaced, so an agent could overwrite any secret it could
+   name.
 4. **`interrupted` means unknown outcome**: the value may or may not be stored. The host does not
    probe the keystore after a restart because it no longer holds the value to compare.
 5. **Receipt delivery to the agent** is a poll (`secret.request.status`) in this contract; pushing a

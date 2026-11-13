@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.secrets.host.SecretItemScope
 import com.letta.mobile.data.secrets.host.TestKeystoreProvider
 import com.letta.mobile.data.secrets.journal.InMemorySecretRequestJournal
 import com.letta.mobile.data.secrets.wire.SecretRequestRouteWire
@@ -23,7 +24,7 @@ class SecretRequestRegistrationTest {
     )
 
     private fun feature(policy: IrohAuthPolicy, keystore: TestKeystoreProvider?): SecretRequestFeature? =
-        SecretRequestFeature.forHost(policy, keystore, InMemorySecretRequestJournal())
+        SecretRequestFeature.forHost(policy, keystore, InMemorySecretRequestJournal(), SecretItemScope.PerAgent)
 
     private fun routerWith(feature: SecretRequestFeature?): AdminRpcRouter =
         AdminRpcRegistry.buildRouter(services = AdminRpcHostServices(secretRequestRoutes = feature?.routes))

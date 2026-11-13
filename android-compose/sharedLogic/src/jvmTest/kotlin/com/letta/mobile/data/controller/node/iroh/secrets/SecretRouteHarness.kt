@@ -12,6 +12,7 @@ import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.secrets.host.CountingRandom
 import com.letta.mobile.data.secrets.host.SecretRequestService
 import com.letta.mobile.data.secrets.host.SecretRequestSettings
+import com.letta.mobile.data.secrets.host.TEAM_SCOPE
 import com.letta.mobile.data.secrets.host.TestClock
 import com.letta.mobile.data.secrets.host.TestKeystoreProvider
 import com.letta.mobile.data.secrets.journal.InMemorySecretRequestJournal
@@ -82,7 +83,7 @@ internal class SecretRouteHarness(val parts: SecretRouteParts = SecretRouteParts
     private val service = SecretRequestService(
         parts.journal,
         parts.provider,
-        SecretRequestSettings(clock = parts.clock, random = CountingRandom()),
+        SecretRequestSettings(TEAM_SCOPE, parts.clock, CountingRandom()),
     )
     val feature = SecretRequestFeature(IrohAuthPolicy.PairedPeersOnly, SecretRequestHandlers(service, parts.recordingDecoder()))
     val router = AdminRpcRouter().also(feature.routes::register)
