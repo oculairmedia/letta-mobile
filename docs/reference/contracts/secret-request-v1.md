@@ -83,7 +83,12 @@ renders markup in it, never turns text in it into a link and never presents it a
 text. The host trims surrounding whitespace and refuses (`purpose_not_plain_text`) any purpose
 that holds `<`, `>`, `[`, `]` or a backtick, `://`, `www.` or `mailto:`, starts with `#`, or holds a
 control, format (including bidirectional overrides and zero-width characters), line or paragraph
-separator, private-use, surrogate or unassigned character.
+separator, private-use, surrogate or unassigned character, or a word (a run of letters) that mixes
+Latin letters with Greek or Cyrillic ones (the look-alike trick of spelling a familiar name with a
+Cyrillic "a"); a sentence may still use several scripts, one per word. A bare domain such as
+`api.openai.com` is accepted on purpose: naming the service a key is for is an ordinary purpose,
+and no small rule tells a domain from `ASP.NET` or a file name. The defence against a link is the
+client's: it never turns purpose text into a link, and the target it shows is the host's.
 
 ## Methods
 
