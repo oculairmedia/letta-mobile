@@ -1,6 +1,7 @@
 package com.letta.mobile.data.voice.responder.chat
 
 import com.letta.mobile.data.chat.send.ChatSendCoordinatorConversationFixture
+import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ToolCallMessage
@@ -75,7 +76,7 @@ internal class ChatVoiceStampedTurnTest : ChatSendCoordinatorConversationFixture
     @Test
     fun aReplyWhoseEchoNeverArrivesIsSpokenFromRowsStampedWithTheSendsOtid() = runTest(UnconfinedTestDispatcher()) {
         val (h, coordinator) = start()
-        h.page.show(userRow(h.otid, "what time is it", sentAs = h.otid))
+        h.page.show(userRow(RowId(h.otid), "what time is it", sentAs = SentMessageId(h.otid)))
 
         // Handled after the accept: the coordinator settles the otid as stale here.
         coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "iroh-run-1"))
@@ -83,12 +84,12 @@ internal class ChatVoiceStampedTurnTest : ChatSendCoordinatorConversationFixture
         coordinator.handleEvent(toolCall(run = "local-run-55", turn = h.otid))
         // Another client's turn on the same conversation: stamped with its own otid.
         coordinator.handleEvent(assistant("theirs", "Not yours.", run = "other-run", turn = "their-otid"))
-        h.page.add(assistantRow("theirs", "Not yours.", run = "other-run"))
+        h.page.add(assistantRow(RowId("theirs"), "Not yours.", run = RowRun("other-run")))
         coordinator.handleEvent(assistant("m1", "It is", run = "local-run-57", turn = h.otid))
-        h.page.add(assistantRow("m1", "It is", run = "local-run-57"))
+        h.page.add(assistantRow(RowId("m1"), "It is", run = RowRun("local-run-57")))
         advanceUntilIdle()
         coordinator.handleEvent(assistant("m1", "It is noon.", run = "local-run-57", turn = h.otid))
-        h.page.replace(assistantRow("m1", "It is noon.", run = "local-run-57"))
+        h.page.replace(assistantRow(RowId("m1"), "It is noon.", run = RowRun("local-run-57")))
         advanceUntilIdle()
         coordinator.handleEvent(WsTimelineEvent.TurnDone(TURN, "local-run-55", BridgeTurnStatus.Completed))
         advanceUntilIdle()
@@ -102,11 +103,11 @@ internal class ChatVoiceStampedTurnTest : ChatSendCoordinatorConversationFixture
         val (h, coordinator) = start()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "iroh-run-1"))
         coordinator.handleEvent(echo(h.otid, run = "iroh-run-1"))
-        h.page.show(userRow(h.otid, "what time is it", sentAs = h.otid))
+        h.page.show(userRow(RowId(h.otid), "what time is it", sentAs = SentMessageId(h.otid)))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted(TURN, AGENT, CONV, "local-run-55"))
         coordinator.handleEvent(toolCall(run = "local-run-55", turn = h.otid))
         coordinator.handleEvent(assistant("m1", "Noon.", run = "local-run-57", turn = h.otid))
-        h.page.add(assistantRow("m1", "Noon.", run = "local-run-57"))
+        h.page.add(assistantRow(RowId("m1"), "Noon.", run = RowRun("local-run-57")))
         advanceUntilIdle()
         coordinator.handleEvent(WsTimelineEvent.TurnDone(TURN, "local-run-55", BridgeTurnStatus.Completed))
         advanceUntilIdle()

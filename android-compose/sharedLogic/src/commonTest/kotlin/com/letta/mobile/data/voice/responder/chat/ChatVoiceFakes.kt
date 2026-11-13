@@ -63,8 +63,15 @@ internal class FakeIdentifiedSend(
     }
 }
 
-internal fun userRow(id: String, text: String, sentAs: String? = null) =
-    UiMessage(id = id, role = "user", content = text, timestamp = "t", clientMessageId = sentAs)
+/** The id a chat row is keyed by on the page. */
+internal data class RowId(val value: String)
 
-internal fun assistantRow(id: String, text: String, run: String?) =
-    UiMessage(id = id, role = "assistant", content = text, timestamp = "t", runId = run)
+/** The run a chat row was streamed on. */
+internal data class RowRun(val value: String)
+
+/** A user row; [sentAs] is the otid this client sent it under, when it is this client's message. */
+internal fun userRow(id: RowId, text: String, sentAs: SentMessageId? = null) =
+    UiMessage(id = id.value, role = "user", content = text, timestamp = "t", clientMessageId = sentAs?.value)
+
+internal fun assistantRow(id: RowId, text: String, run: RowRun?) =
+    UiMessage(id = id.value, role = "assistant", content = text, timestamp = "t", runId = run?.value)

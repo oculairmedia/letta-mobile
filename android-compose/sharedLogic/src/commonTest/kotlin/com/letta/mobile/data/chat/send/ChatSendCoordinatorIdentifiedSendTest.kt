@@ -41,12 +41,13 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
     // The bridge deduplicates message frames process-wide, so every test's echoes need their own ids.
     private val echoPrefix = "echo-${Random.nextLong()}"
 
-    private fun echo(otid: SentMessageId, turn: String, run: String) = WsTimelineEvent.MessageDelta(
+    /** The echo of the message sent as [otid], on [tail]'s turn and run. */
+    private fun echo(otid: SentMessageId, tail: TurnTail) = WsTimelineEvent.MessageDelta(
         message = UserMessage(
-            id = "$echoPrefix-${otid.value}", contentRaw = JsonPrimitive("hi"), date = DATE, otid = otid.value, runId = run,
+            id = "$echoPrefix-${otid.value}", contentRaw = JsonPrimitive("hi"), date = DATE, otid = otid.value, runId = tail.runId,
         ),
         conversationId = CONV,
-        turnId = turn,
+        turnId = tail.turnId,
     )
 
     @Test
@@ -57,7 +58,7 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
         assertEquals(id.value, timeline.externalLocals.single().otid)
 
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT, CONV, "run-1"))
-        coordinator.handleEvent(echo(id, "turn-1", "run-1"))
+        coordinator.handleEvent(echo(id, TurnTail("turn-1", "run-1")))
         assertEquals(mapOf(id to setOf(SentRunId("run-1"))), coordinator.identifiedSend.sentRuns.value.started)
         assertEquals(setOf(SentRunId("run-1")), coordinator.identifiedSend.sentRuns.value.active)
 
@@ -77,7 +78,7 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
         advanceUntilIdle()
         assertTrue(coordinator.identifiedSend.sentRuns.value.started.isEmpty())
 
-        coordinator.handleEvent(echo(id, "turn-1", "run-1"))
+        coordinator.handleEvent(echo(id, TurnTail("turn-1", "run-1")))
         assertEquals(mapOf(id to setOf(SentRunId("run-1"))), coordinator.identifiedSend.sentRuns.value.started)
         assertTrue(coordinator.identifiedSend.sentRuns.value.active.isEmpty())
     }
@@ -89,13 +90,13 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
 
         val firstId = assertNotNull(send.sendIdentified("first"))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT, CONV, "run-1"))
-        coordinator.handleEvent(echo(firstId, "turn-1", "run-1"))
+        coordinator.handleEvent(echo(firstId, TurnTail("turn-1", "run-1")))
         // The second goes out while the first's run is still streaming (the server queues it).
         val secondId = assertNotNull(async { send.sendIdentified("second") }.await())
         assertNotEquals(firstId, secondId)
         coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT, CONV, "run-2"))
-        coordinator.handleEvent(echo(secondId, "turn-2", "run-2"))
+        coordinator.handleEvent(echo(secondId, TurnTail("turn-2", "run-2")))
         advanceUntilIdle()
 
         assertEquals(
