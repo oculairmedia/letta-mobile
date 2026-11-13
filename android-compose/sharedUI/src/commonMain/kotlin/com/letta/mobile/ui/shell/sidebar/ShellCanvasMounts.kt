@@ -53,6 +53,8 @@ data class ShellCanvasMountState(
      * chat) and the board on show in canvas mode (already on screen).
      */
     val notForPane: Set<CanvasId> = emptySet(),
+    /** The mounted board actually on show; it can lag [mounted] while the board before it cannot be saved. */
+    val shown: CanvasId? = mounted,
 )
 
 /** What became of one pick, in the words the menu tells the person. */

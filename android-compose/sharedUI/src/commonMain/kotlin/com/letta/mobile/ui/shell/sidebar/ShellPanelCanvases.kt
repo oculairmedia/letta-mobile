@@ -93,7 +93,8 @@ internal class ShellCanvasPicks(
      * [onBoard] is skipped, so the new conversation is not framed or opened on its board.
      */
     fun bringToBoard(canvas: CanvasId, now: ShellCanvasMountState, onBoard: () -> Unit) {
-        val window = mounts?.takeIf { now.mountsOnPick && canvas != (now.mounted ?: now.own) } ?: return onBoard()
+        // The board actually on show decides, not the mount record: a board that could not be saved stays on show.
+        val window = mounts?.takeIf { now.mountsOnPick && canvas != (now.shown ?: now.own) } ?: return onBoard()
         val conversation = window.ownOnScreen()
         scope.launch { if (pick(window, canvas) && window.ownOnScreen() == conversation) onBoard() }
     }

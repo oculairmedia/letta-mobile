@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas.mount.client
 
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -126,6 +128,9 @@ class ConversationCanvasPicker(
     val resolver: ConversationCanvasResolver,
     val focus: CanvasModeFocus = CanvasModeFocus(),
 ) {
+    /** One pick at a time: a board save and the mount write that follows it run as one step. */
+    private val switching = Mutex()
+
     /** The side menu's view, live. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val state: Flow<CanvasPickerState> = combine(focus.onScreen, focus.current, resolver.supported, ::pickFocus)
@@ -145,11 +150,12 @@ class ConversationCanvasPicker(
     suspend fun useOwnCanvas(): CanvasPick = switchBoard(resolver::unmount)
 
     /** Saves the board on screen, then [write]s the mount of the conversation on screen. */
-    private suspend fun switchBoard(write: suspend (ConversationCanvasTarget) -> CanvasMountChange): CanvasPick {
-        val target = mountTarget() ?: return CanvasPick.OpenAsBefore
-        if (!focus.saveBoard(target)) return CanvasPick.Unsaved
-        return outcome(write(target))
-    }
+    private suspend fun switchBoard(write: suspend (ConversationCanvasTarget) -> CanvasMountChange): CanvasPick =
+        switching.withLock {
+            val target = mountTarget() ?: return@withLock CanvasPick.OpenAsBefore
+            if (!focus.saveBoard(target)) return@withLock CanvasPick.Unsaved
+            outcome(write(target))
+        }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun stateOf(pick: PickFocus): Flow<CanvasPickerState> =

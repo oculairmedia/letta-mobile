@@ -36,6 +36,7 @@ class PickerShellCanvasMounts(private val picker: ConversationCanvasPicker) : Sh
             own = state.target?.ownCanvas,
             deviceOnly = state.reach == CanvasMountReach.Device,
             notForPane = setOfNotNull(state.target?.ownCanvas, state.onBoard),
+            shown = state.shown,
         )
 
         fun outcomeOf(pick: CanvasPick): ShellCanvasPickOutcome = when (pick) {

@@ -7313,7 +7313,7 @@ final class com.letta.mobile.ui.shell.sidebar/ShellAgentPanelState { // com.lett
 }
 
 final class com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState { // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState|null[0]
-    constructor <init>(kotlin/Boolean = ..., com.letta.mobile.data.model/CanvasId? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> = ...) // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.<init>|<init>(kotlin.Boolean;com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;kotlin.collections.Set<com.letta.mobile.data.model.CanvasId>){}[0]
+    constructor <init>(kotlin/Boolean = ..., com.letta.mobile.data.model/CanvasId? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> = ..., com.letta.mobile.data.model/CanvasId? = ...) // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.<init>|<init>(kotlin.Boolean;com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;kotlin.collections.Set<com.letta.mobile.data.model.CanvasId>;com.letta.mobile.data.model.CanvasId?){}[0]
 
     final val deviceOnly // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.deviceOnly|{}deviceOnly[0]
         final fun <get-deviceOnly>(): kotlin/Boolean // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.deviceOnly.<get-deviceOnly>|<get-deviceOnly>(){}[0]
@@ -7325,13 +7325,16 @@ final class com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState { // com.let
         final fun <get-notForPane>(): kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.notForPane.<get-notForPane>|<get-notForPane>(){}[0]
     final val own // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.own|{}own[0]
         final fun <get-own>(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.own.<get-own>|<get-own>(){}[0]
+    final val shown // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.shown|{}shown[0]
+        final fun <get-shown>(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.shown.<get-shown>|<get-shown>(){}[0]
 
     final fun component1(): kotlin/Boolean // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.component1|component1(){}[0]
     final fun component2(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.component4|component4(){}[0]
     final fun component5(): kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.component5|component5(){}[0]
-    final fun copy(kotlin/Boolean = ..., com.letta.mobile.data.model/CanvasId? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> = ...): com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.copy|copy(kotlin.Boolean;com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;kotlin.collections.Set<com.letta.mobile.data.model.CanvasId>){}[0]
+    final fun component6(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.component6|component6(){}[0]
+    final fun copy(kotlin/Boolean = ..., com.letta.mobile.data.model/CanvasId? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> = ..., com.letta.mobile.data.model/CanvasId? = ...): com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.copy|copy(kotlin.Boolean;com.letta.mobile.data.model.CanvasId?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;kotlin.collections.Set<com.letta.mobile.data.model.CanvasId>;com.letta.mobile.data.model.CanvasId?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState.toString|toString(){}[0]

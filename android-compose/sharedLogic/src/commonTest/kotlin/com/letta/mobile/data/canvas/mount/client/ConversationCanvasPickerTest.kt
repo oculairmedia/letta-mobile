@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas.mount.client
 
+import kotlinx.coroutines.async
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
@@ -91,6 +92,39 @@ class ConversationCanvasPickerTest {
         saves = true
         assertIs<CanvasPick.Mounted>(picker.pick(foreign))
         assertEquals(foreign, client.stored[target])
+    }
+
+    @Test
+    fun twoOverlappingPicksSaveAndMountOneAtATime() = runTest {
+        val client = FakeCanvasMountClient()
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(client))
+        val log = mutableListOf<String>()
+        val firstSaveMayFinish = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var saves = 0
+        val switch = ConversationBoardSwitch(
+            CanvasBoardSwitchGate().apply {
+                attach {
+                    val n = ++saves
+                    log += "save $n start"
+                    if (n == 1) firstSaveMayFinish.await()
+                    log += "save $n end"
+                    true
+                }
+            },
+        )
+        picker.focus.enter(target)
+        picker.focus.show(target, switch)
+        val second = CanvasId("canvas-second")
+
+        val one = async { picker.pick(foreign) }
+        val two = async { picker.pick(second) }
+        testScheduler.runCurrent()
+        assertEquals(listOf("save 1 start"), log, "the second pick must not save while the first is mid-switch")
+        firstSaveMayFinish.complete(Unit)
+        assertIs<CanvasPick.Mounted>(one.await())
+        assertIs<CanvasPick.Mounted>(two.await())
+        assertEquals(listOf("save 1 start", "save 1 end", "save 2 start", "save 2 end"), log)
+        assertEquals(second, client.stored[target])
     }
 
     @Test

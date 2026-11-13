@@ -10246,21 +10246,23 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellArchivedChatsDialogKt 
 public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasMountState {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;)V
-	public synthetic fun <init> (ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;Lcom/letta/mobile/data/model/CanvasId;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;Lcom/letta/mobile/data/model/CanvasId;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun component3 ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun component4 ()Z
 	public final fun component5 ()Ljava/util/Set;
-	public final fun copy (ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
+	public final fun component6 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;ZLcom/letta/mobile/data/model/CanvasId;Lcom/letta/mobile/data/model/CanvasId;ZLjava/util/Set;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasMountState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDeviceOnly ()Z
 	public final fun getMounted ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun getMountsOnPick ()Z
 	public final fun getNotForPane ()Ljava/util/Set;
 	public final fun getOwn ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun getShown ()Lcom/letta/mobile/data/model/CanvasId;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
