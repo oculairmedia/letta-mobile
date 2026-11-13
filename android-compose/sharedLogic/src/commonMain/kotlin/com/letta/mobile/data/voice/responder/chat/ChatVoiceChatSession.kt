@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.combine
 /**
  * The app's chat session as a [VoiceChatSession].
  *
- * The rows are the chat page's ([ChatSessionPort.uiState]); the identity of each send and the runs
+ * The rows and the send queue are the chat page's ([ChatSessionPort.uiState]); the identity of each send and the runs
  * the sends started come from [sender] ([IdentifiedChatSend]); [conversation] is the conversation
  * the sends go to, so a switch ends a reply as cancelled; stopping is the page's own Stop
  * ([com.letta.mobile.ui.chat.session.ChatActions.stopRun]). The state is read off those flows with
@@ -28,12 +28,12 @@ class ChatVoiceChatSession(
 ) : VoiceChatSession {
     override val state: StateFlow<VoiceChatState> = DerivedStateFlow(
         combine(page.uiState, sender.sentRuns, conversation) { ui, runs, current ->
-            voiceChatState(ui.messages, runs, current)
+            voiceChatState(ui.messages, runs, current, ui.sendQueue)
         },
     ) { current() }
 
     private fun current(): VoiceChatState =
-        voiceChatState(page.uiState.value.messages, sender.sentRuns.value, conversation.value)
+        page.uiState.value.let { ui -> voiceChatState(ui.messages, sender.sentRuns.value, conversation.value, ui.sendQueue) }
 
     /** Sends [text]; throws [ChatSendRefusedException] when the session refused it before enqueuing. */
     override suspend fun send(text: VoiceText): SentUtterance {

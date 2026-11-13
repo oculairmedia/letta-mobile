@@ -88,6 +88,7 @@ class ChatVoiceResponderThroughChatTest {
 
     private fun failed(code: VoiceErrorCode) = VoiceReplyEvent.Failed(VoiceError(code, VoicePort.RESPONDER))
 
+    /** The second send used to stop the first run (one Stop press); as a follow-up it now stops nothing. */
     @Test
     fun overlappingSendsEachHearOnlyTheirOwnRun() = runTest {
         val first = collect(ask("first"))
@@ -98,7 +99,7 @@ class ChatVoiceResponderThroughChatTest {
         }
 
         val second = collect(ask("second"))
-        assertEquals(1, page.stops)
+        assertEquals(0, page.stops)
         settle { page.replace(assistantRow("m1", "One. And a late tail.", run = "run-1")) }
         settle {
             turnStarted("t2", "run-2")

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.responder.chat
 
+import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.sentruns.IdentifiedChatSend
 import com.letta.mobile.data.chat.sentruns.SentMessageId
 import com.letta.mobile.data.chat.sentruns.SentMessageRuns
@@ -36,6 +37,9 @@ internal class FakeChatPage : ChatSessionPort {
     fun show(vararg rows: UiMessage) = ui.update { it.copy(messages = rows.toList().toPersistentList()) }
 
     fun add(vararg rows: UiMessage) = ui.update { it.copy(messages = (it.messages + rows).toPersistentList()) }
+
+    /** Shows [queue] as the conversation's send queue, as the chat page does with its host's queue. */
+    fun showQueue(queue: ConversationSendQueue) = ui.update { it.copy(sendQueue = queue) }
 
     /** Replaces the row with [row]'s id (or the user row with its client id) in place. */
     fun replace(row: UiMessage) = ui.update { state ->
