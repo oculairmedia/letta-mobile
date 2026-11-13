@@ -40,7 +40,8 @@ class CanvasMountResolutionOrderTest {
         assertShows(CONV_A, null, null, CanvasId.forConversation(CONV_A))
 
         // Level 2: the agent default reaches every conversation of the agent without a binding.
-        assertEquals(CanvasMountWire.DEFAULT_SET, harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_A, AGENT_DEFAULT), PEER).status)
+        val defaultSet = harness.call(CanvasMountRoute.SET_DEFAULT, defaultParams(AGENT_A, AGENT_DEFAULT), PEER)
+        assertEquals(CanvasMountWire.DEFAULT_SET, defaultSet.status)
         assertShows(CONV_A, AGENT_DEFAULT, CanvasMountWire.SOURCE_DEFAULT, AGENT_DEFAULT)
         assertShows(CONV_A2, AGENT_DEFAULT, CanvasMountWire.SOURCE_DEFAULT, AGENT_DEFAULT)
 
@@ -71,7 +72,8 @@ class CanvasMountResolutionOrderTest {
     private suspend fun assertShows(conversation: ConversationId, resolved: CanvasId?, source: String?, tools: CanvasId) {
         val reply = harness.call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, conversation), PEER)
         val expectedStatus = if (resolved == null) CanvasMountWire.NONE else CanvasMountWire.FOUND
-        assertEquals(listOf(expectedStatus, resolved?.value, source), listOf(reply.status, reply.canvas, reply.source), "$conversation resolve")
+        val answered = listOf(reply.status, reply.canvas, reply.source)
+        assertEquals(listOf(expectedStatus, resolved?.value, source), answered, "$conversation resolve")
         assertEquals(tools, backend.currentCanvas(HostCanvasCaller(AGENT_A.value, conversation.value)), "$conversation tools")
     }
 }

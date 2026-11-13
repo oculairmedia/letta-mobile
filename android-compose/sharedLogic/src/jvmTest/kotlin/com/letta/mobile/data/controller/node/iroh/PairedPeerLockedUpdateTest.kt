@@ -32,7 +32,8 @@ class PairedPeerLockedUpdateTest {
 
             val stored = checkNotNull(FilePairedPeerStore(file).get(node))
             assertEquals("after-$round", stored.name, "round $round lost the rename")
-            assertEquals(IrohPeerCapabilities.CHAT_ROLE + IrohPeerCapabilities.MOUNT_CAPABILITIES, stored.capabilities, "round $round lost the upgrade")
+            val upgraded = IrohPeerCapabilities.CHAT_ROLE + IrohPeerCapabilities.MOUNT_CAPABILITIES
+            assertEquals(upgraded, stored.capabilities, "round $round lost the upgrade")
         }
     }
 
@@ -63,7 +64,8 @@ class PairedPeerLockedUpdateTest {
         pairing.touch(node)
         assertEquals(seen, store.get(node)?.lastSeenAtMs, "a touch within the interval is throttled")
         assertEquals(setOf("agent-a"), pairing.setAgentScope(node, setOf("agent-a"))?.agentIds)
-        assertEquals(setOf(IrohPeerCapabilities.CHAT_READ), pairing.setCapabilities(node, setOf(IrohPeerCapabilities.CHAT_READ))?.capabilities)
+        val narrowed = setOf(IrohPeerCapabilities.CHAT_READ)
+        assertEquals(narrowed, pairing.setCapabilities(node, narrowed)?.capabilities)
         assertNull(pairing.rename("e".repeat(64), "nobody"))
         assertEquals(setOf("agent-a"), store.get(node)?.agentIds)
     }

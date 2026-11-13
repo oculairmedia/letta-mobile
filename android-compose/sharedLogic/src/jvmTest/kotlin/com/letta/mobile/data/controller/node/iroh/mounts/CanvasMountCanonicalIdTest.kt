@@ -64,13 +64,14 @@ class CanvasMountCanonicalIdTest {
         assertTrue(records.relay.isBound(A_CANONICAL, CONV_B))
 
         // Agent B uses its conversation's canvas: the relay's foreign id is refused and nothing is recorded.
-        assertEquals("Canvas not found: ${CanvasId.forConversation(CONV_B).value}", tool(CanvasToolContract.GET_SCENE, NO_CANVAS, AGENT_B, CONV_B).refusal())
+        val bScene = tool(CanvasToolContract.GET_SCENE, NO_CANVAS, AGENT_B, CONV_B).refusal()
+        assertEquals("Canvas not found: ${CanvasId.forConversation(CONV_B).value}", bScene)
         assertTrue(tool(CanvasToolContract.APPLY_OPS, ops("b-secret"), AGENT_B, CONV_B) is ExternalToolResult.Error)
         assertNull(records.canvases.get(A_CANONICAL), "no directory entry may record A's id for B's conversation")
         assertNull(records.canvases.forConversation(CONV_B))
 
         // The device's replace of A's binding with A's canonical id stays harmless: A's writes land on A's own topic.
-        assertEquals(CanvasMountWire.REPLACED, harness.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, A_CANONICAL), scopedToA).status)
+        assertEquals(CanvasMountWire.REPLACED, replaceWithOwnCanonical().status)
         tool(CanvasToolContract.APPLY_OPS, ops("a-own"), AGENT_A, CONV_A).success()
         assertEquals(0L, records.relay.head(CanvasRelayProtocol.conversationTopic(CONV_B)), "nothing reached B's conversation topic")
         assertEquals(1L, records.relay.head(CanvasRelayProtocol.conversationTopic(CONV_A)))
@@ -94,11 +95,14 @@ class CanvasMountCanonicalIdTest {
 
     @Test
     fun theOwnCanonicalIdStaysProposableWhileUnusedOrHeldByItsOwnConversation() = runBlocking {
-        assertEquals(CanvasMountWire.REPLACED, harness.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, A_CANONICAL), scopedToA).status)
+        assertEquals(CanvasMountWire.REPLACED, replaceWithOwnCanonical().status)
         tool(CanvasToolContract.APPLY_OPS, ops("claimed"), AGENT_A, CONV_A).success()
         assertEquals(CONV_A.value, records.canvases.get(A_CANONICAL)?.conversationId)
-        assertEquals(CanvasMountWire.REPLACED, harness.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, A_CANONICAL), scopedToA).status)
+        assertEquals(CanvasMountWire.REPLACED, replaceWithOwnCanonical().status)
     }
+
+    private suspend fun replaceWithOwnCanonical(): Reply =
+        harness.call(CanvasMountRoute.REPLACE, bindingParams(AGENT_A, CONV_A, A_CANONICAL), scopedToA)
 
     private suspend fun joinAsDevice(topic: String, proposed: CanvasId) {
         val session = relayHost.connect("app:device") { }

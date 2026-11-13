@@ -48,6 +48,21 @@ internal suspend fun relayOnlyEntry(store: CanvasRelayStore, canvas: CanvasId): 
     return if (store.isBound(canvas, conversation)) transientEntry(canvas, conversationTopic, conversation) else null
 }
 
+/**
+ * The relay-only entry of [mounted], when [caller]'s conversation is mounted on a canvas that is neither its own nor in
+ * the directory ([known]); null otherwise.
+ */
+internal suspend fun relayOnlyMount(
+    store: CanvasRelayStore,
+    caller: HostCanvasCaller,
+    mounted: CanvasId?,
+    known: List<HostCanvasEntry>,
+): HostCanvasEntry? {
+    val ownCanvas = caller.conversationId?.let { CanvasId.forConversation(ConversationId(it)) }
+    val listedAlready = mounted == ownCanvas || known.any { it.id == mounted }
+    return mounted?.takeUnless { listedAlready }?.let { relayOnlyEntry(store, it) }
+}
+
 private fun transientEntry(canvas: CanvasId, topic: String, conversation: ConversationId?) =
     HostCanvasEntry(canvas.value, topic, MOUNTED_TITLE, conversation?.value, NO_AGENT_ACL)
 

@@ -186,15 +186,6 @@ internal class FileCanvasMountStore internal constructor(
         return DurableHostFile(directory.resolve("$kind-$hash.json"), lock, directorySync, hooks)
     }
 
-    private fun ensureDirectory(path: Path) {
-        try {
-            Files.createDirectory(path)
-        } catch (_: FileAlreadyExistsException) {
-            // Existing directories are validated without following a substituted symlink.
-        }
-        require(attributesOrNull(path)?.isDirectory == true) { "Mount directory is not a directory" }
-    }
-
     private fun syncDirectories() {
         directorySync(parent)
         directorySync(directory)
@@ -238,12 +229,6 @@ internal class FileCanvasMountStore internal constructor(
         }
     }
 
-    private suspend fun remove(file: DurableHostFile): CanvasMountMutation = when (val outcome = file.remove()) {
-        DurableReplacement.Applied -> CanvasMountMutation.Removed(written = true)
-        is DurableReplacement.NotApplied -> CanvasMountMutation.NotApplied(outcome.cause)
-        is DurableReplacement.Unknown -> CanvasMountMutation.OutcomeUnknown
-    }
-
     // The sidecar stores the semantic string, not CanvasId's document-metadata object serializer.
     @Serializable
     private data class Record(
@@ -263,6 +248,22 @@ internal class FileCanvasMountStore internal constructor(
         const val DEFAULT_RECORD = "default"
         const val BINDING_RECORD = "binding"
     }
+}
+
+private fun ensureDirectory(path: Path) {
+    try {
+        Files.createDirectory(path)
+    } catch (_: FileAlreadyExistsException) {
+        // Existing directories are validated without following a substituted symlink.
+    }
+    require(attributesOrNull(path)?.isDirectory == true) { "Mount directory is not a directory" }
+}
+
+/** Removes [file]'s record, split at the delete as [DurableHostFile.remove] reports it. */
+private suspend fun remove(file: DurableHostFile): CanvasMountMutation = when (val outcome = file.remove()) {
+    DurableReplacement.Applied -> CanvasMountMutation.Removed(written = true)
+    is DurableReplacement.NotApplied -> CanvasMountMutation.NotApplied(outcome.cause)
+    is DurableReplacement.Unknown -> CanvasMountMutation.OutcomeUnknown
 }
 
 private fun attributesOrNull(path: Path): BasicFileAttributes? = try {

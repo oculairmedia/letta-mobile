@@ -55,7 +55,12 @@ internal class CanvasMountConnection private constructor(
             val endpoint = context.authenticatedEndpointId?.takeIf { context.authenticated } ?: return null
             if (!ENDPOINT_ID.matches(endpoint)) return null
             val principal = CanvasMountPrincipal.fromVerifiedConnection(endpoint) ?: return null
-            return CanvasMountConnection(principal, context.authorizedAgentIds, context.authorizedConversationIds, context.grantedCapabilities)
+            return CanvasMountConnection(
+                principal,
+                context.authorizedAgentIds,
+                context.authorizedConversationIds,
+                context.grantedCapabilities,
+            )
         }
     }
 }
