@@ -59,7 +59,7 @@ fun MemoryPage(
         // Only the chrome pulls to refresh: the graph's drags pan it, and the node card scrolls its own
         // text. Drawn above the graph so the indicator can drop below the chrome.
         LettaRefreshable(refreshing = refreshing, onRefresh = actions::refresh, modifier = Modifier.fillMaxWidth().zIndex(1f)) {
-            MemoryPageChrome(state.parity, actions, MemoryChromeOptions(options.showTitle, state.canCreateBlock))
+            MemoryPageChrome(state.parity, actions, MemoryChromeOptions(options, state.canCreateBlock))
         }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val layout = MemoryPageLayout(state, actions, reducedMotion)
@@ -82,6 +82,10 @@ fun MemoryPage(
 data class MemoryPageOptions(
     val showTitle: Boolean = true,
     val reducedMotion: Boolean = false,
+    /** Replaces the header's agent picker (a host that owns which agent is focused). */
+    val headerContext: (@Composable () -> Unit)? = null,
+    /** The header's controls row: the Memory destination's Blocks | Files switch. */
+    val headerControls: (@Composable () -> Unit)? = null,
 )
 
 private class MemoryPageLayout(
@@ -190,6 +194,7 @@ private fun MemoryGraphArea(
                 view = state.view,
                 counts = state.parity.memory.graph.nodes.groupingBy { it.kind }.eachCount(),
                 onToggle = layout.actions::toggleKind,
+                wide = !runtime.compact,
             )
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
