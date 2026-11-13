@@ -87,6 +87,24 @@ class ConversationModelSelectionsTest {
     }
 
     @Test
+    fun anotherDevicesThirdModelSupersedesAnUnconfirmedLocalPick() {
+        val selections = ConversationModelSelections()
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS)))
+        selections.record("conv-1", GPT)
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = SONNET)))
+        assertEquals(SONNET, selections["conv-1"])
+    }
+
+    @Test
+    fun clearingTheHostOverrideSupersedesAnUnconfirmedLocalPick() {
+        val selections = ConversationModelSelections()
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS)))
+        selections.record("conv-1", GPT)
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = null)))
+        assertEquals(AGENT_MODEL, selections.effectiveModel("conv-1", AGENT_MODEL))
+    }
+
+    @Test
     fun aConversationLimitWithoutAModelOverrideSizesTheAgentsModel() {
         val selections = ConversationModelSelections()
         selections.seedFromHost(listOf(hostConversation("conv-1", model = null, window = 64_000)))

@@ -215,7 +215,11 @@ internal fun RunToolSteps(
     }
 }
 
-/** The plain label over several steps: what their presenters' verbs add up to, never a disclosure. */
+/**
+ * The plain label over several steps: what their presenters' verbs add up to, never a disclosure.
+ * It starts at the steps' own inset (flush with the step rows, under the summary line's label),
+ * with no inset of its own.
+ */
 @Composable
 private fun StepGroupLabel(toolCalls: List<UiToolCall>) {
     val presenters = LocalToolPresenters.current
@@ -226,7 +230,7 @@ private fun StepGroupLabel(toolCalls: List<UiToolCall>) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .testTag(ChatRowTestTags.RUN_STEP_GROUP_LABEL)
-            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+            .padding(end = LettaDimens.Space.sm, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
     )
 }
 
