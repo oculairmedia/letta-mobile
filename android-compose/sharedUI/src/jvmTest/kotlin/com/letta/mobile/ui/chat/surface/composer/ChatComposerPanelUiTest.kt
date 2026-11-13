@@ -68,6 +68,7 @@ import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
 import com.letta.mobile.ui.chat.session.message
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.modelcontrol.ModelPickerEffortTags
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
 import com.letta.mobile.ui.modelcontrol.RecordedPicks
 import com.letta.mobile.ui.modelcontrol.pickerModel
@@ -563,10 +564,14 @@ class ChatComposerPanelUiTest {
             assertFalse(picker.pickerOpen)
         }
         onNodeWithTag(ModelPickerTags.PANE).assertDoesNotExist()
-        onNodeWithTag(ComposerTestTags.EFFORT_CHIP).performClick()
-        onNodeWithText("High").performClick()
+        // The effort is not a control of its own: the one model control's picker offers it under the list.
+        onNodeWithTag(ComposerTestTags.MODEL_CHIP).performClick()
+        onNodeWithTag(ModelPickerEffortTags.CHOICE_PREFIX + "high").performClick()
         val expected: List<Pair<String, ReasoningEffortChoice>> = listOf("openai/a" to ReasoningEffortChoice.Named("high"))
-        runOnIdle { assertEquals(expected, actions.models) }
+        runOnIdle {
+            assertEquals(expected, actions.models)
+            assertFalse(picker.pickerOpen)
+        }
     }
 
     @Test

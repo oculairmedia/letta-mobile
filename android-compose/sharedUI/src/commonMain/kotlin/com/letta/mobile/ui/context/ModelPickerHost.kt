@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.context
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,6 +19,7 @@ import com.letta.mobile.ui.components.isPointerHost
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
+import com.letta.mobile.ui.modelcontrol.LocalModelPickerEffortSection
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
 import com.letta.mobile.ui.modelcontrol.ModelsEditActions
@@ -34,30 +36,49 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ModelPickerHost(binding: ModelPickerBinding, selectedValue: String?) {
+    ModelPickerHost(binding, selectedValue, effort = null)
+}
+
+/**
+ * [ModelPickerHost] with [effort], the selected model's effort choices, under the list: the
+ * composer's one model control offers model and effort in the same pane. Picking an effort closes
+ * the pane, as picking a model does.
+ */
+@Composable
+internal fun ModelPickerHost(binding: ModelPickerBinding, selectedValue: String?, effort: ModelPickerEffortSection?) {
     // Outlives the Models sheet, so the chat's re-read after it closes is not cancelled with it.
     val scope = rememberCoroutineScope()
     val editor = binding.editor
     when {
-        binding.pickerOpen -> ModelPickerPane(binding, selectedValue)
+        binding.pickerOpen -> ModelPickerPane(binding, selectedValue, effort)
         binding.editorOpen && editor != null -> ModelsEditorPane(binding, editor) { scope.launch { binding.onModelsEdited() } }
     }
 }
 
 @Composable
-private fun ModelPickerPane(binding: ModelPickerBinding, selectedValue: String?) {
+private fun ModelPickerPane(binding: ModelPickerBinding, selectedValue: String?, effort: ModelPickerEffortSection?) {
     val scope = rememberCoroutineScope()
     val controller = remember(binding) { ModelPickerController(scope, binding.source) }
     LaunchedEffect(controller, selectedValue) { controller.setSelected(selectedValue) }
     LaunchedEffect(controller) { controller.ensureLoaded() }
     val state by controller.state.collectAsState()
     val actions = rememberPickerActions(binding, controller)
+    val closingEffort = effort?.copy(
+        onSelect = { choice ->
+            binding.close()
+            effort.onSelect(choice)
+        },
+    )
     LettaPane(LettaPaneKind.Modal, onDismiss = binding::close) {
-        ModelPickerContent(
-            state = state,
-            actions = actions,
-            modifier = Modifier.testTag(ModelPickerTags.PANE),
-            autoFocusSearch = isPointerHost(),
-        )
+        // Provided inside the pane: a host may draw its panes away from this call site.
+        CompositionLocalProvider(LocalModelPickerEffortSection provides closingEffort) {
+            ModelPickerContent(
+                state = state,
+                actions = actions,
+                modifier = Modifier.testTag(ModelPickerTags.PANE),
+                autoFocusSearch = isPointerHost(),
+            )
+        }
     }
 }
 

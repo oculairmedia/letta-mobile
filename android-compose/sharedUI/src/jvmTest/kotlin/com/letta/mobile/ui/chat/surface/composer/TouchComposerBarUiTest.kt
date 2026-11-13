@@ -5,6 +5,8 @@ package com.letta.mobile.ui.chat.surface.composer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -75,8 +77,12 @@ class TouchComposerBarUiTest {
         val mode = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
         setContent { TouchPanel(ComposerInputs(composer = ready().copy(permissionMode = mode), actions = actions)) }
 
-        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
+        // No line under the bar: on Touch the mode lives only in the "+" sheet.
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertDoesNotExist()
         onNodeWithContentDescription("Add to message").performClick()
+        val row = hasTestTag(ComposerTestTags.TOUCH_SHEET_ROW) and hasAnyDescendant(hasText("Permission mode: Approve all"))
+        // The row shares the under-card line's entry: the same state for screen readers.
+        assertEquals("Approve all", onNode(row).fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
         onNodeWithText("Permission mode: Approve all").performClick()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertExists()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + AppServerPermissionMode.Standard.name).performClick()
@@ -112,8 +118,9 @@ class TouchComposerBarUiTest {
                 ),
             )
         }
-        // With the mode left out the "+" is attach-only again.
+        // With the mode left out the "+" is attach-only again, and nothing sits under the bar.
         onNodeWithContentDescription("Attach image").assertExists()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).assertDoesNotExist()
     }
 
     @Test
