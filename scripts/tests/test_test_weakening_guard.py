@@ -56,6 +56,44 @@ class FixtureDiffTest(unittest.TestCase):
         self.assertEqual([], self.check_diff({OLD_PATH: BASE}, {OLD_PATH: after}))
         self.assertEqual([], self.check_diff({}, {OLD_PATH: after}))
 
+    def test_bodyless_class_before_tests(self):
+        before = ("class ExampleTest {\n"
+                  "    @Test fun first() { assertTrue(true) }\n"
+                  "    private class Earlier\n"
+                  "    private class TerminalFailure(message: String) :\n"
+                  "        IllegalStateException(message),\n"
+                  "        TerminalConnectionFailure\n"
+                  "    @Test fun later() { assertTrue(true); assertEquals(1, 1) }\n"
+                  "}\n")
+        added = before.replace("    private class TerminalFailure", "    @Test fun added() { assertTrue(true) }\n    private class TerminalFailure")
+        self.assertEqual([], self.check_diff({OLD_PATH: before}, {OLD_PATH: added}))
+        removed = before.replace("    @Test fun later() { assertTrue(true); assertEquals(1, 1) }\n", "")
+        problems = self.check_diff({OLD_PATH: before}, {OLD_PATH: removed})
+        self.assertIn("ExampleTest: @Test/test function removed or renamed: later (1)", problems)
+        self.assertIn("ExampleTest: assertion calls decreased: 3 -> 1", problems)
+
+    def test_function_type_arrow_does_not_end_a_constructor(self):
+        # `->` in a function type must not close the open `(`, or the class is dropped and a class-level
+        # @Ignore goes unnoticed (review on PR #2455).
+        source = ("class ExampleTest(val callback: () -> Unit = ::noop) {\n"
+                  "    @Test fun first() { assertTrue(true) }\n"
+                  "}\n")
+        records = guard.kotlin_records(source)
+        self.assertEqual(1, records["ExampleTest"]["tests"]["first"])
+        ignored = source.replace("class ExampleTest", "@Ignore\nclass ExampleTest")
+        self.assertNotEqual([], self.check_diff({OLD_PATH: source}, {OLD_PATH: ignored}))
+
+    def test_class_header_forms_keep_ownership(self):
+        headers = ("data object Empty", "object Empty : Parent()", "annotation class Empty",
+                   "class Empty\n        : Parent(),\n          Other", "enum class Empty",
+                   "fun interface Empty { fun call() }")
+        for header in headers:
+            with self.subTest(header=header):
+                source = f"class ExampleTest {{\n    {header}\n    @Test fun later() {{ assertTrue(true) }}\n}}\n"
+                records = guard.kotlin_records(source)
+                self.assertEqual(1, records["ExampleTest"]["tests"]["later"])
+                self.assertEqual(1, records["ExampleTest"]["assertions"])
+
     def test_removed_or_renamed_test_fails(self):
         for after in (BASE.replace("@Test", ""), BASE.replace("works", "renamed"), ""):
             with self.subTest(after=after):
