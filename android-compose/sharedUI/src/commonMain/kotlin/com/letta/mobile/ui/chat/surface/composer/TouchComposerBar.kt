@@ -341,6 +341,10 @@ private fun touchSlotDictates(model: ComposerModel): Boolean {
  * The right-hand slot. Empty and idle, it is the platform's hold-to-dictate mic; otherwise Send,
  * or Stop while a run streams with nothing to queue. While the keyboard is up Send steps aside
  * (the keyboard's own action key sends), but Stop and the mic stay.
+ *
+ * It is the Touch bar's one trailing slot: an additional trailing action (a voice-mode button beside
+ * Send) is added here, after the field, not elsewhere in the bar's row. The pointer card's
+ * counterpart is its ComposerTrailingActions.
  */
 @Composable
 private fun TouchTrailingSlot(model: ComposerModel) {
