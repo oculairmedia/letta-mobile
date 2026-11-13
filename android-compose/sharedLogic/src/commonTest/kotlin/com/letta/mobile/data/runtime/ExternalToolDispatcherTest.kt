@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.extras.identity.CallerIdentity.CLAIMED
 import com.letta.mobile.data.controller.extras.identity.CallerIdentity.VERIFIED
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
@@ -69,9 +70,26 @@ class ExternalToolDispatcherTest {
                 return ExternalToolResult.Success("ok")
             }
         }
-        dispatcher(RecordingClient(), registry = registryOf(tool)).answerRequest()
+        dispatcher(RecordingClient(vouchesForRuntimeScope = true), registry = registryOf(tool)).answerRequest()
         // letta-mobile-bglj6.12: and the request's tool_call_id, which the timeline keys the call on.
         assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller(VERIFIED, "agent-1", "conv-1", TOOL_CALL_ID), seen)
+    }
+
+    /** The scope is only as trustworthy as the client that delivered it: a client that does not own its App Server connection is claimed. */
+    @Test
+    fun aClientThatDoesNotVouchForTheScopeYieldsAClaimedCaller() = runTest {
+        val seen = mutableListOf<com.letta.mobile.data.controller.extras.ExternalToolCaller>()
+        val tool = object : ExternalTool by EchoTool({ ExternalToolResult.Success("ok") }) {
+            override suspend fun invoke(input: JsonObject, caller: com.letta.mobile.data.controller.extras.ExternalToolCaller): ExternalToolResult {
+                seen += caller
+                return ExternalToolResult.Success("ok")
+            }
+        }
+        dispatcher(RecordingClient(), registry = registryOf(tool)).answerRequest()
+
+        val caller = seen.single()
+        assertEquals(CLAIMED, caller.identity)
+        assertEquals("agent-1", caller.agentId, "the scope is still passed on, just not vouched for")
     }
 
     @Test
@@ -319,7 +337,7 @@ class ExternalToolDispatcherTest {
         const val PLUGIN = "plugin.echo"
     }
 
-    private class RecordingClient : AppServerClient {
+    private class RecordingClient(override val vouchesForRuntimeScope: Boolean = false) : AppServerClient {
         val responses = mutableListOf<AppServerCommand.ExternalToolCallResponse>()
         var failSend = false
 

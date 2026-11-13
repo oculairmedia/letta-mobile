@@ -33,6 +33,9 @@ internal class IrohDialSwitchingClient(private val scope: CoroutineScope) : Forw
     private val _events = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = EVENT_BUFFER)
     override val events: Flow<AppServerReceivedFrame> = _events.asSharedFlow()
 
+    /** Every dial reaches a remote host's App Server through its Iroh node: a relayed scope is only claimed. */
+    override val vouchesForRuntimeScope: Boolean get() = false
+
     private val switchLock = Mutex()
     private val generationSeq = atomic(0L)
 

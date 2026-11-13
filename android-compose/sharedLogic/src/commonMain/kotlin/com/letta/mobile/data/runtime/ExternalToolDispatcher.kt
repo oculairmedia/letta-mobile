@@ -195,8 +195,9 @@ internal class ExternalToolDispatcher(
                         toolName = request.toolName,
                         input = request.input,
                         caller = ExternalToolCaller(
-                            // n2stx.2.4: the App Server stamped this scope on the frame; the model cannot choose it.
-                            identity = CallerIdentity.VERIFIED,
+                            // The model cannot choose this scope, but only a client that owns its App
+                            // Server connection can vouch that the App Server stamped it.
+                            identity = if (client.vouchesForRuntimeScope) CallerIdentity.VERIFIED else CallerIdentity.CLAIMED,
                             agentId = request.runtime?.agentId,
                             conversationId = request.runtime?.conversationId,
                             // letta-mobile-bglj6.12: the model's tool call id, the key the

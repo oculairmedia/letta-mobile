@@ -24,6 +24,15 @@ import kotlinx.serialization.json.JsonObject
 interface AppServerClient {
     /** Every inbound frame, in socket order where the transport has one ([AppServerTransport.inboundFrames]). */
     val events: Flow<AppServerReceivedFrame>
+
+    /**
+     * Whether this client owns its connection to the App Server that stamps the runtime scope on
+     * the `external_tool_call_request` frames it delivers, so a host tool may treat that scope's
+     * agent id as verified. False unless a client declares otherwise: a client that relays or
+     * forwards frames from another host can vouch only for a claimed scope. Read per call, never
+     * cached, because a forwarding client's connection can change.
+     */
+    val vouchesForRuntimeScope: Boolean get() = false
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
     /**
@@ -253,6 +262,12 @@ class DefaultAppServerClient(
     private val transport: AppServerTransport,
     requestTimeoutMs: Long = AppServerRequestRegistry.DEFAULT_REQUEST_TIMEOUT_MS,
     parentScope: CoroutineScope? = null,
+    /**
+     * True only where this client's transport is the host's own connection to its local App Server
+     * (so the server on the other end is the one that stamps runtime scopes). A client over an Iroh
+     * or relayed transport leaves it false. See [AppServerClient.vouchesForRuntimeScope].
+     */
+    override val vouchesForRuntimeScope: Boolean = false,
 ) : AppServerClient {
     private val registry = AppServerRequestRegistry(
         controlFrames = transport.controlFrames,
