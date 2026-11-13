@@ -48,9 +48,9 @@ class FileCanvasRelayStore(private val root: Path) : CanvasRelayStore {
         proposed
     }
 
-    override suspend fun boundCanvas(topic: String): CanvasId? = io {
+    override suspend fun isBound(topic: String, canvas: CanvasId): Boolean = io {
         val file = dirOf(topic).resolve(BINDING)
-        if (Files.isRegularFile(file)) CanvasId(Files.readString(file).trim()) else null
+        Files.isRegularFile(file) && Files.readString(file).trim() == canvas.value
     }
 
     override suspend fun append(topic: String, op: CanvasOp, origin: String): CanvasRelayAppend = io {

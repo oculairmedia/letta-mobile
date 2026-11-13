@@ -61,7 +61,7 @@ class CanvasMountCanonicalIdTest {
     @Test
     fun theOtherConversationsCanvasToolsRefuseAnIdTheRelayBoundForAnotherConversation() = runBlocking {
         joinAsDevice(CanvasRelayProtocol.conversationTopic(CONV_B), A_CANONICAL)
-        assertEquals(A_CANONICAL, records.relay.boundCanvas(CanvasRelayProtocol.conversationTopic(CONV_B)))
+        assertTrue(records.relay.isBound(CanvasRelayProtocol.conversationTopic(CONV_B), A_CANONICAL))
 
         // Agent B uses its conversation's canvas: the relay's foreign id is refused and nothing is recorded.
         assertEquals("Canvas not found: ${CanvasId.forConversation(CONV_B).value}", tool(CanvasToolContract.GET_SCENE, NO_CANVAS, AGENT_B, CONV_B).refusal())

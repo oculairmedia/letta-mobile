@@ -130,9 +130,17 @@ class HostCanvasBackend(
         // One mount lookup for the whole list; the grant covers only the canvas it names.
         val mounted = (mounts.mountOf(caller) as? HostCanvasMount.Mounted)?.canvas
         val readable = known.filter { it.acl.canRead(caller.agentId) || it.id == mounted }
+        return readable + listOfNotNull(relayOnlyMount(caller, mounted, known))
+    }
+
+    /**
+     * The relay-only entry of [mounted], when the caller's conversation is mounted on a canvas that is neither its own
+     * nor in the directory ([known]); null otherwise.
+     */
+    private suspend fun relayOnlyMount(caller: HostCanvasCaller, mounted: CanvasId?, known: List<HostCanvasEntry>): HostCanvasEntry? {
         val ownCanvas = caller.conversationId?.let { CanvasId.forConversation(ConversationId(it)) }
-        if (mounted == null || mounted == ownCanvas || known.any { it.id == mounted }) return readable
-        return readable + listOfNotNull(relayOnlyEntry(store, mounted))
+        val listedAlready = mounted == ownCanvas || known.any { it.id == mounted }
+        return mounted?.takeUnless { listedAlready }?.let { relayOnlyEntry(store, it) }
     }
 
     /** Whether [caller] may write [entry] now: its ACL, or the live mount of its own conversation (D5). */

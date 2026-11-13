@@ -182,14 +182,19 @@ internal class HostCanvasMountAuthority(
     }
 
     private suspend fun visible(scope: CanvasMountScope, canvas: CanvasId): Boolean {
-        val own = (scope as? CanvasMountScope.Conversation)?.conversation
         // The id string alone proves nothing: the shortcut holds only while the catalog shows the canonical id unused
         // or held through this very conversation (any signed-in app may bind a topic to an id naming another one).
-        if (own != null && canvas == CanvasId.forConversation(own) && catalog.canonicalHeldBy(own)) return true
+        if (ownCanonicalHeld(scope, canvas)) return true
         return when (val ownership = catalog.ownership(canvas, directory)) {
             CanvasOwnership.Absent -> false
             is CanvasOwnership.Owned -> ownedVisible(ownership.agents)
         }
+    }
+
+    /** Whether [canvas] is the addressed binding's own canonical id and the catalog shows it held by that binding. */
+    private suspend fun ownCanonicalHeld(scope: CanvasMountScope, canvas: CanvasId): Boolean {
+        val own = (scope as? CanvasMountScope.Conversation)?.conversation?.takeIf { canvas == CanvasId.forConversation(it) }
+        return own?.let { catalog.canonicalHeldBy(it) } == true
     }
 
     private fun ownedVisible(owners: Set<AgentId>): Boolean =

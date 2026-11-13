@@ -149,7 +149,7 @@ internal class FakeViewer(private val context: AdminRpcRequestContext?) : Viewer
 
     override suspend fun writeFrame(frame: String): Boolean = frames.add(frame)
 
-    override fun adminContextFor(method: String): AdminRpcRequestContext? = context
+    override fun adminContext(): AdminRpcRequestContext? = context
 }
 
 /** Host records shared by every harness on one root, as two host processes share one host's files. */

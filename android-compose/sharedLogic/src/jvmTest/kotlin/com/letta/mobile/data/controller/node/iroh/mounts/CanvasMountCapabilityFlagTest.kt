@@ -40,7 +40,7 @@ class CanvasMountCapabilityFlagTest {
 
         val peer = checkNotNull(FilePairedPeerStore(file).get("old-desktop"))
         assertEquals(IrohPeerCapabilities.LEGACY_DESKTOP_ROLE + mount, peer.capabilities)
-        assertEquals(IrohPeerCapabilities.roles(mountsEnabled = true).getValue("desktop"), peer.capabilities)
+        assertEquals(IrohPairingService.rolesFor(mountsEnabled = true).getValue("desktop"), peer.capabilities)
     }
 
     @Test
@@ -98,8 +98,8 @@ class CanvasMountCapabilityFlagTest {
 
         assertEquals(IrohPeerCapabilities.LEGACY_DESKTOP_ROLE + mount, store.get("explicit")?.capabilities)
         assertEquals(narrow, store.get("narrow")?.capabilities)
-        assertEquals(narrow, IrohPeerCapabilities.grantAsOfNow(narrow, mountsEnabled = true))
-        assertEquals(narrow + mount, IrohPeerCapabilities.grantAsOfNow(narrow + mount, mountsEnabled = false))
+        assertEquals(narrow, IrohPairingService.grantAsOfNow(narrow, mountsEnabled = true))
+        assertEquals(narrow + mount, IrohPairingService.grantAsOfNow(narrow + mount, mountsEnabled = false))
     }
 
     private fun service(invites: PairingInviteStore, mountsEnabled: Boolean) =

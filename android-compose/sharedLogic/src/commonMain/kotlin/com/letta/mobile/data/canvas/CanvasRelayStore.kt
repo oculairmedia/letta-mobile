@@ -18,10 +18,10 @@ interface CanvasRelayStore {
     suspend fun bind(topic: String, proposed: CanvasId): CanvasId
 
     /**
-     * The canvas [topic] is already bound to, or null when it is not bound. Read-only: unlike [bind]
-     * it never creates a binding, so a lookup cannot bring a canvas into existence.
+     * Whether [topic] is already bound to [canvas]. Read-only: unlike [bind] it never creates a
+     * binding, so a lookup cannot bring a canvas into existence.
      */
-    suspend fun boundCanvas(topic: String): CanvasId?
+    suspend fun isBound(topic: String, canvas: CanvasId): Boolean
 
     /**
      * Appends [op] to [topic]'s log, received from [origin], and returns its cursor. Idempotent by
@@ -56,7 +56,7 @@ class InMemoryCanvasRelayStore : CanvasRelayStore {
         bindings.getOrPut(topic) { proposed }
     }
 
-    override suspend fun boundCanvas(topic: String): CanvasId? = mutex.withLock { bindings[topic] }
+    override suspend fun isBound(topic: String, canvas: CanvasId): Boolean = mutex.withLock { bindings[topic] == canvas }
 
     override suspend fun append(topic: String, op: CanvasOp, origin: String): CanvasRelayAppend = mutex.withLock {
         val seen = cursorsByOp.getOrPut(topic) { mutableMapOf() }

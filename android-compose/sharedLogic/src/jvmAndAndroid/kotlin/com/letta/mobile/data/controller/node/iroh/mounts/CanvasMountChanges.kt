@@ -4,6 +4,8 @@ import com.letta.mobile.data.canvas.mount.CanvasMountDecision
 import com.letta.mobile.data.canvas.mount.CanvasMountRequest
 import com.letta.mobile.data.canvas.mount.CanvasMountScope
 import com.letta.mobile.data.canvas.mount.wire.CanvasMountWire
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
+import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.controller.node.iroh.ViewerHandle
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
@@ -23,8 +25,8 @@ internal data class CanvasMountChange(val agent: AgentId, val conversation: Conv
  * Tells the connections viewing a conversation that its binding changed, as a `canvas_mount_updated` frame, so an
  * open conversation follows a switch made on another device without polling (S2).
  *
- * Each viewer gets the frame only if `canvas.mount.resolve` would have shown it the same canvas: its capabilities
- * admit resolve ([ViewerHandle.adminContextFor]), and the resolve authority built from its own verified identity and
+ * Each viewer gets the frame only if `canvas.mount.resolve` would have shown it the same canvas: the capabilities its
+ * connection established ([ViewerHandle.adminContext]) admit resolve, and the resolve authority built from its own verified identity and
  * scopes allows addressing the binding and seeing the canvas. Viewers that fail any check get nothing, so the push
  * reveals nothing resolve would not. Sending runs on [scope]; the writer's reply never waits for it. A client that
  * misses the push re-resolves when it opens the conversation.
@@ -44,12 +46,17 @@ internal class CanvasMountChanges(
     }
 
     private suspend fun mayReceive(viewer: ViewerHandle, change: CanvasMountChange): Boolean {
-        val connection = viewer.adminContextFor(CanvasMountWire.RESOLVE)?.let(CanvasMountConnection::of) ?: return false
+        val context = viewer.adminContext()?.takeIf { it.admits(CanvasMountWire.RESOLVE) } ?: return false
+        val connection = CanvasMountConnection.of(context) ?: return false
         val authority = HostCanvasMountAuthority(connection, sources.catalog, sources.directory, CanvasMountCallTrace())
         val request = CanvasMountRequest(connection.principal, CanvasMountScope.Conversation(change.agent, change.conversation))
         val addressed = authority.mayAddress(request) == CanvasMountDecision.ALLOW
         return addressed && authority.maySee(request, change.canvas) == CanvasMountDecision.ALLOW
     }
+
+    /** Whether the capabilities the connection established admit [method], as the admin RPC gate would. */
+    private fun AdminRpcRequestContext.admits(method: String): Boolean =
+        grantedCapabilities?.let { IrohPeerCapabilities.isAllowed(it, IrohPeerCapabilities.forAdminMethod(method)) } == true
 
     private fun frameOf(change: CanvasMountChange): String = buildJsonObject {
         put("type", CanvasMountWire.EVENT_TYPE)

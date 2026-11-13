@@ -233,12 +233,9 @@ class IrohNodeConnection(
                     IrohPeerCapabilities.conversationScope(capabilities, viewedConversationId = null) == null
             },
         )
-        // Method-scoped pushes (canvas mounts) re-run the method's own checks on this context; it is given
-        // only while the same per-method capability gate admin_rpc applies admits the method.
-        handle.adminContextGate = { method ->
-            val required = IrohPeerCapabilities.forAdminMethod(method)
-            currentAdminRpcRequestContext().takeIf { sessionAuth.allowsAdminCapability(required) }
-        }
+        // Method-scoped pushes (canvas mounts) check the method's capability against the context's granted
+        // capabilities and re-run the method's own checks on it; it is given only while authenticated.
+        handle.adminContextGate = { currentAdminRpcRequestContext().takeIf { it.authenticated } }
         selfViewer = handle
         return handle
     }

@@ -7,6 +7,7 @@ import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AgentScopeGuard
+import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.model.AgentId
@@ -293,8 +294,8 @@ class CanvasMountRouteSecurityTest {
         }
         val mountCapabilities = setOf(IrohPeerCapabilities.CANVAS_MOUNT_READ, IrohPeerCapabilities.CANVAS_MOUNT_WRITE)
         assertTrue(IrohPeerCapabilities.ALL.containsAll(mountCapabilities))
-        assertTrue(IrohPeerCapabilities.roles(mountsEnabled = false).values.none { it.any(mountCapabilities::contains) })
-        val chatRoles = IrohPeerCapabilities.roles(mountsEnabled = true).filterValues { IrohPeerCapabilities.CHAT_READ in it }
+        assertTrue(IrohPairingService.rolesFor(mountsEnabled = false).values.none { it.any(mountCapabilities::contains) })
+        val chatRoles = IrohPairingService.rolesFor(mountsEnabled = true).filterValues { IrohPeerCapabilities.CHAT_READ in it }
         assertEquals(setOf("chat", "desktop", "vibesync"), chatRoles.keys)
         chatRoles.forEach { (role, capabilities) -> assertTrue(capabilities.containsAll(mountCapabilities), role) }
         chatRoles.forEach { (role, capabilities) ->

@@ -134,7 +134,7 @@ class CanvasMountGrantTest {
         val gone = CanvasId("canvas-gone")
         harness.store().replaceBinding(AGENT_A, CONV_A, gone)
         assertEquals("Canvas not found: ${gone.value}", call(CanvasToolContract.GET_SCENE, NOTHING, AGENT_A, CONV_A).refusal())
-        assertNull(records.relay.boundCanvas(com.letta.mobile.data.canvas.CanvasRelayProtocol.canvasTopic(gone)))
+        assertEquals(false, records.relay.isBound(com.letta.mobile.data.canvas.CanvasRelayProtocol.canvasTopic(gone), gone))
         assertNull(records.canvases.get(gone))
     }
 

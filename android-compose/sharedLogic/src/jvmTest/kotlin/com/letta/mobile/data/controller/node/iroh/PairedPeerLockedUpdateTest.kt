@@ -6,7 +6,7 @@ import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 /**
@@ -37,15 +37,16 @@ class PairedPeerLockedUpdateTest {
     }
 
     @Test
-    fun updateWritesOnlyAChangeAndNeverReKeysOrCreates() {
+    fun aLockedChangeWritesOnlyAChangeAndNeverCreatesARecord() {
         val file = Files.createTempDirectory("paired-peer-update").resolve("paired-peers.json")
         val store = FilePairedPeerStore(file)
-        assertNull(store.update(node) { it.copy(name = "ghost") }, "an unpaired node is not created")
+        val pairing = IrohPairingService(store)
+        assertNull(pairing.rename(node, "ghost"), "an unpaired node is not created")
+        assertFalse(Files.exists(file), "nothing is written for an unpaired node")
         store.save(PairedPeer(node, "name", 1L))
         val written = Files.getLastModifiedTime(file)
-        assertEquals("name", store.update(node) { it }?.name)
+        assertEquals("name", pairing.rename(node, "name")?.name)
         assertEquals(written, Files.getLastModifiedTime(file), "an unchanged record is not rewritten")
-        assertFailsWith<IllegalArgumentException> { store.update(node) { it.copy(nodeId = "other") } }
         assertEquals(listOf(node), store.list().map { it.nodeId })
     }
 

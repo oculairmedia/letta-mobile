@@ -41,11 +41,12 @@ interface ViewerHandle {
     fun receivesConversationActivity(agentId: AgentId): Boolean = false
 
     /**
-     * The connection's current admin RPC request context (its verified identity and scopes), only while its
-     * capabilities admit [method]; null otherwise. A push that must reach only peers allowed to call [method] re-runs
-     * that method's own checks on it. Evaluated at send time. Default: null (receives nothing).
+     * The connection's current admin RPC request context (its verified identity, scopes and granted capabilities)
+     * while it is authenticated; null otherwise. A method-scoped push checks the method's capability against
+     * [AdminRpcRequestContext.grantedCapabilities] and re-runs that method's own checks on it. Evaluated at send
+     * time. Default: null (receives nothing).
      */
-    fun adminContextFor(method: String): AdminRpcRequestContext? = null
+    fun adminContext(): AdminRpcRequestContext? = null
 }
 
 /** The live viewers of a conversation, for pushes scoped to that conversation's viewers. */

@@ -77,30 +77,32 @@ class CanvasMountFailureTest {
     @Test
     fun aFailureAfterTheMoveIsOutcomeUnknownAndResolveThenReturnsTheCommittedCanvas() = runBlocking {
         Mutation.entries.forEach { mutation ->
-            val root = Files.createTempDirectory("canvas-mount-after-move")
-            mutation.seed(MountHarness(root))
-            val hooks = DurableHostFileHooks(afterMove = { throw IOException("$root/secret") })
-            val failing = granted(MountHarness(root, HarnessOptions(hooks = hooks)))
-            val reply = failing.call(mutation.route, paramsFor(mutation.route, CONV_A, NEXT), PEER)
-            assertEquals(CanvasMountWire.OUTCOME_UNKNOWN, reply.status, "$mutation")
-            val resolved = granted(MountHarness(root)).call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A), PEER)
-            assertEquals(CanvasMountWire.FOUND to NEXT.value, resolved.status to resolved.canvas, "$mutation")
-            assertNoHostDetail(root, failing.responses)
+            val attempt = failAtMove(mutation) { failure -> DurableHostFileHooks(afterMove = { throw failure }) }
+            assertEquals(CanvasMountWire.OUTCOME_UNKNOWN, attempt.reply.status, "$mutation")
+            assertEquals(CanvasMountWire.FOUND to NEXT.value, attempt.resolved.status to attempt.resolved.canvas, "$mutation")
+            assertNoHostDetail(attempt.root, attempt.failing.responses)
         }
     }
 
     @Test
     fun aFailureBeforeTheMoveIsUnavailableAndChangesNothing() = runBlocking {
         Mutation.entries.forEach { mutation ->
-            val root = Files.createTempDirectory("canvas-mount-before-move")
-            mutation.seed(MountHarness(root))
-            val hooks = DurableHostFileHooks(beforeMove = { throw IOException("$root/secret") })
-            val failing = granted(MountHarness(root, HarnessOptions(hooks = hooks)))
-            val reply = failing.call(mutation.route, paramsFor(mutation.route, CONV_A, NEXT), PEER)
-            assertEquals(unavailable(CanvasMountWire.REASON_STORAGE), reply.unavailability(), "$mutation")
-            val resolved = granted(MountHarness(root)).call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A), PEER)
-            assertEquals(mutation.seeded?.value, resolved.canvas, "$mutation")
+            val attempt = failAtMove(mutation) { failure -> DurableHostFileHooks(beforeMove = { throw failure }) }
+            assertEquals(unavailable(CanvasMountWire.REASON_STORAGE), attempt.reply.unavailability(), "$mutation")
+            assertEquals(mutation.seeded?.value, attempt.resolved.canvas, "$mutation")
         }
+    }
+
+    /** One [mutation] of a seeded record whose store fails as [hooks] script, and what a later resolve then sees. */
+    private class MoveAttempt(val root: Path, val failing: MountHarness, val reply: Reply, val resolved: Reply)
+
+    private suspend fun failAtMove(mutation: Mutation, hooks: (IOException) -> DurableHostFileHooks): MoveAttempt {
+        val root = Files.createTempDirectory("canvas-mount-move")
+        mutation.seed(MountHarness(root))
+        val failing = granted(MountHarness(root, HarnessOptions(hooks = hooks(IOException("$root/secret")))))
+        val reply = failing.call(mutation.route, paramsFor(mutation.route, CONV_A, NEXT), PEER)
+        val resolved = granted(MountHarness(root)).call(CanvasMountRoute.RESOLVE, bindingParams(AGENT_A, CONV_A), PEER)
+        return MoveAttempt(root, failing, reply, resolved)
     }
 
     @Test

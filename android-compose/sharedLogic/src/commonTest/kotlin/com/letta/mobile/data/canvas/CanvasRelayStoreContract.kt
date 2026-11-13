@@ -32,13 +32,14 @@ abstract class CanvasRelayStoreContract {
     }
 
     @Test
-    fun boundCanvasReadsABindingWithoutCreatingOne() = runTest {
+    fun isBoundReadsABindingWithoutCreatingOne() = runTest {
         val store = newStore()
-        assertEquals(null, store.boundCanvas("canvas:absent"))
-        assertEquals(null, store.boundCanvas("canvas:absent"), "a lookup must not bind")
+        assertEquals(false, store.isBound("canvas:absent", CanvasId("absent")))
+        assertEquals(CanvasId("other"), store.bind("canvas:absent", CanvasId("other")), "a lookup must not bind")
         store.bind("canvas:present", CanvasId("present"))
-        assertEquals(CanvasId("present"), store.boundCanvas("canvas:present"))
-        reopen(store)?.let { assertEquals(CanvasId("present"), it.boundCanvas("canvas:present")) }
+        assertEquals(true, store.isBound("canvas:present", CanvasId("present")))
+        assertEquals(false, store.isBound("canvas:present", CanvasId("other")))
+        reopen(store)?.let { assertEquals(true, it.isBound("canvas:present", CanvasId("present"))) }
     }
 
     @Test

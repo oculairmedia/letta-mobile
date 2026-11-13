@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
+import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.mounts.upgrade.CanvasMountDeviceUpgrade
@@ -23,7 +24,7 @@ class CanvasMountDeviceUpgradeTest {
         val outcome = CanvasMountDeviceUpgrade.forPairingStore(file).runOnce()
         assertEquals(CanvasMountDeviceUpgrade.Outcome.Applied(upgraded = 4), outcome)
         listOf("chat", "desktop", "vibesync").forEach { role ->
-            assertEquals(IrohPeerCapabilities.roles(mountsEnabled = true).getValue(role), store.get(role)?.capabilities, role)
+            assertEquals(IrohPairingService.rolesFor(mountsEnabled = true).getValue(role), store.get(role)?.capabilities, role)
         }
         assertEquals(preMount("chat") + MOUNT, store.get("scoped-chat")?.capabilities)
         assertEquals(setOf("agent-a"), store.get("scoped-chat")?.agentIds, "agent scope is kept")

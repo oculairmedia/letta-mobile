@@ -45,10 +45,10 @@ class CanvasMountCatalog(
         val conversation = entry?.conversationId?.let(::ConversationId) ?: conversationOf(canvas)
         val owner = conversation?.let { directory.ownerOf(it) }
         if (entry != null) return if (entry.conversationId != null) owned(owner) else writers(entry.acl.writerAgentIds)
-        if (conversation != null && relay.boundCanvas(CanvasRelayProtocol.conversationTopic(conversation)) == canvas) {
+        if (conversation != null && relay.isBound(CanvasRelayProtocol.conversationTopic(conversation), canvas)) {
             return owned(owner)
         }
-        val bound = relay.boundCanvas(CanvasRelayProtocol.canvasTopic(canvas)) == canvas
+        val bound = relay.isBound(CanvasRelayProtocol.canvasTopic(canvas), canvas)
         return if (bound) CanvasOwnership.Owned(emptySet()) else CanvasOwnership.Absent
     }
 
@@ -61,8 +61,8 @@ class CanvasMountCatalog(
     internal suspend fun canonicalHeldBy(conversation: ConversationId): Boolean {
         val canvas = CanvasId.forConversation(conversation)
         canvases.get(canvas)?.let { entry -> return entry.conversationId == conversation.value }
-        if (relay.boundCanvas(CanvasRelayProtocol.conversationTopic(conversation)) == canvas) return true
-        return relay.boundCanvas(CanvasRelayProtocol.canvasTopic(canvas)) != canvas
+        if (relay.isBound(CanvasRelayProtocol.conversationTopic(conversation), canvas)) return true
+        return !relay.isBound(CanvasRelayProtocol.canvasTopic(canvas), canvas)
     }
 
     /** Every canvas the host's agent canvas directory records, the only canvases `canvas.mount.candidates` enumerates. */

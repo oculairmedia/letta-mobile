@@ -22,8 +22,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * [mountsEnabled] is whether this host serves canvas mounts: only then do the
  * chat, desktop and vibesync roles carry the two mount capabilities
- * ([IrohPeerCapabilities.roles]). A role grant is resolved again when the
- * invite is redeemed ([IrohPeerCapabilities.grantAsOfNow]), so an invite
+ * ([rolesFor]). A role grant is resolved again when the
+ * invite is redeemed ([grantAsOfNow]), so an invite
  * minted by the host `pair` command or before a restart grants the role as
  * this host defines it at redemption.
  */
@@ -73,7 +73,7 @@ class IrohPairingService(
     private val revocationListeners = CopyOnWriteArrayList<(String) -> Unit>()
 
     /** The named roles an inviter may request on this host. */
-    fun roles(): Map<String, Set<String>> = IrohPeerCapabilities.roles(mountsEnabled)
+    fun roles(): Map<String, Set<String>> = rolesFor(mountsEnabled)
 
     /** Backward-compatible mint with the default (chat) grant. */
     fun createInvite(suggestedName: String, ttlMs: Long = DEFAULT_TTL_MS): PairingInvite =
@@ -137,7 +137,7 @@ class IrohPairingService(
             nodeId = nodeId,
             name = name?.trim()?.takeIf { it.isNotBlank() }?.take(MAX_NAME_CHARS) ?: invite.suggestedName,
             pairedAtMs = nowMs(),
-            capabilities = IrohPeerCapabilities.grantAsOfNow(invite.capabilities, mountsEnabled),
+            capabilities = grantAsOfNow(invite.capabilities, mountsEnabled),
             agentIds = invite.agentIds,
             lastSeenAtMs = nowMs(),
         )
@@ -171,14 +171,25 @@ class IrohPairingService(
      * Record a successful authentication for the inventory's "last used"
      * column. Throttled so a reconnect storm does not rewrite the store. Like
      * every mutator here it changes the record under the store's lock
-     * ([PairedPeerStore.update]), so it never overwrites a concurrent change.
+     * ([updatePeer]), so it never overwrites a concurrent change.
      */
     fun touch(nodeId: String) {
         val now = nowMs()
-        store.update(nodeId) { existing ->
+        updatePeer(nodeId) { existing ->
             val last = existing.lastSeenAtMs
             if (last != null && now - last < LAST_SEEN_WRITE_INTERVAL_MS) existing else existing.copy(lastSeenAtMs = now)
         }
+    }
+
+    /**
+     * Applies [change] to the record of [nodeId] inside the store's single locked read-modify-write
+     * ([PairedPeerStore.updateEach]), so a concurrent writer is never overwritten by a stale copy; the store
+     * writes only a change. Answers the record as changed, or null when [nodeId] is not paired.
+     */
+    private fun updatePeer(nodeId: String, change: (PairedPeer) -> PairedPeer): PairedPeer? {
+        var updated: PairedPeer? = null
+        store.updateEach { peer -> if (peer.nodeId == nodeId) change(peer).also { updated = it } else peer }
+        return updated
     }
 
     /**
@@ -187,7 +198,7 @@ class IrohPairingService(
      * capabilities are untouched.
      */
     fun rename(nodeId: String, name: String): PairedPeer? {
-        val updated = store.update(nodeId) { it.copy(name = name) } ?: return null
+        val updated = updatePeer(nodeId) { it.copy(name = name) } ?: return null
         Telemetry.event("IrohPairing", "peer.renamed", "nodeId" attr nodeId, "name" attr name)
         return updated
     }
@@ -200,14 +211,14 @@ class IrohPairingService(
      * peer's live sessions immediately (grants are re-read per request).
      */
     fun setCapabilities(nodeId: String, capabilities: Set<String>): PairedPeer? {
-        val updated = store.update(nodeId) { it.copy(capabilities = capabilities) } ?: return null
+        val updated = updatePeer(nodeId) { it.copy(capabilities = capabilities) } ?: return null
         Telemetry.event("IrohPairing", "peer.capabilities_set", "nodeId" attr nodeId)
         return updated
     }
 
     /** Replace a paired peer's agent scope (null = every agent). */
     fun setAgentScope(nodeId: String, agentIds: Set<String>?): PairedPeer? {
-        val updated = store.update(nodeId) { it.copy(agentIds = agentIds) } ?: return null
+        val updated = updatePeer(nodeId) { it.copy(agentIds = agentIds) } ?: return null
         Telemetry.event("IrohPairing", "peer.agents_set", "nodeId" attr nodeId, "agentScoped" attr (agentIds != null))
         return updated
     }
@@ -247,6 +258,30 @@ class IrohPairingService(
 
         /** Auth-frame prefix marking an invite redemption instead of a bearer token. */
         const val INVITE_TOKEN_PREFIX = "invite:"
+
+        /**
+         * The named roles on a host whose canvas mounts are [mountsEnabled]: the chat roles
+         * ([IrohPeerCapabilities.MOUNT_ROLE_NAMES]) gain [IrohPeerCapabilities.MOUNT_CAPABILITIES].
+         */
+        fun rolesFor(mountsEnabled: Boolean): Map<String, Set<String>> {
+            if (!mountsEnabled) return IrohPeerCapabilities.ROLES
+            return IrohPeerCapabilities.ROLES.mapValues { (name, caps) ->
+                if (name in IrohPeerCapabilities.MOUNT_ROLE_NAMES) caps + IrohPeerCapabilities.MOUNT_CAPABILITIES else caps
+            }
+        }
+
+        /**
+         * The grant [capabilities] amount to on a host whose canvas mounts are [mountsEnabled], applied when an invite
+         * is redeemed (it may have been minted by another process or before a restart). A set equal to a mount role
+         * with or without the mount capabilities IS that role and resolves to it as of now; any other set is a
+         * deliberate hand-scoped grant and is kept exactly.
+         */
+        fun grantAsOfNow(capabilities: Set<String>, mountsEnabled: Boolean): Set<String> {
+            val mount = IrohPeerCapabilities.MOUNT_CAPABILITIES
+            val base = IrohPeerCapabilities.MOUNT_ROLE_NAMES.map { IrohPeerCapabilities.ROLES.getValue(it) }
+                .firstOrNull { it == capabilities || it + mount == capabilities } ?: return capabilities
+            return if (mountsEnabled) base + mount else base
+        }
 
         /** Non-positive requests get the default; longer requests are capped, never extended. */
         fun effectiveTtl(requestedMs: Long): Long =

@@ -35,17 +35,17 @@ internal val HostCanvasMount.Mounted.canvas: CanvasId get() = CanvasId(canvasId)
 /**
  * The read path for a canvas the relay has bound but the host directory does not hold (an app-made canvas, or another
  * conversation's canvas an app opened): a transient entry naming its topic, built from read-only lookups
- * ([CanvasRelayStore.boundCanvas]) so asking can never create a canvas or a binding, and never stored.
+ * ([CanvasRelayStore.isBound]) so asking can never create a canvas or a binding, and never stored.
  *
  * Its ACL admits no agent (owner the local user, readers that user only, so not public-read): only the mount grant
  * ([mountedHere]) lets an agent use it.
  */
 internal suspend fun relayOnlyEntry(store: CanvasRelayStore, canvas: CanvasId): HostCanvasEntry? {
     val canvasTopic = CanvasRelayProtocol.canvasTopic(canvas)
-    if (store.boundCanvas(canvasTopic) == canvas) return transientEntry(canvas, canvasTopic, null)
+    if (store.isBound(canvasTopic, canvas)) return transientEntry(canvas, canvasTopic, null)
     val conversation = canonicalConversationOf(canvas) ?: return null
     val conversationTopic = CanvasRelayProtocol.conversationTopic(conversation)
-    return if (store.boundCanvas(conversationTopic) == canvas) transientEntry(canvas, conversationTopic, conversation) else null
+    return if (store.isBound(conversationTopic, canvas)) transientEntry(canvas, conversationTopic, conversation) else null
 }
 
 private fun transientEntry(canvas: CanvasId, topic: String, conversation: ConversationId?) =

@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh.mounts.upgrade
 
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
+import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
 import com.letta.mobile.data.controller.node.iroh.PairedPeerStore
@@ -16,7 +17,7 @@ import java.nio.file.Path
  *   D2 (that role minus the two mount capabilities). Any other set (hand-scoped, admin, already upgraded) is left as
  *   it is, and nothing but the two mount capabilities is ever added. A set stored explicitly that merely equals a
  *   pre-mount role is treated as that role and upgraded too: role sets carry no provenance, and the same rule decides
- *   what an invite grants at redemption ([IrohPeerCapabilities.grantAsOfNow]). Agent scope and every other field are kept.
+ *   what an invite grants at redemption ([IrohPairingService.grantAsOfNow]). Agent scope and every other field are kept.
  * - All records change in one locked read-modify-write ([PairedPeerStore.updateEach]), so a concurrent pair or revoke
  *   is neither lost nor undone.
  * - [marker] records that the upgrade ran; it never runs again, so a device an administrator later re-scopes to a
