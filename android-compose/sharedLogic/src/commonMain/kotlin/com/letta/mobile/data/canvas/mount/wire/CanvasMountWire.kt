@@ -95,7 +95,10 @@ object CanvasMountWire {
     /** The canvas was created by an agent outside any conversation. */
     const val OWNER_AGENT: String = "agent"
 
-    /** Result field of [LISTED]: true when more candidates exist than [MAX_CANDIDATES]. */
+    /**
+     * Result field of [LISTED]: true when canvases were left out, because more than [MAX_CANDIDATES] qualify or the
+     * host judged only the first entries of a very large directory.
+     */
     const val TRUNCATED: String = "truncated"
 
     /** A resolve found a canvas the caller may see. */

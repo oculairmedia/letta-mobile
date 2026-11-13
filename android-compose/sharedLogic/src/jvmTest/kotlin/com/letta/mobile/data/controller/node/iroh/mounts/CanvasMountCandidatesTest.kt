@@ -67,10 +67,34 @@ class CanvasMountCandidatesTest {
     }
 
     @Test
+    fun oneCallReadsTheDirectoryOnceAndLooksEachOwnerUpAtMostOnce() = runBlocking {
+        val harness = hosted()
+        val before = harness.directory.ownerLookups.get()
+        val reply = harness.candidates(CONV_A, PEER)
+        assertEquals(CanvasMountWire.LISTED, reply.status)
+        assertEquals(1, harness.canvases.reads.get(), "the directory is read once per call")
+        // The binding's own conversation (addressing) and the one other conversation canvas, each once.
+        assertEquals(2, harness.directory.ownerLookups.get() - before)
+        harness.candidates(CONV_A, PEER)
+        assertEquals(2, harness.canvases.reads.get(), "nothing is kept across calls")
+    }
+
+    @Test
+    fun atMostTheScanBoundIsJudgedAndTheAnswerSaysCanvasesWereLeftOut() = runBlocking {
+        val harness = MountHarness()
+        repeat(CanvasMountCandidates.MAX_SCANNED + 20) { harness.canvas(CanvasId("canvas-b-$it"), AGENT_B) }
+        harness.canvas(CanvasId("canvas-a-late"), AGENT_A)
+        val reply = harness.candidates(CONV_A, A_SCOPED_PEER)
+        assertEquals(listOf(CanvasId.forConversation(CONV_A).value), reply.listed, "the unscanned tail is not listed")
+        assertEquals(true, reply.truncated)
+    }
+
+    @Test
     fun aFailedHostLookupAnswersUnavailableNeverAPartialList() = runBlocking {
         val harness = hosted()
-        harness.canvases.failFromCall = 2
-        harness.canvases.failure = IllegalStateException("directory down")
+        // Lookup 1 authorizes addressing the binding; lookup 2, the other conversation canvas's owner, fails.
+        harness.directory.failFromLookup = 2
+        harness.directory.failure = IllegalStateException("conversation records down")
         val reply = harness.candidates(CONV_A, PEER)
         assertEquals(CanvasMountWire.UNAVAILABLE, reply.status)
         assertEquals(CanvasMountWire.REASON_AUTHORITY, reply.reason)

@@ -25,9 +25,10 @@ internal data class CanvasMountCandidate(val canvas: CanvasId, val title: String
  * or replace would refuse is never listed. The binding's own canvas comes first ("go back") whenever the proposal rule admits it.
  *
  * Only the host's agent canvas directory is enumerated: canvases only the relay holds (app-made ones) are not, since
- * the relay store has no listing and the app that made one already has it locally. At most
- * [CanvasMountWire.MAX_CANDIDATES] canvases are answered; a failed host lookup answers `unavailable`, never a
- * partial list.
+ * the relay store has no listing and the app that made one already has it locally. The directory is read once per
+ * call and each conversation's owner looked up at most once ([HostCanvasMountAuthority.over]); at most [MAX_SCANNED]
+ * entries are judged and at most [CanvasMountWire.MAX_CANDIDATES] canvases answered, `truncated` saying whether
+ * either bound left canvases out. A failed host lookup answers `unavailable`, never a partial list.
  */
 internal class CanvasMountCandidates(private val authority: HostCanvasMountAuthority, private val catalog: CanvasMountCatalog) {
     suspend fun list(request: CanvasMountRequest<CanvasMountScope.Conversation>): CanvasMountOutcome {
@@ -36,17 +37,22 @@ internal class CanvasMountCandidates(private val authority: HostCanvasMountAutho
             if (failure is Error) throw failure
             return CanvasMountOutcome.Unavailable(CanvasMountUnavailable.AUTHORITY)
         }
+        val listing = authority.over(entries)
         val own = CanvasId.forConversation(request.scope.conversation)
         // The own canonical id passes the proposal rule like any other: it is not listed while another conversation
         // holds that id, and then a proposal of it would be refused too.
         val ownCandidate = CanvasMountCandidate(own, entries.firstOrNull { it.id == own }?.title, CanvasMountWire.OWNER_CONVERSATION)
-            .takeIf { authority.mayList(request, own) == CanvasMountDecision.ALLOW }
-        val all = listOfNotNull(ownCandidate) + listable(request, entries.filter { it.id != own })
-        return CanvasMountOutcome.Listed(all.take(CanvasMountWire.MAX_CANDIDATES), truncated = all.size > CanvasMountWire.MAX_CANDIDATES)
+            .takeIf { listing.mayList(request, own) == CanvasMountDecision.ALLOW }
+        val others = entries.filter { it.id != own }
+        val scanned = others.take(MAX_SCANNED)
+        val all = listOfNotNull(ownCandidate) + listable(listing, request, scanned)
+        val truncated = all.size > CanvasMountWire.MAX_CANDIDATES || scanned.size < others.size
+        return CanvasMountOutcome.Listed(all.take(CanvasMountWire.MAX_CANDIDATES), truncated)
     }
 
     /** Up to [CanvasMountWire.MAX_CANDIDATES] of [entries] the proposal rule admits: one more than fits beside the own canvas. */
     private suspend fun listable(
+        listing: HostCanvasMountAuthority,
         request: CanvasMountRequest<CanvasMountScope.Conversation>,
         entries: List<HostCanvasEntry>,
     ): List<CanvasMountCandidate> {
@@ -54,7 +60,7 @@ internal class CanvasMountCandidates(private val authority: HostCanvasMountAutho
         val remaining = entries.iterator()
         while (found.size < CanvasMountWire.MAX_CANDIDATES && remaining.hasNext()) {
             val entry = remaining.next()
-            if (authority.mayList(request, entry.id) == CanvasMountDecision.ALLOW) found += entry.candidate()
+            if (listing.mayList(request, entry.id) == CanvasMountDecision.ALLOW) found += entry.candidate()
         }
         return found
     }
@@ -62,6 +68,11 @@ internal class CanvasMountCandidates(private val authority: HostCanvasMountAutho
     private fun HostCanvasEntry.candidate(): CanvasMountCandidate {
         val kind = if (conversationId != null) CanvasMountWire.OWNER_CONVERSATION else CanvasMountWire.OWNER_AGENT
         return CanvasMountCandidate(id, title, kind)
+    }
+
+    companion object {
+        /** Most directory entries one call judges, bounding its owner lookups; more are reported as `truncated`. */
+        const val MAX_SCANNED: Int = 500
     }
 }
 

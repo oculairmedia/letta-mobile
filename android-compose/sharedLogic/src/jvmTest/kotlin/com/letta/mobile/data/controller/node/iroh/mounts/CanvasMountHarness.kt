@@ -86,11 +86,18 @@ internal val OTHER_PEER = Peer.of('b')
 internal class FakeDirectory : CanvasMountDirectory {
     private val owners = ConcurrentHashMap(mapOf(CONV_A to AGENT_A, CONV_A2 to AGENT_A, CONV_B to AGENT_B))
 
+    /** How many conversation owner lookups reached the host. */
+    val ownerLookups = AtomicInteger()
+
     @Volatile var failure: Throwable? = null
 
     @Volatile var hang: Boolean = false
 
+    /** The first owner lookup [failure] applies to; earlier ones answer normally. */
+    @Volatile var failFromLookup: Int = 1
+
     override suspend fun ownerOf(conversation: ConversationId): AgentId? {
+        if (ownerLookups.incrementAndGet() < failFromLookup) return owners[conversation]
         script()
         return owners[conversation]
     }
@@ -117,7 +124,16 @@ internal class ScriptedCanvases(private val delegate: HostCanvasDirectory = InMe
 
     @Volatile var hangFromCall: Int = Int.MAX_VALUE
 
+    /** How many reads (single entries and whole listings) reached the directory. */
+    val reads = AtomicInteger()
+
+    override suspend fun all(): List<HostCanvasEntry> {
+        reads.incrementAndGet()
+        return delegate.all()
+    }
+
     override suspend fun get(canvasId: CanvasId): HostCanvasEntry? {
+        reads.incrementAndGet()
         val call = calls.incrementAndGet()
         if (call >= hangFromCall) awaitCancellation()
         failure?.takeIf { call >= failFromCall }?.let { throw it }

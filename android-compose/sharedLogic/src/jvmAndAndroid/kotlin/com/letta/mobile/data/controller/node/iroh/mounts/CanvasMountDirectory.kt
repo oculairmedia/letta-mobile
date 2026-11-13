@@ -29,6 +29,20 @@ interface CanvasMountDirectory {
     }
 }
 
+/**
+ * [delegate] with every answer kept for one call, so a listing looks each conversation and agent up at most once.
+ * Failures are not kept: they throw as the delegate's do. Not thread-safe; one call is sequential.
+ */
+internal class MemoisedMountDirectory(private val delegate: CanvasMountDirectory) : CanvasMountDirectory {
+    private val owners = mutableMapOf<ConversationId, AgentId?>()
+    private val agents = mutableMapOf<AgentId, Boolean>()
+
+    override suspend fun ownerOf(conversation: ConversationId): AgentId? =
+        if (conversation in owners) owners[conversation] else delegate.ownerOf(conversation).also { owners[conversation] = it }
+
+    override suspend fun hasAgent(agent: AgentId): Boolean = agents[agent] ?: delegate.hasAgent(agent).also { agents[agent] = it }
+}
+
 private class AppServerMountDirectory(private val client: AppServerClient) : CanvasMountDirectory {
     override suspend fun ownerOf(conversation: ConversationId): AgentId? {
         val response = client.conversationRetrieve(

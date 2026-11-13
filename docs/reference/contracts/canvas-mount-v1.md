@@ -119,7 +119,7 @@ Outcomes are `success: true` results carrying `status`. A client treats an unkno
 | `replaced` | replace | `canvas_id`, `durability` | The binding now holds the caller's canvas |
 | `default_set` | default.set | `canvas_id`, `durability` | The default now holds the caller's canvas |
 | `default_cleared` | default.clear | `durability` | The agent has no default now (whether or not it had one) |
-| `listed` | candidates | `canvases`, `truncated` | Candidates in order (below); `truncated` is true when more than 100 exist |
+| `listed` | candidates | `canvases`, `truncated` | Candidates in order (below); `truncated` is true when canvases were left out |
 | `unavailable` | all | `reason` | Nothing changed. `reason` is `storage`, `authority`, `timeout_before_commit` or `identity` |
 | `outcome_unknown` | writes | (none) | The write may or may not have committed: resolve before acting |
 
@@ -164,8 +164,10 @@ Any other failure answers the router's fixed `Internal error`.
   the binding's own canvas first, then every canvas in the host canvas directory that passes the
   proposal check (step 4) for this caller, so nothing is listed that bind or replace would refuse.
   Each entry has `canvas_id`, `title` when the directory records one, and `owner_kind`
-  (`conversation` or `agent`, never an owner id). At most 100 entries. Canvases only the relay holds
-  (app-made) are not enumerated. A failed host lookup answers `unavailable` / `authority`, never a
+  (`conversation` or `agent`, never an owner id). At most 100 entries. The host reads its directory
+  once per call, looks each conversation's owner up at most once, and judges at most its first 500
+  directory entries; `truncated` is true when either bound left canvases out. Canvases only the
+  relay holds (app-made) are not enumerated. A failed host lookup answers `unavailable` / `authority`, never a
   partial list. It reads no mount record and pushes nothing.
 - Agents have no way to call these methods.
 

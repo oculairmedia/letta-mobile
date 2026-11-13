@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
+import com.letta.mobile.data.canvas.HostCanvasEntry
 import com.letta.mobile.data.canvas.mount.CanvasMountAuthority
 import com.letta.mobile.data.canvas.mount.CanvasMountDecision
 import com.letta.mobile.data.canvas.mount.CanvasMountPrincipal
@@ -134,6 +135,14 @@ internal class HostCanvasMountAuthority(
      */
     suspend fun mayList(request: CanvasMountRequest<CanvasMountScope>, canvas: CanvasId): CanvasMountDecision =
         decide(request) { scope -> proposal(scope, canvas) }
+
+    /**
+     * This authority over one call's records loaded once: [entries] answer every directory read, and each
+     * conversation's owner and each agent are looked up at most once ([MemoisedMountDirectory]). Same connection and
+     * trace, so a failed lookup still reaches this call's answer.
+     */
+    internal fun over(entries: List<HostCanvasEntry>): HostCanvasMountAuthority =
+        HostCanvasMountAuthority(connection, catalog.over(entries), MemoisedMountDirectory(directory), trace)
 
     private suspend fun proposal(scope: CanvasMountScope, proposed: CanvasId): CanvasMountDecision = when {
         scope is CanvasMountScope.AgentDefault && !mayChangeDefault(scope) -> CanvasMountDecision.DENY

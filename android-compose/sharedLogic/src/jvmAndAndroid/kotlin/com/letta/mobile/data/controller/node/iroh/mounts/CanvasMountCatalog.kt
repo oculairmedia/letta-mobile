@@ -63,10 +63,27 @@ class CanvasMountCatalog(
     /** Every canvas the host's agent canvas directory records, the only canvases `canvas.mount.candidates` enumerates. */
     internal suspend fun known(): List<HostCanvasEntry> = canvases.all()
 
+    /** This catalog with its directory answered from [entries], loaded once for one call, instead of re-read per canvas. */
+    internal fun over(entries: List<HostCanvasEntry>): CanvasMountCatalog = CanvasMountCatalog(LoadedCanvases(entries), relay)
+
     private fun writers(agents: Set<String>): CanvasOwnership = CanvasOwnership.Owned(agents.mapTo(mutableSetOf(), ::AgentId))
 
     private fun owned(agent: AgentId?): CanvasOwnership = CanvasOwnership.Owned(setOfNotNull(agent))
 
     private fun conversationOf(canvas: CanvasId): ConversationId? =
         canvas.value.removePrefix(CanvasId.CONVERSATION_PREFIX).takeIf { it != canvas.value && it.isNotEmpty() }?.let(::ConversationId)
+}
+
+/** A read-only view of directory entries loaded once; a mount authority never writes the directory. */
+private class LoadedCanvases(entries: List<HostCanvasEntry>) : HostCanvasDirectory {
+    private val byId = entries.associateBy { it.canvasId }
+
+    override suspend fun get(canvasId: CanvasId): HostCanvasEntry? = byId[canvasId.value]
+
+    override suspend fun forConversation(conversationId: ConversationId): HostCanvasEntry? =
+        byId.values.firstOrNull { it.conversationId == conversationId.value }
+
+    override suspend fun putIfAbsent(entry: HostCanvasEntry): HostCanvasEntry = error("loaded canvas entries are read-only")
+
+    override suspend fun all(): List<HostCanvasEntry> = byId.values.toList()
 }
