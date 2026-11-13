@@ -67,6 +67,14 @@ object ShellViews {
     val NOTE = RuntimeViewId("shell.note")
 
     /**
+     * The notes the host shares with this device, and the one opened from them in the document
+     * workspace. It names no object: the person picks the note. A host that cannot reach shared
+     * notes shows it as unavailable. Not part of the default layout; a compact window draws it over
+     * the page (from either lane), which stays mounted beneath.
+     */
+    val DOCUMENT = RuntimeViewId("shell.document")
+
+    /**
      * The open conversation's background tasks (its subagent runs), each dismissable, drawn at the
      * size its lane gives it. It names no object: it follows whichever conversation is open. A host
      * that cannot list tasks shows it as unavailable. Not part of the default layout.

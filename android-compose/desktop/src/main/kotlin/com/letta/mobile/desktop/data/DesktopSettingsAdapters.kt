@@ -309,6 +309,9 @@ data class DesktopDataBindings(
      */
     val modelControl: com.letta.mobile.data.repository.modelcontrol.ModelControlSession? =
         modelControlRpc?.let { com.letta.mobile.data.repository.modelcontrol.ModelControlSession(it) },
+    /** n2stx.2.2: notes the host shares with this device, over the same admin RPC; null without one. */
+    val sharedNotebooks: com.letta.mobile.data.canvas.workspace.SharedNotebooks? =
+        modelControlRpc?.let { com.letta.mobile.data.canvas.authority.RemoteNotebookAccess(it) },
     /** letta-mobile-bzvro.13: the persisted default permission mode, shared by the gateway and the settings card. */
     val permissionModeSettings: com.letta.mobile.data.runtime.PermissionModeSettings =
         com.letta.mobile.data.runtime.PermissionModeSettings(secureSettingsStore),
