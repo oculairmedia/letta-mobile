@@ -34,12 +34,16 @@ abstract class CanvasRelayStoreContract {
     @Test
     fun isBoundReadsABindingWithoutCreatingOne() = runTest {
         val store = newStore()
-        assertEquals(false, store.isBound("canvas:absent", CanvasId("absent")))
-        assertEquals(CanvasId("other"), store.bind("canvas:absent", CanvasId("other")), "a lookup must not bind")
-        store.bind("canvas:present", CanvasId("present"))
-        assertEquals(true, store.isBound("canvas:present", CanvasId("present")))
-        assertEquals(false, store.isBound("canvas:present", CanvasId("other")))
-        reopen(store)?.let { assertEquals(true, it.isBound("canvas:present", CanvasId("present"))) }
+        val absent = CanvasId("absent")
+        assertEquals(false, store.isBound(absent))
+        assertEquals(CanvasId("other"), store.bind(relayTopicOf(absent, null), CanvasId("other")), "a lookup must not bind")
+        val present = CanvasId("present")
+        val conversation = com.letta.mobile.data.model.ConversationId("c-1")
+        store.bind(relayTopicOf(present, conversation), present)
+        assertEquals(true, store.isBound(present, conversation))
+        assertEquals(false, store.isBound(present), "bound under the conversation topic only")
+        assertEquals(false, store.isBound(CanvasId("other"), conversation))
+        reopen(store)?.let { assertEquals(true, it.isBound(present, conversation)) }
     }
 
     @Test

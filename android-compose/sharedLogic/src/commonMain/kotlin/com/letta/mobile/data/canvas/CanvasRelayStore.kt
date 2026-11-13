@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -18,10 +19,11 @@ interface CanvasRelayStore {
     suspend fun bind(topic: String, proposed: CanvasId): CanvasId
 
     /**
-     * Whether [topic] is already bound to [canvas]. Read-only: unlike [bind] it never creates a
-     * binding, so a lookup cannot bring a canvas into existence.
+     * Whether [canvas] is already bound under its own canvas topic or, with [via], under that
+     * conversation's topic ([relayTopicOf]). Read-only: unlike [bind] it never creates a binding,
+     * so a lookup cannot bring a canvas into existence.
      */
-    suspend fun isBound(topic: String, canvas: CanvasId): Boolean
+    suspend fun isBound(canvas: CanvasId, via: ConversationId? = null): Boolean
 
     /**
      * Appends [op] to [topic]'s log, received from [origin], and returns its cursor. Idempotent by
@@ -40,6 +42,10 @@ interface CanvasRelayStore {
     }
 }
 
+/** The topic [canvas] is bound under: [via]'s conversation topic, else the canvas's own topic. */
+fun relayTopicOf(canvas: CanvasId, via: ConversationId?): String =
+    via?.let(CanvasRelayProtocol::conversationTopic) ?: CanvasRelayProtocol.canvasTopic(canvas)
+
 data class CanvasRelayAppend(val cursor: Long, val duplicate: Boolean)
 
 /** One op in a topic's log: [cursor] counts from 1, [origin] is who the host received it from. */
@@ -56,7 +62,8 @@ class InMemoryCanvasRelayStore : CanvasRelayStore {
         bindings.getOrPut(topic) { proposed }
     }
 
-    override suspend fun isBound(topic: String, canvas: CanvasId): Boolean = mutex.withLock { bindings[topic] == canvas }
+    override suspend fun isBound(canvas: CanvasId, via: ConversationId?): Boolean =
+        mutex.withLock { bindings[relayTopicOf(canvas, via)] == canvas }
 
     override suspend fun append(topic: String, op: CanvasOp, origin: String): CanvasRelayAppend = mutex.withLock {
         val seen = cursorsByOp.getOrPut(topic) { mutableMapOf() }

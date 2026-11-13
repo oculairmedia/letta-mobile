@@ -34,7 +34,7 @@ data class PairedPeer(
 )
 
 interface PairedPeerStore {
-    fun isPaired(nodeId: String): Boolean
+    fun isPaired(nodeId: String): Boolean = get(nodeId) != null
 
     fun get(nodeId: String): PairedPeer?
 
@@ -53,8 +53,6 @@ interface PairedPeerStore {
 
 class InMemoryPairedPeerStore : PairedPeerStore {
     private val peers = mutableMapOf<String, PairedPeer>()
-
-    @Synchronized override fun isPaired(nodeId: String): Boolean = nodeId in peers
 
     @Synchronized override fun get(nodeId: String): PairedPeer? = peers[nodeId]
 
@@ -95,8 +93,6 @@ private fun changedPeers(peers: Collection<PairedPeer>, change: (PairedPeer) -> 
  */
 class FilePairedPeerStore(private val path: Path) : PairedPeerStore {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
-
-    override fun isPaired(nodeId: String): Boolean = load().containsKey(nodeId)
 
     override fun get(nodeId: String): PairedPeer? = load()[nodeId]
 

@@ -42,10 +42,10 @@ internal val HostCanvasMount.Mounted.canvas: CanvasId get() = CanvasId(canvasId)
  */
 internal suspend fun relayOnlyEntry(store: CanvasRelayStore, canvas: CanvasId): HostCanvasEntry? {
     val canvasTopic = CanvasRelayProtocol.canvasTopic(canvas)
-    if (store.isBound(canvasTopic, canvas)) return transientEntry(canvas, canvasTopic, null)
+    if (store.isBound(canvas)) return transientEntry(canvas, canvasTopic, null)
     val conversation = canonicalConversationOf(canvas) ?: return null
     val conversationTopic = CanvasRelayProtocol.conversationTopic(conversation)
-    return if (store.isBound(conversationTopic, canvas)) transientEntry(canvas, conversationTopic, conversation) else null
+    return if (store.isBound(canvas, conversation)) transientEntry(canvas, conversationTopic, conversation) else null
 }
 
 private fun transientEntry(canvas: CanvasId, topic: String, conversation: ConversationId?) =

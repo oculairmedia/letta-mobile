@@ -1,6 +1,5 @@
 package com.letta.mobile.data.controller.node.iroh.mounts
 
-import com.letta.mobile.data.canvas.CanvasRelayProtocol
 import com.letta.mobile.data.canvas.CanvasRelayStore
 import com.letta.mobile.data.canvas.HostCanvasDirectory
 import com.letta.mobile.data.canvas.HostCanvasEntry
@@ -45,10 +44,10 @@ class CanvasMountCatalog(
         val conversation = entry?.conversationId?.let(::ConversationId) ?: conversationOf(canvas)
         val owner = conversation?.let { directory.ownerOf(it) }
         if (entry != null) return if (entry.conversationId != null) owned(owner) else writers(entry.acl.writerAgentIds)
-        if (conversation != null && relay.isBound(CanvasRelayProtocol.conversationTopic(conversation), canvas)) {
+        if (conversation != null && relay.isBound(canvas, conversation)) {
             return owned(owner)
         }
-        val bound = relay.isBound(CanvasRelayProtocol.canvasTopic(canvas), canvas)
+        val bound = relay.isBound(canvas)
         return if (bound) CanvasOwnership.Owned(emptySet()) else CanvasOwnership.Absent
     }
 
@@ -61,8 +60,8 @@ class CanvasMountCatalog(
     internal suspend fun canonicalHeldBy(conversation: ConversationId): Boolean {
         val canvas = CanvasId.forConversation(conversation)
         canvases.get(canvas)?.let { entry -> return entry.conversationId == conversation.value }
-        if (relay.isBound(CanvasRelayProtocol.conversationTopic(conversation), canvas)) return true
-        return !relay.isBound(CanvasRelayProtocol.canvasTopic(canvas), canvas)
+        if (relay.isBound(canvas, conversation)) return true
+        return !relay.isBound(canvas)
     }
 
     /** Every canvas the host's agent canvas directory records, the only canvases `canvas.mount.candidates` enumerates. */
