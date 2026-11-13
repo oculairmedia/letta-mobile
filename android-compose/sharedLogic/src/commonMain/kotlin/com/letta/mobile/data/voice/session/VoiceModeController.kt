@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -110,7 +111,7 @@ class VoiceModeController(
 
     /** Stops voice mode and releases the microphone and the speaker. */
     fun stop() {
-        commands.trySend(Command.Stop)
+        commands.trySend(Command.Stop(STOP_REQUESTED))
     }
 
     /** After a failure: retries the kept capture, or listens again. */
@@ -141,11 +142,11 @@ class VoiceModeController(
     private suspend fun apply(command: Command) {
         when (command) {
             is Command.Start -> begin(command.session)
-            Command.Stop -> end(VoiceModeState.Off)
+            is Command.Stop -> end(VoiceModeState.Off, command.reason)
             is Command.Retry -> retryOrBegin(command.session)
             Command.SetupChanged -> clearResolvedSetup()
             is Command.Idle -> showIdle(command.state)
-            is Command.Close -> end(VoiceModeState.Off).also { command.done.complete(Unit) }
+            is Command.Close -> end(VoiceModeState.Off, SHUTDOWN).also { command.done.complete(Unit) }
         }
     }
 
@@ -169,7 +170,7 @@ class VoiceModeController(
     private suspend fun begin(opened: VoiceChatSession?) {
         val running = live
         if (running != null && running.loop.state.value.failure == null) return
-        end(VoiceModeState.Off)
+        end(VoiceModeState.Off, RESTARTED)
         val setup = store.setup.value
         setup.gap?.let { gap ->
             mutableState.value = VoiceModeState.NeedsSetup(gap)
@@ -182,6 +183,7 @@ class VoiceModeController(
         }
         val started = launchLoop(session, setup) ?: return
         live = started
+        VoiceTelemetry.started()
         mutableState.value = VoiceModeState.Listening
         started.loop.activate(VoiceActivationKind.TAP)
     }
@@ -201,15 +203,17 @@ class VoiceModeController(
         }
         val loop = VoiceLoop(set.engines, config, runtime.copy(scope = scope))
         val follower = scope.launch { loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gap) } }
-        val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop) } }
-        return LiveVoice(loop, set, job, listOf(follower, watcher))
+        val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(VoiceTelemetry::loopState) }
+        val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
+        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher))
     }
 
-    /** Releases the live session, if any, and then publishes [next]. Completes even when cancelled. */
-    private suspend fun end(next: VoiceModeState) = withContext(NonCancellable) {
+    /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */
+    private suspend fun end(next: VoiceModeState, reason: String = SHUTDOWN) = withContext(NonCancellable) {
         val current = live
         live = null
         if (current != null) {
+            VoiceTelemetry.stopped(reason)
             current.watchers.forEach { it.cancel() }
             current.loop.shutdown()
             current.set.release()
@@ -218,12 +222,19 @@ class VoiceModeController(
         mutableState.value = next
     }
 
+    private companion object {
+        const val STOP_REQUESTED = "stopRequested"
+        const val CONVERSATION_CHANGED = "conversationChanged"
+        const val RESTARTED = "restarted"
+        const val SHUTDOWN = "shutdown"
+    }
+
     private class LiveVoice(val loop: VoiceLoop, val set: VoiceEngineSet, val job: Job, val watchers: List<Job>)
 
     private sealed interface Command {
         class Start(val session: VoiceChatSession?) : Command
 
-        data object Stop : Command
+        data class Stop(val reason: String) : Command
 
         class Retry(val session: VoiceChatSession?) : Command
 

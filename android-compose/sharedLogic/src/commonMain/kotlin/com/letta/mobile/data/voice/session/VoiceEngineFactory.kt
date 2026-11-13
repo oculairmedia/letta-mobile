@@ -56,7 +56,8 @@ fun interface VoiceEngineFactory {
  * when a device goes away) that transcribes each turn through the endpoint, the agent's chat as the
  * responder, and a mouth that synthesises WAVE audio through the endpoint and plays it on the
  * speaker. Each session gets its own HTTP client on a fresh engine from [httpEngine], closed on
- * release.
+ * release. Every engine reports its decisions as `VoiceMode` telemetry (states, reasons, ids,
+ * counts and levels; never audio, text, the key or the address).
  */
 class EndpointVoiceEngineFactory(
     private val audio: VoiceAudio,
@@ -68,12 +69,14 @@ class EndpointVoiceEngineFactory(
         val url = checkNotNull(endpoint.baseUrl) { "Voice mode started without an endpoint" }
         val engine = httpEngine()
         val client = SpeechEndpointClient(engine, SpeechEndpointConfig(url, request.apiKey))
-        val transcriber = SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint))
+        val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)))
         val microphone = RecoveringFrameSource(audio.microphone(format), deviceChanges = audio.deviceChanges())
-        val ear = VadVoiceEar(microphone, transcriber, VadEarConfig(format))
+        val ear = VadVoiceEar(microphone, transcriber, VadEarConfig(format, observer = VoiceEarTelemetry))
         val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
-        val mouth = EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope)
-        val engines = VoiceEngines(ear = ear, responder = VoiceChatResponder(request.session), mouth = mouth)
+        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope))
+        val session = TelemetryVoiceChatSession(request.session)
+        val responder = TelemetryResponder(VoiceChatResponder(session)) { session.lastSent }
+        val engines = VoiceEngines(ear = ear, responder = responder, mouth = mouth)
         return VoiceEngineSet(engines) {
             ear.close()
             client.close()
