@@ -6924,14 +6924,6 @@ public final class com/letta/mobile/ui/settings/BackendSettingsTags {
 	public static final field TOKEN Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/settings/ComposableSingletons$BackendConnectionViewsKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$BackendConnectionViewsKt;
-	public fun <init> ()V
-	public final fun getLambda$1098448560$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1940133241$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$587436401$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsLayoutKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$SettingsLayoutKt;
 	public fun <init> ()V
@@ -8616,12 +8608,6 @@ public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$Me
 	public final fun getLambda$866273834$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
-public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageHistoryKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageHistoryKt;
-	public fun <init> ()V
-	public final fun getLambda$-1034019802$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageListKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/memfs/ComposableSingletons$MemfsPageListKt;
 	public fun <init> ()V
@@ -8722,13 +8708,6 @@ public final class com/letta/mobile/ui/shell/pages/memory/MemoryWorkspaceView : 
 	public final fun getLabel ()Ljava/lang/String;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/shell/pages/memory/MemoryWorkspaceView;
 	public static fun values ()[Lcom/letta/mobile/ui/shell/pages/memory/MemoryWorkspaceView;
-}
-
-public final class com/letta/mobile/ui/shell/pages/plugins/ComposableSingletons$PluginConsentPaneKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/plugins/ComposableSingletons$PluginConsentPaneKt;
-	public fun <init> ()V
-	public final fun getLambda$1698149155$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1784684442$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/plugins/ComposableSingletons$PluginsPagePartsKt {

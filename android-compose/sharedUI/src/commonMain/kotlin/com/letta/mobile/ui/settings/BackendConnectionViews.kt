@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.ui.theme.LettaChip
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -93,9 +93,9 @@ fun BackendConnectionNotice(
         Text(status.hint(), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
         error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-            actions.onRetry?.let { AssistChip(onClick = it, label = { Text("Retry") }) }
-            actions.onShowAgents?.let { AssistChip(onClick = it, label = { Text("Agents") }) }
-            actions.onOpenSettings?.let { AssistChip(onClick = it, label = { Text("Open settings") }) }
+            actions.onRetry?.let { LettaChip("Retry", onClick = it) }
+            actions.onShowAgents?.let { LettaChip("Agents", onClick = it) }
+            actions.onOpenSettings?.let { LettaChip("Open settings", onClick = it) }
         }
     }
 }

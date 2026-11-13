@@ -10,9 +10,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +36,7 @@ import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.reflection.ReflectionModelChoice
 import com.letta.mobile.ui.chat.surface.composer.ModelListPicker
 import com.letta.mobile.ui.chat.surface.composer.rememberModelListPicker
+import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow
@@ -165,14 +163,14 @@ private fun FocusInstructions(settings: DreamSettings, draft: MutableState<Strin
 @Composable
 private fun TriggerControls(settings: DreamSettings, save: (DreamSettings) -> Unit) {
     Text(DreamingStrings.WHEN, style = MaterialTheme.typography.labelLarge)
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        AutomaticTriggers.forEachIndexed { index, trigger ->
-            SegmentedButton(
-                selected = settings.trigger == trigger,
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        AutomaticTriggers.forEach { trigger ->
+            LettaChipTab(
+                text = DreamingStrings.trigger(trigger),
+                active = settings.trigger == trigger,
                 onClick = { save(settings.copy(trigger = trigger)) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = AutomaticTriggers.size),
                 modifier = Modifier.testTag(DreamingTags.trigger(trigger)),
-            ) { Text(DreamingStrings.trigger(trigger)) }
+            )
         }
     }
     if (settings.trigger == DreamTrigger.StepCount) StepCountStepper(settings, save)
@@ -220,13 +218,13 @@ private fun ReviewInstructions(settings: DreamSettings, save: (DreamSettings) ->
 private fun ScopeChoice(scope: DreamSettingsScope, onPick: (DreamSettingsScope) -> Unit) {
     Text(DreamingStrings.SAVED_FOR, style = MaterialTheme.typography.labelLarge)
     val scopes = DreamSettingsScope.entries
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        scopes.forEachIndexed { index, option ->
-            SegmentedButton(
-                selected = scope == option,
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        scopes.forEach { option ->
+            LettaChipTab(
+                text = DreamingStrings.scope(option),
+                active = scope == option,
                 onClick = { if (option != scope) onPick(option) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = scopes.size),
-            ) { Text(DreamingStrings.scope(option)) }
+            )
         }
     }
 }
