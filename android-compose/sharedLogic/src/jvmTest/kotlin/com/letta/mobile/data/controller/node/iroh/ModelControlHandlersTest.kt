@@ -1,11 +1,15 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,6 +22,48 @@ import kotlinx.serialization.json.put
 
 /** letta-mobile-w4q4p: model.update, model.list exposure filtering, model.exposure.*. */
 class ModelControlHandlersTest {
+    /** letta-mobile-4og95: a switch made on one device must reach the others' model chips. */
+    @Test
+    fun successfulSwitchNotifiesTheScopeItWasAppliedToAndAFailureNotifiesNothing() = runTest {
+        // applied_to as letta.js reports it, the conversation the switch targets, the pushes expected.
+        val cases = listOf(
+            Triple("conversation", "conv-1", Pair(listOf("conv-1"), emptyList<String>())),
+            Triple("agent", IdFormats.DEFAULT_CONVERSATION_ID, Pair(emptyList(), listOf("agent-1"))),
+            Triple(null, "conv-1", Pair(listOf("conv-1"), listOf("agent-1"))),
+        )
+        for ((appliedTo, conversation, expected) in cases) {
+            for (succeeds in listOf(true, false)) {
+                val conversations = mutableListOf<JsonObject>()
+                val agents = mutableListOf<JsonObject>()
+                val conversationChanges = ConversationChangeNotifier(backgroundScope, NOTIFIER_WINDOW_MS)
+                    .also { n -> n.attach { conversations += Json.parseToJsonElement(it).jsonObject } }
+                val agentChanges = AgentChangeNotifier(backgroundScope, NOTIFIER_WINDOW_MS)
+                    .also { n -> n.attach { agents += Json.parseToJsonElement(it).jsonObject } }
+                val router = AdminRpcRegistry.buildRouter(
+                    native = AdminRpcNativeSources(
+                        nativeClient = FakeProviderModelClient(updateSucceeds = succeeds, appliedTo = appliedTo),
+                    ),
+                    notifications = AdminRpcNotifications(agentChanges = agentChanges, conversationChanges = conversationChanges),
+                )
+
+                val response = router.dispatch("r", "model.update", scope {
+                    put("conversation_id", conversation)
+                    put("model_handle", "lmstudio/minimax-m3")
+                })
+                advanceTimeBy(NOTIFIER_WINDOW_MS + 1)
+                runCurrent()
+
+                val label = "applied_to=$appliedTo success=$succeeds"
+                assertEquals(succeeds, response.contains("\"success\":true"), "$label: $response")
+                val (wantConversations, wantAgents) = if (succeeds) expected else Pair(emptyList(), emptyList())
+                assertEquals(wantConversations, conversations.map { it.string("conversation_id") }, label)
+                assertEquals(wantAgents, agents.map { it.string("agent_id") }, label)
+                assertTrue(conversations.all { it.string("type") == "conversation_updated" && it.string("reason") == "updated" }, label)
+                assertTrue(agents.all { it.string("type") == "agent_updated" && it.string("reason") == "updated" }, label)
+            }
+        }
+    }
+
     @Test
     fun modelUpdateTargetsTheConversationScopeAndForwardsTheHandle() = runTest {
         val client = FakeProviderModelClient()
@@ -124,7 +170,11 @@ class ModelControlHandlersTest {
     private fun router(
         client: FakeProviderModelClient?,
         exposure: ModelExposureStore = InMemoryModelExposureStore(),
-    ): AdminRpcRouter = AdminRpcRouter().also { ModelAdminHandlers.register(it, client, exposure) }
+    ): AdminRpcRouter = AdminRpcRouter().also { ModelAdminHandlers.register(it, NativeReadTiers(nativeClient = client), exposure) }
 
     private fun JsonObject.string(key: String): String = getValue(key).jsonPrimitive.content
+
+    private companion object {
+        const val NOTIFIER_WINDOW_MS = 250L
+    }
 }

@@ -153,6 +153,8 @@ object TurnFailureNotices {
             "The selected model is not available for this agent. Pick another model, then send again."
         "network_error" ->
             "The agent host could not reach the model provider. Check the connection and send again."
+        OTHER_DEVICE_BUSY_KIND ->
+            "Another device is running a turn in this conversation; your message was not sent."
         "conversation_busy" ->
             "This conversation is still busy with another run. " +
                 "Wait for it to finish, then send again."
@@ -171,6 +173,9 @@ object TurnFailureNotices {
 
     const val CANCELLED_KIND: String = "cancelled"
 
+    /** The host refused this send because another device's turn holds the conversation. */
+    const val OTHER_DEVICE_BUSY_KIND: String = "other_device_busy"
+
     /** The transport session carrying the turn was lost mid-turn. */
     const val CONNECTION_LOST_KIND: String = "connection_lost"
     private const val OTHER_KIND = "other"
@@ -180,6 +185,7 @@ object TurnFailureNotices {
         "content_filter",
         "approval_pending",
         "invalid_tool_call_ids",
+        OTHER_DEVICE_BUSY_KIND,
         "conversation_busy",
         "empty_response",
         "rate_limited",
