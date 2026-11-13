@@ -21,7 +21,6 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.LocalModelPickerEffortSection
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
-import com.letta.mobile.ui.modelcontrol.ModelPickerEffortSection
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
 import com.letta.mobile.ui.modelcontrol.ModelsEditActions
 import com.letta.mobile.ui.modelcontrol.ModelsEditContent
