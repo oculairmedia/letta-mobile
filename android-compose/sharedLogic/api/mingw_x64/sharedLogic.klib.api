@@ -77492,6 +77492,8 @@ final object com.letta.mobile.data.runtime/TurnFailureNotices { // com.letta.mob
         final fun <get-CONNECTION_LOST_KIND>(): kotlin/String // com.letta.mobile.data.runtime/TurnFailureNotices.CONNECTION_LOST_KIND.<get-CONNECTION_LOST_KIND>|<get-CONNECTION_LOST_KIND>(){}[0]
     final const val GENERIC_MESSAGE // com.letta.mobile.data.runtime/TurnFailureNotices.GENERIC_MESSAGE|{}GENERIC_MESSAGE[0]
         final fun <get-GENERIC_MESSAGE>(): kotlin/String // com.letta.mobile.data.runtime/TurnFailureNotices.GENERIC_MESSAGE.<get-GENERIC_MESSAGE>|<get-GENERIC_MESSAGE>(){}[0]
+    final const val OTHER_DEVICE_BUSY_KIND // com.letta.mobile.data.runtime/TurnFailureNotices.OTHER_DEVICE_BUSY_KIND|{}OTHER_DEVICE_BUSY_KIND[0]
+        final fun <get-OTHER_DEVICE_BUSY_KIND>(): kotlin/String // com.letta.mobile.data.runtime/TurnFailureNotices.OTHER_DEVICE_BUSY_KIND.<get-OTHER_DEVICE_BUSY_KIND>|<get-OTHER_DEVICE_BUSY_KIND>(){}[0]
 
     final fun forCancelledTerminal(): com.letta.mobile.data.runtime/TurnFailureNotice // com.letta.mobile.data.runtime/TurnFailureNotices.forCancelledTerminal|forCancelledTerminal(){}[0]
     final fun forFailedTerminal(kotlin/String?, kotlin/Boolean, kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.runtime/TurnFailureNotice? // com.letta.mobile.data.runtime/TurnFailureNotices.forFailedTerminal|forFailedTerminal(kotlin.String?;kotlin.Boolean;kotlin.Boolean;kotlin.String?){}[0]

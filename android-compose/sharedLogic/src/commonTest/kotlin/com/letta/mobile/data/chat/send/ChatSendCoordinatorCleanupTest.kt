@@ -1324,7 +1324,9 @@ class ChatSendCoordinatorCleanupTest {
             ),
         )
         coordinator.handleEvent(
-            WsTimelineEvent.Error("iroh_turn_engine_busy", "An App Server turn is already active for agent-1/conv-1.", "conv-1", "turn-1", null),
+            WsTimelineEvent.Error(
+                "iroh_turn_engine_busy", "An App Server turn is already active for agent-1/conv-1.", "conv-1", "turn-1", null,
+            ),
         )
         coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "iroh-run-1", BridgeTurnStatus.Failed))
 

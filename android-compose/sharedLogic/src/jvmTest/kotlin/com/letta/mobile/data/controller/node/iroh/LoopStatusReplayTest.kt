@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId as ModelConversationId
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -44,7 +45,7 @@ class LoopStatusReplayTest {
     fun aViewerJoiningMidTurnLearnsTheRunningTurnAndOneJoiningAfterItDoesNot() = runTest {
         val host = NodeTurnHost.childOf(backgroundScope)
         val connections = ConnectionRegistry()
-        connections.addViewerJoinedListener { conversationId, viewer -> host.replayLoopStatus(conversationId, viewer) }
+        connections.addViewerJoinedListener { conversationId, viewer -> host.replayLoopStatus(ModelConversationId(conversationId), viewer) }
         val phone = FakePhoneLink(runtime, CLIENT_MESSAGE_ID, requestId = "req-1", writeScope = backgroundScope)
         phone.protocol.onHost(host)
         val release = CompletableDeferred<Unit>()

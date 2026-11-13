@@ -64,8 +64,7 @@ private fun ConversationTurnState.countsAsActiveTurnDelivery(
 ): Boolean {
     if (event.isReplay || turnId == null) return false
     if (message.content.isBlank()) return false
-    if (!frameConversationMatchesActive(event, resolvedFrame)) return false
-    if (namesAnotherTurnWithoutOwnRun(event)) return false
+    if (!frameConversationMatchesActive(event, resolvedFrame) || namesAnotherTurnWithoutOwnRun(event)) return false
     return runMatchesActiveTurn(message)
 }
 

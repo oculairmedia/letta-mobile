@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -54,11 +55,11 @@ class NodeTurnHost internal constructor(
     }
 
     /**
-     * Tells [viewer], which just started viewing [conversationId], about the turn running there:
+     * Tells [viewer], which just started viewing [conversation], about the turn running there:
      * the same `update_loop_status` (active_run_ids, client_message_ids_by_run_id) its initiator got.
      */
-    internal suspend fun replayLoopStatus(conversationId: String, viewer: ViewerHandle): Boolean =
-        runningTurns[conversationId]?.replayLoopStatusTo(viewer) ?: false
+    internal suspend fun replayLoopStatus(conversation: ConversationId, viewer: ViewerHandle): Boolean =
+        runningTurns[conversation.value]?.replayLoopStatusTo(viewer) ?: false
 
     /**
      * Runs [turn] on the node scope and waits for it. If the caller (the initiator's connection)
