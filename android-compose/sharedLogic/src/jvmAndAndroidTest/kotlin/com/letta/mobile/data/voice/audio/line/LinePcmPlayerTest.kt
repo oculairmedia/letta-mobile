@@ -84,13 +84,6 @@ class LinePcmPlayerTest {
     }
 
     @Test
-    fun rawPcmPlaysInTheConfiguredFormat() = runBlocking {
-        val speaker = FakeSpeaker(SpeakerScript())
-        LinePcmPlayer(speaker, options).play(AudioClip(ByteArray(960), AudioEncoding.PCM)) { }
-        assertEquals(480, speaker.written.size)
-    }
-
-    @Test
     fun compressedAudioIsRefusedWithoutOpeningTheSpeaker() = runBlocking {
         val speaker = FakeSpeaker(SpeakerScript())
         val error = assertFailsWith<VoiceAudioException> {

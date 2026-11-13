@@ -3,7 +3,6 @@ package com.letta.mobile.data.voice.audio.desktop
 import com.letta.mobile.data.voice.audio.AudioCapture
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioPlayer
-import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.device.AudioDeviceId
 import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
@@ -51,14 +50,12 @@ object DesktopAudio {
         FrameAudioCapture({ format -> frameSource(format, device) })
 
     /**
-     * A speaker on `SourceDataLine`. Plays WAVE clips and raw PCM in [rawPcm]; refuses compressed
-     * clips with UNSUPPORTED_FORMAT. Opens the line at the clip's rate, or at 48 kHz with resampling
-     * when the device refuses it.
+     * A speaker on `SourceDataLine`. Plays WAVE clips; refuses anything else (compressed audio with
+     * UNSUPPORTED_FORMAT), so build the endpoint synthesizer with `AudioEncoding.WAV`. Opens the
+     * line at the clip's rate, or at 48 kHz with resampling when the device refuses it.
      */
-    fun player(
-        device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault,
-        rawPcm: PcmFormat = PcmFormat(sampleRateHz = RAW_PCM_RATE_HZ),
-    ): AudioPlayer = LinePcmPlayer(JavaSoundOutputDevice(device), PlayerOptions(rawPcm = rawPcm))
+    fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
+        LinePcmPlayer(JavaSoundOutputDevice(device), PlayerOptions())
 
     /** Mixers that can capture. */
     fun inputs(): List<AudioDeviceOption> = devicesWith(TargetDataLine::class.java)
@@ -80,6 +77,4 @@ object DesktopAudio {
     private fun devicesWith(kind: Class<out Line>): List<AudioDeviceOption> = AudioSystem.getMixerInfo()
         .filter { info -> AudioSystem.getMixer(info).isLineSupported(Line.Info(kind)) }
         .map { info -> AudioDeviceOption(AudioDeviceId(info.name), info.name) }
-
-    private const val RAW_PCM_RATE_HZ = 24_000
 }

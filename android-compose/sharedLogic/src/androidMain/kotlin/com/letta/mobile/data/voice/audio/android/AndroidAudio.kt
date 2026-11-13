@@ -11,7 +11,6 @@ import com.letta.mobile.data.voice.audio.AudioCapture
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.AudioPlayer
-import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.device.AudioDeviceId
 import com.letta.mobile.data.voice.audio.device.AudioDeviceOption
 import com.letta.mobile.data.voice.audio.device.AudioDeviceSelection
@@ -97,12 +96,11 @@ class AndroidAudio(private val context: Context) {
     /**
      * A speaker on a streaming `AudioTrack` with assistant usage. Each clip holds transient audio
      * focus that lets other apps duck, abandoned when the clip ends; losing focus stops the clip
-     * with PLAYBACK_FAILED. Plays WAVE and raw PCM in [rawPcm]; refuses compressed clips.
+     * with PLAYBACK_FAILED. Plays WAVE clips; refuses anything else
+     * (build the endpoint synthesizer with `AudioEncoding.WAV`).
      */
-    fun player(
-        device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault,
-        rawPcm: PcmFormat = PcmFormat(sampleRateHz = RAW_PCM_RATE_HZ),
-    ): AudioPlayer = FocusedPlayer(LinePcmPlayer(AudioTrackOutputDevice(context, device), PlayerOptions(rawPcm = rawPcm)), manager)
+    fun player(device: AudioDeviceSelection = AudioDeviceSelection.SystemDefault): AudioPlayer =
+        FocusedPlayer(LinePcmPlayer(AudioTrackOutputDevice(context, device), PlayerOptions()), manager)
 
     /** Input devices, identified by their `AudioDeviceInfo` id. */
     fun inputs(): List<AudioDeviceOption> = manager.getDevices(AudioManager.GET_DEVICES_INPUTS)
@@ -121,10 +119,6 @@ class AndroidAudio(private val context: Context) {
         }
         manager.registerAudioDeviceCallback(callback, null)
         awaitClose { manager.unregisterAudioDeviceCallback(callback) }
-    }
-
-    private companion object {
-        const val RAW_PCM_RATE_HZ = 24_000
     }
 }
 

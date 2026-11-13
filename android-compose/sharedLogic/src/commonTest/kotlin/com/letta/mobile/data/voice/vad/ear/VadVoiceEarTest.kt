@@ -99,9 +99,11 @@ class VadVoiceEarTest {
         val source = ScriptedSource(turn())
         val ear = valueEar(source, ScriptedTranscriber(failing(unreachable), heard("again")))
         val handle = ear.turns().firstFailure()
-        assertTrue(ear.retry(handle))
-        source.script = emptyList()
+        source.script = frames(0, 2)
         ear.turns().test {
+            // The loop retries only once the reopened ear reports it is listening.
+            assertEquals(VoiceEarEvent.ListeningStarted, awaitItem())
+            assertTrue(ear.retry(handle))
             assertEquals(said("again"), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }

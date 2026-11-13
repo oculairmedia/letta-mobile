@@ -118,7 +118,6 @@ private class DecodeCase(val name: String, val clip: AudioClip, val expect: Expe
 
 class ClipDecoderTest {
     private val wav = WavCodec.encode(PcmAudio(shortArrayOf(1, 2), PcmFormat(16_000)))
-    private val rawPcm = PcmFormat(24_000)
 
     private fun tagged(magic: String, encoding: AudioEncoding) = AudioClip(magic.encodeToByteArray() + ByteArray(20), encoding)
 
@@ -127,10 +126,9 @@ class ClipDecoderTest {
     private val cases = listOf(
         DecodeCase("WAVE clip", AudioClip(wav, AudioEncoding.WAV), Expect.Samples(listOf(1, 2))),
         DecodeCase("WAVE bytes despite an MP3 label", AudioClip(wav, AudioEncoding.MP3), Expect.Samples(listOf(1, 2))),
-        DecodeCase("raw PCM", AudioClip(samplesBody(3, -4) + byteArrayOf(1), AudioEncoding.PCM), Expect.Samples(listOf(3, -4))),
         DecodeCase("MP3", tagged("ID3", AudioEncoding.MP3), unsupported),
-        DecodeCase("Ogg labelled PCM", tagged("OggS", AudioEncoding.PCM), unsupported),
-        DecodeCase("FLAC labelled PCM", tagged("fLaC", AudioEncoding.PCM), unsupported),
+        DecodeCase("Ogg", tagged("OggS", AudioEncoding.OPUS), unsupported),
+        DecodeCase("FLAC", tagged("fLaC", AudioEncoding.FLAC), unsupported),
         DecodeCase("opus without magic", AudioClip(ByteArray(20), AudioEncoding.OPUS), unsupported),
         DecodeCase("WAVE label without RIFF", AudioClip(ByteArray(20), AudioEncoding.WAV), Expect.Refused(VoiceErrorCode.BAD_RESPONSE)),
     )
@@ -140,20 +138,15 @@ class ClipDecoderTest {
         cases.forEach { case ->
             when (val expect = case.expect) {
                 is Expect.Samples -> {
-                    val audio = ClipDecoder.decode(case.clip, rawPcm)
+                    val audio = ClipDecoder.decode(case.clip)
                     assertEquals(expect.samples, audio.samples.map { it.toInt() }, case.name)
                 }
                 is Expect.Refused -> {
-                    val error = assertFailsWith<VoiceAudioException>(case.name) { ClipDecoder.decode(case.clip, rawPcm) }
+                    val error = assertFailsWith<VoiceAudioException>(case.name) { ClipDecoder.decode(case.clip) }
                     assertEquals(expect.code, error.code, case.name)
                 }
             }
         }
-    }
-
-    @Test
-    fun rawPcmTakesTheCallersFormat() {
-        assertEquals(rawPcm, ClipDecoder.decode(AudioClip(samplesBody(1), AudioEncoding.PCM), rawPcm).format)
     }
 
     @Test

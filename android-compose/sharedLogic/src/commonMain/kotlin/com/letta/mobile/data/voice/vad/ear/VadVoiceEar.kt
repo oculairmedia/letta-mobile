@@ -53,11 +53,16 @@ data class VadEarConfig(
  * Events: [VoiceEarEvent.ListeningStarted] with the first frame, [VoiceEarEvent.InputLevel] per
  * frame, [VoiceEarEvent.SpeechStarted] once speech has lasted the policy's minimum (the barge-in
  * signal; raised thresholds while [setOutputActive] is true), [VoiceEarEvent.EndOfTurn] after
- * transcription, and [VoiceEarEvent.Failed]. A failed transcription keeps that turn's audio for ONE
- * [retry] (in memory, bounded by the hard cap); it is wiped when it is retried, when the next turn's
- * speech starts, or on [close]. It survives the listen being cancelled, because the loop closes the
- * microphone on a failure before the person asks to retry. A successful turn's audio is wiped at
- * once, so utterances carry no capture handle.
+ * transcription, and [VoiceEarEvent.Failed].
+ *
+ * Kept audio: a turn whose transcription failed is kept, in memory only and bounded by the hard
+ * cap, under the handle its [VoiceEarEvent.Failed] offers, until the first of: [retry] takes it (one
+ * retry; whatever that retry ends in, the audio is then wiped and no new handle is offered), the
+ * next turn's speech starts ([VoiceEarEvent.SpeechStarted], in this or any later listen), or
+ * [close]. Cancelling a listen does not wipe it: the loop closes the microphone on a failure and
+ * calls [retry] only once the reopened ear reports [VoiceEarEvent.ListeningStarted]. [retry] returns
+ * false whenever the handle is no longer kept. A transcribed turn, and a retry cancelled mid-way,
+ * are wiped at once; utterances carry no capture handle.
  *
  * Collecting [listen] opens the source; cancelling releases it before the collection completes,
  * and nothing is emitted after. A source that fails or ends reports one [VoiceEarEvent.Failed] with

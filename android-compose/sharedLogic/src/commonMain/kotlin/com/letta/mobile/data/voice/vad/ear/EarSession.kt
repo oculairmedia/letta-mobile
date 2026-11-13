@@ -228,6 +228,10 @@ private class TranscriptionWorker(
         val outcome = runCatching { parts.transcriber.transcribe(clip) }
         clip.bytes.fill(0)
         val error = outcome.exceptionOrNull()
+        if (error is CancellationException) {
+            job.turn.wipe()
+            throw error
+        }
         if (error == null) {
             job.turn.wipe()
             return out.send(VoiceEarEvent.EndOfTurn(VoiceUtterance(outcome.getOrThrow())))

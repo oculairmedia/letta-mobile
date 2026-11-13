@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.SpeechEndpointUrl
 import com.letta.mobile.data.voice.SpeechModelName
 import com.letta.mobile.data.voice.SpeechVoiceName
 import com.letta.mobile.data.voice.VoiceEndpointSettings
+import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
@@ -24,6 +25,7 @@ import com.letta.mobile.data.voice.endpoint.EndpointVoiceMouth
 import com.letta.mobile.data.voice.endpoint.SpeechApiKey
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointClient
 import com.letta.mobile.data.voice.endpoint.SpeechEndpointConfig
+import com.letta.mobile.data.voice.endpoint.SpeechTransportPolicy
 import com.letta.mobile.data.voice.engine.SpeechSegment
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
@@ -31,6 +33,7 @@ import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.data.voice.vad.ear.VadVoiceEar
 import io.ktor.client.engine.cio.CIO
+import io.ktor.http.Url
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -47,7 +50,9 @@ import kotlin.time.Duration.Companion.minutes
  * - `loop <base-url> [minutes] [speech-model] [voice] [transcription-model]`: listens with the
  *   voice-activity ear, transcribes each turn through the OpenAI-compatible server at base-url,
  *   and speaks "You said ..." back through the endpoint mouth, printing every state change.
- *   A bearer key, if the server needs one, is read from VOICE_SMOKE_API_KEY. Destination grants
+ *   A bearer key, if the server needs one, is read from VOICE_SMOKE_API_KEY; with a key the URL must
+ *   be https or a loopback host, otherwise the run stops before sending anything (INSECURE_TRANSPORT).
+ *   The mouth asks the server for WAVE audio. Destination grants
  *   for that one origin are created here, explicitly, for this run only.
  *
  * Run: `./gradlew :sharedLogic:voiceSmoke --args="record"` or
@@ -105,6 +110,12 @@ private suspend fun loop(args: LoopArgs) {
     val origin = checkNotNull(EndpointOrigin.of(url)) { "not an http(s) URL" }
     val grants = VoiceEndpointGrants(VoiceEndpointPayload.entries.map { VoiceEndpointGrant(origin, it) }.toSet())
     val key = System.getenv("VOICE_SMOKE_API_KEY")?.takeIf { it.isNotBlank() }?.let(::SpeechApiKey)
+    if (key != null && !SpeechTransportPolicy.protectsKey(url.value, runCatching { Url(url.value) }.getOrNull())) {
+        return println(
+            "refused (${VoiceErrorCode.INSECURE_TRANSPORT}): VOICE_SMOKE_API_KEY is set but ${url.value} is not https or a " +
+                "loopback host (localhost, 127.x.x.x, ::1); nothing was sent. Use https or a loopback tunnel.",
+        )
+    }
     val client = SpeechEndpointClient(CIO.create(), SpeechEndpointConfig(url, key))
     val transcriber = SpeechTranscriber.endpoint(EndpointTranscriber(client, { grants }, args.settings))
     val source = RecoveringFrameSource(DesktopAudio.frameSource(), deviceChanges = DesktopAudio.deviceChanges())
@@ -131,7 +142,10 @@ private class EchoTurns(private val ear: VadVoiceEar, private val mouth: Endpoin
         when (event) {
             is VoiceMouthEvent.Started -> ear.setOutputActive(true).also { println("mouth: speaking") }
             is VoiceMouthEvent.Finished -> ear.setOutputActive(false).also { println("mouth: finished") }
-            is VoiceMouthEvent.Failed -> ear.setOutputActive(false).also { println("mouth: failed ${event.error.code}") }
+            is VoiceMouthEvent.Failed -> {
+                ear.setOutputActive(false)
+                println("mouth: segment ${event.id.value} failed ${explain(event.error.code)}")
+            }
             is VoiceMouthEvent.OutputLevel -> Unit
         }
     }
@@ -153,10 +167,19 @@ private class EchoTurns(private val ear: VadVoiceEar, private val mouth: Endpoin
     }
 
     private fun failed(event: VoiceEarEvent.Failed) {
-        println("ear: failed ${event.error.code}")
+        println("ear: failed ${explain(event.error.code)}")
         val handle = event.retry ?: return
         if (retried) return
         retried = true
         println("ear: retrying once -> ${ear.retry(handle)}")
     }
+}
+
+/** A failure code, with a hint for the ones a person can fix from the command line. */
+private fun explain(code: VoiceErrorCode): String = when (code) {
+    VoiceErrorCode.INSECURE_TRANSPORT -> "$code (a key over plain http to a non-loopback host; use https or a loopback tunnel)"
+    VoiceErrorCode.UNSUPPORTED_FORMAT -> "$code (the server did not return WAVE audio)"
+    VoiceErrorCode.PERMISSION_REQUIRED -> "$code (microphone permission or destination grant missing)"
+    VoiceErrorCode.UNAUTHORIZED -> "$code (check VOICE_SMOKE_API_KEY)"
+    else -> code.toString()
 }

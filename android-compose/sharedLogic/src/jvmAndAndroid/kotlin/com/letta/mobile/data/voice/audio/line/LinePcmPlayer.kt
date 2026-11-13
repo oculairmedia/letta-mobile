@@ -26,8 +26,6 @@ import kotlin.time.DurationUnit
 
 /** How a line player decodes and paces audio. */
 internal data class PlayerOptions(
-    /** The format of a clip declared raw PCM (OpenAI-compatible servers send 24 kHz mono). */
-    val rawPcm: PcmFormat = PcmFormat(sampleRateHz = 24_000),
     /** Audio per write; one output level is reported per chunk. */
     val chunk: Duration = 20.milliseconds,
     /** How often the end of playback is checked. */
@@ -39,8 +37,8 @@ internal data class PlayerOptions(
 )
 
 /**
- * An [AudioPlayer] on a blocking [PcmOutputDevice]. It decodes the clip ([ClipDecoder]: WAVE or raw
- * PCM; compressed audio is refused with a [VoiceAudioException]), mixes it down to mono, resamples
+ * An [AudioPlayer] on a blocking [PcmOutputDevice]. It decodes the clip ([ClipDecoder]: WAVE only;
+ * anything else is refused with a [VoiceAudioException]), mixes it down to mono, resamples
  * when the line opened at another rate, and writes it in short chunks, reporting each chunk's
  * level. It returns once the line has played everything it was given.
  *
@@ -52,7 +50,7 @@ internal class LinePcmPlayer(
     private val options: PlayerOptions = PlayerOptions(),
 ) : AudioPlayer {
     override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
-        val pcm = ClipDecoder.decode(clip, options.rawPcm).toMono()
+        val pcm = ClipDecoder.decode(clip).toMono()
         val line = withContext(options.dispatcher + NonCancellable) { device.open(PcmFormat(pcm.format.sampleRateHz)) }
         try {
             coroutineScope {
