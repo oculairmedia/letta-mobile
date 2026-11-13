@@ -220,6 +220,10 @@ private fun emptyState(state: ModelPickerState): PickerEmpty = when {
 @Composable
 private fun PickerFooterBar(state: ModelPickerState, actions: ModelPickerActions) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    LocalModelPickerEffortSection.current?.let { section ->
+        ModelPickerEffortRow(section)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
     actions.onSelectToolset?.let { onSelect ->
         if (actions.availableToolsets.isNotEmpty()) {
             ToolsetSelectorRow(
