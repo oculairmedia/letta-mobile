@@ -3,6 +3,9 @@ package com.letta.mobile.data.voice.audio.line
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.PcmFormat
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * A blocking microphone line opened in an exact format: the minimal surface of `TargetDataLine`
@@ -58,3 +61,12 @@ internal fun interface PcmOutputDevice {
     /** A started line; throws [VoiceAudioException] (UNAVAILABLE, PLAYBACK_FAILED). */
     fun open(format: PcmFormat): PcmOutputLine
 }
+
+/**
+ * Runs the blocking [open] on [dispatcher] and hands its line back even when the caller is
+ * cancelled meanwhile: a plain `withContext(dispatcher + NonCancellable)` returns to a cancelled
+ * caller by throwing and drops the result, leaking the opened device. The outer NonCancellable
+ * context keeps the hand-off; the caller checks for cancellation once it owns the line.
+ */
+internal suspend fun <L> acquire(dispatcher: CoroutineDispatcher, open: () -> L): L =
+    withContext(NonCancellable) { withContext(dispatcher) { open() } }

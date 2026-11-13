@@ -106,16 +106,20 @@ internal class JavaSoundOutputDevice(
     private fun openAt(sampleRateHz: Int): PcmOutputLine = javaSound {
         val audioFormat = pcm16(sampleRateHz, 1)
         val line = lineFor(selection, DataLine.Info(SourceDataLine::class.java, audioFormat)) as SourceDataLine
-        line.open(audioFormat, sampleRateHz * BYTES_PER_SAMPLE / BUFFERS_PER_SECOND)
+        line.open(audioFormat, outputBufferBytes(sampleRateHz))
         line.start()
         JavaSoundOutputLine(line, PcmFormat(sampleRateHz))
     }
 
     private companion object {
         const val FALLBACK_RATE_HZ = 48_000
-        const val BUFFERS_PER_SECOND = 8
     }
 }
+
+private const val OUTPUT_BUFFERS_PER_SECOND = 8
+
+/** An eighth of a second of mono PCM16 at [sampleRateHz], in whole frames as Java Sound requires. */
+internal fun outputBufferBytes(sampleRateHz: Int): Int = sampleRateHz / OUTPUT_BUFFERS_PER_SECOND * BYTES_PER_SAMPLE
 
 private class JavaSoundOutputLine(private val line: SourceDataLine, override val format: PcmFormat) : PcmOutputLine {
     override fun write(samples: ShortArray, count: Int): Int {

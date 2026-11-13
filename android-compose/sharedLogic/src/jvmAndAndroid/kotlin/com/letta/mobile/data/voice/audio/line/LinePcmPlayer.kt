@@ -51,7 +51,7 @@ internal class LinePcmPlayer(
 ) : AudioPlayer {
     override suspend fun play(clip: AudioClip, onLevel: (AudioLevel) -> Unit) {
         val pcm = ClipDecoder.decode(clip).toMono()
-        val line = withContext(options.dispatcher + NonCancellable) { device.open(PcmFormat(pcm.format.sampleRateHz)) }
+        val line = acquire(options.dispatcher) { device.open(PcmFormat(pcm.format.sampleRateHz)) }
         try {
             coroutineScope {
                 val writer = launch(options.dispatcher) { LineWriter(line, options, onLevel).playAll(pcm) }

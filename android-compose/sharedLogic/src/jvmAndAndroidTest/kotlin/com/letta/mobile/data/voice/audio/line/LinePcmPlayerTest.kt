@@ -126,6 +126,25 @@ class LinePcmPlayerTest {
     }
 
     @Test
+    fun aLineOpenedWhileThePlayerIsCancelledIsStillReleased() = runBlocking {
+        val speaker = FakeSpeaker(SpeakerScript())
+        val opening = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        val slow = PcmOutputDevice { format ->
+            opening.countDown()
+            proceed.await(5, TimeUnit.SECONDS)
+            speaker.open(format)
+        }
+        val playing = launch(Dispatchers.Default) { LinePcmPlayer(slow, options).play(wavClip(2_400)) { } }
+        assertTrue(opening.await(5, TimeUnit.SECONDS))
+        playing.cancel()
+        proceed.countDown()
+        playing.join()
+        assertTrue("release" in speaker.events)
+        assertTrue(speaker.written.isEmpty())
+    }
+
+    @Test
     fun aSpeakerThatNeverPlaysFails() = runBlocking {
         val speaker = FakeSpeaker(SpeakerScript(stuck = true))
         val error = assertFailsWith<VoiceAudioException> { LinePcmPlayer(speaker, options).play(wavClip(480)) { } }

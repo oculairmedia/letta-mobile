@@ -45,10 +45,29 @@ private fun pcm16(sampleRateHz: Int, channelMask: Int): AudioFormat =
 
 private fun channelMaskIn(channels: Int): Int = if (channels == 1) AudioFormat.CHANNEL_IN_MONO else AudioFormat.CHANNEL_IN_STEREO
 
-private fun AudioManager.deviceFor(selection: AudioDeviceSelection, flags: Int): AudioDeviceInfo? = when (selection) {
+/** The device [selection] names among [flags] devices, or null for the system default; throws when it is gone. */
+private fun Context.deviceFor(selection: AudioDeviceSelection, flags: Int): AudioDeviceInfo? = when (selection) {
     AudioDeviceSelection.SystemDefault -> null
-    is AudioDeviceSelection.Specific -> getDevices(flags).firstOrNull { it.id.toString() == selection.id.value }
+    is AudioDeviceSelection.Specific -> getSystemService(AudioManager::class.java).getDevices(flags)
+        .firstOrNull { it.id.toString() == selection.id.value }
         ?: throw VoiceAudioException(VoiceErrorCode.UNAVAILABLE)
+}
+
+/**
+ * Routes a new line to [selection] through [prefer]. An explicitly selected device that is gone or
+ * refused is never swapped for the default route: the line is released ([release]) and the open
+ * fails UNAVAILABLE.
+ */
+private inline fun Context.route(
+    selection: AudioDeviceSelection,
+    flags: Int,
+    prefer: (AudioDeviceInfo) -> Boolean,
+    release: () -> Unit,
+) {
+    val routed = runCatching { deviceFor(selection, flags)?.let(prefer) ?: true }.getOrDefault(false)
+    if (routed) return
+    release()
+    throw VoiceAudioException(VoiceErrorCode.UNAVAILABLE)
 }
 
 /**
@@ -78,9 +97,8 @@ internal class AudioRecordInputDevice(
     }
 
     private fun start(record: AudioRecord): PcmInputLine {
-        val manager = context.getSystemService(AudioManager::class.java)
         val ready = record.state == AudioRecord.STATE_INITIALIZED
-        if (ready) runCatching { manager.deviceFor(options.device, AudioManager.GET_DEVICES_INPUTS)?.let(record::setPreferredDevice) }
+        if (ready) context.route(options.device, AudioManager.GET_DEVICES_INPUTS, record::setPreferredDevice, record::release)
         if (ready) record.startRecording()
         if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
             record.release()
@@ -156,8 +174,7 @@ internal class AudioTrackOutputDevice(private val context: Context, private val 
             track.release()
             throw VoiceAudioException(VoiceErrorCode.UNAVAILABLE)
         }
-        val manager = context.getSystemService(AudioManager::class.java)
-        runCatching { manager.deviceFor(device, AudioManager.GET_DEVICES_OUTPUTS)?.let(track::setPreferredDevice) }
+        context.route(device, AudioManager.GET_DEVICES_OUTPUTS, track::setPreferredDevice, track::release)
         track.play()
         return AudioTrackOutputLine(track, PcmFormat(format.sampleRateHz))
     }

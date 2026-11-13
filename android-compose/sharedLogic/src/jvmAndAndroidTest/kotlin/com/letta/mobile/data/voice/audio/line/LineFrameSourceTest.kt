@@ -3,8 +3,10 @@ package com.letta.mobile.data.voice.audio.line
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.audio.AudioFrameFormat
 import com.letta.mobile.data.voice.audio.pcm.VoiceAudioException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -106,6 +108,24 @@ class LineFrameSourceTest {
         val options = PumpOptions(stallTimeout = 30.milliseconds, pollInterval = 1.milliseconds)
         val error = assertFailsWith<VoiceAudioException> { source(line, options).frames().toList() }
         assertEquals(VoiceErrorCode.UNAVAILABLE, error.code)
+    }
+
+    @Test
+    fun aLineOpenedWhileTheCollectorIsCancelledIsStillReleased() = runBlocking {
+        val line = FakeInputLine(LineScript(blockAfter = 0))
+        val opening = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        val slow = LineFrameSource({
+            opening.countDown()
+            proceed.await(5, TimeUnit.SECONDS)
+            line
+        }, format)
+        val collecting = launch(Dispatchers.Default) { slow.frames().collect { } }
+        assertTrue(opening.await(5, TimeUnit.SECONDS))
+        collecting.cancel()
+        proceed.countDown()
+        collecting.join()
+        assertEquals(listOf("stop", "release"), synchronized(line.events) { line.events.toList() })
     }
 
     @Test

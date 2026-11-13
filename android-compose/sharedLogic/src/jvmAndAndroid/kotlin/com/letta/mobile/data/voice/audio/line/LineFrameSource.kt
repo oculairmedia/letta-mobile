@@ -55,7 +55,7 @@ internal class LineFrameSource(
     override val droppedFrames: Long get() = dropped.get()
 
     override fun frames(): Flow<AudioFrame> = flow {
-        val line = withContext(dispatcher + NonCancellable) { device.open(format) }
+        val line = acquire(dispatcher) { device.open(format) }
         val pump = CapturePump(line, format, options, dropped)
         try {
             currentCoroutineContext().ensureActive()
