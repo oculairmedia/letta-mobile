@@ -87,7 +87,7 @@ class EndpointVoiceEngineFactory(
         val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
         val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope), telemetry)
         val session = TelemetryVoiceChatSession(request.session, telemetry)
-        val responder = TelemetryResponder(VoiceChatResponder(session), telemetry) { session.lastSent }
+        val responder = TelemetryResponder(VoiceChatResponder(session), telemetry, session)
         val engines = VoiceEngines(ear = ear, responder = responder, mouth = mouth)
         return VoiceEngineSet(engines) {
             ear.close()

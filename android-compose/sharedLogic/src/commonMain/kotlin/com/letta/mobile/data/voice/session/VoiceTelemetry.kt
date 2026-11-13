@@ -20,8 +20,11 @@ import com.letta.mobile.data.voice.loop.VoiceLoopObserver
 import com.letta.mobile.data.voice.loop.VoiceLoopState
 import com.letta.mobile.data.voice.responder.ClientMessageId
 import com.letta.mobile.data.voice.responder.SentUtterance
+import com.letta.mobile.data.voice.responder.VoiceChatRow
 import com.letta.mobile.data.voice.responder.VoiceChatSession
 import com.letta.mobile.data.voice.responder.VoiceChatState
+import com.letta.mobile.data.voice.responder.VoiceRowKey
+import com.letta.mobile.data.voice.responder.VoiceRowKind
 import com.letta.mobile.data.voice.responder.VoiceRunId
 import com.letta.mobile.data.voice.vad.TurnDiscardReason
 import com.letta.mobile.data.voice.vad.TurnEndReason
@@ -31,10 +34,8 @@ import com.letta.mobile.data.voice.vad.ear.SpeechTranscriber
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryValue
 import com.letta.mobile.util.attr
-import kotlin.concurrent.Volatile
-import kotlin.math.roundToInt
-import kotlin.time.TimeMark
-import kotlin.time.TimeSource
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlin.concurrent.Volatile
+import kotlin.math.roundToInt
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * Voice mode's diagnostics, as `VoiceMode` telemetry events. Every event carries `tMs`, the
@@ -152,6 +157,12 @@ internal class TelemetryTranscriber(
  * first time the session publishes the run a sent message started `reply.attributed` with the run
  * ids, and each stop: `stop.requested` with the runs in flight that this session's messages
  * started, and `stop.settled` once none of those is in flight any more.
+ *
+ * While a reply is pending (sent, not yet reported finished through [finished]): `reply.text` each
+ * time an assistant text row of its run grows, with the characters added and the row's run id;
+ * and, once per pending message, `reply.row_unmatched` with the run id and kind of the first new
+ * non-user row whose run is in no pending message's runs. Rows already shown when a message was
+ * sent are never reported. No text, only counts and ids.
  */
 internal class TelemetryVoiceChatSession(
     private val delegate: VoiceChatSession,
@@ -161,15 +172,36 @@ internal class TelemetryVoiceChatSession(
     private val attributed = MutableStateFlow<Set<ClientMessageId>>(emptySet())
     private val queued = MutableStateFlow<Set<ClientMessageId>>(emptySet())
     private val stopping = MutableStateFlow<Set<VoiceRunId>>(emptySet())
+    private val rows = ReplyRowTelemetry(telemetry)
+    private val sentCount = MutableStateFlow(0)
+    private val sentInOrder = MutableStateFlow<Map<Int, ClientMessageId>>(emptyMap())
 
     /** The last message sent, for the responder's failure reports. */
     val lastSent: ClientMessageId? get() = sent.value.lastOrNull()
+
+    /** How many messages this session has sent; the next one sent is number [sendCount]. */
+    val sendCount: Int get() = sentCount.value
+
+    /** The message sent as number [index], once it has been sent. */
+    fun sentAs(index: Int): ClientMessageId? = sentInOrder.value[index]
+
+    /** The current state, for the responder's completion reports. */
+    val current: VoiceChatState get() = delegate.state.value
+
+    /** The reply to [id] has been reported finished: it is no longer pending. */
+    fun finished(id: ClientMessageId?) {
+        if (id != null) rows.finished(id)
+    }
 
     override val state: StateFlow<VoiceChatState> =
         DerivedStateFlow(delegate.state.onEach(::observe)) { delegate.state.value }
 
     override suspend fun send(text: VoiceText): SentUtterance {
+        val before = delegate.state.value
         val utterance = delegate.send(text)
+        rows.pending(utterance.id, before)
+        val index = sentCount.getAndUpdate { it + 1 }
+        sentInOrder.update { (it + (index to utterance.id)).filterKeys { key -> key > index - MAX_TRACKED } }
         sent.update { (it + utterance.id).takeLast(MAX_TRACKED) }
         telemetry.event("utterance.sent", "clientMessageId" attr utterance.id.value, "characters" attr text.value.length)
         observe(delegate.state.value)
@@ -190,6 +222,7 @@ internal class TelemetryVoiceChatSession(
             reportAttribution(state, id)
         }
         reportSettledStops(state)
+        rows.observe(state)
     }
 
     private fun reportQueued(state: VoiceChatState, id: ClientMessageId) {
@@ -224,21 +257,20 @@ internal class TelemetryVoiceChatSession(
 internal class TelemetryResponder(
     private val delegate: VoiceResponder,
     private val telemetry: VoiceTelemetry,
-    private val lastSent: () -> ClientMessageId?,
+    private val session: TelemetryVoiceChatSession? = null,
+    private val lastSent: () -> ClientMessageId? = { session?.lastSent },
 ) : VoiceResponder {
     override fun respond(utterance: VoiceUtterance): VoiceReply {
+        val index = session?.sendCount
         val reply = delegate.respond(utterance)
         var characters = 0
+        val own = { index?.let { session?.sentAs(it) } ?: lastSent() }
         return object : VoiceReply {
             override val events: Flow<VoiceReplyEvent> = reply.events.onEach { event ->
                 when (event) {
                     is VoiceReplyEvent.Text -> characters += event.delta.value.length
-                    VoiceReplyEvent.Completed -> telemetry.event(
-                        "reply.completed",
-                        "clientMessageId" attr lastSent()?.value,
-                        "characters" attr characters,
-                    )
-                    is VoiceReplyEvent.Failed -> reportFailure(event)
+                    VoiceReplyEvent.Completed -> reportCompleted(own(), characters)
+                    is VoiceReplyEvent.Failed -> reportFailure(event, own())
                     else -> Unit
                 }
             }
@@ -248,10 +280,35 @@ internal class TelemetryResponder(
         }
     }
 
-    private fun reportFailure(event: VoiceReplyEvent.Failed) {
+    /**
+     * `reply.completed` with the characters received, why the reply counted as complete (its run
+     * ended, failed, or none was ever published for it) and its run ids at that moment.
+     */
+    private fun reportCompleted(id: ClientMessageId?, characters: Int) {
+        val state = session?.current
+        val runs = id?.let { state?.startedRuns?.get(it) }.orEmpty()
+        val reason = when {
+            state == null -> "unknown"
+            runs.isEmpty() -> "noRun"
+            runs.any { it in state.activeRuns } -> "runStillActive"
+            runs.any { it in state.failedRuns } -> "runFailed"
+            else -> "runEnded"
+        }
+        telemetry.event(
+            "reply.completed",
+            "clientMessageId" attr id?.value,
+            "characters" attr characters,
+            "reason" attr reason,
+            "runIds" attr runs.joinToString(",") { it.value },
+        )
+        session?.finished(id)
+    }
+
+    private fun reportFailure(event: VoiceReplyEvent.Failed, id: ClientMessageId?) {
         val code = event.error.code
         val name = if (code.name == UNATTRIBUTED || code.name == NOT_DELIVERED) "reply.unattributed" else "reply.failed"
-        telemetry.event(name, "reason" attr code.name, "clientMessageId" attr lastSent()?.value)
+        telemetry.event(name, "reason" attr code.name, "clientMessageId" attr id?.value)
+        session?.finished(id)
     }
 
     private companion object {
@@ -281,5 +338,63 @@ internal class TelemetryMouth(private val delegate: VoiceMouth, private val tele
     override fun speak(segment: SpeechSegment) {
         telemetry.event("speech.requested", "segment" attr segment.id.value, "characters" attr segment.text.value.length)
         delegate.speak(segment)
+    }
+}
+
+/**
+ * The row half of [TelemetryVoiceChatSession]: which pending message each new row belongs to, by
+ * its run id, reported as counts and ids only.
+ */
+private class ReplyRowTelemetry(private val telemetry: VoiceTelemetry) {
+    private val lock = SynchronizedObject()
+    private val pending = linkedSetOf<ClientMessageId>()
+    private val baseline = HashSet<VoiceRowKey>()
+    private val lengths = HashMap<VoiceRowKey, Int>()
+    private val unmatchedReported = HashSet<ClientMessageId>()
+
+    fun pending(id: ClientMessageId, before: VoiceChatState) = synchronized(lock) {
+        before.rows.forEach { if (it.key !in lengths) baseline += it.key }
+        pending += id
+        while (pending.size > MAX_PENDING) pending.remove(pending.first())
+    }
+
+    fun finished(id: ClientMessageId) {
+        synchronized(lock) { pending.remove(id) }
+    }
+
+    fun observe(state: VoiceChatState) = synchronized(lock) {
+        if (pending.isEmpty()) return@synchronized
+        val owners = pending.flatMap { id -> state.startedRuns[id].orEmpty().map { it to id } }.toMap()
+        state.rows.filter { it.kind != VoiceRowKind.USER && it.key !in baseline }.forEach { observeRow(it, owners) }
+    }
+
+    private fun observeRow(row: VoiceChatRow, owners: Map<VoiceRunId, ClientMessageId>) {
+        val owner = row.runId?.let(owners::get)
+        if (owner == null) return reportUnmatched(row)
+        if (row.kind != VoiceRowKind.ASSISTANT_TEXT) return
+        val grown = row.text.value.length - (lengths[row.key] ?: 0)
+        if (grown <= 0) return
+        lengths[row.key] = row.text.value.length
+        telemetry.event(
+            "reply.text",
+            "clientMessageId" attr owner.value,
+            "runId" attr row.runId?.value,
+            "characters" attr grown,
+        )
+    }
+
+    private fun reportUnmatched(row: VoiceChatRow) {
+        val waiting = pending.lastOrNull() ?: return
+        if (!unmatchedReported.add(waiting)) return
+        telemetry.event(
+            "reply.row_unmatched",
+            "clientMessageId" attr waiting.value,
+            "runId" attr row.runId?.value,
+            "kind" attr row.kind.name,
+        )
+    }
+
+    private companion object {
+        const val MAX_PENDING = 8
     }
 }
