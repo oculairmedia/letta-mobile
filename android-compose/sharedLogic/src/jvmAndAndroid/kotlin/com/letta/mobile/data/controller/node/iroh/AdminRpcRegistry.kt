@@ -165,11 +165,11 @@ object AdminRpcRegistry {
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos", "subagent.dismiss")
 
-    /** Host-supplied route families: the plugin host, and the canvas mount routes (letta-mobile-n2stx.5). */
+    /** Host-supplied route families: the plugin host, and the canvas mount routes. */
     private fun registerHostRoutes(router: AdminRpcRouter, services: AdminRpcHostServices) {
         services.pluginRoutes?.register(router)
             ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
-        // All four canvas mount routes or none, never under the anonymous policy.
+        // All six canvas mount routes or none, never under the anonymous policy.
         services.canvasMountRoutes?.register(router)
     }
 

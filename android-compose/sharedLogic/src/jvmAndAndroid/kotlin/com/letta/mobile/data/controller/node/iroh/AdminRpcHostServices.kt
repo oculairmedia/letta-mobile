@@ -19,7 +19,7 @@ class AdminRpcHostServices(
     /** Host-specific plugin routes; null registers capability-unavailable responses for plugin methods. */
     val pluginRoutes: AdminRpcRoutes? = null,
     /**
-     * Authenticated canvas mount routes (letta-mobile-n2stx.5); null registers and advertises none. The routes
+     * Authenticated canvas mount routes; null registers and advertises none. The routes
      * themselves register nothing under the anonymous test policy.
      */
     val canvasMountRoutes: AdminRpcRoutes? = null,

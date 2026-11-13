@@ -24,7 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 internal class HostCanvasRecords(val directory: HostCanvasDirectory, val relay: CanvasRelayStore)
 
 /**
- * Opt-in (`--enable-canvas-mounts`) host wiring of the canvas mounts (letta-mobile-n2stx.5): the mount records live
+ * Opt-in (`--enable-canvas-mounts`) host wiring of the canvas mounts: the mount records live
  * in `canvas-mounts/` of the product-state directory that already holds `host-canvases.json`, under this host's
  * stable node id. Not for use until the security review of the canvas mount routes passes; without the flag nothing
  * is built, registered or advertised, and the canvas tools keep using each conversation's own canvas.
@@ -38,7 +38,7 @@ internal class CanvasMountWiring private constructor(
     val toolLookup: HostCanvasMountLookup = CanvasMountToolLookup(location, scope)
 
     /**
-     * The four routes for [policy] (they register nothing under the anonymous test policy); null without an App
+     * The six canvas mount routes for [policy] (they register nothing under the anonymous test policy); null without an App
      * Server client, whose conversation and agent records the authority needs: incomplete wiring registers nothing.
      */
     fun routes(policy: IrohAuthPolicy, client: AppServerClient?, viewers: ConversationViewers): AdminRpcRoutes? =
