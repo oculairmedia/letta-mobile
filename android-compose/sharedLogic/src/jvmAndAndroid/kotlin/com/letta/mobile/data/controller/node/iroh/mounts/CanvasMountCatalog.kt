@@ -47,6 +47,19 @@ class CanvasMountCatalog(
         return if (bound) CanvasOwnership.Owned(emptySet()) else CanvasOwnership.Absent
     }
 
+    /**
+     * Whether [conversation]'s canonical canvas id is still unused on this host or is held through [conversation]
+     * itself: its directory entry belongs to [conversation], or the relay bound `conversation:<conversation>` to it.
+     * False when the id is recorded for any other conversation or board, or bound only under another topic, since any
+     * signed-in app may bind a topic to an id that names a different conversation.
+     */
+    internal suspend fun canonicalHeldBy(conversation: ConversationId): Boolean {
+        val canvas = CanvasId.forConversation(conversation)
+        canvases.get(canvas)?.let { entry -> return entry.conversationId == conversation.value }
+        if (relay.boundCanvas(CanvasRelayProtocol.conversationTopic(conversation)) == canvas) return true
+        return relay.boundCanvas(CanvasRelayProtocol.canvasTopic(canvas)) != canvas
+    }
+
     /** Every canvas the host's agent canvas directory records, the only canvases `canvas.mount.candidates` enumerates. */
     internal suspend fun known(): List<HostCanvasEntry> = canvases.all()
 

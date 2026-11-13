@@ -90,9 +90,10 @@ internal class CanvasMountCallTrace {
  * - See: the stored canvas is visible to the connection.
  * - List (`canvas.mount.candidates`, [mayList]): exactly the proposal rule, so nothing is listed a proposal refuses.
  *
- * Visibility (owner decision D3): a binding's own conversation canvas is always visible to a caller allowed to
- * address that binding; any other canvas must exist on this host and be owned by an agent in the connection's agent
- * scope ([CanvasMountCatalog.ownership]). A canvas with no known owner is visible only with unrestricted agent
+ * Visibility (owner decision D3): a binding's own conversation canvas is visible to a caller allowed to address that
+ * binding while the catalog shows that id unused or held through the binding's own conversation
+ * ([CanvasMountCatalog.canonicalHeldBy]); otherwise it is judged like any other canvas. Any other canvas must exist
+ * on this host and be owned by an agent in the connection's agent scope ([CanvasMountCatalog.ownership]). A canvas with no known owner is visible only with unrestricted agent
  * scope, and a canvas the host does not have is visible to no one, so both deny exactly like any other denial.
  */
 internal class HostCanvasMountAuthority(
@@ -139,8 +140,10 @@ internal class HostCanvasMountAuthority(
     }
 
     private suspend fun visible(scope: CanvasMountScope, canvas: CanvasId): Boolean {
-        val ownCanvas = (scope as? CanvasMountScope.Conversation)?.conversation?.let(CanvasId::forConversation)
-        if (canvas == ownCanvas) return true
+        val own = (scope as? CanvasMountScope.Conversation)?.conversation
+        // The id string alone proves nothing: the shortcut holds only while the catalog shows the canonical id unused
+        // or held through this very conversation (any signed-in app may bind a topic to an id naming another one).
+        if (own != null && canvas == CanvasId.forConversation(own) && catalog.canonicalHeldBy(own)) return true
         return when (val ownership = catalog.ownership(canvas, directory)) {
             CanvasOwnership.Absent -> false
             is CanvasOwnership.Owned -> ownedVisible(ownership.agents)

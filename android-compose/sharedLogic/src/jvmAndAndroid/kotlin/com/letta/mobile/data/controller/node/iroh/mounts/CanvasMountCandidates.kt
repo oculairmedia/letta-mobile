@@ -22,7 +22,7 @@ internal data class CanvasMountCandidate(val canvas: CanvasId, val title: String
  * Same check order as every route: the router's agent scope guard, verified identity and strict params (the handler),
  * then [HostCanvasMountAuthority.mayAddress] for the binding, whose refusal is the one byte-identical denial. Each
  * listed canvas then passes [HostCanvasMountAuthority.mayList], which is the proposal rule itself, so a canvas a bind
- * or replace would refuse is never listed. The binding's own canvas comes first (always mountable, "go back").
+ * or replace would refuse is never listed. The binding's own canvas comes first ("go back") whenever the proposal rule admits it.
  *
  * Only the host's agent canvas directory is enumerated: canvases only the relay holds (app-made ones) are not, since
  * the relay store has no listing and the app that made one already has it locally. At most
@@ -37,8 +37,11 @@ internal class CanvasMountCandidates(private val authority: HostCanvasMountAutho
             return CanvasMountOutcome.Unavailable(CanvasMountUnavailable.AUTHORITY)
         }
         val own = CanvasId.forConversation(request.scope.conversation)
+        // The own canonical id passes the proposal rule like any other: it is not listed while another conversation
+        // holds that id, and then a proposal of it would be refused too.
         val ownCandidate = CanvasMountCandidate(own, entries.firstOrNull { it.id == own }?.title, CanvasMountWire.OWNER_CONVERSATION)
-        val all = listOf(ownCandidate) + listable(request, entries.filter { it.id != own })
+            .takeIf { authority.mayList(request, own) == CanvasMountDecision.ALLOW }
+        val all = listOfNotNull(ownCandidate) + listable(request, entries.filter { it.id != own })
         return CanvasMountOutcome.Listed(all.take(CanvasMountWire.MAX_CANDIDATES), truncated = all.size > CanvasMountWire.MAX_CANDIDATES)
     }
 

@@ -217,9 +217,16 @@ class HostCanvasBackend(
         }
     }
 
+    /**
+     * Claims [conversationId]'s canonical canvas for [caller]. A relay that already bound the conversation's topic to
+     * any other id (any signed-in app may propose one) is refused as not found and nothing is recorded: adopting it
+     * would let a canvas id that names another conversation be stored as this one's.
+     */
     private suspend fun claimConversation(caller: HostCanvasCaller, conversationId: ConversationId): HostCanvasAccess {
         val topic = CanvasRelayProtocol.conversationTopic(conversationId)
-        val bound = store.bind(topic, CanvasId.forConversation(conversationId))
+        val canonical = CanvasId.forConversation(conversationId)
+        val bound = store.bind(topic, canonical)
+        if (bound != canonical) return HostCanvasAccess.Denied("Canvas not found: $canonical")
         val entry = directory.putIfAbsent(
             HostCanvasEntry(bound.value, topic, CONVERSATION_CANVAS_TITLE, conversationId.value, aclFor(caller)),
         )
