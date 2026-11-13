@@ -1303,6 +1303,40 @@ class ChatSendCoordinatorCleanupTest {
         assertNull(coordinator.sendQueue.state.value[QueueConversationId("conv-1")])
     }
 
+    // letta-mobile-6vf4r (S4): the other device's reply streams into this timeline while this
+    // device's send waits on a synthetic run. That reply is not this send's delivery: the host's
+    // rejection proves the send never started, so it is held (text kept) instead of failing with
+    // "This turn failed before the assistant could reply."
+    @Test
+    fun otherDevicesStreamingReplyDoesNotTurnTheBusyBounceIntoAGenericFailure() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(sendResults = mutableListOf(true, true))
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = transport, scope = backgroundScope)
+
+        coordinator.send("follow-up").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "iroh-run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "other-msg", contentRaw = JsonPrimitive("working on it"), runId = "local-run-507"),
+                conversationId = "conv-1",
+                turnId = "turn-other-device",
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                "iroh_turn_engine_busy", "An App Server turn is already active for agent-1/conv-1.", "conv-1", "turn-1", null,
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "iroh-run-1", BridgeTurnStatus.Failed))
+
+        assertTrue(timeline.failedLocals.isEmpty(), "the send was never started, so its row is not failed")
+        assertTrue(ui.currentError() != TurnFailureNotices.GENERIC_MESSAGE, "never the generic dead-turn copy")
+        val held = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1"))
+        assertTrue(held.heldByOtherClient, "the send waits for the other device's turn")
+        assertEquals(listOf("follow-up"), held.items.map { it.text })
+    }
+
     @Test
     fun sendQueuedOnTheServerShowsUntilItsOwnTurnStreams() = runTest(UnconfinedTestDispatcher()) {
         val coordinator = coordinator(timeline = RecordingTimelineWriter(), ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)))
