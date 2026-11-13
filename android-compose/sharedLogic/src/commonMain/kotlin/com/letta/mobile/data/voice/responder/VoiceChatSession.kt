@@ -90,13 +90,13 @@ data class SentUtterance(
  * The chat session as the voice responder needs it: sending returns the message's identity, and
  * the state publishes the run each sent message started.
  *
- * No adapter from the app's chat session port exists yet, deliberately: one cannot be written
- * correctly until the chat session itself (1) returns the client message id from a send (today
- * `sendText` returns nothing; the id is chosen internally as the otid in
- * `data/chat/send/ConversationTurnState.kt`), and (2) publishes, per sent message, the provisional
- * and durable ids of the run it started (today the pairing exists only inside
- * `data/chat/send/TurnIdentityLifecycle.kt` and is not on the chat state). Any adapter built
- * without those would have to guess, and guessing speaks other messages' replies.
+ * The app's chat session is adapted by
+ * [com.letta.mobile.data.voice.responder.chat.ChatVoiceChatSession]: the chat page supplies the
+ * rows and the Stop, and an [com.letta.mobile.data.chat.sentruns.IdentifiedChatSend] supplies each
+ * send's otid and the runs the send pipeline pairs with it by identity (the send's echo names its
+ * run; a durable id promoting a provisional one joins it). Nothing in the adapter guesses: a chat
+ * owner that cannot name the message it sent offers no such sender, and then there is no voice
+ * session over it.
  */
 interface VoiceChatSession {
     /** The conversation state. */

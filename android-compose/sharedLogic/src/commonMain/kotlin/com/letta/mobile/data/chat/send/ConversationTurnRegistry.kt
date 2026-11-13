@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.util.attr
+import com.letta.mobile.data.chat.sentruns.SentRunLedger
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -26,6 +27,9 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
     // Also published inside identity.acceptSend; a setter must not acquire the index lock there.
     @Volatile var lastActiveConversationId: String? = null
 
+    /** The runs this pipeline's sends started, shared by every conversation's state. */
+    val sentRuns = SentRunLedger()
+
     /** UI publication is performed by the coordinator after releasing the index lock. */
     data class Binding(val state: ConversationTurnState?, val rekeyedConversationId: ConversationId?)
 
@@ -44,7 +48,7 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
 
     private fun stateForLocked(conversationId: ConversationId): ConversationTurnState {
         val targetId = conversationAliases[conversationId] ?: conversationId
-        val state = turnStates.remove(targetId) ?: ConversationTurnState(targetId.value)
+        val state = turnStates.remove(targetId) ?: ConversationTurnState(targetId.value, sentRuns)
         turnStates[targetId] = state
         evictOverflowStatesLocked(keep = targetId)
         return state
@@ -133,6 +137,7 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
             rekeyedConversation = serverConversation?.let { state.rebindToServerConversationLocked(it, tail) }
             if (tail.turnId != null && state.turnId == null) state.turnId = tail.turnId
             if (tail.runId != null && state.runId == null) state.runId = tail.runId
+            state.bindOwnRun(tail)
             state
         }
 
