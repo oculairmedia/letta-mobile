@@ -53,6 +53,7 @@ import com.letta.mobile.ui.chat.voice.VoiceModeTags
 import com.letta.mobile.ui.chat.voice.voiceErrorText
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_action_dismiss
+import com.letta.mobile.sharedui.resources.voice_action_interrupt
 import com.letta.mobile.sharedui.resources.voice_action_retry
 import com.letta.mobile.sharedui.resources.voice_action_setup
 import com.letta.mobile.sharedui.resources.voice_error_no_conversation
@@ -65,12 +66,14 @@ import com.letta.mobile.sharedui.resources.voice_mode_state_permission
 import com.letta.mobile.sharedui.resources.voice_mode_state_setup
 import com.letta.mobile.sharedui.resources.voice_mode_state_speaking
 import com.letta.mobile.sharedui.resources.voice_mode_state_thinking
+import com.letta.mobile.sharedui.resources.voice_mode_interrupt
 import com.letta.mobile.sharedui.resources.voice_mode_stop
 import com.letta.mobile.sharedui.resources.voice_status_hearing
 import com.letta.mobile.sharedui.resources.voice_status_listening
 import com.letta.mobile.sharedui.resources.voice_status_permission
 import com.letta.mobile.sharedui.resources.voice_status_setup
 import com.letta.mobile.sharedui.resources.voice_status_speaking
+import com.letta.mobile.sharedui.resources.voice_status_speaking_press
 import com.letta.mobile.sharedui.resources.voice_status_thinking
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
@@ -81,14 +84,15 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The chat bar's voice mode button, [size] across with a [iconSize] glyph: off it reads "Start
  * voice conversation"; on (listening, hearing, waiting, speaking) it sits on the primary container,
- * reads "Stop voice conversation" and says which of those it is; after a failure it shows a crossed
+ * reads "Stop voice conversation" ("Stop speaking and listen" while the reply is spoken, since a
+ * press then only interrupts it) and says which of those it is; after a failure it shows a crossed
  * microphone. A press goes to [VoiceModeHandle.press].
  */
 @Composable
 internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, modifier: Modifier = Modifier) {
     val state by handle.controller.state.collectAsState()
     val look = buttonLook(state)
-    val description = stringResource(if (state.active) Res.string.voice_mode_stop else Res.string.voice_mode_start)
+    val description = stringResource(buttonDescription(state))
     val stateText = stringResource(look.state)
     val container by animateColorAsState(look.container, colorSpec(), label = "voiceModeContainer")
     val content by animateColorAsState(look.content, colorSpec(), label = "voiceModeContent")
@@ -111,14 +115,17 @@ internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, mo
 
 /**
  * One compact line directly above the chat bar while voice mode is not off: what it is doing
- * ("Listening…", "Speaking… — talk to interrupt"), or why it stopped with the action that helps
- * (Retry, Set up), and a close control that stops voice mode. The line is a polite live region.
+ * ("Listening…"; while speaking "Speaking… — talk to interrupt", or "— press to interrupt" where
+ * speaking does not interrupt, with an Interrupt action that stops the reply and listens), or why it
+ * stopped with the action that helps (Retry, Set up), and a close control that stops voice mode.
+ * The line is a polite live region.
  */
 @Composable
 internal fun VoiceStatusStrip(handle: VoiceModeHandle, modifier: Modifier = Modifier) {
     val state by handle.controller.state.collectAsState()
+    val byVoice by handle.controller.bargeInByVoice.collectAsState()
     if (state == VoiceModeState.Off) return
-    val line = statusLine(state)
+    val line = statusLine(state, byVoice)
     Surface(
         modifier = modifier.fillMaxWidth().testTag(VoiceModeTags.STRIP),
         shape = RoundedCornerShape(LettaDimens.Radius.md),
@@ -154,6 +161,7 @@ internal fun VoiceStatusStrip(handle: VoiceModeHandle, modifier: Modifier = Modi
 private enum class StripActionKind(val label: StringResource) {
     RETRY(Res.string.voice_action_retry),
     PRESS_AGAIN(Res.string.voice_action_retry),
+    INTERRUPT(Res.string.voice_action_interrupt),
     SETUP(Res.string.voice_action_setup),
 }
 
@@ -164,6 +172,7 @@ private fun StripAction(action: StripActionKind, handle: VoiceModeHandle) {
             when (action) {
                 StripActionKind.RETRY -> handle.controller.retry()
                 StripActionKind.PRESS_AGAIN -> handle.press()
+                StripActionKind.INTERRUPT -> handle.press()
                 StripActionKind.SETUP -> handle.setupOpen = true
             }
         },
@@ -177,17 +186,28 @@ private fun StripAction(action: StripActionKind, handle: VoiceModeHandle) {
 @Immutable
 private class StatusLine(val text: StringResource, val action: StripActionKind? = null, val problem: Boolean = false)
 
-private fun statusLine(state: VoiceModeState): StatusLine = when (state) {
+private fun statusLine(state: VoiceModeState, byVoice: Boolean): StatusLine = when (state) {
     VoiceModeState.Listening -> StatusLine(Res.string.voice_status_listening)
     VoiceModeState.Hearing -> StatusLine(Res.string.voice_status_hearing)
     VoiceModeState.WaitingForReply -> StatusLine(Res.string.voice_status_thinking)
-    VoiceModeState.Speaking -> StatusLine(Res.string.voice_status_speaking)
+    VoiceModeState.Speaking -> StatusLine(speakingHint(byVoice), StripActionKind.INTERRUPT)
     is VoiceModeState.NeedsSetup -> StatusLine(Res.string.voice_status_setup, StripActionKind.SETUP, problem = true)
     VoiceModeState.NeedsMicPermission -> StatusLine(Res.string.voice_status_permission, StripActionKind.PRESS_AGAIN, problem = true)
     VoiceModeState.NeedsConversation -> StatusLine(Res.string.voice_error_no_conversation, problem = true)
     is VoiceModeState.Error -> StatusLine(voiceErrorText(state.code), errorAction(state.code), problem = true)
     is VoiceModeState.TurnFailed -> StatusLine(voiceErrorText(state.code), turnFailureAction(state), problem = true)
     VoiceModeState.Off -> StatusLine(Res.string.voice_mode_state_off)
+}
+
+/** The speaking hint: talking interrupts only where the microphone path allows it; elsewhere a press does. */
+private fun speakingHint(byVoice: Boolean): StringResource =
+    if (byVoice) Res.string.voice_status_speaking else Res.string.voice_status_speaking_press
+
+/** What a press of the button does now: stop the reply and listen while speaking, else start or stop. */
+private fun buttonDescription(state: VoiceModeState): StringResource = when {
+    state == VoiceModeState.Speaking -> Res.string.voice_mode_interrupt
+    state.active -> Res.string.voice_mode_stop
+    else -> Res.string.voice_mode_start
 }
 
 /** Voice mode listens on after a failed utterance: Retry sends it again; pressing the button would stop voice mode. */

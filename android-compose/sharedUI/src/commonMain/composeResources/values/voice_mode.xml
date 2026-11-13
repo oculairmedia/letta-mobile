@@ -3,6 +3,7 @@
     <!-- The chat bar's voice mode button. -->
     <string name="voice_mode_start">Start voice conversation</string>
     <string name="voice_mode_stop">Stop voice conversation</string>
+    <string name="voice_mode_interrupt">Stop speaking and listen</string>
     <string name="voice_mode_sheet_row">Voice conversation</string>
     <string name="voice_mode_state_off">Off</string>
     <string name="voice_mode_state_setup">Needs setup</string>
@@ -18,9 +19,11 @@
     <string name="voice_status_hearing">Hearing you…</string>
     <string name="voice_status_thinking">Thinking…</string>
     <string name="voice_status_speaking">Speaking… — talk to interrupt</string>
+    <string name="voice_status_speaking_press">Speaking… — press to interrupt</string>
     <string name="voice_status_setup">Voice mode needs a speech server and your consent.</string>
     <string name="voice_status_permission">Voice mode needs the microphone. Allow it when asked, or in system settings.</string>
     <string name="voice_action_retry">Retry</string>
+    <string name="voice_action_interrupt">Interrupt</string>
     <string name="voice_action_setup">Set up</string>
     <string name="voice_action_dismiss">Close voice mode</string>
 
@@ -49,6 +52,9 @@
     <string name="voice_settings_key_remove">Remove saved key</string>
     <string name="voice_settings_consent">Send my voice and the replies to this server</string>
     <string name="voice_settings_consent_help">While voice mode is on, recordings of what you say and the text of the agent's replies go to this server to be transcribed and spoken. Nothing is sent until you turn voice mode on.</string>
+    <string name="voice_settings_interrupt">Interrupt by speaking (use headphones)</string>
+    <string name="voice_settings_interrupt_help">Without headphones the microphone hears the replies, and they would interrupt themselves. While this is off, press the voice button to interrupt a reply.</string>
+    <string name="voice_settings_interrupt_builtin">Speaking over a reply interrupts it: this device cancels its own echo.</string>
     <string name="voice_settings_save">Save</string>
     <string name="voice_settings_test">Test</string>
     <string name="voice_settings_testing">Testing…</string>

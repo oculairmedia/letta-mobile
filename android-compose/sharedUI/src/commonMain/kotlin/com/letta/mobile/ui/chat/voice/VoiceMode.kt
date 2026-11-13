@@ -13,6 +13,7 @@ import com.letta.mobile.data.voice.session.VoiceModeController
 import com.letta.mobile.data.voice.session.VoicePress
 import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.data.voice.session.VoiceSetupStore
+import com.letta.mobile.data.voice.session.echoCancelled
 
 /**
  * Voice mode's stored setup and its reachability check, shared by the chat (to start) and the
@@ -21,6 +22,8 @@ import com.letta.mobile.data.voice.session.VoiceSetupStore
 class VoiceSetupAccess(
     /** The stored setup. */
     val store: VoiceSetupStore,
+    /** Whether this platform's voice microphone cancels its own echo (then speaking always interrupts). */
+    val echoCancelled: Boolean = false,
     /** Whether a draft's server answers: null when it does, else why not. */
     val check: suspend (VoiceSetupDraft) -> VoiceErrorCode?,
 )
@@ -44,9 +47,11 @@ val LocalVoiceMode = staticCompositionLocalOf<VoiceModeHandle?> { null }
 @Composable
 fun rememberVoiceSetupAccess(settings: SecureSettingsStore): VoiceSetupAccess? {
     if (!voiceModeSupported) return null
-    return remember(settings) {
+    val audio = rememberVoiceAudio()
+    return remember(settings, audio) {
         val store = VoiceSetupStore(settings = settings, secrets = settings)
-        VoiceSetupAccess(store) { draft -> store.check(draft, newSpeechHttpEngine()) }
+        val echoCancelled = audio?.echoCancelled == true
+        VoiceSetupAccess(store, echoCancelled) { draft -> store.check(draft, newSpeechHttpEngine()) }
     }
 }
 
@@ -59,7 +64,10 @@ class VoiceModeHandle internal constructor(
     /** Whether the Voice settings pane is showing (a press found the setup incomplete). */
     var setupOpen: Boolean by mutableStateOf(false)
 
-    /** The voice button: starts or stops voice mode, or opens the Voice settings when setup is missing. */
+    /**
+     * The voice button: starts or stops voice mode, interrupts the reply while it is spoken, or opens
+     * the Voice settings when setup is missing.
+     */
     fun press() {
         if (controller.press() == VoicePress.OPEN_SETUP) setupOpen = true
     }

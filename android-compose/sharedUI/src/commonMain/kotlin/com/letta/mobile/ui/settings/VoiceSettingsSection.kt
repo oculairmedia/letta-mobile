@@ -19,6 +19,9 @@ import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.voice_settings_consent
 import com.letta.mobile.sharedui.resources.voice_settings_consent_help
+import com.letta.mobile.sharedui.resources.voice_settings_interrupt
+import com.letta.mobile.sharedui.resources.voice_settings_interrupt_builtin
+import com.letta.mobile.sharedui.resources.voice_settings_interrupt_help
 import com.letta.mobile.sharedui.resources.voice_settings_key
 import com.letta.mobile.sharedui.resources.voice_settings_key_remove
 import com.letta.mobile.sharedui.resources.voice_settings_key_saved
@@ -95,8 +98,8 @@ private class VoiceForm(private val access: VoiceSetupAccess, url: String, conse
  * The Voice section: the speech server's URL (validated by the endpoint client's own rules, its
  * problem shown under the field), an optional API key where the platform keeps keys in its secure
  * store (typed keys live only in memory until saved, never in saved UI state), the plain-language
- * consent to send audio and reply text to that server, Save, and a Test that only checks the server
- * answers. [onSaved] hears each successful save, with whether voice mode can now start.
+ * consent to send audio and reply text to that server, whether speaking over a reply interrupts it,
+ * Save, and a Test that only checks the server answers. [onSaved] hears each successful save, with whether voice mode can now start.
  */
 @Composable
 fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier, onSaved: ((ready: Boolean) -> Unit)? = null) {
@@ -112,6 +115,7 @@ fun VoiceSettingsSection(access: VoiceSetupAccess, modifier: Modifier = Modifier
     SettingsSection(header, modifier) {
         VoiceAddressRows(form, keepsKey = access.store.keepsApiKey, keySaved = keySaved)
         VoiceConsentRow(form)
+        VoiceInterruptRow(access, stored.interruptBySpeaking)
         VoiceActionRow(form, keySaved, onSaved)
         form.outcome?.let { NoteRow(SettingsRow.Note(VoiceSettingsKeys.STATUS, SettingsStatus(stringResource(it.message), it.tone))) }
     }
@@ -146,6 +150,28 @@ private fun SettingsScope.VoiceConsentRow(form: VoiceForm) {
         checked = form.consent,
         supporting = stringResource(Res.string.voice_settings_consent_help),
     ) { checked -> form.edit { consent = checked } }
+    ToggleRow(row)
+}
+
+/**
+ * Whether speaking over a reply interrupts it. Where the microphone cancels its own echo it always
+ * does, and this is only a note; elsewhere it is off by default (the replies would interrupt
+ * themselves through the speakers) and the person can turn it on when they use headphones. It is
+ * stored at once, apart from Save, and applies from the next start of voice mode.
+ */
+@Composable
+private fun SettingsScope.VoiceInterruptRow(access: VoiceSetupAccess, enabled: Boolean) {
+    if (access.echoCancelled) {
+        val note = SettingsStatus(stringResource(Res.string.voice_settings_interrupt_builtin))
+        NoteRow(SettingsRow.Note(VoiceSettingsKeys.INTERRUPT, note))
+        return
+    }
+    val row = SettingsRow.Toggle(
+        key = VoiceSettingsKeys.INTERRUPT,
+        title = stringResource(Res.string.voice_settings_interrupt),
+        checked = enabled,
+        supporting = stringResource(Res.string.voice_settings_interrupt_help),
+    ) { checked -> access.store.setInterruptBySpeaking(checked) }
     ToggleRow(row)
 }
 

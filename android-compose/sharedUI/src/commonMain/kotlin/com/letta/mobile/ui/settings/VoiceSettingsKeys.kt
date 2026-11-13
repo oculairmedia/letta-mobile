@@ -14,6 +14,9 @@ object VoiceSettingsKeys {
     /** The consent toggle. */
     const val CONSENT: String = "voice-consent"
 
+    /** Interrupting replies by speaking: a toggle, or a note where the microphone cancels its own echo. */
+    const val INTERRUPT: String = "voice-interrupt"
+
     /** The Save button. */
     const val SAVE: String = "voice-save"
 
