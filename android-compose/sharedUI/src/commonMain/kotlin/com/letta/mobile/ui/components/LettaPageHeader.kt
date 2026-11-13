@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -107,18 +106,26 @@ private fun PageTitleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        title?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() }.testTag(LETTA_PAGE_TITLE_TAG),
-            )
+        // The title and context share what the actions leave: the actions are measured at their own
+        // width first, and a long title (or enlarged text) ellipsizes instead of pushing them out.
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        ) {
+            title?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).semantics { heading() }.testTag(LETTA_PAGE_TITLE_TAG),
+                )
+            }
+            context?.invoke()
         }
-        Box(Modifier.weight(1f)) { context?.invoke() }
         iconActions()
         primaryAction?.let { PagePrimaryButton(it) }
     }

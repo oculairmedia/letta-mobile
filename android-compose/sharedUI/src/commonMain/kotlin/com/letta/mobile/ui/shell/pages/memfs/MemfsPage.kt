@@ -19,6 +19,7 @@ import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.memory.memfs.MemfsPageState
 import com.letta.mobile.data.memory.memfs.MemfsTab
+import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -137,6 +138,9 @@ private fun WideMemfsLayout(page: MemfsPageScope) {
 private fun CompactMemfsLayout(page: MemfsPageScope) {
     Column(Modifier.fillMaxSize()) {
         if (page.showsDetail) {
+            // The open file replaces the list and its header, but not the host's controls: the Memory
+            // destination's Blocks | Files switch stays reachable without closing the file first.
+            if (page.options.headerControls != null) LettaPageHeader(title = null, controls = page.options.headerControls)
             MemfsDetailPane(page)
         } else {
             MemfsHeader(page)

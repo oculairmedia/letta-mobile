@@ -2,6 +2,9 @@
 
 package com.letta.mobile.ui.components
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -90,6 +93,31 @@ class LettaPageHeaderTest {
             }
         }
     }
+
+    @Test
+    fun aLongTitleInEnlargedTextEllipsizesAndNeverPushesTheActionsOutOnACompactPointerPage() =
+        runDesktopComposeUiTest(width = 360, height = HEIGHT) {
+            setContent {
+                MaterialTheme {
+                    CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
+                        ProvideLettaHost(LettaHost.Pointer) {
+                            LettaPageHeader(
+                                title = "Schedules for every agent on this backend",
+                                primaryAction = LettaMenuItem(label = "New", onClick = {}),
+                                refresh = { LettaRefreshAction(refreshing = false, onRefresh = {}, modifier = Modifier.testTag(REFRESH)) },
+                            )
+                        }
+                    }
+                }
+            }
+            val title = bounds(LETTA_PAGE_TITLE_TAG)
+            val refresh = bounds(REFRESH)
+            val action = bounds(ACTION)
+            assertTrue(title.right <= refresh.left, "the title stops before refresh: $title $refresh")
+            assertTrue(refresh.right - refresh.left >= 40.dp, "refresh keeps its width: $refresh")
+            assertTrue(refresh.right <= action.left, "refresh then the action: $refresh $action")
+            assertEquals(360.dp - GUTTER_COMPACT, action.right, "the action still ends on the page gutter")
+        }
 
     private fun ComposeUiTest.assertRowsFollowInOrder(above: androidx.compose.ui.unit.Dp) {
         val controls = bounds(CONTROLS)

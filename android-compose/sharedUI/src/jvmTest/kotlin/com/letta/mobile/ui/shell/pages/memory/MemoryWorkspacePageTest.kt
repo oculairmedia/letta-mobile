@@ -20,6 +20,7 @@ import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.data.memory.memfs.MemfsEditor
 import com.letta.mobile.data.memory.memfs.MemfsFile
 import com.letta.mobile.data.memory.memfs.MemfsFileKind
 import com.letta.mobile.data.memory.memfs.MemfsLoad
@@ -49,7 +50,7 @@ class MemoryWorkspacePageTest {
         files = listOf(MemfsFile("system/persona.md", isSystem = true, description = null, sizeBytes = 12, kind = MemfsFileKind.Markdown)),
     )
 
-    private fun ComposeUiTest.show(view: MemoryWorkspaceView, host: LettaHost = LettaHost.Touch) {
+    private fun ComposeUiTest.show(view: MemoryWorkspaceView, host: LettaHost = LettaHost.Touch, files: MemfsPageState = this@MemoryWorkspacePageTest.files) {
         val binding = MemoryWorkspaceBinding(
             memory = MemoryPageState(),
             memoryActions = recording(),
@@ -121,5 +122,15 @@ class MemoryWorkspacePageTest {
     fun onAPointerHostBlocksKeepsItsRefreshButton() = runComposeUiTest {
         show(MemoryWorkspaceView.Blocks, LettaHost.Pointer)
         onAllNodesWithContentDescription("Refresh").assertCountEquals(1)
+    }
+
+    @Test
+    fun onAPhoneAnOpenFileKeepsTheBlocksFilesSwitchAboveIt() = runComposeUiTest {
+        val editor = MemfsEditor("system/persona.md", original = "a", draft = "a", loading = false)
+        show(MemoryWorkspaceView.Files, files = files.copy(editor = editor))
+
+        onNodeWithTag(MemfsPageTags.SEARCH).assertDoesNotExist()
+        onNodeWithTag(MemoryWorkspaceTags.view(MemoryWorkspaceView.Blocks)).assertExists()
+        onNodeWithTag(MemoryWorkspaceTags.view(MemoryWorkspaceView.Files)).assertExists()
     }
 }
