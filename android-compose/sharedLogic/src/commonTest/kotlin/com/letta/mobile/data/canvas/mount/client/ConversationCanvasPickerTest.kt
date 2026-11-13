@@ -75,6 +75,53 @@ class ConversationCanvasPickerTest {
     }
 
     @Test
+    fun aBoardThatCannotSaveKeepsTheMountTheBoardAndTheToolsWhereTheyWere() = runTest {
+        val client = FakeCanvasMountClient()
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(client))
+        var saves = false
+        val switch = ConversationBoardSwitch(CanvasBoardSwitchGate().apply { attach { saves } })
+        picker.focus.enter(target)
+        picker.focus.show(target, switch)
+
+        assertEquals(CanvasPick.Unsaved, picker.pick(foreign))
+        assertEquals(CanvasPick.Unsaved, picker.useOwnCanvas())
+        assertEquals(0, client.writes)
+        assertNull(picker.resolver.mountedCanvas(target.agentId, target.conversationId))
+
+        saves = true
+        assertIs<CanvasPick.Mounted>(picker.pick(foreign))
+        assertEquals(foreign, client.stored[target])
+    }
+
+    @Test
+    fun theBoardOnShowIsTheOneSwitchedToNotTheMountAskedFor() = runTest {
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(FakeCanvasMountClient()))
+        var saves = false
+        val switch = ConversationBoardSwitch(CanvasBoardSwitchGate().apply { attach { saves } })
+        picker.focus.show(target, switch)
+        val mounted = ConversationCanvasState.Mounted(foreign, CanvasMountSource.Binding)
+
+        assertFalse(switch.follow(mounted))
+        assertNull(picker.focus.shownBoard.first())
+
+        saves = true
+        assertTrue(switch.follow(mounted))
+        assertEquals(foreign, picker.focus.shownBoard.first())
+        picker.focus.hide(target)
+        assertNull(picker.focus.shownBoard.first())
+    }
+
+    @Test
+    fun leavingThePageDropsItsBoardSeat() = runTest {
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(FakeCanvasMountClient()))
+        val switch = ConversationBoardSwitch(CanvasBoardSwitchGate().apply { attach { false } })
+        picker.focus.show(target, switch)
+        picker.focus.hide(target)
+        picker.focus.show(target)
+        assertIs<CanvasPick.Mounted>(picker.pick(foreign))
+    }
+
+    @Test
     fun leavingCanvasModeKeepsANewerConversation() {
         val focus = CanvasModeFocus()
         val other = target.copy(conversationId = ConversationId("conv-2"))

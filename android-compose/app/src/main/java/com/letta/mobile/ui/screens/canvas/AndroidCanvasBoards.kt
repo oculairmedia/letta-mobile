@@ -19,7 +19,16 @@ class AndroidCanvasBoards @Inject constructor(
     factory: Provider<CanvasBoardSessions>,
     lifecycle: ActivityRetainedLifecycle,
 ) : CanvasBoardOwner(factory::get) {
-    val mounts: CanvasMountClient = DeviceFallbackCanvasMountClient(CanvasMountClient.Unsupported)
+    private var held: Pair<Long, CanvasMountClient>? = null
 
     init { lifecycle.addOnClearedListener(::close) }
+
+    /**
+     * The window's canvas mounts for the boards of [generation] ([context]'s): the same ones across a
+     * configuration change, and none carried over to a new backend, whose conversations may share
+     * ids with the last one's but not its canvases.
+     */
+    fun mounts(generation: Long): CanvasMountClient =
+        held?.takeIf { it.first == generation }?.second
+            ?: DeviceFallbackCanvasMountClient(CanvasMountClient.Unsupported).also { held = generation to it }
 }

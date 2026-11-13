@@ -38,6 +38,9 @@ class ConversationBoardSwitch(private val gate: CanvasBoardSwitchGate) {
     /** The mounted board on show, or null for the conversation's own board. */
     val shown: StateFlow<CanvasId?> = showing.asStateFlow()
 
+    /** Saves the board on screen before something else switches it; false when the save failed and the board must stay. */
+    suspend fun save(): Boolean = gate.prepare()
+
     /** Moves to the board [state] asks for; false when the current board could not be saved first. */
     suspend fun follow(state: ConversationCanvasState): Boolean {
         if (state == ConversationCanvasState.Resolving) return true

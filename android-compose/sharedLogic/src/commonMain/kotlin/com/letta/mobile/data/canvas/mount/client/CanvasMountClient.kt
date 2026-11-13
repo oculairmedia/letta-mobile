@@ -27,7 +27,9 @@ import kotlinx.coroutines.flow.flowOf
  *   `canvas.mount.invalid_input:<field>:<code>` to [CanvasMountProblem.InvalidInput], the answers
  *   `unavailable{reason}` to [CanvasMountProblem.Unavailable] and `outcome_unknown` (or a lost
  *   connection after the request was sent) to [CanvasMountProblem.OutcomeUnknown];
- * - feed [changes] from the host's change notification when it has one, else return an empty flow;
+ * - feed [changes] from the host's change notification when it has one, else return an empty flow:
+ *   each emission is the board the conversation shows after the change, its own canvas
+ *   ([ConversationCanvasTarget.ownCanvas]) once nothing is mounted for it;
  * - keep the default [reach]: a host's mount reaches every paired device and the agent's tools.
  * It must never throw for a host answer; cancellation propagates.
  *
@@ -41,13 +43,20 @@ interface CanvasMountClient {
     /** Which canvas the host has mounted for [target]. */
     suspend fun resolve(target: ConversationCanvasTarget): CanvasMountLookup
 
+    /**
+     * [resolve], answered only by mounts that reach the host (every paired device and the agent's
+     * tools). Mounts held on this device answer [CanvasMountUnavailableReason.DeviceOnly] instead, so
+     * the agent's tools and the confirmation of a host write never take a device-only answer.
+     */
+    suspend fun resolveOnHost(target: ConversationCanvasTarget): CanvasMountLookup = resolve(target)
+
     /** Mounts [canvas] for [target] only, replacing whatever it showed. */
     suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange
 
     /** Puts [target] back on its own board. */
     suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange
 
-    /** Mounts the host pushes for [target] after this call; empty when the host pushes none. */
+    /** The board [target] shows after each change the host pushes after this call (its own canvas once unmounted); empty when the host pushes none. */
     fun changes(target: ConversationCanvasTarget): Flow<CanvasId>
 
     /** Who the mounts this client reports reach: the host (every device and the agent's tools) or this device only. */

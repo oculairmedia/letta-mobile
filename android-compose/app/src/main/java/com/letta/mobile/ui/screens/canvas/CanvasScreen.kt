@@ -39,7 +39,7 @@ internal fun AndroidCanvasHost(
     // device's until the host's mount client is wired). A new backend starts the picker over.
     val picker = remember(context.generation) {
         com.letta.mobile.data.canvas.mount.client.ConversationCanvasPicker(
-            com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver(owner.mounts),
+            com.letta.mobile.data.canvas.mount.client.ConversationCanvasResolver(owner.mounts(context.generation)),
         )
     }
     androidx.compose.runtime.CompositionLocalProvider(

@@ -41,6 +41,8 @@ data class ShellCanvasMountState(
     val mountsOnPick: Boolean = false,
     /** The canvas mounted for the conversation on screen; null while it shows its own. */
     val mounted: CanvasId? = null,
+    /** The conversation on screen's own canvas, the one the way back returns to; null with none on screen. */
+    val own: CanvasId? = null,
     /** The mount is held on this device only (a host without mounts); the agent's tools keep the conversation's own canvas. */
     val deviceOnly: Boolean = false,
     /**
@@ -57,6 +59,9 @@ enum class ShellCanvasPickOutcome {
 
     /** The conversation's board switched. */
     Mounted,
+
+    /** The board on screen could not be saved first, so it stays and nothing switched. */
+    Unsaved,
 
     /** This device may not switch this conversation's canvas. */
     Denied,

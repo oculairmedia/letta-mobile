@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.update
  * session), one per conversation ([ConversationCanvasTarget]). It stands in for a host without
  * mounts so a pick still swaps the board on screen; it reaches nothing else, so its [reach] is
  * [CanvasMountReach.Device]: other devices and the agent's canvas tools keep the conversation's own
- * canvas. It always answers and never fails.
+ * canvas, and it answers [resolveOnHost] with [CanvasMountUnavailableReason.DeviceOnly]. Its writes
+ * always answer and never fail.
  */
 class DeviceCanvasMountClient : CanvasMountClient {
     private val held = MutableStateFlow<Map<ConversationCanvasTarget, CanvasId>>(emptyMap())
@@ -28,6 +29,9 @@ class DeviceCanvasMountClient : CanvasMountClient {
 
     override suspend fun resolve(target: ConversationCanvasTarget): CanvasMountLookup =
         held.value[target]?.let { CanvasMountLookup.Found(it, CanvasMountSource.Binding) } ?: CanvasMountLookup.None
+
+    /** This device's mounts say nothing about the host's. */
+    override suspend fun resolveOnHost(target: ConversationCanvasTarget): CanvasMountLookup = DEVICE_ONLY
 
     /** Mounting the conversation's own canvas is the same as [unmount]. */
     override suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange {
@@ -44,4 +48,8 @@ class DeviceCanvasMountClient : CanvasMountClient {
     /** [target]'s board after each change made after this call (its own canvas once unmounted). */
     override fun changes(target: ConversationCanvasTarget): Flow<CanvasId> =
         held.map { it[target] ?: target.ownCanvas }.distinctUntilChanged().drop(1)
+
+    private companion object {
+        val DEVICE_ONLY = CanvasMountLookup.Failed(CanvasMountProblem.Unavailable(CanvasMountUnavailableReason.DeviceOnly))
+    }
 }

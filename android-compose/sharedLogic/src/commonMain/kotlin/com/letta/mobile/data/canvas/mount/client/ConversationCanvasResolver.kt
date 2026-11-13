@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -42,10 +41,12 @@ val ConversationCanvasState.mountedCanvas: CanvasId? get() = (this as? Conversat
  * Opening a conversation never waits on the host: [state] starts at
  * [ConversationCanvasState.Resolving] (the own board shows) and moves on when the host answers.
  * A conversation is resolved again each time it is observed and after each of this app's own
- * writes; a change the host pushes ([CanvasMountClient.changes]) is taken as it arrives. An answer
- * of `outcome_unknown` is never trusted: the conversation is resolved again.
+ * writes; a change the host pushes ([CanvasMountClient.changes]) is taken in turn with them, and
+ * only while the host offers mounts. An answer of `outcome_unknown` is never trusted: the
+ * conversation is resolved again, and only the host's own answer confirms the write.
  *
- * Calls are serialized, so a slow answer that was asked before a write can never overwrite it.
+ * Calls are serialized, so a slow answer that was asked before a write or a pushed change can never
+ * overwrite it.
  * One instance per window (and the tools it serves), so every view agrees.
  */
 class ConversationCanvasResolver(private val client: CanvasMountClient) {
@@ -71,12 +72,14 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
 
     /**
      * The canvas mounted for [conversationId] of [agentId] now, asking the host; null for its own board.
-     * The agent's canvas tools ask this, so a mount held on this device only ([CanvasMountReach.Device])
-     * answers null: the tools keep the conversation's own canvas, as the screen tells the person.
+     * The agent's canvas tools ask this, so only the host's answer counts ([CanvasMountClient.resolveOnHost]):
+     * a mount held on this device only answers null, even when the host drops in the middle of the
+     * question, and the tools keep the conversation's own canvas, as the screen tells the person.
      */
     suspend fun mountedCanvas(agentId: AgentId, conversationId: ConversationId): CanvasId? {
-        if (client.reach.first() == CanvasMountReach.Device) return null
-        return refresh(ConversationCanvasTarget(agentId, conversationId)).mountedCanvas
+        if (!client.supported.value) return null
+        val target = ConversationCanvasTarget(agentId, conversationId)
+        return stateOf(target, lookup(target, client::resolveOnHost)).mountedCanvas
     }
 
     /** Asks the host for [target]'s board now and publishes the answer. */
@@ -90,9 +93,12 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
     suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange =
         write(target, target.ownCanvas) { client.unmount(target) }
 
-    /** Takes a mount the host pushed for [target]. */
-    fun accept(target: ConversationCanvasTarget, canvas: CanvasId) {
-        publish(target, stateOf(target, CanvasMountLookup.Found(canvas, CanvasMountSource.Binding)))
+    /**
+     * Takes the board the host pushed for [target] (its own canvas once unmounted), in turn with
+     * lookups and writes; ignored once the host no longer offers mounts.
+     */
+    suspend fun accept(target: ConversationCanvasTarget, canvas: CanvasId) = turn.withLock {
+        if (client.supported.value) publish(target, stateOf(target, CanvasMountLookup.Found(canvas, CanvasMountSource.Binding)))
     }
 
     private suspend fun write(
@@ -113,12 +119,17 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
         refreshLocked(target, keep = true)
     }
 
-    /** After an unknown outcome, what the host now holds decides whether the write landed. */
+    /**
+     * After an unknown outcome, what the host now holds decides whether the write landed. Only the
+     * host's own answer confirms it: when the host cannot say (or has gone, leaving this device's
+     * mounts to answer) the outcome stays unknown and the board shows whatever answers now.
+     */
     private suspend fun settle(target: ConversationCanvasTarget, wanted: CanvasId, failed: CanvasMountChange.Failed): CanvasMountChange {
         if (failed.problem != CanvasMountProblem.OutcomeUnknown) return failed
-        val now = refreshLocked(target, keep = false)
-        val shown = shownCanvas(target, now)
-        return if (shown == wanted) CanvasMountChange.Applied(wanted) else failed
+        val held = lookup(target, client::resolveOnHost)
+        if (held is CanvasMountLookup.Failed) return failed.also { refreshLocked(target, keep = false) }
+        val now = stateOf(target, held).also { publish(target, it) }
+        return if (shownCanvas(target, now) == wanted) CanvasMountChange.Applied(wanted) else failed
     }
 
     /** [keep]: a failed answer leaves what is known (after this app's own write) instead of falling back. */
@@ -129,9 +140,12 @@ class ConversationCanvasResolver(private val client: CanvasMountClient) {
         return stateOf(target, answer).also { publish(target, it) }
     }
 
-    private suspend fun lookup(target: ConversationCanvasTarget): CanvasMountLookup {
+    private suspend fun lookup(
+        target: ConversationCanvasTarget,
+        ask: suspend (ConversationCanvasTarget) -> CanvasMountLookup = client::resolve,
+    ): CanvasMountLookup {
         repeat(ASKS) {
-            val answer = client.resolve(target)
+            val answer = ask(target)
             if (answer != OUTCOME_UNKNOWN) return answer
         }
         return CanvasMountLookup.Failed(CanvasMountProblem.Unavailable(CanvasMountUnavailableReason.StillUnknown))

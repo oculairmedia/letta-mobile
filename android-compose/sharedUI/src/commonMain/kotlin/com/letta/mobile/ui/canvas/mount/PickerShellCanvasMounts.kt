@@ -31,6 +31,7 @@ class PickerShellCanvasMounts(private val picker: ConversationCanvasPicker) : Sh
         fun menuStateOf(state: CanvasPickerState): ShellCanvasMountState = ShellCanvasMountState(
             mountsOnPick = state.mountsOnPick,
             mounted = state.mounted,
+            own = state.target?.ownCanvas,
             deviceOnly = state.reach == CanvasMountReach.Device,
             notForPane = setOfNotNull(state.target?.ownCanvas, state.onBoard),
         )
@@ -38,6 +39,7 @@ class PickerShellCanvasMounts(private val picker: ConversationCanvasPicker) : Sh
         fun outcomeOf(pick: CanvasPick): ShellCanvasPickOutcome = when (pick) {
             CanvasPick.OpenAsBefore -> ShellCanvasPickOutcome.OpenAsBefore
             is CanvasPick.Mounted -> ShellCanvasPickOutcome.Mounted
+            CanvasPick.Unsaved -> ShellCanvasPickOutcome.Unsaved
             is CanvasPick.Failed -> outcomeOf(pick.problem)
         }
 

@@ -253,6 +253,36 @@ class ShellCanvasPickTest {
     }
 
     @Test
+    fun theWayBackTellsTheHostAsAPickDoes() = runComposeUiTest {
+        val mounts = TestHostMounts(supported = true).apply { stored[target] = boardB }
+        val picker = picker(mounts).apply { focus.enter(target) }
+        val opened = Opened()
+        setContent { Panel(picker, opened) }
+        waitForIdle()
+
+        onNodeWithTag(ShellCanvasTags.USE_OWN).performClick()
+        waitForIdle()
+
+        assertEquals(target.ownCanvas, mounts.stored[target])
+        // The phone's drawer closes on this, as after a pick, so the restored board is in view.
+        assertEquals(1, opened.mounted)
+    }
+
+    @Test
+    fun theWayBackStaysWhenTheMountedCanvasHasNoRow() = runComposeUiTest {
+        val mounts = TestHostMounts(supported = true).apply { stored[target] = CanvasId("canvas-archived") }
+        val picker = picker(mounts).apply { focus.enter(target) }
+        setContent { Panel(picker, Opened()) }
+        waitForIdle()
+
+        onNodeWithTag(ShellCanvasTags.USE_OWN).performClick()
+        waitForIdle()
+
+        assertEquals(target.ownCanvas, mounts.stored[target])
+        onNodeWithTag(ShellCanvasTags.USE_OWN).assertDoesNotExist()
+    }
+
+    @Test
     fun aRefusedPickIsToldInPlainWordsAndTheBoardStays() = runComposeUiTest {
         val mounts = TestHostMounts(supported = true).apply { refusal = CanvasMountProblem.Denied }
         val picker = picker(mounts).apply { focus.enter(target) }

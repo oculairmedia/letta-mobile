@@ -62,6 +62,9 @@ value class CanvasMountUnavailableReason(val value: String) {
 
         /** The host's answer stayed unknown after asking again. */
         val StillUnknown: CanvasMountUnavailableReason = CanvasMountUnavailableReason("outcome_unknown")
+
+        /** The mounts answering are held on this device only, so they say nothing about the host's. */
+        val DeviceOnly: CanvasMountUnavailableReason = CanvasMountUnavailableReason("device_only")
     }
 }
 

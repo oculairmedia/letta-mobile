@@ -3,13 +3,17 @@ package com.letta.mobile.data.canvas.mount.client
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 /** Which board a conversation shows: the host's mount when it offers one, else the conversation's own. */
 class ConversationCanvasResolverTest {
@@ -155,5 +159,68 @@ class ConversationCanvasResolverTest {
         val resolver = ConversationCanvasResolver(FakeCanvasMountClient())
         resolver.accept(target, foreign)
         assertEquals(foreign, resolver.current(target).mountedCanvas)
+    }
+
+    @Test
+    fun aPushedClearPutsTheConversationBackOnItsOwnBoard() = runTest {
+        val resolver = ConversationCanvasResolver(FakeCanvasMountClient())
+        resolver.accept(target, foreign)
+        resolver.accept(target, target.ownCanvas)
+        assertEquals(ConversationCanvasState.Own, resolver.current(target))
+    }
+
+    @Test
+    fun aPushThatArrivesDuringALookupIsNotOverwrittenByTheOlderAnswer() = runTest {
+        val slow = CompletableDeferred<Unit>()
+        val client = FakeCanvasMountClient().apply {
+            slowResolve = slow
+            answers.add(CanvasMountLookup.Found(CanvasId("canvas-before"), CanvasMountSource.Binding))
+        }
+        val resolver = ConversationCanvasResolver(client)
+        val lookup = launch { resolver.refresh(target) }
+        runCurrent()
+        val push = launch { resolver.accept(target, foreign) }
+        runCurrent()
+        slow.complete(Unit)
+        lookup.join()
+        push.join()
+        assertEquals(foreign, resolver.current(target).mountedCanvas)
+    }
+
+    @Test
+    fun aPushAfterTheHostStopsOfferingMountsIsIgnored() = runTest {
+        val client = FakeCanvasMountClient()
+        val resolver = ConversationCanvasResolver(client)
+        client.support.value = false
+        assertEquals(ConversationCanvasState.Own, resolver.refresh(target))
+        resolver.accept(target, foreign)
+        assertEquals(ConversationCanvasState.Own, resolver.current(target))
+    }
+
+    @Test
+    fun anUnknownHostWriteIsNotConfirmedByThisDevicesMounts() = runTest {
+        val host = FakeCanvasMountClient().apply { stored[target] = foreign }
+        val resolver = ConversationCanvasResolver(DeviceFallbackCanvasMountClient(host))
+        assertEquals(foreign, resolver.refresh(target).mountedCanvas)
+        host.writeAnswers.add(CanvasMountChange.Failed(CanvasMountProblem.OutcomeUnknown))
+        // The host drops while the unmount is on its way; this device holds no mount, so it would answer "own".
+        host.onWrite = { host.support.value = false }
+
+        val change = resolver.unmount(target)
+
+        assertEquals(CanvasMountProblem.OutcomeUnknown, assertIs<CanvasMountChange.Failed>(change).problem)
+    }
+
+    @Test
+    fun theAgentsToolsNeverTakeAMountHeldOnThisDevice() = runTest {
+        val host = FakeCanvasMountClient(supported = false)
+        val resolver = ConversationCanvasResolver(DeviceFallbackCanvasMountClient(host))
+        assertIs<CanvasMountChange.Applied>(resolver.mount(target, foreign))
+        assertEquals(foreign, resolver.current(target).mountedCanvas)
+        assertNull(resolver.mountedCanvas(target.agentId, target.conversationId))
+
+        host.stored[target] = CanvasId("canvas-on-host")
+        host.support.value = true
+        assertEquals(CanvasId("canvas-on-host"), resolver.mountedCanvas(target.agentId, target.conversationId))
     }
 }

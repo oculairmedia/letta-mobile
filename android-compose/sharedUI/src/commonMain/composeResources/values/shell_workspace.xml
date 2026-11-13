@@ -25,4 +25,5 @@
     <string name="shell_canvas_mount_invalid">That canvas can’t be used here.</string>
     <string name="shell_canvas_mount_unavailable">Couldn’t switch the canvas right now. Try again.</string>
     <string name="shell_canvas_mount_unknown">Couldn’t confirm the canvas switch. The board shows what the host has.</string>
+    <string name="shell_canvas_mount_unsaved">Couldn’t save this board, so it stays. Try again.</string>
 </resources>

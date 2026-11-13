@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -9,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.ArrowDown
@@ -22,6 +24,7 @@ import com.letta.mobile.sharedui.resources.shell_canvas_mount_denied
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_invalid
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_unavailable
 import com.letta.mobile.sharedui.resources.shell_canvas_mount_unknown
+import com.letta.mobile.sharedui.resources.shell_canvas_mount_unsaved
 import com.letta.mobile.sharedui.resources.shell_canvas_new
 import com.letta.mobile.sharedui.resources.shell_canvas_open_in_pane
 import com.letta.mobile.sharedui.resources.shell_canvas_use_own
@@ -80,7 +83,7 @@ internal class ShellCanvasPicks(
         val window = mounts ?: return actions.onOpenCanvas(canvas)
         when (window.pickPlan()) {
             ShellCanvasPickPlan.Open -> actions.onOpenCanvas(canvas)
-            ShellCanvasPickPlan.Mount -> scope.launch { report(window.pick(canvas), canvas) }
+            ShellCanvasPickPlan.Mount -> scope.launch { report(window.pick(canvas), canvas, onOpenAsBefore = canvas) }
             ShellCanvasPickPlan.OpenAndMount -> scope.launch { openAndMount(window, canvas) }
         }
     }
@@ -90,10 +93,10 @@ internal class ShellCanvasPicks(
         actions.onOpenCanvasInPane?.invoke(canvas)
     }
 
-    /** "Use this conversation's own canvas" on the mounted row. */
-    fun useOwn() {
+    /** "Use this conversation's own canvas" ([own]): once back on it the host is told, as after a pick. */
+    fun useOwn(own: CanvasId) {
         val window = mounts ?: return
-        scope.launch { report(window.useOwn(), canvas = null) }
+        scope.launch { report(window.useOwn(), own, onOpenAsBefore = null) }
     }
 
     /**
@@ -105,11 +108,12 @@ internal class ShellCanvasPicks(
         actions.onOpenCanvas(canvas)
     }
 
-    private suspend fun report(outcome: ShellCanvasPickOutcome, canvas: CanvasId?) {
+    /** [onBoard] is the board on show after a switch; [onOpenAsBefore] what opens once no conversation is on screen. */
+    private suspend fun report(outcome: ShellCanvasPickOutcome, onBoard: CanvasId, onOpenAsBefore: CanvasId?) {
         when (outcome) {
             // The conversation left the screen while the pick was on its way: open it as a pick without one does.
-            ShellCanvasPickOutcome.OpenAsBefore -> canvas?.let(actions.onOpenCanvas)
-            ShellCanvasPickOutcome.Mounted -> canvas?.let(actions.onCanvasMounted)
+            ShellCanvasPickOutcome.OpenAsBefore -> onOpenAsBefore?.let(actions.onOpenCanvas)
+            ShellCanvasPickOutcome.Mounted -> actions.onCanvasMounted(onBoard)
             else -> notify(outcome)
         }
     }
@@ -126,24 +130,48 @@ internal class ShellCanvasPicks(
             ShellCanvasPickOutcome.Invalid -> Res.string.shell_canvas_mount_invalid
             ShellCanvasPickOutcome.Unavailable -> Res.string.shell_canvas_mount_unavailable
             ShellCanvasPickOutcome.Unknown -> Res.string.shell_canvas_mount_unknown
+            ShellCanvasPickOutcome.Unsaved -> Res.string.shell_canvas_mount_unsaved
             else -> null
         }
     }
 }
 
 /**
- * A canvas row menu's extras: the way back's label while a conversation is on screen, and
- * "Open in side panel"'s where the window is wide enough for a side pane and the host has one
- * (null hides each), with the canvases the latter leaves out.
+ * A canvas row menu's extras: the way back's label while a conversation is on screen (to its [own]
+ * canvas), and "Open in side panel"'s where the window is wide enough for a side pane and the host
+ * has one (null hides each), with the canvases the latter leaves out.
  */
-internal class ShellCanvasMenu(val useOwnLabel: String?, val paneLabel: String?, val notForPane: Set<CanvasId>)
+internal class ShellCanvasMenu(val useOwnLabel: String?, val paneLabel: String?, val notForPane: Set<CanvasId>, val own: CanvasId?)
 
 @Composable
 internal fun rememberCanvasMenu(mounts: ShellCanvasMountState, actions: ShellAgentPanelActions): ShellCanvasMenu {
     val useOwn = stringResource(Res.string.shell_canvas_use_own).takeIf { mounts.mountsOnPick }
     val wide = currentPaneWindowClass() == PaneWindowClass.Wide
     val pane = stringResource(Res.string.shell_canvas_open_in_pane).takeIf { wide }?.takeIf { actions.onOpenCanvasInPane != null }
-    return remember(useOwn, pane, mounts.notForPane) { ShellCanvasMenu(useOwn, pane, mounts.notForPane) }
+    return remember(useOwn, pane, mounts.notForPane, mounts.own) { ShellCanvasMenu(useOwn, pane, mounts.notForPane, mounts.own) }
+}
+
+/**
+ * The way back to the conversation's own canvas when the mounted canvas has no row in [canvases]
+ * (filtered out, or not in the library), so it is never lost; null while the mounted row offers it.
+ */
+internal fun strayWayBack(canvases: List<ShellCanvasRowModel>, mounts: ShellCanvasMountState, picks: ShellCanvasPicks): (() -> Unit)? {
+    val own = mounts.own?.takeIf { mounts.mounted != null } ?: return null
+    return if (canvases.any { it.mounted }) null else ({ picks.useOwn(own) })
+}
+
+/** The Canvases header's end: the [wayBack] when the mounted canvas has no row, then New canvas; null with neither. */
+internal fun canvasHeaderEnd(onNewCanvas: (() -> Unit)?, wayBack: (() -> Unit)?): (@Composable () -> Unit)? {
+    if (onNewCanvas == null && wayBack == null) return null
+    return { CanvasHeaderButtons(onNewCanvas, wayBack) }
+}
+
+@Composable
+private fun CanvasHeaderButtons(onNewCanvas: (() -> Unit)?, wayBack: (() -> Unit)?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        wayBack?.let { UseOwnCanvasButton(it) }
+        onNewCanvas?.let { NewCanvasButton(it) }
+    }
 }
 
 /** This window's canvas picks over [actions]. */

@@ -32,6 +32,9 @@ class DeviceFallbackCanvasMountClient(
 
     override suspend fun resolve(target: ConversationCanvasTarget): CanvasMountLookup = active.resolve(target)
 
+    /** Only the host answers; this device's mounts answer [CanvasMountUnavailableReason.DeviceOnly]. */
+    override suspend fun resolveOnHost(target: ConversationCanvasTarget): CanvasMountLookup = active.resolveOnHost(target)
+
     override suspend fun mount(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange = active.mount(target, canvas)
 
     override suspend fun unmount(target: ConversationCanvasTarget): CanvasMountChange = active.unmount(target)

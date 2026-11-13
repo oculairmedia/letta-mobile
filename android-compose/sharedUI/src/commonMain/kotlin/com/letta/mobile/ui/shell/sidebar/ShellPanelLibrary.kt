@@ -79,15 +79,17 @@ internal fun canvasesLine(sections: List<RosterSection<ShellPanelItem>>): Int =
  * [RosterList]. A pinned or settled chat that moves glides to its place. With a conversation on
  * screen a canvas pick mounts it for that conversation ([ShellCanvasPicks]: in place in canvas mode,
  * and opened as before too in chat mode); the mounted one is marked current and offers the way back
- * to the conversation's own canvas. A canvas's menu can open it in a side panel without mounting it.
+ * to the conversation's own canvas (the Canvases header offers it when the mounted canvas has no
+ * row). A canvas's menu can open it in a side panel without mounting it.
  */
 @Composable
 internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
     val picker = rememberCanvasMountState()
     val picks = rememberCanvasPicks(actions)
     val canvases = remember(state.canvases, picker) { markMounted(state.canvases, picker) }
-    val sections = remember(state.conversations, canvases, actions.onNewCanvas) {
-        shellPanelSections(state.copy(canvases = canvases), actions.onNewCanvas?.let { { NewCanvasButton(it) } })
+    val wayBack = remember(canvases, picker, picks) { strayWayBack(canvases, picker, picks) }
+    val sections = remember(state.conversations, canvases, actions.onNewCanvas, wayBack) {
+        shellPanelSections(state.copy(canvases = canvases), canvasHeaderEnd(actions.onNewCanvas, wayBack))
     }
     val rosterState = rememberRosterListState()
     val scope = rememberCoroutineScope()
@@ -151,7 +153,8 @@ private class ShellPanelRows(
     }
 
     /** The mounted row's way back to the conversation's own canvas; null on every other row. */
-    fun useOwn(canvas: ShellCanvasRowModel): (() -> Unit)? = picks::useOwn.takeIf { canvas.mounted && menu.useOwnLabel != null }
+    fun useOwn(canvas: ShellCanvasRowModel): (() -> Unit)? =
+        menu.own?.takeIf { canvas.mounted && menu.useOwnLabel != null }?.let { own -> { picks.useOwn(own) } }
 
     /** A canvas's menu entries before archive: the mounted row's way back, then "Open in side panel" where offered. */
     fun menuExtras(canvas: ShellCanvasRowModel): List<LettaMenuItem> = listOfNotNull(useOwnItem(canvas), paneItem(canvas))

@@ -12,15 +12,20 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 
+/** The board seat of the page on screen: [target]'s, switching through [board]. */
+private class BoardSeat(val target: ConversationCanvasTarget, val board: ConversationBoardSwitch)
+
 /**
  * The conversation whose page is on screen, and whether its board is on show with the chat over it
  * (canvas mode), for the window. The chat page reports it ([show] / [hide] while the page is
- * composed, [enter] / [leave] for canvas mode); the side menu reads it. Scoped like the window's
- * chat session state: one per window, never shared across windows or accounts.
+ * composed, with its board seat, [enter] / [leave] for canvas mode); the side menu reads it. Scoped
+ * like the window's chat session state: one per window, never shared across windows or accounts.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class CanvasModeFocus {
     private val page = MutableStateFlow<ConversationCanvasTarget?>(null)
     private val board = MutableStateFlow<ConversationCanvasTarget?>(null)
+    private val seat = MutableStateFlow<BoardSeat?>(null)
 
     /** The conversation whose page is on screen, in either mode; null on a page without one (Home). */
     val onScreen: StateFlow<ConversationCanvasTarget?> = page.asStateFlow()
@@ -28,16 +33,28 @@ class CanvasModeFocus {
     /** The conversation in canvas mode, or null when no board is on show. */
     val current: StateFlow<ConversationCanvasTarget?> = board.asStateFlow()
 
-    /** [target]'s page is now on screen. */
-    fun show(target: ConversationCanvasTarget) {
+    /**
+     * The mounted board actually on show for the conversation on screen, once its seat has saved the
+     * board before it and switched; null for its own board, or without a seat.
+     */
+    val shownBoard: Flow<CanvasId?> = seat.flatMapLatest { it?.board?.shown ?: flowOf(null) }
+
+    /** [target]'s page is now on screen, its board switching through [board] (null: no seat to save). */
+    fun show(target: ConversationCanvasTarget, board: ConversationBoardSwitch? = null) {
         page.value = target
+        seat.value = board?.let { BoardSeat(target, it) }
     }
 
     /** [target]'s page left the screen (and with it canvas mode); a newer conversation shown since is kept. */
     fun hide(target: ConversationCanvasTarget) {
         page.update { if (it == target) null else it }
+        seat.update { if (it?.target == target) null else it }
         leave(target)
     }
+
+    /** Saves [target]'s board on screen before a pick switches it; true when it saved or there is none to save. */
+    suspend fun saveBoard(target: ConversationCanvasTarget): Boolean =
+        seat.value?.takeIf { it.target == target }?.board?.save() ?: true
 
     /** [target]'s board is now on show, so its page is on screen too. */
     fun enter(target: ConversationCanvasTarget) {
@@ -77,6 +94,9 @@ sealed interface CanvasPick {
     /** The conversation's board switched; [change] says how. */
     data class Mounted(val change: CanvasMountChange.Applied) : CanvasPick
 
+    /** The board on screen could not be saved first, so nothing was switched and it stays, with its drawing. */
+    data object Unsaved : CanvasPick
+
     /** The switch did not happen, for [problem]; the board stays as it was. */
     data class Failed(val problem: CanvasMountProblem) : CanvasPick
 }
@@ -88,7 +108,9 @@ private data class PickFocus(val target: ConversationCanvasTarget, val canvasMod
  * The side menu's canvas pick: while a conversation is on screen, picking a canvas mounts it for
  * that conversation (and only that one), in canvas mode and chat mode alike; what else the pick
  * shows (a side pane in chat mode) is the menu's call. With no conversation on screen, or on a host
- * without mounts, it opens as before. Shared by every host, so the decision is made once.
+ * without mounts, it opens as before. The board on screen is saved before the mount changes, so a
+ * failed save leaves the mount, the board and the agent's tools where they were.
+ * Shared by every host, so the decision is made once.
  */
 class ConversationCanvasPicker(
     val resolver: ConversationCanvasResolver,
@@ -107,15 +129,16 @@ class ConversationCanvasPicker(
     fun inCanvasMode(): Boolean = mountTarget()?.let { it == focus.current.value } ?: false
 
     /** Mounts [canvas] on the conversation on screen, or says to open it as before. */
-    suspend fun pick(canvas: CanvasId): CanvasPick {
-        val target = mountTarget() ?: return CanvasPick.OpenAsBefore
-        return outcome(resolver.mount(target, canvas))
-    }
+    suspend fun pick(canvas: CanvasId): CanvasPick = switchBoard { resolver.mount(it, canvas) }
 
     /** Puts the conversation on screen back on its own board. */
-    suspend fun useOwnCanvas(): CanvasPick {
+    suspend fun useOwnCanvas(): CanvasPick = switchBoard(resolver::unmount)
+
+    /** Saves the board on screen, then [write]s the mount of the conversation on screen. */
+    private suspend fun switchBoard(write: suspend (ConversationCanvasTarget) -> CanvasMountChange): CanvasPick {
         val target = mountTarget() ?: return CanvasPick.OpenAsBefore
-        return outcome(resolver.unmount(target))
+        if (!focus.saveBoard(target)) return CanvasPick.Unsaved
+        return outcome(write(target))
     }
 
     private fun stateOf(focus: PickFocus): Flow<CanvasPickerState> =

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.mount.client
 
 import com.letta.mobile.data.model.CanvasId
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,12 @@ class FakeCanvasMountClient(supported: Boolean = true) : CanvasMountClient {
     /** Whether a scripted write reply still stores the write (an applied write whose reply was lost). */
     var applyScripted = false
 
+    /** When set, the next resolve waits for it before answering (a slow host). */
+    var slowResolve: CompletableDeferred<Unit>? = null
+
+    /** Runs as each write reaches the host (the connection dropping mid-write, say). */
+    var onWrite: () -> Unit = {}
+
     /** Mounts the host pushes. */
     val pushed = MutableSharedFlow<CanvasId>(extraBufferCapacity = PUSH_BUFFER)
 
@@ -36,6 +43,7 @@ class FakeCanvasMountClient(supported: Boolean = true) : CanvasMountClient {
 
     override suspend fun resolve(target: ConversationCanvasTarget): CanvasMountLookup {
         resolves++
+        slowResolve?.also { slowResolve = null }?.await()
         return answers.removeFirstOrNull()
             ?: stored[target]?.let { CanvasMountLookup.Found(it, CanvasMountSource.Binding, CanvasMountDurability.Durable) }
             ?: CanvasMountLookup.None
@@ -49,6 +57,7 @@ class FakeCanvasMountClient(supported: Boolean = true) : CanvasMountClient {
 
     private fun store(target: ConversationCanvasTarget, canvas: CanvasId): CanvasMountChange {
         writes++
+        onWrite()
         val scripted = writeAnswers.removeFirstOrNull()
         if (scripted == null || applyScripted) stored[target] = canvas
         return scripted ?: CanvasMountChange.Applied(canvas, CanvasMountDurability.Durable)
