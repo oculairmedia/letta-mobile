@@ -144,6 +144,18 @@ class ConversationTurnStateSentRunsTest {
     }
 
     @Test
+    fun aStampedRowAfterTheTurnSettledWithNoEchoIsPublishedAsEndedAndFailed() {
+        accept("c1")
+        state.ownRun.settle(SettledSentTurn(setOf("run-1"), failed = true, SentMessageId("c1")))
+        TurnSettlementOwnership(registry, ChatSendQueue()).clear(state, reason = "test")
+
+        registry.sentRuns.row("c1", "run-1")
+        assertEquals(mapOf(SentMessageId("c1") to setOf(SentRunId("run-1"))), runs.started)
+        assertTrue(runs.active.isEmpty())
+        assertEquals(setOf(SentRunId("run-1")), runs.failed)
+    }
+
+    @Test
     fun aNewSendEndsAnOwnRunStillMarkedInFlight() {
         accept("c1")
         echo("c1", "t1", "run-1")

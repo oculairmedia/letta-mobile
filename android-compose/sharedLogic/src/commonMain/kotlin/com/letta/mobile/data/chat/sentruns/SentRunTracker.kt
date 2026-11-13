@@ -8,8 +8,11 @@ internal data class SentRunTail(val turnId: String?, val runId: String?)
 /** A turn state moving from turn [from] to turn [to]; either may be unknown. */
 internal data class SentTurnMove(val from: String?, val to: String?)
 
-/** A turn that settled: every run id it is known by, and whether it ended as a failure. */
-internal data class SettledSentTurn(val runIds: Set<String?>, val failed: Boolean)
+/**
+ * A turn that settled: every run id it is known by, whether it ended as a failure, and the send it
+ * was answering ([sent]), when the state had one.
+ */
+internal data class SettledSentTurn(val runIds: Set<String?>, val failed: Boolean, val sent: SentMessageId? = null)
 
 /**
  * The run one conversation's own send started, as that conversation's turn state sees it, written
@@ -94,6 +97,7 @@ internal class SentRunTracker(private val ledger: SentRunLedger) {
     fun settle(turn: SettledSentTurn) {
         val ids = turn.runIds.filterNot { it.isNullOrBlank() }.mapTo(mutableSetOf()) { SentRunId(it.orEmpty()) }
         ledger.settled(ids, turn.failed)
+        turn.sent?.let { ledger.sendSettled(it, turn.failed) }
         if (turn.failed) fail() else end()
     }
 

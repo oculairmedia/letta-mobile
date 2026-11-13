@@ -1,9 +1,10 @@
 package com.letta.mobile.data.chat.sentruns
 
+import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -19,7 +20,9 @@ import kotlinx.coroutines.withContext
  *
  * Once started, a send is not withdrawn by its caller's cancellation: the enqueue runs to its end
  * and the caller still receives the otid it was enqueued under, so a message that went out always
- * has an identity its sender can follow or stop.
+ * has an identity its sender can follow or stop. Likewise when the pipeline's work after accepting
+ * the send fails (a timeline write, say): the failure is reported and the caller still receives
+ * the otid. A failure before the send was accepted reaches the caller, with no otid.
  */
 internal class IdentifiedPipelineSend(
     private val scope: CoroutineScope,
@@ -34,18 +37,34 @@ internal class IdentifiedPipelineSend(
     /** A new otid for a send the pipeline enqueues next; call under [lock]. */
     fun nextOtid(): String = generateOtid().also { taken = it }
 
-    /** This send as an [IdentifiedChatSend] over the pipeline's published [sentRuns]. */
-    fun binding(sentRuns: StateFlow<SentMessageRuns>): IdentifiedChatSend = IdentifiedSendBinding(sentRuns, ::send)
+    /** This send as an [IdentifiedChatSend] over the pipeline's sent-run [ledger]. */
+    fun binding(ledger: SentRunLedger): IdentifiedChatSend =
+        IdentifiedSendBinding(ledger.state) { text -> send(OutgoingText(text, target()), ledger) }
 
-    private suspend fun send(text: String): SentMessageId? {
-        val conversation = target()
-        val enqueued = scope.async {
-            lock.withLock {
-                taken = null
-                sendLocked(text, conversation)
-                taken
-            }
-        }
-        return withContext(NonCancellable) { enqueued.await() }?.let(::SentMessageId)
+    private suspend fun send(outgoing: OutgoingText, ledger: SentRunLedger): SentMessageId? {
+        val enqueued = scope.async { lock.withLock { enqueue(outgoing, ledger) } }
+        return withContext(NonCancellable) { enqueued.await() }
+    }
+
+    /** Under [lock]: sends [outgoing] and returns the otid it was enqueued under, if any. */
+    private suspend fun enqueue(outgoing: OutgoingText, ledger: SentRunLedger): SentMessageId? {
+        taken = null
+        val failure = runCatching { sendLocked(outgoing.text, outgoing.conversation) }.exceptionOrNull()
+            ?: return taken?.let(::SentMessageId)
+        if (failure is CancellationException) throw failure
+        return acceptedDespite(failure, ledger)
+    }
+
+    /**
+     * The send threw [failure]: the otid taken, when [ledger] shows the pipeline had already
+     * accepted that send (the failure is reported); otherwise [failure] is rethrown.
+     */
+    private fun acceptedDespite(failure: Throwable, ledger: SentRunLedger): SentMessageId {
+        val sent = taken?.let(::SentMessageId)?.takeIf(ledger::wasSent) ?: throw failure
+        Telemetry.error("IdentifiedSend", "send.failedAfterAccept", failure)
+        return sent
     }
 }
+
+/** A text to send and the conversation it goes to, as read in the caller's turn. */
+private class OutgoingText(val text: String, val conversation: String?)

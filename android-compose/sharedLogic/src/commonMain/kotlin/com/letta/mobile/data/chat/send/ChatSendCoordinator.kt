@@ -123,7 +123,7 @@ class ChatSendCoordinator(
     ) { text, target -> sendInternalLocked(text, emptyList(), target) }
 
     /** This coordinator's sends with their identity, and the runs they started (paired in the turn registry). */
-    val identifiedSend: IdentifiedChatSend = identified.binding(turnRegistry.sentRuns.state)
+    val identifiedSend: IdentifiedChatSend = identified.binding(turnRegistry.sentRuns)
 
     init {
         scope.launch {

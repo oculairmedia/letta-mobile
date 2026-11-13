@@ -127,6 +127,16 @@ internal class ChatSendCoordinatorIdentifiedSendTest : ChatSendCoordinatorConver
     }
 
     @Test
+    fun aSendWhoseTimelineWriteFailsAfterTheChannelAcceptedItStillHasItsId() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport) { CONV }
+        timeline.appendRelease = CompletableDeferred<Unit>().apply { completeExceptionally(IllegalStateException("write failed")) }
+
+        assertNotNull(coordinator.identifiedSend.sendIdentified("hello"))
+        assertEquals(listOf("hello"), transport.sentTexts)
+    }
+
+    @Test
     fun aDisconnectWhoseTimelineWriteFailsStillEndsTheSentRunAsFailed() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
         val coordinator = standalone(transport = transport, writer = FailingFailureMarks(timeline)) { CONV }
