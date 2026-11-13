@@ -193,4 +193,6 @@ private fun ComposerAboveCard(model: ComposerModel) {
         )
     }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)
+    // Last, so it sits directly on the bar.
+    ComposerVoiceStatus()
 }

@@ -120,6 +120,10 @@ Chat timeline, paged/resident lists, viewport behavior and page overlays. Supply
 
 User/assistant, tool-step, approval, reasoning, error and canvas-receipt renderers. Row context and action callbacks connect interactions to the session; rows must not issue independent transport requests or reinterpret approval authority.
 
+# Package com.letta.mobile.ui.chat.voice
+
+What the chat page's voice mode shares with the rest of the app, kept free of page and theme imports: the voice setup ([VoiceSetupAccess](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.chat.voice/-voice-setup-access/index.html), provided by the shell to the chat and the Settings page), the page's [VoiceModeHandle](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.chat.voice/-voice-mode-handle/index.html) read by the chat bar, the slot for the Voice settings pane, failure wording and test tags. The platform pieces (audio, the recording permission, the HTTP engine) are expect/actual here; the web offers no voice mode. The chat surface builds the controller and the composer draws the button and the status strip.
+
 # Package com.letta.mobile.ui.components
 
 Reusable menus, list parts, chips, errors, refresh and pane primitives. Supply menu entries and callbacks through [LettaMenuItem](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-menu-item/index.html) and [LettaPopupMenu](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.components/-letta-popup-menu.html), and content through composable slots and modifiers; business workflows and repository access belong to callers.

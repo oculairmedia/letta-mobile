@@ -146,6 +146,7 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
                 ComposerExpandButton(onExpand = { model.onIntent(ChatSurfaceIntent.Expand) })
                 ComposerPlusButton(model, onAttachImage)
                 ComposerTextField(model = model, style = dockedFieldStyle(DockedFieldStyle, fieldHeight), modifier = Modifier.weight(1f))
+                ComposerVoiceModeButton()
                 ComposerVoiceButton(model)
             }
             ComposerActionButton(model, Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm))
@@ -154,5 +155,5 @@ private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldH
 }
 
 // The column already has md end padding; reserve the rest of the button, inset and gap.
-private fun cornerContentPadding(): Dp =
+internal fun cornerContentPadding(): Dp =
     LettaDimens.Control.actionButton + LettaDimens.Space.sm * 2 - LettaDimens.Space.md

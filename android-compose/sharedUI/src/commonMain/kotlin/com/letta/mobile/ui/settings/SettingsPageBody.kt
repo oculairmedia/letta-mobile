@@ -38,6 +38,7 @@ import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.settings.SettingsContribution
 import com.letta.mobile.data.settings.SettingsGroup
 import com.letta.mobile.data.shell.ShellSettingsSection
+import com.letta.mobile.ui.chat.voice.LocalVoiceSetup
 import com.letta.mobile.ui.pairing.InstallAndPairCard
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.math.roundToInt
@@ -243,7 +244,11 @@ internal class StandardSectionInputs(
                 services.appearance?.let { AppearanceSettingsSection(it) }
                 LayoutSettingsSection()
             }
-            SettingsGroup.Chat -> services.chat?.let { ChatSettingsSection(it) }
+            SettingsGroup.Chat -> {
+                services.chat?.let { ChatSettingsSection(it) }
+                // Voice mode's setup, where the platform offers it (not the web).
+                LocalVoiceSetup.current?.let { VoiceSettingsSection(it) }
+            }
             SettingsGroup.Notifications -> services.notifications?.let { NotificationSettingsSection(it) }
             SettingsGroup.Providers -> services.onOpenProviders?.let { open ->
                 CompositionLocalProvider(LocalSettingsLock provides hostLock) { ProvidersSettingsSection(open) }

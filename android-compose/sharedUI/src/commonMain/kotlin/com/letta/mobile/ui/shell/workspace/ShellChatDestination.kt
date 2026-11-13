@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.workspace
 
+import com.letta.mobile.data.voice.session.VoiceChatSessions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -111,6 +112,8 @@ class ShellChatLook(
     val onBoardShown: ((CanvasId?) -> Unit)? = null,
     /** The conversation's subagent dual view; null draws the page alone. */
     val subagentViews: SubagentDualViewBinding? = null,
+    /** Opens the chat session voice mode talks through; null leaves voice mode off the chat bar. */
+    val voiceSessions: VoiceChatSessions? = null,
 )
 
 /**
@@ -186,6 +189,7 @@ private fun ParentChatPage(inputs: ParentChatInputs, modifier: Modifier) {
         dockGeometry = dockGeometry,
         onDockGeometryChange = { dockGeometry = it },
         recents = look.recents,
+        voiceSessions = look.voiceSessions,
     )
 }
 

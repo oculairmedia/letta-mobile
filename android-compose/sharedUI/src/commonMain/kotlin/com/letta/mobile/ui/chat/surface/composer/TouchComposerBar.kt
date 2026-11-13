@@ -126,6 +126,7 @@ internal fun TouchComposerBar(
             Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
                 ComposerTextField(model = model, style = touchFieldStyle(model))
             }
+            ComposerVoiceModeButton(size = TouchComposerDimens.actionTarget, iconSize = TouchComposerDimens.actionIcon)
             TouchTrailingSlot(model)
         }
     }

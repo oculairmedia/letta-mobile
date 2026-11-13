@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -85,6 +86,8 @@ internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit)
                     if (!narrow) secondary?.invoke()
                 }
                 ComposerVoiceButton(model)
+                // Last, and kept as clear of the Send corner as the prompt field is.
+                ComposerVoiceModeButton(modifier = Modifier.padding(end = cornerContentPadding()))
             }
             if (narrow && secondary != null) WrappedControlsRow { secondary() }
         }
