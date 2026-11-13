@@ -15,18 +15,13 @@ class QrModules(val size: Int, private val dark: (row: Int, col: Int) -> Boolean
 }
 
 /**
- * Platform port: render text as a QR grid (zxing on JVM/Android); throws if it cannot fit. A platform
- * that draws no QR codes at all uses [Unavailable], which answers null, so the inviter still gets a
- * usable invite: it is shown and shared as its link text instead of failing after the host minted it.
+ * Platform port: render text as a QR grid; throws if it cannot fit. An encoder that cannot draw a
+ * code answers null, so the inviter still gets a usable invite: it is shown and shared as its link
+ * text instead of failing after the host minted it.
  */
 fun interface QrEncoder {
-    /** The grid for [content], or null when this platform has no QR encoder. */
+    /** The grid for [content], or null when no QR can be drawn for it. */
     fun encode(content: String): QrModules?
-
-    companion object {
-        /** No QR encoder on this platform: every code is shown as its link. */
-        val Unavailable: QrEncoder = QrEncoder { null }
-    }
 }
 
 /** What the inviter's screen shows. */
@@ -99,7 +94,7 @@ class PairInviteSession(
         _state.update { it.copy(selfNodeId = nodeId?.lowercase()) }
     }
 
-    fun revokeDevice(nodeId: String) = tracked(TrackedItem(Tracked.DEVICE, nodeId)) { repository.revokeDevice(nodeId) }
+    fun revokeDevice(nodeId: String) = tracked(deviceRows, nodeId) { repository.revokeDevice(nodeId) }
 
     /** "Revoke all other devices": every paired device except this one. Needs this device to be known. */
     fun revokeAllOthers() {
@@ -109,7 +104,7 @@ class PairInviteSession(
     }
 
     /** Cancel a pending invite (the on-screen one or one from the list). */
-    fun revokeInvite(inviteId: String) = tracked(TrackedItem(Tracked.INVITE, inviteId)) {
+    fun revokeInvite(inviteId: String) = tracked(inviteRows, inviteId) {
         repository.revokeInvite(inviteId).also { revoked ->
             if (revoked && _state.value.invite?.inviteId == inviteId) {
                 _state.update { it.copy(invite = null, qr = null, cancelled = true) }
@@ -147,41 +142,33 @@ class PairInviteSession(
         }
     }
 
-    /** Which kind of row a revoke/cancel targets, and what to tell the user if the host does not confirm it. */
-    private enum class Tracked(val failure: String) { DEVICE(REVOKE_FAILED), INVITE(CANCEL_FAILED) }
+    /**
+     * One kind of row a revoke/cancel targets: the in-flight id set it marks in [PairInviteUiState] and
+     * what to tell the user if the host does not confirm the action.
+     */
+    private class TrackedRows(
+        val failure: String,
+        val ids: (PairInviteUiState) -> Set<String>,
+        val withIds: (PairInviteUiState, Set<String>) -> PairInviteUiState,
+    )
 
-    /** One in-flight revoke/cancel: the row kind plus its device NodeId or invite id. */
-    private data class TrackedItem(val kind: Tracked, val id: String)
+    private val deviceRows = TrackedRows(REVOKE_FAILED, { it.revoking }) { state, ids -> state.copy(revoking = ids) }
+    private val inviteRows = TrackedRows(CANCEL_FAILED, { it.cancelling }) { state, ids -> state.copy(cancelling = ids) }
 
-    private fun PairInviteUiState.markTracked(item: TrackedItem): PairInviteUiState = when (item.kind) {
-        Tracked.DEVICE -> copy(revoking = revoking + item.id)
-        Tracked.INVITE -> copy(cancelling = cancelling + item.id)
-    }
-
-    private fun PairInviteUiState.unmarkTracked(item: TrackedItem): PairInviteUiState = when (item.kind) {
-        Tracked.DEVICE -> copy(revoking = revoking - item.id)
-        Tracked.INVITE -> copy(cancelling = cancelling - item.id)
-    }
-
-    private fun isTracked(item: TrackedItem): Boolean = when (item.kind) {
-        Tracked.DEVICE -> item.id in _state.value.revoking
-        Tracked.INVITE -> item.id in _state.value.cancelling
-    }
-
-    /** Run one revoke/cancel independently of [run]'s busy gate, marking [item] until the host answers. */
-    private fun tracked(item: TrackedItem, action: suspend () -> Boolean) {
-        if (isTracked(item)) return
-        _state.update { it.markTracked(item).copy(error = null) }
+    /** Run one revoke/cancel independently of [run]'s busy gate, marking [id] in [rows] until the host answers. */
+    private fun tracked(rows: TrackedRows, id: String, action: suspend () -> Boolean) {
+        if (id in rows.ids(_state.value)) return
+        _state.update { rows.withIds(it, rows.ids(it) + id).copy(error = null) }
         scope.launch {
             try {
-                if (!action()) _state.update { it.copy(error = item.kind.failure) }
+                if (!action()) _state.update { it.copy(error = rows.failure) }
                 reload()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _state.update { it.copy(error = userMessage(error)) }
             } finally {
-                _state.update { it.unmarkTracked(item) }
+                _state.update { rows.withIds(it, rows.ids(it) - id) }
             }
         }
     }

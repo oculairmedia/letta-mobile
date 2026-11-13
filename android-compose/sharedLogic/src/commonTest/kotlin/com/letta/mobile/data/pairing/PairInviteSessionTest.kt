@@ -78,8 +78,8 @@ class PairInviteSessionTest {
     )
 
     @Test
-    fun withoutAQrEncoderTheMintedCodeIsShownAsItsLinkAndNotLost() = runTest {
-        val session = session(QrEncoder.Unavailable)
+    fun whenNoQrCanBeDrawnTheMintedCodeIsShownAsItsLinkAndNotLost() = runTest {
+        val session = session(QrEncoder { null })
         session.mint(PairInviteRequest("browser"))
         advanceUntilIdle()
         val state = session.state.value
@@ -100,11 +100,6 @@ class PairInviteSessionTest {
         assertNotNull(session.state.value.qr)
         assertEquals("meridian://pair?qr=letta-qr-v1.x1", session.state.value.invite?.pairLink)
         assertNull(session.state.value.error)
-    }
-
-    @Test
-    fun theUnavailableEncoderAnswersNullInsteadOfThrowing() {
-        assertNull(QrEncoder.Unavailable.encode("meridian://pair?qr=letta-qr-v1.x"))
     }
 
     @Test
