@@ -11695,6 +11695,7 @@ public final class com/letta/mobile/ui/theme/TouchComposerDimens {
 	public final fun getFieldPadding-D9Ej5fM ()F
 	public final fun getHorizontalPadding-D9Ej5fM ()F
 	public final fun getItemSpacing-D9Ej5fM ()F
+	public final fun getMinFieldWidth-D9Ej5fM ()F
 	public final fun getRestingCorner-D9Ej5fM ()F
 	public final fun getRestingElevation-D9Ej5fM ()F
 	public final fun getRestingVerticalPadding-D9Ej5fM ()F

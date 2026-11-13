@@ -11669,6 +11669,8 @@ final object com.letta.mobile.ui.theme/TouchComposerDimens { // com.letta.mobile
         final fun <get-horizontalPadding>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/TouchComposerDimens.horizontalPadding.<get-horizontalPadding>|<get-horizontalPadding>(){}[0]
     final val itemSpacing // com.letta.mobile.ui.theme/TouchComposerDimens.itemSpacing|{}itemSpacing[0]
         final fun <get-itemSpacing>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/TouchComposerDimens.itemSpacing.<get-itemSpacing>|<get-itemSpacing>(){}[0]
+    final val minFieldWidth // com.letta.mobile.ui.theme/TouchComposerDimens.minFieldWidth|{}minFieldWidth[0]
+        final fun <get-minFieldWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/TouchComposerDimens.minFieldWidth.<get-minFieldWidth>|<get-minFieldWidth>(){}[0]
     final val restingCorner // com.letta.mobile.ui.theme/TouchComposerDimens.restingCorner|{}restingCorner[0]
         final fun <get-restingCorner>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/TouchComposerDimens.restingCorner.<get-restingCorner>|<get-restingCorner>(){}[0]
     final val restingElevation // com.letta.mobile.ui.theme/TouchComposerDimens.restingElevation|{}restingElevation[0]

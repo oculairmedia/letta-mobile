@@ -138,7 +138,7 @@ internal fun TouchComposerBar(
                     val single = sheetItems.singleOrNull()
                     if (single == null) sheetOpen = true else if (single.enabled) single.onClick()
                 }
-                Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
+                Box(Modifier.weight(1f).padding(TouchComposerDimens.fieldPadding)) {
                     ComposerTextField(model = model, style = touchFieldStyle(model))
                 }
                 TouchTrailingSlot(model, voiceMode = voiceInSlot)
