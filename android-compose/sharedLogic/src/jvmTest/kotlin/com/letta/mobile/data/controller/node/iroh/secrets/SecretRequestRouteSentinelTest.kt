@@ -14,6 +14,7 @@ import com.letta.mobile.data.secrets.journal.FileSecretRequestJournal
 import com.letta.mobile.data.secrets.request.SecretRequestId
 import com.letta.mobile.data.secrets.request.SecretRequestLimits
 import com.letta.mobile.data.secrets.request.SecretRequestMethods
+import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.plugin.keystore.KeystoreError
 import com.letta.mobile.util.Telemetry
@@ -93,6 +94,7 @@ class SecretRequestRouteSentinelTest {
     private suspend fun SecretRouteHarness.submitAs(context: AdminRpcRequestContext, id: SecretRequestId, secret: TestSecret) {
         val params = submitParams(id, secret)
         observe(dispatch(SecretRequestRoute.SUBMIT, params, context), AdminRpcInvocation("s", SecretRequestMethods.SUBMIT, params, context))
+        observe(AppServerCommand.AdminRpc("s", SecretRequestMethods.SUBMIT, params))
         observe(status(id), dispatch(SecretRequestRoute.GET, idParams(id), HUMAN), dispatch(SecretRequestRoute.LIST, null, HUMAN))
     }
 

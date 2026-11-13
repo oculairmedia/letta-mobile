@@ -161,7 +161,10 @@ sealed interface AppServerCommand {
         @SerialName("request_id") val requestId: String,
         val method: String,
         val params: JsonObject? = null,
-    ) : AppServerCommand
+    ) : AppServerCommand {
+        /** Never the params' values (a call may carry a secret, as `secret.request.submit` does): only their names. */
+        override fun toString(): String = "AdminRpc(requestId=$requestId, method=$method, paramNames=${params?.keys})"
+    }
 
     // Runtime-native admin commands (lgns8.7), shapes pinned against the
     // installed @letta-ai/letta-code 0.29.12 protocol declaration. query/body
