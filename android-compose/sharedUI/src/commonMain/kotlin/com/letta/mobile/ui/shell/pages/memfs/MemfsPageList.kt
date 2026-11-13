@@ -1,10 +1,11 @@
 package com.letta.mobile.ui.shell.pages.memfs
 
+import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.components.LettaRefreshAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,8 +20,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -34,8 +33,9 @@ import com.letta.mobile.data.memory.memfs.MemfsFileKind
 import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsTab
 import com.letta.mobile.ui.components.row.LettaListRowSpec
-import com.letta.mobile.ui.components.LettaRefreshAction
-import com.letta.mobile.ui.components.isPointerHost
+import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterListTag
@@ -47,62 +47,63 @@ import com.letta.mobile.ui.theme.LettaBusyBar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The list's header: the filter field first (directly under the host's Blocks | Files mode switch),
- * then the Current | History tabs. The title row shows only when the host does not title the page,
- * and the refresh button only on a pointer host - touch pulls the list instead
- *.
+ * The shared page header: the title with the refresh button at its end (pointer hosts only; touch
+ * pulls the list), then the host's controls (the Memory destination's Blocks | Files switch). On a
+ * phone the list's own controls follow in the same header; a wide page shows them above its list.
  */
 @Composable
 internal fun MemfsHeader(page: MemfsPageScope) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    LettaPageHeader(
+        title = page.options.title.takeIf { page.options.showTitle },
+        refresh = {
+            LettaRefreshAction(page.state.isLoading, page.actions::refresh, Modifier.testTag(MemfsPageTags.REFRESH))
+        },
+        controls = page.options.headerControls,
     ) {
-        MemfsTitleRow(page)
-        if (page.state.tab == MemfsTab.Files) {
-            OutlinedTextField(
-                value = page.state.query,
-                onValueChange = page.actions::updateQuery,
-                placeholder = { Text(SEARCH_PLACEHOLDER) },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth().testTag(MemfsPageTags.SEARCH),
-            )
-        }
-        MemfsTabs(page)
-        if (page.state.isLoading || page.state.history.loading) {
-            LettaBusyBar()
-        }
+        if (!page.wide) MemfsListControls(page)
     }
 }
 
+/** A wide page's list controls, above the docked list and on the page's gutter. */
 @Composable
-private fun MemfsTitleRow(page: MemfsPageScope) {
-    val pointer = isPointerHost()
-    if (!page.options.showTitle && !pointer) return
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f)) {
-            if (page.options.showTitle) Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall)
-        }
-        LettaRefreshAction(
-            refreshing = page.state.isLoading,
-            onRefresh = page.actions::refresh,
-            modifier = Modifier.testTag(MemfsPageTags.REFRESH),
+internal fun MemfsDockedListControls(page: MemfsPageScope) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = lettaPageGutter(wide = true))
+            .padding(bottom = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) { MemfsListControls(page) }
+}
+
+/** The filter field first, then the Current | History switch and the load's progress bar. */
+@Composable
+private fun MemfsListControls(page: MemfsPageScope) {
+    if (page.state.tab == MemfsTab.Files) {
+        OutlinedTextField(
+            value = page.state.query,
+            onValueChange = page.actions::updateQuery,
+            placeholder = { Text(SEARCH_PLACEHOLDER) },
+            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+            singleLine = true,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().testTag(MemfsPageTags.SEARCH),
         )
+    }
+    MemfsTabs(page)
+    if (page.state.isLoading || page.state.history.loading) {
+        LettaBusyBar()
     }
 }
 
 /** Files' sub-view: the current tree or its history; "Current", since the mode switch already says Files. */
 @Composable
 private fun MemfsTabs(page: MemfsPageScope) {
-    val tabs = MemfsTab.entries
-    SecondaryTabRow(selectedTabIndex = tabs.indexOf(page.state.tab), modifier = Modifier.fillMaxWidth()) {
-        tabs.forEach { tab ->
-            Tab(
-                selected = page.state.tab == tab,
+    LettaChipTabRow(Modifier.fillMaxWidth()) {
+        MemfsTab.entries.forEach { tab ->
+            LettaChipTab(
+                text = if (tab == MemfsTab.Files) CURRENT_TAB else HISTORY_TAB,
+                active = page.state.tab == tab,
                 onClick = { page.actions.selectTab(tab) },
-                text = { Text(if (tab == MemfsTab.Files) CURRENT_TAB else HISTORY_TAB) },
                 modifier = Modifier.testTag(MemfsPageTags.tab(tab)),
             )
         }
@@ -211,7 +212,6 @@ private fun oneDecimal(value: Double): String {
 private const val KILOBYTE = 1024L
 private const val TENTHS = 10.0
 private const val SYSTEM_PREFIX = "system/"
-private const val PAGE_TITLE = "Memory files"
 private const val SEARCH_PLACEHOLDER = "Filter memory files"
 private const val CURRENT_TAB = "Current"
 private const val HISTORY_TAB = "History"

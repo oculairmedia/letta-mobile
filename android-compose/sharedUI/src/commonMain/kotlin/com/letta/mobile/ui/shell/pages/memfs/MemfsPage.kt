@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,6 +19,7 @@ import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.memory.memfs.MemfsPageState
 import com.letta.mobile.data.memory.memfs.MemfsTab
+import com.letta.mobile.ui.components.LettaPageHeader
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -54,6 +56,10 @@ data class MemfsPageOptions(
     val showTitle: Boolean = true,
     val touch: Boolean = false,
     val readOnly: Boolean = false,
+    /** The page's title; the Memory destination shows this page under its own "Memory". */
+    val title: String = "Memory files",
+    /** The header's controls row: the Memory destination's Blocks | Files switch. */
+    val headerControls: (@Composable () -> Unit)? = null,
 )
 
 /** Test tags for the shared MemFS page. */
@@ -113,14 +119,17 @@ internal class MemfsPageScope(
 
 @Composable
 private fun WideMemfsLayout(page: MemfsPageScope) {
-    Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(LettaDimens.Pane.sidePanelWidth).fillMaxHeight()) {
-            MemfsHeader(page)
-            MemfsListPane(page)
-        }
-        VerticalDivider()
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.weight(1f).fillMaxHeight()) {
-            MemfsDetailPane(page)
+    Column(Modifier.fillMaxSize()) {
+        MemfsHeader(page)
+        Row(Modifier.fillMaxWidth().weight(1f)) {
+            Column(Modifier.width(LettaDimens.Pane.sidePanelWidth).fillMaxHeight()) {
+                MemfsDockedListControls(page)
+                MemfsListPane(page)
+            }
+            VerticalDivider()
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                MemfsDetailPane(page)
+            }
         }
     }
 }
@@ -129,6 +138,9 @@ private fun WideMemfsLayout(page: MemfsPageScope) {
 private fun CompactMemfsLayout(page: MemfsPageScope) {
     Column(Modifier.fillMaxSize()) {
         if (page.showsDetail) {
+            // The open file replaces the list and its header, but not the host's controls: the Memory
+            // destination's Blocks | Files switch stays reachable without closing the file first.
+            if (page.options.headerControls != null) LettaPageHeader(title = null, controls = page.options.headerControls)
             MemfsDetailPane(page)
         } else {
             MemfsHeader(page)
