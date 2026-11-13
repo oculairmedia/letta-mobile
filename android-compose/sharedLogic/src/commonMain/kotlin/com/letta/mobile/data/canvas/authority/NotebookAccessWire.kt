@@ -6,13 +6,19 @@ import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSave
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.references.NotebookReferenceLoad
+import com.letta.mobile.data.canvas.workspace.SharedNote
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
+import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 /**
  * The `notebook.*` admin_rpc result shapes, shared by the host routes and the remote client so the
@@ -110,6 +116,83 @@ object NotebookAccessWire {
     }
 }
 
+/**
+ * The `notebook.shared.list` request and result shapes, shared by the host route and the remote
+ * client. A listing is paged: the request carries an optional `cursor` (absent for the first page)
+ * and a page that stopped before the caller's last grant carries `next_cursor`. An absent
+ * `next_cursor` means nothing is left. The cursor is opaque to the client and read only by the host
+ * that issued it; a cursor the host cannot read is answered unavailable with [INVALID_CURSOR].
+ */
+object SharedNotesWire {
+    const val LIST = "notebook.shared.list"
+
+    /** The most notes one page carries; a host with more stops there and hands back a cursor. */
+    const val MAX_LISTED = 500
+
+    /**
+     * The most grants one page rechecks (a bounded number per grant transaction), so a caller
+     * holding many grants that cannot open the editor costs the host bounded work per request.
+     */
+    const val MAX_CHECKED = 2 * MAX_LISTED
+
+    /** The longest cursor either side accepts; a longer one is malformed, never shortened. */
+    const val MAX_CURSOR_CHARS = 1024
+
+    /** The request field naming where the page starts; the only field the request may carry. */
+    const val CURSOR = "cursor"
+
+    /** The result field naming where the next page starts. */
+    const val NEXT_CURSOR = "next_cursor"
+
+    /** The reason a host gives for a cursor it cannot read; the caller starts again from the first page. */
+    const val INVALID_CURSOR = SharedNoteListing.Unavailable.INVALID_CURSOR
+
+    /** The request for the page starting at [from], or the first page when it is null. */
+    fun request(from: SharedNotesCursor?): JsonObject = buildJsonObject { from?.let { put(CURSOR, it.value) } }
+
+    /**
+     * One page: the notes the caller may open now, at most [MAX_LISTED], and `next_cursor` when the
+     * host stopped before checking every grant (the caller may be shared more than listed so far).
+     */
+    fun sharedNotes(result: SharedNoteListing): JsonObject = when (result) {
+        is SharedNoteListing.Listed -> listed(result)
+        SharedNoteListing.Denied -> response(DENIED)
+        is SharedNoteListing.Unavailable -> response(UNAVAILABLE) { put("reason", result.reason) }
+    }
+
+    private fun listed(result: SharedNoteListing.Listed): JsonObject {
+        require(result.notes.size <= MAX_LISTED) { "A shared-notes page holds at most $MAX_LISTED notes" }
+        return response(LISTED) {
+            result.next?.let { put(NEXT_CURSOR, it.value) }
+            putJsonArray("notes") {
+                result.notes.forEach { note ->
+                    addJsonObject {
+                        put("document_id", note.id.value)
+                        put("title", note.title)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Read a page; an entry without an id or a title, or an unreadable cursor, makes the whole answer malformed. */
+    fun readSharedNotes(result: JsonElement?): SharedNoteListing {
+        val body = result as? JsonObject ?: return SharedNoteListing.Unavailable(NO_RESULT)
+        return when (body.status()) {
+            LISTED -> body.listing() ?: SharedNoteListing.Unavailable(MALFORMED_LIST)
+            DENIED -> SharedNoteListing.Denied
+            else -> SharedNoteListing.Unavailable(body.reason())
+        }
+    }
+
+    /** [text] as a cursor when it is within the bounds both sides accept, else null. */
+    fun cursorOf(text: String): SharedNotesCursor? {
+        if (text.isEmpty()) return null
+        if (text.length > MAX_CURSOR_CHARS) return null
+        return SharedNotesCursor(text)
+    }
+}
+
 private fun JsonObject.status(): String? = text("status")
 
 private fun JsonObject.reason(): String = text("reason") ?: "The host could not complete the request"
@@ -121,6 +204,26 @@ private fun JsonObject.conflict(id: NotebookDocumentId): NotebookNoteSave.Confli
     val current = snapshotAt("current", id) ?: return null
     if (!containsKey("durable")) return NotebookNoteSave.Conflict(current)
     return snapshotAt("durable", id)?.let { NotebookNoteSave.Conflict(current, it) }
+}
+
+/** A page; an absent `next_cursor` (the last page, or an older host) is "no more", an unreadable one is malformed. */
+private fun JsonObject.listing(): SharedNoteListing.Listed? {
+    val notes = notes() ?: return null
+    if (!containsKey(SharedNotesWire.NEXT_CURSOR)) return SharedNoteListing.Listed(notes)
+    val next = text(SharedNotesWire.NEXT_CURSOR)?.let(SharedNotesWire::cursorOf) ?: return null
+    return SharedNoteListing.Listed(notes, next)
+}
+
+private fun JsonObject.notes(): List<SharedNote>? {
+    val entries = (get("notes") as? JsonArray)?.takeIf { it.size <= SharedNotesWire.MAX_LISTED } ?: return null
+    val notes = entries.mapNotNull { entry -> (entry as? JsonObject)?.sharedNote() }
+    return notes.takeIf { it.size == entries.size }
+}
+
+private fun JsonObject.sharedNote(): SharedNote? {
+    val id = text("document_id")?.takeIf { it.isNotBlank() } ?: return null
+    val title = text("title") ?: return null
+    return SharedNote(NotebookDocumentId(id), title)
 }
 
 private fun JsonObject.snapshotAt(key: String, id: NotebookDocumentId): NotebookNoteSnapshot? {
@@ -138,7 +241,9 @@ private const val DENIED = "denied"
 private const val MISSING = "missing"
 private const val UNAVAILABLE = "unavailable"
 private const val SAVED = "saved"
+private const val LISTED = "listed"
 private const val CONFLICT = "conflict"
 private const val PENDING_DURABILITY = "pending_durability"
 private const val NO_RESULT = "The host returned no result"
 private const val MALFORMED = "The host returned a malformed note"
+private const val MALFORMED_LIST = "The host returned a malformed list of notes"

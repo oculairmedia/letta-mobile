@@ -3,6 +3,7 @@ package com.letta.mobile.wrapper.notebook
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.github.ajalt.clikt.core.parse
 import com.letta.mobile.data.canvas.authority.FileNotebookGrantStore
+import com.letta.mobile.data.canvas.authority.SharedNotesWire
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.AdminRpcInvocation
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
@@ -92,6 +93,26 @@ class NotebookAdminRoutesTest {
             assertEquals("", store.read(storageId)?.markdown)
             Files.writeString(root.resolve("grants.json"), "{broken")
             assertEquals("unavailable", alice.call(referenceMethod, reference("a".repeat(64))).status())
+        }
+    }
+
+    /** The shared listing takes no field but a string `cursor`, and a cursor this host did not issue to the caller is refused. */
+    @Test
+    fun theSharedListingTakesOnlyAStringCursorAndRefusesOneItDidNotIssue() = runBlocking {
+        val root = Files.createTempDirectory("notebook-shared-list-params")
+        NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { store ->
+            val router = AdminRpcRouter()
+            registerNotebookAdminRoutes(router, store, FileNotebookGrantStore(root.resolve("grants.json")))
+            val alice = connection(router, "a".repeat(64))
+
+            assertEquals("listed", alice.call(SharedNotesWire.LIST, buildJsonObject {}).status())
+            val forged = alice.call(SharedNotesWire.LIST, buildJsonObject { put(SharedNotesWire.CURSOR, "forged") })
+            assertEquals("unavailable", forged.status())
+            assertEquals(SharedNotesWire.INVALID_CURSOR, forged.getValue("reason").jsonPrimitive.content)
+            val malformed = listOf(buildJsonObject { put("principal", "b".repeat(64)) }, buildJsonObject { put(SharedNotesWire.CURSOR, 1) })
+            for (params in malformed) {
+                assertEquals("false", alice.adminFrame(SharedNotesWire.LIST, params).getValue("success").jsonPrimitive.content, "$params")
+            }
         }
     }
 
