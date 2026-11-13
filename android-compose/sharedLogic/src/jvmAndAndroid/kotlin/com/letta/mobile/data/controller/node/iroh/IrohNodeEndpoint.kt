@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 
 import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
@@ -106,6 +107,14 @@ class IrohNodeEndpoint(
      * detached turns never outlive the endpoint and a restarted endpoint gets a live host.
      */
     private var turnHost: NodeTurnHost? = null
+
+    init {
+        // letta-mobile-6vf4r (S3): a connection that starts viewing a conversation mid-turn learns
+        // the running turn from its `update_loop_status`, next to the subagent/approval replays.
+        connectionRegistry.addViewerJoinedListener { conversationId, viewer ->
+            turnHost?.replayLoopStatus(ConversationId(conversationId), viewer)
+        }
+    }
 
     /**
      * Delivers device-wide `agent_updated` frames to every live connection allowed to read agents

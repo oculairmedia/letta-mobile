@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -17,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +56,8 @@ import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
+import com.letta.mobile.ui.theme.ChatRowMotion
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import kotlinx.collections.immutable.toImmutableList
@@ -318,10 +322,7 @@ internal fun AgentText(params: AgentTextParams) {
     val hovered by hoverSource.collectIsHoveredAsState()
     val pointer = !touchStyle()
     Box(modifier = Modifier.agentTextRoot(hoverSource, params.isStreaming)) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = ChatRowSpacing.bubblePaddingVertical),
-            verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = ChatRowSpacing.bubblePaddingVertical)) {
             SelectionContainer {
                 SharedMarkdownText(
                     text = displayText,
@@ -332,22 +333,48 @@ internal fun AgentText(params: AgentTextParams) {
                 )
             }
             if (pointer) {
-                // letta-mobile-zrode: where a pointer hovers, the actions take their own reserved
-                // line under the text (beside the delivery time). Drawn over the first line they
-                // hid its words; reserved, showing them never moves the text either.
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    params.deliveryTimestamp?.let { DeliveryTime(it) }
-                    Spacer(Modifier.weight(1f))
-                    AgentTextActions(params, hovered)
-                }
+                PointerActionsLine(params, hovered)
             } else {
-                params.deliveryTimestamp?.let { DeliveryTime(it) }
+                params.deliveryTimestamp?.let { Box(Modifier.padding(top = ChatRowSpacing.messagePart)) { DeliveryTime(it) } }
             }
         }
         // Touch never hovers, so its hidden action keeps its old seat over the first line.
         if (!pointer) AgentTextActions(params, hovered, Modifier.align(Alignment.TopEnd))
     }
 }
+
+/**
+ * Where a pointer hovers, a reply's actions take their own reserved line under the text (beside the
+ * delivery time): drawn over the first line they hid its words; reserved, showing them never moves
+ * the text either. Prose that more of its run follows ([LocalReplyActionsLine] false) reserves no
+ * line, so the next step sits one beat under its words; its actions stay on the right-click menu.
+ * The line eases in and out with the run's fold, so folding never jumps.
+ */
+@Composable
+private fun PointerActionsLine(params: AgentTextParams, hovered: Boolean) {
+    val motion = ChatRowMotion(LocalReducedMotion.current)
+    AnimatedVisibility(
+        visible = LocalReplyActionsLine.current || params.deliveryTimestamp != null,
+        enter = motion.expansionEnter(),
+        exit = motion.expansionExit(),
+        label = "replyActionsLine",
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = ChatRowSpacing.messagePart),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            params.deliveryTimestamp?.let { DeliveryTime(it) }
+            Spacer(Modifier.weight(1f))
+            AgentTextActions(params, hovered)
+        }
+    }
+}
+
+/**
+ * Whether a pointer host reserves a reply's hover-actions line under its text. A run turns it off
+ * for prose that more of the run's visible steps follow: the line belongs where the run's words end.
+ */
+internal val LocalReplyActionsLine = compositionLocalOf { true }
 
 /** Fork and Copy for a reply, shown while it is hovered. */
 @Composable

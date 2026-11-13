@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.scan
@@ -66,7 +65,8 @@ fun Flow<ContextReadingInputs>.contextUsageStates(breakdown: ContextBreakdownLoa
     breakdown ?: return contextUsageStates()
     val inputs = this
     return channelFlow {
-        launch { breakdown.follow(inputs.filter { it.key.settled }.map(ContextReadingInputs::breakdownRequest)) }
+        // A running turn maps to no request, so a refresh still waiting for the turn to stay settled is dropped.
+        launch { breakdown.follow(inputs.map { if (it.key.settled) it.breakdownRequest() else null }) }
         combine(inputs.contextUsageStates(), inputs.map { it.key.breakdownKey() }.distinctUntilChanged(), breakdown.breakdowns) {
                 reading, key, known ->
             MeterInputs(reading, key, key?.let(known::get))

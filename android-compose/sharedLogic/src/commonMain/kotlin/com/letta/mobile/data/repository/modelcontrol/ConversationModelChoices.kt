@@ -64,13 +64,13 @@ internal class ConversationModelLedger {
         current
     }
 
-    /** Takes each record as the host's word; a pick the host now reports is confirmed and dropped. */
+    /** Confirms a matching pick, preserves the pre-pick snapshot, and yields to a third host model. */
     fun report(conversations: Iterable<Conversation>) = update {
         conversations.forEach { conversation ->
             val id = conversation.id.value.takeIf { it.isNotBlank() } ?: return@forEach
             val reported = HostReport.of(conversation)
             reports = if (reported == null) reports - id else reports + (id to reported)
-            if (reported != null && picks[id]?.confirmedBy(reported) == true) picks = picks - id
+            if (picks[id]?.supersededBy(reported) == true) picks = picks - id
         }
     }
 
@@ -84,7 +84,8 @@ internal class ConversationModelLedger {
         val kept = picks[change.conversationId]
             ?.takeIf { it.model == model && change.effort == ReasoningEffortChoice.Unchanged }
             ?.effort
-        return PendingPick(model, kept ?: change.effort)
+        val before = reports[change.conversationId]?.model
+        return PendingPick(model, kept ?: change.effort, before)
     }
 
     private inline fun <T> update(change: () -> T): T = synchronized(lock) {
@@ -108,7 +109,14 @@ internal class ConversationModelLedger {
     }
 
     /** A pick not yet confirmed by the host: its model and the effort sent with it. */
-    private data class PendingPick(val model: String, val effort: ReasoningEffortChoice) {
+    private data class PendingPick(val model: String, val effort: ReasoningEffortChoice, val before: String?) {
+        /** Keep pre-switch snapshots, but yield to a third model (including a cleared override). */
+        fun supersededBy(report: HostReport?): Boolean = when (report?.model) {
+            model -> report != null && confirmedBy(report)
+            before -> false
+            else -> true
+        }
+
         /** The host reports this pick: same model and, for a named effort, that effort. */
         fun confirmedBy(report: HostReport): Boolean = report.model == model &&
             (effort !is ReasoningEffortChoice.Named || report.effort.equals(effort.effort, ignoreCase = true))
