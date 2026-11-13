@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryRecorder
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -313,6 +315,183 @@ class QueuedSendDriverTest {
         assertEquals(listOf(retry), rig.queue.queueFor(CONV).items)
         advanceTimeBy(RETRY_DELAY_MS * 3)
         assertEquals(1, rig.turns.attempts.size, "cancellation must not schedule another attempt")
+    }
+
+    @Test
+    fun declinedHeadSurvivesTenSecondOutage() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertEquals(listOf("outage"), rig.queuedTexts())
+        rig.turns.accept = true
+        advanceTimeBy(30_001)
+        runCurrent()
+        assertEquals(listOf("outage"), rig.turns.dispatched)
+        assertTrue(rig.turns.visibleCounts.all { it == 1 })
+        assertTrue(rig.queue.queueFor(CONV).isEmpty)
+    }
+
+    @Test
+    fun throwingHeadSurvivesTenSecondOutage() = runTest {
+        val rig = rig(busy = true)
+        rig.enqueue("outage")
+        rig.turns.dispatchFailure = IllegalStateException("transport unavailable")
+        rig.finishTurn()
+        advanceTimeBy(10_000)
+        runCurrent()
+        rig.turns.dispatchFailure = null
+        advanceTimeBy(30_001)
+        runCurrent()
+        assertEquals(listOf("outage"), rig.turns.dispatched)
+        assertTrue(rig.turns.visibleCounts.all { it == 1 })
+    }
+
+    @Test
+    fun foreignTerminalWakesHeadDuringBackoff() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        advanceTimeBy(10_000)
+        runCurrent()
+        rig.turns.accept = true
+        rig.foreignTerminal()
+        assertEquals(listOf("outage"), rig.turns.dispatched)
+    }
+
+    @Test
+    fun pauseDuringBackoffStopsRetriesUntilResume() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        advanceTimeBy(10_000)
+        runCurrent()
+        rig.driver.onStopped(CONV)
+        val attempts = rig.turns.attempts.size
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(attempts, rig.turns.attempts.size)
+        rig.turns.accept = true
+        rig.driver.resume(CONV)
+        assertEquals(listOf("outage"), rig.turns.dispatched)
+    }
+
+    @Test
+    fun scopeCancellationDuringBackoffSchedulesNothingMore() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        advanceTimeBy(10_000)
+        runCurrent()
+        val attempts = rig.turns.attempts.size
+        backgroundScope.cancel()
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(attempts, rig.turns.attempts.size)
+        assertEquals(listOf("outage"), rig.queuedTexts())
+    }
+
+    @Test
+    fun dispatchCancellationDuringBackoffStopsTheDrain() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        advanceTimeBy(10_000)
+        runCurrent()
+        rig.turns.dispatchFailure = kotlinx.coroutines.CancellationException("cancelled backoff")
+        val attempts = rig.turns.attempts.size
+        advanceTimeBy(30_001)
+        runCurrent()
+        assertEquals(attempts + 1, rig.turns.attempts.size)
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(attempts + 1, rig.turns.attempts.size)
+        assertEquals(listOf("outage"), rig.queuedTexts())
+    }
+
+    @Test
+    fun cancellingHeadDuringBackoffStopsTheDrain() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        advanceTimeBy(10_000)
+        runCurrent()
+        val attempts = rig.turns.attempts.size
+        assertTrue(rig.driver.cancel(rig.queue.queueFor(CONV).items.single().id))
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(attempts, rig.turns.attempts.size)
+        assertTrue(rig.queue.queueFor(CONV).isEmpty)
+    }
+
+    @Test
+    fun retryDelayGrowsThenStaysAtThirtySeconds() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("outage")
+        runCurrent()
+        advanceTimeBy(2_001)
+        runCurrent()
+        val fastAttempts = rig.turns.attempts.size
+        advanceTimeBy(498)
+        runCurrent()
+        assertEquals(fastAttempts, rig.turns.attempts.size)
+        advanceTimeBy(2)
+        runCurrent()
+        assertEquals(fastAttempts + 1, rig.turns.attempts.size)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(fastAttempts + 2, rig.turns.attempts.size)
+        advanceTimeBy(60_000)
+        runCurrent()
+        val cappedAttempts = rig.turns.attempts.size
+        advanceTimeBy(30_000)
+        runCurrent()
+        assertEquals(cappedAttempts + 1, rig.turns.attempts.size)
+        advanceTimeBy(30_000)
+        runCurrent()
+        assertEquals(cappedAttempts + 2, rig.turns.attempts.size)
+    }
+
+    @Test
+    fun recoveryOnLastFastRetryDoesNotReportBackoff() = runTest {
+        val recording = Telemetry.installRecorder(TelemetryRecorder())
+        try {
+            val rig = rig(busy = false)
+            rig.turns.accept = false
+            rig.enqueue("outage")
+            runCurrent()
+            advanceTimeBy(2_000)
+            rig.turns.accept = true
+            runCurrent()
+            assertEquals(listOf("outage"), rig.turns.dispatched)
+            assertTrue(Telemetry.events.value.none { it.name.startsWith("queue.drain") })
+        } finally {
+            recording.close()
+        }
+    }
+
+    @Test
+    fun backoffReportsOneFallbackAndOneImmediateRecoveryWithRetryCounts() = runTest {
+        val recording = Telemetry.installRecorder(TelemetryRecorder())
+        try {
+            val rig = rig(busy = false)
+            rig.turns.accept = false
+            rig.enqueue("outage")
+            runCurrent()
+            advanceTimeBy(2_000)
+            runCurrent()
+            rig.turns.accept = true
+            rig.driver.resume(CONV)
+            advanceTimeBy(60_000)
+            runCurrent()
+            val events = Telemetry.events.value.asReversed().filter { it.name.startsWith("queue.drain") }
+            assertEquals(listOf("queue.drainDeferred", "queue.drainRecovered"), events.map { it.name })
+            assertEquals(listOf("40", "40"), events.map { it.attrs["attempts"].toString() })
+        } finally {
+            recording.close()
+        }
     }
 
     private class ScriptedTurns(var busy: Boolean, private val queue: ChatSendQueue) : QueuedSendTurns {

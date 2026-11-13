@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.runCatchingCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,10 +62,11 @@ sealed interface ContextBreakdownState {
  * context card both read [breakdowns], so they never disagree.
  *
  * Nothing polls. [follow] fetches the focused conversation's breakdown when it is opened and again
- * once each turn settles (its total changes), dropping a stale fetch when the focus moves; the
- * card's sheet [load]s too and after a compaction. A repeat request for the same conversation and
- * total is served from the last answer, and each conversation's last breakdown stays in
- * [breakdowns], so a revisit draws it at once while the refresh runs.
+ * once each turn settles (its total changes) and stays settled for [BREAKDOWN_REFRESH_QUIET_MS], so
+ * the run boundaries inside one App Server turn (each briefly reads as settled) cost no fetch; a
+ * stale fetch is dropped when the focus moves. The card's sheet [load]s too and after a compaction.
+ * A repeat request for a conversation and total already answered is served from [breakdowns], whoever
+ * asks (meter, card, another pane), so a revisit draws it at once with no new `agent.context`.
  */
 class ContextBreakdownLoader(
     private val fetch: suspend (ContextBreakdownRequest) -> ContextWindowOverview,
@@ -87,7 +89,7 @@ class ContextBreakdownLoader(
     private val lock = Mutex()
 
     suspend fun load(request: ContextBreakdownRequest, force: Boolean = false): ContextBreakdownState = lock.withLock {
-        if (!force) answeredFor(request)?.let { return@withLock it }
+        if (!force) answeredFor(request)?.let { answer -> return@withLock answer.also { mutableState.value = it } }
         mutableState.value = ContextBreakdownState.Loading(request)
         val next = runCatchingCancellable { fetch(request) }.fold(
             onSuccess = { overview ->
@@ -109,14 +111,24 @@ class ContextBreakdownLoader(
     /**
      * Keeps the focused conversation's breakdown loaded until cancelled: each new request (a
      * conversation opened, or a settled turn's new total) is fetched in the background, and one
-     * still in flight when the focus moves on is cancelled. Null is no focus.
+     * still in flight when the focus moves on is cancelled. A refresh of a conversation that already
+     * has a breakdown waits [BREAKDOWN_REFRESH_QUIET_MS] first, and a null (no focus, or a turn running
+     * again) cancels the wait. Null is no focus.
      */
     suspend fun follow(requests: Flow<ContextBreakdownRequest?>) {
-        requests.distinctUntilChanged().collectLatest { request -> request?.let { load(it) } }
+        requests.distinctUntilChanged().collectLatest { request ->
+            request ?: return@collectLatest
+            val known = cache.value[request.key]
+            if (known != null && known.reportedTotal != request.reportedTotal) delay(BREAKDOWN_REFRESH_QUIET_MS)
+            load(request)
+        }
     }
 
+    /** The last answer, or the breakdown already loaded for this conversation and total. */
     private fun answeredFor(request: ContextBreakdownRequest): ContextBreakdownState.Loaded? =
         (mutableState.value as? ContextBreakdownState.Loaded)?.takeIf { it.request == request }
+            ?: cache.value[request.key]?.takeIf { it.reportedTotal == request.reportedTotal }
+                ?.let { ContextBreakdownState.Loaded(request, it.overview) }
 
     /** Forget the last answer, e.g. when the focused conversation changes. */
     fun clear() {
@@ -137,6 +149,13 @@ class ContextBreakdownLoader(
         const val CAPABILITY_UNAVAILABLE = "capability_unavailable"
     }
 }
+
+/**
+ * How long a settled reading must hold before [ContextBreakdownLoader.follow] refreshes a breakdown
+ * (~140 KB, 0.3-0.4 s of host work): an App Server turn is several runs, and the gap between two reads
+ * as settled. Meanwhile the meter shows the exact streamed total.
+ */
+internal const val BREAKDOWN_REFRESH_QUIET_MS = 10_000L
 
 /** The breakdown a [ContextBreakdownState] holds for [request], when it holds one. */
 fun ContextBreakdownState.overviewFor(request: ContextBreakdownRequest?): ContextWindowOverview? =

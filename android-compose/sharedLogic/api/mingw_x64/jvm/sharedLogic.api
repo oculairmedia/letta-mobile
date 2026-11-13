@@ -8998,9 +8998,11 @@ public final class com/letta/mobile/data/canvas/UnauthorizedCanvasMutationExcept
 
 public final class com/letta/mobile/data/canvas/authority/FileNotebookGrantStore : com/letta/mobile/data/canvas/authority/NotebookGrantStore {
 	public fun <init> (Ljava/nio/file/Path;)V
+	public fun documentsOf (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun provision (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/NotebookPeerGrant;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun revoke (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun withGrants (Ljava/lang/String;Ljava/util/Collection;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/authority/HostNotebookAccess {
@@ -9008,6 +9010,8 @@ public final class com/letta/mobile/data/canvas/authority/HostNotebookAccess {
 	public final fun getBackend ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;
 	public final fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
 	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
+	public final fun sharedNotes-e-n832c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sharedNotes-e-n832c$default (Lcom/letta/mobile/data/canvas/authority/HostNotebookAccess;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/authority/NotebookAccessWire {
@@ -9029,7 +9033,9 @@ public final class com/letta/mobile/data/canvas/authority/NotebookAccessWire {
 }
 
 public abstract interface class com/letta/mobile/data/canvas/authority/NotebookGrantStore {
+	public abstract fun documentsOf (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun withGrant (Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun withGrants (Ljava/lang/String;Ljava/util/Collection;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/authority/NotebookGrantStoreKt {
@@ -9037,11 +9043,31 @@ public final class com/letta/mobile/data/canvas/authority/NotebookGrantStoreKt {
 	public static final fun mayResolveNotebookReference (Lcom/letta/mobile/data/canvas/NotebookPeerGrant;)Z
 }
 
-public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccess {
+public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccess : com/letta/mobile/data/canvas/workspace/SharedNotebooks {
 	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;)V
 	public final fun getBackend ()Lcom/letta/mobile/data/canvas/notes/NotebookNoteBackend;
-	public final fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
+	public fun getDirectory ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteDirectory;
+	public fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
 	public final fun getResolver ()Lcom/letta/mobile/data/canvas/references/NotebookReferenceResolver;
+}
+
+public final class com/letta/mobile/data/canvas/authority/RemoteNotebookAccessKt {
+	public static final fun remoteNotebooksOver (Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;
+}
+
+public final class com/letta/mobile/data/canvas/authority/SharedNotesWire {
+	public static final field CURSOR Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/authority/SharedNotesWire;
+	public static final field INVALID_CURSOR Ljava/lang/String;
+	public static final field LIST Ljava/lang/String;
+	public static final field MAX_CHECKED I
+	public static final field MAX_CURSOR_CHARS I
+	public static final field MAX_LISTED I
+	public static final field NEXT_CURSOR Ljava/lang/String;
+	public final fun cursorOf-BnZTiBg (Ljava/lang/String;)Ljava/lang/String;
+	public final fun readSharedNotes (Lkotlinx/serialization/json/JsonElement;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
+	public final fun request-wIa-Xck (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
+	public final fun sharedNotes (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;)Lkotlinx/serialization/json/JsonObject;
 }
 
 public final class com/letta/mobile/data/canvas/bubble/CanvasBubbleLayout {
@@ -11569,6 +11595,121 @@ public final class com/letta/mobile/data/canvas/workspace/DocumentWorkspaceState
 	public final fun getTransitioning ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNote {
+	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNote;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNote;Lcom/letta/mobile/data/canvas/NotebookDocumentId;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNote;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteBrowser {
+	public fun <init> (Lcom/letta/mobile/data/canvas/workspace/SharedNotebooks;)V
+	public final fun closeNote (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun loadMore (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun open (Lcom/letta/mobile/data/canvas/NotebookDocumentId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun refresh (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun workspaceEmptied (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteBrowserKt {
+	public static final fun withdrawn (Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;)Z
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteBrowserState {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun component6 ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;
+	public final fun component7 ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;
+	public final fun copy (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteBrowserState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteBrowserState;Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;ZZZLcom/letta/mobile/data/canvas/NotebookDocumentId;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteBrowserState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getListing ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing;
+	public final fun getLoading ()Z
+	public final fun getLoadingMore ()Z
+	public final fun getMoreFailed ()Z
+	public final fun getOpenProblem ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceProblem;
+	public final fun getOpening ()Lcom/letta/mobile/data/canvas/NotebookDocumentId;
+	public final fun getWorkspace ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/workspace/SharedNoteDirectory {
+	public abstract fun list-e-n832c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Denied : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2-Lsr3kjc ()Ljava/lang/String;
+	public final fun copy-e962Jwc (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
+	public static synthetic fun copy-e962Jwc$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Listed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNext-Lsr3kjc ()Ljava/lang/String;
+	public final fun getNotes ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable : com/letta/mobile/data/canvas/workspace/SharedNoteListing {
+	public static final field Companion Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable$Companion;
+	public static final field INVALID_CURSOR Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNoteListing$Unavailable$Companion {
+}
+
+public abstract interface class com/letta/mobile/data/canvas/workspace/SharedNotebooks {
+	public abstract fun getDirectory ()Lcom/letta/mobile/data/canvas/workspace/SharedNoteDirectory;
+	public abstract fun getOpener ()Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceOpener;
+}
+
+public final class com/letta/mobile/data/canvas/workspace/SharedNotesCursor {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/workspace/SharedNotesCursor;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/channel/ChannelDisplayItem {
@@ -19658,8 +19799,8 @@ public final class com/letta/mobile/data/controller/node/iroh/ModelAdminHandlers
 	public final fun getEXPOSURE_METHODS ()Ljava/util/Set;
 	public final fun getFORMER_ADMIN_REST_METHODS ()Ljava/util/Set;
 	public final fun getMETHODS ()Ljava/util/Set;
-	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;)V
-	public static synthetic fun register$default (Lcom/letta/mobile/data/controller/node/iroh/ModelAdminHandlers;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;ILjava/lang/Object;)V
+	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeReadTiers;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;)V
+	public static synthetic fun register$default (Lcom/letta/mobile/data/controller/node/iroh/ModelAdminHandlers;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeReadTiers;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;ILjava/lang/Object;)V
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ModelExposureStore {
@@ -44102,6 +44243,7 @@ public class com/letta/mobile/data/repository/CachedVibesyncEventStreamRepositor
 public final class com/letta/mobile/data/repository/ConversationChangeObservationKt {
 	public static final fun conversationChanges (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lkotlinx/coroutines/flow/Flow;
 	public static final fun observeConversationInvalidations (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun observeConversationInvalidations-dWUq8MI (Lkotlinx/coroutines/flow/Flow;JLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun observeConversationUpdates (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -48522,6 +48664,7 @@ public final class com/letta/mobile/data/runtime/TurnFailureNotices {
 	public static final field CONNECTION_LOST_KIND Ljava/lang/String;
 	public static final field GENERIC_MESSAGE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/runtime/TurnFailureNotices;
+	public static final field OTHER_DEVICE_BUSY_KIND Ljava/lang/String;
 	public final fun forCancelledTerminal ()Lcom/letta/mobile/data/runtime/TurnFailureNotice;
 	public final fun forFailedTerminal (Ljava/lang/String;ZZLjava/lang/String;)Lcom/letta/mobile/data/runtime/TurnFailureNotice;
 	public static synthetic fun forFailedTerminal$default (Lcom/letta/mobile/data/runtime/TurnFailureNotices;Ljava/lang/String;ZZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/runtime/TurnFailureNotice;
@@ -53111,12 +53254,21 @@ public final class com/letta/mobile/data/shell/layout/ShellLayoutConfigStore$Com
 public final class com/letta/mobile/data/shell/layout/ShellViews {
 	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/ShellViews;
 	public final fun getCANVAS-p0dNODo ()Ljava/lang/String;
+	public final fun getDOCUMENT-p0dNODo ()Ljava/lang/String;
 	public final fun getHostOwned ()Ljava/util/Set;
 	public final fun getNOTE-p0dNODo ()Ljava/lang/String;
 	public final fun getPAGE-p0dNODo ()Ljava/lang/String;
 	public final fun getSECRET_REQUEST-p0dNODo ()Ljava/lang/String;
 	public final fun getSIDE_PANE-p0dNODo ()Ljava/lang/String;
 	public final fun getTASKS-p0dNODo ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/shell/layout/edit/SharedNotesPlacement {
+	public static final field INSTANCE Lcom/letta/mobile/data/shell/layout/edit/SharedNotesPlacement;
+	public final fun getSLOT ()Lcom/letta/mobile/data/shell/layout/ModuleSlot;
+	public final fun overCompactPage (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
+	public final fun shown (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Z
+	public final fun toggled (Lcom/letta/mobile/data/shell/layout/ShellLayoutConfig;)Lcom/letta/mobile/data/shell/layout/edit/ShellLayoutEditResult;
 }
 
 public final class com/letta/mobile/data/shell/layout/edit/ShellLayoutAction : java/lang/Enum {
@@ -71266,6 +71418,1876 @@ public final class com/letta/mobile/data/transport/teardown/TransportTeardown : 
 public final class com/letta/mobile/data/transport/teardown/TransportTeardown$Companion {
 }
 
+public final class com/letta/mobile/data/voice/AudioLevel {
+	public static final field Companion Lcom/letta/mobile/data/voice/AudioLevel$Companion;
+	public static final synthetic fun box-impl (F)Lcom/letta/mobile/data/voice/AudioLevel;
+	public static fun constructor-impl (F)F
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (FLjava/lang/Object;)Z
+	public static final fun equals-impl0 (FF)Z
+	public final fun getValue ()F
+	public fun hashCode ()I
+	public static fun hashCode-impl (F)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (F)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()F
+}
+
+public final class com/letta/mobile/data/voice/AudioLevel$Companion {
+	public final fun clamped-EzKktFY (F)F
+	public final fun getSilent-cl3m8eg ()F
+}
+
+public final class com/letta/mobile/data/voice/CapturedAudioHandle {
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class com/letta/mobile/data/voice/InterruptStatus : java/lang/Enum {
+	public static final field NONE Lcom/letta/mobile/data/voice/InterruptStatus;
+	public static final field REQUESTED Lcom/letta/mobile/data/voice/InterruptStatus;
+	public static final field UNRESPONSIVE Lcom/letta/mobile/data/voice/InterruptStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/InterruptStatus;
+	public static fun values ()[Lcom/letta/mobile/data/voice/InterruptStatus;
+}
+
+public final class com/letta/mobile/data/voice/LateReplyPolicy : java/lang/Enum {
+	public static final field DISCARD Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public static final field SPEAK_WHEN_QUIET Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public static fun values ()[Lcom/letta/mobile/data/voice/LateReplyPolicy;
+}
+
+public final class com/letta/mobile/data/voice/SpeechEndpointUrl {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/SpeechEndpointUrl;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/SpeechLanguage {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/SpeechLanguage;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/SpeechModelName {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/SpeechModelName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/SpeechVoiceName {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/SpeechVoiceName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceActionDecision {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-PsiDlxc ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy-XQ55XYM (Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/data/voice/VoiceActionDecision;
+	public static synthetic fun copy-XQ55XYM$default (Lcom/letta/mobile/data/voice/VoiceActionDecision;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceActionDecision;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArguments ()Ljava/util/Map;
+	public final fun getKind-PsiDlxc ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceActionKind {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceActionKind;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceConversationMode : java/lang/Enum {
+	public static final field CONTINUOUS Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public static final field SINGLE_SHOT Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoiceConversationMode;
+}
+
+public abstract interface class com/letta/mobile/data/voice/VoiceDecision {
+}
+
+public final class com/letta/mobile/data/voice/VoiceDecision$Act : com/letta/mobile/data/voice/VoiceDecision {
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceActionDecision;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceActionDecision;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceActionDecision;)Lcom/letta/mobile/data/voice/VoiceDecision$Act;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/VoiceDecision$Act;Lcom/letta/mobile/data/voice/VoiceActionDecision;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceDecision$Act;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAction ()Lcom/letta/mobile/data/voice/VoiceActionDecision;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceDecision$AnsweredByEar : com/letta/mobile/data/voice/VoiceDecision {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/VoiceDecision$AnsweredByEar;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceDecision$Respond : com/letta/mobile/data/voice/VoiceDecision {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/VoiceDecision$Respond;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceEarKind : java/lang/Enum {
+	public static final field PLATFORM_RECOGNIZER Lcom/letta/mobile/data/voice/VoiceEarKind;
+	public static final field REALTIME_MODEL Lcom/letta/mobile/data/voice/VoiceEarKind;
+	public static final field TRANSCRIPTION_ENDPOINT Lcom/letta/mobile/data/voice/VoiceEarKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceEarKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoiceEarKind;
+}
+
+public final class com/letta/mobile/data/voice/VoiceEndpointSettings {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-MPXUHBE ()Ljava/lang/String;
+	public final fun component2-CAMs64U ()Ljava/lang/String;
+	public final fun component3-CAMs64U ()Ljava/lang/String;
+	public final fun component4-ama1Wpo ()Ljava/lang/String;
+	public final fun component5-VV7C9BA ()Ljava/lang/String;
+	public final fun copy-fNpWTUs (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceEndpointSettings;
+	public static synthetic fun copy-fNpWTUs$default (Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceEndpointSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseUrl-MPXUHBE ()Ljava/lang/String;
+	public final fun getLanguage-VV7C9BA ()Ljava/lang/String;
+	public final fun getSpeechModel-CAMs64U ()Ljava/lang/String;
+	public final fun getTranscriptionModel-CAMs64U ()Ljava/lang/String;
+	public final fun getVoice-ama1Wpo ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceError {
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceErrorCode;Lcom/letta/mobile/data/voice/VoicePort;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/VoicePort;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceErrorCode;Lcom/letta/mobile/data/voice/VoicePort;)Lcom/letta/mobile/data/voice/VoiceError;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/VoiceErrorCode;Lcom/letta/mobile/data/voice/VoicePort;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceError;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAction ()Lcom/letta/mobile/data/voice/VoiceUserAction;
+	public final fun getCode ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun getPort ()Lcom/letta/mobile/data/voice/VoicePort;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceErrorCode : java/lang/Enum {
+	public static final field ASSET_MISSING Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field BAD_RESPONSE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field BUSY Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field CANCELLED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field CAPTURE_EXPIRED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field ENGINE_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field INSECURE_TRANSPORT Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field INVALID_ENDPOINT Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field NOT_DELIVERED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field PERMISSION_REQUIRED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field PLAYBACK_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field PREPARATION_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field REJECTED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field RUN_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field SYNTHESIS_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field TIMED_OUT Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field TRANSCRIPTION_FAILED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNATTRIBUTED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNAUTHORIZED Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNAVAILABLE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNREACHABLE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNRESPONSIVE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNSUPPORTED_FORMAT Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static final field UNSUPPORTED_LOCALE Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun getAction ()Lcom/letta/mobile/data/voice/VoiceUserAction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoiceErrorCode;
+}
+
+public final class com/letta/mobile/data/voice/VoiceLoopConfig {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;JJIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;JJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public final fun component2 ()Z
+	public final fun component3 ()Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public final fun component4-UwyO8pc ()J
+	public final fun component5-UwyO8pc ()J
+	public final fun component6 ()I
+	public final fun component7 ()I
+	public final fun copy-2AWqQcw (Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;JJII)Lcom/letta/mobile/data/voice/VoiceLoopConfig;
+	public static synthetic fun copy-2AWqQcw$default (Lcom/letta/mobile/data/voice/VoiceLoopConfig;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;JJIIILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceLoopConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBargeIn ()Z
+	public final fun getLateReplies ()Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public final fun getMaxHeldLateSegments ()I
+	public final fun getMaxSegmentLength ()I
+	public final fun getMode ()Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public final fun getReleaseTimeout-UwyO8pc ()J
+	public final fun getThinkingTimeout-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceMouthKind : java/lang/Enum {
+	public static final field PLATFORM_TTS Lcom/letta/mobile/data/voice/VoiceMouthKind;
+	public static final field SPEECH_ENDPOINT Lcom/letta/mobile/data/voice/VoiceMouthKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceMouthKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoiceMouthKind;
+}
+
+public final class com/letta/mobile/data/voice/VoicePhase : java/lang/Enum {
+	public static final field FAILED Lcom/letta/mobile/data/voice/VoicePhase;
+	public static final field IDLE Lcom/letta/mobile/data/voice/VoicePhase;
+	public static final field LISTENING Lcom/letta/mobile/data/voice/VoicePhase;
+	public static final field SPEAKING Lcom/letta/mobile/data/voice/VoicePhase;
+	public static final field THINKING Lcom/letta/mobile/data/voice/VoicePhase;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoicePhase;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoicePhase;
+}
+
+public final class com/letta/mobile/data/voice/VoicePort : java/lang/Enum {
+	public static final field ACTIVATION Lcom/letta/mobile/data/voice/VoicePort;
+	public static final field EAR Lcom/letta/mobile/data/voice/VoicePort;
+	public static final field LOOP Lcom/letta/mobile/data/voice/VoicePort;
+	public static final field MOUTH Lcom/letta/mobile/data/voice/VoicePort;
+	public static final field RESPONDER Lcom/letta/mobile/data/voice/VoicePort;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoicePort;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoicePort;
+}
+
+public final class com/letta/mobile/data/voice/VoiceResponderKind : java/lang/Enum {
+	public static final field CHAT_AGENT Lcom/letta/mobile/data/voice/VoiceResponderKind;
+	public static final field FAST_WITH_AGENT_DELEGATION Lcom/letta/mobile/data/voice/VoiceResponderKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceResponderKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoiceResponderKind;
+}
+
+public final class com/letta/mobile/data/voice/VoiceSettings {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceEarKind;Lcom/letta/mobile/data/voice/VoiceMouthKind;Lcom/letta/mobile/data/voice/VoiceResponderKind;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceEarKind;Lcom/letta/mobile/data/voice/VoiceMouthKind;Lcom/letta/mobile/data/voice/VoiceResponderKind;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceEarKind;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/VoiceMouthKind;
+	public final fun component3 ()Lcom/letta/mobile/data/voice/VoiceResponderKind;
+	public final fun component4 ()Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public final fun component5 ()Z
+	public final fun component6 ()Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public final fun component7 ()Lcom/letta/mobile/data/voice/VoiceEndpointSettings;
+	public final fun component8 ()Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceEarKind;Lcom/letta/mobile/data/voice/VoiceMouthKind;Lcom/letta/mobile/data/voice/VoiceResponderKind;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;)Lcom/letta/mobile/data/voice/VoiceSettings;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/VoiceSettings;Lcom/letta/mobile/data/voice/VoiceEarKind;Lcom/letta/mobile/data/voice/VoiceMouthKind;Lcom/letta/mobile/data/voice/VoiceResponderKind;Lcom/letta/mobile/data/voice/VoiceConversationMode;ZLcom/letta/mobile/data/voice/LateReplyPolicy;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBargeIn ()Z
+	public final fun getEar ()Lcom/letta/mobile/data/voice/VoiceEarKind;
+	public final fun getEndpoint ()Lcom/letta/mobile/data/voice/VoiceEndpointSettings;
+	public final fun getLateReplies ()Lcom/letta/mobile/data/voice/LateReplyPolicy;
+	public final fun getMode ()Lcom/letta/mobile/data/voice/VoiceConversationMode;
+	public final fun getMouth ()Lcom/letta/mobile/data/voice/VoiceMouthKind;
+	public final fun getResponder ()Lcom/letta/mobile/data/voice/VoiceResponderKind;
+	public final fun getWakeWord ()Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceText {
+	public static final field Companion Lcom/letta/mobile/data/voice/VoiceText$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceText;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public static final fun isBlank-impl (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceText$Companion {
+	public final fun getEmpty-WHRWuv8 ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceUserAction : java/lang/Enum {
+	public static final field NONE Lcom/letta/mobile/data/voice/VoiceUserAction;
+	public static final field OPEN_SETTINGS Lcom/letta/mobile/data/voice/VoiceUserAction;
+	public static final field RETRY Lcom/letta/mobile/data/voice/VoiceUserAction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceUserAction;
+	public static fun values ()[Lcom/letta/mobile/data/voice/VoiceUserAction;
+}
+
+public final class com/letta/mobile/data/voice/VoiceUtterance {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/VoiceDecision;Lcom/letta/mobile/data/voice/CapturedAudioHandle;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/VoiceDecision;Lcom/letta/mobile/data/voice/CapturedAudioHandle;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-WHRWuv8 ()Ljava/lang/String;
+	public final fun component2-r0nVoFo ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/data/voice/VoiceDecision;
+	public final fun component4-YTo8GjY ()Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public final fun copy-yffy-bc (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/VoiceDecision;Lcom/letta/mobile/data/voice/CapturedAudioHandle;)Lcom/letta/mobile/data/voice/VoiceUtterance;
+	public static synthetic fun copy-yffy-bc$default (Lcom/letta/mobile/data/voice/VoiceUtterance;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/VoiceDecision;Lcom/letta/mobile/data/voice/CapturedAudioHandle;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceUtterance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapture-YTo8GjY ()Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public final fun getDecision ()Lcom/letta/mobile/data/voice/VoiceDecision;
+	public final fun getImmediateReply-r0nVoFo ()Ljava/lang/String;
+	public final fun getText-WHRWuv8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceWakeWordSettings {
+	public static final field Companion Lcom/letta/mobile/data/voice/VoiceWakeWordSettings$Companion;
+	public static final field MAX_PHRASES I
+	public synthetic fun <init> (ZLjava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ZLjava/util/List;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3-3zlmQBM ()Ljava/lang/String;
+	public final fun copy-8hCFJCk (ZLjava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;
+	public static synthetic fun copy-8hCFJCk$default (Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;ZLjava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/VoiceWakeWordSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEnabled ()Z
+	public final fun getPhrases ()Ljava/util/List;
+	public final fun getPreferredEngine-3zlmQBM ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/VoiceWakeWordSettings$Companion {
+}
+
+public final class com/letta/mobile/data/voice/WakeLanguage {
+	public static final field Companion Lcom/letta/mobile/data/voice/WakeLanguage$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/WakeLanguage;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getTag ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/WakeLanguage$Companion {
+	public final fun getEnglish-y4rKF58 ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/WakePhrase {
+	public static final field Companion Lcom/letta/mobile/data/voice/WakePhrase$Companion;
+	public static final field MAX_LENGTH I
+	public static final field MIN_LENGTH I
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;FILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;FLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-y4rKF58 ()Ljava/lang/String;
+	public final fun component3-XANKw1Q ()F
+	public final fun copy-qUEwbjg (Ljava/lang/String;Ljava/lang/String;F)Lcom/letta/mobile/data/voice/WakePhrase;
+	public static synthetic fun copy-qUEwbjg$default (Lcom/letta/mobile/data/voice/WakePhrase;Ljava/lang/String;Ljava/lang/String;FILjava/lang/Object;)Lcom/letta/mobile/data/voice/WakePhrase;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLanguage-y4rKF58 ()Ljava/lang/String;
+	public final fun getSensitivity-XANKw1Q ()F
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/WakePhrase$Companion {
+	public final fun problemWith (Ljava/lang/String;)Lcom/letta/mobile/data/voice/WakePhraseProblem;
+}
+
+public final class com/letta/mobile/data/voice/WakePhraseProblem : java/lang/Enum {
+	public static final field EMPTY Lcom/letta/mobile/data/voice/WakePhraseProblem;
+	public static final field FORBIDDEN_CHARACTER Lcom/letta/mobile/data/voice/WakePhraseProblem;
+	public static final field TOO_LONG Lcom/letta/mobile/data/voice/WakePhraseProblem;
+	public static final field TOO_SHORT Lcom/letta/mobile/data/voice/WakePhraseProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/WakePhraseProblem;
+	public static fun values ()[Lcom/letta/mobile/data/voice/WakePhraseProblem;
+}
+
+public final class com/letta/mobile/data/voice/WakeSensitivity {
+	public static final field Companion Lcom/letta/mobile/data/voice/WakeSensitivity$Companion;
+	public static final synthetic fun box-impl (F)Lcom/letta/mobile/data/voice/WakeSensitivity;
+	public static fun constructor-impl (F)F
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (FLjava/lang/Object;)Z
+	public static final fun equals-impl0 (FF)Z
+	public static final fun getThreshold-impl (F)F
+	public final fun getValue ()F
+	public fun hashCode ()I
+	public static fun hashCode-impl (F)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (F)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()F
+}
+
+public final class com/letta/mobile/data/voice/WakeSensitivity$Companion {
+	public final fun getDefault-XANKw1Q ()F
+}
+
+public final class com/letta/mobile/data/voice/WakeWordEngineId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/WakeWordEngineId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/ActivationKeyClassifier {
+	public static final field Companion Lcom/letta/mobile/data/voice/activation/ActivationKeyClassifier$Companion;
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun classify (Lcom/letta/mobile/data/voice/activation/KeyClassifierState;Lcom/letta/mobile/data/voice/activation/KeyGesture;)Lcom/letta/mobile/data/voice/activation/KeyStep;
+}
+
+public final class com/letta/mobile/data/voice/activation/ActivationKeyClassifier$Companion {
+	public final fun getDEFAULT_HOLD_THRESHOLD-UwyO8pc ()J
+}
+
+public final class com/letta/mobile/data/voice/activation/ActivationKeyMode : java/lang/Enum {
+	public static final field AUTO Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;
+	public static final field HOLD Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;
+	public static final field TOGGLE Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;
+	public static fun values ()[Lcom/letta/mobile/data/voice/activation/ActivationKeyMode;
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyClassifierState {
+	public synthetic fun <init> (ZLcom/letta/mobile/data/voice/activation/KeyTime;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ZLcom/letta/mobile/data/voice/activation/KeyTime;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2-M-JK3Kg ()Lcom/letta/mobile/data/voice/activation/KeyTime;
+	public final fun component3 ()Z
+	public final fun copy-q1hpJWM (ZLcom/letta/mobile/data/voice/activation/KeyTime;Z)Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
+	public static synthetic fun copy-q1hpJWM$default (Lcom/letta/mobile/data/voice/activation/KeyClassifierState;ZLcom/letta/mobile/data/voice/activation/KeyTime;ZILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActive ()Z
+	public final fun getKeyDown ()Z
+	public final fun getPressedAt-M-JK3Kg ()Lcom/letta/mobile/data/voice/activation/KeyTime;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyDecision : java/lang/Enum {
+	public static final field DISCARD Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public static final field END_TURN Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public static final field NONE Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public static final field START Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public static fun values ()[Lcom/letta/mobile/data/voice/activation/KeyDecision;
+}
+
+public abstract interface class com/letta/mobile/data/voice/activation/KeyGesture {
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyGesture$Cancel : com/letta/mobile/data/voice/activation/KeyGesture {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/activation/KeyGesture$Cancel;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyGesture$Press : com/letta/mobile/data/voice/activation/KeyGesture {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-NISSvYg ()J
+	public final fun copy-i1gvbiM (J)Lcom/letta/mobile/data/voice/activation/KeyGesture$Press;
+	public static synthetic fun copy-i1gvbiM$default (Lcom/letta/mobile/data/voice/activation/KeyGesture$Press;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/KeyGesture$Press;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAt-NISSvYg ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyGesture$Release : com/letta/mobile/data/voice/activation/KeyGesture {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-NISSvYg ()J
+	public final fun copy-i1gvbiM (J)Lcom/letta/mobile/data/voice/activation/KeyGesture$Release;
+	public static synthetic fun copy-i1gvbiM$default (Lcom/letta/mobile/data/voice/activation/KeyGesture$Release;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/KeyGesture$Release;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAt-NISSvYg ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyStep {
+	public fun <init> (Lcom/letta/mobile/data/voice/activation/KeyClassifierState;Lcom/letta/mobile/data/voice/activation/KeyDecision;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public final fun copy (Lcom/letta/mobile/data/voice/activation/KeyClassifierState;Lcom/letta/mobile/data/voice/activation/KeyDecision;)Lcom/letta/mobile/data/voice/activation/KeyStep;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/activation/KeyStep;Lcom/letta/mobile/data/voice/activation/KeyClassifierState;Lcom/letta/mobile/data/voice/activation/KeyDecision;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/KeyStep;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDecision ()Lcom/letta/mobile/data/voice/activation/KeyDecision;
+	public final fun getState ()Lcom/letta/mobile/data/voice/activation/KeyClassifierState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/KeyTime {
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/data/voice/activation/KeyTime;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getSinceOrigin-UwyO8pc ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public abstract interface class com/letta/mobile/data/voice/activation/VoiceActivationEvent {
+	public abstract fun getKind ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+}
+
+public final class com/letta/mobile/data/voice/activation/VoiceActivationEvent$Activated : com/letta/mobile/data/voice/activation/VoiceActivationEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public final fun copy (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Activated;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Activated;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Activated;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getKind ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/VoiceActivationEvent$Degraded : com/letta/mobile/data/voice/activation/VoiceActivationEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/VoiceError;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun copy (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/VoiceError;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Degraded;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Degraded;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/VoiceError;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Degraded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/voice/VoiceError;
+	public fun getKind ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/VoiceActivationEvent$Discard : com/letta/mobile/data/voice/activation/VoiceActivationEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public final fun copy (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Discard;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Discard;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$Discard;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getKind ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/VoiceActivationEvent$EndTurn : com/letta/mobile/data/voice/activation/VoiceActivationEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public final fun copy (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$EndTurn;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$EndTurn;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/activation/VoiceActivationEvent$EndTurn;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getKind ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/activation/VoiceActivationKind : java/lang/Enum {
+	public static final field HOTKEY Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public static final field PUSH_TO_TALK Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public static final field TAP Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public static final field WAKE_WORD Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+}
+
+public abstract interface class com/letta/mobile/data/voice/activation/VoiceActivationSource {
+	public abstract fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/data/voice/activation/WakeWordActivationSource : com/letta/mobile/data/voice/activation/VoiceActivationSource {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/WakeWordListener;)V
+	public fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public abstract interface class com/letta/mobile/data/voice/audio/AudioCapture {
+	public abstract fun capture (Lcom/letta/mobile/data/voice/audio/PcmFormat;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/data/voice/audio/AudioChunk {
+	public fun <init> ([B)V
+	public final fun getBytes ()[B
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/audio/AudioClip {
+	public fun <init> ([BLcom/letta/mobile/data/voice/audio/AudioEncoding;)V
+	public final fun getBytes ()[B
+	public final fun getEncoding ()Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/audio/AudioEncoding : java/lang/Enum {
+	public static final field AAC Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public static final field FLAC Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public static final field MP3 Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public static final field OPUS Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public static final field WAV Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getMimeType ()Ljava/lang/String;
+	public final fun getWireName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public static fun values ()[Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+}
+
+public final class com/letta/mobile/data/voice/audio/AudioFrame {
+	public synthetic fun <init> ([SJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getSamples ()[S
+	public final fun getStart-ojl65Jo ()J
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/audio/AudioFrameFormat {
+	public fun <init> ()V
+	public fun <init> (III)V
+	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun copy (III)Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;IIIILjava/lang/Object;)Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChannels ()I
+	public final fun getFrameSamples ()I
+	public final fun getSampleRateHz ()I
+	public final fun getSamplesPerFrame ()I
+	public fun hashCode ()I
+	public final fun timeAt-JHqABMg (J)J
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/audio/AudioFrameSource {
+	public abstract fun frames ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getFormat ()Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
+}
+
+public abstract interface class com/letta/mobile/data/voice/audio/AudioPlayer {
+	public abstract fun play (Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/audio/PcmFormat {
+	public fun <init> ()V
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/letta/mobile/data/voice/audio/PcmFormat;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/audio/PcmFormat;IIILjava/lang/Object;)Lcom/letta/mobile/data/voice/audio/PcmFormat;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChannels ()I
+	public final fun getSampleRateHz ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/audio/SamplePosition {
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/data/voice/audio/SamplePosition;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class com/letta/mobile/data/voice/consent/EndpointOrigin {
+	public static final field Companion Lcom/letta/mobile/data/voice/consent/EndpointOrigin$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/consent/EndpointOrigin;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/consent/EndpointOrigin$Companion {
+	public final fun of-lAftvEI (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/consent/VoiceEndpointGrant {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-eK0h7o4 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
+	public final fun copy-qqsSr2k (Ljava/lang/String;Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrant;
+	public static synthetic fun copy-qqsSr2k$default (Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrant;Ljava/lang/String;Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOrigin-eK0h7o4 ()Ljava/lang/String;
+	public final fun getPayload ()Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/consent/VoiceEndpointGrantSource {
+	public abstract fun current ()Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrants;
+}
+
+public final class com/letta/mobile/data/voice/consent/VoiceEndpointGrants {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun allows-SjlXbKs (Ljava/lang/String;Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;)Z
+	public final fun component1 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/Set;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrants;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrants;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrants;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getGrants ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun with (Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrant;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrants;
+	public final fun without (Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrant;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrants;
+}
+
+public final class com/letta/mobile/data/voice/consent/VoiceEndpointPayload : java/lang/Enum {
+	public static final field AUDIO_FOR_TRANSCRIPTION Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
+	public static final field TEXT_FOR_SYNTHESIS Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
+	public static fun values ()[Lcom/letta/mobile/data/voice/consent/VoiceEndpointPayload;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/EndpointSpeechSynthesizer {
+	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/audio/AudioEncoding;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;Lcom/letta/mobile/data/voice/audio/AudioEncoding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun synthesize-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/EndpointTranscriber {
+	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointClient;Lcom/letta/mobile/data/voice/consent/VoiceEndpointGrantSource;Lcom/letta/mobile/data/voice/VoiceEndpointSettings;)V
+	public final fun transcribe-Bwq2bAg (Lcom/letta/mobile/data/voice/audio/AudioClip;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/EndpointVoiceMouth : com/letta/mobile/data/voice/engine/VoiceMouth {
+	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/EndpointSpeechSynthesizer;Lcom/letta/mobile/data/voice/audio/AudioPlayer;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun flush ()V
+	public synthetic fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun speak (Lcom/letta/mobile/data/voice/engine/SpeechSegment;)V
+	public fun stop (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechApiKey {
+	public fun <init> (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/endpoint/SpeechClientDiagnostics {
+	public abstract fun record (Lcom/letta/mobile/data/voice/endpoint/SpeechClientEvent;)V
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechClientEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;Lcom/letta/mobile/data/voice/VoiceErrorCode;Ljava/lang/Integer;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun copy (Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;Lcom/letta/mobile/data/voice/VoiceErrorCode;Ljava/lang/Integer;)Lcom/letta/mobile/data/voice/endpoint/SpeechClientEvent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/endpoint/SpeechClientEvent;Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;Lcom/letta/mobile/data/voice/VoiceErrorCode;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechClientEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailure ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun getOperation ()Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+	public final fun getStatus ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechEndpointClient {
+	public fun <init> (Lio/ktor/client/engine/HttpClientEngine;Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointConfig;Lcom/letta/mobile/data/voice/endpoint/SpeechClientDiagnostics;)V
+	public synthetic fun <init> (Lio/ktor/client/engine/HttpClientEngine;Lcom/letta/mobile/data/voice/endpoint/SpeechEndpointConfig;Lcom/letta/mobile/data/voice/endpoint/SpeechClientDiagnostics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun close ()V
+	public final fun getEndpoint-QU7wm-U ()Ljava/lang/String;
+	public final fun synthesize (Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun synthesizeClip (Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun transcribe-Bwq2bAg (Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechEndpointConfig {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/SpeechApiKey;Lcom/letta/mobile/data/voice/endpoint/SpeechTimeouts;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/endpoint/SpeechApiKey;Lcom/letta/mobile/data/voice/endpoint/SpeechTimeouts;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getApiKey ()Lcom/letta/mobile/data/voice/endpoint/SpeechApiKey;
+	public final fun getBaseUrl-QU7wm-U ()Ljava/lang/String;
+	public final fun getTimeouts ()Lcom/letta/mobile/data/voice/endpoint/SpeechTimeouts;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechEndpointException : java/lang/Exception {
+	public fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;Lcom/letta/mobile/data/voice/VoiceErrorCode;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;Lcom/letta/mobile/data/voice/VoiceErrorCode;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCode ()Lcom/letta/mobile/data/voice/VoiceErrorCode;
+	public final fun getOperation ()Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+	public final fun getStatus ()Ljava/lang/Integer;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechOperation : java/lang/Enum {
+	public static final field SPEECH Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+	public static final field TRANSCRIPTION Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+	public static fun values ()[Lcom/letta/mobile/data/voice/endpoint/SpeechOperation;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechRequest {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-WHRWuv8 ()Ljava/lang/String;
+	public final fun component2-CAMs64U ()Ljava/lang/String;
+	public final fun component3-ama1Wpo ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public final fun copy-MWE-sJ0 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;)Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;
+	public static synthetic fun copy-MWE-sJ0$default (Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/voice/audio/AudioEncoding;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncoding ()Lcom/letta/mobile/data/voice/audio/AudioEncoding;
+	public final fun getModel-CAMs64U ()Ljava/lang/String;
+	public final fun getText-WHRWuv8 ()Ljava/lang/String;
+	public final fun getVoice-ama1Wpo ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/SpeechTimeouts {
+	public synthetic fun <init> (JJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun component2-UwyO8pc ()J
+	public final fun copy-QTBD994 (JJ)Lcom/letta/mobile/data/voice/endpoint/SpeechTimeouts;
+	public static synthetic fun copy-QTBD994$default (Lcom/letta/mobile/data/voice/endpoint/SpeechTimeouts;JJILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/SpeechTimeouts;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConnect-UwyO8pc ()J
+	public final fun getRequest-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/endpoint/TranscriptionRequest {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/audio/AudioClip;
+	public final fun component2-CAMs64U ()Ljava/lang/String;
+	public final fun component3-VV7C9BA ()Ljava/lang/String;
+	public final fun copy-modvSwU (Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;
+	public static synthetic fun copy-modvSwU$default (Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;Lcom/letta/mobile/data/voice/audio/AudioClip;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/endpoint/TranscriptionRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAudio ()Lcom/letta/mobile/data/voice/audio/AudioClip;
+	public final fun getLanguage-VV7C9BA ()Ljava/lang/String;
+	public final fun getModel-CAMs64U ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/SpeechSegment {
+	public synthetic fun <init> (JLjava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-N_zLtOA ()J
+	public final fun component2-WHRWuv8 ()Ljava/lang/String;
+	public final fun copy-yUGmzlY (JLjava/lang/String;)Lcom/letta/mobile/data/voice/engine/SpeechSegment;
+	public static synthetic fun copy-yUGmzlY$default (Lcom/letta/mobile/data/voice/engine/SpeechSegment;JLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/SpeechSegment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-N_zLtOA ()J
+	public final fun getText-WHRWuv8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/SpeechSegmentId {
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/data/voice/engine/SpeechSegmentId;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceCancelOutcome : java/lang/Enum {
+	public static final field ALREADY_FINISHED Lcom/letta/mobile/data/voice/engine/VoiceCancelOutcome;
+	public static final field STOPPED Lcom/letta/mobile/data/voice/engine/VoiceCancelOutcome;
+	public static final field UNRESPONSIVE Lcom/letta/mobile/data/voice/engine/VoiceCancelOutcome;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/engine/VoiceCancelOutcome;
+	public static fun values ()[Lcom/letta/mobile/data/voice/engine/VoiceCancelOutcome;
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceEar {
+	public abstract fun commitTurn ()V
+	public abstract fun listen ()Lkotlinx/coroutines/flow/Flow;
+	public fun retry--NuGPmU (J)Z
+	public fun setOutputActive (Z)V
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEar$DefaultImpls {
+	public static fun retry--NuGPmU (Lcom/letta/mobile/data/voice/engine/VoiceEar;J)Z
+	public static fun setOutputActive (Lcom/letta/mobile/data/voice/engine/VoiceEar;Z)V
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceEarEvent {
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$EndOfTurn : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceUtterance;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceUtterance;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceUtterance;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$EndOfTurn;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$EndOfTurn;Lcom/letta/mobile/data/voice/VoiceUtterance;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$EndOfTurn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getUtterance ()Lcom/letta/mobile/data/voice/VoiceUtterance;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$Failed : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/CapturedAudioHandle;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/CapturedAudioHandle;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun component2-YTo8GjY ()Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public final fun copy-dcDFmFE (Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/CapturedAudioHandle;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$Failed;
+	public static synthetic fun copy-dcDFmFE$default (Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$Failed;Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/CapturedAudioHandle;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun getRetry-YTo8GjY ()Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$InputLevel : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public synthetic fun <init> (FLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-cl3m8eg ()F
+	public final fun copy-nWeSJUc (F)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$InputLevel;
+	public static synthetic fun copy-nWeSJUc$default (Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$InputLevel;FILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$InputLevel;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLevel-cl3m8eg ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$ListeningStarted : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$ListeningStarted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$PartialTranscript : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-WHRWuv8 ()Ljava/lang/String;
+	public final fun copy-8iZQIHs (Ljava/lang/String;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$PartialTranscript;
+	public static synthetic fun copy-8iZQIHs$default (Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$PartialTranscript;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$PartialTranscript;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText-WHRWuv8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceEarEvent$SpeechStarted : com/letta/mobile/data/voice/engine/VoiceEarEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceEarEvent$SpeechStarted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceMouth {
+	public abstract fun flush ()V
+	public abstract fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun speak (Lcom/letta/mobile/data/voice/engine/SpeechSegment;)V
+	public abstract fun stop (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceMouthEvent {
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed : com/letta/mobile/data/voice/engine/VoiceMouthEvent {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceError;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun component2-N_zLtOA ()J
+	public final fun copy-gyNZfHs (Lcom/letta/mobile/data/voice/VoiceError;J)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;
+	public static synthetic fun copy-gyNZfHs$default (Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;Lcom/letta/mobile/data/voice/VoiceError;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun getId-N_zLtOA ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceMouthEvent$Finished : com/letta/mobile/data/voice/engine/VoiceMouthEvent {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-N_zLtOA ()J
+	public final fun copy-UeUW_rs (J)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Finished;
+	public static synthetic fun copy-UeUW_rs$default (Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Finished;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Finished;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-N_zLtOA ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceMouthEvent$OutputLevel : com/letta/mobile/data/voice/engine/VoiceMouthEvent {
+	public synthetic fun <init> (FLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-cl3m8eg ()F
+	public final fun copy-nWeSJUc (F)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$OutputLevel;
+	public static synthetic fun copy-nWeSJUc$default (Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$OutputLevel;FILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$OutputLevel;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLevel-cl3m8eg ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceMouthEvent$Started : com/letta/mobile/data/voice/engine/VoiceMouthEvent {
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-N_zLtOA ()J
+	public final fun copy-UeUW_rs (J)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Started;
+	public static synthetic fun copy-UeUW_rs$default (Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Started;JILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceMouthEvent$Started;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-N_zLtOA ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceReply {
+	public abstract fun cancel (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceReplyEvent {
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceReplyEvent$AwaitingLateReply : com/letta/mobile/data/voice/engine/VoiceReplyEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$AwaitingLateReply;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceReplyEvent$Completed : com/letta/mobile/data/voice/engine/VoiceReplyEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Completed;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceReplyEvent$Failed : com/letta/mobile/data/voice/engine/VoiceReplyEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceError;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceError;)Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Failed;Lcom/letta/mobile/data/voice/VoiceError;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/voice/VoiceError;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceReplyEvent$PartEnded : com/letta/mobile/data/voice/engine/VoiceReplyEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$PartEnded;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/engine/VoiceReplyEvent$Text : com/letta/mobile/data/voice/engine/VoiceReplyEvent {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-WHRWuv8 ()Ljava/lang/String;
+	public final fun copy-8iZQIHs (Ljava/lang/String;)Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Text;
+	public static synthetic fun copy-8iZQIHs$default (Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Text;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/engine/VoiceReplyEvent$Text;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDelta-WHRWuv8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/engine/VoiceResponder {
+	public abstract fun respond (Lcom/letta/mobile/data/voice/VoiceUtterance;)Lcom/letta/mobile/data/voice/engine/VoiceReply;
+}
+
+public final class com/letta/mobile/data/voice/loop/VoiceEngines {
+	public fun <init> (Lcom/letta/mobile/data/voice/engine/VoiceEar;Lcom/letta/mobile/data/voice/engine/VoiceResponder;Lcom/letta/mobile/data/voice/engine/VoiceMouth;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/engine/VoiceEar;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/engine/VoiceResponder;
+	public final fun component3 ()Lcom/letta/mobile/data/voice/engine/VoiceMouth;
+	public final fun copy (Lcom/letta/mobile/data/voice/engine/VoiceEar;Lcom/letta/mobile/data/voice/engine/VoiceResponder;Lcom/letta/mobile/data/voice/engine/VoiceMouth;)Lcom/letta/mobile/data/voice/loop/VoiceEngines;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/loop/VoiceEngines;Lcom/letta/mobile/data/voice/engine/VoiceEar;Lcom/letta/mobile/data/voice/engine/VoiceResponder;Lcom/letta/mobile/data/voice/engine/VoiceMouth;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/loop/VoiceEngines;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEar ()Lcom/letta/mobile/data/voice/engine/VoiceEar;
+	public final fun getMouth ()Lcom/letta/mobile/data/voice/engine/VoiceMouth;
+	public final fun getResponder ()Lcom/letta/mobile/data/voice/engine/VoiceResponder;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/loop/VoiceLoop {
+	public fun <init> (Lcom/letta/mobile/data/voice/loop/VoiceEngines;Lcom/letta/mobile/data/voice/VoiceLoopConfig;Lcom/letta/mobile/data/voice/loop/VoiceLoopRuntime;)V
+	public final fun activate (Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)V
+	public final fun bind (Lcom/letta/mobile/data/voice/activation/VoiceActivationSource;)Lkotlinx/coroutines/Job;
+	public final fun close ()V
+	public final fun conversationChanged ()V
+	public final fun endTurn ()V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun onKey (Lcom/letta/mobile/data/voice/activation/KeyDecision;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;)V
+	public final fun retryCapture ()V
+	public final fun shutdown (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun stop ()V
+}
+
+public final class com/letta/mobile/data/voice/loop/VoiceLoopRuntime {
+	public fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/time/Clock;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineScope;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/time/Clock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lkotlinx/coroutines/CoroutineScope;
+	public final fun component2 ()Lkotlinx/coroutines/CoroutineDispatcher;
+	public final fun component3 ()Lkotlin/time/Clock;
+	public final fun copy (Lkotlinx/coroutines/CoroutineScope;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/time/Clock;)Lcom/letta/mobile/data/voice/loop/VoiceLoopRuntime;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/loop/VoiceLoopRuntime;Lkotlinx/coroutines/CoroutineScope;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/time/Clock;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/loop/VoiceLoopRuntime;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClock ()Lkotlin/time/Clock;
+	public final fun getDispatcher ()Lkotlinx/coroutines/CoroutineDispatcher;
+	public final fun getScope ()Lkotlinx/coroutines/CoroutineScope;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/loop/VoiceLoopState {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoicePhase;Ljava/lang/String;Ljava/lang/String;FFZLcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/CapturedAudioHandle;Lcom/letta/mobile/data/voice/InterruptStatus;ZILkotlin/time/Instant;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoicePhase;Ljava/lang/String;Ljava/lang/String;FFZLcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/CapturedAudioHandle;Lcom/letta/mobile/data/voice/InterruptStatus;ZILkotlin/time/Instant;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoicePhase;
+	public final fun component10-YTo8GjY ()Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public final fun component11 ()Lcom/letta/mobile/data/voice/InterruptStatus;
+	public final fun component12 ()Z
+	public final fun component13 ()I
+	public final fun component14 ()Lkotlin/time/Instant;
+	public final fun component2-r0nVoFo ()Ljava/lang/String;
+	public final fun component3-r0nVoFo ()Ljava/lang/String;
+	public final fun component4-cl3m8eg ()F
+	public final fun component5-cl3m8eg ()F
+	public final fun component6 ()Z
+	public final fun component7 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun component8 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun component9 ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public final fun copy-AlDkqXg (Lcom/letta/mobile/data/voice/VoicePhase;Ljava/lang/String;Ljava/lang/String;FFZLcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/CapturedAudioHandle;Lcom/letta/mobile/data/voice/InterruptStatus;ZILkotlin/time/Instant;)Lcom/letta/mobile/data/voice/loop/VoiceLoopState;
+	public static synthetic fun copy-AlDkqXg$default (Lcom/letta/mobile/data/voice/loop/VoiceLoopState;Lcom/letta/mobile/data/voice/VoicePhase;Ljava/lang/String;Ljava/lang/String;FFZLcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/VoiceError;Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;Lcom/letta/mobile/data/voice/CapturedAudioHandle;Lcom/letta/mobile/data/voice/InterruptStatus;ZILkotlin/time/Instant;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/loop/VoiceLoopState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActivation ()Lcom/letta/mobile/data/voice/activation/VoiceActivationKind;
+	public final fun getActivationNotice ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun getAwaitingLateReply ()Z
+	public final fun getFailure ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun getHeldLateSegments ()I
+	public final fun getInputLevel-cl3m8eg ()F
+	public final fun getInterrupt ()Lcom/letta/mobile/data/voice/InterruptStatus;
+	public final fun getMicrophoneOpen ()Z
+	public final fun getOutputLevel-cl3m8eg ()F
+	public final fun getPhase ()Lcom/letta/mobile/data/voice/VoicePhase;
+	public final fun getPhaseSince ()Lkotlin/time/Instant;
+	public final fun getRetryableCapture-YTo8GjY ()Lcom/letta/mobile/data/voice/CapturedAudioHandle;
+	public final fun getSpeaking-r0nVoFo ()Ljava/lang/String;
+	public final fun getTranscript-r0nVoFo ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/ChatReplyPolicy {
+	public synthetic fun <init> (JJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun component2-UwyO8pc ()J
+	public final fun copy-QTBD994 (JJ)Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;
+	public static synthetic fun copy-QTBD994$default (Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;JJILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDeliveryTimeout-UwyO8pc ()J
+	public final fun getStopTimeout-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/ClientMessageId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/ClientMessageId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/SentUtterance {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-qNd_j7I ()Ljava/lang/String;
+	public final fun copy-TO09WPU (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/SentUtterance;
+	public static synthetic fun copy-TO09WPU$default (Lcom/letta/mobile/data/voice/responder/SentUtterance;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/SentUtterance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-qNd_j7I ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatResponder : com/letta/mobile/data/voice/engine/VoiceResponder {
+	public fun <init> (Lcom/letta/mobile/data/voice/responder/VoiceChatSession;Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/responder/VoiceChatSession;Lcom/letta/mobile/data/voice/responder/ChatReplyPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun respond (Lcom/letta/mobile/data/voice/VoiceUtterance;)Lcom/letta/mobile/data/voice/engine/VoiceReply;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatRow {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-S6PfSEs ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public final fun component3-WHRWuv8 ()Ljava/lang/String;
+	public final fun component4-XLRj9Ro ()Ljava/lang/String;
+	public final fun component5-QkQMI6A ()Ljava/lang/String;
+	public final fun copy-BxLJEW8 (Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceChatRow;
+	public static synthetic fun copy-BxLJEW8$default (Lcom/letta/mobile/data/voice/responder/VoiceChatRow;Ljava/lang/String;Lcom/letta/mobile/data/voice/responder/VoiceRowKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/VoiceChatRow;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClientMessageId-XLRj9Ro ()Ljava/lang/String;
+	public final fun getKey-S6PfSEs ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public final fun getRunId-QkQMI6A ()Ljava/lang/String;
+	public final fun getText-WHRWuv8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/responder/VoiceChatSession {
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun send-iyX4eW4 (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun stopRun ()V
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceChatState {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-n7MmrEY ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun component4 ()Ljava/util/Set;
+	public final fun component5 ()Ljava/util/Set;
+	public final fun copy-Yhk6gEM (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/data/voice/responder/VoiceChatState;
+	public static synthetic fun copy-Yhk6gEM$default (Lcom/letta/mobile/data/voice/responder/VoiceChatState;Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/responder/VoiceChatState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActiveRuns ()Ljava/util/Set;
+	public final fun getConversation-n7MmrEY ()Ljava/lang/String;
+	public final fun getFailedRuns ()Ljava/util/Set;
+	public final fun getRows ()Ljava/util/List;
+	public final fun getStartedRuns ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceConversationKey {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceConversationKey;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceRowKey {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceRowKey;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceRowKind : java/lang/Enum {
+	public static final field ASSISTANT_TEXT Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static final field ERROR Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static final field OTHER Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static final field USER Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/responder/VoiceRowKind;
+}
+
+public final class com/letta/mobile/data/voice/responder/VoiceRunId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/responder/VoiceRunId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/speech/SentenceChunker {
+	public static final field Companion Lcom/letta/mobile/data/voice/speech/SentenceChunker$Companion;
+	public static final field DEFAULT_MAX_SEGMENT_LENGTH I
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun flush ()Ljava/util/List;
+	public final fun push-8iZQIHs (Ljava/lang/String;)Ljava/util/List;
+	public final fun reset ()V
+}
+
+public final class com/letta/mobile/data/voice/speech/SentenceChunker$Companion {
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/CalibratingWakeWordSession : com/letta/mobile/data/voice/wake/WakeWordSession {
+	public abstract fun calibrate-89YdUjA (Lcom/letta/mobile/data/voice/WakePhrase;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/wake/CalibrationRecording {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getFrames ()Ljava/util/List;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/DetectionConfidence {
+	public static final synthetic fun box-impl (F)Lcom/letta/mobile/data/voice/wake/DetectionConfidence;
+	public static fun constructor-impl (F)F
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (FLjava/lang/Object;)Z
+	public static final fun equals-impl0 (FF)Z
+	public final fun getValue ()F
+	public fun hashCode ()I
+	public static fun hashCode-impl (F)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (F)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()F
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/PhraseOutcome {
+	public abstract fun getPhrase ()Lcom/letta/mobile/data/voice/WakePhrase;
+}
+
+public final class com/letta/mobile/data/voice/wake/PhraseOutcome$Accepted : com/letta/mobile/data/voice/wake/PhraseOutcome {
+	public fun <init> (Lcom/letta/mobile/data/voice/WakePhrase;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/WakePhrase;
+	public final fun copy (Lcom/letta/mobile/data/voice/WakePhrase;)Lcom/letta/mobile/data/voice/wake/PhraseOutcome$Accepted;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/PhraseOutcome$Accepted;Lcom/letta/mobile/data/voice/WakePhrase;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/PhraseOutcome$Accepted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getPhrase ()Lcom/letta/mobile/data/voice/WakePhrase;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/PhraseOutcome$Rejected : com/letta/mobile/data/voice/wake/PhraseOutcome {
+	public fun <init> (Lcom/letta/mobile/data/voice/WakePhrase;Lcom/letta/mobile/data/voice/wake/PhraseRejection;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/WakePhrase;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public final fun copy (Lcom/letta/mobile/data/voice/WakePhrase;Lcom/letta/mobile/data/voice/wake/PhraseRejection;)Lcom/letta/mobile/data/voice/wake/PhraseOutcome$Rejected;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/PhraseOutcome$Rejected;Lcom/letta/mobile/data/voice/WakePhrase;Lcom/letta/mobile/data/voice/wake/PhraseRejection;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/PhraseOutcome$Rejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getPhrase ()Lcom/letta/mobile/data/voice/WakePhrase;
+	public final fun getReason ()Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/PhraseRejection : java/lang/Enum {
+	public static final field EMPTY Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public static final field TOO_MANY Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public static final field TOO_SHORT Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public static final field UNPRONOUNCEABLE Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public static final field UNSUPPORTED_LANGUAGE Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+	public static fun values ()[Lcom/letta/mobile/data/voice/wake/PhraseRejection;
+}
+
+public final class com/letta/mobile/data/voice/wake/SkippedEngine {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-0yABaq8 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public final fun copy-ZSWQhTA (Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;)Lcom/letta/mobile/data/voice/wake/SkippedEngine;
+	public static synthetic fun copy-ZSWQhTA$default (Lcom/letta/mobile/data/voice/wake/SkippedEngine;Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/SkippedEngine;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-0yABaq8 ()Ljava/lang/String;
+	public final fun getReason ()Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/WakeHitConfirmer {
+	public static final field Companion Lcom/letta/mobile/data/voice/wake/WakeHitConfirmer$Companion;
+	public abstract fun confirm (Lcom/letta/mobile/data/voice/wake/WakeWordHit;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeHitConfirmer$Companion {
+	public final fun getAcceptAll ()Lcom/letta/mobile/data/voice/wake/WakeHitConfirmer;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeListenerState : java/lang/Enum {
+	public static final field LISTENING Lcom/letta/mobile/data/voice/wake/WakeListenerState;
+	public static final field STOPPED Lcom/letta/mobile/data/voice/wake/WakeListenerState;
+	public static final field UNAVAILABLE Lcom/letta/mobile/data/voice/wake/WakeListenerState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/WakeListenerState;
+	public static fun values ()[Lcom/letta/mobile/data/voice/wake/WakeListenerState;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakePhraseKind : java/lang/Enum {
+	public static final field FIXED_SET Lcom/letta/mobile/data/voice/wake/WakePhraseKind;
+	public static final field SPOKEN_ENROLLMENT Lcom/letta/mobile/data/voice/wake/WakePhraseKind;
+	public static final field TYPED_TEXT Lcom/letta/mobile/data/voice/wake/WakePhraseKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/WakePhraseKind;
+	public static fun values ()[Lcom/letta/mobile/data/voice/wake/WakePhraseKind;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordBinding {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/WakeWordEngine;Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssets;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/WakeWordEngine;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssets;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/WakeWordEngine;Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssets;)Lcom/letta/mobile/data/voice/wake/WakeWordBinding;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordBinding;Lcom/letta/mobile/data/voice/wake/WakeWordEngine;Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssets;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordBinding;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssets ()Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssets;
+	public final fun getEngine ()Lcom/letta/mobile/data/voice/wake/WakeWordEngine;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/WakeWordEngine {
+	public abstract fun getDescriptor ()Lcom/letta/mobile/data/voice/wake/WakeWordEngineDescriptor;
+	public abstract fun open (Lcom/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEngineDescriptor {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;ILcom/letta/mobile/data/voice/audio/AudioFrameFormat;ZLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;ILcom/letta/mobile/data/voice/audio/AudioFrameFormat;ZLjava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-0yABaq8 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()Ljava/util/Set;
+	public final fun component4 ()I
+	public final fun component5 ()Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
+	public final fun component6 ()Z
+	public final fun component7 ()Ljava/util/List;
+	public final fun copy-weUmnYI (Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;ILcom/letta/mobile/data/voice/audio/AudioFrameFormat;ZLjava/util/List;)Lcom/letta/mobile/data/voice/wake/WakeWordEngineDescriptor;
+	public static synthetic fun copy-weUmnYI$default (Lcom/letta/mobile/data/voice/wake/WakeWordEngineDescriptor;Ljava/lang/String;Ljava/util/Set;Ljava/util/Set;ILcom/letta/mobile/data/voice/audio/AudioFrameFormat;ZLjava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordEngineDescriptor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFormat ()Lcom/letta/mobile/data/voice/audio/AudioFrameFormat;
+	public final fun getId-0yABaq8 ()Ljava/lang/String;
+	public final fun getLanguages ()Ljava/util/Set;
+	public final fun getMaxPhrases ()I
+	public final fun getPhraseKinds ()Ljava/util/Set;
+	public final fun getRequiredAssets ()Ljava/util/List;
+	public final fun getSupportsCalibration ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEngines {
+	public fun <init> ()V
+	public final fun getIds ()Ljava/util/List;
+	public final fun open-uNgasQA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun register (Lcom/letta/mobile/data/voice/wake/WakeWordBinding;)V
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/WakeWordEvent {
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEvent$Detected : com/letta/mobile/data/voice/wake/WakeWordEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/WakeWordHit;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/WakeWordHit;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/WakeWordHit;)Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Detected;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Detected;Lcom/letta/mobile/data/voice/wake/WakeWordHit;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Detected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHit ()Lcom/letta/mobile/data/voice/wake/WakeWordHit;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEvent$Listening : com/letta/mobile/data/voice/wake/WakeWordEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Listening;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEvent$PhrasesApplied : com/letta/mobile/data/voice/wake/WakeWordEvent {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/voice/wake/WakeWordEvent$PhrasesApplied;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordEvent$PhrasesApplied;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordEvent$PhrasesApplied;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutcomes ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEvent$Stopped : com/letta/mobile/data/voice/wake/WakeWordEvent {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Stopped;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordEvent$Unavailable : com/letta/mobile/data/voice/wake/WakeWordEvent {
+	public fun <init> (Lcom/letta/mobile/data/voice/VoiceError;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/VoiceError;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Lcom/letta/mobile/data/voice/VoiceError;Ljava/util/List;)Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Unavailable;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Unavailable;Lcom/letta/mobile/data/voice/VoiceError;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordEvent$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/letta/mobile/data/voice/VoiceError;
+	public final fun getSkipped ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordHit {
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/WakePhrase;FJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/WakePhrase;
+	public final fun component2-wFDI1Ao ()F
+	public final fun component3-ojl65Jo ()J
+	public final fun copy-wNgv8Fw (Lcom/letta/mobile/data/voice/WakePhrase;FJ)Lcom/letta/mobile/data/voice/wake/WakeWordHit;
+	public static synthetic fun copy-wNgv8Fw$default (Lcom/letta/mobile/data/voice/wake/WakeWordHit;Lcom/letta/mobile/data/voice/WakePhrase;FJILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordHit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfidence-wFDI1Ao ()F
+	public final fun getPhrase ()Lcom/letta/mobile/data/voice/WakePhrase;
+	public final fun getPosition-ojl65Jo ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordListener {
+	public fun <init> (Lcom/letta/mobile/data/voice/audio/AudioFrameSource;Lcom/letta/mobile/data/voice/wake/WakeWordEngines;Lcom/letta/mobile/data/voice/wake/WakeWordListenerConfig;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/voice/audio/AudioFrameSource;Lcom/letta/mobile/data/voice/wake/WakeWordEngines;Lcom/letta/mobile/data/voice/wake/WakeWordListenerConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEvents ()Lkotlinx/coroutines/flow/Flow;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun setAppSpeaking (Z)V
+	public final fun setPhrases (Ljava/util/List;)V
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordListenerConfig {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-3zlmQBM ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;
+	public final fun copy-uNgasQA (Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;)Lcom/letta/mobile/data/voice/wake/WakeWordListenerConfig;
+	public static synthetic fun copy-uNgasQA$default (Lcom/letta/mobile/data/voice/wake/WakeWordListenerConfig;Ljava/lang/String;Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordListenerConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPolicy ()Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;
+	public final fun getPreferredEngine-3zlmQBM ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordOpenFailure : java/lang/Enum {
+	public static final field ASSET_CORRUPT Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public static final field ASSET_MISSING Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public static final field ENGINE_FAILED Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public static final field UNSUPPORTED_PLATFORM Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public static fun values ()[Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordPolicy {
+	public synthetic fun <init> (JJLcom/letta/mobile/data/voice/wake/WakeHitConfirmer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JJLcom/letta/mobile/data/voice/wake/WakeHitConfirmer;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun component2-UwyO8pc ()J
+	public final fun component3 ()Lcom/letta/mobile/data/voice/wake/WakeHitConfirmer;
+	public final fun copy-NqJ4yvY (JJLcom/letta/mobile/data/voice/wake/WakeHitConfirmer;)Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;
+	public static synthetic fun copy-NqJ4yvY$default (Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;JJLcom/letta/mobile/data/voice/wake/WakeHitConfirmer;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfirmer ()Lcom/letta/mobile/data/voice/wake/WakeHitConfirmer;
+	public final fun getCooldown-UwyO8pc ()J
+	public final fun getSpeechTail-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/WakeWordSelection {
+	public abstract fun getSkipped ()Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordSelection$Opened : com/letta/mobile/data/voice/wake/WakeWordSelection {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/WakeWordBinding;Lcom/letta/mobile/data/voice/wake/WakeWordSession;Ljava/util/List;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/WakeWordBinding;
+	public final fun component2 ()Lcom/letta/mobile/data/voice/wake/WakeWordSession;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/WakeWordBinding;Lcom/letta/mobile/data/voice/wake/WakeWordSession;Ljava/util/List;)Lcom/letta/mobile/data/voice/wake/WakeWordSelection$Opened;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordSelection$Opened;Lcom/letta/mobile/data/voice/wake/WakeWordBinding;Lcom/letta/mobile/data/voice/wake/WakeWordSession;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordSelection$Opened;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBinding ()Lcom/letta/mobile/data/voice/wake/WakeWordBinding;
+	public final fun getSession ()Lcom/letta/mobile/data/voice/wake/WakeWordSession;
+	public fun getSkipped ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordSelection$Unavailable : com/letta/mobile/data/voice/wake/WakeWordSelection {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/letta/mobile/data/voice/wake/WakeWordSelection$Unavailable;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordSelection$Unavailable;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordSelection$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getSkipped ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/WakeWordSession {
+	public abstract fun close ()V
+	public abstract fun process (Lcom/letta/mobile/data/voice/audio/AudioFrame;)Lcom/letta/mobile/data/voice/wake/WakeWordHit;
+	public abstract fun reset ()V
+	public abstract fun setPhrases (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/WakeWordSessionResult {
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordSessionResult$Failed : com/letta/mobile/data/voice/wake/WakeWordSessionResult {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;)Lcom/letta/mobile/data/voice/wake/WakeWordSessionResult$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordSessionResult$Failed;Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordSessionResult$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailure ()Lcom/letta/mobile/data/voice/wake/WakeWordOpenFailure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/WakeWordSessionResult$Opened : com/letta/mobile/data/voice/wake/WakeWordSessionResult {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/WakeWordSession;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/WakeWordSession;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/WakeWordSession;)Lcom/letta/mobile/data/voice/wake/WakeWordSessionResult$Opened;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/WakeWordSessionResult$Opened;Lcom/letta/mobile/data/voice/wake/WakeWordSession;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/WakeWordSessionResult$Opened;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSession ()Lcom/letta/mobile/data/voice/wake/WakeWordSession;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/AssetProgress {
+	public static final synthetic fun box-impl (F)Lcom/letta/mobile/data/voice/wake/assets/AssetProgress;
+	public static fun constructor-impl (F)F
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (FLjava/lang/Object;)Z
+	public static final fun equals-impl0 (FF)Z
+	public final fun getFraction ()F
+	public fun hashCode ()I
+	public static fun hashCode-impl (F)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (F)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()F
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun covers (Ljava/util/List;)Z
+	public final fun getHandles ()Ljava/util/Map;
+	public final fun handle-Th4pHfA (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/assets/WakeAssetHandle;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/Sha256Digest {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/assets/Sha256Digest;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getHex ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeAssetFailure : java/lang/Enum {
+	public static final field DIGEST_MISMATCH Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public static final field DOWNLOAD_FAILED Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public static final field NOT_ENABLED Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public static final field NOT_WHITELISTED Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public static final field STORAGE_FAILED Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public static fun values ()[Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/assets/WakeAssetHandle {
+	public abstract fun bytes (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getAsset ()Lcom/letta/mobile/data/voice/wake/assets/WakeWordAsset;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeAssetId {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/voice/wake/assets/WakeAssetId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeWordAsset {
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-guHoTTk ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun component3-13eXjo4 ()Ljava/lang/String;
+	public final fun copy-fMlHzzY (Ljava/lang/String;JLjava/lang/String;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAsset;
+	public static synthetic fun copy-fMlHzzY$default (Lcom/letta/mobile/data/voice/wake/assets/WakeWordAsset;Ljava/lang/String;JLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAsset;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getByteSize ()J
+	public final fun getId-guHoTTk ()Ljava/lang/String;
+	public final fun getSha256-13eXjo4 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/assets/WakeWordAssetState {
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Downloading : com/letta/mobile/data/voice/wake/assets/WakeWordAssetState {
+	public synthetic fun <init> (FLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-1w33Kso ()F
+	public final fun copy-r6JPVGY (F)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Downloading;
+	public static synthetic fun copy-r6JPVGY$default (Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Downloading;FILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Downloading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgress-1w33Kso ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Failed : com/letta/mobile/data/voice/wake/assets/WakeWordAssetState {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Failed;Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailure ()Lcom/letta/mobile/data/voice/wake/assets/WakeAssetFailure;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Missing : com/letta/mobile/data/voice/wake/assets/WakeWordAssetState {
+	public static final field INSTANCE Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Missing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Ready : com/letta/mobile/data/voice/wake/assets/WakeWordAssetState {
+	public fun <init> (Lcom/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets;)V
+	public final fun component1 ()Lcom/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets;
+	public final fun copy (Lcom/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Ready;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Ready;Lcom/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets;ILjava/lang/Object;)Lcom/letta/mobile/data/voice/wake/assets/WakeWordAssetState$Ready;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssets ()Lcom/letta/mobile/data/voice/wake/assets/ReadyWakeWordAssets;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/voice/wake/assets/WakeWordAssets {
+	public abstract fun ensure (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun remove (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/workspace/AppServerWorkspaceFileSource : com/letta/mobile/data/workspace/WorkspaceFileSource {
 	public static final field Companion Lcom/letta/mobile/data/workspace/AppServerWorkspaceFileSource$Companion;
 	public static final field DEFAULT_MAX_VIEW_CHARS I
@@ -71786,6 +73808,11 @@ public final class com/letta/mobile/data/workspace/relay/WorkspaceRelayClient$Co
 	public final fun forbidden (Lcom/letta/mobile/data/transport/appserver/WorkspaceRelayAccess;)Ljava/lang/String;
 }
 
+public final class com/letta/mobile/qr/PortableQrEncoder : com/letta/mobile/data/pairing/QrEncoder {
+	public static final field INSTANCE Lcom/letta/mobile/qr/PortableQrEncoder;
+	public fun encode (Ljava/lang/String;)Lcom/letta/mobile/data/pairing/QrModules;
+}
+
 public final class com/letta/mobile/qr/QrCode {
 	public static final field INSTANCE Lcom/letta/mobile/qr/QrCode;
 	public final fun encode (Ljava/lang/String;Lcom/google/zxing/qrcode/decoder/ErrorCorrectionLevel;)Lcom/letta/mobile/qr/QrCode$Matrix;
@@ -71797,6 +73824,64 @@ public final class com/letta/mobile/qr/QrCode$Matrix {
 	public final fun get (II)Z
 	public final fun getDarkRows ()[[Z
 	public final fun getSize ()I
+}
+
+public final class com/letta/mobile/qr/QrCodeGenerator {
+	public static final field INSTANCE Lcom/letta/mobile/qr/QrCodeGenerator;
+	public final fun encode (Ljava/lang/String;Lcom/letta/mobile/qr/QrErrorCorrection;)Lcom/letta/mobile/qr/QrEncodeResult;
+	public static synthetic fun encode$default (Lcom/letta/mobile/qr/QrCodeGenerator;Ljava/lang/String;Lcom/letta/mobile/qr/QrErrorCorrection;ILjava/lang/Object;)Lcom/letta/mobile/qr/QrEncodeResult;
+}
+
+public final class com/letta/mobile/qr/QrContentTooLongException : java/lang/IllegalArgumentException {
+	public fun <init> (II)V
+	public final fun getCapacityBits ()I
+	public final fun getRequiredBits ()I
+}
+
+public abstract interface class com/letta/mobile/qr/QrEncodeResult {
+}
+
+public final class com/letta/mobile/qr/QrEncodeResult$ContentTooLong : com/letta/mobile/qr/QrEncodeResult {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/letta/mobile/qr/QrEncodeResult$ContentTooLong;
+	public static synthetic fun copy$default (Lcom/letta/mobile/qr/QrEncodeResult$ContentTooLong;IIILjava/lang/Object;)Lcom/letta/mobile/qr/QrEncodeResult$ContentTooLong;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapacityBits ()I
+	public final fun getRequiredBits ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/qr/QrEncodeResult$Encoded : com/letta/mobile/qr/QrEncodeResult {
+	public fun <init> (Lcom/letta/mobile/qr/QrMatrix;)V
+	public final fun component1 ()Lcom/letta/mobile/qr/QrMatrix;
+	public final fun copy (Lcom/letta/mobile/qr/QrMatrix;)Lcom/letta/mobile/qr/QrEncodeResult$Encoded;
+	public static synthetic fun copy$default (Lcom/letta/mobile/qr/QrEncodeResult$Encoded;Lcom/letta/mobile/qr/QrMatrix;ILjava/lang/Object;)Lcom/letta/mobile/qr/QrEncodeResult$Encoded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMatrix ()Lcom/letta/mobile/qr/QrMatrix;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/qr/QrErrorCorrection : java/lang/Enum {
+	public static final field H Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static final field L Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static final field M Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static final field Q Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/qr/QrErrorCorrection;
+	public static fun values ()[Lcom/letta/mobile/qr/QrErrorCorrection;
+}
+
+public final class com/letta/mobile/qr/QrMatrix {
+	public final fun getErrorCorrection ()Lcom/letta/mobile/qr/QrErrorCorrection;
+	public final fun getMask ()I
+	public final fun getSize ()I
+	public final fun getVersion ()I
+	public final fun isDark (II)Z
+	public final fun toModules ()Lcom/letta/mobile/data/pairing/QrModules;
 }
 
 public final class com/letta/mobile/qr/QrRenderer {

@@ -1,0 +1,21 @@
+{
+  "_contract": "project-registry-v1 \u00a72",
+  "projectId": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+  "name": "fixture-project-copy",
+  "state": "invalid",
+  "invalidReason": "key_conflict",
+  "checkouts": [
+    {
+      "root": "scratch",
+      "relativePath": "fixture-project-copy",
+      "path": "/srv/roots/scratch/fixture-project-copy",
+      "primary": true
+    }
+  ],
+  "roleAgents": {},
+  "engine": {
+    "enabled": false,
+    "ciChecks": []
+  },
+  "revision": "r-000042"
+}

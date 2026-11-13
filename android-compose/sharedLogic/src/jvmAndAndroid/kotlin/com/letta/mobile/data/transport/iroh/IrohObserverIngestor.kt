@@ -11,6 +11,7 @@ import com.letta.mobile.data.runtime.TurnBoundaryGate
 import com.letta.mobile.data.subagents.SubagentParentProjection
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerStopReason
@@ -243,7 +244,12 @@ internal class IrohObserverIngestor(
             return
         }
         val status = loopStatusFrame.loopStatus
-        if (status.status != TurnBoundaryGate.LOOP_WAITING_ON_INPUT || status.activeRunIds.isNotEmpty()) return
+        val activeRun = status.activeRunIds.firstOrNull { it.isNotBlank() }
+        if (activeRun != null) {
+            if (status.status != TurnBoundaryGate.LOOP_WAITING_ON_INPUT) observeRunningTurn(scope, activeRun, status)
+            return
+        }
+        if (status.status != TurnBoundaryGate.LOOP_WAITING_ON_INPUT) return
         val current = observedTurns.completeOnIdleLoop(ConversationId(scope.conversationId))
         if (current == null) {
             // A second viewer may have missed the wake entirely. Publish idle evidence without
@@ -261,6 +267,25 @@ internal class IrohObserverIngestor(
             context = RuntimeEventServerFrameMapper.Context(
                 agentId = current.agentId, conversationId = current.conversationId.value,
                 turnId = current.turnId, runId = current.runId,
+            ),
+        ).forEach { emitBoth(it) }
+    }
+
+    /**
+     * Another device's turn is running here. The node replays its
+     * `update_loop_status` to a viewer that opens the conversation mid-turn, so this device knows a
+     * turn runs before (or without) any of its deltas: the run becomes the observed turn (its idle
+     * loop status completes it) and its phase reaches the status line.
+     */
+    private suspend fun observeRunningTurn(scope: AppServerRuntimeScope, activeRun: String, status: AppServerLoopStatus) {
+        val turnId = status.clientMessageIdsByRunId[activeRun]?.firstOrNull { it.isNotBlank() }
+        val observed = ObservedTurn(scope.agentId, ConversationId(scope.conversationId), turnId, activeRun)
+        if (observedTurns.isCompleted(observed) || turnRegistry.isRetiredRun(IrohRunId(activeRun))) return
+        observedTurns.recordDelta(observed, LOOP_STATUS_FRAME_TYPE)
+        RuntimeEventServerFrameMapper.map(
+            payload = RuntimeEventPayload.LoopPhaseChanged(status.status),
+            context = RuntimeEventServerFrameMapper.Context(
+                agentId = scope.agentId, conversationId = scope.conversationId, turnId = turnId.orEmpty(), runId = activeRun,
             ),
         ).forEach { emitBoth(it) }
     }
@@ -642,6 +667,9 @@ internal class IrohObserverIngestor(
 
         /** The host registry's push; see SubagentRegistryPublisher on the host. */
         private const val SUBAGENTS_UPDATED_TYPE = "subagents_updated"
+
+        /** The frame type an observed turn records when it is learned from a loop status. */
+        private const val LOOP_STATUS_FRAME_TYPE = "update_loop_status"
 
         private val HOST_PUSH_TYPES = setOf(
             "conversation_activity", AGENT_UPDATED_TYPE, CONVERSATION_UPDATED_TYPE, SUBAGENTS_UPDATED_TYPE,

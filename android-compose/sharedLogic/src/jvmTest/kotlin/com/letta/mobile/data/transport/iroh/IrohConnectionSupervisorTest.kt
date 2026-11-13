@@ -153,6 +153,29 @@ class IrohConnectionSupervisorTest {
         com.letta.mobile.data.transport.TerminalConnectionFailure
 
     @Test
+    fun zeroTimeoutStillStartsDial() = runTest {
+        var dials = 0
+        val supervisor = supervisor(config = { configA }) {
+            dials++
+            fakeHandle(it, "dial")
+        }
+        assertFailsWith<IllegalStateException> { supervisor.ready(timeout = 0.milliseconds) }
+        runCurrent()
+        assertEquals(1, dials)
+        supervisor.close()
+    }
+
+    @Test
+    fun timeoutUsesVirtualTimeAcrossRetries() = runTest {
+        val supervisor = supervisor(config = { configA }) { throw IllegalStateException("no route") }
+        val started = testScheduler.currentTime
+        val error = assertFailsWith<IllegalStateException> { supervisor.ready(timeout = 1_200.milliseconds) }
+        assertEquals(1_200L, testScheduler.currentTime - started)
+        assertEquals("App Server connection not ready after 1200ms: no route", error.message)
+        supervisor.close()
+    }
+
+    @Test
     fun readyRespectsScheduledBackoffAfterFailure() = runTest {
         var dials = 0
         val supervisor = supervisor(config = { configA }) {
@@ -177,6 +200,23 @@ class IrohConnectionSupervisorTest {
         advanceUntilIdle()
         assertEquals("dial-2", retry.await().sessionId)
         assertEquals(2, dials)
+    }
+
+    @Test
+    fun readyAtElapsedBackoffDoesNotWaitAnotherBackoff() = runTest {
+        var dials = 0
+        val supervisor = supervisor(config = { configA }) {
+            dials++
+            fakeHandle(it, "dial-$dials")
+        }
+        supervisor.ready()
+        supervisor.onConnectionLost("test_loss")
+        runCurrent()
+        advanceTimeBy(500)
+        assertEquals("dial-2", supervisor.ready(timeout = 10.milliseconds).sessionId)
+        assertEquals(500L, testScheduler.currentTime)
+        assertEquals(2, dials)
+        supervisor.close()
     }
 
     @Test

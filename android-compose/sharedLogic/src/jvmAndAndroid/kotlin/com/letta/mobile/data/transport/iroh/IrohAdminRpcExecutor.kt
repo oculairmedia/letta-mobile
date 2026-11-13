@@ -153,38 +153,43 @@ internal class IrohAdminRpcExecutor(
     ) {
         val reason: String get() = "admin_rpc_failed_after_retry: ${error.message ?: error}"
     }
-    private data class RetryMetrics(val failures: Int, val idleMs: Long) {
+    internal data class RetryMetrics(val failures: Int, val idleMs: Long) {
         val shouldEscalate: Boolean get() = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
         fun nextFailure(): RetryMetrics = copy(failures = failures + 1)
     }
 
-    internal class GenerationRetryState(val generation: Long) {
+    internal class GenerationRetryState(
+        val generation: Long,
+        private val clock: () -> Long = kotlin.time.TimeSource.Monotonic.markNow().let { origin ->
+            { origin.elapsedNow().inWholeMilliseconds }
+        },
+    ) {
         private val mutex = Mutex()
         @Volatile var consecutiveFailures = 0
-        @Volatile private var lastProofOfLifeMs = System.currentTimeMillis()
+        @Volatile private var lastProofOfLifeMs = clock()
         private val inFlightStartByToken = ConcurrentHashMap<Long, Long>()
         private val nextInFlightToken = AtomicLong(0L)
-        private val timeoutStreak = AdminRpcTimeoutStreak()
+        private val timeoutStreak = AdminRpcTimeoutStreak(clock)
 
         suspend fun recordFailure(): Int = mutex.withLock { ++consecutiveFailures }
         suspend fun reset() = mutex.withLock { consecutiveFailures = 0 }
         /** Any answer (stream frame or admin_rpc) also breaks a request-timeout streak. */
         fun recordProofOfLife() {
-            lastProofOfLifeMs = System.currentTimeMillis()
+            lastProofOfLifeMs = clock()
             timeoutStreak.reset()
         }
         /** A connection-class failure on a nominally alive connection. */
         fun recordIsolatedFailure() = timeoutStreak.record()
-        fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
-        fun beginAdminRpc(): Long = nextInFlightToken.incrementAndGet().also { inFlightStartByToken[it] = System.currentTimeMillis() }
+        fun millisSinceLastStream(): Long = clock() - lastProofOfLifeMs
+        fun beginAdminRpc(): Long = nextInFlightToken.incrementAndGet().also { inFlightStartByToken[it] = clock() }
         fun endAdminRpc(token: Long) { inFlightStartByToken.remove(token) }
         fun youngInFlightAdminRpcCount(graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): Int {
-            val now = System.currentTimeMillis()
+            val now = clock()
             return inFlightStartByToken.values.count { now - it in 0 until graceMs }
         }
         fun pathEvidence(windowMs: Long, graceMs: Long): AdminRpcPathEvidence = AdminRpcPathEvidence(
             youngInFlight = youngInFlightAdminRpcCount(graceMs),
-            oldestInFlightAgeMs = inFlightStartByToken.values.minOrNull()?.let { System.currentTimeMillis() - it },
+            oldestInFlightAgeMs = inFlightStartByToken.values.minOrNull()?.let { clock() - it },
             recentRequestTimeouts = timeoutStreak.countWithin(windowMs),
             proofOfLifeAgeMs = millisSinceLastStream(),
         )
