@@ -13,6 +13,9 @@ import com.letta.mobile.data.canvas.references.NotebookReferenceSession
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpener
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions
+import com.letta.mobile.data.canvas.workspace.SharedNoteDirectory
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
+import com.letta.mobile.data.canvas.workspace.SharedNotebooks
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.JsonElement
@@ -25,7 +28,7 @@ import kotlinx.serialization.json.put
  * never shows content the host did not return for the current call. A transport failure is
  * unavailable, not denied and not empty.
  */
-class RemoteNotebookAccess(rpc: AdminRpcInvoker) {
+class RemoteNotebookAccess(rpc: AdminRpcInvoker) : SharedNotebooks {
     private val host = NotebookRpc(rpc)
 
     /** Every load is a fresh `notebook.note.open`, so remounting a note rechecks the grant. */
@@ -43,8 +46,15 @@ class RemoteNotebookAccess(rpc: AdminRpcInvoker) {
         readAuthorized = ::resolve,
     )
 
+    /** Every page is a fresh `notebook.shared.list`; the host lists only notes this device may open now. */
+    override val directory = SharedNoteDirectory { from ->
+        host.call(SharedNotesWire.LIST, SharedNotesWire.request(from), { SharedNoteListing.Unavailable(it) }) {
+            SharedNotesWire.readSharedNotes(it)
+        }
+    }
+
     /** Opens a shared note only when the host grants edit access to it now. */
-    val opener = DocumentWorkspaceOpener { id ->
+    override val opener = DocumentWorkspaceOpener { id ->
         when (backend.load(id)) {
             is NotebookNoteLoad.Found -> DocumentWorkspaceOpen.Opened(
                 DocumentWorkspaceSessions(NotebookNoteSession(id, backend), NotebookReferenceSession(id, resolver)),
@@ -103,3 +113,7 @@ private class NotebookRpc(private val rpc: AdminRpcInvoker) {
 
 /** The admin_rpc errors a host returns when it refuses the caller rather than failing the call. */
 private val HOST_REFUSALS = setOf("unauthorized", "forbidden")
+
+/** Shared notes over the admin RPC [admin] resolves on each call, so building this never waits for the transport. */
+fun remoteNotebooksOver(admin: () -> AdminRpcInvoker): SharedNotebooks =
+    RemoteNotebookAccess(AdminRpcInvoker { method, params -> admin().invoke(method, params) })

@@ -31,7 +31,7 @@ import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterActions
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListTag

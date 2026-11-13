@@ -7,13 +7,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import com.letta.mobile.ui.components.row.LettaListRow
+import com.letta.mobile.ui.components.row.LettaListRowSpec
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -62,8 +62,11 @@ import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAtWork
-import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.shared_notes_hide
+import com.letta.mobile.sharedui.resources.shared_notes_show
 import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.stringResource
 
 /** Test tags for the agent panel's parts. */
 object ShellAgentPanelTags {
@@ -176,30 +179,15 @@ data class ShellNavRowModel(
 
 @Composable
 fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val content = if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-    LocalLettaHost.current.tooltip(model.tooltip ?: model.label) {
-        Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .height(LettaDimens.Space.xxl)
-                .clip(MaterialTheme.shapes.small)
-                .background(if (model.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
-                .clickable(onClick = onClick)
-                .padding(horizontal = LettaDimens.Space.sm),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(imageVector = model.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = content)
-            Text(
-                text = model.label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = content,
-                fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    LettaListRow(
+        spec = LettaListRowSpec(
+            title = model.label, icon = model.icon, selected = model.selected,
+            emphasized = model.selected, quiet = !model.selected,
+            tooltip = model.tooltip ?: model.label,
+        ),
+        onClick = onClick,
+        modifier = modifier.heightIn(min = LettaDimens.Space.xxl),
+    )
 }
 
 /**
@@ -294,6 +282,7 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
     val state = frame.state
     val actions = frame.actions
     var menuOpen by remember { mutableStateOf(false) }
+    val sharedNotes = sharedNotesMenuItem()
     Box {
         Icon(
             imageVector = Icons.Outlined.MoreVert,
@@ -313,10 +302,22 @@ private fun ShellAgentOverflowMenu(frame: ShellPanelFrame) {
                 LettaMenuItem(label = "Memory") { actions.onOpenSection(LensDestination.Memory) },
                 LettaMenuItem(label = "Archived chats") { frame.onOpenDialog(ShellPanelDialog.Archived) },
                 state.chatOptions?.let { LettaMenuItem(label = "Chat options") { frame.onOpenDialog(ShellPanelDialog.ChatOptions) } },
+                sharedNotes,
                 LettaMenuItem(label = "Settings", onClick = actions.onOpenSettings),
             ),
         )
     }
+}
+
+/**
+ * Shows or hides the shared-notes view beside the agent's chat; null while the host cannot reach
+ * shared notes, so the menu never offers a view that would only say it is unavailable.
+ */
+@Composable
+internal fun sharedNotesMenuItem(): LettaMenuItem? {
+    val toggle = LocalSharedNotesToggle.current ?: return null
+    val label = stringResource(if (toggle.shown) Res.string.shared_notes_hide else Res.string.shared_notes_show)
+    return LettaMenuItem(label = label, onClick = toggle.toggle)
 }
 
 /** The dialog the agent menu has open, if any; the panel frame holds it. */

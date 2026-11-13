@@ -117,7 +117,7 @@ object AdminRpcRegistry {
         RunAdminHandlers.register(router, localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
-        ModelAdminHandlers.register(router, native.nativeClient, modelExposureStore(native.modelExposureFile))
+        ModelAdminHandlers.register(router, tiers, modelExposureStore(native.modelExposureFile))
         ScheduleAdminHandlers.register(router, native.nativeClient)
         ToolAdminHandlers.register(router, localBackendStore, native.nativeClient)
         McpAdminHandlers.register(router)

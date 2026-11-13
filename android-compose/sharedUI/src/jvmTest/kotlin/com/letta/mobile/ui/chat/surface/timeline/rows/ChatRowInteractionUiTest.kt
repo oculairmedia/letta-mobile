@@ -27,7 +27,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
-import com.letta.mobile.ui.components.LettaListRowDefaults
+import com.letta.mobile.ui.components.row.LettaListRowDefaults
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick

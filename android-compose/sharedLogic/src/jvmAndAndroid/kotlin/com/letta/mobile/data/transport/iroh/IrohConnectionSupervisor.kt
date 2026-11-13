@@ -10,6 +10,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -133,7 +135,6 @@ class IrohConnectionSupervisor(
     private var dialJob: Job? = null
     private var dialResult: CompletableDeferred<IrohConnectionHandle>? = null
     private var redialJob: Job? = null
-    private var redialReadyAtMs: Long? = null
     private var currentHandle: IrohConnectionHandle? = null
     private var currentConfig: IrohConnectConfig? = null
     private var dialConfig: IrohConnectConfig? = null
@@ -144,17 +145,23 @@ class IrohConnectionSupervisor(
 
     suspend fun ready(timeout: kotlin.time.Duration = readyTimeout): IrohConnectionHandle {
         val timeoutMs = timeout.inWholeMilliseconds
-        val deadline = System.currentTimeMillis() + timeoutMs
         var lastError: Throwable? = null
-        while (System.currentTimeMillis() < deadline) {
-            val waitMs = deadline - System.currentTimeMillis()
-            val result = withTimeoutOrNull(waitMs.milliseconds) {
-                val deferred = ensureDialing()
-                runCatching { deferred.await() }
-            } ?: break
-            result.onSuccess { return it }
-            lastError = result.exceptionOrNull()
+        val first = if (timeout <= kotlin.time.Duration.ZERO) ensureDialing() else null
+        val handle = withTimeoutOrNull(timeout) {
+            var deferred = first ?: ensureDialing()
+            var connected: IrohConnectionHandle? = null
+            while (connected == null) {
+                val result = runCatching { deferred.await() }
+                connected = result.getOrNull()
+                if (connected == null) {
+                    currentCoroutineContext().ensureActive()
+                    lastError = result.exceptionOrNull()
+                    deferred = ensureDialing()
+                }
+            }
+            connected
         }
+        if (handle != null) return handle
         val suffix = lastError?.message?.let { ": $it" }.orEmpty()
         error("App Server connection not ready after ${timeoutMs}ms$suffix")
     }
@@ -237,7 +244,6 @@ class IrohConnectionSupervisor(
             stopped = false
             redialJob?.cancel()
             redialJob = null
-            redialReadyAtMs = null
             cancelDialLocked(reason)
             val existing = currentHandle
             currentHandle = null
@@ -254,7 +260,6 @@ class IrohConnectionSupervisor(
             stopped = false
             redialJob?.cancel()
             redialJob = null
-            redialReadyAtMs = null
             cancelDialLocked(reason)
             val existing = currentHandle
             currentHandle = null
@@ -284,13 +289,8 @@ class IrohConnectionSupervisor(
             transitionTo(IrohConnectionState.Degraded(IROH_CONFIG_CHANGED), IROH_CONFIG_CHANGED)
         }
         dialResult?.takeIf { dialJob?.isActive == true && dialConfig == desired }?.let { return@withLock it }
-        redialReadyAtMs?.let { readyAt ->
-            val delayMs = readyAt - System.currentTimeMillis()
-            if (delayMs > 0) {
-                val waiting = dialResult ?: CompletableDeferred<IrohConnectionHandle>().also { dialResult = it }
-                if (redialJob?.isActive != true) scheduleRedialLocked("await_backoff")
-                return@withLock waiting
-            }
+        if (redialJob?.isActive == true) {
+            return@withLock dialResult ?: CompletableDeferred<IrohConnectionHandle>().also { dialResult = it }
         }
         startDialLocked(desired)
     }
@@ -298,7 +298,6 @@ class IrohConnectionSupervisor(
     private fun startDialLocked(config: IrohConnectConfig): CompletableDeferred<IrohConnectionHandle> {
         redialJob?.cancel()
         redialJob = null
-        redialReadyAtMs = null
         currentConfig = config
         dialConfig = config
         val result = dialResult?.takeIf { !it.isCompleted } ?: CompletableDeferred()
@@ -419,7 +418,6 @@ class IrohConnectionSupervisor(
         stopped = true
         redialJob?.cancel()
         redialJob = null
-        redialReadyAtMs = null
         val next = if (error is IrohAuthFailure) {
             IrohConnectionState.AuthFailed(error.message ?: "Iroh auth failed")
         } else {
@@ -432,7 +430,6 @@ class IrohConnectionSupervisor(
         if (redialJob?.isActive == true || closed || stopped) return
         val attempt = failureCount + 1
         val delayMs = backoffPolicy.delayMs(attempt, randomJitterMs)
-        redialReadyAtMs = System.currentTimeMillis() + delayMs
         redialJob = scope.launch {
             Telemetry.event(
                 "IrohSupervisor",
@@ -444,7 +441,6 @@ class IrohConnectionSupervisor(
             delay(delayMs.milliseconds)
             val config = configProvider() ?: return@launch
             mutex.withLock {
-                redialReadyAtMs = null
                 if (!closed && !stopped && currentHandle == null && dialJob?.isActive != true) {
                     startDialLocked(config)
                 }

@@ -4,7 +4,9 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlin.time.Duration
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.sync.Mutex
@@ -36,13 +38,22 @@ fun IChannelTransport.conversationChanges(): Flow<Pair<ConversationId, AgentId?>
     }
 }
 
+/** [observeConversationInvalidations] without a coalescing window: each queued burst is read at once. */
+suspend fun observeConversationInvalidations(
+    updates: Flow<Pair<ConversationId, AgentId?>>,
+    refresh: suspend (Map<ConversationId, AgentId?>) -> Unit,
+): Unit = observeConversationInvalidations(updates, Duration.ZERO, refresh)
+
 /**
  * Keeps dirty identities while a read is in flight. Queued bursts drain into one batch, so each
  * owning agent needs at most one refresh per batch. A push arriving during that read remains
- * queued for the next batch, including another push for the same conversation.
+ * queued for the next batch, including another push for the same conversation. A positive
+ * [coalesceWindow] waits that long after the first push of a batch, so a burst spread over time
+ * (a streaming turn's pushes) is read once.
  */
 suspend fun observeConversationInvalidations(
     updates: Flow<Pair<ConversationId, AgentId?>>,
+    coalesceWindow: Duration,
     refresh: suspend (Map<ConversationId, AgentId?>) -> Unit,
 ): Unit = coroutineScope {
     val wake = Channel<Unit>(Channel.CONFLATED)
@@ -59,7 +70,7 @@ suspend fun observeConversationInvalidations(
         }
     }
     wake.consumeEach {
-        yield()
+        if (coalesceWindow.isPositive()) delay(coalesceWindow) else yield()
         val batch = mutex.withLock { dirty.toMap().also { dirty.clear() } }
         if (batch.isNotEmpty()) refresh(batch)
     }

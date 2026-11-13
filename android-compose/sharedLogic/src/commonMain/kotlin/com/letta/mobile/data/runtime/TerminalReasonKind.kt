@@ -34,6 +34,9 @@ private val TERMINAL_REASON_FAMILIES = listOf(
     ReasonFamily("connection_lost", anyOf = listOf("connection lost")),
     ReasonFamily("approval_pending", anyOf = listOf("waiting for approval")),
     ReasonFamily("invalid_tool_call_ids", anyOf = listOf("invalid tool call ids")),
+    // letta-mobile-6vf4r: the host's rejection of a send into a conversation whose turn another
+    // device runs ([isTurnAlreadyActiveMessage]); the send never started. Before conversation_busy.
+    ReasonFamily(TurnFailureNotices.OTHER_DEVICE_BUSY_KIND, anyOf = listOf("already active", "already busy")),
     ReasonFamily("conversation_busy", allOf = listOf("conversation", "busy")),
     ReasonFamily("empty_response", anyOf = listOf("empty content in", "empty response")),
     // letta-mobile-bzvro.9 (F09): the actionable families. Credit before rate limiting: an

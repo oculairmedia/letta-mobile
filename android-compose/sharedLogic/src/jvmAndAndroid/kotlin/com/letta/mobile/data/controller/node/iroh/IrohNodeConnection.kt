@@ -968,6 +968,8 @@ class IrohNodeConnection(
             }
             if (!rejectedBusy) turn.fanout.settleIdentity()
         } finally {
+            // A turn that ended without its terminal frames must not keep telling late viewers it runs.
+            turnHost.markIdle(turn.protocol)
             if (!rejectedBusy) turn.fanout.abandonIdentity()
         }
     }

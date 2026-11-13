@@ -70,6 +70,7 @@ import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.shell.pages.home.LocalHomeLane
 import com.letta.mobile.ui.shell.sidebar.LocalPanelLane
+import com.letta.mobile.ui.shell.sidebar.LocalSharedNotesToggle
 import com.letta.mobile.ui.settings.LocalShellLayoutReset
 import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
@@ -124,6 +125,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                             val purposes = remember(state.navigation.panel.conversations) {
                                 state.navigation.panel.conversations.mapNotNull { row -> row.lane?.let { row.id to it } }.toMap()
                             }
+                            val sharedNotes = rememberSharedNoteBrowser()
                             CompositionLocalProvider(
                                 LocalConversationLanes provides host.conversationLanes,
                                 LocalConversationPurposes provides purposes,
@@ -131,6 +133,8 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                 LocalRailLane provides remember(state.layout.lanes) { state.layout.lanes.railLane().map { it.view } },
                                 LocalPanelLane provides remember(state.layout.lanes) { state.layout.lanes.panelLane().map { it.view } },
                                 LocalShellLayoutReset provides rememberShellLayoutReset(),
+                                LocalShellSharedNotes provides sharedNotes,
+                                LocalSharedNotesToggle provides rememberSharedNotesToggle(sharedNotes, state.layout.lanesStore),
                             ) {
                                 ProvideCanvasDocumentViewerRegistry(viewers) {
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {

@@ -17,6 +17,143 @@ letta-mobile-guardrails:
     active: true
   NoAdHocJsonInstance:
     active: true
+  # Literal bidi / zero-width characters in any Kotlin file (SonarCloud blocks them). Zero on main.
+  InvisibleOrBidiCharacter:
+    active: true
+  # Ratchet: each rule below had zero findings in exactly these paths on main (2026-11-12). It runs
+  # on changed files without a baseline, so a path may only join an includes list once it is clean.
+  # Counts and hit lists for everything else are in the change that added them; fix, then widen.
+  NoRunBlockingInProduction:
+    active: true
+    includes:
+      - "**/core/android-data/src/**"
+      - "**/core/data/src/**"
+      - "**/core/ids/src/**"
+      - "**/core/runtime/src/**"
+      - "**/core/testutil/src/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/feature-chat/src/**"
+      - "**/plugin-api/src/**"
+      - "**/plugin-view/src/**"
+      - "**/sharedUI/src/**"
+      - "**/sharedUI-devfixtures/src/**"
+      - "**/web/src/**"
+      - "**/avatar/core/src/**"
+      - "**/avatar/renderer-rive/src/**"
+      - "**/appserver-testkit/src/**"
+      # Packages built with these limits from day one (n2stx); widen as more code is cleaned.
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  UnboundedBufferNeedsPolicy:
+    active: true
+    includes:
+      - "**/core/android-data/src/**"
+      - "**/core/data/src/**"
+      - "**/core/ids/src/**"
+      - "**/core/runtime/src/**"
+      - "**/core/testutil/src/**"
+      - "**/designsystem/src/**"
+      - "**/desktop/src/**"
+      - "**/feature-chat/src/**"
+      - "**/plugin-api/src/**"
+      - "**/plugin-api-testkit/src/**"
+      - "**/plugin-view/src/**"
+      - "**/sharedUI-devfixtures/src/**"
+      - "**/web/src/**"
+      - "**/avatar/core/src/**"
+      - "**/avatar/renderer-rive/src/**"
+      - "**/appserver-testkit/src/**"
+      - "**/appserver-cli/src/**"
+      - "**/cli/src/**"
+      - "**/iroh-wrapper-cli/src/**"
+      # Packages built with these limits from day one (n2stx); widen as more code is cleaned.
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  WallClockInSharedLogic:
+    active: true
+    includes:
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/transport/iroh/IrohConnectionSupervisor.kt"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/transport/iroh/IrohAdminRpcExecutor.kt"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/transport/iroh/IrohTurnRegistry.kt"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  # Off: real findings on main that need an owner decision first (see the change description):
+  # ExceptionMessageToClientOrTelemetry 80, HostOrUrlStringMatching 31, SecretBearingDataClass 48.
+  ExceptionMessageToClientOrTelemetry:
+    active: false
+  HostOrUrlStringMatching:
+    active: false
+  SecretBearingDataClass:
+    active: false
+
+# CodeScene limits (functions over 4 arguments, cyclomatic complexity 9+, conditions with more than
+# one boolean operator), enforced locally where main already meets them so CodeScene stops being the
+# first to say so. detekt.yml keeps the looser repo-wide thresholds; constructors are left to it.
+complexity:
+  active: true
+  LongParameterList:
+    active: true
+    functionThreshold: 5
+    constructorThreshold: 1000
+    includes:
+      - "**/core/data/src/**"
+      - "**/core/ids/src/**"
+      - "**/plugin-api/src/**"
+      - "**/plugin-api-testkit/src/**"
+      - "**/avatar/core/src/**"
+      - "**/avatar/renderer-rive/src/**"
+      - "**/appserver-cli/src/**"
+      - "**/architecture-tests/src/**"
+      - "**/build-logic/src/**"
+      - "**/baselineprofile/src/**"
+      - "**/macrobenchmark/src/**"
+      # Packages built with these limits from day one (n2stx); widen as more code is cleaned.
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 9
+    includes:
+      - "**/core/ids/src/**"
+      - "**/plugin-api/src/**"
+      - "**/plugin-view/src/**"
+      - "**/sharedUI-devfixtures/src/**"
+      - "**/baselineprofile/src/**"
+      - "**/macrobenchmark/src/**"
+      # Packages built with these limits from day one (n2stx); widen as more code is cleaned.
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
+  ComplexCondition:
+    active: true
+    threshold: 3
+    includes:
+      - "**/core/data/src/**"
+      - "**/core/ids/src/**"
+      - "**/core/runtime/src/**"
+      - "**/core/testutil/src/**"
+      - "**/plugin-api/src/**"
+      - "**/plugin-api-testkit/src/**"
+      - "**/plugin-view/src/**"
+      - "**/sharedUI-devfixtures/src/**"
+      - "**/web/src/**"
+      - "**/avatar/core/src/**"
+      - "**/avatar/renderer-rive/src/**"
+      - "**/appserver-cli/src/**"
+      - "**/appserver-testkit/src/**"
+      - "**/architecture-tests/src/**"
+      - "**/build-logic/src/**"
+      - "**/baselineprofile/src/**"
+      - "**/macrobenchmark/src/**"
+      # Packages built with these limits from day one (n2stx); widen as more code is cleaned.
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/secrets/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/canvas/mount/**"
+      - "**/sharedLogic/src/*/kotlin/com/letta/mobile/data/voice/**"
 
 letta-mobile-design-system:
   active: true
