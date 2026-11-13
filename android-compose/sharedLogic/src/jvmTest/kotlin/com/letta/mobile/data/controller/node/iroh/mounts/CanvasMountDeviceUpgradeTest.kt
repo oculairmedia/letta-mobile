@@ -22,7 +22,7 @@ class CanvasMountDeviceUpgradeTest {
         val outcome = CanvasMountDeviceUpgrade.forPairingStore(file).runOnce()
         assertEquals(CanvasMountDeviceUpgrade.Outcome.Applied(upgraded = 4), outcome)
         listOf("chat", "desktop", "vibesync").forEach { role ->
-            assertEquals(IrohPeerCapabilities.ROLES.getValue(role), store.get(role)?.capabilities, role)
+            assertEquals(IrohPeerCapabilities.roles(mountsEnabled = true).getValue(role), store.get(role)?.capabilities, role)
         }
         assertEquals(preMount("chat") + MOUNT, store.get("scoped-chat")?.capabilities)
         assertEquals(setOf("agent-a"), store.get("scoped-chat")?.agentIds, "agent scope is kept")
@@ -42,7 +42,7 @@ class CanvasMountDeviceUpgradeTest {
         assertEquals(preMount("chat"), store.get("chat")?.capabilities)
 
         // Without the marker (a crash before it was written) a rerun only touches still-pre-mount records.
-        store.save(checkNotNull(store.get("chat")).copy(capabilities = IrohPeerCapabilities.CHAT_ROLE))
+        store.save(checkNotNull(store.get("chat")).copy(capabilities = preMount("chat") + MOUNT))
         Files.list(file.parent).use { files -> files.filter { it.fileName.toString().endsWith(".canvas-mount-v1") }.toList() }
             .forEach(Files::delete)
         assertEquals(CanvasMountDeviceUpgrade.Outcome.Applied(upgraded = 0), upgrade.runOnce())

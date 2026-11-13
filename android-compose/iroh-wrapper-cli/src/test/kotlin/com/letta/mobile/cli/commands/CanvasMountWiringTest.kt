@@ -74,7 +74,7 @@ class CanvasMountWiringTest {
     @Test
     fun thePairedDeviceUpgradeRunsOnlyWithTheFlagAndAPairingStore() {
         val peers = productState.resolve("paired-peers.json")
-        val chatBefore = IrohPeerCapabilities.CHAT_ROLE - IrohPeerCapabilities.CANVAS_MOUNT_READ - IrohPeerCapabilities.CANVAS_MOUNT_WRITE
+        val chatBefore = IrohPeerCapabilities.CHAT_ROLE
         FilePairedPeerStore(peers).save(PairedPeer("phone", "phone", pairedAtMs = 1L, capabilities = chatBefore))
 
         assertNull(upgradePairedDevicesForCanvasMounts(CanvasMountOptions(enabled = false, secretKeyFile = keyFile), peers))
@@ -83,7 +83,7 @@ class CanvasMountWiringTest {
 
         val enabled = CanvasMountOptions(enabled = true, secretKeyFile = keyFile)
         assertEquals(CanvasMountDeviceUpgrade.Outcome.Applied(upgraded = 1), upgradePairedDevicesForCanvasMounts(enabled, peers))
-        assertEquals(IrohPeerCapabilities.CHAT_ROLE, FilePairedPeerStore(peers).get("phone")?.capabilities)
+        assertEquals(IrohPeerCapabilities.CHAT_ROLE + IrohPeerCapabilities.MOUNT_CAPABILITIES, FilePairedPeerStore(peers).get("phone")?.capabilities)
         assertEquals(CanvasMountDeviceUpgrade.Outcome.AlreadyApplied, upgradePairedDevicesForCanvasMounts(enabled, peers))
     }
 

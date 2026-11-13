@@ -389,7 +389,7 @@ class AppServerServeIrohCommand : CliktCommand(
             val identityRows = com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows()
             val turnIdentity = newTurnIdentityLedger(identityRows)
 
-            val pairingService = access.pairingService(::println)
+            val pairingService = access.pairingService(::println, canvasMountsEnabled = enableCanvasMounts)
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             

@@ -17,11 +17,12 @@ data class PairedPeer(
     val name: String,
     val pairedAtMs: Long,
     /**
-     * Explicit capability grants. Records without the field keep the
-     * least-privilege desktop role they were paired under; admin.full is never
+     * Explicit capability grants. Records without the field keep the frozen
+     * pre-mount desktop role ([IrohPeerCapabilities.LEGACY_DESKTOP_ROLE]) they
+     * were paired under, never a later, wider desktop role; admin.full is never
      * implicit and must be granted deliberately.
      */
-    val capabilities: Set<String> = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE,
+    val capabilities: Set<String> = IrohPeerCapabilities.LEGACY_DESKTOP_ROLE,
     /**
      * Agents this peer may address. Null = every agent
      * on the host (records paired before agent scoping keep that meaning); a

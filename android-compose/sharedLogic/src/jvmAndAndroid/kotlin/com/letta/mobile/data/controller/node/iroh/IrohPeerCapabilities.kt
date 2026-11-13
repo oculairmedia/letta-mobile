@@ -40,14 +40,27 @@ object IrohPeerCapabilities {
     const val SUBAGENT_SPAWN = "subagent.spawn"
     const val WORKACTIVITY_REPORT = "workactivity.report"
 
-    // letta-mobile-n2stx.5: canvas mount routes. Every role with chat access holds both (owner decision D2); the
-    // handler still checks agent and conversation scope, conversation ownership and canvas visibility. Setting an
-    // agent default is admin.full only (D1).
+    // letta-mobile-n2stx.5: canvas mount routes. The chat, desktop and vibesync roles hold both only on a host that runs
+    // with canvas mounts enabled ([roles]); the handler still checks agent and conversation scope, conversation
+    // ownership and canvas visibility.
     /** Admits the read-only `canvas.mount.resolve` and `canvas.mount.candidates`. */
     const val CANVAS_MOUNT_READ = CanvasMountWire.READ_CAPABILITY
 
-    /** Admits the canvas mount writes: bind, replace and default.set. */
+    /** Admits the canvas mount writes: bind and replace. */
     const val CANVAS_MOUNT_WRITE = CanvasMountWire.WRITE_CAPABILITY
+
+    /** The two canvas mount capabilities, granted with a role only while canvas mounts are enabled. */
+    val MOUNT_CAPABILITIES: Set<String> = setOf(CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE)
+
+    /**
+     * The desktop role as it was before canvas mounts, frozen: what a paired-peer record stored without a
+     * `capabilities` field means. Never edit it; a record that predates a later capability must not gain it by
+     * being read back.
+     */
+    val LEGACY_DESKTOP_ROLE: Set<String> = setOf(
+        CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
+        SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE,
+    )
 
     val ALL: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
@@ -61,12 +74,11 @@ object IrohPeerCapabilities {
      * (chat, conversation management, memory, schedules, skills, tools,
      * projects) WITHOUT admin.full — server administration (agent CRUD,
      * identities, runs/jobs, providers, goals, pairing management, health)
-     * must be granted explicitly.
+     * must be granted explicitly. The canvas mount capabilities are added by [roles] only while mounts are enabled.
      */
     val DEFAULT_DESKTOP_ROLE: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE,
-        CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE,
     )
 
     /**
@@ -75,9 +87,12 @@ object IrohPeerCapabilities {
      * nothing else (no memory writes, tools, skills, schedules, projects, and
      * never admin). Wider roles are requested explicitly by the inviter.
      */
-    val CHAT_ROLE: Set<String> = setOf(CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE)
+    val CHAT_ROLE: Set<String> = setOf(CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE)
 
-    /** Named roles an inviter may request instead of an explicit capability list. */
+    /** The roles that gain [MOUNT_CAPABILITIES] while canvas mounts are enabled. */
+    val MOUNT_ROLE_NAMES: Set<String> = setOf("chat", "desktop", "vibesync")
+
+    /** Named roles an inviter may request instead of an explicit capability list, as on a host without mounts. */
     val ROLES: Map<String, Set<String>> by lazy {
         mapOf(
             "chat" to CHAT_ROLE,
@@ -98,8 +113,23 @@ object IrohPeerCapabilities {
     val VIBESYNC_ROLE: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE,
         SUBAGENT_SPAWN, WORKACTIVITY_REPORT,
-        CANVAS_MOUNT_READ, CANVAS_MOUNT_WRITE,
     )
+
+    /** The named roles on a host whose canvas mounts are [mountsEnabled]: the chat roles gain [MOUNT_CAPABILITIES]. */
+    fun roles(mountsEnabled: Boolean): Map<String, Set<String>> =
+        if (!mountsEnabled) ROLES else ROLES.mapValues { (name, caps) -> if (name in MOUNT_ROLE_NAMES) caps + MOUNT_CAPABILITIES else caps }
+
+    /**
+     * The grant [capabilities] amount to on a host whose canvas mounts are [mountsEnabled], applied when an invite is
+     * redeemed (an invite may have been minted by another process or before a restart). A set equal to a mount role
+     * with or without the mount capabilities IS that role and resolves to it as of now; any other set is a deliberate
+     * hand-scoped grant and is kept exactly.
+     */
+    fun grantAsOfNow(capabilities: Set<String>, mountsEnabled: Boolean): Set<String> {
+        val base = MOUNT_ROLE_NAMES.map(ROLES::getValue)
+            .firstOrNull { it == capabilities || it + MOUNT_CAPABILITIES == capabilities } ?: return capabilities
+        return if (mountsEnabled) base + MOUNT_CAPABILITIES else base
+    }
 
     /** Capability required for the runtime-protocol commands on the control channel. */
     fun forProtocolCommand(type: String): String? = when (type) {

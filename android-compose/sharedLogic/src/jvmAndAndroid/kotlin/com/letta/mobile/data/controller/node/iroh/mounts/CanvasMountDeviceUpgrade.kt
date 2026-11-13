@@ -14,7 +14,9 @@ import java.nio.file.Path
  *
  * - A record is upgraded only when its capability set is EXACTLY the chat, desktop or vibesync role as it was before
  *   D2 (that role minus the two mount capabilities). Any other set (hand-scoped, admin, already upgraded) is left as
- *   it is, and nothing but the two mount capabilities is ever added. Agent scope and every other field are kept.
+ *   it is, and nothing but the two mount capabilities is ever added. A set stored explicitly that merely equals a
+ *   pre-mount role is treated as that role and upgraded too: role sets carry no provenance, and the same rule decides
+ *   what an invite grants at redemption ([IrohPeerCapabilities.grantAsOfNow]). Agent scope and every other field are kept.
  * - All records change in one locked read-modify-write ([PairedPeerStore.updateEach]), so a concurrent pair or revoke
  *   is neither lost nor undone.
  * - [marker] records that the upgrade ran; it never runs again, so a device an administrator later re-scopes to a
@@ -45,11 +47,14 @@ class CanvasMountDeviceUpgrade(private val peers: PairedPeerStore, private val m
     companion object {
         private const val UPGRADE_NAME = "canvas-mount-v1"
 
-        private val MOUNT_CAPABILITIES = setOf(IrohPeerCapabilities.CANVAS_MOUNT_READ, IrohPeerCapabilities.CANVAS_MOUNT_WRITE)
+        private val MOUNT_CAPABILITIES = IrohPeerCapabilities.MOUNT_CAPABILITIES
 
-        /** The chat, desktop and vibesync roles exactly as they were before D2 added the mount capabilities. */
+        /**
+         * The chat, desktop and vibesync roles without the mount capabilities, as every pre-mount record holds them
+         * (a record stored without a `capabilities` field reads back as the frozen pre-mount desktop role).
+         */
         private val PRE_MOUNT_ROLES: Set<Set<String>> =
-            listOf("chat", "desktop", "vibesync").mapTo(mutableSetOf()) { IrohPeerCapabilities.ROLES.getValue(it) - MOUNT_CAPABILITIES }
+            IrohPeerCapabilities.MOUNT_ROLE_NAMES.mapTo(mutableSetOf()) { IrohPeerCapabilities.ROLES.getValue(it) - MOUNT_CAPABILITIES }
 
         /** The upgrade of the paired-device file [pairedPeers], its marker a hidden sibling of that file. */
         fun forPairingStore(pairedPeers: Path): CanvasMountDeviceUpgrade =

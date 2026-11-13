@@ -19,12 +19,20 @@ import java.util.concurrent.CopyOnWriteArrayList
  * persisted, so a concurrent second redemption — or any replay — fails.
  * Only a hash of each secret is stored; secrets never appear in telemetry or
  * errors.
+ *
+ * [mountsEnabled] is whether this host serves canvas mounts: only then do the
+ * chat, desktop and vibesync roles carry the two mount capabilities
+ * ([IrohPeerCapabilities.roles]). A role grant is resolved again when the
+ * invite is redeemed ([IrohPeerCapabilities.grantAsOfNow]), so an invite
+ * minted by the host `pair` command or before a restart grants the role as
+ * this host defines it at redemption.
  */
 class IrohPairingService(
     private val store: PairedPeerStore,
     private val invites: PairingInviteStore = InMemoryPairingInviteStore(),
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val random: SecureRandom = SecureRandom(),
+    private val mountsEnabled: Boolean = false,
 ) {
     /** What the inviter grants the device that redeems the invite. */
     data class InviteRequest(
@@ -63,6 +71,9 @@ class IrohPairingService(
     }
 
     private val revocationListeners = CopyOnWriteArrayList<(String) -> Unit>()
+
+    /** The named roles an inviter may request on this host. */
+    fun roles(): Map<String, Set<String>> = IrohPeerCapabilities.roles(mountsEnabled)
 
     /** Backward-compatible mint with the default (chat) grant. */
     fun createInvite(suggestedName: String, ttlMs: Long = DEFAULT_TTL_MS): PairingInvite =
@@ -126,7 +137,7 @@ class IrohPairingService(
             nodeId = nodeId,
             name = name?.trim()?.takeIf { it.isNotBlank() }?.take(MAX_NAME_CHARS) ?: invite.suggestedName,
             pairedAtMs = nowMs(),
-            capabilities = invite.capabilities,
+            capabilities = IrohPeerCapabilities.grantAsOfNow(invite.capabilities, mountsEnabled),
             agentIds = invite.agentIds,
             lastSeenAtMs = nowMs(),
         )
