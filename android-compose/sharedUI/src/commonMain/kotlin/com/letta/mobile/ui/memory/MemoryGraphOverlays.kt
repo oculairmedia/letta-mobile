@@ -36,13 +36,12 @@ internal fun MemoryKindFilterBar(
     counts: Map<MemoryGraphNodeKind, Int>,
     onToggle: (MemoryGraphNodeKind) -> Unit,
     wide: Boolean,
-    modifier: Modifier = Modifier,
 ) {
     val palette = rememberMemoryGraphPalette()
     // One row above the canvas (never over it), scrolling sideways when a phone is too narrow.
     val scroll = rememberScrollState()
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             // Fade whichever edge has more chips beyond it (the rail's shared fade, sideways).
             .lettaHorizontalFadingEdges(
