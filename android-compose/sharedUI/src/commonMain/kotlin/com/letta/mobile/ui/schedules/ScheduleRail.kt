@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,8 +69,6 @@ object ScheduleRailTags {
     const val ACTIVE_LIST = "schedule-rail-active"
 }
 
-val ScheduleRailWidth = 372.dp
-
 /** What the rail draws from and asks its host to do. A null [onTogglePause] disables Pause / Resume. */
 @Immutable
 data class ScheduleRailParams(
@@ -91,17 +88,13 @@ data class ScheduleRailParams(
 
 /**
  *  (hard cut S7): the schedules page's right rail, shared. The overview's
- * active schedules are a [RosterList]; a schedule or a run opens its detail in place. [modifier]
- * sizes it: a docked rail by default, the full width of a sheet on a phone.
+ * active schedules are a [RosterList]; a schedule or a run opens its detail in place. It draws no
+ * ground or edge of its own: the page docks it in the shared LettaSidePane, or shows it in a sheet
+ * on a phone, and [modifier] sizes it there.
  */
 @Composable
-fun ScheduleRail(params: ScheduleRailParams, modifier: Modifier = Modifier.width(ScheduleRailWidth).fillMaxHeight()) {
-    Box(
-        modifier
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(LettaDimens.Space.xl),
-    ) {
+fun ScheduleRail(params: ScheduleRailParams, modifier: Modifier = Modifier.fillMaxSize()) {
+    Box(modifier.padding(LettaDimens.Space.lg)) {
         when (val rail = params.rail) {
             ScheduleRailState.Overview -> ScheduleOverviewRail(params)
             is ScheduleRailState.Detail -> params.defsById[rail.scheduleId]?.let { ScheduleDetailRail(it, params) } ?: ScheduleOverviewRail(params)
