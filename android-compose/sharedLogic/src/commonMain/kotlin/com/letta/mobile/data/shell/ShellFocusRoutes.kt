@@ -41,3 +41,26 @@ internal fun initialFocusSnapshot(
         railExpanded = railExpanded,
     ).also { require(it.copy(sourceKey = sourceKey.ifBlank { "unbound" }).valid()) }
 }
+
+/**
+ * Only the owner's current target may turn a catalog observation ([references], the catalog's rows)
+ * into a chat load: the exact conversation, or the agent's chat to resume. An exact target the
+ * catalog does not list yet is selected anyway; any other is selected once its focus completes.
+ */
+fun ShellWorkspaceState.projectFocus(references: List<ShellConversationRef>, select: (ConversationId) -> Unit) {
+    if (sourceKey == null || page !is ShellDestination.Chat) return
+    val focus = currentFocus
+    val token = requestToken()
+    val target = when (focus.chatMode) {
+        CurrentFocusChatMode.Exact -> focus.conversationId
+        CurrentFocusChatMode.Resume -> focus.agentId?.let { resolveAgentChat(it, references) }
+        CurrentFocusChatMode.New -> null
+    } ?: return
+    val reference = references.singleOrNull { it.id == target }
+    if (reference == null && focus.chatMode == CurrentFocusChatMode.Exact) {
+        select(target)
+        return
+    }
+    val agent = reference?.agent ?: return
+    if (completeFocus(token, target, agent, reference)) select(target)
+}

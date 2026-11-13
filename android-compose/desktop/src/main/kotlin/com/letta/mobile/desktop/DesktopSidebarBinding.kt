@@ -3,8 +3,6 @@ package com.letta.mobile.desktop
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasLibrary
-import com.letta.mobile.data.chat.display.ChatDisplayOptions
-import com.letta.mobile.data.chat.display.ChatTextSize
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -31,6 +29,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import com.letta.mobile.ui.shell.sidebar.ShellSidebarInput
 import com.letta.mobile.ui.shell.sidebar.ShellSidebarMapping
+import com.letta.mobile.ui.shell.sidebar.closeIfShowing
 import com.letta.mobile.ui.shell.sidebar.shellSectionIcon
 import kotlin.time.Clock
 
@@ -109,19 +108,6 @@ internal fun desktopPanelPage(destination: DesktopDestination, mode: WorkPlayMod
 internal fun desktopOpenConversation(destination: DesktopDestination, selectedId: String?): String? =
     selectedId.takeIf { destination == DesktopDestination.Conversations }
 
-/** The Chat options dialog's state: display options, the window's text size, auto-pin, and whether a chat is open. */
-internal fun desktopChatOptionsState(
-    display: ChatDisplayOptions,
-    fontScale: Float,
-    autoPin: Boolean,
-    hasChat: Boolean,
-): ShellChatOptionsState = ShellChatOptionsState(
-    display = display,
-    textSize = ChatTextSize.nearest(fontScale),
-    autoPinNewChats = autoPin,
-    canDownloadTranscript = hasChat,
-)
-
 /** What the shared panel's asks do on the desktop. */
 internal fun desktopSidebarActions(
     context: DesktopShellContext,
@@ -154,11 +140,10 @@ internal fun desktopSidebarActions(
             }
         },
         onOpenCanvas = { context.openCanvas(it) },
-        // The row menu's "Open in side panel": the pane, even in canvas mode, with the mount left as it is.
-        onOpenCanvasInPane = { canvasShell.open(it) },
+        onOpenCanvasInPane = canvasShell::open,
         onArchiveCanvas = canvasShell.library::setArchived,
         onNewCanvas = { canvasShell.createNew(frame.value.focus.selectedAgentId) },
-        onCanvasMounted = { id -> if (canvasShell.activeSession?.canvasId == id) canvasShell.close() },
+        onCanvasMounted = canvasShell::closeIfShowing,
         conversationMarks = chatController.conversationMarks.rowActions(),
         chatOptions = desktopChatOptionsActions(chatController, setFontScale),
     )

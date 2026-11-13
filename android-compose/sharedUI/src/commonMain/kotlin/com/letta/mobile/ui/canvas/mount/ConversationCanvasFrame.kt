@@ -21,6 +21,7 @@ import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.LocalCanvasBoardSave
 import com.letta.mobile.ui.chat.surface.LocalChatCanvasOnBoard
 import com.letta.mobile.ui.shell.sidebar.LocalShellCanvasMounts
+import com.letta.mobile.ui.shell.sidebar.ShellCanvasPane
 import kotlinx.coroutines.delay
 
 /**
@@ -106,6 +107,12 @@ fun CloseCanvasPaneShownOnBoard(paneCanvas: CanvasId?, close: () -> Unit) {
     LaunchedEffect(mountedOnBoard) {
         if (mountedOnBoard != null && mountedOnBoard == pane) onClose()
     }
+}
+
+/** [CloseCanvasPaneShownOnBoard] for a host's side [pane] of canvases. */
+@Composable
+fun CloseCanvasPaneShownOnBoard(pane: ShellCanvasPane) {
+    CloseCanvasPaneShownOnBoard(pane.activeSession?.canvasId, pane::close)
 }
 
 private const val SWITCH_RETRY_MS = 2_000L

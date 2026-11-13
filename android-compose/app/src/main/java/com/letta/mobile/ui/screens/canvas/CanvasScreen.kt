@@ -45,7 +45,7 @@ internal fun AndroidCanvasHost(
     androidx.compose.runtime.CompositionLocalProvider(
         com.letta.mobile.ui.canvas.boards.LocalCanvasBoardGeneration provides context.generation,
     ) {
-        com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards(deps.canvasViewers, context.boards, picker, content)
+        com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards(deps.canvasViewers, context.boards, picker, content = content)
     }
 }
 

@@ -6963,6 +6963,11 @@ public final class com/letta/mobile/data/canvas/CanvasRelayClient$RelayView {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/canvas/CanvasRelayClientKt {
+	public static final fun storedBoardsRelayClient (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSnapshotSeed;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
+	public static synthetic fun storedBoardsRelayClient$default (Lcom/letta/mobile/data/canvas/CanvasDocumentStore;Lcom/letta/mobile/data/canvas/CanvasOpLog;Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;Lcom/letta/mobile/data/storage/AssetStore;Lcom/letta/mobile/data/canvas/CanvasSnapshotSeed;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
+}
+
 public abstract interface class com/letta/mobile/data/canvas/CanvasRelayConnection {
 	public abstract fun getHostId-VGA35RE ()Ljava/lang/String;
 	public abstract fun receive (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -51420,6 +51425,10 @@ public final class com/letta/mobile/data/shell/ShellDestinationKt {
 	public static final fun getSettingsSection (Lcom/letta/mobile/data/shell/ShellDestination;)Lcom/letta/mobile/data/shell/ShellSettingsSection;
 	public static final fun getSkillsSection (Lcom/letta/mobile/data/shell/ShellDestination;)Lcom/letta/mobile/data/shell/ShellSkillsSection;
 	public static final fun toShellDestination (Lcom/letta/mobile/data/lens/LensDestination;Ljava/lang/String;)Lcom/letta/mobile/data/shell/ShellDestination;
+}
+
+public final class com/letta/mobile/data/shell/ShellFocusRoutesKt {
+	public static final fun projectFocus (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class com/letta/mobile/data/shell/ShellHomePrompt {

@@ -11,13 +11,12 @@ import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.shell.CurrentFocusChatMode
 import com.letta.mobile.data.shell.FocusAvailability
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.data.shell.projectFocus
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.canvas.boards.ProvideCanvasHostWithBoards
-import com.letta.mobile.ui.canvas.mount.CloseCanvasPaneShownOnBoard
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellSearchContext
@@ -66,10 +65,8 @@ internal fun LettaDesktopApp(
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
-        ProvideCanvasHostWithBoards(context.core.canvasShell.viewers, context.core.canvasShell.boards, context.core.canvasShell.picker) {
-            // Entering canvas mode with the pane's board mounted puts it behind the chat: the pane copy closes.
-            val canvasShell = context.core.canvasShell
-            CloseCanvasPaneShownOnBoard(canvasShell.activeSession?.canvasId, canvasShell::close)
+        val canvasShell = context.core.canvasShell
+        ProvideCanvasHostWithBoards(canvasShell.viewers, canvasShell.boards, canvasShell.picker, pane = canvasShell) {
             DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
                 // Boards register where the canvas_* tools look and open by id for canvas modules; the header hoists into the title bar.
                 val header = DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange)
@@ -221,30 +218,16 @@ private fun DesktopFocusProjection(context: DesktopShellContext, chatState: Desk
     }
 }
 
-/** Only the owner's current target may turn a catalog observation into a chat load. */
+/** The window's catalog rows as the owner's references, projected onto its current target ([projectFocus]). */
 internal fun projectDesktopFocus(
     workspace: ShellWorkspaceState,
     chatState: DesktopChatSurfaceState,
     select: (ConversationId) -> Unit,
 ) {
-    if (workspace.sourceKey == null || workspace.page !is ShellDestination.Chat) return
-    val focus = workspace.currentFocus
-    val token = workspace.requestToken()
     val references = chatState.conversations.map { row ->
         ShellConversationRef(ConversationId(row.id), row.agentId?.let(::AgentId), row.updatedAtLabel, tags = row.tags)
     }
-    val target = when (focus.chatMode) {
-        CurrentFocusChatMode.Exact -> focus.conversationId
-        CurrentFocusChatMode.Resume -> focus.agentId?.let { workspace.resolveAgentChat(it, references) }
-        CurrentFocusChatMode.New -> null
-    } ?: return
-    val reference = references.singleOrNull { it.id == target }
-    if (reference == null && focus.chatMode == CurrentFocusChatMode.Exact) {
-        select(target)
-        return
-    }
-    val agent = reference?.agent ?: return
-    if (workspace.completeFocus(token, target, agent, reference)) select(target)
+    workspace.projectFocus(references, select)
 }
 
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {

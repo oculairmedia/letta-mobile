@@ -729,7 +729,7 @@ public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSource$DefaultIm
 
 public final class com/letta/mobile/ui/canvas/boards/CanvasBoardSourceKt {
 	public static final fun ProvideCanvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
-	public static final fun ProvideCanvasHostWithBoards (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasPicker;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun ProvideCanvasHostWithBoards (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerRegistry;Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasPicker;Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPane;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun canvasBoardSource (Lcom/letta/mobile/data/canvas/library/CanvasBoardSessions;)Lcom/letta/mobile/ui/canvas/boards/CanvasBoardSource;
 	public static final fun getLocalCanvasBoardGeneration ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalCanvasBoardSessions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
@@ -752,6 +752,7 @@ public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 
 public final class com/letta/mobile/ui/canvas/mount/ConversationCanvasFrameKt {
 	public static final fun CloseCanvasPaneShownOnBoard (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
+	public static final fun CloseCanvasPaneShownOnBoard (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPane;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ConversationCanvasFrame (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideConversationCanvasPicker (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasPicker;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalConversationCanvasPicker ()Landroidx/compose/runtime/ProvidableCompositionLocal;
@@ -10381,6 +10382,16 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasMountsKt {
 	public static final fun getLocalShellCanvasMounts ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
+public abstract interface class com/letta/mobile/ui/shell/sidebar/ShellCanvasPane {
+	public abstract fun close ()V
+	public abstract fun getActiveSession ()Lcom/letta/mobile/data/canvas/CanvasSession;
+	public abstract fun open (Lcom/letta/mobile/data/model/CanvasId;)V
+}
+
+public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasPaneKt {
+	public static final fun closeIfShowing (Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPane;Lcom/letta/mobile/data/model/CanvasId;)V
+}
+
 public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasPickOutcome : java/lang/Enum {
 	public static final field Denied Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickOutcome;
 	public static final field Invalid Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickOutcome;
@@ -10486,6 +10497,7 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions {
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellChatOptionsKt {
 	public static final fun ShellChatOptionsDialog (Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsActions;Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
+	public static final fun shellChatOptionsState (Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;FZZ)Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;
 }
 
 public final class com/letta/mobile/ui/shell/sidebar/ShellChatOptionsState {

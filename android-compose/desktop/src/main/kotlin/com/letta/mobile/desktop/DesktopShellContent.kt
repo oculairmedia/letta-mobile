@@ -211,7 +211,7 @@ private fun rememberDesktopSidebarInputs(context: DesktopShellContext, frame: De
         canvases = canvasLibraryState.documents,
         archivedCanvasIds = canvasLibraryState.archived,
         activeCanvasId = canvasShell.activeSession?.canvasId,
-        chatOptions = desktopChatOptionsState(
+        chatOptions = com.letta.mobile.ui.shell.sidebar.shellChatOptionsState(
             display = chatController.conversationMarks.displayOptions.collectAsState().value,
             fontScale = LocalDesktopChatFontScale.current,
             autoPin = chatController.conversationMarks.autoPinNewChats.collectAsState().value,

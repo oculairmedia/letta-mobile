@@ -7,7 +7,6 @@ import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.relayTopicOf
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
@@ -130,14 +129,11 @@ abstract class AppModule {
             opLog: com.letta.mobile.data.canvas.CanvasOpLog,
             documents: com.letta.mobile.data.canvas.CanvasDocumentStore,
             assets: com.letta.mobile.data.storage.AssetStore,
-        ): com.letta.mobile.data.canvas.CanvasRelayClient = com.letta.mobile.data.canvas.CanvasRelayClient(
+        ): com.letta.mobile.data.canvas.CanvasRelayClient = com.letta.mobile.data.canvas.storedBoardsRelayClient(
+            documents = documents,
             opLog = opLog,
             delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
-            topicOf = { id -> documents.relayTopicOf(id) },
             assets = assets,
-            // Ops for a board that is not open (the agent drawing while the person is in chat)
-            // go straight into the stored canvas (letta-mobile-qygvv.23).
-            closedBoard = com.letta.mobile.data.canvas.StoreCanvasClosedBoardApplier(documents, opLog),
         )
 
         @Provides
