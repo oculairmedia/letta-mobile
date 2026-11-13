@@ -19602,8 +19602,8 @@ public final class com/letta/mobile/data/controller/node/iroh/ModelAdminHandlers
 	public final fun getEXPOSURE_METHODS ()Ljava/util/Set;
 	public final fun getFORMER_ADMIN_REST_METHODS ()Ljava/util/Set;
 	public final fun getMETHODS ()Ljava/util/Set;
-	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;)V
-	public static synthetic fun register$default (Lcom/letta/mobile/data/controller/node/iroh/ModelAdminHandlers;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;ILjava/lang/Object;)V
+	public final fun register (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeReadTiers;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;)V
+	public static synthetic fun register$default (Lcom/letta/mobile/data/controller/node/iroh/ModelAdminHandlers;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/NativeReadTiers;Lcom/letta/mobile/data/controller/node/iroh/ModelExposureStore;ILjava/lang/Object;)V
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/ModelExposureStore {
@@ -42486,6 +42486,7 @@ public class com/letta/mobile/data/repository/CachedVibesyncEventStreamRepositor
 public final class com/letta/mobile/data/repository/ConversationChangeObservationKt {
 	public static final fun conversationChanges (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lkotlinx/coroutines/flow/Flow;
 	public static final fun observeConversationInvalidations (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun observeConversationInvalidations-dWUq8MI (Lkotlinx/coroutines/flow/Flow;JLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun observeConversationUpdates (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -46906,6 +46907,7 @@ public final class com/letta/mobile/data/runtime/TurnFailureNotices {
 	public static final field CONNECTION_LOST_KIND Ljava/lang/String;
 	public static final field GENERIC_MESSAGE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/runtime/TurnFailureNotices;
+	public static final field OTHER_DEVICE_BUSY_KIND Ljava/lang/String;
 	public final fun forCancelledTerminal ()Lcom/letta/mobile/data/runtime/TurnFailureNotice;
 	public final fun forFailedTerminal (Ljava/lang/String;ZZLjava/lang/String;)Lcom/letta/mobile/data/runtime/TurnFailureNotice;
 	public static synthetic fun forFailedTerminal$default (Lcom/letta/mobile/data/runtime/TurnFailureNotices;Ljava/lang/String;ZZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/runtime/TurnFailureNotice;

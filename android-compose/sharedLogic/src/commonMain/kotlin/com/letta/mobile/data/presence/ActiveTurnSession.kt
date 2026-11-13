@@ -191,7 +191,9 @@ class ActiveTurnSession(
         val server = kotlinx.atomicfu.locks.synchronized(lock) {
             identity?.takeUnless { captured.phase == ActiveTurnPhase.Idle }?.let { serverRuns.value[conversation to it] }
         }?.let(::RunId)
-        if (captured.phase != ActiveTurnPhase.Idle && server == null) return
+        // An active turn is read only by its server run, and the run store behind run.get never holds an
+        // App Server run: that turn's own events are its only authority.
+        if (server?.isAppServerRunId() ?: (captured.phase != ActiveTurnPhase.Idle)) return
         // A read that fails (the host no longer has the run, or cannot be reached) is not evidence of
         // a terminal, and it must not reach the caller: a presentation reconciles as it is recreated.
         val runs = runCatching { read(conversation, agent, server) }.getOrElse { failure ->

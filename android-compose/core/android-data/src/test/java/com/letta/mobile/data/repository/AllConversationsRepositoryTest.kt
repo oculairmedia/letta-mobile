@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -70,6 +71,7 @@ class AllConversationsRepositoryTest {
 
         fakeApi.conversations.add(TestData.conversation(id = "from-phone"))
         transport.events.emit(conversationPush("from-phone"))
+        advanceTimeBy(PUSH_SETTLE_MS) // pushes coalesce for 500 ms
         runCurrent()
 
         assertTrue(pushed.conversations.value.any { it.id.value == "from-phone" })
@@ -82,6 +84,7 @@ class AllConversationsRepositoryTest {
         runCurrent()
 
         transport.events.emit(conversationPush("from-phone"))
+        advanceTimeBy(PUSH_SETTLE_MS) // pushes coalesce for 500 ms
         runCurrent()
 
         assertEquals(0, fakeApi.calls.count { it == "listConversations" })
@@ -103,6 +106,10 @@ class AllConversationsRepositoryTest {
 
         assertEquals(callsAfterLoad + 1, fakeApi.calls.count { it == "listConversations" })
         assertTrue(pushed.conversations.value.any { it.id.value == "while-offline" })
+    }
+
+    private companion object {
+        const val PUSH_SETTLE_MS = 1_000L
     }
 
     private fun conversationPush(conversationId: String) = ServerFrame.ConversationUpdated(
@@ -152,6 +159,7 @@ class AllConversationsRepositoryTest {
         pushed.refresh()
 
         transport.events.emit(conversationPush("1"))
+        advanceTimeBy(PUSH_SETTLE_MS) // pushes coalesce for 500 ms
         runCurrent()
 
         assertEquals(true, pushed.conversations.value.single().archived)
