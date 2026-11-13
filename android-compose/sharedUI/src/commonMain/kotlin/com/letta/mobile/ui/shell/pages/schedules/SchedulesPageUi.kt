@@ -37,6 +37,9 @@ import com.letta.mobile.data.schedules.SchedulesPageModel
 import com.letta.mobile.data.schedules.SchedulesView
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.data.schedules.leases.Lease
+import com.letta.mobile.ui.components.LettaPageHeaderDefaults
+import com.letta.mobile.ui.components.LettaPageRefresh
+import com.letta.mobile.ui.components.LettaSidePane
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaPane
@@ -250,15 +253,23 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
         val calendar = ScheduleCalendarParams(days, ui.today, ui.anchor, data.clock, data.cadenceById, actions, ui.linkedRun?.recordId)
         Column(Modifier.fillMaxSize()) {
             SchedulesHeader(headerParams(ui, input, view, wide))
-            SchedulesFilters(filterParams(ui, input))
             ui.leaseNotice?.let { notice ->
-                Text(notice, Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm))
+                Text(notice, Modifier.padding(horizontal = LettaPageHeaderDefaults.gutter(wide), vertical = LettaDimens.Space.sm))
             }
             val selectedId = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
             val body = SchedulesBody(input.state, data, view, calendar, selectedId, input.actions.onRefresh)
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 SchedulesMainContent(body, Modifier.weight(1f).fillMaxHeight())
-                if (docked && ui.railShows(view)) ScheduleRail(railParams(ui, input))
+                if (docked && ui.railShows(view)) {
+                    // The shared docked pane, as every page's detail docks; the rail draws its own headings.
+                    LettaSidePane(
+                        title = RAIL_TITLE,
+                        onClose = { ui.rail = ScheduleRailState.Overview },
+                        initialWidth = LettaDimens.Pane.sidePanelWidth,
+                        minWidth = LettaDimens.Pane.sidePanelWidth,
+                        showHeader = false,
+                    ) { ScheduleRail(railParams(ui, input)) }
+                }
             }
             if (!wide) SchedulesViewBar(view, ui::selectView)
         }
@@ -287,8 +298,9 @@ private fun headerParams(ui: SchedulesPageUi, input: SchedulesPageInput, view: S
     ),
     onNew = { ui.form = ScheduleFormDraft() }.takeIf { input.state.canCreate },
     options = input.options,
-    refresh = SchedulesRefresh(input.state.library.isLoading, input.actions.onRefresh),
+    refresh = LettaPageRefresh(input.state.library.isLoading, input.actions.onRefresh),
     wide = wide,
+    filters = filterParams(ui, input),
 )
 
 private fun filterParams(ui: SchedulesPageUi, input: SchedulesPageInput) = SchedulesFilterParams(
@@ -345,6 +357,8 @@ internal fun SchedulesPageDialogs(ui: SchedulesPageUi, state: SchedulesPageState
 }
 
 private val DetailSheetHeight = 520.dp
+
+private const val RAIL_TITLE = "Schedule details"
 
 /** Views that keep the overview rail docked on a wide page. */
 private val SchedulesView.docksOverview: Boolean

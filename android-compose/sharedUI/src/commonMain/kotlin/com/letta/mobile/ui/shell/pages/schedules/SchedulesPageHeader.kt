@@ -2,20 +2,14 @@ package com.letta.mobile.ui.shell.pages.schedules
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,12 +24,14 @@ import androidx.compose.ui.text.style.TextAlign
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Plus
 import com.letta.mobile.data.schedules.SchedulesView
 import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.LettaPageAction
+import com.letta.mobile.ui.components.LettaPageCaption
+import com.letta.mobile.ui.components.LettaPageHeader
+import com.letta.mobile.ui.components.LettaPageRefresh
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.customColors
 
 /** The calendar range in view: its label, paging, a way back to today, and the zone times read in. */
 internal class SchedulesRange(
@@ -53,99 +49,49 @@ internal class SchedulesHeaderParams(
     /** Null hides "New schedule". */
     val onNew: (() -> Unit)?,
     val options: SchedulesPageOptions,
-    val refresh: SchedulesRefresh,
+    /** Reloading the library: the header's refresh icon on pointer hosts, the body's pull on touch. */
+    val refresh: LettaPageRefresh,
     /** A wide page carries the view tabs here; a phone carries them in [SchedulesViewBar]. */
     val wide: Boolean,
+    val filters: SchedulesFilterParams,
 )
 
-/** Reloading the library: the header's refresh icon on pointer hosts, the body's pull on touch. */
-internal class SchedulesRefresh(val refreshing: Boolean, val onRefresh: () -> Unit)
-
 /**
- * The title and "New schedule"; then on a wide page the view tabs with the range beside them, on a
- * phone the range alone; then the zone the times are in.
+ * The shared page header: the title with refresh and "New schedule" at its end; then on a wide page
+ * the view tabs with the range beside them, on a phone the range alone; the agent and paused filters
+ * under them; then the zone the times are in.
  */
 @Composable
 internal fun SchedulesHeader(params: SchedulesHeaderParams) {
-    val inset = if (params.wide) LettaDimens.Space.xl else LettaDimens.Space.lg
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = inset, vertical = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        SchedulesTitleRow(params)
-        if (params.wide) SchedulesWideRangeRow(params) else SchedulesPhoneRangeRow(params)
-        SchedulesZoneLine(params)
-    }
-}
-
-/** The view tabs with the range beside them, and the refresh icon pointer hosts reload with. */
-@Composable
-private fun SchedulesWideRangeRow(params: SchedulesHeaderParams) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        SchedulesTabs(params.view, params.onView, Modifier.weight(1f))
-        RangeNavigation(params.range, params.view.hasRange, compact = false)
+    val hasRange = params.view.hasRange
+    LettaPageHeader(
+        title = "Schedules".takeIf { params.options.showTitle },
+        primaryAction = params.onNew?.let { LettaPageAction("New schedule", it, testTag = SchedulesPageTags.NEW) },
         // Touch pulls the body down instead (SchedulesMainContent's LettaRefreshable).
-        LettaRefreshAction(refreshing = params.refresh.refreshing, onRefresh = params.refresh.onRefresh)
-    }
-}
-
-/** A phone's range alone (its tabs are in [SchedulesViewBar]), on views that have one. */
-@Composable
-private fun SchedulesPhoneRangeRow(params: SchedulesHeaderParams) {
-    if (!params.view.hasRange) return
-    RangeNavigation(params.range, shown = true, compact = true)
-}
-
-/** The zone the times are read in, on views that show times. */
-@Composable
-private fun SchedulesZoneLine(params: SchedulesHeaderParams) {
-    if (!params.view.hasRange) return
-    Text(
-        "Times in ${params.range.zone}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.customColors.onSurfaceMutedColor,
-        modifier = Modifier.testTag(SchedulesPageTags.ZONE),
+        refresh = params.refresh,
+        caption = LettaPageCaption("Times in ${params.range.zone}", SchedulesPageTags.ZONE).takeIf { hasRange },
+        controls = {
+            if (params.wide) SchedulesWideControls(params) else if (hasRange) RangeNavigation(params.range, shown = true, compact = true)
+            SchedulesFilters(params.filters)
+        },
     )
 }
 
+/** The view tabs with the range beside them. */
 @Composable
-private fun SchedulesTitleRow(params: SchedulesHeaderParams) {
-    val showTitle = params.options.showTitle
-    if (!showTitle && params.onNew == null) return
-    val title = if (showTitle) "Schedules" else ""
+private fun SchedulesWideControls(params: SchedulesHeaderParams) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        params.onNew?.let { onNew ->
-            Button(onClick = onNew, modifier = Modifier.testTag(SchedulesPageTags.NEW)) {
-                Icon(Lucide.Plus, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-                Spacer(Modifier.size(LettaDimens.Space.xs))
-                Text("New schedule")
+        LettaChipTabRow(Modifier.weight(1f)) {
+            SchedulesView.entries.forEach { entry ->
+                LettaChipTab(
+                    text = entry.label,
+                    active = entry == params.view,
+                    onClick = { params.onView(entry) },
+                    modifier = Modifier.testTag(SchedulesPageTags.tab(entry)),
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun SchedulesTabs(view: SchedulesView, onView: (SchedulesView) -> Unit, modifier: Modifier) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SchedulesView.entries.forEach { entry ->
-            LettaChipTab(
-                text = entry.label,
-                active = entry == view,
-                onClick = { onView(entry) },
-                modifier = Modifier.testTag(SchedulesPageTags.tab(entry)),
-            )
-        }
+        RangeNavigation(params.range, params.view.hasRange, compact = false)
     }
 }
 
@@ -205,14 +151,10 @@ internal class SchedulesFilterParams(
 
 /** The library's agents as chips when the host has not focused one, then whether paused schedules show. */
 @Composable
-internal fun SchedulesFilters(params: SchedulesFilterParams) {
+private fun SchedulesFilters(params: SchedulesFilterParams) {
     val state = params.state
     if (!state.showsAgentChips && params.showPaused == null) return
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-            .padding(horizontal = LettaDimens.Space.lg).padding(bottom = LettaDimens.Space.sm),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
+    LettaChipTabRow(Modifier.fillMaxWidth()) {
         SchedulesAgentChips(params)
         params.showPaused?.let { shown -> SchedulesPausedChip(shown, params.onTogglePaused) }
     }

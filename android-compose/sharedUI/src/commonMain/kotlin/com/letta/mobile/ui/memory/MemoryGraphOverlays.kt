@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -17,10 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphView
+import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaPageHeaderDefaults
 import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.components.lettaHorizontalFadingEdges
 import com.letta.mobile.ui.components.lettaCount
@@ -36,6 +35,7 @@ internal fun MemoryKindFilterBar(
     view: MemoryGraphView,
     counts: Map<MemoryGraphNodeKind, Int>,
     onToggle: (MemoryGraphNodeKind) -> Unit,
+    wide: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val palette = rememberMemoryGraphPalette()
@@ -51,23 +51,19 @@ internal fun MemoryKindFilterBar(
                 fadeLength = LettaDimens.Space.xxl,
             )
             .horizontalScroll(scroll)
-            .padding(horizontal = LettaDimens.Space.lg),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+            .padding(horizontal = LettaPageHeaderDefaults.gutter(wide)),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         view.kindsPresent.forEach { kind ->
             val enabled = view.isKindEnabled(kind)
-            FilterChip(
-                selected = enabled,
+            val count = counts[kind]?.let { " " + lettaCount(it) }.orEmpty()
+            val swatch = palette.kindColor(kind)
+            LettaChipTab(
+                text = memoryNodeKindLabel(kind) + count,
+                active = enabled,
                 onClick = { onToggle(kind) },
-                label = {
-                    val count = counts[kind]?.let { " " + lettaCount(it) }.orEmpty()
-                    Text(memoryNodeKindLabel(kind) + count, style = MaterialTheme.typography.labelMedium)
-                },
-                leadingIcon = {
-                    val swatch = palette.kindColor(kind)
-                    LettaSwatch(if (enabled) swatch else swatch.copy(alpha = LettaDimens.Alpha.disabled))
-                },
-                modifier = Modifier.semantics { role = Role.Checkbox },
+                role = Role.Checkbox,
+                leading = { LettaSwatch(if (enabled) swatch else swatch.copy(alpha = LettaDimens.Alpha.disabled)) },
             )
         }
     }

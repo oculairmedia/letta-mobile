@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -54,6 +55,10 @@ data class MemfsPageOptions(
     val showTitle: Boolean = true,
     val touch: Boolean = false,
     val readOnly: Boolean = false,
+    /** The page's title; the Memory destination shows this page under its own "Memory". */
+    val title: String = "Memory files",
+    /** The header's controls row: the Memory destination's Blocks | Files switch. */
+    val headerControls: (@Composable () -> Unit)? = null,
 )
 
 /** Test tags for the shared MemFS page. */
@@ -113,14 +118,17 @@ internal class MemfsPageScope(
 
 @Composable
 private fun WideMemfsLayout(page: MemfsPageScope) {
-    Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(LettaDimens.Pane.sidePanelWidth).fillMaxHeight()) {
-            MemfsHeader(page)
-            MemfsListPane(page)
-        }
-        VerticalDivider()
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.weight(1f).fillMaxHeight()) {
-            MemfsDetailPane(page)
+    Column(Modifier.fillMaxSize()) {
+        MemfsHeader(page)
+        Row(Modifier.fillMaxWidth().weight(1f)) {
+            Column(Modifier.width(LettaDimens.Pane.sidePanelWidth).fillMaxHeight()) {
+                MemfsDockedListControls(page)
+                MemfsListPane(page)
+            }
+            VerticalDivider()
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                MemfsDetailPane(page)
+            }
         }
     }
 }

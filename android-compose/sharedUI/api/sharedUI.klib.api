@@ -3442,6 +3442,41 @@ final class com.letta.mobile.ui.components/LettaMenuItem { // com.letta.mobile.u
     final fun toString(): kotlin/String // com.letta.mobile.ui.components/LettaMenuItem.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.ui.components/LettaPageAction { // com.letta.mobile.ui.components/LettaPageAction|null[0]
+    constructor <init>(kotlin/String, kotlin/Function0<kotlin/Unit>, androidx.compose.ui.graphics.vector/ImageVector? = ..., kotlin/String? = ...) // com.letta.mobile.ui.components/LettaPageAction.<init>|<init>(kotlin.String;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.graphics.vector.ImageVector?;kotlin.String?){}[0]
+
+    final val icon // com.letta.mobile.ui.components/LettaPageAction.icon|{}icon[0]
+        final fun <get-icon>(): androidx.compose.ui.graphics.vector/ImageVector? // com.letta.mobile.ui.components/LettaPageAction.icon.<get-icon>|<get-icon>(){}[0]
+    final val label // com.letta.mobile.ui.components/LettaPageAction.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.ui.components/LettaPageAction.label.<get-label>|<get-label>(){}[0]
+    final val onClick // com.letta.mobile.ui.components/LettaPageAction.onClick|{}onClick[0]
+        final fun <get-onClick>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.components/LettaPageAction.onClick.<get-onClick>|<get-onClick>(){}[0]
+    final val testTag // com.letta.mobile.ui.components/LettaPageAction.testTag|{}testTag[0]
+        final fun <get-testTag>(): kotlin/String? // com.letta.mobile.ui.components/LettaPageAction.testTag.<get-testTag>|<get-testTag>(){}[0]
+}
+
+final class com.letta.mobile.ui.components/LettaPageCaption { // com.letta.mobile.ui.components/LettaPageCaption|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ...) // com.letta.mobile.ui.components/LettaPageCaption.<init>|<init>(kotlin.String;kotlin.String?){}[0]
+
+    final val testTag // com.letta.mobile.ui.components/LettaPageCaption.testTag|{}testTag[0]
+        final fun <get-testTag>(): kotlin/String? // com.letta.mobile.ui.components/LettaPageCaption.testTag.<get-testTag>|<get-testTag>(){}[0]
+    final val text // com.letta.mobile.ui.components/LettaPageCaption.text|{}text[0]
+        final fun <get-text>(): kotlin/String // com.letta.mobile.ui.components/LettaPageCaption.text.<get-text>|<get-text>(){}[0]
+}
+
+final class com.letta.mobile.ui.components/LettaPageRefresh { // com.letta.mobile.ui.components/LettaPageRefresh|null[0]
+    constructor <init>(kotlin/Boolean, kotlin/Function0<kotlin/Unit>, kotlin/String? = ..., kotlin/Function4<kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ...) // com.letta.mobile.ui.components/LettaPageRefresh.<init>|<init>(kotlin.Boolean;kotlin.Function0<kotlin.Unit>;kotlin.String?;kotlin.Function4<kotlin.Function0<kotlin.Unit>,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?){}[0]
+
+    final val button // com.letta.mobile.ui.components/LettaPageRefresh.button|{}button[0]
+        final fun <get-button>(): kotlin/Function4<kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.components/LettaPageRefresh.button.<get-button>|<get-button>(){}[0]
+    final val onRefresh // com.letta.mobile.ui.components/LettaPageRefresh.onRefresh|{}onRefresh[0]
+        final fun <get-onRefresh>(): kotlin/Function0<kotlin/Unit> // com.letta.mobile.ui.components/LettaPageRefresh.onRefresh.<get-onRefresh>|<get-onRefresh>(){}[0]
+    final val refreshing // com.letta.mobile.ui.components/LettaPageRefresh.refreshing|{}refreshing[0]
+        final fun <get-refreshing>(): kotlin/Boolean // com.letta.mobile.ui.components/LettaPageRefresh.refreshing.<get-refreshing>|<get-refreshing>(){}[0]
+    final val testTag // com.letta.mobile.ui.components/LettaPageRefresh.testTag|{}testTag[0]
+        final fun <get-testTag>(): kotlin/String? // com.letta.mobile.ui.components/LettaPageRefresh.testTag.<get-testTag>|<get-testTag>(){}[0]
+}
+
 final class com.letta.mobile.ui.context/AgentContextCardBinding { // com.letta.mobile.ui.context/AgentContextCardBinding|null[0]
     constructor <init>(com.letta.mobile.ui.context/AgentContextCardDeps, com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding?) // com.letta.mobile.ui.context/AgentContextCardBinding.<init>|<init>(com.letta.mobile.ui.context.AgentContextCardDeps;com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding?){}[0]
 
@@ -4324,8 +4359,12 @@ final class com.letta.mobile.ui.memory/MemoryGraphViewportState { // com.letta.m
 }
 
 final class com.letta.mobile.ui.memory/MemoryPageOptions { // com.letta.mobile.ui.memory/MemoryPageOptions|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.ui.memory/MemoryPageOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ...) // com.letta.mobile.ui.memory/MemoryPageOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?){}[0]
 
+    final val headerContext // com.letta.mobile.ui.memory/MemoryPageOptions.headerContext|{}headerContext[0]
+        final fun <get-headerContext>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.memory/MemoryPageOptions.headerContext.<get-headerContext>|<get-headerContext>(){}[0]
+    final val headerControls // com.letta.mobile.ui.memory/MemoryPageOptions.headerControls|{}headerControls[0]
+        final fun <get-headerControls>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.memory/MemoryPageOptions.headerControls.<get-headerControls>|<get-headerControls>(){}[0]
     final val reducedMotion // com.letta.mobile.ui.memory/MemoryPageOptions.reducedMotion|{}reducedMotion[0]
         final fun <get-reducedMotion>(): kotlin/Boolean // com.letta.mobile.ui.memory/MemoryPageOptions.reducedMotion.<get-reducedMotion>|<get-reducedMotion>(){}[0]
     final val showTitle // com.letta.mobile.ui.memory/MemoryPageOptions.showTitle|{}showTitle[0]
@@ -4333,7 +4372,9 @@ final class com.letta.mobile.ui.memory/MemoryPageOptions { // com.letta.mobile.u
 
     final fun component1(): kotlin/Boolean // com.letta.mobile.ui.memory/MemoryPageOptions.component1|component1(){}[0]
     final fun component2(): kotlin/Boolean // com.letta.mobile.ui.memory/MemoryPageOptions.component2|component2(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.ui.memory/MemoryPageOptions // com.letta.mobile.ui.memory/MemoryPageOptions.copy|copy(kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component3(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.memory/MemoryPageOptions.component3|component3(){}[0]
+    final fun component4(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.memory/MemoryPageOptions.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ..., kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ...): com.letta.mobile.ui.memory/MemoryPageOptions // com.letta.mobile.ui.memory/MemoryPageOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.memory/MemoryPageOptions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.memory/MemoryPageOptions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.memory/MemoryPageOptions.toString|toString(){}[0]
@@ -6089,19 +6130,25 @@ final class com.letta.mobile.ui.shell.pages.home/HomePageOptions { // com.letta.
 }
 
 final class com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions { // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ...) // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?){}[0]
 
+    final val headerControls // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.headerControls|{}headerControls[0]
+        final fun <get-headerControls>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.headerControls.<get-headerControls>|<get-headerControls>(){}[0]
     final val readOnly // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.readOnly|{}readOnly[0]
         final fun <get-readOnly>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.readOnly.<get-readOnly>|<get-readOnly>(){}[0]
     final val showTitle // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.showTitle|{}showTitle[0]
         final fun <get-showTitle>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.showTitle.<get-showTitle>|<get-showTitle>(){}[0]
+    final val title // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.title|{}title[0]
+        final fun <get-title>(): kotlin/String // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.title.<get-title>|<get-title>(){}[0]
     final val touch // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.touch|{}touch[0]
         final fun <get-touch>(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.touch.<get-touch>|<get-touch>(){}[0]
 
     final fun component1(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.component1|component1(){}[0]
     final fun component2(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.component3|component3(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.component4|component4(){}[0]
+    final fun component5(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.component5|component5(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String = ..., kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? = ...): com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.ui.shell.pages.memfs/MemfsPageOptions.toString|toString(){}[0]
@@ -8854,6 +8901,15 @@ final object com.letta.mobile.ui.components/LettaInlineErrorTags { // com.letta.
         final fun <get-ERROR>(): kotlin/String // com.letta.mobile.ui.components/LettaInlineErrorTags.ERROR.<get-ERROR>|<get-ERROR>(){}[0]
     final const val RETRY // com.letta.mobile.ui.components/LettaInlineErrorTags.RETRY|{}RETRY[0]
         final fun <get-RETRY>(): kotlin/String // com.letta.mobile.ui.components/LettaInlineErrorTags.RETRY.<get-RETRY>|<get-RETRY>(){}[0]
+}
+
+final object com.letta.mobile.ui.components/LettaPageHeaderDefaults { // com.letta.mobile.ui.components/LettaPageHeaderDefaults|null[0]
+    final fun gutter(kotlin/Boolean): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.components/LettaPageHeaderDefaults.gutter|gutter(kotlin.Boolean){}[0]
+}
+
+final object com.letta.mobile.ui.components/LettaPageHeaderTags { // com.letta.mobile.ui.components/LettaPageHeaderTags|null[0]
+    final const val TITLE // com.letta.mobile.ui.components/LettaPageHeaderTags.TITLE|{}TITLE[0]
+        final fun <get-TITLE>(): kotlin/String // com.letta.mobile.ui.components/LettaPageHeaderTags.TITLE.<get-TITLE>|<get-TITLE>(){}[0]
 }
 
 final object com.letta.mobile.ui.components/LettaRefreshTags { // com.letta.mobile.ui.components/LettaRefreshTags|null[0]
@@ -11935,6 +11991,11 @@ final val com.letta.mobile.ui.components/LocalObjectVerbs // com.letta.mobile.ui
 final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_DisclosureChevronDefaults$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_DisclosureChevronDefaults$stableprop|#static{}com_letta_mobile_ui_components_DisclosureChevronDefaults$stableprop[0]
 final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaInlineErrorTags$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaInlineErrorTags$stableprop|#static{}com_letta_mobile_ui_components_LettaInlineErrorTags$stableprop[0]
 final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaMenuItem$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaMenuItem$stableprop|#static{}com_letta_mobile_ui_components_LettaMenuItem$stableprop[0]
+final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageAction$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageAction$stableprop|#static{}com_letta_mobile_ui_components_LettaPageAction$stableprop[0]
+final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageCaption$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageCaption$stableprop|#static{}com_letta_mobile_ui_components_LettaPageCaption$stableprop[0]
+final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderDefaults$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderDefaults$stableprop|#static{}com_letta_mobile_ui_components_LettaPageHeaderDefaults$stableprop[0]
+final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderTags$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderTags$stableprop|#static{}com_letta_mobile_ui_components_LettaPageHeaderTags$stableprop[0]
+final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageRefresh$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageRefresh$stableprop|#static{}com_letta_mobile_ui_components_LettaPageRefresh$stableprop[0]
 final val com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaRefreshTags$stableprop // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaRefreshTags$stableprop|#static{}com_letta_mobile_ui_components_LettaRefreshTags$stableprop[0]
 final val com.letta.mobile.ui.context/com_letta_mobile_ui_context_AgentContextCardBinding$stableprop // com.letta.mobile.ui.context/com_letta_mobile_ui_context_AgentContextCardBinding$stableprop|#static{}com_letta_mobile_ui_context_AgentContextCardBinding$stableprop[0]
 final val com.letta.mobile.ui.context/com_letta_mobile_ui_context_AgentContextCardDeps$stableprop // com.letta.mobile.ui.context/com_letta_mobile_ui_context_AgentContextCardDeps$stableprop|#static{}com_letta_mobile_ui_context_AgentContextCardDeps$stableprop[0]
@@ -12093,8 +12154,6 @@ final val com.letta.mobile.ui.runtime/LocalAgentDefaults // com.letta.mobile.ui.
     final fun <get-LocalAgentDefaults>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.data.runtime/AgentDefaultsRepository?> // com.letta.mobile.ui.runtime/LocalAgentDefaults.<get-LocalAgentDefaults>|<get-LocalAgentDefaults>(){}[0]
 final val com.letta.mobile.ui.schedules/LocalCalendarAccent // com.letta.mobile.ui.schedules/LocalCalendarAccent|{}LocalCalendarAccent[0]
     final fun <get-LocalCalendarAccent>(): androidx.compose.runtime/ProvidableCompositionLocal<kotlin/Function1<kotlin/String, androidx.compose.ui.graphics/Color?>> // com.letta.mobile.ui.schedules/LocalCalendarAccent.<get-LocalCalendarAccent>|<get-LocalCalendarAccent>(){}[0]
-final val com.letta.mobile.ui.schedules/ScheduleRailWidth // com.letta.mobile.ui.schedules/ScheduleRailWidth|{}ScheduleRailWidth[0]
-    final fun <get-ScheduleRailWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.schedules/ScheduleRailWidth.<get-ScheduleRailWidth>|<get-ScheduleRailWidth>(){}[0]
 final val com.letta.mobile.ui.schedules/com_letta_mobile_ui_schedules_AgendaItem_Empty$stableprop // com.letta.mobile.ui.schedules/com_letta_mobile_ui_schedules_AgendaItem_Empty$stableprop|#static{}com_letta_mobile_ui_schedules_AgendaItem_Empty$stableprop[0]
 final val com.letta.mobile.ui.schedules/com_letta_mobile_ui_schedules_AgendaItem_Entry$stableprop // com.letta.mobile.ui.schedules/com_letta_mobile_ui_schedules_AgendaItem_Entry$stableprop|#static{}com_letta_mobile_ui_schedules_AgendaItem_Entry$stableprop[0]
 final val com.letta.mobile.ui.schedules/com_letta_mobile_ui_schedules_AgendaItem_Heading$stableprop // com.letta.mobile.ui.schedules/com_letta_mobile_ui_schedules_AgendaItem_Heading$stableprop|#static{}com_letta_mobile_ui_schedules_AgendaItem_Heading$stableprop[0]
@@ -12857,10 +12916,12 @@ final fun com.letta.mobile.ui.components.tabs/com_letta_mobile_ui_components_tab
 final fun com.letta.mobile.ui.components/DisclosureChevron(kotlin/Boolean, androidx.compose.ui/Modifier?, kotlin/Boolean, com.letta.mobile.ui.components/ChevronEmphasis?, com.letta.mobile.ui.components/ChevronIndication?, kotlin/Boolean, kotlin/String?, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/DisclosureChevron|DisclosureChevron(kotlin.Boolean;androidx.compose.ui.Modifier?;kotlin.Boolean;com.letta.mobile.ui.components.ChevronEmphasis?;com.letta.mobile.ui.components.ChevronIndication?;kotlin.Boolean;kotlin.String?;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/ImageDropOverlay(androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/ImageDropOverlay|ImageDropOverlay(androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaCatalogCard(kotlin/String, kotlin/String?, androidx.compose.ui.graphics/Color, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, kotlin/String?, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaCatalogCard|LettaCatalogCard(kotlin.String;kotlin.String?;androidx.compose.ui.graphics.Color;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;kotlin.String?;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
-final fun com.letta.mobile.ui.components/LettaChipTab(kotlin/String, kotlin/Boolean, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaChipTab|LettaChipTab(kotlin.String;kotlin.Boolean;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.components/LettaChipTab(kotlin/String, kotlin/Boolean, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, androidx.compose.ui.semantics/Role?, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaChipTab|LettaChipTab(kotlin.String;kotlin.Boolean;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;androidx.compose.ui.semantics.Role?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.components/LettaChipTabRow(androidx.compose.ui/Modifier?, kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaChipTabRow|LettaChipTabRow(androidx.compose.ui.Modifier?;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaEmptyHint(kotlin/String, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaEmptyHint|LettaEmptyHint(kotlin.String;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaInfoBox(kotlin/String, androidx.compose.ui/Modifier?, androidx.compose.foundation.layout/PaddingValues?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaInfoBox|LettaInfoBox(kotlin.String;androidx.compose.ui.Modifier?;androidx.compose.foundation.layout.PaddingValues?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaInlineError(kotlin/String, androidx.compose.ui/Modifier?, kotlin/String?, kotlin/Function0<kotlin/Unit>?, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaInlineError|LettaInlineError(kotlin.String;androidx.compose.ui.Modifier?;kotlin.String?;kotlin.Function0<kotlin.Unit>?;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.components/LettaPageHeader(kotlin/String?, androidx.compose.ui/Modifier?, com.letta.mobile.ui.components/LettaPageAction?, com.letta.mobile.ui.components/LettaPageRefresh?, com.letta.mobile.ui.components/LettaPageCaption?, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, kotlin/Function3<androidx.compose.foundation.layout/RowScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, kotlin/Function3<androidx.compose.foundation.layout/ColumnScope, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaPageHeader|LettaPageHeader(kotlin.String?;androidx.compose.ui.Modifier?;com.letta.mobile.ui.components.LettaPageAction?;com.letta.mobile.ui.components.LettaPageRefresh?;com.letta.mobile.ui.components.LettaPageCaption?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.Function3<androidx.compose.foundation.layout.RowScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;kotlin.Function3<androidx.compose.foundation.layout.ColumnScope,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaPopupMenu(kotlin/Boolean, kotlin/Function0<kotlin/Unit>, kotlin.collections/List<com.letta.mobile.ui.components/LettaMenuItem>, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaPopupMenu|LettaPopupMenu(kotlin.Boolean;kotlin.Function0<kotlin.Unit>;kotlin.collections.List<com.letta.mobile.ui.components.LettaMenuItem>;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaRefreshAction(kotlin/Boolean, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, kotlin/Function4<kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaRefreshAction|LettaRefreshAction(kotlin.Boolean;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;kotlin.Function4<kotlin.Function0<kotlin.Unit>,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.components/LettaRefreshIconButton(kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.components/LettaRefreshIconButton|LettaRefreshIconButton(kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
@@ -12871,6 +12932,11 @@ final fun com.letta.mobile.ui.components/ProvideObjectVerbs(com.letta.mobile.dat
 final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_DisclosureChevronDefaults$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_DisclosureChevronDefaults$stableprop_getter|com_letta_mobile_ui_components_DisclosureChevronDefaults$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaInlineErrorTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaInlineErrorTags$stableprop_getter|com_letta_mobile_ui_components_LettaInlineErrorTags$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaMenuItem$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaMenuItem$stableprop_getter|com_letta_mobile_ui_components_LettaMenuItem$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageAction$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageAction$stableprop_getter|com_letta_mobile_ui_components_LettaPageAction$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageCaption$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageCaption$stableprop_getter|com_letta_mobile_ui_components_LettaPageCaption$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderDefaults$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderDefaults$stableprop_getter|com_letta_mobile_ui_components_LettaPageHeaderDefaults$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageHeaderTags$stableprop_getter|com_letta_mobile_ui_components_LettaPageHeaderTags$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageRefresh$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaPageRefresh$stableprop_getter|com_letta_mobile_ui_components_LettaPageRefresh$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaRefreshTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.components/com_letta_mobile_ui_components_LettaRefreshTags$stableprop_getter|com_letta_mobile_ui_components_LettaRefreshTags$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.components/horizontalResizePointerIcon(): androidx.compose.ui.input.pointer/PointerIcon // com.letta.mobile.ui.components/horizontalResizePointerIcon|horizontalResizePointerIcon(){}[0]
 final fun com.letta.mobile.ui.components/isPointerHost(androidx.compose.runtime/Composer?, kotlin/Int): kotlin/Boolean // com.letta.mobile.ui.components/isPointerHost|isPointerHost(androidx.compose.runtime.Composer?;kotlin.Int){}[0]
