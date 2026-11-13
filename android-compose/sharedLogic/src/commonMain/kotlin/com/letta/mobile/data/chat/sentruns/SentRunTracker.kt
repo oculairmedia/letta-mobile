@@ -81,7 +81,8 @@ internal class SentRunTracker(private val ledger: SentRunLedger) {
     /** The state makes [move]: leaving the own run's turn for another turn ends that run. */
     fun leave(move: SentTurnMove) {
         val turn = turnId ?: return
-        if (move.from == turn && move.to != null && move.to != turn) end()
+        val next = move.to ?: return
+        if (move.from == turn && next != turn) end()
     }
 
     /** A send other than [sent] is accepted: an own run still marked in flight is over. */
