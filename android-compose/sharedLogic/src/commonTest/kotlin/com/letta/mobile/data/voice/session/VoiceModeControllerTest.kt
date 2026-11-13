@@ -233,6 +233,41 @@ class VoiceModeControllerTest {
     }
 
     @Test
+    fun aFailedUtteranceKeepsVoiceModeOnAndRetrySendsItAgain() = runTest {
+        val h = ControllerHarness(this)
+        h.configure()
+        h.press()
+        h.ear.say(VoiceText("what time is it"))
+        h.settle()
+        h.responder.last.send(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.NOT_DELIVERED, VoicePort.RESPONDER)))
+        h.settle()
+        assertEquals(VoiceModeState.TurnFailed(VoiceErrorCode.NOT_DELIVERED, retryable = true), h.state)
+        assertTrue(h.state.active)
+        assertTrue(h.ear.listening)
+        assertEquals(0, h.releases)
+        h.controller.retry()
+        h.settle()
+        assertEquals(2, h.responder.replies.size)
+        assertEquals("what time is it", h.responder.last.utterance.text.value)
+        assertEquals(VoiceModeState.WaitingForReply, h.state)
+    }
+
+    @Test
+    fun anUnattributedReplyIsShownWithoutARetryAndANewUtteranceClearsIt() = runTest {
+        val h = ControllerHarness(this)
+        h.configure()
+        h.press()
+        h.ear.say(VoiceText("what time is it"))
+        h.settle()
+        h.responder.last.send(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.UNATTRIBUTED, VoicePort.RESPONDER)))
+        h.settle()
+        assertEquals(VoiceModeState.TurnFailed(VoiceErrorCode.UNATTRIBUTED, retryable = false), h.state)
+        h.ear.say(VoiceText("hello?"))
+        h.settle()
+        assertEquals(VoiceModeState.WaitingForReply, h.state)
+    }
+
+    @Test
     fun shutdownReleasesEverythingAndIgnoresLaterPresses() = runTest {
         val h = ControllerHarness(this)
         h.configure()

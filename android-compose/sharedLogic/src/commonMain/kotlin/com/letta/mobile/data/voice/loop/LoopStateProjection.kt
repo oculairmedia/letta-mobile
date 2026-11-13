@@ -24,6 +24,9 @@ internal object LoopStateProjection {
             interrupt = interruptStatus(model.turn),
             awaitingLateReply = model.late.delegated.isNotEmpty(),
             heldLateSegments = model.late.held.size,
+            turnFailure = view.turnFailure,
+            replyRetryable = view.retryUtterance != null,
+            pendingReplies = model.turn.replies.size,
             phaseSince = since,
         )
     }

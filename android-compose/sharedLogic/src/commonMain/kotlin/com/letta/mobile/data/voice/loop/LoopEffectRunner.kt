@@ -23,6 +23,7 @@ internal class LoopWiring(
     val config: VoiceLoopConfig,
     val scope: CoroutineScope,
     val inputs: SendChannel<LoopInput>,
+    val observer: VoiceLoopObserver = VoiceLoopObserver.None,
 ) {
     /** A fault for an engine on [port] that would not let go. */
     fun unresponsive(port: VoicePort): LoopInput = LoopInput.Fault(VoiceError(VoiceErrorCode.UNRESPONSIVE, port))
@@ -107,7 +108,15 @@ internal class LoopEffectRunner(private val wiring: LoopWiring) {
         is LoopEffect.Speak -> mouth.speak(effect.segment)
         LoopEffect.FlushMouth -> mouth.flush()
         LoopEffect.StopMouth -> mouth.stop()
+        is LoopEffect.SpeechSkipped -> report(effect)
         else -> null
+    }
+
+    /** Tells the observer; an observer that throws is ignored (diagnostics never stop the loop). */
+    private fun report(effect: LoopEffect.SpeechSkipped): LoopInput? {
+        val error = runCatching { wiring.observer.speechSkipped(effect.reason, effect.segments) }.exceptionOrNull()
+        if (error is CancellationException) throw error
+        return null
     }
 
     /** The first-text timer runs whenever an answer is open and has produced no text, in any phase. */
