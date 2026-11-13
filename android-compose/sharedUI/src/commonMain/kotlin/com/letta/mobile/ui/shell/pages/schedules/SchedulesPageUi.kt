@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.pages.schedules
 
+import com.letta.mobile.ui.components.lettaPageGutter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -37,8 +38,6 @@ import com.letta.mobile.data.schedules.SchedulesPageModel
 import com.letta.mobile.data.schedules.SchedulesView
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.data.schedules.leases.Lease
-import com.letta.mobile.ui.components.LettaPageHeaderDefaults
-import com.letta.mobile.ui.components.LettaPageRefresh
 import com.letta.mobile.ui.components.LettaSidePane
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
@@ -254,7 +253,7 @@ internal fun SchedulesPageLayout(ui: SchedulesPageUi, input: SchedulesPageInput,
         Column(Modifier.fillMaxSize()) {
             SchedulesHeader(headerParams(ui, input, view, wide))
             ui.leaseNotice?.let { notice ->
-                Text(notice, Modifier.padding(horizontal = LettaPageHeaderDefaults.gutter(wide), vertical = LettaDimens.Space.sm))
+                Text(notice, Modifier.padding(horizontal = lettaPageGutter(wide), vertical = LettaDimens.Space.sm))
             }
             val selectedId = (ui.rail as? ScheduleRailState.Detail)?.scheduleId
             val body = SchedulesBody(input.state, data, view, calendar, selectedId, input.actions.onRefresh)
@@ -298,7 +297,7 @@ private fun headerParams(ui: SchedulesPageUi, input: SchedulesPageInput, view: S
     ),
     onNew = { ui.form = ScheduleFormDraft() }.takeIf { input.state.canCreate },
     options = input.options,
-    refresh = LettaPageRefresh(input.state.library.isLoading, input.actions.onRefresh),
+    refresh = SchedulesRefresh(input.state.library.isLoading, input.actions.onRefresh),
     wide = wide,
     filters = filterParams(ui, input),
 )

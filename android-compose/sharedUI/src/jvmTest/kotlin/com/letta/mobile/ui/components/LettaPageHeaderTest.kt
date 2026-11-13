@@ -41,10 +41,10 @@ class LettaPageHeaderTest {
                     Box(Modifier.width(width.dp)) {
                         LettaPageHeader(
                             title = title,
-                            primaryAction = LettaPageAction("New schedule", { clicks += "new" }, testTag = ACTION),
-                            refresh = LettaPageRefresh(refreshing = false, onRefresh = { clicks += "refresh" }, testTag = REFRESH),
-                            caption = LettaPageCaption("Times in UTC-5", CAPTION),
+                            primaryAction = LettaMenuItem(label = "New schedule", onClick = { clicks += "new" }),
+                            caption = "Times in UTC-5",
                             context = { Text("PM-letta-mobile", Modifier.testTag(CONTEXT)) },
+                            refresh = { LettaRefreshAction(refreshing = false, onRefresh = { clicks += "refresh" }, modifier = Modifier.testTag(REFRESH)) },
                             controls = { Text("Agenda", Modifier.testTag(CONTROLS)) },
                         ) { Text("stats", Modifier.testTag(CONTENT)) }
                     }
@@ -60,7 +60,7 @@ class LettaPageHeaderTest {
         listOf(760, 1200).forEach { width ->
             runDesktopComposeUiTest(width = width, height = HEIGHT) {
                 show(width, LettaHost.Pointer)
-                val title = bounds(LettaPageHeaderTags.TITLE)
+                val title = bounds(LETTA_PAGE_TITLE_TAG)
                 val context = bounds(CONTEXT)
                 val refresh = bounds(REFRESH)
                 val action = bounds(ACTION)
@@ -78,7 +78,7 @@ class LettaPageHeaderTest {
         listOf(360, 700).forEach { width ->
             runDesktopComposeUiTest(width = width, height = HEIGHT) {
                 show(width, LettaHost.Touch)
-                val title = bounds(LettaPageHeaderTags.TITLE)
+                val title = bounds(LETTA_PAGE_TITLE_TAG)
                 val action = bounds(ACTION)
                 val context = bounds(CONTEXT)
                 onAllNodesWithContentDescription("Refresh").assertCountEquals(0)
@@ -103,16 +103,16 @@ class LettaPageHeaderTest {
     @Test
     fun aHostTitledPageKeepsItsActionsAndTheyReportTheirClicks() = runDesktopComposeUiTest(width = 1200, height = HEIGHT) {
         show(1200, LettaHost.Pointer, title = null)
-        onNodeWithTag(LettaPageHeaderTags.TITLE).assertDoesNotExist()
+        onNodeWithTag(LETTA_PAGE_TITLE_TAG).assertDoesNotExist()
         onNodeWithTag(ACTION).performClick()
         onNodeWithContentDescription("Refresh").performClick()
         assertEquals(listOf("new", "refresh"), clicks)
     }
 
     private companion object {
-        const val ACTION = "action"
+        const val ACTION = LETTA_PAGE_PRIMARY_ACTION_TAG
         const val REFRESH = "refresh"
-        const val CAPTION = "caption"
+        const val CAPTION = LETTA_PAGE_CAPTION_TAG
         const val CONTEXT = "context"
         const val CONTROLS = "controls"
         const val CONTENT = "content"

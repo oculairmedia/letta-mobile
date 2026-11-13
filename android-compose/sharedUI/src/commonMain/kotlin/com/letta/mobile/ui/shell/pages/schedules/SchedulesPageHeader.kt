@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.pages.schedules
 
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaMenuItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -27,10 +29,7 @@ import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.schedules.SchedulesView
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaChipTabRow
-import com.letta.mobile.ui.components.LettaPageAction
-import com.letta.mobile.ui.components.LettaPageCaption
 import com.letta.mobile.ui.components.LettaPageHeader
-import com.letta.mobile.ui.components.LettaPageRefresh
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** The calendar range in view: its label, paging, a way back to today, and the zone times read in. */
@@ -49,12 +48,14 @@ internal class SchedulesHeaderParams(
     /** Null hides "New schedule". */
     val onNew: (() -> Unit)?,
     val options: SchedulesPageOptions,
-    /** Reloading the library: the header's refresh icon on pointer hosts, the body's pull on touch. */
-    val refresh: LettaPageRefresh,
+    val refresh: SchedulesRefresh,
     /** A wide page carries the view tabs here; a phone carries them in [SchedulesViewBar]. */
     val wide: Boolean,
     val filters: SchedulesFilterParams,
 )
+
+/** Reloading the library: the header's refresh icon on pointer hosts, the body's pull on touch. */
+internal class SchedulesRefresh(val refreshing: Boolean, val onRefresh: () -> Unit)
 
 /**
  * The shared page header: the title with refresh and "New schedule" at its end; then on a wide page
@@ -66,10 +67,10 @@ internal fun SchedulesHeader(params: SchedulesHeaderParams) {
     val hasRange = params.view.hasRange
     LettaPageHeader(
         title = "Schedules".takeIf { params.options.showTitle },
-        primaryAction = params.onNew?.let { LettaPageAction("New schedule", it, testTag = SchedulesPageTags.NEW) },
+        primaryAction = params.onNew?.let { LettaMenuItem(label = "New schedule", onClick = it) },
+        caption = "Times in ${params.range.zone}".takeIf { hasRange },
         // Touch pulls the body down instead (SchedulesMainContent's LettaRefreshable).
-        refresh = params.refresh,
-        caption = LettaPageCaption("Times in ${params.range.zone}", SchedulesPageTags.ZONE).takeIf { hasRange },
+        refresh = { LettaRefreshAction(refreshing = params.refresh.refreshing, onRefresh = params.refresh.onRefresh) },
         controls = {
             if (params.wide) SchedulesWideControls(params) else if (hasRange) RangeNavigation(params.range, shown = true, compact = true)
             SchedulesFilters(params.filters)

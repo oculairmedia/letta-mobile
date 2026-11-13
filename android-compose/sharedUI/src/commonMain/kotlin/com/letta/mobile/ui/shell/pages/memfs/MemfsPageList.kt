@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.pages.memfs
 
+import com.letta.mobile.ui.components.lettaPageGutter
+import com.letta.mobile.ui.components.LettaRefreshAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,8 +36,6 @@ import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaChipTabRow
 import com.letta.mobile.ui.components.LettaPageHeader
-import com.letta.mobile.ui.components.LettaPageHeaderDefaults
-import com.letta.mobile.ui.components.LettaPageRefresh
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterListTag
@@ -55,7 +55,9 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal fun MemfsHeader(page: MemfsPageScope) {
     LettaPageHeader(
         title = page.options.title.takeIf { page.options.showTitle },
-        refresh = LettaPageRefresh(page.state.isLoading, page.actions::refresh, testTag = MemfsPageTags.REFRESH),
+        refresh = {
+            LettaRefreshAction(page.state.isLoading, page.actions::refresh, Modifier.testTag(MemfsPageTags.REFRESH))
+        },
         controls = page.options.headerControls,
     ) {
         if (!page.wide) MemfsListControls(page)
@@ -67,7 +69,7 @@ internal fun MemfsHeader(page: MemfsPageScope) {
 internal fun MemfsDockedListControls(page: MemfsPageScope) {
     Column(
         modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = LettaPageHeaderDefaults.gutter(wide = true))
+            .padding(horizontal = lettaPageGutter(wide = true))
             .padding(bottom = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) { MemfsListControls(page) }

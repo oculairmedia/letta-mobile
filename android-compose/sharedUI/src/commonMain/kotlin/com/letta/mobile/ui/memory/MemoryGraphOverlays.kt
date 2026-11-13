@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.memory
 
+import com.letta.mobile.ui.components.lettaPageGutter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.graph.MemoryGraphView
 import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaPageHeaderDefaults
 import com.letta.mobile.ui.components.LettaSwatch
 import com.letta.mobile.ui.components.lettaHorizontalFadingEdges
 import com.letta.mobile.ui.components.lettaCount
@@ -50,7 +50,7 @@ internal fun MemoryKindFilterBar(
                 fadeLength = LettaDimens.Space.xxl,
             )
             .horizontalScroll(scroll)
-            .padding(horizontal = LettaPageHeaderDefaults.gutter(wide)),
+            .padding(horizontal = lettaPageGutter(wide)),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         view.kindsPresent.forEach { kind ->

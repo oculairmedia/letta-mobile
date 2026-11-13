@@ -2403,7 +2403,7 @@ public final class com/letta/mobile/ui/components/ComposableSingletons$LettaCata
 public final class com/letta/mobile/ui/components/ComposableSingletons$LettaPageHeaderKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/components/ComposableSingletons$LettaPageHeaderKt;
 	public fun <init> ()V
-	public final fun getLambda$1746355286$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$865239646$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/components/ComposableSingletons$LettaSidePaneKt {
@@ -2492,48 +2492,12 @@ public final class com/letta/mobile/ui/components/LettaMenuItem {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/components/LettaPageAction {
-	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getIcon ()Landroidx/compose/ui/graphics/vector/ImageVector;
-	public final fun getLabel ()Ljava/lang/String;
-	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
-	public final fun getTestTag ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/components/LettaPageCaption {
-	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getTestTag ()Ljava/lang/String;
-	public final fun getText ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/components/LettaPageHeaderDefaults {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/components/LettaPageHeaderDefaults;
-	public final fun gutter-u2uoSUM (Z)F
-}
-
 public final class com/letta/mobile/ui/components/LettaPageHeaderKt {
-	public static final fun LettaPageHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/LettaPageAction;Lcom/letta/mobile/ui/components/LettaPageRefresh;Lcom/letta/mobile/ui/components/LettaPageCaption;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
-}
-
-public final class com/letta/mobile/ui/components/LettaPageHeaderTags {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/components/LettaPageHeaderTags;
-	public static final field TITLE Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/components/LettaPageRefresh {
-	public static final field $stable I
-	public fun <init> (ZLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function4;)V
-	public synthetic fun <init> (ZLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function4;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getButton ()Lkotlin/jvm/functions/Function4;
-	public final fun getOnRefresh ()Lkotlin/jvm/functions/Function0;
-	public final fun getRefreshing ()Z
-	public final fun getTestTag ()Ljava/lang/String;
+	public static final field LETTA_PAGE_CAPTION_TAG Ljava/lang/String;
+	public static final field LETTA_PAGE_PRIMARY_ACTION_TAG Ljava/lang/String;
+	public static final field LETTA_PAGE_TITLE_TAG Ljava/lang/String;
+	public static final fun LettaPageHeader (Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/components/LettaMenuItem;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun lettaPageGutter (Z)F
 }
 
 public final class com/letta/mobile/ui/components/LettaPopupMenuKt {
@@ -5072,6 +5036,10 @@ public final class com/letta/mobile/ui/memory/MemoryGraphViewportState {
 
 public final class com/letta/mobile/ui/memory/MemoryGraphViewportStateKt {
 	public static final fun rememberMemoryGraphViewportState (Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/memory/MemoryGraphViewportState;
+}
+
+public final class com/letta/mobile/ui/memory/MemoryPageChromeKt {
+	public static final fun MemoryViewSwitch (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/memory/MemoryPageKt {

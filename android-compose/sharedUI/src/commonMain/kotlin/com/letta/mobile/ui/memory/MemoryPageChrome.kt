@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.memory
 
+import androidx.compose.ui.platform.testTag
+import com.letta.mobile.ui.components.LettaChipTabRow
+import com.letta.mobile.ui.components.LettaChipTab
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaMenuItem
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,9 +36,7 @@ import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaInlineError
-import com.letta.mobile.ui.components.LettaPageAction
 import com.letta.mobile.ui.components.LettaPageHeader
-import com.letta.mobile.ui.components.LettaPageRefresh
 import com.letta.mobile.ui.components.lettaCount
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
@@ -62,10 +65,10 @@ internal fun MemoryPageChrome(
     LettaPageHeader(
         title = "Memory".takeIf { options.page.showTitle },
         modifier = modifier.verticalScroll(rememberScrollState()),
-        primaryAction = LettaPageAction("New block", actions::beginCreate).takeIf { options.canCreateBlock },
-        // Touch pulls the chrome down instead (MemoryPage's LettaRefreshable).
-        refresh = LettaPageRefresh(parity.isLoading, actions::refresh),
+        primaryAction = LettaMenuItem(label = "New block", onClick = actions::beginCreate).takeIf { options.canCreateBlock },
         context = options.page.headerContext ?: picker,
+        // Touch pulls the chrome down instead (MemoryPage's LettaRefreshable).
+        refresh = { LettaRefreshAction(refreshing = parity.isLoading, onRefresh = actions::refresh) },
         controls = options.page.headerControls,
     ) {
         parity.errorMessage?.let { MemoryErrorBanner(it) }
@@ -134,4 +137,17 @@ private fun MemorySummaryStrip(summary: MemoryParitySummary) {
 @Composable
 private fun MemoryErrorBanner(message: String) {
     LettaInlineError(message = message, title = null)
+}
+
+/**
+ * The Memory destination's view switch (Blocks | Files) for the header's controls row: one chip per
+ * [labels] entry, tagged by [tags], the [selected] one raised.
+ */
+@Composable
+fun MemoryViewSwitch(labels: List<String>, tags: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    LettaChipTabRow {
+        labels.forEachIndexed { index, label ->
+            LettaChipTab(text = label, active = index == selected, onClick = { onSelect(index) }, modifier = Modifier.testTag(tags[index]))
+        }
+    }
 }

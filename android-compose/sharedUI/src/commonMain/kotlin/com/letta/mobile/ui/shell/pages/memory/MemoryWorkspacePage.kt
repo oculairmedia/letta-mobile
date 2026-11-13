@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell.pages.memory
 
+import com.letta.mobile.ui.memory.MemoryViewSwitch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,8 +14,6 @@ import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.memory.memfs.MemfsPageState
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaChipTabRow
 import com.letta.mobile.ui.memory.MemoryPage
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPage
@@ -79,16 +78,13 @@ fun MemoryWorkspacePage(binding: MemoryWorkspaceBinding, modifier: Modifier = Mo
 
 @Composable
 private fun MemoryWorkspaceSwitch(view: MemoryWorkspaceView, onSelect: (MemoryWorkspaceView) -> Unit) {
-    LettaChipTabRow {
-        MemoryWorkspaceView.entries.forEach { option ->
-            LettaChipTab(
-                text = option.label,
-                active = view == option,
-                onClick = { onSelect(option) },
-                modifier = Modifier.testTag(MemoryWorkspaceTags.view(option)),
-            )
-        }
-    }
+    val views = MemoryWorkspaceView.entries
+    MemoryViewSwitch(
+        labels = views.map { it.label },
+        tags = views.map(MemoryWorkspaceTags::view),
+        selected = views.indexOf(view),
+        onSelect = { onSelect(views[it]) },
+    )
 }
 
 private const val PAGE_TITLE = "Memory"
