@@ -168,11 +168,11 @@ private fun ComposerUnderCardLine(model: ComposerModel) {
     val permission = model.composer.permissionMode
     val hints = model.platform.showKeyboardHints
     if (permission == null && !hints) return
-    // Shares the line with the hint: each gives way to the other, the mode never past half.
+    // The mode takes its own width first (ellipsized if the line is narrower); the hint gives way.
     val leading: (@Composable RowScope.() -> Unit)? = if (permission == null) {
         null
     } else {
-        { ComposerPermissionModeLine(permission, model.actions::setPermissionMode, Modifier.weight(1f, fill = false)) }
+        { ComposerPermissionModeLine(permission, model.actions::setPermissionMode) }
     }
     ComposerHintRow(
         visible = hints && composerHintVisible(model.composer),

@@ -278,7 +278,9 @@ private fun <T> chipSpec(): AnimationSpec<T> {
  * the inset itself, so it tracks the keyboard frame by frame). The bar runs flush to the screen's
  * bottom edge (legacy ChatScreen's bottomInsetDp = 0): the opaque bar sits
  * under the navigation bar, which draws over its bottom padding, instead of growing by the
- * navigation inset and floating its controls ~48 dp up on three-button devices.
+ * navigation inset and floating its controls ~48 dp up on three-button devices. The one exception
+ * is the permission mode's line under the row ([TouchUnderBar]): it takes the bottom padding and
+ * keeps the navigation inset below it, because text drawn under the system bar is unreadable.
  */
 @Composable
 private fun touchBarPadding(): Pair<Dp, Dp> {
