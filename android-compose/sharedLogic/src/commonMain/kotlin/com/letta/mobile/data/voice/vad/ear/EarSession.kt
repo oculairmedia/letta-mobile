@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.CapturedAudioHandle
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
+import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.VoiceUtterance
 import com.letta.mobile.data.voice.audio.AudioClip
 import com.letta.mobile.data.voice.audio.AudioEncoding
@@ -20,6 +21,8 @@ import com.letta.mobile.data.voice.vad.CaptureRecorder
 import com.letta.mobile.data.voice.vad.Hop
 import com.letta.mobile.data.voice.vad.HopObservation
 import com.letta.mobile.data.voice.vad.HopSplitter
+import com.letta.mobile.data.voice.vad.SpeechDetector
+import com.letta.mobile.data.voice.vad.TurnEndReason
 import com.letta.mobile.data.voice.vad.TurnSignal
 import com.letta.mobile.data.voice.vad.TurnTracker
 import kotlinx.coroutines.CancellationException
@@ -36,10 +39,15 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
-/** A finished turn's audio under its handle; [wipe] zeroes it. */
-internal class CapturedTurn(val handle: CapturedAudioHandle, val samples: ShortArray) {
+/** A finished turn's audio under its handle, with what was measured about it; [wipe] zeroes the audio. */
+internal class CapturedTurn(
+    val handle: CapturedAudioHandle,
+    val samples: ShortArray,
+    val report: EarTurnReport = EarTurnReport.Unmeasured,
+) {
     fun wipe() = samples.fill(0)
 }
 
@@ -113,7 +121,9 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private val recorder = CaptureRecorder(samplesOf(parts.config.policy.preRoll), limit())
     // overflow: one entry per finished spoken turn (each within the hard cap); undelivered turns are wiped on close.
     private val turns = Channel<CapturedTurn>(Channel.UNLIMITED) { it.wipe() }
+    private val observer = parts.config.observer
     private var started = false
+    private var peakDb = SILENT_DB
 
     suspend fun run() {
         memory.drainCommits()
@@ -164,8 +174,13 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     }
 
     private suspend fun onHop(hop: Hop) {
+        val outputActive = memory.outputActive.value
+        detector.setOutputActive(outputActive)
         val probability = detector.probability(hop.samples)
-        apply(tracker.onHop(HopObservation(probability, hop.end, memory.outputActive.value)), hop)
+        val signal = tracker.onHop(HopObservation(probability, hop.end, outputActive))
+        if (signal == TurnSignal.Candidate) peakDb = SILENT_DB
+        if (tracker.recording || signal is TurnSignal.Ended) peakDb = maxOf(peakDb, PcmLevels.dbfs(hop.samples))
+        apply(signal, hop)
         recorder.remember(hop.samples)
     }
 
@@ -177,8 +192,11 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
                 record(hop)
             }
             TurnSignal.Confirmed -> speechStarted(hop)
-            TurnSignal.Abandoned -> recorder.discard()
-            is TurnSignal.Ended -> endTurn(hop)
+            is TurnSignal.Abandoned -> {
+                recorder.discard()
+                observer.turnDiscarded(turnReport(tracker, peakDb, detector, format.sampleRateHz), signal.reason)
+            }
+            is TurnSignal.Ended -> endTurn(hop, signal.reason)
         }
     }
 
@@ -189,12 +207,15 @@ internal class EarSession(private val parts: EarParts, private val out: Producer
     private suspend fun speechStarted(hop: Hop?) {
         record(hop)
         memory.forget()
+        observer.turnOpened()
         out.send(VoiceEarEvent.SpeechStarted)
     }
 
-    private suspend fun endTurn(hop: Hop?) {
+    private suspend fun endTurn(hop: Hop?, reason: TurnEndReason) {
         record(hop)
-        turns.send(CapturedTurn(memory.nextHandle(), recorder.finish()))
+        val report = turnReport(tracker, peakDb, detector, format.sampleRateHz)
+        observer.turnClosed(report, reason)
+        turns.send(CapturedTurn(memory.nextHandle(), recorder.finish(), report))
     }
 
     private suspend fun fail(code: VoiceErrorCode): Nothing {
@@ -244,7 +265,7 @@ private class TranscriptionWorker(
         }
         if (error == null) {
             job.turn.wipe()
-            return out.send(VoiceEarEvent.EndOfTurn(VoiceUtterance(outcome.getOrThrow())))
+            return out.send(VoiceEarEvent.EndOfTurn(judged(outcome.getOrThrow(), job.turn.report)))
         }
         val failure = VoiceError(codeOf(error), VoicePort.EAR)
         if (job.isRetry) {
@@ -255,10 +276,34 @@ private class TranscriptionWorker(
         out.send(VoiceEarEvent.Failed(failure, retry = job.turn.handle))
     }
 
+    /** The transcript as the turn's utterance, or an empty one (the loop listens on) when the policy drops it. */
+    private fun judged(text: VoiceText, report: EarTurnReport): VoiceUtterance {
+        val reason = parts.config.transcripts.discardReason(text, report)
+        if (reason != null) {
+            parts.config.observer.turnDiscarded(report, reason)
+            return VoiceUtterance(VoiceText.Empty)
+        }
+        parts.config.observer.transcriptAccepted(text.value.length)
+        return VoiceUtterance(text)
+    }
+
     private fun codeOf(error: Throwable): VoiceErrorCode = when (error) {
         is CancellationException -> throw error
         is SpeechEndpointException -> error.code
         is VoiceAudioException -> error.code
         else -> VoiceErrorCode.TRANSCRIPTION_FAILED
     }
+}
+
+private const val SILENT_DB = -120.0
+
+/** What [tracker] and [detector] measured about the turn that just ended or was dropped. */
+private fun turnReport(
+    tracker: TurnTracker,
+    peakDb: Double,
+    detector: SpeechDetector,
+    sampleRateHz: Int,
+): EarTurnReport {
+    val voiced = (tracker.voicedSamples.toDouble() / sampleRateHz).seconds
+    return EarTurnReport(voiced, peakDb, detector.noiseFloorDb)
 }

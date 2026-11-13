@@ -53,6 +53,15 @@ interface SpeechDetector {
 
     /** Forgets everything learned so far; called when a new capture starts. */
     fun reset()
+
+    /** The noise floor the detector currently judges against, in dBFS; null when it keeps none. */
+    val noiseFloorDb: Double? get() = null
+
+    /**
+     * True while the app's own speech plays (reported before every hop). A detector may judge
+     * against that echo instead of the room; the default ignores it.
+     */
+    fun setOutputActive(active: Boolean) = Unit
 }
 
 /** Creates a detector for one capture in [AudioFrameFormat]; the ear asks for a new one per listen. */
