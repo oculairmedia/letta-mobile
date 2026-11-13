@@ -94,12 +94,20 @@ class AppServerClientScopeTrustTest {
     /** A client that does not override the trust. */
     private class Bare : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
-        override suspend fun input(command: AppServerCommand.Input) = error("unused")
-        override suspend fun sync(command: AppServerCommand.Sync) = error("unused")
-        override suspend fun abort(command: AppServerCommand.AbortMessage) = error("unused")
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc) = error("unused")
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = error("unused")
+        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
+            error("unused")
+
+        override suspend fun input(command: AppServerCommand.Input): Unit = error("unused")
+
+        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse = error("unused")
+
+        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
+            error("unused")
+
+        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+            error("unused")
+
+        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse): Unit = error("unused")
     }
 
     private class SilentTransport : AppServerTransport {

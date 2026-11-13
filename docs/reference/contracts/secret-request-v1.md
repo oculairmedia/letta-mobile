@@ -375,5 +375,11 @@ Each was settled conservatively for v1 and is listed for the owner:
    the route stage.
 8. **The host service is JVM only**, because `:plugin-api` is a JVM-only dependency of
    `:sharedLogic`. An Android host would need that dependency on Android too.
-9. **Limits**: purpose 280 characters, 8 pending requests per agent, 512 journal records, 15 minute
-   lifetime, 24 hour retention of settled records.
+9. **Limits**: purpose 280 characters, 8 pending requests per agent, 8 created per agent in any 15
+   minutes, 16 settled records kept per agent, 512 journal records, 15 minute lifetime, 24 hour
+   retention of settled records, 15 s keystore deadline, 2 s write-lock wait.
+10. **Open for the owner, unchanged on purpose** (2026-11-13 security review): (a) a Meridian
+    live-call token can be requested by any local process running as the same OS user, so
+    `CallerIdentity.VERIFIED` does not separate agents that share one OS user; (b) whether a
+    record should store which device answered it; (c) whether `secret.request.answer` should be
+    granted to any role (today it is granted to none, so only `admin.full` devices answer).
