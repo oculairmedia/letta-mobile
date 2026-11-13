@@ -4698,7 +4698,7 @@ abstract fun interface com.letta.mobile.data.pairing/PairingRedeemer { // com.le
 }
 
 abstract fun interface com.letta.mobile.data.pairing/QrEncoder { // com.letta.mobile.data.pairing/QrEncoder|null[0]
-    abstract fun encode(kotlin/String): com.letta.mobile.data.pairing/QrModules // com.letta.mobile.data.pairing/QrEncoder.encode|encode(kotlin.String){}[0]
+    abstract fun encode(kotlin/String): com.letta.mobile.data.pairing/QrModules? // com.letta.mobile.data.pairing/QrEncoder.encode|encode(kotlin.String){}[0]
 }
 
 abstract fun interface com.letta.mobile.data.plugin.view/PluginViewConsent { // com.letta.mobile.data.plugin.view/PluginViewConsent|null[0]
