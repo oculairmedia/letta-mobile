@@ -94,4 +94,36 @@ class SentRunLedgerTest {
         assertEquals(setOf(provisional), runs.active)
         assertTrue(runs.failed.all { failed -> runs.started.values.any { failed in it } })
     }
+
+    @Test
+    fun aRowStampedWithASentMessageAsItsTurnJoinsThatMessagesRun() {
+        ledger.sent(first)
+        ledger.row(turn = "c1", run = "local-run-55")
+        ledger.row(turn = "c1", run = "local-run-57")
+        assertEquals(setOf(SentRunId("local-run-55"), SentRunId("local-run-57")), ledger.state.value.started[first])
+        assertEquals(setOf(SentRunId("local-run-55"), SentRunId("local-run-57")), ledger.state.value.active)
+    }
+
+    @Test
+    fun aRowOfAnotherTurnPublishesNothing() {
+        ledger.sent(first)
+        ledger.row(turn = "someone-elses-otid", run = "other-run")
+        ledger.row(turn = "iroh-turn-1", run = "other-run")
+        ledger.row(turn = null, run = "other-run")
+        assertTrue(ledger.state.value.started.isEmpty())
+    }
+
+    @Test
+    fun settlingAnyRunOfASentMessageEndsIt() {
+        ledger.sent(first)
+        ledger.sent(second)
+        ledger.row(turn = "c1", run = "local-run-55")
+        ledger.row(turn = "c1", run = "local-run-57")
+        ledger.row(turn = "c2", run = "local-run-58")
+
+        ledger.settled(setOf(SentRunId("local-run-55")), failed = false)
+
+        assertEquals(setOf(SentRunId("local-run-58")), ledger.state.value.active)
+        assertTrue(ledger.state.value.failed.isEmpty())
+    }
 }

@@ -21,7 +21,9 @@ value class SentRunId(
  * Which run each message this client sent started, keyed by identity only.
  *
  * A run is attributed to a sent message only when the server pairs them: the echo of the message
- * carries its otid together with the run's id, and a later id of the same turn (the durable id
+ * carries its otid together with the run's id, every row of the turn the message started is
+ * stamped with that otid as its turn id together with its run's id (a turn's run id rotates, a
+ * tool step on one run and the reply on the next), and a later id of the same turn (the durable id
  * that replaces a provisional one) is added to the same entry. Nothing is inferred from text,
  * position or timing. A run in [started] is in [active] from the moment it is published until its
  * turn ends; when it ended as a failure its ids are also in [failed].

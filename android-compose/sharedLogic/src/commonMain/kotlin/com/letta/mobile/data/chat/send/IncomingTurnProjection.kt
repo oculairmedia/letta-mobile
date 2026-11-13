@@ -115,8 +115,20 @@ internal class IncomingTurnProjection(
         source: String,
     ) {
         runtimeEventBatcher.enqueue(delta, conversation.value)
+        pairOwnRow(delta, state)
         state?.recordAssistantEvidence(delta, turnRegistry.resolveConversationId(delta.conversationId?.let(::ConversationId)))
         timelineRepository.ingestExternalTransportMessage(agentId, conversation.value, delta.message, source = source)
+    }
+
+    /** Every live row names its turn: a turn this pipeline's send started pairs the row's run with that send. */
+    private fun pairOwnRow(delta: WsTimelineEvent.MessageDelta, state: ConversationTurnState?) {
+        if (delta.isReplay) return
+        val ownRun = state?.ownRun
+        if (ownRun != null) {
+            ownRun.row(delta.turnId, delta.message.runId)
+        } else {
+            turnRegistry.sentRuns.row(delta.turnId, delta.message.runId)
+        }
     }
 
     suspend fun error(event: WsTimelineEvent.Error): Boolean {

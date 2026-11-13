@@ -94,6 +94,7 @@ internal class ConversationTurnState(
     fun acceptSend(pending: QueuedChatSend, send: () -> Boolean, onAccepted: () -> Unit): Boolean =
         identity.acceptSend(pending.conversationId.value, send) {
             ownRun.endUnless(pending.id.value)
+            ownRun.accepted(pending.id.value)
             otid = pending.id.value
             inFlightSend = pending
             localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
