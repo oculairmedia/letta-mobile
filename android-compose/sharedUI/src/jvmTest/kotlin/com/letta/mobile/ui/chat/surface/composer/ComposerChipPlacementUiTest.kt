@@ -40,9 +40,10 @@ import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
- * Where the permission mode and the context chip sit: the mode is a quiet line under the card (and
- * under the Touch bar's row), never in the control row; the context chip ends the line under the
- * card where the platform shows the keyboard hint, and stays in the control row otherwise.
+ * Where the permission mode and the context chip sit: the mode is a quiet line under the pointer
+ * card, never in the control row (the Touch bar offers it in its "+" sheet instead); the context
+ * chip ends the line under the card where the platform shows the keyboard hint, and stays in the
+ * control row otherwise.
  */
 class ComposerChipPlacementUiTest {
     private val composer = ChatComposerUiState(
@@ -202,15 +203,13 @@ class ComposerChipPlacementUiTest {
         assertTrue(mode.left >= card.left && mode.right <= card.right, "mode line $mode overflows the card's width $card")
     }
 
-    /** The Touch bar carries the mode as the line under its row, not as a chip above it. */
+    /** The Touch bar carries no mode line: its "+" sheet offers the mode (TouchComposerBarUiTest). */
     @Test
-    fun theTouchBarCarriesTheModeLineUnderItsRow() = runComposeUiTest {
+    fun theTouchBarHasNoModeLineOrChip() = runComposeUiTest {
         showPanel(width = 360.dp, keyboardHints = false, style = LettaInput.Touch)
 
         waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.TOUCH_BAR))
-        waitUntilExactlyOneExists(chipIn(ComposerTestTags.PERMISSION_MODE_LINE, ComposerTestTags.TOUCH_UNDER_BAR))
-        val input = onNodeWithTag(ComposerTestTags.INPUT).getUnclippedBoundsInRoot()
-        val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).getUnclippedBoundsInRoot()
-        assertTrue(mode.top >= input.bottom, "mode line $mode is not under the field $input")
+        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.PERMISSION_MODE_LINE))
+        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.HINT_FOOTER))
     }
 }

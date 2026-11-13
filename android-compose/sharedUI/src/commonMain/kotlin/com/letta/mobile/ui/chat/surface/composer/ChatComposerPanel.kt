@@ -203,7 +203,7 @@ private fun ComposerAboveCard(model: ComposerModel) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
     }
     // The mode is chrome of the full page, not of the compact dock. Its line sits under the pointer
-    // card and under the Touch bar's row; only its note stays here.
+    // card, its row in the Touch bar's "+" sheet; only its note stays here.
     if (model.mode != ChatSurfaceMode.Docked) {
         model.composer.permissionMode?.let { state -> ComposerPermissionModeNoteRow(state) }
         ComposerAgentMentionChips(model.composer.text, actions::updateComposerText)

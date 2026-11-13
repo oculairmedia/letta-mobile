@@ -15,7 +15,9 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Dp
@@ -45,9 +47,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The prompt bar's one model control (model and effort in one picker) and the permission mode's
- * line under the bar, at the phone (360), tablet (700, 760) and desktop (1200) widths, for the
- * pointer card and the Touch bar.
+ * The prompt bar's one model control (model and effort in one picker) and the permission mode (a
+ * line under the pointer card, a row of the Touch bar's "+" sheet), at the phone (360), tablet
+ * (700, 760) and desktop (1200) widths, for the pointer card and the Touch bar.
  */
 class ComposerUnifiedModelControlUiTest {
     private val withEfforts = ChatModelOption(
@@ -126,21 +128,23 @@ class ComposerUnifiedModelControlUiTest {
     }
 
     @Test
-    fun theTouchBarHasNoModelOrEffortControlAndCarriesTheModeLine() = WIDTHS.forEach { width ->
-        scene(width, LettaInput.Touch) {
+    fun theTouchBarHasNoModelOrEffortControlAndOffersTheModeInItsPlusSheet() = WIDTHS.forEach { width ->
+        scene(width, LettaInput.Touch) { scene ->
             assertEquals(0, count(ComposerTestTags.MODEL_CHIP), "model controls in the Touch bar at $width")
             assertEquals(0, count(OLD_EFFORT_CHIP), "a separate effort control at $width")
+            assertEquals(0, count(ComposerTestTags.PERMISSION_MODE_LINE), "a mode line under the Touch bar at $width")
+            // The bar is main's: full width, the same height, the row untouched.
             val bar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getUnclippedBoundsInRoot()
+            assertEquals(0.dp, bar.left, "bar start at $width")
+            assertEquals(width, bar.right - bar.left, "bar width at $width")
+            assertEquals(MAIN_TOUCH_BAR_HEIGHT, bar.bottom - bar.top, "bar height at $width")
             val input = onNodeWithTag(ComposerTestTags.INPUT).getUnclippedBoundsInRoot()
-            val send = onNodeWithTag(ComposerTestTags.SEND).getUnclippedBoundsInRoot()
-            val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).getUnclippedBoundsInRoot()
-            assertTrue(mode.top >= input.bottom && mode.top >= send.bottom, "mode line $mode not under the row at $width")
-            assertTrue(mode.bottom <= bar.bottom, "mode line $mode leaves the bar $bar at $width")
-            assertTrue(mode.bottom - mode.top <= LettaDimens.Space.xl, "mode line $mode is more than one line at $width")
-            // The row is what it was: the "+", the field and Send.
             assertTrue(input.right - input.left >= width - TOUCH_ROW_CHROME, "field $input narrowed at $width")
-            onNodeWithTag(ComposerTestTags.PERMISSION_MODE_LINE).performClick()
-            onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertExists()
+
+            onNodeWithContentDescription("Add to message").performClick()
+            onNodeWithText("Permission mode: Accept edits").performClick()
+            onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + AppServerPermissionMode.Strict.name).performClick()
+            runOnIdle { assertEquals(listOf(AppServerPermissionMode.Strict), scene.actions.permissionModes, "mode pick at $width") }
         }
     }
 
@@ -255,6 +259,9 @@ class ComposerUnifiedModelControlUiTest {
          */
         val FIELD_RESERVE_BEFORE = 66.dp
         val ROUNDING = 0.5.dp
+
+        /** The Touch bar's height on main (its rendered height before this change): the bar is unchanged. */
+        val MAIN_TOUCH_BAR_HEIGHT = 104.dp
 
         /** The Touch row's chrome around its field: the bar's insets, the "+" and Send targets, gaps and field padding. */
         val TOUCH_ROW_CHROME = 160.dp

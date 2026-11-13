@@ -28,10 +28,8 @@ internal object ComposerTestTags {
     /** The chevron a chip that opens a picker ends with. */
     const val CHIP_CHEVRON = "composer-chip-chevron"
     const val WORKING_DIRECTORY = "composer-working-directory"
-    /** The permission mode's quiet line under the prompt, which opens its popover. */
+    /** The permission mode's quiet line under the pointer card, which opens its popover. */
     const val PERMISSION_MODE_LINE = "composer-permission-mode"
-    /** The Touch bar's reserved line under its row, which holds [PERMISSION_MODE_LINE]. */
-    const val TOUCH_UNDER_BAR = "composer-touch-under-bar"
     const val PERMISSION_MODE_POPOVER = "composer-permission-mode-popover"
     const val PERMISSION_MODE_OPTION = "composer-permission-mode-option-"
     const val PERMISSION_MODE_NOTE = "composer-permission-mode-note"

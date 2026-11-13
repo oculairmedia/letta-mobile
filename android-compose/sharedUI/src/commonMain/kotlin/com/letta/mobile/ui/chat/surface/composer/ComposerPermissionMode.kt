@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -39,6 +41,7 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_accept_edits
 import com.letta.mobile.sharedui.resources.composer_permission_mode_accept_edits_hint
 import com.letta.mobile.sharedui.resources.composer_permission_mode_changing
 import com.letta.mobile.sharedui.resources.composer_permission_mode_failed
+import com.letta.mobile.sharedui.resources.composer_permission_mode_item
 import com.letta.mobile.sharedui.resources.composer_permission_mode_not_saved
 import com.letta.mobile.sharedui.resources.composer_permission_mode_on_start
 import com.letta.mobile.sharedui.resources.composer_permission_mode_runtime_host
@@ -58,10 +61,10 @@ import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
-// The permission mode is a quiet line under the prompt (the pointer card and the Touch bar alike),
-// not a control in the bar: it shows the mode the server confirmed (or, while a change waits for the
-// server's echo, that the change is pending) and opens the one popover of the modes. Where the owner
-// cannot change the mode the line stays, disabled, with the reason in the note above the composer.
+// The permission mode is one entry, drawn two ways: a quiet line under the pointer card, and a row of
+// the Touch bar's "+" sheet. Both show the mode the server confirmed (or, while a change waits for
+// the server's echo, that the change is pending) and open the one popover of the modes. Where the
+// owner cannot change the mode the entry stays, disabled, with the reason in the note above the composer.
 
 /** The mode's name as the picker and the settings show it. */
 @Composable
@@ -86,10 +89,38 @@ fun AppServerPermissionMode.description(): String = stringResource(
 )
 
 /**
- * The permission mode as one quiet line under the prompt: a shield, the mode in small muted text
- * (ellipsized, never wrapped) and a chevron; pressing it opens [ComposerPermissionModePicker] above
- * it. Its note stays above the composer ([ComposerPermissionModeNoteRow]). One focus stop, announced
- * as the permission mode with the mode (and the runtime it governs) as its state.
+ * What the permission-mode entry shows, wherever it is drawn: [icon], the mode as [label] (pending or
+ * unconfirmed when its change is not settled), [title] naming the control, [state] (the mode and the
+ * runtime it governs) for screen readers, and whether the owner can change it ([enabled]).
+ */
+@Immutable
+internal class PermissionModeEntry(
+    val icon: ImageVector,
+    val label: String,
+    val title: String,
+    val state: String,
+    val enabled: Boolean,
+)
+
+/** The one [PermissionModeEntry] for [state]: the under-card line and the "+" sheet row both draw it. */
+@Composable
+internal fun permissionModeEntry(state: ChatPermissionModeUiState): PermissionModeEntry {
+    val label = chipText(state, state.shown().displayName())
+    val runtimeLabel = state.runtime?.let { permissionModeRuntimeLabel(it) }
+    return PermissionModeEntry(
+        icon = Lucide.Shield,
+        label = label,
+        title = stringResource(Res.string.composer_permission_mode),
+        state = runtimeLabel?.let { "$label, $it" } ?: label,
+        enabled = state.canChange,
+    )
+}
+
+/**
+ * The permission mode as one quiet line under the pointer card: the entry's icon, its label in small
+ * muted text (ellipsized, never wrapped) and a chevron; pressing it opens [ComposerPermissionModePicker]
+ * above it. Its note stays above the composer ([ComposerPermissionModeNoteRow]). One focus stop,
+ * announced as the permission mode with the mode (and the runtime it governs) as its state.
  */
 @Composable
 internal fun ComposerPermissionModeLine(
@@ -98,27 +129,25 @@ internal fun ComposerPermissionModeLine(
     modifier: Modifier = Modifier,
 ) {
     var open by remember { mutableStateOf(false) }
-    val label = chipText(state, state.shown().displayName())
-    val runtimeLabel = state.runtime?.let { permissionModeRuntimeLabel(it) }
-    val title = stringResource(Res.string.composer_permission_mode)
+    val entry = permissionModeEntry(state)
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Box(modifier) {
         Row(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
-                .clickable(enabled = state.canChange, role = Role.Button, onClickLabel = title) { open = true }
+                .clickable(enabled = entry.enabled, role = Role.Button, onClickLabel = entry.title) { open = true }
                 .semantics(mergeDescendants = true) {
-                    contentDescription = title
-                    stateDescription = runtimeLabel?.let { "$label, $it" } ?: label
+                    contentDescription = entry.title
+                    stateDescription = entry.state
                 }
                 .testTag(ComposerTestTags.PERMISSION_MODE_LINE)
                 .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            Icon(Lucide.Shield, contentDescription = null, tint = muted, modifier = Modifier.size(LettaDimens.Control.iconSm))
+            Icon(entry.icon, contentDescription = null, tint = muted, modifier = Modifier.size(LettaDimens.Control.iconSm))
             Text(
-                text = label,
+                text = entry.label,
                 style = MaterialTheme.typography.labelSmall,
                 color = muted,
                 maxLines = 1,
@@ -137,7 +166,7 @@ internal fun ComposerPermissionModeLine(
 }
 
 /**
- * The modes' popover, above whatever it is composed beside (the line under the prompt), while
+ * The modes' popover, above whatever it is composed beside (the line under the card, or the Touch bar's "+"), while
  * [open] and the owner can change the mode. A pick closes it before it is applied.
  */
 @Composable
@@ -149,6 +178,23 @@ internal fun ComposerPermissionModePicker(
 ) {
     if (!open || !state.canChange) return
     PermissionModePopover(state, onSelect = { mode -> onDismiss(); onSelect(mode) }, onDismiss = onDismiss)
+}
+
+/**
+ * The Touch "+" sheet's row for the mode: the entry's icon and label ("Permission mode: Ask for
+ * approval"), its state for screen readers, greyed where the owner cannot change it; [onOpenPicker]
+ * opens the same popover as the under-card line.
+ */
+@Composable
+internal fun permissionModeSheetItem(state: ChatPermissionModeUiState, onOpenPicker: () -> Unit): TouchSheetItem {
+    val entry = permissionModeEntry(state)
+    return TouchSheetItem(
+        label = stringResource(Res.string.composer_permission_mode_item, entry.label),
+        icon = entry.icon,
+        onClick = onOpenPicker,
+        enabled = entry.enabled,
+        stateDescription = entry.state,
+    )
 }
 
 /** The mode to name: the requested one while it is pending or unconfirmed, else the confirmed one. */

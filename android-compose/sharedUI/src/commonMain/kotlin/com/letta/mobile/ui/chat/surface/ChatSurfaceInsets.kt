@@ -28,8 +28,7 @@ import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
  * - not the status bar: the host's floating header and the status bar above it are
  *   [ChatSurfacePlatform.topChromeInset], under which the timeline scrolls edge to edge;
  * - not the navigation bar: the Touch composer bar runs flush to the screen's bottom edge, its
- *   opaque surface under the navigation bar, and the canvas draws behind it. Only the bar's
- *   permission-mode line under its row reads the navigation bar's inset, to sit above it.
+ *   opaque surface under the navigation bar, and the canvas draws behind it.
  */
 internal object ChatSurfaceInsets {
     /** The window insets the page's scaffold pads for besides the keyboard: none (see above). */
