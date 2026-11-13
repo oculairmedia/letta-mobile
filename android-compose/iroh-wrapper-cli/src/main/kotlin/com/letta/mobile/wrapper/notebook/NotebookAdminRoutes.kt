@@ -9,28 +9,33 @@ import com.letta.mobile.data.canvas.authority.SharedNotesWire
 import com.letta.mobile.data.canvas.notes.NotebookNoteLoad
 import com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot
 import com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpen
+import com.letta.mobile.data.canvas.workspace.SharedNoteListing
 import com.letta.mobile.data.canvas.workspace.SharedNotesCursor
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.adminError
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
-/** Installs notebook operations on the authenticated host router. No request field selects a principal. */
+/**
+ * Installs notebook operations on the authenticated host router. No request field selects a principal.
+ * At most one `notebook.shared.list` runs per principal at a time; another call from the same principal
+ * meanwhile is answered at once, unavailable with [SharedNotesWire.BUSY], and never queued.
+ */
 fun registerNotebookAdminRoutes(router: AdminRpcRouter, notebooks: NotebookLocalStore, grants: NotebookGrantStore) {
     notebooks.requireGrantIsolation()
-    fun access(context: AdminRpcRequestContext): HostNotebookAccess {
-        val principal = context.authenticatedEndpointId?.takeIf { context.authenticated && it.matches(ENDPOINT_ID) }
-            ?: adminError("unauthorized")
-        return HostNotebookAccess(notebooks, grants, principal)
-    }
+    fun access(context: AdminRpcRequestContext): HostNotebookAccess = HostNotebookAccess(notebooks, grants, principalOf(context))
+    val listing = ConcurrentHashMap.newKeySet<String>()
     router.registerScoped(NotebookAccessWire.RESOLVE) { params, context ->
         val id = documentId(params)
         NotebookAccessWire.reference(access(context).resolver.resolve(id))
     }
     router.registerScoped(SharedNotesWire.LIST) { params, context ->
-        SharedNotesWire.sharedNotes(access(context).sharedNotes(listCursor(params)))
+        val principal = principalOf(context)
+        val from = listCursor(params)
+        SharedNotesWire.sharedNotes(listing.oneAtATime(principal) { HostNotebookAccess(notebooks, grants, principal).sharedNotes(from) })
     }
     router.registerScoped(NotebookAccessWire.OPEN) { params, context ->
         val id = documentId(params)
@@ -51,6 +56,22 @@ fun registerNotebookAdminRoutes(router: AdminRpcRouter, notebooks: NotebookLocal
         if (string(item, "document_id") != id.value) adminError("snapshot identity mismatch")
         val applied = NotebookNoteSnapshot(id, string(item, "title"), string(item, "markdown"))
         NotebookAccessWire.save(access(context).backend.flush(applied))
+    }
+}
+
+/** The authenticated transport identity; never a request field. */
+private fun principalOf(context: AdminRpcRequestContext): String {
+    return context.authenticatedEndpointId?.takeIf { context.authenticated && it.matches(ENDPOINT_ID) }
+        ?: adminError("unauthorized")
+}
+
+/** Runs [list] unless one is already running for [principal], which is answered busy at once instead. */
+private suspend fun MutableSet<String>.oneAtATime(principal: String, list: suspend () -> SharedNoteListing): SharedNoteListing {
+    if (!add(principal)) return SharedNoteListing.Unavailable(SharedNotesWire.BUSY)
+    try {
+        return list()
+    } finally {
+        remove(principal)
     }
 }
 

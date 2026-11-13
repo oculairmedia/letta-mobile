@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.update
  * @property opening The note being opened, while the opener decides.
  * @property workspace The workspace holding the open note, or null while the list shows.
  * @property openProblem Why the latest open failed, shown beside the list.
+ * @property capped The host had more notes than [SharedNoteBrowser.MAX_HELD]: only the first that many
+ *   are held and shown, nothing more is asked for, and the list says so until the next refresh.
  */
 data class SharedNoteBrowserState(
     val listing: SharedNoteListing? = null,
@@ -27,12 +29,14 @@ data class SharedNoteBrowserState(
     val opening: NotebookDocumentId? = null,
     val workspace: DocumentWorkspaceController? = null,
     val openProblem: DocumentWorkspaceProblem? = null,
+    val capped: Boolean = false,
 )
 
 /**
  * The shared notes a host offers this device, and the one open in a [DocumentWorkspaceController].
  * Opening goes through [SharedNotebooks.opener], so the host rechecks the grant every time; the
  * listing itself grants nothing. Call on one owner dispatcher; the caller owns the coroutines.
+ * Across pages it holds at most [MAX_HELD] notes, however many a host lists.
  */
 class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
     private val mutableState = MutableStateFlow(SharedNoteBrowserState())
@@ -79,7 +83,7 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
     /** A published refresh starts the listing again, so no page is being asked for it yet. */
     private fun showRefresh(current: SharedNoteBrowserState, fresh: SharedNoteListing?): SharedNoteBrowserState {
         if (fresh == null) return current.copy(loading = waiting > 0)
-        return current.copy(listing = fresh, loading = waiting > 0, loadingMore = false, moreFailed = false)
+        return current.copy(listing = fresh, loading = waiting > 0, loadingMore = false, moreFailed = false, capped = false)
     }
 
     /**
@@ -124,15 +128,23 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
     private fun showPage(current: SharedNoteBrowserState, page: SharedNoteListing?): SharedNoteBrowserState {
         return when (page) {
             null -> current.copy(loadingMore = false)
-            SharedNoteListing.Denied -> current.copy(listing = SharedNoteListing.Denied, loadingMore = false)
+            SharedNoteListing.Denied -> current.copy(listing = SharedNoteListing.Denied, loadingMore = false, capped = false)
             is SharedNoteListing.Unavailable -> current.copy(loadingMore = false, moreFailed = page != CURSOR_REFUSED)
-            is SharedNoteListing.Listed -> current.copy(listing = appended(current.listing, page), loadingMore = false)
+            is SharedNoteListing.Listed -> held(current.copy(loadingMore = false), appended(current.listing, page), page.next)
         }
     }
 
-    private fun appended(shown: SharedNoteListing?, page: SharedNoteListing.Listed): SharedNoteListing.Listed {
-        val notes = ((shown as? SharedNoteListing.Listed)?.notes.orEmpty() + page.notes).distinctBy { it.id }
-        return SharedNoteListing.Listed(notes, page.next)
+    private fun appended(shown: SharedNoteListing?, page: SharedNoteListing.Listed): List<SharedNote> =
+        ((shown as? SharedNoteListing.Listed)?.notes.orEmpty() + page.notes).distinctBy { it.id }
+
+    /**
+     * Shows [notes] with [next], unless the host has more than [MAX_HELD]: then only the first [MAX_HELD]
+     * are kept, no further page is offered, and [SharedNoteBrowserState.capped] says so.
+     */
+    private fun held(current: SharedNoteBrowserState, notes: List<SharedNote>, next: SharedNotesCursor?): SharedNoteBrowserState {
+        val capped = notes.size > MAX_HELD || (notes.size == MAX_HELD && next != null)
+        if (!capped) return current.copy(listing = SharedNoteListing.Listed(notes, next))
+        return current.copy(listing = SharedNoteListing.Listed(notes.take(MAX_HELD)), capped = true)
     }
 
     private suspend fun ask(from: SharedNotesCursor?): SharedNoteListing = try {
@@ -180,6 +192,12 @@ class SharedNoteBrowser(private val notebooks: SharedNotebooks) {
         if (controller.state.value.current != null) return
         mutableState.update { it.copy(workspace = null) }
         refresh()
+    }
+
+    /** Limits for every browser. */
+    companion object {
+        /** The most notes a browser holds across pages; a host sharing more shows only the first this many. */
+        const val MAX_HELD = 5000
     }
 }
 
