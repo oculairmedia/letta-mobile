@@ -8635,6 +8635,8 @@ sealed interface com.letta.mobile.data.canvas.workspace/SharedNoteListing { // c
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.toString|toString(){}[0]
 
         final object Companion { // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion|null[0]
+            final const val BUSY // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.BUSY|{}BUSY[0]
+                final fun <get-BUSY>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.BUSY.<get-BUSY>|<get-BUSY>(){}[0]
             final const val INVALID_CURSOR // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.INVALID_CURSOR|{}INVALID_CURSOR[0]
                 final fun <get-INVALID_CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteListing.Unavailable.Companion.INVALID_CURSOR.<get-INVALID_CURSOR>|<get-INVALID_CURSOR>(){}[0]
         }
@@ -31938,11 +31940,18 @@ final class com.letta.mobile.data.canvas.workspace/SharedNoteBrowser { // com.le
     final suspend fun open(com.letta.mobile.data.canvas/NotebookDocumentId): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.open|open(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
     final suspend fun refresh() // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.refresh|refresh(){}[0]
     final suspend fun workspaceEmptied() // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.workspaceEmptied|workspaceEmptied(){}[0]
+
+    final object Companion { // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.Companion|null[0]
+        final const val MAX_HELD // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.Companion.MAX_HELD|{}MAX_HELD[0]
+            final fun <get-MAX_HELD>(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteBrowser.Companion.MAX_HELD.<get-MAX_HELD>|<get-MAX_HELD>(){}[0]
+    }
 }
 
 final class com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState { // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState|null[0]
-    constructor <init>(com.letta.mobile.data.canvas.workspace/SharedNoteListing? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas/NotebookDocumentId? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ...) // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.<init>|<init>(com.letta.mobile.data.canvas.workspace.SharedNoteListing?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.NotebookDocumentId?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?){}[0]
+    constructor <init>(com.letta.mobile.data.canvas.workspace/SharedNoteListing? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas/NotebookDocumentId? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ..., kotlin/Boolean = ...) // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.<init>|<init>(com.letta.mobile.data.canvas.workspace.SharedNoteListing?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.NotebookDocumentId?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?;kotlin.Boolean){}[0]
 
+    final val capped // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.capped|{}capped[0]
+        final fun <get-capped>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.capped.<get-capped>|<get-capped>(){}[0]
     final val listing // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.listing|{}listing[0]
         final fun <get-listing>(): com.letta.mobile.data.canvas.workspace/SharedNoteListing? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.listing.<get-listing>|<get-listing>(){}[0]
     final val loading // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.loading|{}loading[0]
@@ -31965,7 +31974,8 @@ final class com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState { // c
     final fun component5(): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component5|component5(){}[0]
     final fun component6(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component6|component6(){}[0]
     final fun component7(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component7|component7(){}[0]
-    final fun copy(com.letta.mobile.data.canvas.workspace/SharedNoteListing? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas/NotebookDocumentId? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ...): com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.copy|copy(com.letta.mobile.data.canvas.workspace.SharedNoteListing?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.NotebookDocumentId?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?){}[0]
+    final fun component8(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.component8|component8(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.workspace/SharedNoteListing? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas/NotebookDocumentId? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController? = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ..., kotlin/Boolean = ...): com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.copy|copy(com.letta.mobile.data.canvas.workspace.SharedNoteListing?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.NotebookDocumentId?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceController?;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/SharedNoteBrowserState.toString|toString(){}[0]
@@ -75357,6 +75367,8 @@ final object com.letta.mobile.data.canvas.authority/NotebookAccessWire { // com.
 }
 
 final object com.letta.mobile.data.canvas.authority/SharedNotesWire { // com.letta.mobile.data.canvas.authority/SharedNotesWire|null[0]
+    final const val BUSY // com.letta.mobile.data.canvas.authority/SharedNotesWire.BUSY|{}BUSY[0]
+        final fun <get-BUSY>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.BUSY.<get-BUSY>|<get-BUSY>(){}[0]
     final const val CURSOR // com.letta.mobile.data.canvas.authority/SharedNotesWire.CURSOR|{}CURSOR[0]
         final fun <get-CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.CURSOR.<get-CURSOR>|<get-CURSOR>(){}[0]
     final const val INVALID_CURSOR // com.letta.mobile.data.canvas.authority/SharedNotesWire.INVALID_CURSOR|{}INVALID_CURSOR[0]
@@ -75369,6 +75381,10 @@ final object com.letta.mobile.data.canvas.authority/SharedNotesWire { // com.let
         final fun <get-MAX_CURSOR_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_CURSOR_CHARS.<get-MAX_CURSOR_CHARS>|<get-MAX_CURSOR_CHARS>(){}[0]
     final const val MAX_LISTED // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED|{}MAX_LISTED[0]
         final fun <get-MAX_LISTED>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_LISTED.<get-MAX_LISTED>|<get-MAX_LISTED>(){}[0]
+    final const val MAX_PAGE_BYTES // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_PAGE_BYTES|{}MAX_PAGE_BYTES[0]
+        final fun <get-MAX_PAGE_BYTES>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_PAGE_BYTES.<get-MAX_PAGE_BYTES>|<get-MAX_PAGE_BYTES>(){}[0]
+    final const val MAX_TITLE_CHARS // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_TITLE_CHARS|{}MAX_TITLE_CHARS[0]
+        final fun <get-MAX_TITLE_CHARS>(): kotlin/Int // com.letta.mobile.data.canvas.authority/SharedNotesWire.MAX_TITLE_CHARS.<get-MAX_TITLE_CHARS>|<get-MAX_TITLE_CHARS>(){}[0]
     final const val NEXT_CURSOR // com.letta.mobile.data.canvas.authority/SharedNotesWire.NEXT_CURSOR|{}NEXT_CURSOR[0]
         final fun <get-NEXT_CURSOR>(): kotlin/String // com.letta.mobile.data.canvas.authority/SharedNotesWire.NEXT_CURSOR.<get-NEXT_CURSOR>|<get-NEXT_CURSOR>(){}[0]
 

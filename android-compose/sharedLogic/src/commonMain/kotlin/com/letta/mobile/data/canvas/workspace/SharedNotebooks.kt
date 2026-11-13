@@ -39,6 +39,12 @@ sealed interface SharedNoteListing {
         companion object {
             /** The reason a host gives for a cursor it cannot read; the caller starts again from the first page. */
             const val INVALID_CURSOR = "The listing position is not valid; list again from the start"
+
+            /**
+             * The reason a host gives while it is already answering a listing for the same caller; it never
+             * queues a second one, so the caller asks again shortly.
+             */
+            const val BUSY = "The host is already listing notes for this device; try again shortly"
         }
     }
 }
