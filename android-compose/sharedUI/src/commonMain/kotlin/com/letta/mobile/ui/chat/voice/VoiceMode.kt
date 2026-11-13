@@ -10,10 +10,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.session.VoiceModeController
+import com.letta.mobile.data.voice.session.VoiceModeState
 import com.letta.mobile.data.voice.session.VoicePress
 import com.letta.mobile.data.voice.session.VoiceSetupDraft
 import com.letta.mobile.data.voice.session.VoiceSetupStore
 import com.letta.mobile.data.voice.session.echoCancelled
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Voice mode's stored setup and its reachability check, shared by the chat (to start) and the
@@ -55,11 +57,18 @@ fun rememberVoiceSetupAccess(settings: SecureSettingsStore): VoiceSetupAccess? {
     }
 }
 
-/** A page's voice mode: its controller and whether the Voice settings pane is open over the chat. */
+/**
+ * A page's voice mode: its controller, what the chat bar shows of it (its state and the smoothed
+ * microphone and playback levels, the controller's own unless a test pins them) and whether the
+ * Voice settings pane is open over the chat.
+ */
 @Stable
 class VoiceModeHandle internal constructor(
     /** The controller the button and the status strip drive. */
     val controller: VoiceModeController,
+    internal val state: StateFlow<VoiceModeState> = controller.state,
+    internal val microphoneLevel: StateFlow<Float> = controller.microphoneLevel,
+    internal val playbackLevel: StateFlow<Float> = controller.playbackLevel,
 ) {
     /** Whether the Voice settings pane is showing (a press found the setup incomplete). */
     var setupOpen: Boolean by mutableStateOf(false)

@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -90,7 +92,7 @@ import org.jetbrains.compose.resources.stringResource
  */
 @Composable
 internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, modifier: Modifier = Modifier) {
-    val state by handle.controller.state.collectAsState()
+    val state by handle.state.collectAsState()
     val look = buttonLook(state)
     val description = stringResource(buttonDescription(state))
     val stateText = stringResource(look.state)
@@ -114,7 +116,11 @@ internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, mo
 }
 
 /**
- * One compact line directly above the chat bar while voice mode is not off: what it is doing
+ * Voice mode's band directly above the chat bar while voice mode is not off, inside the chat column
+ * (never over the conversation or the window): a fixed-height band in the prompt card's shape whose
+ * backdrop shows what voice mode is doing ([voiceBandVisual]: the reactive wave on the microphone
+ * while listening and hearing, the thinking glow while waiting, the wave on the reply while
+ * speaking, the still surface after a failure), under its one status line: what it is doing
  * ("Listening…"; while speaking "Speaking… — talk to interrupt", or "— press to interrupt" where
  * speaking does not interrupt, with an Interrupt action that stops the reply and listens), or why it
  * stopped with the action that helps (Retry, Set up), and a close control that stops voice mode.
@@ -122,37 +128,55 @@ internal fun VoiceModeButton(handle: VoiceModeHandle, size: Dp, iconSize: Dp, mo
  */
 @Composable
 internal fun VoiceStatusStrip(handle: VoiceModeHandle, modifier: Modifier = Modifier) {
-    val state by handle.controller.state.collectAsState()
+    val state by handle.state.collectAsState()
     val byVoice by handle.controller.bargeInByVoice.collectAsState()
     if (state == VoiceModeState.Off) return
     val line = statusLine(state, byVoice)
+    val visual = voiceBandVisual(state)
+    val moving = !LocalReducedMotion.current && visual != VoiceBandVisual.Still
     Surface(
-        modifier = modifier.fillMaxWidth().testTag(VoiceModeTags.STRIP),
-        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(voiceBandHeight())
+            .testTag(VoiceModeTags.STRIP)
+            .semantics {
+                voiceBandVisual = visual
+                voiceBandAnimated = moving
+            },
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Row(
-            modifier = Modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xs),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(Modifier.fillMaxSize()) {
+            VoiceBandBackdrop(visual, handle, Modifier.matchParentSize())
+            VoiceStatusLine(line, handle)
+        }
+    }
+}
+
+/** The band's status text, its action and its close control, laid over the backdrop. */
+@Composable
+private fun VoiceStatusLine(line: StatusLine, handle: VoiceModeHandle) {
+    Row(
+        modifier = Modifier.fillMaxSize().padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(line.text),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (line.problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        line.action?.let { action -> StripAction(action, handle) }
+        IconButton(
+            onClick = handle.controller::stop,
+            modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(VoiceModeTags.STRIP_CLOSE),
         ) {
-            Text(
-                text = stringResource(line.text),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (line.problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
-            )
-            line.action?.let { action -> StripAction(action, handle) }
-            IconButton(
-                onClick = handle.controller::stop,
-                modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(VoiceModeTags.STRIP_CLOSE),
-            ) {
-                val dismiss = stringResource(Res.string.voice_action_dismiss)
-                Icon(Lucide.X, contentDescription = dismiss, modifier = Modifier.size(LettaDimens.Control.iconSm))
-            }
+            val dismiss = stringResource(Res.string.voice_action_dismiss)
+            Icon(Lucide.X, contentDescription = dismiss, modifier = Modifier.size(LettaDimens.Control.iconSm))
         }
     }
 }

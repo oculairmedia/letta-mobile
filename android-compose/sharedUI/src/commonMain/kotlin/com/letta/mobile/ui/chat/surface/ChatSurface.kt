@@ -42,6 +42,9 @@ import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.chat.surface.ambient.rememberAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.LocalVoiceWaveShaders
+import com.letta.mobile.ui.chat.surface.ambient.rememberVoiceWaveShaders
+import com.letta.mobile.ui.chat.surface.composer.LocalVoiceBandBackdrop
 import com.letta.mobile.ui.chat.surface.composer.CompanionLayer
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchors
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatOverlay
@@ -189,6 +192,8 @@ fun ChatSurface(
     BindComposerShortcuts(focusHandoff)
     // The thinking glow's shader, compiled once for the page rather than at every run's start.
     val glowShaders = rememberAmbientGlowShaders()
+    // Voice mode's reactive wave, compiled the first time its band shows a wave.
+    val voiceWaveShaders = rememberVoiceWaveShaders()
     // letta-mobile-ckmub.3.15 (S13): the page's messages go to the window's overlay queue (its own
     // when composed without a window root); its snackbar slot draws them above the composer.
     ProvideOverlayHost { overlays ->
@@ -202,6 +207,8 @@ fun ChatSurface(
             LocalThinkingGlowStyle provides appearance.displayOptions.thinkingGlow,
             LocalChatImageActions provides stablePlatform.imageActions,
             LocalVoiceMode provides voiceMode,
+            LocalVoiceWaveShaders provides voiceWaveShaders,
+            LocalVoiceBandBackdrop provides ChatVoiceBandBackdrop,
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
             ChatSurfacePageFrame(modifier) {

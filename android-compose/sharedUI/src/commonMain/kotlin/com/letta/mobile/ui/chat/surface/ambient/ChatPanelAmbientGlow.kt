@@ -170,6 +170,12 @@ internal sealed interface AmbientGlowPlacement {
      * [ChatSurfaceDimens.collapsedHaloBleed] and fades out at its edges, a soft halo on the canvas.
      */
     data object Halo : AmbientGlowPlacement
+
+    /**
+     * Filling voice mode's band above the chat bar while it waits for the reply: the light rises
+     * from the band's bottom edge over most of its height, inside the band's own rounded shape.
+     */
+    data object VoiceBand : AmbientGlowPlacement
 }
 
 /**
@@ -275,7 +281,7 @@ private fun GlowLayer(
                     agitation = inputs.agitation.value,
                     envelope = inputs.envelope.value,
                     streamEnergy = motion.streamEnergy.floatValue,
-                    band = if (placement is AmbientGlowPlacement.Halo) HALO_BAND else PANEL_BAND,
+                    band = bandFor(placement),
                     tint = inputs.tint.value,
                     fieldHeight = fieldHeightFor(placement),
                     gain = GLOW_GAIN,
@@ -320,7 +326,7 @@ private fun rememberSettledRedraw(inputs: GlowInputs, motion: GlowMotion): Mutab
  * rises from behind the composer bar, never as a band floating across the conversation.
  */
 private fun DrawScope.fieldHeightFor(placement: AmbientGlowPlacement): Float = when (placement) {
-    is AmbientGlowPlacement.AboveComposer -> size.height
+    is AmbientGlowPlacement.AboveComposer, AmbientGlowPlacement.VoiceBand -> size.height
     // The halo's light rises from the bar the mascot stands on: the field ends at the row's foot,
     // not at the bottom of the bleed below it (which the bar covers).
     AmbientGlowPlacement.Halo -> (size.height - ChatSurfaceDimens.collapsedHaloBleed.toPx()).coerceAtLeast(1f)
@@ -503,8 +509,18 @@ internal const val CHAT_AMBIENT_GLOW_TAG = "chat-ambient-glow"
 internal val AmbientGlowAnimatedKey = SemanticsPropertyKey<Boolean>("AmbientGlowAnimated")
 internal var SemanticsPropertyReceiver.ambientGlowAnimated by AmbientGlowAnimatedKey
 
+/** Where the glow sits in its field for [placement]. */
+private fun bandFor(placement: AmbientGlowPlacement): AmbientBand = when (placement) {
+    is AmbientGlowPlacement.AboveComposer -> PANEL_BAND
+    AmbientGlowPlacement.Halo -> HALO_BAND
+    AmbientGlowPlacement.VoiceBand -> VOICE_BAND
+}
+
 /** The halo is short: it lifts its glow over most of its height rather than a thin edge strip. */
 private val HALO_BAND = AmbientBand(top = 0.05f, peak = 0.8f)
+
+/** Voice mode's band is shorter still: the glow fills it from its foot nearly to its top. */
+private val VOICE_BAND = AmbientBand(top = 0.0f, peak = 0.9f)
 
 /**
  * The panel's band: taller than a page's, since a panel a third of the window high would

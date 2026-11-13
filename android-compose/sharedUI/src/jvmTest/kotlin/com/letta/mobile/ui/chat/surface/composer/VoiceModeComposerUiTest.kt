@@ -320,12 +320,12 @@ class VoiceModeComposerUiTest {
         keepsTheStack(760.dp, Layout.Card, ComposerTestTags.PERMISSION_MODE_LINE)
 
     @Test
-    fun theStripAndTheUnderBarLineKeepThePhoneBarStillAt360() =
-        keepsTheStack(360.dp, Layout.Touch, ComposerTestTags.TOUCH_UNDER_BAR)
+    fun theStripKeepsThePhoneBarStillAt360() =
+        keepsTheStack(360.dp, Layout.Touch, ComposerTestTags.TOUCH_BAR)
 
     @Test
-    fun theStripAndTheUnderBarLineKeepTheTouchBarStillAt700() =
-        keepsTheStack(700.dp, Layout.Touch, ComposerTestTags.TOUCH_UNDER_BAR)
+    fun theStripKeepsTheTouchBarStillAt700() =
+        keepsTheStack(700.dp, Layout.Touch, ComposerTestTags.TOUCH_BAR)
 
     @Test
     fun aTapTurnsVoiceModeOnAndASecondTapTurnsItOff() = runComposeUiTest {
