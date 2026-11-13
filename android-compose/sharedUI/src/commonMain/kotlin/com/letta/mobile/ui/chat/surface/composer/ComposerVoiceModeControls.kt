@@ -186,7 +186,15 @@ private fun statusLine(state: VoiceModeState): StatusLine = when (state) {
     VoiceModeState.NeedsMicPermission -> StatusLine(Res.string.voice_status_permission, StripActionKind.PRESS_AGAIN, problem = true)
     VoiceModeState.NeedsConversation -> StatusLine(Res.string.voice_error_no_conversation, problem = true)
     is VoiceModeState.Error -> StatusLine(voiceErrorText(state.code), errorAction(state.code), problem = true)
+    is VoiceModeState.TurnFailed -> StatusLine(voiceErrorText(state.code), turnFailureAction(state), problem = true)
     VoiceModeState.Off -> StatusLine(Res.string.voice_mode_state_off)
+}
+
+/** Voice mode listens on after a failed utterance: Retry sends it again; pressing the button would stop voice mode. */
+private fun turnFailureAction(state: VoiceModeState.TurnFailed): StripActionKind? = when {
+    state.retryable -> StripActionKind.RETRY
+    state.code.action == VoiceUserAction.OPEN_SETTINGS -> StripActionKind.SETUP
+    else -> null
 }
 
 private fun errorAction(code: VoiceErrorCode): StripActionKind? = when (code.action) {
@@ -209,6 +217,7 @@ private fun buttonLook(state: VoiceModeState): ButtonLook {
         VoiceModeState.Hearing -> on(Lucide.AudioLines, Res.string.voice_mode_state_hearing)
         VoiceModeState.WaitingForReply -> on(Lucide.AudioLines, Res.string.voice_mode_state_thinking)
         VoiceModeState.Speaking -> on(Lucide.Volume2, Res.string.voice_mode_state_speaking)
+        is VoiceModeState.TurnFailed -> on(Lucide.AudioLines, Res.string.voice_mode_state_listening)
         VoiceModeState.NeedsMicPermission -> off(Lucide.MicOff, scheme.error, Res.string.voice_mode_state_permission)
         is VoiceModeState.Error -> off(Lucide.MicOff, scheme.error, Res.string.voice_mode_state_error)
         is VoiceModeState.NeedsSetup -> off(Lucide.AudioLines, scheme.onSurface, Res.string.voice_mode_state_setup)

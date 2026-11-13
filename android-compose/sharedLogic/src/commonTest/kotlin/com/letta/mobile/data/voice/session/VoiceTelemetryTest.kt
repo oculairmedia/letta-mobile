@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.session
 
+import com.letta.mobile.data.voice.SpeechSkipReason
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
@@ -40,6 +41,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class VoiceTelemetryTest {
     private val recorder = TelemetryRecorder()
@@ -54,6 +57,9 @@ class VoiceTelemetryTest {
     fun uninstall() {
         installed?.close()
     }
+
+    private val clock = TestTimeSource()
+    private val telemetry = VoiceTelemetry(clock)
 
     private fun voiceEvents(): List<Telemetry.Event> = recorder.events.value.filter { it.tag == "VoiceMode" }.reversed()
 
@@ -78,7 +84,7 @@ class VoiceTelemetryTest {
     @Test
     fun aSendAndItsAttributionAreReportedByIdentityWithoutText() = runTest {
         val fake = FakeSession()
-        val session = TelemetryVoiceChatSession(fake)
+        val session = TelemetryVoiceChatSession(fake, telemetry)
         session.send(VoiceText(SECRET))
         fake.state.value = VoiceChatState(startedRuns = mapOf(ClientMessageId("otid-1") to setOf(VoiceRunId("local-run-57"))))
         session.state.first { it.startedRuns.isNotEmpty() }
@@ -101,6 +107,7 @@ class VoiceTelemetryTest {
                     override suspend fun cancel() = VoiceCancelOutcome.ALREADY_FINISHED
                 }
             },
+            telemetry,
         ) { ClientMessageId("otid-1") }
         responder.respond(VoiceUtterance(VoiceText(SECRET))).events.toList()
 
@@ -121,6 +128,7 @@ class VoiceTelemetryTest {
                     override suspend fun cancel() = VoiceCancelOutcome.ALREADY_FINISHED
                 }
             },
+            telemetry,
         ) { ClientMessageId("otid-1") }
         responder.respond(VoiceUtterance(VoiceText(SECRET))).events.toList()
 
@@ -141,6 +149,7 @@ class VoiceTelemetryTest {
 
                 override suspend fun stop() = Unit
             },
+            telemetry,
         )
         mouth.speak(SpeechSegment(SpeechSegmentId(3), VoiceText(REPLY)))
         mouth.events.toList()
@@ -155,6 +164,7 @@ class VoiceTelemetryTest {
     fun endpointErrorsAreReportedWithKindAndStatusAndRethrown() = runTest {
         val transcriber = TelemetryTranscriber(
             SpeechTranscriber { throw SpeechEndpointException(SpeechOperation.TRANSCRIPTION, VoiceErrorCode.REJECTED, 422) },
+            telemetry,
         )
         assertFailsWith<SpeechEndpointException> { transcriber.transcribe(AudioClip(ByteArray(4), AudioEncoding.WAV)) }
 
@@ -166,8 +176,9 @@ class VoiceTelemetryTest {
 
     @Test
     fun earDecisionsCarryLevelsAndReasons() {
-        VoiceEarTelemetry.turnDiscarded(EarTurnReport(250.milliseconds, -31.4, -52.0), TurnDiscardReason.TOO_LITTLE_VOICE)
-        VoiceEarTelemetry.transcriptAccepted(12)
+        val ear = VoiceEarTelemetry(telemetry)
+        ear.turnDiscarded(EarTurnReport(250.milliseconds, -31.4, -52.0), TurnDiscardReason.TOO_LITTLE_VOICE)
+        ear.transcriptAccepted(12)
 
         val discarded = named("turn.discarded")
         assertEquals("TOO_LITTLE_VOICE", attr(discarded, "reason"))
@@ -175,6 +186,45 @@ class VoiceTelemetryTest {
         assertEquals("-31", attr(discarded, "peakDb"))
         assertEquals("-52", attr(discarded, "floorDb"))
         assertEquals("12", attr(named("transcript.accepted"), "characters"))
+    }
+
+    @Test
+    fun everyEventIsTimedFromTheSessionStartOnTheInjectedClock() {
+        telemetry.event("before.start")
+        clock += 5.seconds
+        telemetry.started()
+        clock += 1250.milliseconds
+        telemetry.loop.speechSkipped(SpeechSkipReason.BARGE_IN, 2)
+        clock += 750.milliseconds
+        telemetry.stopped("stopRequested")
+
+        assertEquals("null", attr(named("before.start"), "tMs"))
+        assertEquals("0", attr(named("mode.started"), "tMs"))
+        val skipped = named("speech.skipped")
+        assertEquals("1250", attr(skipped, "tMs"))
+        assertEquals("BARGE_IN", attr(skipped, "reason"))
+        assertEquals("2", attr(skipped, "segments"))
+        assertEquals("2000", attr(named("mode.stopped"), "tMs"))
+    }
+
+    @Test
+    fun aQueuedSendAndAStopAreReportedByIdentity() = runTest {
+        val fake = FakeSession()
+        val session = TelemetryVoiceChatSession(fake, telemetry)
+        val own = ClientMessageId("otid-1")
+        fake.state.value = VoiceChatState(queued = setOf(own))
+        session.send(VoiceText(SECRET))
+        val run = VoiceRunId("local-run-401")
+        fake.state.value = VoiceChatState(startedRuns = mapOf(own to setOf(run)), activeRuns = setOf(run, VoiceRunId("theirs")))
+        session.state.first { it.activeRuns.isNotEmpty() }
+        session.stopRun()
+        fake.state.value = fake.state.value.copy(activeRuns = setOf(VoiceRunId("theirs")))
+        session.state.first { run !in it.activeRuns }
+
+        assertEquals("otid-1", attr(named("utterance.queued"), "clientMessageId"))
+        assertEquals("local-run-401", attr(named("stop.requested"), "runIds"))
+        assertEquals("local-run-401", attr(named("stop.settled"), "runIds"))
+        assertNoText()
     }
 
     private companion object {

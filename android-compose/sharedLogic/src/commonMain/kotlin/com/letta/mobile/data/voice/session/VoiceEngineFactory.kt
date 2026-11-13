@@ -20,7 +20,7 @@ import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.CoroutineScope
 
 /** What one voice session's engines are built from. Its [toString] carries no address or key. */
-class VoiceEngineRequest(
+class VoiceEngineRequest internal constructor(
     /** The chat the utterances go to and the replies come from. */
     val session: VoiceChatSession,
     /** The stored setup; its endpoint is configured and consented. */
@@ -31,7 +31,18 @@ class VoiceEngineRequest(
     val grants: VoiceEndpointGrantSource,
     /** The session's scope; the mouth's workers run in it. */
     val scope: CoroutineScope,
+    /** Where the engines report their decisions, timed from the session's start. */
+    internal val telemetry: VoiceTelemetry,
 ) {
+    /** A request whose engines report with their own clock (it starts at the first `mode.started`). */
+    constructor(
+        session: VoiceChatSession,
+        setup: VoiceSetup,
+        apiKey: SpeechApiKey?,
+        grants: VoiceEndpointGrantSource,
+        scope: CoroutineScope,
+    ) : this(session, setup, apiKey, grants, scope, VoiceTelemetry())
+
     override fun toString(): String = "VoiceEngineRequest(keySet=${apiKey != null})"
 }
 
@@ -69,13 +80,14 @@ class EndpointVoiceEngineFactory(
         val url = checkNotNull(endpoint.baseUrl) { "Voice mode started without an endpoint" }
         val engine = httpEngine()
         val client = SpeechEndpointClient(engine, SpeechEndpointConfig(url, request.apiKey))
-        val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)))
+        val telemetry = request.telemetry
+        val transcriber = TelemetryTranscriber(SpeechTranscriber.endpoint(EndpointTranscriber(client, request.grants, endpoint)), telemetry)
         val microphone = RecoveringFrameSource(audio.microphone(format), deviceChanges = audio.deviceChanges())
-        val ear = VadVoiceEar(microphone, transcriber, VadEarConfig(format, observer = VoiceEarTelemetry))
+        val ear = VadVoiceEar(microphone, transcriber, VadEarConfig(format, observer = VoiceEarTelemetry(telemetry)))
         val synthesizer = EndpointSpeechSynthesizer(client, request.grants, endpoint, AudioEncoding.WAV)
-        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope))
-        val session = TelemetryVoiceChatSession(request.session)
-        val responder = TelemetryResponder(VoiceChatResponder(session)) { session.lastSent }
+        val mouth = TelemetryMouth(EndpointVoiceMouth(synthesizer, audio.speaker(), request.scope), telemetry)
+        val session = TelemetryVoiceChatSession(request.session, telemetry)
+        val responder = TelemetryResponder(VoiceChatResponder(session), telemetry) { session.lastSent }
         val engines = VoiceEngines(ear = ear, responder = responder, mouth = mouth)
         return VoiceEngineSet(engines) {
             ear.close()

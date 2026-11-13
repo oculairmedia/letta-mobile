@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
+import kotlin.time.TimeSource
 
 /** What a press of the voice button did. */
 enum class VoicePress {
@@ -54,9 +55,15 @@ enum class VoicePress {
  * also call [stop] when the app goes to the background). A failure keeps the session so [retry] can
  * hand the ear its kept capture; the loop has already closed the microphone by then.
  *
+ * A failed utterance (not delivered, unattributed, a failed run, an answer that timed out, a failed
+ * segment of speech) does not end voice mode: the loop keeps listening and the state shows the
+ * failure ([VoiceModeState.TurnFailed]) until the person says something new. Only the microphone or
+ * its permission going away, a missing setup, an engine that ends or will not let go, or a stop end it.
+ *
  * Commands are applied in order by one coroutine in [runtime]'s scope and dispatcher; [sessions] is
  * opened on the thread that presses (the UI thread), so a host may read its own UI state there.
- * Nothing here logs audio, transcripts, addresses or keys.
+ * Nothing here logs audio, transcripts, addresses or keys; every `VoiceMode` event is timed on
+ * [timeSource] from the session's `mode.started`.
  */
 class VoiceModeController(
     private val sessions: VoiceChatSessions,
@@ -65,7 +72,9 @@ class VoiceModeController(
     private val microphone: MicrophoneAccess,
     private val runtime: VoiceLoopRuntime,
     private val config: VoiceLoopConfig = VoiceLoopConfig(),
+    timeSource: TimeSource = TimeSource.Monotonic,
 ) {
+    private val telemetry = VoiceTelemetry(timeSource)
     // overflow: one consumer applying presses in order; dropping one could lose a stop.
     private val commands = Channel<Command>(Channel.UNLIMITED)
     private val mutableState = MutableStateFlow<VoiceModeState>(VoiceModeState.Off)
@@ -114,7 +123,7 @@ class VoiceModeController(
         commands.trySend(Command.Stop(STOP_REQUESTED))
     }
 
-    /** After a failure: retries the kept capture, or listens again. */
+    /** After a failure: retries the kept capture, sends again the utterance whose answer failed, or listens again. */
     fun retry() = offer(Command.Retry(sessions.open()))
 
     /**
@@ -164,7 +173,12 @@ class VoiceModeController(
     private suspend fun retryOrBegin(session: VoiceChatSession?) {
         val current = live ?: return begin(session)
         val loop = current.loop
-        if (loop.state.value.retryableCapture != null) loop.retryCapture() else loop.activate(VoiceActivationKind.TAP)
+        val state = loop.state.value
+        when {
+            state.retryableCapture != null -> loop.retryCapture()
+            state.replyRetryable -> loop.retryReply()
+            else -> loop.activate(VoiceActivationKind.TAP)
+        }
     }
 
     private suspend fun begin(opened: VoiceChatSession?) {
@@ -183,7 +197,7 @@ class VoiceModeController(
         }
         val started = launchLoop(session, setup) ?: return
         live = started
-        VoiceTelemetry.started()
+        telemetry.started()
         mutableState.value = VoiceModeState.Listening
         started.loop.activate(VoiceActivationKind.TAP)
     }
@@ -191,7 +205,7 @@ class VoiceModeController(
     private fun launchLoop(session: BoundVoiceChatSession, setup: VoiceSetup): LiveVoice? {
         val job = SupervisorJob(runtime.scope.coroutineContext[Job])
         val scope = runtime.scope + job + runtime.dispatcher
-        val request = VoiceEngineRequest(session, setup, store.apiKey(), { store.setup.value.grants }, scope)
+        val request = VoiceEngineRequest(session, setup, store.apiKey(), { store.setup.value.grants }, scope, telemetry)
         val built = runCatching { engines.create(request) }
         val error = built.exceptionOrNull()
         if (error is CancellationException) throw error
@@ -201,9 +215,9 @@ class VoiceModeController(
             mutableState.value = VoiceModeState.Error(VoiceErrorCode.PREPARATION_FAILED)
             return null
         }
-        val loop = VoiceLoop(set.engines, config, runtime.copy(scope = scope))
+        val loop = VoiceLoop(set.engines, config, runtime.copy(scope = scope, observer = telemetry.loop))
         val follower = scope.launch { loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gap) } }
-        val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(VoiceTelemetry::loopState) }
+        val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(telemetry::loopState) }
         val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
         return LiveVoice(loop, set, job, listOf(follower, tracer, watcher))
     }
@@ -213,7 +227,7 @@ class VoiceModeController(
         val current = live
         live = null
         if (current != null) {
-            VoiceTelemetry.stopped(reason)
+            telemetry.stopped(reason)
             current.watchers.forEach { it.cancel() }
             current.loop.shutdown()
             current.set.release()

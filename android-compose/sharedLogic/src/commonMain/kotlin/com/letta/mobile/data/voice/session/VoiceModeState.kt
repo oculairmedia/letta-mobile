@@ -57,6 +57,19 @@ sealed interface VoiceModeState {
         override val active: Boolean get() = true
     }
 
+    /**
+     * The last utterance failed with [code] (not delivered, no answer, a failed run, speech that
+     * could not be played) and voice mode listens on; [retryable] when that utterance can be sent again.
+     */
+    data class TurnFailed(
+        /** What went wrong. */
+        val code: VoiceErrorCode,
+        /** Whether a retry sends that utterance again. */
+        val retryable: Boolean,
+    ) : VoiceModeState {
+        override val active: Boolean get() = true
+    }
+
     /** Voice mode stopped on [code]; its [VoiceErrorCode.action] says what to offer. */
     data class Error(
         /** What went wrong. */
@@ -70,10 +83,20 @@ internal object VoiceModeProjection {
     fun of(loop: VoiceLoopState, gap: VoiceSetupGap?): VoiceModeState = when (loop.phase) {
         // A session exists, so an idle loop is one whose first activation is still queued.
         VoicePhase.IDLE -> VoiceModeState.Listening
-        VoicePhase.LISTENING -> if (loop.userSpeaking) VoiceModeState.Hearing else VoiceModeState.Listening
+        VoicePhase.LISTENING -> listening(loop)
         VoicePhase.THINKING -> VoiceModeState.WaitingForReply
         VoicePhase.SPEAKING -> VoiceModeState.Speaking
         VoicePhase.FAILED -> failure(loop.failure, gap)
+    }
+
+    /** Listening: hearing the person, showing the last utterance's failure, or just listening. */
+    private fun listening(loop: VoiceLoopState): VoiceModeState {
+        val failed = loop.turnFailure
+        return when {
+            loop.userSpeaking -> VoiceModeState.Hearing
+            failed != null -> VoiceModeState.TurnFailed(failed.code, loop.replyRetryable)
+            else -> VoiceModeState.Listening
+        }
     }
 
     /**
