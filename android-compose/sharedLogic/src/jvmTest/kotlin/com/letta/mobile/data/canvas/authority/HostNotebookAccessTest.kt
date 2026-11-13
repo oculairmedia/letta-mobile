@@ -26,6 +26,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.automerge.ObjectId
+import org.automerge.repo.DocumentId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -268,7 +269,7 @@ class HostNotebookAccessTest {
     @Test
     fun aGrantStoreThatCannotBeReadStillMakesThePageUnavailable() = runBlocking {
         withNotes(1) { notebooks, (id) ->
-            val grants = UnreadableGrants(listOf(id))
+            val grants = MemoryGrants(listOf(id to EDITOR)).apply { unreadable = true }
 
             assertIs<SharedNoteListing.Unavailable>(HostNotebookAccess(notebooks, grants, PEER).sharedNotes())
         }
@@ -284,11 +285,11 @@ class HostNotebookAccessTest {
                 check(store.persistCanvas(id))
             }
         }
-        val retiredKey = keyOf(retired.bytes)
+        val retiredKey = keyOf(retired)
         val successor = NotebookHistoryArchive(directory)
             .compactToNewDocument(retiredKey, 1_000L, NotebookDocumentIndex(directory), 1_024L).newKey
         NotebookLocalStore(directory, "host").use { notebooks ->
-            assertEquals(successor, notebooks.resolveStorageId(retired)?.let { keyOf(it.bytes) }, "the successor is recorded")
+            assertEquals(successor, notebooks.resolveStorageId(retired)?.let(::keyOf), "the successor is recorded")
             val grants = MemoryGrants(listOf(NotebookDocumentId(retiredKey) to EDITOR, NotebookDocumentId(successor) to EDITOR))
 
             val listing = assertIs<SharedNoteListing.Listed>(HostNotebookAccess(notebooks, grants, PEER).sharedNotes())
@@ -358,7 +359,7 @@ class HostNotebookAccessTest {
     @Test
     fun aPageStopsAtTheByteBudgetAndTheNextStartsWithTheNoteThatDidNotFit() = runBlocking {
         val count = 2 * SharedNotesWire.MAX_PAGE_BYTES / longEntryBytes() + 1
-        withTitledNotes(count, LONG_TITLE) { notebooks, ids ->
+        withNotes(count, title = { LONG_TITLE }) { notebooks, ids ->
             val grants = MemoryGrants(ids.map { it to EDITOR })
             val pages = walk(HostNotebookAccess(notebooks, grants, PEER))
 
@@ -441,18 +442,15 @@ class HostNotebookAccessTest {
         assertEquals(buildJsonObject { put("cursor", "v1.opaque") }, SharedNotesWire.request(page.next))
     }
 
-    private suspend fun withNotes(count: Int, block: suspend (NotebookLocalStore, List<NotebookDocumentId>) -> Unit) {
+    /** [count] new notes, the n-th titled [title] of n ("Note n" by default), in a fresh store. */
+    private suspend fun withNotes(
+        count: Int,
+        title: (Int) -> String = { "Note $it" },
+        block: suspend (NotebookLocalStore, List<NotebookDocumentId>) -> Unit,
+    ) {
         val root = Files.createTempDirectory("notebook-shared-listing")
         NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { notebooks ->
-            block(notebooks, (0 until count).map { requireNotNull(notebooks.read(notebooks.create("Note $it"))).id })
-        }
-    }
-
-    /** Like [withNotes], every note titled [title]. */
-    private suspend fun withTitledNotes(count: Int, title: String, block: suspend (NotebookLocalStore, List<NotebookDocumentId>) -> Unit) {
-        val root = Files.createTempDirectory("notebook-shared-titled")
-        NotebookLocalStore(Files.createDirectory(root.resolve("notebooks")), "host").use { notebooks ->
-            block(notebooks, (0 until count).map { requireNotNull(notebooks.read(notebooks.create(title))).id })
+            block(notebooks, (0 until count).map { requireNotNull(notebooks.read(notebooks.create(title(it)))).id })
         }
     }
 
@@ -473,7 +471,7 @@ class HostNotebookAccessTest {
     private fun titleOf(notebooks: NotebookLocalStore, id: NotebookDocumentId): String =
         requireNotNull(notebooks.read(notebookStorageId(id))).title
 
-    private fun keyOf(bytes: ByteArray): String = bytes.joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+    private fun keyOf(id: DocumentId): String = id.bytes.joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
 
     /** Every page the host hands out, following cursors from the first until one has none. */
     private suspend fun walk(access: HostNotebookAccess): List<SharedNoteListing.Listed> {
@@ -504,12 +502,14 @@ class HostNotebookAccessTest {
 
     /**
      * Grants held in memory, listed in id order as the store contract says. Counts every grant handed
-     * to a transaction ([rechecks]) and every store read, each transaction or listing ([reads]).
+     * to a transaction ([rechecks]) and every store read, each transaction or listing ([reads]). While
+     * [unreadable], listing still works but every grant transaction fails, as a broken store would.
      */
     private class MemoryGrants(grants: List<Pair<NotebookDocumentId, NotebookPeerGrant>>) : NotebookGrantStore {
         private val byDocument = grants.toMap().toMutableMap()
         var rechecks = 0
         var reads = 0
+        var unreadable = false
 
         fun revoke(id: NotebookDocumentId) {
             byDocument.remove(id)
@@ -530,6 +530,7 @@ class HostNotebookAccessTest {
             documentIds: Collection<NotebookDocumentId>,
             action: suspend (Map<NotebookDocumentId, NotebookPeerGrant>) -> T,
         ): T {
+            if (unreadable) throw IOException("grant store unreadable")
             rechecks += documentIds.size
             reads++
             val held = documentIds.mapNotNull { id -> byDocument[id]?.takeIf { it.peerId == principal }?.let { id to it } }
@@ -540,23 +541,6 @@ class HostNotebookAccessTest {
             reads++
             return byDocument.filterValues { it.peerId == principal }.keys.sortedBy { it.value }
         }
-    }
-
-    /** Grants the store cannot read: listing works, every transaction fails as a broken store would. */
-    private class UnreadableGrants(private val documents: List<NotebookDocumentId>) : NotebookGrantStore {
-        override suspend fun <T> withGrant(
-            principal: String,
-            documentId: NotebookDocumentId,
-            action: suspend (NotebookPeerGrant?) -> T,
-        ): T = throw IOException("grant store unreadable")
-
-        override suspend fun <T> withGrants(
-            principal: String,
-            documentIds: Collection<NotebookDocumentId>,
-            action: suspend (Map<NotebookDocumentId, NotebookPeerGrant>) -> T,
-        ): T = throw IOException("grant store unreadable")
-
-        override suspend fun documentsOf(principal: String): List<NotebookDocumentId> = documents
     }
 
     private companion object {
