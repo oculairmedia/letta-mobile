@@ -637,28 +637,22 @@ class CanvasRelayClient(
     }
 }
 
-/** The three stores an app's boards live in, which [storedBoardsRelayClient] binds a relay over. */
-data class StoredBoardStores(
-    val documents: CanvasDocumentStore,
-    val opLog: CanvasOpLog,
-    val delivery: CanvasDeliveryStore,
-)
-
 /**
- * The relay client over an app's stored boards, bound the same on every host: topics by
- * conversation ([relayTopicOf]) and ops for a board no window has open written straight into the
- * stored board ([StoreCanvasClosedBoardApplier]). [snapshotSeed] seeds a never-shared board's
- * first join where the op log is bounded.
+ * The relay client over the boards stored here, with [opLog] and [delivery], bound the same on
+ * every host: topics by conversation ([relayTopicOf]) and ops for a board no window has open written
+ * straight into the stored board ([StoreCanvasClosedBoardApplier]). [snapshotSeed] seeds a
+ * never-shared board's first join where the op log is bounded.
  */
-fun storedBoardsRelayClient(
-    stores: StoredBoardStores,
+fun CanvasDocumentStore.storedBoardsRelayClient(
+    opLog: CanvasOpLog,
+    delivery: CanvasDeliveryStore,
     assets: AssetStore? = null,
     snapshotSeed: CanvasSnapshotSeed? = null,
 ): CanvasRelayClient = CanvasRelayClient(
-    opLog = stores.opLog,
-    delivery = stores.delivery,
-    topicOf = { stores.documents.relayTopicOf(it) },
+    opLog = opLog,
+    delivery = delivery,
+    topicOf = { relayTopicOf(it) },
     assets = assets,
-    closedBoard = StoreCanvasClosedBoardApplier(stores.documents, stores.opLog),
+    closedBoard = StoreCanvasClosedBoardApplier(this, opLog),
     snapshotSeed = snapshotSeed,
 )

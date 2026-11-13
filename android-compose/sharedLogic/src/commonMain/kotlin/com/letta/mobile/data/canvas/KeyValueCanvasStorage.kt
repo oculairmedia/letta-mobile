@@ -56,8 +56,9 @@ class KeyValueCanvasStorage(
      * conversation, ops for closed boards into the stored board, and - because this log is
      * bounded - a never-shared board's first join seeded from the board ([StoreCanvasSnapshotSeed]).
      */
-    fun relayClient(assets: AssetStore? = null): CanvasRelayClient = storedBoardsRelayClient(
-        stores = StoredBoardStores(documents, opLog, delivery),
+    fun relayClient(assets: AssetStore? = null): CanvasRelayClient = documents.storedBoardsRelayClient(
+        opLog = opLog,
+        delivery = delivery,
         assets = assets,
         snapshotSeed = StoreCanvasSnapshotSeed(documents, opLog),
     )
