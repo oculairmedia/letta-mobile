@@ -65,7 +65,11 @@ fun ConversationCanvasFrame(target: ConversationCanvasTarget?, content: @Composa
 }
 
 @Composable
-private fun FrameSeat(picker: ConversationCanvasPicker, target: ConversationCanvasTarget, content: @Composable (mounted: CanvasId?) -> Unit) {
+private fun FrameSeat(
+    picker: ConversationCanvasPicker,
+    target: ConversationCanvasTarget,
+    content: @Composable (mounted: CanvasId?) -> Unit,
+) {
     val gate = remember(target) { CanvasBoardSwitchGate() }
     val switch = remember(target) { ConversationBoardSwitch(gate) }
     val state by remember(picker, target) { picker.resolver.state(target) }.collectAsState(ConversationCanvasState.Resolving)

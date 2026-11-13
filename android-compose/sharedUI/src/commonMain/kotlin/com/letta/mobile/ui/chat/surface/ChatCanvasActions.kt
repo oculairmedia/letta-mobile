@@ -27,9 +27,15 @@ val LocalChatCanvasBringToBoard = staticCompositionLocalOf<((CanvasId, () -> Uni
 
 /** The page's [ChatCanvasActions], switching boards through the window's [LocalChatCanvasBringToBoard]. */
 @Composable
-internal fun rememberChatCanvasActions(actions: ChatActions, onIntent: (ChatSurfaceIntent) -> Unit, shareFailedMessage: String): ChatCanvasActions {
+internal fun rememberChatCanvasActions(
+    actions: ChatActions,
+    onIntent: (ChatSurfaceIntent) -> Unit,
+    shareFailedMessage: String,
+): ChatCanvasActions {
     val bringToBoard = LocalChatCanvasBringToBoard.current
-    return remember(actions, onIntent, shareFailedMessage, bringToBoard) { ChatCanvasActions(actions, onIntent, shareFailedMessage, bringToBoard) }
+    return remember(actions, onIntent, shareFailedMessage, bringToBoard) {
+        ChatCanvasActions(actions, onIntent, shareFailedMessage, bringToBoard)
+    }
 }
 
 @Stable
