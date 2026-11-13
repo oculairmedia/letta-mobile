@@ -91,7 +91,9 @@ open class CachedAllConversationsRepository(
             }
         }
         transport?.let { channelTransport ->
-            repositoryScope.launch { observeConversationInvalidations(channelTransport.conversationChanges(), PUSH_COALESCE_WINDOW, ::applyPush) }
+            repositoryScope.launch {
+                observeConversationInvalidations(channelTransport.conversationChanges(), PUSH_COALESCE_WINDOW, ::applyPush)
+            }
             repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
         }
     }
