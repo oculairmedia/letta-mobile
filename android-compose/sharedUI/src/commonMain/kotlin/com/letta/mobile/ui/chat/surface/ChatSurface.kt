@@ -144,7 +144,7 @@ fun ChatSurface(
     val stableOnIntent = rememberLatestIntent(onIntent)
     val stableHost = rememberStableHost(host)
     val stablePlatform = rememberStablePlatform(platform)
-    val canvasActions = remember(viewedPort, shareFailed) { ChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed) }
+    val canvasActions = rememberChatCanvasActions(viewedPort.actions, stableOnIntent, shareFailed)
     // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
     // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {

@@ -80,12 +80,26 @@ internal class ShellCanvasPicks(
 ) {
     /** A canvas row was picked. */
     fun open(canvas: CanvasId) {
-        val window = mounts ?: return actions.onOpenCanvas(canvas)
-        when (window.pickPlan()) {
-            ShellCanvasPickPlan.Open -> actions.onOpenCanvas(canvas)
-            ShellCanvasPickPlan.Mount -> scope.launch { report(window.pick(canvas), canvas, onOpenAsBefore = canvas) }
-            ShellCanvasPickPlan.OpenAndMount -> scope.launch { openAndMount(window, canvas) }
-        }
+        val window = mounts?.takeIf { it.pickPlan() != ShellCanvasPickPlan.Open } ?: return actions.onOpenCanvas(canvas)
+        scope.launch { pick(window, canvas) }
+    }
+
+    /**
+     * A chat card's "Show on canvas" for [canvas], with the menu's view [now]: a canvas already on the
+     * board goes straight to [onBoard]; another is picked exactly as from the list (the board on show
+     * saved first), and [onBoard] follows only once it is the conversation's board. A refusal is told
+     * and [onBoard] never runs. With no conversation to mount on, [onBoard] runs as before.
+     */
+    fun bringToBoard(canvas: CanvasId, now: ShellCanvasMountState, onBoard: () -> Unit) {
+        val window = mounts?.takeIf { now.mountsOnPick && canvas != (now.mounted ?: now.own) } ?: return onBoard()
+        scope.launch { if (pick(window, canvas)) onBoard() }
+    }
+
+    /** The pick of [canvas] by the plan now; true once it is the conversation's board. */
+    private suspend fun pick(window: ShellCanvasMounts, canvas: CanvasId): Boolean = when (window.pickPlan()) {
+        ShellCanvasPickPlan.Open -> false.also { actions.onOpenCanvas(canvas) }
+        ShellCanvasPickPlan.Mount -> report(window.pick(canvas), canvas, onOpenAsBefore = canvas)
+        ShellCanvasPickPlan.OpenAndMount -> openAndMount(window, canvas)
     }
 
     /** The row menu's "Open in side panel": a pane, whatever the mode, without touching the mount. */
@@ -103,19 +117,25 @@ internal class ShellCanvasPicks(
      * Chat mode: the mount lands first, then the canvas opens, because opening may close the phone's
      * drawer and with it this scope. A failed mount is told; the canvas still opens.
      */
-    private suspend fun openAndMount(window: ShellCanvasMounts, canvas: CanvasId) {
-        notify(window.pick(canvas))
+    private suspend fun openAndMount(window: ShellCanvasMounts, canvas: CanvasId): Boolean {
+        val outcome = window.pick(canvas)
+        notify(outcome)
         actions.onOpenCanvas(canvas)
+        return outcome == ShellCanvasPickOutcome.Mounted
     }
 
-    /** [onBoard] is the board on show after a switch; [onOpenAsBefore] what opens once no conversation is on screen. */
-    private suspend fun report(outcome: ShellCanvasPickOutcome, onBoard: CanvasId, onOpenAsBefore: CanvasId?) {
+    /**
+     * [onBoard] is the board on show after a switch; [onOpenAsBefore] what opens once no conversation
+     * is on screen. True when the board switched.
+     */
+    private suspend fun report(outcome: ShellCanvasPickOutcome, onBoard: CanvasId, onOpenAsBefore: CanvasId?): Boolean {
         when (outcome) {
             // The conversation left the screen while the pick was on its way: open it as a pick without one does.
             ShellCanvasPickOutcome.OpenAsBefore -> onOpenAsBefore?.let(actions.onOpenCanvas)
             ShellCanvasPickOutcome.Mounted -> actions.onCanvasMounted(onBoard)
             else -> notify(outcome)
         }
+        return outcome == ShellCanvasPickOutcome.Mounted
     }
 
     private suspend fun notify(outcome: ShellCanvasPickOutcome) {

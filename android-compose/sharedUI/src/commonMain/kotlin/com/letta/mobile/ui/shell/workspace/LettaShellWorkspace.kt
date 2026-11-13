@@ -136,7 +136,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                                     ProvideObjectVerbs(host.objectPins, shellObjectVerbFeedback()) {
                                         val rail = rememberPinnedRailState(state.navigation.rail, host.objectPins)
                                         val pinnedState = state.copy(navigation = state.navigation.copy(rail = rail))
-                                        WorkspaceColumn(WorkspaceFrame(pinnedState, host, drawer, fit))
+                                        ProvideShowOnCanvas(host.actions.panel) { WorkspaceColumn(WorkspaceFrame(pinnedState, host, drawer, fit)) }
                                         host.slots.overlays()
                                     }
                                 }

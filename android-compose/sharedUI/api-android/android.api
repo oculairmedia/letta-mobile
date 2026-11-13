@@ -1966,6 +1966,10 @@ public final class com/letta/mobile/ui/chat/surface/ChatCanvasActions {
 	public final fun showArtifact (Lcom/letta/mobile/data/chat/projection/CanvasArtifactReceipt;)V
 }
 
+public final class com/letta/mobile/ui/chat/surface/ChatCanvasActionsKt {
+	public static final fun getLocalChatCanvasBringToBoard ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/chat/surface/ChatCanvasPlaceholderKt {
 	public static final fun ChatCanvasPlaceholder (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun chatCanvasKey (Ljava/lang/String;J)Ljava/lang/String;
