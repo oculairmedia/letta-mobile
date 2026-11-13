@@ -643,8 +643,10 @@ class NotebookLocalStore(
         val deadline = TimeSource.Monotonic.markNow() + TITLE_READ_SECONDS.seconds
         // No fault-board report: running out of this short listing budget says nothing about the notebook.
         val handle = openWithin(id, TITLE_READ_SECONDS.seconds, reportSlow = null) ?: return null
-        return handle.withDocument { document -> (document.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value }
+        // Nothing may throw inside withDocument (see [writing]): read the raw value there and judge it outside.
+        val title = handle.withDocument { document -> document.get(ObjectId.ROOT, "title").orElse(null) }
             .get((-deadline.elapsedNow()).inWholeNanoseconds.coerceAtLeast(1L), TimeUnit.NANOSECONDS)
+        return (title as? AmValue.Str)?.value ?: error("notebook title is missing or not a string")
     }
 
     /** Resolve only known retired ids; an arbitrary id never becomes an index or access grant. */

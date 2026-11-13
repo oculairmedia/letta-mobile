@@ -163,11 +163,9 @@ class HostNotebookAccess(
 
     /** The note's title; null when it is missing or retired, or (logged, without the title) when the read fails. */
     private fun titleOrSkip(id: NotebookDocumentId, storage: DocumentId): String? {
-        return try {
-            notebooks.titleOf(storage)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (unreadable: Exception) {
+        // Any failure of this one read (timeout, failed load, malformed title) skips the note; cancellation still propagates.
+        return runCatching { notebooks.titleOf(storage) }.getOrElse { unreadable ->
+            if (unreadable is CancellationException || unreadable !is Exception) throw unreadable
             reportUnreadable(id, unreadable)
             null
         }
