@@ -2,6 +2,7 @@ package com.letta.mobile.data.voice.loop.machine
 
 import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.CapturedAudioHandle
+import com.letta.mobile.data.voice.SpeechSkipReason
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoicePhase
@@ -20,16 +21,26 @@ import kotlin.jvm.JvmInline
 @JvmInline
 internal value class TurnKey(val value: Long)
 
-/** The current turn and the answers still outstanding. */
-internal data class TurnState(
-    /** The turn whose answer is being awaited or spoken. */
-    val active: TurnKey? = null,
-    /** Whether the active turn's answer may still produce text before going back to listening. */
-    val replyOpen: Boolean = false,
-    /** The active answer has produced text (maybe not yet a whole sentence); the thinking timeout no longer applies. */
+/**
+ * One answer the loop awaits or speaks. Answers are spoken in the order their utterances were
+ * sent; text that arrives before an answer's turn to speak is held on it.
+ */
+internal data class PendingReply(
+    val key: TurnKey,
+    /** The answer may still produce text. */
+    val open: Boolean = true,
+    /** The answer has produced text (maybe not yet a whole sentence); the thinking timeout no longer applies. */
     val textArrived: Boolean = false,
-    /** A failure to report once the queued speech has been spoken. */
-    val pendingFailure: VoiceError? = null,
+    /** Segments that arrived before this answer could be spoken. */
+    val held: List<VoiceText> = emptyList(),
+    /** What the person said, kept so a failed answer can be asked again. */
+    val utterance: VoiceUtterance? = null,
+)
+
+/** The answers outstanding, oldest first, and the person's own turn. */
+internal data class TurnState(
+    /** Answers awaited or being spoken, in send order; the head is spoken next (or now). */
+    val replies: List<PendingReply> = emptyList(),
     /** The ear reported speech in this listening window and no end of turn yet. */
     val userSpeaking: Boolean = false,
     /** Interrupted turns whose answers may still arrive; their text is dropped. */
@@ -38,12 +49,36 @@ internal data class TurnState(
     val interruptUnresponsive: Boolean = false,
     /** The next turn's key. */
     val nextKey: Long = 1,
-)
+) {
+    /** The answer spoken next, or now. */
+    val head: PendingReply? get() = replies.firstOrNull()
 
-/** Segments handed to the mouth and not yet finished, in order. */
+    /** The head answer's turn. */
+    val active: TurnKey? get() = head?.key
+
+    /** Whether the head answer may still produce text. */
+    val replyOpen: Boolean get() = head?.open == true
+
+    /** Whether the head answer has produced text. */
+    val textArrived: Boolean get() = head?.textArrived == true
+
+    /** The pending answer of [key], or null. */
+    fun find(key: TurnKey): PendingReply? = replies.firstOrNull { it.key == key }
+
+    /** These answers with [key]'s changed by [change]. */
+    fun update(key: TurnKey, change: PendingReply.() -> PendingReply): TurnState =
+        copy(replies = replies.map { if (it.key == key) it.change() else it })
+
+    /** These answers without [key]'s. */
+    fun without(key: TurnKey): TurnState = copy(replies = replies.filterNot { it.key == key })
+}
+
+/** Segments handed to the mouth and not yet finished, in order, and the answer they belong to. */
 internal data class SpeechQueue(
     val outstanding: Map<SpeechSegmentId, VoiceText> = emptyMap(),
     val nextId: Long = 1,
+    /** The answer whose segments are outstanding; null for standalone speech (late or held text). */
+    val owner: TurnKey? = null,
 )
 
 /** Delegated answers that may still arrive, and late text held until the person is quiet. */
@@ -63,6 +98,10 @@ internal data class LoopView(
     val notice: VoiceError? = null,
     val activation: VoiceActivationKind? = null,
     val retryable: CapturedAudioHandle? = null,
+    /** The last answer or speech that failed while the loop kept going. */
+    val turnFailure: VoiceError? = null,
+    /** The utterance whose answer failed and may be asked again. */
+    val retryUtterance: VoiceUtterance? = null,
 )
 
 /** The whole loop, as the pure machine sees it. */
@@ -104,6 +143,9 @@ internal sealed interface LoopInput {
 
     /** The person asked to retry the retained capture. */
     data object RetryCapture : LoopInput
+
+    /** The person asked to send again the utterance whose answer failed. */
+    data object RetryReply : LoopInput
 
     /** An optional activation helper degraded. */
     data class Notice(val error: VoiceError) : LoopInput
@@ -147,13 +189,16 @@ internal sealed interface ReplySignal {
 
 /** What the driver must do after a transition. */
 internal sealed interface LoopEffect {
-    /** Ask the responder to answer [utterance] under generation [turn]. */
+    /**
+     * Ask the responder to answer [utterance] under generation [turn]. The driver sends it only
+     * once every interrupt still settling has settled (bounded), so a stop never meets it.
+     */
     data class Respond(val turn: TurnKey, val utterance: VoiceUtterance) : LoopEffect
 
     /** Ask the responder to stop [turn]'s answer, without waiting; the outcome comes back as an input. */
     data class RequestInterrupt(val turn: TurnKey) : LoopEffect
 
-    /** Stop following [turn]'s answer (its interrupt settled). */
+    /** Stop following [turn]'s answer without stopping it (its interrupt settled, or it is no longer spoken). */
     data class ReleaseReply(val turn: TurnKey) : LoopEffect
 
     /** Cancel every answer and wait (bounded) for each to settle. */
@@ -173,6 +218,9 @@ internal sealed interface LoopEffect {
 
     /** Ask the ear to retry the capture [handle]. */
     data class RetryCapture(val handle: CapturedAudioHandle) : LoopEffect
+
+    /** Report that [segments] segments (or a whole unspoken answer) were not spoken, for [reason]. */
+    data class SpeechSkipped(val reason: SpeechSkipReason, val segments: Int) : LoopEffect
 }
 
 /** A transition's result. */

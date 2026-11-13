@@ -78,6 +78,11 @@ data class VoiceChatState(
     val activeRuns: Set<VoiceRunId> = emptySet(),
     /** The runs that failed. */
     val failedRuns: Set<VoiceRunId> = emptySet(),
+    /**
+     * Sent messages the chat holds in its own send queue behind a run, not dispatched yet. Such a
+     * message cannot start a run (or appear as a row) before it leaves the queue.
+     */
+    val queued: Set<ClientMessageId> = emptySet(),
 )
 
 /** A message as sent: its client message id. */
@@ -106,6 +111,9 @@ interface VoiceChatSession {
     /** Sends [text] and returns its identity. */
     suspend fun send(text: VoiceText): SentUtterance
 
-    /** Asks the session to stop the run in flight. */
+    /**
+     * Asks the session to stop the run in flight. Callers check first that the run in flight is the
+     * one they mean to stop; the stop must not touch messages still queued behind it.
+     */
     fun stopRun()
 }

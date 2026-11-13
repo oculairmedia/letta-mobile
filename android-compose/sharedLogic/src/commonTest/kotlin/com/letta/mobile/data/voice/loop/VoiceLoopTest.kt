@@ -13,7 +13,6 @@ import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.VoiceText
-import com.letta.mobile.data.voice.VoiceUserAction
 import com.letta.mobile.data.voice.VoiceUtterance
 import com.letta.mobile.data.voice.activation.KeyDecision
 import com.letta.mobile.data.voice.activation.VoiceActivationEvent
@@ -99,18 +98,6 @@ class VoiceLoopTest {
     }
 
     @Test
-    fun bargeInWhileThinkingInterruptsTheAnswer() = runTest {
-        val h = LoopHarness(this)
-        h.listening()
-        h.turn()
-        h.ear.hear(VoiceEarEvent.SpeechStarted)
-        h.settle()
-        assertEquals(VoicePhase.LISTENING, h.state.phase)
-        assertEquals(1, h.responder.last.cancels)
-        assertEquals(0, h.mouth.stops)
-    }
-
-    @Test
     fun bargeInWhileListeningOnlyMarksSpeech() = runTest {
         val h = LoopHarness(this)
         h.listening()
@@ -135,17 +122,17 @@ class VoiceLoopTest {
         assertEquals(listOf("It is noon.", "Tuesday."), h.mouth.spokenTexts)
     }
 
+    /** Interrupted by speech over its speech now (speech while thinking no longer interrupts). */
     @Test
     fun unresponsiveInterruptKeepsDroppingTextUntilTheAnswerEnds() = runTest {
         val h = LoopHarness(this)
-        h.listening()
-        h.turn()
+        h.speaking()
         h.responder.last.cancelOutcome = VoiceCancelOutcome.UNRESPONSIVE
         h.ear.hear(VoiceEarEvent.SpeechStarted)
         h.settle()
         assertEquals(InterruptStatus.UNRESPONSIVE, h.state.interrupt)
         h.replyText(VoiceText("Still talking. "))
-        assertTrue(h.mouth.spokenTexts.isEmpty())
+        assertEquals(listOf("It is noon."), h.mouth.spokenTexts)
         h.reply(VoiceReplyEvent.Completed)
         assertEquals(InterruptStatus.NONE, h.state.interrupt)
     }
@@ -206,39 +193,6 @@ class VoiceLoopTest {
         h.settle()
         assertEquals(VoicePhase.FAILED, h.state.phase)
         assertEquals(VoiceError(VoiceErrorCode.UNRESPONSIVE, VoicePort.MOUTH), h.state.failure)
-    }
-
-    @Test
-    fun responderFailureFailsWithItsCodeAndSuggestedAction() = runTest {
-        val h = LoopHarness(this)
-        h.listening()
-        h.turn()
-        h.reply(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.RUN_FAILED, VoicePort.RESPONDER)))
-        assertEquals(VoicePhase.FAILED, h.state.phase)
-        assertEquals(VoiceErrorCode.RUN_FAILED, h.state.failure?.code)
-        assertEquals(VoiceUserAction.RETRY, h.state.failure?.action)
-        assertFalse(h.ear.listening)
-    }
-
-    @Test
-    fun responderFailureAfterSomeSpeechIsReportedOnceTheSpeechEnds() = runTest {
-        val h = LoopHarness(this)
-        h.speaking()
-        h.reply(VoiceReplyEvent.Failed(VoiceError(VoiceErrorCode.RUN_FAILED, VoicePort.RESPONDER)))
-        assertEquals(VoicePhase.SPEAKING, h.state.phase)
-        h.finishSpeech()
-        assertEquals(VoicePhase.FAILED, h.state.phase)
-    }
-
-    @Test
-    fun thinkingTimeoutFailsAndCancelsTheAnswer() = runTest {
-        val h = LoopHarness(this)
-        h.listening()
-        h.turn()
-        advanceTimeBy(VoiceLoopConfig().thinkingTimeout + 1.seconds)
-        h.settle()
-        assertEquals(VoiceErrorCode.TIMED_OUT, h.state.failure?.code)
-        assertEquals(1, h.responder.last.cancels)
     }
 
     @Test
@@ -565,7 +519,7 @@ class VoiceLoopTest {
         h.finishSpeech()
         advanceTimeBy(VoiceLoopConfig().thinkingTimeout + 1.seconds)
         h.settle()
-        assertEquals(VoiceErrorCode.TIMED_OUT, h.state.failure?.code)
+        assertEquals(VoiceErrorCode.TIMED_OUT, h.state.turnFailure?.code)
         assertEquals(1, h.responder.last.cancels)
     }
 

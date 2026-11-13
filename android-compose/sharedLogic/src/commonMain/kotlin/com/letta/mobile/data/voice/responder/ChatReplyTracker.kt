@@ -19,6 +19,7 @@ import com.letta.mobile.data.voice.VoiceText
 internal class ChatReplyTracker(start: VoiceChatState, private val sent: ClientMessageId) {
     private val conversation: VoiceConversationKey? = start.conversation
     private val spokenLengths = mutableMapOf<VoiceRowKey, Int>()
+    private val endedParts = mutableSetOf<VoiceRowKey>()
 
     /** The sent message's own row has appeared in the conversation. */
     fun anchored(state: VoiceChatState): Boolean = state.rows.any { it.clientMessageId == sent }
@@ -31,6 +32,9 @@ internal class ChatReplyTracker(start: VoiceChatState, private val sent: ClientM
 
     /** The session moved to another conversation. */
     fun conversationChanged(state: VoiceChatState): Boolean = conversation != null && state.conversation != conversation
+
+    /** The message is still in the chat's send queue behind a run. */
+    fun queued(state: VoiceChatState): Boolean = sent in state.queued
 
     /** The message's run is still in flight. */
     fun running(state: VoiceChatState): Boolean = ownRuns(state).any { it in state.activeRuns }
@@ -46,6 +50,18 @@ internal class ChatReplyTracker(start: VoiceChatState, private val sent: ClientM
         val texts = ownRows(state, ownRuns(state)).filter { it.kind == VoiceRowKind.ASSISTANT_TEXT }
         val pieces = texts.mapNotNull(::newText)
         return if (pieces.isEmpty()) null else VoiceText(pieces.joinToString(""))
+    }
+
+    /**
+     * True, once per assistant text row already spoken from, when a later row of the run follows it
+     * (a tool call, reasoning, another message): that row's text is complete, so its last sentence
+     * can be spoken now rather than when the run ends.
+     */
+    fun partEnded(state: VoiceChatState): Boolean {
+        val rows = ownRows(state, ownRuns(state))
+        val ended = rows.dropLast(1).filter { it.key in spokenLengths && it.key !in endedParts }
+        endedParts += ended.map { it.key }
+        return ended.isNotEmpty()
     }
 
     private fun ownRuns(state: VoiceChatState): Set<VoiceRunId> = state.startedRuns[sent].orEmpty()

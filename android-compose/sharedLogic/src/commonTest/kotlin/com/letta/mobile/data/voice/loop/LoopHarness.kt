@@ -1,5 +1,6 @@
 package com.letta.mobile.data.voice.loop
 
+import com.letta.mobile.data.voice.SpeechSkipReason
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoiceText
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
@@ -19,6 +20,8 @@ internal class LoopHarness(
     config: VoiceLoopConfig = VoiceLoopConfig(),
     owner: CoroutineScope = test.backgroundScope,
 ) {
+    /** Every speech.skipped decision the loop reported, as "REASON:segments". */
+    val skipped = mutableListOf<String>()
     val log = EngineLog()
     val ear = FakeEar(log)
     val mouth = FakeMouth(log)
@@ -29,7 +32,11 @@ internal class LoopHarness(
     val loop = VoiceLoop(
         VoiceEngines(ear, responder, mouth),
         config,
-        VoiceLoopRuntime(owner, StandardTestDispatcher(test.testScheduler), clock),
+        VoiceLoopRuntime(owner, StandardTestDispatcher(test.testScheduler), clock, observer = object : VoiceLoopObserver {
+            override fun speechSkipped(reason: SpeechSkipReason, segments: Int) {
+                skipped += "${reason.name}:$segments"
+            }
+        }),
     )
 
     val state: VoiceLoopState get() = loop.state.value
