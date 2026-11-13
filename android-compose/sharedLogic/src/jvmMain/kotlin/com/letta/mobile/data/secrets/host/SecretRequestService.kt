@@ -25,8 +25,6 @@ import com.letta.mobile.data.secrets.request.TextAuthor
 import com.letta.mobile.plugin.keystore.KeystoreProvider
 import com.letta.mobile.plugin.keystore.SecretValue
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Base64
 import kotlin.time.Duration.Companion.milliseconds
@@ -68,7 +66,7 @@ class SecretRequestService(
     private val ledger = SecretRequestLedger(journal, settings.clock)
     private val writer = SecretVaultWriter(provider)
     private val keystore = SecretKeystoreName(provider.describe().id.value)
-    private val writeMutex = Mutex()
+    private val submissions = SecretSubmissions(ledger, writer, settings)
 
     /**
      * Creates a pending request for [agent] (the verified requesting agent) from its [request],
@@ -84,7 +82,8 @@ class SecretRequestService(
             return SecretServiceResult.Refused(SecretServiceError.INVALID_REQUEST, validation.problem)
         }
         val valid = (validation as SecretRequestValidation.Valid).request
-        val record = newRecord(agent, valid, writer.holdsValue(targetOf(valid)))
+        val replacesExisting = bounded(settings.keystoreDeadline) { writer.holdsValue(targetOf(valid)) } ?: false
+        val record = newRecord(agent, valid, replacesExisting)
         return journaled {
             when (ledger.add(record, settings.policy.maxPendingPerAgent)) {
                 AddOutcome.ADDED -> created(record)
@@ -97,21 +96,37 @@ class SecretRequestService(
     /**
      * Writes [value] to request [requestId]'s fixed target on behalf of [principal] and answers the
      * agent's receipt. The service takes ownership of [value] and wipes it before returning, on
-     * every path. An empty or oversized value is refused and the request stays pending; any other
-     * refusal writes nothing. A keystore failure settles the request as failed.
+     * every path. See the other [submit] for the order of checks.
      */
     suspend fun submit(
         principal: SecretRequestPrincipal,
         requestId: SecretRequestId,
         value: SecretValue,
     ): SecretServiceResult<SecretRequestReceipt> = try {
-        when {
-            !principal.mayAnswer -> refuseAnswer(requestId, SecretServiceError.FORBIDDEN)
-            value.valueProblem != null -> refuseAnswer(requestId, SecretServiceError.INVALID_VALUE)
-            else -> journaled { claimAndWrite(requestId, value) }
-        }
+        submit(principal, requestId) { value }
     } finally {
         value.wipe()
+    }
+
+    /**
+     * Writes the value [decode] makes to request [requestId]'s fixed target on behalf of
+     * [principal] and answers the agent's receipt. In order: the principal must answer; the request
+     * must be pending; this submission must get the write lock within
+     * [SecretRequestSettings.writeLockWait] or it is refused [SecretServiceError.BUSY]; only then is
+     * [decode] called (no value, or an empty or oversized one, is [SecretServiceError.INVALID_VALUE]),
+     * the request claimed and the value written within [SecretRequestSettings.keystoreDeadline].
+     * Every refusal leaves the request as it was and writes nothing; a keystore failure or an
+     * overrun settles it as failed. The decoded value is wiped before this returns, on every path.
+     */
+    suspend fun submit(
+        principal: SecretRequestPrincipal,
+        requestId: SecretRequestId,
+        decode: () -> SecretValue?,
+    ): SecretServiceResult<SecretRequestReceipt> {
+        if (!principal.mayAnswer) return refuseAnswer(requestId, SecretServiceError.FORBIDDEN)
+        return journaled {
+            submissions.submit(requestId, decode)
+        }
     }
 
     /** Declines request [requestId] on behalf of [principal]; answers the agent's receipt. */
@@ -170,24 +185,6 @@ class SecretRequestService(
         }
     }
 
-    private suspend fun claimAndWrite(requestId: SecretRequestId, value: SecretValue): SecretServiceResult<SecretRequestReceipt> {
-        val claim = ledger.transition(requestId, SecretRequestEvent.Claim)
-        val claimed = (claim as? LedgerOutcome.Applied)?.record ?: return refuseAnswer(requestId, SecretServiceError.NOT_PENDING)
-        return try {
-            val outcome = writeMutex.withLock { writer.write(claimed.details, value) }
-            settle(ledger.transition(requestId, outcome), requestId)
-        } finally {
-            ledger.release(requestId)
-        }
-    }
-
-    private fun settle(outcome: LedgerOutcome, requestId: SecretRequestId): SecretServiceResult<SecretRequestReceipt> {
-        val receipt = (outcome as? LedgerOutcome.Applied)?.record?.receipt()
-            ?: return refuseAnswer(requestId, SecretServiceError.NOT_PENDING)
-        SecretRequestTelemetry.settled(requestId, receipt)
-        return SecretServiceResult.Ok(receipt)
-    }
-
     private fun targetOf(request: AgentSecretRequest): SecretRequestTarget =
         SecretRequestTarget(keystore, request.vaultItemName, request.fieldName)
 
@@ -239,8 +236,3 @@ private fun found(record: SecretRequestRecord?): SecretServiceResult<SecretReque
 
 private fun ownRecord(records: List<SecretRequestRecord>, agent: RequestingAgent, requestId: SecretRequestId): SecretRequestRecord? =
     records.firstOrNull { it.requestId == requestId }?.takeIf { it.details.requestingAgent == agent.agentId }
-
-private fun refuseAnswer(requestId: SecretRequestId, error: SecretServiceError): SecretServiceResult<Nothing> {
-    SecretRequestTelemetry.answerRefused(requestId, error)
-    return SecretServiceResult.Refused(error)
-}

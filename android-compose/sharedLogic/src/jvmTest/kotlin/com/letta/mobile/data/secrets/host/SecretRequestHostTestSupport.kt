@@ -28,6 +28,7 @@ import com.letta.mobile.plugin.keystore.SecretValue
 import com.letta.mobile.plugin.keystore.WriteMode
 import kotlinx.coroutines.CompletableDeferred
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /** The test vault's id; matches [SecretRequestTestData.TARGET]. */
@@ -41,6 +42,13 @@ internal val TARGET_REF = SecretRef(TEST_VAULT, SecretPath("team/openai"), Secre
  * both name [SecretRequestTestData.TARGET]. The per-agent default has its own tests.
  */
 internal val TEAM_SCOPE = SecretRequestPolicy(itemScope = SecretItemScope.Shared(VaultItemName("team")))
+
+/**
+ * The settings most tests run under: [TEAM_SCOPE] and no time bounds, so a test that holds a write
+ * open on purpose is never cut short by virtual time. The bounds have their own tests.
+ */
+internal fun testSettings(clock: TestClock, random: SecretRandomSource): SecretRequestSettings =
+    SecretRequestSettings(TEAM_SCOPE, clock, random, keystoreDeadline = Duration.INFINITE, writeLockWait = Duration.INFINITE)
 
 /** The human principal every answer test uses. */
 internal val HUMAN = SecretRequestPrincipal(
@@ -99,6 +107,9 @@ internal class TestKeystoreProvider(
     /** When set, `put` waits for it before writing. */
     var putGate: CompletableDeferred<Unit>? = null
 
+    /** When set, `get` waits for it before reading. */
+    var getGate: CompletableDeferred<Unit>? = null
+
     /** Signalled when a `put` starts. */
     val putStarted = CompletableDeferred<Unit>()
 
@@ -114,6 +125,7 @@ internal class TestKeystoreProvider(
     override suspend fun health(): KeystoreHealth = KeystoreHealth(HealthStatus.READY)
 
     override suspend fun get(ref: SecretRef): KeystoreResult<SecretValue> = guard {
+        getGate?.await()
         val bytes = slots[ref] ?: return@guard KeystoreResult.Failure(KeystoreError.NotFound(ref))
         val corrupt = corruptReadBack && ref in written
         val answer = bytes.copyOf().also { if (corrupt) it[it.lastIndex] = (it.last() + 1).toByte() }
@@ -171,8 +183,9 @@ internal class ServiceHarness(
     val provider: TestKeystoreProvider = TestKeystoreProvider(),
     val clock: TestClock = TestClock(),
     random: SecretRandomSource = CountingRandom(),
+    settings: SecretRequestSettings = testSettings(clock, random),
 ) {
-    val service = SecretRequestService(journal, provider, SecretRequestSettings(TEAM_SCOPE, clock, random))
+    val service = SecretRequestService(journal, provider, settings)
 
     /** Creates a pending request for [agent] and answers its id. */
     suspend fun pending(agent: RequestingAgent = REQUESTER): SecretRequestId {

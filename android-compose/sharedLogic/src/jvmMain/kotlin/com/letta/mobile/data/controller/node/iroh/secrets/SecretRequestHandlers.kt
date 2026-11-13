@@ -72,19 +72,17 @@ internal class SecretRequestHandlers(
     }
 
     /**
-     * The value becomes a [com.letta.mobile.plugin.keystore.SecretValue] before anything else is
-     * looked at, and is wiped in `finally` whatever happens next; the service wipes it too.
+     * The named request must exist and be visible first; then the service decodes the value into
+     * a [com.letta.mobile.plugin.keystore.SecretValue] only once the request is pending and this
+     * submission holds the write lock (a busy host refuses before any value is decoded), and wipes
+     * it on every path.
      */
     private suspend fun submit(human: HumanCaller, input: SecretRouteInput): SecretRouteAnswer {
-        val value = decode(input[SecretRequestRouteWire.VALUE])
-            ?: return SecretRouteAnswer.refused(SecretServiceError.INVALID_VALUE)
-        return try {
-            val id = input.requestId()
-            val visible = visibleRecord(human, id, SecretServiceError.NOT_PENDING)
-            if (visible.record == null) visible.denial() else service.submit(human.principal, id, value).answer(::receiptResult)
-        } finally {
-            value.wipe()
-        }
+        val id = input.requestId()
+        val visible = visibleRecord(human, id, SecretServiceError.NOT_PENDING)
+        if (visible.record == null) return visible.denial()
+        val encoded = input[SecretRequestRouteWire.VALUE]
+        return service.submit(human.principal, id) { decode(encoded) }.answer(::receiptResult)
     }
 
     private suspend fun cancel(human: HumanCaller, id: SecretRequestId): SecretRouteAnswer {

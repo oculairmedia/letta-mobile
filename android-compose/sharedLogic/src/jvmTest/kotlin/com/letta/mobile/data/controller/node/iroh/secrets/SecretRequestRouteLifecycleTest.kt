@@ -81,7 +81,7 @@ class SecretRequestRouteLifecycleTest {
         assertTrue(others.all { it == refusalEnvelope("not_pending") }, "every other submission is refused")
         assertEquals(1, harness.provider.writes)
         assertEquals("racer-0", harness.provider.storedText(TARGET_REF))
-        assertEquals(CONTENDERS + 1, harness.parts.decoded.size)
+        assertEquals(1, harness.parts.decoded.size, "a request that is already being written decodes no other value")
         assertTrue(harness.parts.decoded.all { it.isWiped }, "every decoded value is wiped")
     }
 

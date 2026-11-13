@@ -142,6 +142,7 @@ for `failed`.
 | `unknown_request` | No such request for this caller; another agent's request answers the same | `status`, `get` |
 | `journal_unavailable` | The journal cannot be read or written; nothing was written to the keystore by this call | All |
 | `invalid_params` | *route* The params are not exactly the method's fields, or a field is not a JSON string; nothing about the params is echoed | All |
+| `busy` | Another submission's write did not finish within the lock wait (default 2 s); nothing was decoded, claimed or written and the request stays pending | `submit` |
 
 Problems for `invalid_request`: `purpose_blank`, `purpose_too_long`, `purpose_not_plain_text`,
 `item_malformed`, `field_malformed`, `item_outside_scope`, `too_many_pending`.
@@ -209,6 +210,14 @@ verified value is stored or nothing new is left behind:
   undo fails.
 - **W4** Every keystore error maps to a fixed reason; diagnostics and exception text are dropped.
   There is no automatic retry. Writes are serialized across requests.
+- **W5** *Time bounds.* A submission for a request that is not pending is refused at once. One
+  that cannot get the write lock within the lock wait (default 2 s) is refused `busy` before its
+  value is decoded or its request claimed. A keystore write, and the creation-time check of the
+  slot, may take at most the keystore deadline (default 15 s): a write that runs over settles
+  `failed` (`vault_unavailable`), its value is wiped and the lock is freed (the value may or may
+  not have been stored, as for `interrupted`); a check that runs over counts as "no existing
+  value". The deadline can stop only a provider that suspends cancellably; one that blocks a
+  thread holds it until it returns.
 
 ## Principals
 
@@ -270,9 +279,10 @@ item, field, purpose, path or value.
   host) or a call without an agent answers `forbidden` before any argument is read (owner decision
   2026-11-11). Its result is the route's result and its error the route's code.
 - **R5 Order.** Principal, then strict params (exactly the method's fields, all JSON strings), then
-  for `submit` the value (length and padding checked against 65 536 bytes before any byte is
-  allocated, then decoded straight into the keystore secret type), then visibility of the named
-  request, then the service. A malformed id answers like an unknown one.
+  visibility of the named request, then the service. For `submit` the service checks that the
+  request is pending and takes the write lock (W5) before the value is touched; only then is it
+  decoded (length and padding checked against 65 536 bytes before any byte is allocated, then
+  decoded straight into the keystore secret type). A malformed id answers like an unknown one.
 - **R6 No value out.** No result, refusal, telemetry event or `toString` carries a value. The routes
   log method, side, transport and outcome code only; the stream server answers a frame it cannot
   parse with fixed text.

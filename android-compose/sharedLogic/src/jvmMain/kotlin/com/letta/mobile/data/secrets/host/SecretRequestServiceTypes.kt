@@ -9,6 +9,7 @@ import java.security.SecureRandom
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /** A service answer: a value or a refusal with a stable code. */
 sealed interface SecretServiceResult<out T> {
@@ -100,7 +101,7 @@ fun interface SecretRandomSource {
     }
 }
 
-/** The service's injected policy, clock and randomness. */
+/** The service's injected policy, clock, randomness and keystore time bounds. */
 data class SecretRequestSettings(
     /** What agents may request. */
     val policy: SecretRequestPolicy = SecretRequestPolicy(),
@@ -108,4 +109,27 @@ data class SecretRequestSettings(
     val clock: Clock = Clock.System,
     /** The source of request ids. */
     val random: SecretRandomSource = SecretRandomSource.secure(),
-)
+    /**
+     * The longest one keystore write (or the creation-time check of the slot) may take. A write
+     * that runs over settles its request as failed with `vault_unavailable`, wipes the value and
+     * frees the write lock for the next submission; the value may or may not have been stored,
+     * as for `interrupted`. It can stop only a provider that suspends cancellably: one that blocks
+     * a thread keeps it until it returns. [Duration.INFINITE] waits for ever.
+     */
+    val keystoreDeadline: Duration = DEFAULT_KEYSTORE_DEADLINE,
+    /**
+     * How long a submission waits for another submission's write to finish. One that cannot get
+     * the write lock in time is refused `busy` before its value is decoded or its request claimed,
+     * so the request stays pending. [Duration.INFINITE] waits for ever.
+     */
+    val writeLockWait: Duration = DEFAULT_WRITE_LOCK_WAIT,
+) {
+    /** The default time bounds. */
+    companion object {
+        /** The default [keystoreDeadline]. */
+        val DEFAULT_KEYSTORE_DEADLINE: Duration = 15.seconds
+
+        /** The default [writeLockWait]. */
+        val DEFAULT_WRITE_LOCK_WAIT: Duration = 2.seconds
+    }
+}

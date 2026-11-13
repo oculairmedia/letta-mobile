@@ -60,6 +60,13 @@ enum class SecretServiceError {
      */
     @SerialName("invalid_params")
     INVALID_PARAMS,
+
+    /**
+     * Another submission's write is still in progress and did not finish in time. Nothing was
+     * decoded, claimed or written; the request stays pending and the human may submit again.
+     */
+    @SerialName("busy")
+    BUSY,
 }
 
 /** The body of a refused call: the code and, for [SecretServiceError.INVALID_REQUEST], the problem. */

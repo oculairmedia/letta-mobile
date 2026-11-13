@@ -33,8 +33,10 @@ class SecretRequestScopeAndReplaceTest {
     private val outsideScope =
         SecretServiceResult.Refused(SecretServiceError.INVALID_REQUEST, SecretRequestProblem.ITEM_OUTSIDE_SCOPE)
 
-    private fun perAgentService(provider: TestKeystoreProvider = TestKeystoreProvider()): SecretRequestService =
-        SecretRequestService(InMemorySecretRequestJournal(), provider, SecretRequestSettings(clock = TestClock(), random = CountingRandom()))
+    private fun perAgentService(provider: TestKeystoreProvider = TestKeystoreProvider()): SecretRequestService {
+        val settings = SecretRequestSettings(clock = TestClock(), random = CountingRandom())
+        return SecretRequestService(InMemorySecretRequestJournal(), provider, settings)
+    }
 
     private fun asking(item: String): AgentSecretRequest = SecretRequestTestData.request().copy(vaultItemName = VaultItemName(item))
 
