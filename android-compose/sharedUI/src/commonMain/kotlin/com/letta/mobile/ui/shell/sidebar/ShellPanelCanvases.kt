@@ -88,11 +88,14 @@ internal class ShellCanvasPicks(
      * A chat card's "Show on canvas" for [canvas], with the menu's view [now]: a canvas already on the
      * board goes straight to [onBoard]; another is picked exactly as from the list (the board on show
      * saved first), and [onBoard] follows only once it is the conversation's board. A refusal is told
-     * and [onBoard] never runs. With no conversation to mount on, [onBoard] runs as before.
+     * and [onBoard] never runs. With no conversation to mount on, [onBoard] runs as before. When the
+     * person moved to another conversation while the pick was on its way, the mount stands but
+     * [onBoard] is skipped, so the new conversation is not framed or opened on its board.
      */
     fun bringToBoard(canvas: CanvasId, now: ShellCanvasMountState, onBoard: () -> Unit) {
         val window = mounts?.takeIf { now.mountsOnPick && canvas != (now.mounted ?: now.own) } ?: return onBoard()
-        scope.launch { if (pick(window, canvas)) onBoard() }
+        val conversation = window.ownOnScreen()
+        scope.launch { if (pick(window, canvas) && window.ownOnScreen() == conversation) onBoard() }
     }
 
     /** The pick of [canvas] by the plan now; true once it is the conversation's board. */

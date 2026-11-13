@@ -11126,20 +11126,22 @@ public final class com/letta/mobile/data/canvas/mount/client/CanvasPick$Unsaved 
 
 public final class com/letta/mobile/data/canvas/mount/client/CanvasPickerState {
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;Lcom/letta/mobile/data/model/CanvasId;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;Lcom/letta/mobile/data/model/CanvasId;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;
 	public final fun component2 ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun component3 ()Z
 	public final fun component4 ()Lcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;
-	public final fun copy (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;)Lcom/letta/mobile/data/canvas/mount/client/CanvasPickerState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/client/CanvasPickerState;Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/client/CanvasPickerState;
+	public final fun component5 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun copy (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;Lcom/letta/mobile/data/model/CanvasId;)Lcom/letta/mobile/data/canvas/mount/client/CanvasPickerState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/canvas/mount/client/CanvasPickerState;Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;Lcom/letta/mobile/data/model/CanvasId;ZLcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;Lcom/letta/mobile/data/model/CanvasId;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/mount/client/CanvasPickerState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCanvasMode ()Z
 	public final fun getMounted ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun getMountsOnPick ()Z
 	public final fun getOnBoard ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun getReach ()Lcom/letta/mobile/data/canvas/mount/client/CanvasMountReach;
+	public final fun getShown ()Lcom/letta/mobile/data/model/CanvasId;
 	public final fun getTarget ()Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasTarget;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

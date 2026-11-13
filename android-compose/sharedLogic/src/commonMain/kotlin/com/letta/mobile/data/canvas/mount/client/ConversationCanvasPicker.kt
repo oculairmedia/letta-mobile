@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 /** The board seat of the page on screen: [target]'s, switching through [board]. */
@@ -52,6 +53,13 @@ class CanvasModeFocus {
         leave(target)
     }
 
+    /**
+     * The board on show for [target]'s page: what its seat switched to (it keeps the board before a
+     * mount while that cannot be saved), or [mounted] where no seat reports one.
+     */
+    internal fun displayed(target: ConversationCanvasTarget, mounted: CanvasId?): Flow<CanvasId?> =
+        seat.flatMapLatest { it?.takeIf { seated -> seated.target == target }?.board?.shown ?: flowOf(mounted) }
+
     /** Saves [target]'s board on screen before a pick switches it; true when it saved or there is none to save. */
     suspend fun saveBoard(target: ConversationCanvasTarget): Boolean =
         seat.value?.takeIf { it.target == target }?.board?.save() ?: true
@@ -78,12 +86,14 @@ data class CanvasPickerState(
     val canvasMode: Boolean = false,
     /** Who the mount reaches: the host's, or this device's only (a host without mounts). */
     val reach: CanvasMountReach = CanvasMountReach.Host,
+    /** The mounted board actually on show (the board before [mounted] stays while it cannot be saved); null for its own. */
+    val shown: CanvasId? = mounted,
 ) {
     /** Whether picking a canvas mounts it (else it opens as it always has). */
     val mountsOnPick: Boolean get() = target != null
 
-    /** The board on show in canvas mode (the mount, else the conversation's own); null outside canvas mode. */
-    val onBoard: CanvasId? get() = target?.takeIf { canvasMode }?.let { mounted ?: it.ownCanvas }
+    /** The board on show in canvas mode (the one switched to, else the conversation's own); null outside canvas mode. */
+    val onBoard: CanvasId? get() = target?.takeIf { canvasMode }?.let { shown ?: it.ownCanvas }
 }
 
 /** What became of one pick in the side menu. */
@@ -141,9 +151,11 @@ class ConversationCanvasPicker(
         return outcome(write(target))
     }
 
-    private fun stateOf(focus: PickFocus): Flow<CanvasPickerState> =
-        combine(resolver.state(focus.target), resolver.reach) { state, reach ->
-            CanvasPickerState(focus.target, state.mountedCanvas, focus.canvasMode, reach)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun stateOf(pick: PickFocus): Flow<CanvasPickerState> =
+        combine(resolver.state(pick.target), resolver.reach, ::Pair).flatMapLatest { (state, reach) ->
+            val mounted = state.mountedCanvas
+            focus.displayed(pick.target, mounted).map { shown -> CanvasPickerState(pick.target, mounted, pick.canvasMode, reach, shown) }
         }
 
     private fun outcome(change: CanvasMountChange): CanvasPick = when (change) {

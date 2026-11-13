@@ -112,6 +112,19 @@ class ConversationCanvasPickerTest {
     }
 
     @Test
+    fun inCanvasModeTheBoardOnShowIsTheOneDisplayedNotTheMountAskedFor() = runTest {
+        val picker = ConversationCanvasPicker(ConversationCanvasResolver(FakeCanvasMountClient().apply { stored[target] = foreign }))
+        val switch = ConversationBoardSwitch(CanvasBoardSwitchGate().apply { attach { false } })
+        picker.focus.enter(target)
+        picker.focus.show(target, switch)
+        assertFalse(switch.follow(ConversationCanvasState.Mounted(foreign, CanvasMountSource.Binding)))
+
+        val state = picker.state.first { it.mounted == foreign }
+
+        assertEquals(target.ownCanvas, state.onBoard)
+    }
+
+    @Test
     fun leavingThePageDropsItsBoardSeat() = runTest {
         val picker = ConversationCanvasPicker(ConversationCanvasResolver(FakeCanvasMountClient()))
         val switch = ConversationBoardSwitch(CanvasBoardSwitchGate().apply { attach { false } })

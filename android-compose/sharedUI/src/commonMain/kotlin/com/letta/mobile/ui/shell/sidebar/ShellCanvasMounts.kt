@@ -16,6 +16,9 @@ interface ShellCanvasMounts {
     /** What a pick does right now. */
     fun pickPlan(): ShellCanvasPickPlan
 
+    /** The own canvas of the conversation on screen right now (it names the conversation); null with none. */
+    fun ownOnScreen(): CanvasId?
+
     /** Mounts [canvas] on the conversation on screen. */
     suspend fun pick(canvas: CanvasId): ShellCanvasPickOutcome
 

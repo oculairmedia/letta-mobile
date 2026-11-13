@@ -41,11 +41,15 @@ class ShellShowOnCanvasTest {
         var framed = 0
         var mounted = 0
         val opened = mutableListOf<CanvasId>()
+        var afterMount: () -> Unit = {}
     }
 
     @Composable
     private fun Window(picker: ConversationCanvasPicker, seen: Seen, overlays: OverlayHost) {
-        val panel = ShellAgentPanelActions(onOpenCanvas = { seen.opened += it }, onCanvasMounted = { seen.mounted++ })
+        val panel = ShellAgentPanelActions(onOpenCanvas = { seen.opened += it }, onCanvasMounted = {
+            seen.mounted++
+            seen.afterMount()
+        })
         MaterialTheme {
             CompositionLocalProvider(LocalOverlayHost provides overlays) {
                 ProvideConversationCanvasPicker(picker) {
@@ -89,6 +93,22 @@ class ShellShowOnCanvasTest {
         assertEquals(1, seen.framed)
         assertEquals(0, seen.mounted, "no switch was made")
         assertEquals(boardB, mounts.stored[target])
+    }
+
+    @Test
+    fun movingToAnotherConversationDuringTheSwitchKeepsTheMountButFramesNothing() = runComposeUiTest {
+        val mounts = TestHostMounts(supported = true)
+        val picker = picker(mounts)
+        val other = target.copy(conversationId = ConversationId("conv-2"))
+        val seen = Seen().apply { afterMount = { picker.focus.enter(other) } }
+        setContent { Window(picker, seen, OverlayHost()) }
+        waitForIdle()
+
+        runOnIdle { assertNotNull(seen.bringToBoard)(boardB) { seen.framed++ } }
+        waitForIdle()
+
+        assertEquals(boardB, mounts.stored[target])
+        assertEquals(0, seen.framed)
     }
 
     @Test

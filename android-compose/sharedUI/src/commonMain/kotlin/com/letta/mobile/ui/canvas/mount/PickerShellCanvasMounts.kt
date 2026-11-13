@@ -23,6 +23,8 @@ class PickerShellCanvasMounts(private val picker: ConversationCanvasPicker) : Sh
         else -> ShellCanvasPickPlan.OpenAndMount
     }
 
+    override fun ownOnScreen(): CanvasId? = picker.focus.onScreen.value?.ownCanvas
+
     override suspend fun pick(canvas: CanvasId): ShellCanvasPickOutcome = outcomeOf(picker.pick(canvas))
 
     override suspend fun useOwn(): ShellCanvasPickOutcome = outcomeOf(picker.useOwnCanvas())

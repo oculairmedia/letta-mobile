@@ -31328,7 +31328,7 @@ final class com.letta.mobile.data.canvas.mount.client/CanvasModeFocus { // com.l
 }
 
 final class com.letta.mobile.data.canvas.mount.client/CanvasPickerState { // com.letta.mobile.data.canvas.mount.client/CanvasPickerState|null[0]
-    constructor <init>(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.mount.client/CanvasMountReach = ...) // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.<init>|<init>(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;com.letta.mobile.data.canvas.mount.client.CanvasMountReach){}[0]
+    constructor <init>(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.mount.client/CanvasMountReach = ..., com.letta.mobile.data.model/CanvasId? = ...) // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.<init>|<init>(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;com.letta.mobile.data.canvas.mount.client.CanvasMountReach;com.letta.mobile.data.model.CanvasId?){}[0]
 
     final val canvasMode // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.canvasMode|{}canvasMode[0]
         final fun <get-canvasMode>(): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.canvasMode.<get-canvasMode>|<get-canvasMode>(){}[0]
@@ -31340,6 +31340,8 @@ final class com.letta.mobile.data.canvas.mount.client/CanvasPickerState { // com
         final fun <get-onBoard>(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.onBoard.<get-onBoard>|<get-onBoard>(){}[0]
     final val reach // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.reach|{}reach[0]
         final fun <get-reach>(): com.letta.mobile.data.canvas.mount.client/CanvasMountReach // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.reach.<get-reach>|<get-reach>(){}[0]
+    final val shown // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.shown|{}shown[0]
+        final fun <get-shown>(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.shown.<get-shown>|<get-shown>(){}[0]
     final val target // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.target|{}target[0]
         final fun <get-target>(): com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.target.<get-target>|<get-target>(){}[0]
 
@@ -31347,7 +31349,8 @@ final class com.letta.mobile.data.canvas.mount.client/CanvasPickerState { // com
     final fun component2(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.canvas.mount.client/CanvasMountReach // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component4|component4(){}[0]
-    final fun copy(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.mount.client/CanvasMountReach = ...): com.letta.mobile.data.canvas.mount.client/CanvasPickerState // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.copy|copy(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;com.letta.mobile.data.canvas.mount.client.CanvasMountReach){}[0]
+    final fun component5(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.mount.client/ConversationCanvasTarget? = ..., com.letta.mobile.data.model/CanvasId? = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.mount.client/CanvasMountReach = ..., com.letta.mobile.data.model/CanvasId? = ...): com.letta.mobile.data.canvas.mount.client/CanvasPickerState // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.copy|copy(com.letta.mobile.data.canvas.mount.client.ConversationCanvasTarget?;com.letta.mobile.data.model.CanvasId?;kotlin.Boolean;com.letta.mobile.data.canvas.mount.client.CanvasMountReach;com.letta.mobile.data.model.CanvasId?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.mount.client/CanvasPickerState.toString|toString(){}[0]

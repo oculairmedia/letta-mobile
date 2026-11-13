@@ -60,6 +60,12 @@ fun ConversationCanvasFrame(target: ConversationCanvasTarget?, content: @Composa
         content(null)
         return
     }
+    // Keyed by the conversation, so nothing collected for the last one (its mount, its board on show) carries over.
+    key(target) { FrameSeat(picker, target, content) }
+}
+
+@Composable
+private fun FrameSeat(picker: ConversationCanvasPicker, target: ConversationCanvasTarget, content: @Composable (mounted: CanvasId?) -> Unit) {
     val gate = remember(target) { CanvasBoardSwitchGate() }
     val switch = remember(target) { ConversationBoardSwitch(gate) }
     val state by remember(picker, target) { picker.resolver.state(target) }.collectAsState(ConversationCanvasState.Resolving)

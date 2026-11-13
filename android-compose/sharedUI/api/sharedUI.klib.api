@@ -894,6 +894,7 @@ abstract interface com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts { // com.
     abstract val state // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.state|{}state[0]
         abstract fun <get-state>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState> // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.state.<get-state>|<get-state>(){}[0]
 
+    abstract fun ownOnScreen(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.ownOnScreen|ownOnScreen(){}[0]
     abstract fun pickPlan(): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.pickPlan|pickPlan(){}[0]
     abstract suspend fun pick(com.letta.mobile.data.model/CanvasId): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickOutcome // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.pick|pick(com.letta.mobile.data.model.CanvasId){}[0]
     abstract suspend fun useOwn(): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickOutcome // com.letta.mobile.ui.shell.sidebar/ShellCanvasMounts.useOwn|useOwn(){}[0]
@@ -1959,6 +1960,7 @@ final class com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts : com.letta
     final val state // com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/Flow<com.letta.mobile.ui.shell.sidebar/ShellCanvasMountState> // com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts.state.<get-state>|<get-state>(){}[0]
 
+    final fun ownOnScreen(): com.letta.mobile.data.model/CanvasId? // com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts.ownOnScreen|ownOnScreen(){}[0]
     final fun pickPlan(): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickPlan // com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts.pickPlan|pickPlan(){}[0]
     final suspend fun pick(com.letta.mobile.data.model/CanvasId): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickOutcome // com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts.pick|pick(com.letta.mobile.data.model.CanvasId){}[0]
     final suspend fun useOwn(): com.letta.mobile.ui.shell.sidebar/ShellCanvasPickOutcome // com.letta.mobile.ui.canvas.mount/PickerShellCanvasMounts.useOwn|useOwn(){}[0]

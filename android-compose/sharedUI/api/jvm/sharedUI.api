@@ -762,6 +762,7 @@ public final class com/letta/mobile/ui/canvas/mount/PickerShellCanvasMounts : co
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/data/canvas/mount/client/ConversationCanvasPicker;)V
 	public fun getState ()Lkotlinx/coroutines/flow/Flow;
+	public fun ownOnScreen ()Lcom/letta/mobile/data/model/CanvasId;
 	public fun pick (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun pickPlan ()Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
 	public fun useOwn (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -10390,6 +10391,7 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellCanvasMountState {
 
 public abstract interface class com/letta/mobile/ui/shell/sidebar/ShellCanvasMounts {
 	public abstract fun getState ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun ownOnScreen ()Lcom/letta/mobile/data/model/CanvasId;
 	public abstract fun pick (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun pickPlan ()Lcom/letta/mobile/ui/shell/sidebar/ShellCanvasPickPlan;
 	public abstract fun useOwn (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
