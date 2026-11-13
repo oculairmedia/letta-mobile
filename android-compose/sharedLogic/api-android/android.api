@@ -7675,7 +7675,8 @@ public abstract interface class com/letta/mobile/data/canvas/CanvasRelayStore {
 	public abstract fun append (Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasOp;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun bind (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun head (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun isBound (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun isBound-DogRbrI (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun isBound-DogRbrI$default (Lcom/letta/mobile/data/canvas/CanvasRelayStore;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun readAfter (Ljava/lang/String;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun readAfter$default (Lcom/letta/mobile/data/canvas/CanvasRelayStore;Ljava/lang/String;JILkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
@@ -7685,7 +7686,12 @@ public final class com/letta/mobile/data/canvas/CanvasRelayStore$Companion {
 }
 
 public final class com/letta/mobile/data/canvas/CanvasRelayStore$DefaultImpls {
+	public static synthetic fun isBound-DogRbrI$default (Lcom/letta/mobile/data/canvas/CanvasRelayStore;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun readAfter$default (Lcom/letta/mobile/data/canvas/CanvasRelayStore;Ljava/lang/String;JILkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/canvas/CanvasRelayStoreKt {
+	public static final fun relayTopicOf-YqMpGMc (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/canvas/CanvasRelayUploadException : java/lang/Exception {
@@ -8552,7 +8558,7 @@ public final class com/letta/mobile/data/canvas/InMemoryCanvasRelayStore : com/l
 	public fun append (Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasOp;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun bind (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun head (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun isBound (Ljava/lang/String;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun isBound-DogRbrI (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readAfter (Ljava/lang/String;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -20092,11 +20098,15 @@ public final class com/letta/mobile/data/controller/node/iroh/PairedPeer$Compani
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/PairedPeerStore {
 	public abstract fun get (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/PairedPeer;
-	public abstract fun isPaired (Ljava/lang/String;)Z
+	public fun isPaired (Ljava/lang/String;)Z
 	public abstract fun list ()Ljava/util/List;
 	public abstract fun remove (Ljava/lang/String;)Z
 	public abstract fun save (Lcom/letta/mobile/data/controller/node/iroh/PairedPeer;)V
 	public abstract fun updateEach (Lkotlin/jvm/functions/Function1;)I
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/PairedPeerStore$DefaultImpls {
+	public static fun isPaired (Lcom/letta/mobile/data/controller/node/iroh/PairedPeerStore;Ljava/lang/String;)Z
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/PairingAdminHandlers {
