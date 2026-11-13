@@ -8177,6 +8177,12 @@ public final class com/letta/mobile/ui/shell/pages/agents/AgentsPageTags {
 	public static final field SHARE_PREVIEW Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/shell/pages/agents/ComposableSingletons$AgentsPageKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/agents/ComposableSingletons$AgentsPageKt;
+	public fun <init> ()V
+	public final fun getLambda$1697002473$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/shell/pages/channels/ChannelsPageKt {
 	public static final fun ChannelsPage (Lcom/letta/mobile/data/channel/ChannelsPageState;Lcom/letta/mobile/data/channel/ChannelsPageActions;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/shell/pages/channels/ChannelsPageOptions;Landroidx/compose/runtime/Composer;II)V
 }
@@ -8691,6 +8697,7 @@ public final class com/letta/mobile/ui/shell/pages/plugins/ComposableSingletons$
 	public fun <init> ()V
 	public final fun getLambda$-1340944898$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-1364593228$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1540611104$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1122184034$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$350824640$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
