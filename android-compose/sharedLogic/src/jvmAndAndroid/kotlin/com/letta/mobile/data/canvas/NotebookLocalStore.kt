@@ -633,6 +633,22 @@ class NotebookLocalStore(
         NotebookDocument(NotebookDocumentId(id.stableKey()), title, document.text(textId).orElseThrow(), board, items)
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
+    /**
+     * The title of storage [id] alone, for listings: the markdown, board and items are never decoded,
+     * and the whole read waits at most [TITLE_READ_SECONDS]. A retired, quarantined or unknown id is
+     * null; it is never resolved to a successor, so this never scans other notebooks. A notebook that
+     * does not load in time, or whose title is not a string, throws.
+     */
+    internal fun titleOf(id: DocumentId): String? {
+        val deadline = TimeSource.Monotonic.markNow() + TITLE_READ_SECONDS.seconds
+        // No fault-board report: running out of this short listing budget says nothing about the notebook.
+        val handle = openWithin(id, TITLE_READ_SECONDS.seconds, reportSlow = null) ?: return null
+        // Nothing may throw inside withDocument (see [writing]): read the raw value there and judge it outside.
+        val title = handle.withDocument { document -> document.get(ObjectId.ROOT, "title").orElse(null) }
+            .get((-deadline.elapsedNow()).inWholeNanoseconds.coerceAtLeast(1L), TimeUnit.NANOSECONDS)
+        return (title as? AmValue.Str)?.value ?: error("notebook title is missing or not a string")
+    }
+
     /** Resolve only known retired ids; an arbitrary id never becomes an index or access grant. */
     internal fun resolveStorageId(id: DocumentId): DocumentId? {
         health.awaitPrepared()
@@ -758,6 +774,9 @@ class NotebookLocalStore(
 
     private companion object {
         const val TIMEOUT_SECONDS = 10L
+
+        /** A listing reads many titles under one grant transaction, so each gets far less than [TIMEOUT_SECONDS]. */
+        const val TITLE_READ_SECONDS = 2L
 
         /** With one-second polling, a full sync of every notebook about once a minute. */
         const val FULL_SYNC_EVERY = 60L
