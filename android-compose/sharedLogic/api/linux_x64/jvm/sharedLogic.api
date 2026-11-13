@@ -10943,11 +10943,11 @@ public final class com/letta/mobile/data/canvas/mount/lookup/HostCanvasMount$Una
 
 public abstract interface class com/letta/mobile/data/canvas/mount/lookup/HostCanvasMountLookup {
 	public static final field Companion Lcom/letta/mobile/data/canvas/mount/lookup/HostCanvasMountLookup$Companion;
-	public abstract fun mounted (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun mounted (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/mount/lookup/HostCanvasMountLookup$Companion {
-	public final fun getNone ()Lcom/letta/mobile/data/canvas/mount/lookup/HostCanvasMountLookup;
+	public final fun none ()Lcom/letta/mobile/data/canvas/mount/lookup/HostCanvasMountLookup;
 }
 
 public final class com/letta/mobile/data/canvas/mount/wire/CanvasMountWire {
@@ -20598,7 +20598,8 @@ public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMount
 
 public final class com/letta/mobile/data/controller/node/iroh/mounts/CanvasMountToolLookup : com/letta/mobile/data/canvas/mount/lookup/HostCanvasMountLookup {
 	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/mounts/CanvasMountStoreLocation;Lkotlinx/coroutines/CoroutineScope;)V
-	public fun mounted (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun mounted (Lcom/letta/mobile/data/canvas/HostCanvasCaller;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public synthetic fun mounted (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class com/letta/mobile/data/controller/node/iroh/mounts/directory/CanvasMountDirectory {

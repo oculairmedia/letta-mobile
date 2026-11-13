@@ -4537,6 +4537,14 @@ final enum class com.letta.mobile.ui.haptics/LettaHapticPlayback : kotlin/Enum<c
     final fun values(): kotlin/Array<com.letta.mobile.ui.haptics/LettaHapticPlayback> // com.letta.mobile.ui.haptics/LettaHapticPlayback.values|values#static(){}[0]
 }
 
+abstract fun interface <#A: in kotlin/Any?> com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup|null[0]
+    abstract suspend fun mounted(#A): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.mounted|mounted(1:0){}[0]
+
+    final object Companion { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion|null[0]
+        final fun <#A2: kotlin/Any?> none(): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup<#A2> // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion.none|none(){0§<kotlin.Any?>}[0]
+    }
+}
+
 abstract fun interface <#A: kotlin/Any> com.letta.mobile.data.chat.runtime/ChatRunInterruptHost { // com.letta.mobile.data.chat.runtime/ChatRunInterruptHost|null[0]
     abstract fun onForcedClear(#A, kotlin/String) // com.letta.mobile.data.chat.runtime/ChatRunInterruptHost.onForcedClear|onForcedClear(1:0;kotlin.String){}[0]
     open fun onAbortFailed(#A, kotlin/Exception) // com.letta.mobile.data.chat.runtime/ChatRunInterruptHost.onAbortFailed|onAbortFailed(1:0;kotlin.Exception){}[0]
@@ -4557,15 +4565,6 @@ abstract fun interface com.letta.mobile.data.a2ui/A2uiLinkPolicy { // com.letta.
 
 abstract fun interface com.letta.mobile.data.agenteditor/AgentCreator { // com.letta.mobile.data.agenteditor/AgentCreator|null[0]
     abstract suspend fun create(com.letta.mobile.data.model/AgentCreateParams): com.letta.mobile.data.agenteditor/AgentCreated // com.letta.mobile.data.agenteditor/AgentCreator.create|create(com.letta.mobile.data.model.AgentCreateParams){}[0]
-}
-
-abstract fun interface com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup|null[0]
-    abstract suspend fun mounted(kotlin/String, kotlin/String): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMount // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.mounted|mounted(kotlin.String;kotlin.String){}[0]
-
-    final object Companion { // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion|null[0]
-        final val None // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion.None|{}None[0]
-            final fun <get-None>(): com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup // com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup.Companion.None.<get-None>|<get-None>(){}[0]
-    }
 }
 
 abstract fun interface com.letta.mobile.data.canvas.plugin/PluginBoardKinds { // com.letta.mobile.data.canvas.plugin/PluginBoardKinds|null[0]
@@ -33695,7 +33694,7 @@ final class com.letta.mobile.data.canvas/CanvasToolDefinition { // com.letta.mob
 }
 
 final class com.letta.mobile.data.canvas/HostCanvasBackend { // com.letta.mobile.data.canvas/HostCanvasBackend|null[0]
-    constructor <init>(com.letta.mobile.data.canvas/CanvasRelayHost, com.letta.mobile.data.canvas/CanvasRelayStore, com.letta.mobile.data.canvas/HostCanvasDirectory, kotlin/Function0<com.letta.mobile.data.model/CanvasOpId> = ..., kotlin.time/Duration = ..., com.letta.mobile.data.canvas.plugin/PluginKindCatalog = ..., com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup = ...) // com.letta.mobile.data.canvas/HostCanvasBackend.<init>|<init>(com.letta.mobile.data.canvas.CanvasRelayHost;com.letta.mobile.data.canvas.CanvasRelayStore;com.letta.mobile.data.canvas.HostCanvasDirectory;kotlin.Function0<com.letta.mobile.data.model.CanvasOpId>;kotlin.time.Duration;com.letta.mobile.data.canvas.plugin.PluginKindCatalog;com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup){}[0]
+    constructor <init>(com.letta.mobile.data.canvas/CanvasRelayHost, com.letta.mobile.data.canvas/CanvasRelayStore, com.letta.mobile.data.canvas/HostCanvasDirectory, kotlin/Function0<com.letta.mobile.data.model/CanvasOpId> = ..., kotlin.time/Duration = ..., com.letta.mobile.data.canvas.plugin/PluginKindCatalog = ..., com.letta.mobile.data.canvas.mount.lookup/HostCanvasMountLookup<com.letta.mobile.data.canvas/HostCanvasCaller> = ...) // com.letta.mobile.data.canvas/HostCanvasBackend.<init>|<init>(com.letta.mobile.data.canvas.CanvasRelayHost;com.letta.mobile.data.canvas.CanvasRelayStore;com.letta.mobile.data.canvas.HostCanvasDirectory;kotlin.Function0<com.letta.mobile.data.model.CanvasOpId>;kotlin.time.Duration;com.letta.mobile.data.canvas.plugin.PluginKindCatalog;com.letta.mobile.data.canvas.mount.lookup.HostCanvasMountLookup<com.letta.mobile.data.canvas.HostCanvasCaller>){}[0]
 
     final suspend fun check(com.letta.mobile.data.canvas/HostCanvasCaller, com.letta.mobile.data.canvas/HostCanvasEntry, kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>): com.letta.mobile.data.canvas/HostCanvasCheck // com.letta.mobile.data.canvas/HostCanvasBackend.check|check(com.letta.mobile.data.canvas.HostCanvasCaller;com.letta.mobile.data.canvas.HostCanvasEntry;kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>){}[0]
     final suspend fun conversation(com.letta.mobile.data.canvas/HostCanvasCaller, com.letta.mobile.data.model/ConversationId, kotlin/Boolean): com.letta.mobile.data.canvas/HostCanvasAccess? // com.letta.mobile.data.canvas/HostCanvasBackend.conversation|conversation(com.letta.mobile.data.canvas.HostCanvasCaller;com.letta.mobile.data.model.ConversationId;kotlin.Boolean){}[0]
