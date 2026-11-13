@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.audio.SamplePosition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -34,6 +35,13 @@ class VadRobustnessTest {
     private fun turnsIn(found: List<TurnSignal>): Int = found.count { it == TurnSignal.Confirmed }
 
     private fun join(vararg parts: ShortArray): ShortArray = parts.reduce { acc, part -> acc + part }
+
+    /** [room] rumble, then [sound] (made after the lead, so the noise generator runs in order), then 1.5 s more rumble. */
+    private fun inRoom(room: RoomNoise = RoomNoise(), sound: () -> ShortArray): ShortArray {
+        val lead = signals.rumble(room.lead, room.level)
+        val middle = sound()
+        return join(lead, middle, signals.rumble(1.5.seconds, room.level))
+    }
 
     @Test
     fun steadyNoiseAtSeveralLevelsNeverOpensATurn() {
@@ -68,26 +76,15 @@ class VadRobustnessTest {
 
     @Test
     fun speechAboveTheRoomOpensOneTurnThatEnds() {
-        val found = signalsFor(
-            join(
-                signals.rumble(1.0.seconds, VadSignals.ROOM),
-                signals.speechLike(1.5.seconds, Amplitude(4_000)),
-                signals.rumble(1.5.seconds, VadSignals.ROOM),
-            ),
-        )
+        val found = signalsFor(inRoom { signals.speechLike(1.5.seconds, Amplitude(4_000)) })
         assertEquals(1, turnsIn(found))
         assertEquals(TurnSignal.Ended(TurnEndReason.SILENCE), found.last())
     }
 
     @Test
     fun loudRoomNoiseThenSpeechOpensOneTurnForTheSpeech() {
-        val found = signalsFor(
-            join(
-                signals.rumble(4.0.seconds, Amplitude(1_200)),
-                signals.speechLike(1.5.seconds, Amplitude(12_000)),
-                signals.rumble(1.5.seconds, Amplitude(1_200)),
-            ),
-        )
+        val loudRoom = RoomNoise(level = Amplitude(1_200), lead = 4.seconds)
+        val found = signalsFor(inRoom(loudRoom) { signals.speechLike(1.5.seconds, Amplitude(12_000)) })
         assertEquals(1, turnsIn(found))
         assertEquals(TurnSignal.Ended(TurnEndReason.SILENCE), found.last())
     }
@@ -109,13 +106,7 @@ class VadRobustnessTest {
 
     @Test
     fun aShortBurstOfVoiceIsDroppedNotTurnedIntoATurn() {
-        val found = signalsFor(
-            join(
-                signals.rumble(1.0.seconds, VadSignals.ROOM),
-                signals.tone(0.25.seconds, Pitch(180.0, Amplitude(4_000))),
-                signals.rumble(1.5.seconds, VadSignals.ROOM),
-            ),
-        )
+        val found = signalsFor(inRoom { signals.tone(0.25.seconds, Pitch(180.0, Amplitude(4_000))) })
         assertEquals(0, turnsIn(found))
         assertEquals(listOf(TurnSignal.Abandoned(TurnDiscardReason.TOO_LITTLE_VOICE)), found.filterIsInstance<TurnSignal.Abandoned>())
     }
@@ -140,3 +131,6 @@ class VadRobustnessTest {
         assertEquals(1, turnsIn(bargeIn), "barge-in")
     }
 }
+
+/** The rumble a test sound sits in: its [level] and how long it runs before the sound. */
+private data class RoomNoise(val level: Amplitude = VadSignals.ROOM, val lead: Duration = 1.seconds)
