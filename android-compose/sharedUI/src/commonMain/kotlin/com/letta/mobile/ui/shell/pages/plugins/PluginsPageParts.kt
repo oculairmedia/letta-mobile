@@ -25,7 +25,6 @@ import com.letta.mobile.data.plugin.catalog.PluginSummary
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
 import com.letta.mobile.data.plugin.catalog.PluginsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.row.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
@@ -42,7 +41,10 @@ import com.letta.mobile.ui.theme.LettaPill
 
 @Composable
 internal fun PluginsError(message: String, onDismiss: () -> Unit) {
-    LettaInlineError(message, Modifier.testTag(PluginsPageTags.ERROR), title = null, onDismiss = onDismiss)
+    Row(Modifier.fillMaxWidth().testTag(PluginsPageTags.ERROR), verticalAlignment = Alignment.CenterVertically) {
+        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+        TextButton(onClick = onDismiss) { Text(DISMISS) }
+    }
 }
 
 /** This device's "Live plugin views" switch: plugin pages render live here, or as static cards. */
@@ -201,6 +203,7 @@ private val PluginHealth.label: String
         is PluginHealth.Failed -> "Unhealthy"
     }
 
+private const val DISMISS = "Dismiss"
 private const val LIVE_VIEWS = "Live plugin views"
 private const val LIVE_VIEWS_HELP = "On this device, plugin elements run their pages live. Off shows them as static cards."
 private const val INSTALL_FROM_FILE = "Install from file…"

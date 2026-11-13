@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
@@ -15,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.avatar.core.model.MascotIdentity
-import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.shell.rail.ShellAgentLibrary
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
@@ -77,15 +76,11 @@ private fun AgentsPageBody(state: AgentsPageState, actions: ShellAgentRailAction
     // A scrolling column for the states without a list, so a pull still reaches the refresh.
     val still = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
     when {
-        error != null && state.agents.isEmpty() -> Column(still) {
-            LettaInlineError(error, Modifier.padding(LettaDimens.Space.lg).testTag(AgentsPageTags.ERROR), title = null, onRetry = onReload)
-        }
+        error != null && state.agents.isEmpty() -> Column(still) { AgentsPageError(error, onReload) }
         state.agents.isEmpty() && state.loading -> Column(still) {
             LettaBusyBar(Modifier.testTag(AgentsPageTags.LOADING))
         }
-        state.agents.isEmpty() -> Column(still) {
-            LettaEmptyHint("No agents yet", Modifier.padding(LettaDimens.Space.lg).testTag(AgentsPageTags.EMPTY))
-        }
+        state.agents.isEmpty() -> Column(still) { AgentsPageEmpty() }
         else -> Column(Modifier.fillMaxSize()) {
             val groups = remember(state.agents) { ShellRailMapping.groups(state.agents, selectedAgentId = null) }
             val focus = ShellRailFocus(identityByAgentId = state.identities, pinnedAgentIds = state.pinnedAgentIds)
@@ -107,6 +102,24 @@ private fun SharePreview(text: String) {
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+@Composable
+private fun AgentsPageError(message: String, onRetry: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(LettaDimens.Space.lg).testTag(AgentsPageTags.ERROR)) {
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        TextButton(onClick = onRetry) { Text("Retry") }
+    }
+}
+
+@Composable
+private fun AgentsPageEmpty() {
+    Text(
+        "No agents yet",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(LettaDimens.Space.lg).testTag(AgentsPageTags.EMPTY),
+    )
 }
 
 private const val SHARE_PREVIEW_LINES = 3
