@@ -1,12 +1,15 @@
 package com.letta.mobile.data.voice.session
 
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.data.voice.AudioLevel
 import com.letta.mobile.data.voice.VoiceError
 import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoicePort
 import com.letta.mobile.data.voice.VoiceText
+import com.letta.mobile.data.voice.audio.pcm.VoiceLevelMeter
 import com.letta.mobile.data.voice.engine.SpeechSegmentId
 import com.letta.mobile.data.voice.engine.VoiceEarEvent
+import com.letta.mobile.data.voice.engine.VoiceMouthEvent
 import com.letta.mobile.data.voice.engine.VoiceReplyEvent
 import com.letta.mobile.data.voice.loop.EngineLog
 import com.letta.mobile.data.voice.loop.FakeEar
@@ -32,6 +35,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
+
+/** Long enough for a smoothed level to settle on a steady reading. */
+private const val LEVEL_SETTLE_MILLIS = 600L
 
 /** A chat session whose conversation the test moves. */
 private class FakeChatSession : VoiceChatSession {
@@ -200,6 +206,42 @@ class VoiceModeControllerTest {
         assertEquals(VoiceModeState.Listening, h.state)
         assertTrue(h.ear.listening)
         assertEquals(1, h.ear.opens(), "voice mode never left: the microphone stayed open")
+    }
+
+    @Test
+    fun theLevelsFollowTheMicrophoneAndThePlaybackAndHalfDuplexMutesTheMicrophoneWhileSpeaking() = runTest {
+        val h = ControllerHarness(this, bargeInByVoice = false)
+        h.configure()
+        h.press()
+        assertEquals(0f, h.controller.microphoneLevel.value)
+        h.ear.hear(VoiceEarEvent.InputLevel(AudioLevel(0.9f)))
+        h.settle()
+        testScheduler.advanceTimeBy(LEVEL_SETTLE_MILLIS)
+        h.settle()
+        assertTrue(h.controller.microphoneLevel.value > 0.9f, "loud speech reads near 1")
+        assertEquals(0f, h.controller.playbackLevel.value, "nothing is playing")
+
+        h.ear.say(VoiceText("what time is it"))
+        h.settle()
+        h.responder.last.send(VoiceReplyEvent.Text(VoiceText("It is noon. ")))
+        h.settle()
+        h.mouth.started(SpeechSegmentId(1))
+        h.settle()
+        assertEquals(VoiceModeState.Speaking, h.state)
+        testScheduler.advanceTimeBy(VoiceLevelMeter.INTERVAL_MILLIS * 2)
+        h.settle()
+        assertEquals(0f, h.controller.microphoneLevel.value, "the ignored microphone reads 0 at once, not a decay")
+
+        h.mouth.emit(VoiceMouthEvent.OutputLevel(AudioLevel(0.9f)))
+        h.settle()
+        testScheduler.advanceTimeBy(LEVEL_SETTLE_MILLIS)
+        h.settle()
+        assertTrue(h.controller.playbackLevel.value > 0.9f, "the reply's level drives the playback level")
+
+        h.press()
+        assertEquals(VoicePress.STOPPED, h.press())
+        assertEquals(0f, h.controller.microphoneLevel.value, "voice mode off: both levels are 0")
+        assertEquals(0f, h.controller.playbackLevel.value)
     }
 
     @Test

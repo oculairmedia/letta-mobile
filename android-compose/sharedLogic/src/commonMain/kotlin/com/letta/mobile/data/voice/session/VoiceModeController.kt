@@ -4,6 +4,7 @@ import com.letta.mobile.data.voice.VoiceErrorCode
 import com.letta.mobile.data.voice.VoiceLoopConfig
 import com.letta.mobile.data.voice.VoicePhase
 import com.letta.mobile.data.voice.activation.VoiceActivationKind
+import com.letta.mobile.data.voice.audio.pcm.VoiceLevelMeter
 import com.letta.mobile.data.voice.loop.VoiceLoop
 import com.letta.mobile.data.voice.loop.VoiceLoopRuntime
 import com.letta.mobile.data.voice.responder.VoiceChatSession
@@ -14,11 +15,15 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -104,6 +109,25 @@ class VoiceModeController(
      * runs half-duplex and only a press interrupts. The status strip words its hint from it.
      */
     val bargeInByVoice: StateFlow<Boolean> = mutableBargeInByVoice.asStateFlow()
+
+    private val mutableMicrophoneLevel = MutableStateFlow(0f)
+
+    /**
+     * How loud the microphone is right now, smoothed, from 0 (silence or a quiet room) to 1, at
+     * most about 30 updates a second; for the voice band's visual. It follows the levels the ear
+     * measures on the frames it already analyses, reads 0 while the microphone is closed, and reads
+     * 0 at once while a half-duplex ear ignores the microphone during the reply. A number only.
+     */
+    val microphoneLevel: StateFlow<Float> = mutableMicrophoneLevel.asStateFlow()
+
+    private val mutablePlaybackLevel = MutableStateFlow(0f)
+
+    /**
+     * How loud the reply being played is right now, smoothed, from 0 to 1, at most about 30 updates
+     * a second: the level of each chunk of audio as it is written to the speaker, 0 between and
+     * after replies. A number only.
+     */
+    val playbackLevel: StateFlow<Float> = mutablePlaybackLevel.asStateFlow()
 
     init {
         runtime.scope.launch(runtime.dispatcher) { store.setup.collect { offer(Command.SetupChanged) } }
@@ -241,7 +265,35 @@ class VoiceModeController(
         val follower = scope.launch { loop.state.collect { mutableState.value = VoiceModeProjection.of(it, store.setup.value.gap) } }
         val tracer = scope.launch { loop.state.distinctUntilChangedBy { it.diagnosticKey() }.collect(telemetry::loopState) }
         val watcher = scope.launch { session.awaitMove { commands.send(Command.Stop(CONVERSATION_CHANGED)) } }
-        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher))
+        // Half-duplex, the ear ignores the microphone while the reply plays: the level reads 0 at
+        // once rather than decaying from the last thing the person said.
+        val muteWhileSpeaking = !set.bargeInByVoice
+        val hearing = scope.launch {
+            publishLevel(
+                loop.state.map { state ->
+                    if (muteWhileSpeaking && state.phase == VoicePhase.SPEAKING) VoiceLevelMeter.MUTED else state.inputLevel.value
+                },
+                mutableMicrophoneLevel,
+            )
+        }
+        val playing = scope.launch { publishLevel(loop.state.map { it.outputLevel.value }, mutablePlaybackLevel) }
+        return LiveVoice(loop, set, job, listOf(follower, tracer, watcher, hearing, playing))
+    }
+
+    /**
+     * Steps a [VoiceLevelMeter] toward the latest of [readings] and publishes it into [out]: at most
+     * once per [VoiceLevelMeter.INTERVAL_MILLIS], and only while the level still has somewhere to go
+     * (a steady reading publishes nothing more). Readings arriving faster are conflated to the latest.
+     */
+    private suspend fun publishLevel(readings: Flow<Float>, out: MutableStateFlow<Float>) = coroutineScope {
+        val meter = VoiceLevelMeter()
+        val latest = MutableStateFlow(0f)
+        launch { readings.collect { latest.value = it } }
+        while (true) {
+            val reading = latest.first { !meter.settled(it) }
+            out.value = meter.update(reading, VoiceLevelMeter.INTERVAL_MILLIS)
+            delay(VoiceLevelMeter.INTERVAL_MILLIS)
+        }
     }
 
     /** Releases the live session, if any (reporting [reason]), and then publishes [next]. Completes even when cancelled. */
@@ -255,6 +307,8 @@ class VoiceModeController(
             current.set.release()
             current.job.cancelAndJoin()
         }
+        mutableMicrophoneLevel.value = 0f
+        mutablePlaybackLevel.value = 0f
         mutableState.value = next
     }
 
