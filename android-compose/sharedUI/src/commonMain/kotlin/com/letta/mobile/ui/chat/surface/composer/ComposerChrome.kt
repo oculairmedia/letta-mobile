@@ -5,7 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -143,15 +146,22 @@ internal fun ComposerErrorRow(message: String, onDismiss: () -> Unit) {
 }
 
 /**
- * The keyboard-affordance strip under the composer. Faded rather than removed: it keeps its
- * space, so typing the first character dims a line instead of shifting the composer. Lifted
- * from desktop's ComposerHintRow.
+ * The line under the full page's prompt card: the permission mode ([leading]) at its start, the
+ * keyboard hint where the platform shows one ([showHint]), and the context indicator
+ * ([contextUsage]) at its end. It keeps one line's height whatever it holds, so a mode change or the
+ * hint fading never moves the composer. The hint fades rather than goes: typing the first character
+ * dims it instead of shifting the line. Lifted from desktop's ComposerHintRow.
  *
- * The context indicator ([contextUsage]) sits at the line's right end. It does not fade with the hint:
- * it stays visible, announced and clickable while the draft has text.
+ * The context indicator does not fade with the hint: it stays visible, announced and clickable
+ * while the draft has text.
  */
 @Composable
-internal fun ComposerHintRow(visible: Boolean, contextUsage: ContextWindowUsageState? = null) {
+internal fun ComposerHintRow(
+    visible: Boolean,
+    contextUsage: ContextWindowUsageState? = null,
+    showHint: Boolean = true,
+    leading: (@Composable RowScope.() -> Unit)? = null,
+) {
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(durationMillis = LettaMotionTokens.CONTENT_SIZE_MILLIS),
@@ -161,24 +171,30 @@ internal fun ComposerHintRow(visible: Boolean, contextUsage: ContextWindowUsageS
         modifier = Modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
+            .heightIn(min = LettaDimens.Space.xl)
             .padding(start = LettaDimens.Space.sm, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.hair)
             .testTag(ComposerTestTags.HINT_FOOTER),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Text(
-            text = stringResource(Res.string.composer_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatComposerDimens.hintAlpha),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .weight(1f)
-                .graphicsLayer { this.alpha = alpha }
-                .testTag(ComposerTestTags.HINT)
-                // Hidden copy must not be announced or hit-tested.
-                .clearAndSetSemantics { },
-        )
+        leading?.invoke(this)
+        if (showHint) {
+            Text(
+                text = stringResource(Res.string.composer_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatComposerDimens.hintAlpha),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .graphicsLayer { this.alpha = alpha }
+                    .testTag(ComposerTestTags.HINT)
+                    // Hidden copy must not be announced or hit-tested.
+                    .clearAndSetSemantics { },
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
         contextUsage?.let { ComposerContextIndicator(it) }
     }
 }
